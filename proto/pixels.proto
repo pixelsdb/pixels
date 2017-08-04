@@ -16,31 +16,31 @@
  * limitations under the License.
  */
 
-package pixel.proto;
+package pixels.proto;
 
-option java_package = "cn.edu.ruc.iir.pixel.core";
+option java_package = "cn.edu.ruc.iir.pixels.core";
 
 // The contents of the file tail that must be serialized.
 // This gets serialized as part of OrcSplit, also used by footer cache.
 message FileTail {
-    required Footer footer = 1;
-    required PostScript postscript = 2;
-    required uint64 footerLength = 3;
-    required uint64 postscriptLength = 4;
+    optional Footer footer = 1;
+    optional PostScript postscript = 2;
+    optional uint64 footerLength = 3;
+    optional uint64 postscriptLength = 4;
 }
 
 // Serialized length must be less that 255 bytes
 message PostScript {
-    required uint32 version = 1;
-    required uint64 contentLength = 2;
-    required uint64 fileLength = 3;
-    required uint64 numberOfRows = 4;
-    required CompressionKind compression = 5;
-    required uint64 compressionBlockSize = 6;
-    required uint32 rowIndexStride = 7;
-    required string writerTimezone = 8;
+    optional uint32 version = 1;
+    optional uint64 contentLength = 2;
+    optional uint64 fileLength = 3;
+    optional uint64 numberOfRows = 4;
+    optional CompressionKind compression = 5;
+    optional uint64 compressionBlockSize = 6;
+    optional uint32 rowIndexStride = 7;
+    optional string writerTimezone = 8;
     // Leave this last in the record
-    required string magic = 8000;
+    optional string magic = 8000;
 }
 
 enum CompressionKind {
@@ -82,19 +82,19 @@ message Type {
         VARCHAR = 16;
         CHAR = 17;
     }
-    required Kind kind = 1;
-    required string name = 2;
+    optional Kind kind = 1;
+    optional string name = 2;
     repeated uint32 subtypes = 3 [packed=true];
-    required uint32 maximumLength = 4;
-    required uint32 precision = 5;
-    required uint32 scale = 6;
+    optional uint32 maximumLength = 4;
+    optional uint32 precision = 5;
+    optional uint32 scale = 6;
 }
 
 message RowGroupInformation {
-    required uint64 offset = 1;
-    required uint64 dataLength = 2;
-    required uint64 footerLength = 3;
-    required uint64 numberOfRows = 4;
+    optional uint64 offset = 1;
+    optional uint64 dataLength = 2;
+    optional uint64 footerLength = 3;
+    optional uint64 numberOfRows = 4;
 }
 
 message RowGroupStatistic {
@@ -163,11 +163,11 @@ message ColumnStatistic {
 }
 
 message PixelStatistic {
-    required ColumnStatistic statistic = 1;
+    optional ColumnStatistic statistic = 1;
 }
 
 message ColumnIndex {
-    required ColumnStatistic columnStatistic = 1;
+    optional ColumnStatistic columnStatistic = 1;
     repeated uint64 pixelPositions = 2 [packed=true];
     repeated PixelStatistic pixelStatistics = 3;
 }
@@ -177,5 +177,5 @@ message RowGroupIndex {
 }
 
 message RowGroupFooter {
-    required RowGroupIndex rowGroupIndexEntry = 1;
+    optional RowGroupIndex rowGroupIndexEntry = 1;
 }
