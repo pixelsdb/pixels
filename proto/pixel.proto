@@ -18,7 +18,7 @@
 
 package pixel.proto;
 
-option java_package = "cn.edu.ruc.iir.pixel";
+option java_package = "cn.edu.ruc.iir.pixel.core";
 
 // The contents of the file tail that must be serialized.
 // This gets serialized as part of OrcSplit, also used by footer cache.
@@ -92,10 +92,9 @@ message Type {
 
 message RowGroupInformation {
     required uint64 offset = 1;
-    required uint64 indexLength = 2;
-    required uint64 dataLength = 3;
-    required uint64 footerLength = 4;
-    required uint64 numberOfRows = 5;
+    required uint64 dataLength = 2;
+    required uint64 footerLength = 3;
+    required uint64 numberOfRows = 4;
 }
 
 message RowGroupStatistic {
