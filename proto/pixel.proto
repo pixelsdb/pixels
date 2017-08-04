@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package orc.proto;
+package pixel.proto;
 
-option java_package = "cn.edu.ruc.iir.orc";
+option java_package = "cn.edu.ruc.iir.pixel";
 
 // The contents of the file tail that must be serialized.
 // This gets serialized as part of OrcSplit, also used by footer cache.
