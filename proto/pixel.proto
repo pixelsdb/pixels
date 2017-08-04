@@ -1,0 +1,182 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package orc.proto;
+
+option java_package = "cn.edu.ruc.iir.orc";
+
+// The contents of the file tail that must be serialized.
+// This gets serialized as part of OrcSplit, also used by footer cache.
+message FileTail {
+    required Footer footer = 1;
+    required PostScript postscript = 2;
+    required uint64 footerLength = 3;
+    required uint64 postscriptLength = 4;
+}
+
+// Serialized length must be less that 255 bytes
+message PostScript {
+    required uint32 version = 1;
+    required uint64 contentLength = 2;
+    required uint64 fileLength = 3;
+    required uint64 numberOfRows = 4;
+    required CompressionKind compression = 5;
+    required uint64 compressionBlockSize = 6;
+    required uint32 rowIndexStride = 7;
+    required string writerTimezone = 8;
+    // Leave this last in the record
+    required string magic = 8000;
+}
+
+enum CompressionKind {
+    NONE = 0;
+    ZLIB = 1;
+    SNAPPY = 2;
+    LZO = 3;
+    LZ4 = 4;
+    ZSTD = 5;
+}
+
+message Footer {
+    // schema
+    repeated Type types = 1;
+    // file level column statistics
+    repeated ColumnStatistic columnStats = 2;
+    repeated RowGroupInformation rowGroupInfos = 3;
+    repeated RowGroupStatistic rowGroupStats = 4;
+}
+
+message Type {
+    enum Kind {
+        BOOLEAN = 0;
+        BYTE = 1;
+        SHORT = 2;
+        INT = 3;
+        LONG = 4;
+        FLOAT = 5;
+        DOUBLE = 6;
+        STRING = 7;
+        BINARY = 8;
+        TIMESTAMP = 9;
+        LIST = 10;
+        MAP = 11;
+        STRUCT = 12;
+        UNION = 13;
+        DECIMAL = 14;
+        DATE = 15;
+        VARCHAR = 16;
+        CHAR = 17;
+    }
+    required Kind kind = 1;
+    required string name = 2;
+    repeated uint32 subtypes = 3 [packed=true];
+    required uint32 maximumLength = 4;
+    required uint32 precision = 5;
+    required uint32 scale = 6;
+}
+
+message RowGroupInformation {
+    required uint64 offset = 1;
+    required uint64 indexLength = 2;
+    required uint64 dataLength = 3;
+    required uint64 footerLength = 4;
+    required uint64 numberOfRows = 5;
+}
+
+message RowGroupStatistic {
+    repeated ColumnStatistic colStats = 1;
+}
+
+message IntegerStatistic  {
+    optional sint64 minimum = 1;
+    optional sint64 maximum = 2;
+    optional sint64 sum = 3;
+}
+
+message DoubleStatistic {
+    optional double minimum = 1;
+    optional double maximum = 2;
+    optional double sum = 3;
+}
+
+message StringStatistic {
+    optional string minimum = 1;
+    optional string maximum = 2;
+    // sum will store the total length of all strings in a stripe
+    optional sint64 sum = 3;
+}
+
+message BucketStatistic {
+    repeated uint64 count = 1 [packed=true];
+}
+
+message DecimalStatistic {
+    optional string minimum = 1;
+    optional string maximum = 2;
+    optional string sum = 3;
+}
+
+message DateStatistic {
+    // min,max values saved as days since epoch
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
+}
+
+message TimestampStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint64 minimum = 1;
+    optional sint64 maximum = 2;
+    optional sint64 minimumUtc = 3;
+    optional sint64 maximumUtc = 4;
+}
+
+message BinaryStatistic {
+    // sum will store the total binary blob length in a stripe
+    optional sint64 sum = 1;
+}
+
+message ColumnStatistic {
+    optional uint64 numberOfValues = 1;
+    optional IntegerStatistic intStatistics = 2;
+    optional DoubleStatistic doubleStatistics = 3;
+    optional StringStatistic stringStatistics = 4;
+    optional BucketStatistic bucketStatistics = 5;
+    optional DecimalStatistic decimalStatistics = 6;
+    optional DateStatistic dateStatistics = 7;
+    optional BinaryStatistic binaryStatistics = 8;
+    optional TimestampStatistic timestampStatistics = 9;
+    optional bool hasNull = 10;
+}
+
+message PixelStatistic {
+    required ColumnStatistic statistic = 1;
+}
+
+message ColumnIndex {
+    required ColumnStatistic columnStatistic = 1;
+    repeated uint64 pixelPositions = 2 [packed=true];
+    repeated PixelStatistic pixelStatistics = 3;
+}
+
+message RowGroupIndex {
+    repeated ColumnIndex columnIndexEntries = 1;
+}
+
+message RowGroupFooter {
+    required RowGroupIndex rowGroupIndexEntry = 1;
+}
