@@ -49,6 +49,16 @@
                 <artifactId>protobuf-java</artifactId>
                 <version>2.5.0</version>
             </dependency>
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-spi</artifactId>
+                <version>0.182</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>19.0</version>
+            </dependency>
 
             <dependency>
                 <groupId>junit</groupId>
