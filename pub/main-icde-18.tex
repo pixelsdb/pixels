@@ -1,0 +1,79 @@
+% IEEE Paper Template for US-LETTER Page Size (V1)
+% Sample Conference Paper using IEEE LaTeX style file for US-LETTER pagesize.
+% Copyright (C) 2006-2008 Causal Productions Pty Ltd.
+% Permission is granted to distribute and revise this file provided that
+% this header remains intact.
+%
+% REVISION HISTORY
+% 20080211 changed some space characters in the title-author block
+%
+\documentclass[10pt,conference,letterpaper]{IEEEtran}
+\usepackage{times,amsmath,epsfig}
+%
+\title{Adaptive Layout Optimization for Wide Tables}
+%
+\author{%
+% author names are typeset in 11pt, which is the default size in the author block
+{First Author{\small $~^{\#1}$}, Second Author{\small $~^{*2}$}, Third Author{\small $~^{\#3}$} }%
+% add some space between author names and affils
+\vspace{1.6mm}\\
+\fontsize{10}{10}\selectfont\itshape
+% 20080211 CAUSAL PRODUCTIONS
+% separate superscript on following line from affiliation using narrow space
+$^{\#}$\,DEKE Key Lab (MOE), Renmin University of China, Beijing, China\\
+\fontsize{9}{9}\selectfont\ttfamily\upshape
+%
+% 20080211 CAUSAL PRODUCTIONS
+% in the following email addresses, separate the superscript from the email address 
+% using a narrow space \,
+% the reason is that Acrobat Reader has an option to auto-detect urls and email
+% addresses, and make them 'hot'.  Without a narrow space, the superscript is included
+% in the email address and corrupts it.
+% Also, removed ~ from pre-superscript since it does not seem to serve any purpose
+$^{1}$\,first.author@first-third.edu\\
+$^{3}$\,third.author@first-third.edu%
+% add some space between email and affil
+%% \vspace{1.2mm}\\
+%% \fontsize{10}{10}\selectfont\rmfamily\itshape
+% 20080211 CAUSAL PRODUCTIONS
+% separated superscript on following line from affiliation using narrow space \,
+%% $^{*}$\,Second Company\\
+%% Address Including Country Name\\
+%% \fontsize{9}{9}\selectfont\ttfamily\upshape
+% 20080211 CAUSAL PRODUCTIONS
+% removed ~ from pre-superscript since it does not seem to serve any purpose
+%% $^{2}$\,second.author@second.com
+}
+%
+\begin{document}
+\maketitle
+%
+\begin{abstract} 
+For your paper to be published in the conference proceedings, you must
+use this document as both an instruction set and as a template into
+which you can type your own text.  If your paper does not conform to
+the required format, you will be asked to fix it.
+\end{abstract}
+
+
+% NOTE keywords are not used for conference papers so do not populate them
+% \begin{keywords}
+% keyword-1, keyword-2, keyword-3
+% \end{keywords}
+%
+
+
+\input{introduction}
+\input{preliminary}
+\input{solution}
+\input{implementation}
+\input{experiment}
+\input{related}
+\input{conclusion}
+
+
+\bibliographystyle{IEEEtran}
+
+\bibliography{IEEEabrv,ref}
+
+\end{document}

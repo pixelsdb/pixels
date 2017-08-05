@@ -7,3 +7,9 @@ target
 *.iml
 .DS_Store
 *.class
+
+main-icde-18.aux
+main-icde-18.bbl
+main-icde-18.blg
+main-icde-18.log
+main-icde-18.gz
