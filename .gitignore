@@ -14,3 +14,5 @@ main-icde-18.blg
 main-icde-18.log
 main-icde-18.pdf
 main-icde-18.synctex.gz
+pub/*.fls
+pub/*.fdb_latexmk
