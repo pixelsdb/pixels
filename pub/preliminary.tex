@@ -1,20 +1,11 @@
-\section{Page Layout}
+\section{Preliminaries}
 
-An easy way to comply with the conference paper formatting
-requirements is to use this document as a template and simply type
-your text into it.
+In this section, we review today's HDFS-based column stores in which wide tables are stored, and how queries are executed on top of these wide tables \cite{IEEEexample:IEEEwebsite}.
 
-\subsection{Page Layout}
+\subsection{Table Layout in HDFS Column Store}
+\todo{1) columnar format in HDFS; 2) wide tables are store in these formats; 3) disk seek cost problem.}
 
-Your paper must use a page size corresponding to US Letter which is
-215.9mm (8.5") wide and 279.4mm (11") long.  The margins must be
-set as follows:
 
-\begin{itemize}
-\item	Top = 19mm (0.75")
-\item	Bottom = 25.4mm (1")
-\item	Left = Right = 17.3mm (0.68")
-\end{itemize}
+\subsection{Query Execution on Wide Tables}
 
-Your paper must be in two column format with a space of 4.22mm
-(0.17") between columns. 
+\todo{1) one task per split / row group; 2) task schedule and initialization cost; 3) adaptive split size problem.}
