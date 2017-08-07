@@ -19,9 +19,17 @@
 package pixels.proto;
 
 option java_package = "cn.edu.ruc.iir.pixels.core";
+option java_outer_classname = "PixelsProto";
+
+// Row Group: A logical horizontal partitioning of the data into rows. There is no physical
+//            structure that is guaranteed for a row group. A row group consists of a column
+//            chunk for each column in the dataset.
+// Column Chunk: A chunk of the data for a particular column. These live in a particular row group and is guaranteed to
+//               be contiguous in the file.
+// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an samllest indivisible unit in terms
+//        of indexing. Each pixel contains a fixed num (like 10000) of values inside.
 
 // The contents of the file tail that must be serialized.
-// This gets serialized as part of OrcSplit, also used by footer cache.
 message FileTail {
     optional Footer footer = 1;
     optional PostScript postscript = 2;
@@ -29,16 +37,22 @@ message FileTail {
     optional uint64 postscriptLength = 4;
 }
 
-// Serialized length must be less that 255 bytes
+// PostScript
+// version: pixels file version
+// contentLength: pixels content length (everything except FileTail)
+// number of rows: number of rows in the file
+// compression: compression kind. currently USELESS
+// compressionBlockSize: compression block size. currently USELESS
+// pixelSize: num of rows in a pixel
+// magic: "PIXELS"
 message PostScript {
     optional uint32 version = 1;
     optional uint64 contentLength = 2;
-    optional uint64 fileLength = 3;
-    optional uint64 numberOfRows = 4;
-    optional CompressionKind compression = 5;
-    optional uint64 compressionBlockSize = 6;
-    optional uint32 rowIndexStride = 7;
-    optional string writerTimezone = 8;
+    optional uint64 numberOfRows = 3;
+    optional CompressionKind compression = 4;
+    optional uint64 compressionBlockSize = 5;
+    optional uint32 pixelSize = 6;
+    optional string writerTimezone = 7;
     // Leave this last in the record
     optional string magic = 8000;
 }
@@ -52,6 +66,11 @@ enum CompressionKind {
     ZSTD = 5;
 }
 
+// Footer
+// types: file schema
+// columnStats: file level column statistics
+// rowGroupInfos: row group information
+// rowGroupStats: row group statistics
 message Footer {
     // schema
     repeated Type types = 1;
@@ -73,11 +92,8 @@ message Type {
         STRING = 7;
         BINARY = 8;
         TIMESTAMP = 9;
-        LIST = 10;
         MAP = 11;
         STRUCT = 12;
-        UNION = 13;
-        DECIMAL = 14;
         DATE = 15;
         VARCHAR = 16;
         CHAR = 17;
@@ -90,6 +106,11 @@ message Type {
     optional uint32 scale = 6;
 }
 
+// Row group information.
+// offset: row group start offset
+// dataLength: row group serialized content length
+// footerLength: serialized RowGroupFooter length
+// numberOfRows: number of rows in this row group
 message RowGroupInformation {
     optional uint64 offset = 1;
     optional uint64 dataLength = 2;
@@ -97,6 +118,10 @@ message RowGroupInformation {
     optional uint64 numberOfRows = 4;
 }
 
+// Row group statistic
+// colStats: row group level statistic for each column.
+//             for example, min/max for col0 in this row group
+//           this can be used to filter row groups.
 message RowGroupStatistic {
     repeated ColumnStatistic colStats = 1;
 }
@@ -162,18 +187,22 @@ message ColumnStatistic {
     optional bool hasNull = 10;
 }
 
+// Pixel statistic
+// statistic: statistic for this pixel
 message PixelStatistic {
     optional ColumnStatistic statistic = 1;
 }
 
-message ColumnIndex {
-    optional ColumnStatistic columnStatistic = 1;
-    repeated uint64 pixelPositions = 2 [packed=true];
-    repeated PixelStatistic pixelStatistics = 3;
+// ColumnChunk index
+// pixelPositions: starting offsets of each pixel in this column chunk
+message ColumnChunkIndex {
+//    optional ColumnStatistic columnStatistic = 1;
+    repeated uint64 pixelPositions = 1 [packed=true];
+    repeated PixelStatistic pixelStatistics = 2;
 }
 
 message RowGroupIndex {
-    repeated ColumnIndex columnIndexEntries = 1;
+    repeated ColumnChunkIndex columnChunkIndexEntries = 1;
 }
 
 message RowGroupFooter {

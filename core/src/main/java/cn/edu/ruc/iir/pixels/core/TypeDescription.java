@@ -42,21 +42,6 @@ public class TypeDescription
                     case CHAR:
                     case VARCHAR:
                         return maxLength - other.maxLength;
-                    case DECIMAL:
-                        if (precision != other.precision) {
-                            return precision - other.precision;
-                        }
-                        return scale - other.scale;
-                    case UNION:
-                    case LIST:
-                    case MAP:
-                        if (children.size() != other.children.size()) {
-                            return children.size() - other.children.size();
-                        }
-                        for(int c=0; result == 0 && c < children.size(); ++c) {
-                            result = children.get(c).compareTo(other.children.get(c));
-                        }
-                        break;
                     case STRUCT:
                         if (children.size() != other.children.size()) {
                             return children.size() - other.children.size();
@@ -88,13 +73,9 @@ public class TypeDescription
         DATE("date", true),
         TIMESTAMP("timestamp", true),
         BINARY("binary", true),
-        DECIMAL("decimal", true),
         VARCHAR("varchar", true),
         CHAR("char", true),
-        LIST("array", false),
-        MAP("map", false),
-        STRUCT("struct", false),
-        UNION("uniontype", false);
+        STRUCT("struct", false);
 
         Category(String name, boolean isPrimitive) {
             this.name = name;
@@ -155,10 +136,6 @@ public class TypeDescription
 
     public static TypeDescription createBinary() {
         return new TypeDescription(Category.BINARY);
-    }
-
-    public static TypeDescription createDecimal() {
-        return new TypeDescription(Category.DECIMAL);
     }
 
     static class StringPosition {
@@ -286,14 +263,6 @@ public class TypeDescription
         return result;
     }
 
-    static void parseUnion(TypeDescription type, StringPosition source) {
-        requireChar(source, '<');
-        do {
-            type.addUnionChild(parseType(source));
-        } while (consumeChar(source, ','));
-        requireChar(source, '>');
-    }
-
     static void parseStruct(TypeDescription type, StringPosition source) {
         requireChar(source, '<');
         do {
@@ -324,38 +293,6 @@ public class TypeDescription
                 requireChar(source, '(');
                 result.withMaxLength(parseInt(source));
                 requireChar(source, ')');
-                break;
-            case DECIMAL: {
-                requireChar(source, '(');
-                int precision = parseInt(source);
-                requireChar(source, ',');
-                result.withScale(parseInt(source));
-                result.withPrecision(precision);
-                requireChar(source, ')');
-                break;
-            }
-            case LIST: {
-                requireChar(source, '<');
-                TypeDescription child = parseType(source);
-                result.children.add(child);
-                child.parent = result;
-                requireChar(source, '>');
-                break;
-            }
-            case MAP: {
-                requireChar(source, '<');
-                TypeDescription keyType = parseType(source);
-                result.children.add(keyType);
-                keyType.parent = result;
-                requireChar(source, ',');
-                TypeDescription valueType = parseType(source);
-                result.children.add(valueType);
-                valueType.parent = result;
-                requireChar(source, '>');
-                break;
-            }
-            case UNION:
-                parseUnion(result, source);
                 break;
             case STRUCT:
                 parseStruct(result, source);
@@ -392,10 +329,7 @@ public class TypeDescription
      * @return this
      */
     public TypeDescription withPrecision(int precision) {
-        if (category != Category.DECIMAL) {
-            throw new IllegalArgumentException("precision is only allowed on decimal"+
-                    " and not " + category.name);
-        } else if (precision < 1 || precision > MAX_PRECISION || scale > precision){
+        if (precision < 1 || precision > MAX_PRECISION || scale > precision){
             throw new IllegalArgumentException("precision " + precision +
                     " is out of range 1 .. " + scale);
         }
@@ -409,10 +343,7 @@ public class TypeDescription
      * @return this
      */
     public TypeDescription withScale(int scale) {
-        if (category != Category.DECIMAL) {
-            throw new IllegalArgumentException("scale is only allowed on decimal"+
-                    " and not " + category.name);
-        } else if (scale < 0 || scale > MAX_SCALE || scale > precision) {
+        if (scale < 0 || scale > MAX_SCALE || scale > precision) {
             throw new IllegalArgumentException("scale is out of range at " + scale);
         }
         this.scale = scale;
@@ -441,44 +372,8 @@ public class TypeDescription
         return this;
     }
 
-    public static TypeDescription createList(TypeDescription childType) {
-        TypeDescription result = new TypeDescription(Category.LIST);
-        result.children.add(childType);
-        childType.parent = result;
-        return result;
-    }
-
-    public static TypeDescription createMap(TypeDescription keyType,
-                                            TypeDescription valueType) {
-        TypeDescription result = new TypeDescription(Category.MAP);
-        result.children.add(keyType);
-        result.children.add(valueType);
-        keyType.parent = result;
-        valueType.parent = result;
-        return result;
-    }
-
-    public static TypeDescription createUnion() {
-        return new TypeDescription(Category.UNION);
-    }
-
     public static TypeDescription createStruct() {
         return new TypeDescription(Category.STRUCT);
-    }
-
-    /**
-     * Add a child to a union type.
-     * @param child a new child type to add
-     * @return the union type.
-     */
-    public TypeDescription addUnionChild(TypeDescription child) {
-        if (category != Category.UNION) {
-            throw new IllegalArgumentException("Can only add types to union type" +
-                    " and not " + category);
-        }
-        children.add(child);
-        child.parent = this;
-        return this;
     }
 
     /**
@@ -750,30 +645,11 @@ public class TypeDescription
     public void printToBuffer(StringBuilder buffer) {
         buffer.append(category.name);
         switch (category) {
-            case DECIMAL:
-                buffer.append('(');
-                buffer.append(precision);
-                buffer.append(',');
-                buffer.append(scale);
-                buffer.append(')');
-                break;
             case CHAR:
             case VARCHAR:
                 buffer.append('(');
                 buffer.append(maxLength);
                 buffer.append(')');
-                break;
-            case LIST:
-            case MAP:
-            case UNION:
-                buffer.append('<');
-                for(int i=0; i < children.size(); ++i) {
-                    if (i != 0) {
-                        buffer.append(',');
-                    }
-                    children.get(i).printToBuffer(buffer);
-                }
-                buffer.append('>');
                 break;
             case STRUCT:
                 buffer.append('<');
@@ -811,29 +687,10 @@ public class TypeDescription
         buffer.append(", \"max\": ");
         buffer.append(maxId);
         switch (category) {
-            case DECIMAL:
-                buffer.append(", \"precision\": ");
-                buffer.append(precision);
-                buffer.append(", \"scale\": ");
-                buffer.append(scale);
-                break;
             case CHAR:
             case VARCHAR:
                 buffer.append(", \"length\": ");
                 buffer.append(maxLength);
-                break;
-            case LIST:
-            case MAP:
-            case UNION:
-                buffer.append(", \"children\": [");
-                for(int i=0; i < children.size(); ++i) {
-                    buffer.append('\n');
-                    children.get(i).printJsonToBuffer("", buffer, indent + 2);
-                    if (i != children.size() - 1) {
-                        buffer.append(',');
-                    }
-                }
-                buffer.append("]");
                 break;
             case STRUCT:
                 buffer.append(", \"fields\": [");
