@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
+import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
@@ -18,5 +20,5 @@ public abstract class ColumnWriter
         this.schema = schema;
     }
 
-    public abstract void writeBatch(ColumnVector vector, int offset, int length);
+    public abstract void writeBatch(ColumnVector vector, RowGroupInformation information, RowGroupStatistic rowGroupStatistic);
 }

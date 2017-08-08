@@ -149,24 +149,10 @@ message BucketStatistic {
     repeated uint64 count = 1 [packed=true];
 }
 
-message DecimalStatistic {
-    optional string minimum = 1;
-    optional string maximum = 2;
-    optional string sum = 3;
-}
-
-message DateStatistic {
-    // min,max values saved as days since epoch
-    optional sint32 minimum = 1;
-    optional sint32 maximum = 2;
-}
-
 message TimestampStatistic {
     // min,max values saved as milliseconds since epoch
     optional sint64 minimum = 1;
     optional sint64 maximum = 2;
-    optional sint64 minimumUtc = 3;
-    optional sint64 maximumUtc = 4;
 }
 
 message BinaryStatistic {
@@ -180,8 +166,6 @@ message ColumnStatistic {
     optional DoubleStatistic doubleStatistics = 3;
     optional StringStatistic stringStatistics = 4;
     optional BucketStatistic bucketStatistics = 5;
-    optional DecimalStatistic decimalStatistics = 6;
-    optional DateStatistic dateStatistics = 7;
     optional BinaryStatistic binaryStatistics = 8;
     optional TimestampStatistic timestampStatistics = 9;
     optional bool hasNull = 10;

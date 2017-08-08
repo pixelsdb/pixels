@@ -6,6 +6,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto.Footer;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.PostScript;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.core.writer.BinaryColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.BooleanColumnWriter;
@@ -47,6 +48,8 @@ public class PixelsWriter
     private Footer footer;
     private long fileContentLength;
     private long fileRowNum;
+
+    private int rowGroupNum = 0;
 
     private ByteBuffer rowGroupBuffer;
 
@@ -159,6 +162,11 @@ public class PixelsWriter
 
     public void addRowBatch(VectorizedRowBatch rowBatch)
     {
+        ColumnVector[] cvs = rowBatch.cols;
+        for (int i = 0; i < cvs.length; i++)
+        {
+            ColumnWriter writer = columnWriters[i];
+        }
     }
 
     public void close()
