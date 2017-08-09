@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 /**
@@ -8,11 +9,15 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
  *
  * @author guodong
  */
-public class IntegerColumnWriter extends ColumnWriter
+public abstract class BaseColumnWriter implements ColumnWriter
 {
-    public IntegerColumnWriter(TypeDescription schema)
+    private final TypeDescription type;
+    private StatsRecorder fileStatistics;
+
+
+    public BaseColumnWriter(TypeDescription type)
     {
-        super(schema);
+        this.type = type;
     }
 
     @Override

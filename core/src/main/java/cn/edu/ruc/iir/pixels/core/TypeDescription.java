@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  *
  * Schema description in an Pixels file.
  */
-public class TypeDescription
+public final class TypeDescription
     implements Comparable<TypeDescription>, Serializable, Cloneable
 {
     private static final int MAX_PRECISION = 38;

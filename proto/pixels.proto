@@ -119,11 +119,11 @@ message RowGroupInformation {
 }
 
 // Row group statistic
-// colStats: row group level statistic for each column.
+// columnChunkStats: statistic for each column chunk.
 //             for example, min/max for col0 in this row group
 //           this can be used to filter row groups.
 message RowGroupStatistic {
-    repeated ColumnStatistic colStats = 1;
+    repeated ColumnStatistic columnChunkStats = 1;
 }
 
 message IntegerStatistic  {

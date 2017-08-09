@@ -21,7 +21,7 @@ import cn.edu.ruc.iir.pixels.core.writer.TimestampColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.VarcharColumnWriter;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -41,17 +41,23 @@ public class PixelsWriter
     private final int compressionBlockSize;
 
     private final ColumnWriter[] columnWriters;
-    private List<RowGroupInformation> rowGroupInformations;
-    private List<RowGroupStatistic> rowGroupStatistics;
-    private ColumnStatistic fileColumnStatistic;         // file level column statistic
+    private final ColumnStatistic[] fileColumnStatistics;         // file level column statistic
     private PostScript postScript;
     private Footer footer;
     private long fileContentLength;
     private long fileRowNum;
 
+    private boolean isNewRowGroup = true;
     private int rowGroupNum = 0;
+    private long curRowGroupOffset = 0L;
+    private long curRowGroupNumOfRows = 0L;
+    private PixelsProto.RowGroupInformation.Builder curRowGroupInfo = null;
+    private PixelsProto.RowGroupIndex.Builder curRowGroupIndex = null;
+    private PixelsProto.RowGroupStatistic.Builder curRowGroupStatistic = null;
 
-    private ByteBuffer rowGroupBuffer;
+    private final List<ByteBuffer> rowGroupBufferList;
+    private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
+    private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
 
     private PixelsWriter(TypeDescription schema, int pixelSize, String filePath, int rowGroupSize)
     {
@@ -74,15 +80,17 @@ public class PixelsWriter
         this.compressionBlockSize = compresseionBlockSize;
 
         List<TypeDescription> children = schema.getChildren();
+        assert children != null;
         this.columnWriters = new ColumnWriter[children.size()];
+        this.fileColumnStatistics = new ColumnStatistic[children.size()];
         for (int i = 0; i < columnWriters.length; ++i)
         {
             columnWriters[i] = createWriter(schema);
         }
-        rowGroupInformations = new ArrayList<>();
-        rowGroupStatistics = new ArrayList<>();
 
-        rowGroupBuffer = ByteBuffer.allocate(rowGroupSize * Constants.MB1);
+        this.rowGroupBufferList = new LinkedList<>();
+        this.rowGroupInfoList = new LinkedList<>();
+        this.rowGroupStatisticList = new LinkedList<>();
     }
 
     public static class Builer
@@ -99,7 +107,7 @@ public class PixelsWriter
             this.builderSchema = schema;
         }
 
-        public void setBuilderPixelSize(int pixelSize)
+        public void setPixelSize(int pixelSize)
         {
             this.builderPixelSize = pixelSize;
         }
@@ -109,12 +117,12 @@ public class PixelsWriter
             this.builderFilePath = filePath;
         }
 
-        public void setBuilderRowGroupSize(int rowGroupSize)
+        public void setRowGroupSize(int rowGroupSize)
         {
             this.builderRowGroupSize = rowGroupSize;
         }
 
-        public void setBuilderCompressionKind(CompressionKind compressionKind)
+        public void setCompressionKind(CompressionKind compressionKind)
         {
             this.builderCompressionKind = compressionKind;
         }
@@ -162,15 +170,54 @@ public class PixelsWriter
 
     public void addRowBatch(VectorizedRowBatch rowBatch)
     {
+        // see if current size has exceeded the row group size. if so, call endRowGroup()
+
+
+        if (isNewRowGroup) {
+            startRowGroup();
+        }
+        curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
         for (int i = 0; i < cvs.length; i++)
         {
+            // TODO writers should be global
             ColumnWriter writer = columnWriters[i];
+            writer.writeBatch(cvs[i]);
         }
     }
 
     public void close()
     {}
+
+    private void startRowGroup()
+    {
+        this.isNewRowGroup = false;
+        this.curRowGroupNumOfRows = 0L;
+        this.curRowGroupInfo =
+                PixelsProto.RowGroupInformation.newBuilder();
+        this.curRowGroupIndex =
+                PixelsProto.RowGroupIndex.newBuilder();
+        this.curRowGroupStatistic =
+                PixelsProto.RowGroupStatistic.newBuilder();
+        curRowGroupInfo.setOffset(curRowGroupOffset);
+    }
+
+    private void endRowGroup(PixelsProto.RowGroupInformation.Builder rowGroupInformation)
+    {
+        this.isNewRowGroup = true;
+        this.rowGroupNum++;
+        // form byte buffers from every column chunk into a temp row group data buffer
+
+        // gather ColumnChunkIndex from every column chunk, and get the RowGroupIndex, then form RowGroupFooter
+
+        // gather RowGroupStatistic, and put it into rowGroupStatisticList
+
+        // serialize RowGroupFooter and append to the previous temp data buffer. Put the buffer into rowGroupBUfferList
+
+        // update RowGroupInformation, and put it into rowGroupInfoList
+
+        // call children writer reset()
+    }
 
     /**
      * Write file tail
