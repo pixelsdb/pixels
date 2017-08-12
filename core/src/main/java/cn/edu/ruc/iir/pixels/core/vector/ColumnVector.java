@@ -16,6 +16,8 @@ import java.util.Arrays;
  */
 public abstract class ColumnVector
 {
+    private final int length;
+
     /**
      * The current kinds of column vectors.
      */
@@ -60,11 +62,17 @@ public abstract class ColumnVector
      * @param len Vector length
      */
     public ColumnVector(int len) {
+        this.length = len;
         isNull = new boolean[len];
         noNulls = true;
         isRepeating = false;
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
+    }
+
+    public int getLength()
+    {
+        return length;
     }
 
     /**
