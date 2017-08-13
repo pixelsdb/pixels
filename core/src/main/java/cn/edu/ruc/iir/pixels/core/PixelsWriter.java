@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.PixelsProto.ColumnStatistic;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
@@ -60,6 +59,7 @@ public class PixelsWriter
     private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
+    private int curRowGroupDataLength = 0;
 
     private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
     private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
@@ -290,7 +290,6 @@ public class PixelsWriter
 
     public void addRowBatch(VectorizedRowBatch rowBatch)
     {
-        // see if current size has exceeded the row group size. if so, call writeRowGroup()
         if (isNewRowGroup) {
             this.isNewRowGroup = false;
             this.curRowGroupNumOfRows = 0L;
@@ -300,7 +299,12 @@ public class PixelsWriter
         for (int i = 0; i < cvs.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
-            writer.writeBatch(cvs[i]);
+            curRowGroupDataLength += writer.writeBatch(cvs[i]);
+        }
+        // see if current size has exceeded the row group size. if so, write out current row group
+        if (curRowGroupDataLength >= rowGroupSize * Constants.MB1) {
+            writeRowGroup();
+            curRowGroupDataLength = 0;
         }
     }
 
@@ -311,6 +315,9 @@ public class PixelsWriter
     {
         try
         {
+            if (curRowGroupDataLength != 0) {
+                writeRowGroup();
+            }
             writeFileTail();
             physicalWriter.close();
         } catch (IOException e)
@@ -322,7 +329,7 @@ public class PixelsWriter
         }
     }
 
-    private void writeRowGroup(PixelsProto.RowGroupInformation.Builder rowGroupInformation)
+    private void writeRowGroup()
     {
         this.isNewRowGroup = true;
         int rowGroupDataLength = 0;

@@ -16,9 +16,9 @@ public class FloatColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void writeBatch(ColumnVector vector)
+    public int writeBatch(ColumnVector vector)
     {
-
+        return 0;
     }
 
     @Override

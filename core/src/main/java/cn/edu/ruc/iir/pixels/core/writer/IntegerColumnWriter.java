@@ -19,18 +19,19 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void writeBatch(ColumnVector vector)
+    public int writeBatch(ColumnVector vector)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
         ByteBuffer buffer = ByteBuffer.allocate(values.length * Long.BYTES);
         for (int i = 0; i < values.length; i++)
         {
+            curPixelSize++;
             long value = values[i];
             buffer.putLong(value);
             pixelStatRecorder.updateInteger(value, 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
-            if (curPixelSize + 1 >= pixelStride) {
+            if (curPixelSize >= pixelStride) {
                 newPixel();
             }
         }
@@ -38,6 +39,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         buffer.flip();
         rowBatchBufferList.add(buffer);
         colChunkSize += buffer.limit();
+        return colChunkSize;
     }
 
     @Override

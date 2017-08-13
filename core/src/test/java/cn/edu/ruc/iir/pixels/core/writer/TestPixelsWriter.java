@@ -23,7 +23,7 @@ public class TestPixelsWriter
     @Test
     public void test()
     {
-        final int ROWNUM = 10000;
+        final int ROWNUM = 1000;
 
         String fileP = "hdfs://127.0.0.1:9000/test.pxl";
         Configuration conf = new Configuration();
@@ -41,8 +41,8 @@ public class TestPixelsWriter
             PixelsWriter pixelsWriter =
                     PixelsWriter.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(10000)
-                            .setRowGroupSize(256)
+                            .setPixelStride(100)
+                            .setRowGroupSize(1)
                             .setFS(fs)
                             .setFilePath(new Path(fileP))
                             .setBlockSize(1048576000)
