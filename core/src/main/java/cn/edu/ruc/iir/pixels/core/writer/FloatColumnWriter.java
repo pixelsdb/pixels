@@ -1,16 +1,29 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 /**
  * pixels
  *
  * @author guodong
  */
-public class FloatColumnWriter extends ColumnWriter
+public class FloatColumnWriter extends BaseColumnWriter
 {
-    public FloatColumnWriter(TypeDescription schema)
+    public FloatColumnWriter(TypeDescription schema, int pixelStride)
     {
-        super(schema);
+        super(schema, pixelStride);
+    }
+
+    @Override
+    public void writeBatch(ColumnVector vector)
+    {
+
+    }
+
+    @Override
+    public byte[] serializeContent()
+    {
+        return new byte[0];
     }
 }

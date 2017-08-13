@@ -66,8 +66,19 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStat;
     }
 
+    public StatsRecorder getColumnChunkStatRecorder()
+    {
+        return columnChunkStatRecorder;
+    }
+
     public void reset()
-    {}
+    {
+        columnChunkIndex.clear();
+        columnChunkStat.clear();
+        pixelStatRecorder.reset();
+        columnChunkStatRecorder.reset();
+        rowBatchBufferList.clear();
+    }
 
     /**
      * End of a pixel
@@ -83,6 +94,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
         PixelsProto.PixelStatistic.Builder pixelStat =
                 PixelsProto.PixelStatistic.newBuilder();
         pixelStat.setStatistic(pixelStatRecorder.serialize());
+        // TODO columnChunkIndex add pixel positions
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         pixelStatRecorder.reset();
     }

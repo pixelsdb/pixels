@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto.ColumnStatistic;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
+import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.core.writer.BinaryColumnWriter;
@@ -52,7 +53,7 @@ public class PixelsWriter
     private final boolean blockPadding;
 
     private final ColumnWriter[] columnWriters;
-    private final ColumnStatistic[] fileColumnStatistics;         // file level column statistic
+    private final StatsRecorder[] fileColStatRecorders;
     private long fileContentLength;
     private long fileRowNum;
 
@@ -93,10 +94,11 @@ public class PixelsWriter
         List<TypeDescription> children = schema.getChildren();
         assert children != null;
         this.columnWriters = new ColumnWriter[children.size()];
-        this.fileColumnStatistics = new ColumnStatistic[children.size()];
-        for (int i = 0; i < columnWriters.length; ++i)
+        fileColStatRecorders = new StatsRecorder[children.size()];
+        for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = createWriter(schema);
+            columnWriters[i] = createWriter(children.get(i));
+            fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
         this.rowGroupInfoList = new LinkedList<>();
@@ -127,59 +129,81 @@ public class PixelsWriter
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
 
-        public void setSchema(TypeDescription schema)
+        public Builer setSchema(TypeDescription schema)
         {
             this.builderSchema = schema;
+
+            return this;
         }
 
-        public void setPixelSize(int pixelSize)
+        public Builer setPixelStride(int pixelSize)
         {
             this.builderPixelSize = pixelSize;
+
+            return this;
         }
 
-        public void setRowGroupSize(int rowGroupSize)
+        public Builer setRowGroupSize(int rowGroupSize)
         {
             this.builderRowGroupSize = rowGroupSize;
+
+            return this;
         }
 
-        public void setCompressionKind(CompressionKind compressionKind)
+        public Builer setCompressionKind(CompressionKind compressionKind)
         {
             this.builderCompressionKind = compressionKind;
+
+            return this;
         }
 
-        public void setCompressionBlockSize(int compressionBlockSize)
+        public Builer setCompressionBlockSize(int compressionBlockSize)
         {
             this.builderCompressionBlockSize = compressionBlockSize;
+
+            return this;
         }
 
-        public void setTimeZone(TimeZone timeZone)
+        public Builer setTimeZone(TimeZone timeZone)
         {
             this.builderTimeZone = timeZone;
+
+            return this;
         }
 
-        public void setFS(FileSystem fs)
+        public Builer setFS(FileSystem fs)
         {
             this.builderFS = fs;
+
+            return this;
         }
 
-        public void setFilePath(Path filePath)
+        public Builer setFilePath(Path filePath)
         {
             this.builderFilePath = filePath;
+
+            return this;
         }
 
-        public void setBlockSize(long blockSize)
+        public Builer setBlockSize(long blockSize)
         {
             this.builderBlockSize = blockSize;
+
+            return this;
         }
 
-        public void setReplication(short replication)
+        public Builer setReplication(short replication)
         {
             this.builderReplication = replication;
+
+            return this;
         }
 
-        public void setBlockPadding(boolean blockPadding)
+        public Builer setBlockPadding(boolean blockPadding)
         {
             this.builderBlockPadding = blockPadding;
+
+            return this;
         }
 
         public PixelsWriter build()
@@ -197,6 +221,11 @@ public class PixelsWriter
                     builderReplication,
                     builderBlockPadding);
         }
+    }
+
+    public static Builer newBuilder()
+    {
+        return new Builer();
     }
 
     public TypeDescription getSchema()
@@ -306,13 +335,16 @@ public class PixelsWriter
                 PixelsProto.RowGroupIndex.newBuilder();
 
 
-        for (ColumnWriter writer : columnWriters)
+        for (int i = 0; i < columnWriters.length; i++)
         {
+            ColumnWriter writer = columnWriters[i];
             rowGroupDataLength += writer.getColumnChunkSize();
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
             curRowGroupIndex.addColumnChunkIndexEntries(writer.getColumnChunkIndex().build());
             // collect columnChunkStatistic into rowGroupStatistic
             curRowGroupStatistic.addColStats(writer.getColumnChunkStat().build());
+            // update file column statistic
+            fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             // call children writer reset()
             writer.reset();
         }
@@ -372,9 +404,9 @@ public class PixelsWriter
         PixelsProto.Footer.Builder footerBuilder =
                 PixelsProto.Footer.newBuilder();
         writeTypes(footerBuilder, schema);
-        for (ColumnStatistic colStat : fileColumnStatistics)
+        for (StatsRecorder recorder : fileColStatRecorders)
         {
-            footerBuilder.addColumnStats(colStat);
+            footerBuilder.addColumnStats(recorder.serialize().build());
         }
         for (RowGroupInformation rowGroupInformation : rowGroupInfoList)
         {
@@ -465,27 +497,27 @@ public class PixelsWriter
         switch (schema.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(schema);
+                return new BooleanColumnWriter(schema, pixelStride);
             case BYTE:
-                return new BytesColumnWriter(schema);
+                return new BytesColumnWriter(schema, pixelStride);
             case SHORT:
             case INT:
             case LONG:
                 return new IntegerColumnWriter(schema, pixelStride);
             case FLOAT:
-                return new FloatColumnWriter(schema);
+                return new FloatColumnWriter(schema, pixelStride);
             case DOUBLE:
-                return new DoubleColumnWriter(schema);
+                return new DoubleColumnWriter(schema, pixelStride);
             case STRING:
-                return new StringColumnWriter(schema);
+                return new StringColumnWriter(schema, pixelStride);
             case CHAR:
-                return new CharColumnWriter(schema);
+                return new CharColumnWriter(schema, pixelStride);
             case VARCHAR:
-                return new VarcharColumnWriter(schema);
+                return new VarcharColumnWriter(schema, pixelStride);
             case BINARY:
-                return new BinaryColumnWriter(schema);
+                return new BinaryColumnWriter(schema, pixelStride);
             case TIMESTAMP:
-                return new TimestampColumnWriter(schema);
+                return new TimestampColumnWriter(schema, pixelStride);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + schema.getCategory());
         }
