@@ -71,7 +71,7 @@ public class PixelsWriter
             int pixelStride,
             int rowGroupSize,
             CompressionKind compressionKind,
-            int compresseionBlockSize,
+            int compressionBlockSize,
             TimeZone timeZone,
             FileSystem fs,
             Path filePath,
@@ -83,7 +83,7 @@ public class PixelsWriter
         this.pixelStride = pixelStride;
         this.rowGroupSize = rowGroupSize;
         this.compressionKind = compressionKind;
-        this.compressionBlockSize = compresseionBlockSize;
+        this.compressionBlockSize = compressionBlockSize;
         this.timeZone = timeZone;
         this.fs = fs;
         this.filePath = filePath;
@@ -115,7 +115,7 @@ public class PixelsWriter
         }
     }
 
-    public static class Builer
+    public static class Builder
     {
         private TypeDescription builderSchema;
         private int builderPixelSize;
@@ -129,77 +129,77 @@ public class PixelsWriter
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
 
-        public Builer setSchema(TypeDescription schema)
+        public Builder setSchema(TypeDescription schema)
         {
             this.builderSchema = schema;
 
             return this;
         }
 
-        public Builer setPixelStride(int pixelSize)
+        public Builder setPixelStride(int pixelSize)
         {
             this.builderPixelSize = pixelSize;
 
             return this;
         }
 
-        public Builer setRowGroupSize(int rowGroupSize)
+        public Builder setRowGroupSize(int rowGroupSize)
         {
             this.builderRowGroupSize = rowGroupSize;
 
             return this;
         }
 
-        public Builer setCompressionKind(CompressionKind compressionKind)
+        public Builder setCompressionKind(CompressionKind compressionKind)
         {
             this.builderCompressionKind = compressionKind;
 
             return this;
         }
 
-        public Builer setCompressionBlockSize(int compressionBlockSize)
+        public Builder setCompressionBlockSize(int compressionBlockSize)
         {
             this.builderCompressionBlockSize = compressionBlockSize;
 
             return this;
         }
 
-        public Builer setTimeZone(TimeZone timeZone)
+        public Builder setTimeZone(TimeZone timeZone)
         {
             this.builderTimeZone = timeZone;
 
             return this;
         }
 
-        public Builer setFS(FileSystem fs)
+        public Builder setFS(FileSystem fs)
         {
             this.builderFS = fs;
 
             return this;
         }
 
-        public Builer setFilePath(Path filePath)
+        public Builder setFilePath(Path filePath)
         {
             this.builderFilePath = filePath;
 
             return this;
         }
 
-        public Builer setBlockSize(long blockSize)
+        public Builder setBlockSize(long blockSize)
         {
             this.builderBlockSize = blockSize;
 
             return this;
         }
 
-        public Builer setReplication(short replication)
+        public Builder setReplication(short replication)
         {
             this.builderReplication = replication;
 
             return this;
         }
 
-        public Builer setBlockPadding(boolean blockPadding)
+        public Builder setBlockPadding(boolean blockPadding)
         {
             this.builderBlockPadding = blockPadding;
 
@@ -223,9 +223,9 @@ public class PixelsWriter
         }
     }
 
-    public static Builer newBuilder()
+    public static Builder newBuilder()
     {
-        return new Builer();
+        return new Builder();
     }
 
     public TypeDescription getSchema()
@@ -349,7 +349,7 @@ public class PixelsWriter
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
             curRowGroupIndex.addColumnChunkIndexEntries(writer.getColumnChunkIndex().build());
             // collect columnChunkStatistic into rowGroupStatistic
-            curRowGroupStatistic.addColStats(writer.getColumnChunkStat().build());
+            curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             // call children writer reset()
