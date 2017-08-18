@@ -112,25 +112,7 @@
                 <plugin>
                     <groupId>com.github.os72</groupId>
                     <artifactId>protoc-jar-maven-plugin</artifactId>
-                    <version>3.0.0-a3</version>
-                    <executions>
-                        <execution>
-                            <phase>generate-sources</phase>
-                            <goals>
-                                <goal>run</goal>
-                            </goals>
-                            <configuration>
-                                <protocVersion>2.5.0</protocVersion>
-                                <addSources>none</addSources>
-                                <includeDirectories>
-                                    <include>./proto</include>
-                                </includeDirectories>
-                                <inputDirectories>
-                                    <include>./proto</include>
-                                </inputDirectories>
-                            </configuration>
-                        </execution>
-                    </executions>
+                    <version>3.0.0.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>
