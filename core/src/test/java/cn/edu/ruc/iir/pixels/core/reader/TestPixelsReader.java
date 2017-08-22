@@ -22,7 +22,7 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://127.0.0.1:9000/test.pxl";
+        String filePath = "hdfs://192.168.124.15:9000/test_big3.pxl";
         Path path = new Path(filePath);
 
         Configuration conf = new Configuration();

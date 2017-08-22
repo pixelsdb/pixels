@@ -23,9 +23,9 @@ public class TestPixelsWriter
     @Test
     public void test()
     {
-        final int ROWNUM = 1000;
+        final int ROWNUM = 10000000;
 
-        String fileP = "hdfs://127.0.0.1:9000/test.pxl";
+        String fileP = "hdfs://192.168.124.15:9000/test_big3.pxl";
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
@@ -41,8 +41,8 @@ public class TestPixelsWriter
             PixelsWriter pixelsWriter =
                     PixelsWriter.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(100)
-                            .setRowGroupSize(1)
+                            .setPixelStride(10000)
+                            .setRowGroupSize(32)
                             .setFS(fs)
                             .setFilePath(new Path(fileP))
                             .setBlockSize(1048576000)
@@ -56,8 +56,12 @@ public class TestPixelsWriter
                 x.vector[row] = i;
                 y.vector[row] = i * 2;
                 if (rowBatch.size == rowBatch.getMaxSize()) {
+                    //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);
+                    //System.out.println("add rb:" + (System.currentTimeMillis()-start));
+                    //start = System.currentTimeMillis();
                     rowBatch.reset();
+                    //System.out.println("reset: " + (System.currentTimeMillis()-start));
                 }
             }
             if (rowBatch.size != 0) {

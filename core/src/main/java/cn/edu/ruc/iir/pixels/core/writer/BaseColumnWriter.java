@@ -73,6 +73,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     public void reset()
     {
+        colChunkSize = 0;
         columnChunkIndex.clear();
         columnChunkStat.clear();
         pixelStatRecorder.reset();

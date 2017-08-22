@@ -352,8 +352,6 @@ public class PixelsWriter
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
-            // call children writer reset()
-            writer.reset();
         }
 
         // put curRowGroupIndex into rowGroupFooter
@@ -367,6 +365,8 @@ public class PixelsWriter
         for (ColumnWriter writer : columnWriters)
         {
             curRowGroupBuffer.put(writer.serializeContent());
+            // call children writer reset()
+            writer.reset();
         }
         curRowGroupBuffer.put(rowGroupFooter.toByteArray());
         try {
