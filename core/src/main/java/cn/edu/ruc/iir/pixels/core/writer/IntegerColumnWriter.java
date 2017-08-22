@@ -39,7 +39,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         buffer.flip();
         rowBatchBufferList.add(buffer);
         colChunkSize += buffer.limit();
-        return colChunkSize;
+        return buffer.limit();
     }
 
     @Override
