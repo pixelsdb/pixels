@@ -435,7 +435,7 @@ public class PixelsWriter
                         .setNumberOfRows(fileRowNum)
                         .setCompression(compressionKind)
                         .setCompressionBlockSize(compressionBlockSize)
-                        .setPixelSize(pixelStride)
+                        .setPixelStride(pixelStride)
                         .setWriterTimezone(timeZone.getDisplayName())
                         .setMagic(Constants.MAGIC)
                         .build();
