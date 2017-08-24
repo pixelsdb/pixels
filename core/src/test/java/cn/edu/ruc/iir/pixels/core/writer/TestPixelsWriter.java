@@ -23,7 +23,7 @@ public class TestPixelsWriter
     @Test
     public void test()
     {
-        final int ROWNUM = 10000000;
+        final int ROWNUM = 100000000;
 
         String fileP = "hdfs://192.168.124.15:9000/test_big3.pxl";
         Configuration conf = new Configuration();

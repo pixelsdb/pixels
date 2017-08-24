@@ -39,11 +39,11 @@ message FileTail {
 
 // PostScript
 // version: pixels file version
-// contentLength: pixels content length (everything except FileTail)
+// contentLength: file content length (everything except FileTail)
 // number of rows: number of rows in the file
 // compression: compression kind. currently USELESS
 // compressionBlockSize: compression block size. currently USELESS
-// pixelSize: num of rows in a pixel
+// pixelStride: the maximum number of rows in a pixel
 // magic: "PIXELS"
 message PostScript {
     optional uint32 version = 1;
@@ -51,7 +51,7 @@ message PostScript {
     optional uint64 numberOfRows = 3;
     optional CompressionKind compression = 4;
     optional uint64 compressionBlockSize = 5;
-    optional uint32 pixelSize = 6;
+    optional uint32 pixelStride = 6;
     optional string writerTimezone = 7;
     // Leave this last in the record
     optional string magic = 8000;
@@ -166,9 +166,9 @@ message ColumnStatistic {
     optional DoubleStatistic doubleStatistics = 3;
     optional StringStatistic stringStatistics = 4;
     optional BucketStatistic bucketStatistics = 5;
-    optional BinaryStatistic binaryStatistics = 8;
-    optional TimestampStatistic timestampStatistics = 9;
-    optional bool hasNull = 10;
+    optional BinaryStatistic binaryStatistics = 6;
+    optional TimestampStatistic timestampStatistics = 7;
+    optional bool hasNull = 8;
 }
 
 // Pixel statistic
