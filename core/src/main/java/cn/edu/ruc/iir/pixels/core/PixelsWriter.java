@@ -97,7 +97,7 @@ public class PixelsWriter
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = createWriter(children.get(i));
+            columnWriters[i] = createColumnWriter(children.get(i));
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -118,7 +118,7 @@ public class PixelsWriter
     public static class Builder
     {
         private TypeDescription builderSchema;
-        private int builderPixelSize;
+        private int builderPixelStride;
         private int builderRowGroupSize;  // group size in MB
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
         private int builderCompressionBlockSize = 0;
@@ -136,9 +136,9 @@ public class PixelsWriter
             return this;
         }
 
-        public Builder setPixelStride(int pixelSize)
+        public Builder setPixelStride(int stride)
         {
-            this.builderPixelSize = pixelSize;
+            this.builderPixelStride = stride;
 
             return this;
         }
@@ -210,7 +210,7 @@ public class PixelsWriter
         {
             return new PixelsWriter(
                     builderSchema,
-                    builderPixelSize,
+                    builderPixelStride,
                     builderRowGroupSize,
                     builderCompressionKind,
                     builderCompressionBlockSize,
@@ -379,7 +379,7 @@ public class PixelsWriter
         }
 
         // update RowGroupInformation, and put it into rowGroupInfoList
-        curRowGroupInfo.setOffset(curRowGroupOffset);
+        curRowGroupInfo.setFooterOffset(curRowGroupOffset+rowGroupDataLength);
         curRowGroupInfo.setDataLength(rowGroupDataLength);
         curRowGroupInfo.setFooterLength(rowGroupFooter.getSerializedSize());
         curRowGroupInfo.setNumberOfRows(curRowGroupNumOfRows);
@@ -499,7 +499,7 @@ public class PixelsWriter
         }
     }
 
-    private ColumnWriter createWriter(TypeDescription schema)
+    private ColumnWriter createColumnWriter(TypeDescription schema)
     {
         switch (schema.getCategory())
         {
