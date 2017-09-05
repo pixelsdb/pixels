@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 /**
  * TypeDescription from org.apache.orc
  *
- * Schema description in an Pixels file.
+ * Schema description in a Pixels file.
  */
 public final class TypeDescription
     implements Comparable<TypeDescription>, Serializable, Cloneable

@@ -112,7 +112,7 @@ message Type {
 // footerLength: serialized RowGroupFooter length
 // numberOfRows: number of rows in this row group
 message RowGroupInformation {
-    optional uint64 offset = 1;
+    optional uint64 footerOffset = 1;
     optional uint64 dataLength = 2;
     optional uint64 footerLength = 3;
     optional uint64 numberOfRows = 4;
@@ -120,8 +120,8 @@ message RowGroupInformation {
 
 // Row group statistic
 // columnChunkStats: statistic for each column chunk.
-//             for example, min/max for col0 in this row group
-//           this can be used to filter row groups.
+// for example, min/max for col0 in this row group
+// this can be used to filter row groups.
 message RowGroupStatistic {
     repeated ColumnStatistic columnChunkStats = 1;
 }
@@ -181,8 +181,8 @@ message PixelStatistic {
 // pixelPositions: starting offsets of each pixel in this column chunk
 message ColumnChunkIndex {
 //    optional ColumnStatistic columnStatistic = 1;
-    repeated uint64 pixelPositions = 1 [packed=true];
-    repeated PixelStatistic pixelStatistics = 2;
+    repeated uint64 pixelPositions = 2 [packed=true];
+    repeated PixelStatistic pixelStatistics = 3;
 }
 
 message RowGroupIndex {
