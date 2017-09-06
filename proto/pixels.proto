@@ -39,11 +39,11 @@ message FileTail {
 
 // PostScript
 // version: pixels file version
-// contentLength: pixels content length (everything except FileTail)
+// contentLength: file content length (everything except FileTail)
 // number of rows: number of rows in the file
 // compression: compression kind. currently USELESS
 // compressionBlockSize: compression block size. currently USELESS
-// pixelSize: num of rows in a pixel
+// pixelStride: the maximum number of rows in a pixel
 // magic: "PIXELS"
 message PostScript {
     optional uint32 version = 1;
@@ -51,7 +51,7 @@ message PostScript {
     optional uint64 numberOfRows = 3;
     optional CompressionKind compression = 4;
     optional uint64 compressionBlockSize = 5;
-    optional uint32 pixelSize = 6;
+    optional uint32 pixelStride = 6;
     optional string writerTimezone = 7;
     // Leave this last in the record
     optional string magic = 8000;
@@ -112,7 +112,7 @@ message Type {
 // footerLength: serialized RowGroupFooter length
 // numberOfRows: number of rows in this row group
 message RowGroupInformation {
-    optional uint64 offset = 1;
+    optional uint64 footerOffset = 1;
     optional uint64 dataLength = 2;
     optional uint64 footerLength = 3;
     optional uint64 numberOfRows = 4;
@@ -120,8 +120,8 @@ message RowGroupInformation {
 
 // Row group statistic
 // columnChunkStats: statistic for each column chunk.
-//             for example, min/max for col0 in this row group
-//           this can be used to filter row groups.
+// for example, min/max for col0 in this row group
+// this can be used to filter row groups.
 message RowGroupStatistic {
     repeated ColumnStatistic columnChunkStats = 1;
 }
@@ -166,9 +166,9 @@ message ColumnStatistic {
     optional DoubleStatistic doubleStatistics = 3;
     optional StringStatistic stringStatistics = 4;
     optional BucketStatistic bucketStatistics = 5;
-    optional BinaryStatistic binaryStatistics = 8;
-    optional TimestampStatistic timestampStatistics = 9;
-    optional bool hasNull = 10;
+    optional BinaryStatistic binaryStatistics = 6;
+    optional TimestampStatistic timestampStatistics = 7;
+    optional bool hasNull = 8;
 }
 
 // Pixel statistic
@@ -181,8 +181,8 @@ message PixelStatistic {
 // pixelPositions: starting offsets of each pixel in this column chunk
 message ColumnChunkIndex {
 //    optional ColumnStatistic columnStatistic = 1;
-    repeated uint64 pixelPositions = 1 [packed=true];
-    repeated PixelStatistic pixelStatistics = 2;
+    repeated uint64 pixelPositions = 2 [packed=true];
+    repeated PixelStatistic pixelStatistics = 3;
 }
 
 message RowGroupIndex {

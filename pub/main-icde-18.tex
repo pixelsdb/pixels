@@ -9,8 +9,23 @@
 %
 \documentclass[10pt,conference,letterpaper]{IEEEtran}
 \usepackage{times,amsmath,epsfig}
+\usepackage{color}
+\newtheorem{Definition}{Definition}{\itshape}{\rmfamily}
+
+\newtheorem{Theorem}{Theorem}{\itshape}{\rmfamily}
+
+\newcommand{\todo}[1]{{\footnotesize \textcolor{red}{$\ll$\textsf{TODO #1}$\gg$}}}
+\newcommand{\bluefont}[1]{\textcolor{blue}{#1}}
+
+\newcommand{\redfont}[1]{\textcolor{red}{#1}}
+
+\newcommand{\greenfont}[1]{\textcolor{green}{#1}}
+
+\newcommand{\yellowfont}[1]{\textcolor{yellow}{#1}}
+
+
 %
-\title{Adaptive Layout Optimization for Wide Tables}
+\title{Adaptive Data Splitting and Column Chunk Ordering in Wide Tables}
 %
 \author{%
 % author names are typeset in 11pt, which is the default size in the author block
@@ -49,10 +64,7 @@ $^{3}$\,third.author@first-third.edu%
 \maketitle
 %
 \begin{abstract} 
-For your paper to be published in the conference proceedings, you must
-use this document as both an instruction set and as a template into
-which you can type your own text.  If your paper does not conform to
-the required format, you will be asked to fix it.
+\todo{write later.}
 \end{abstract}
 
 
@@ -63,17 +75,27 @@ the required format, you will be asked to fix it.
 %
 
 
-\input{introduction}
-\input{preliminary}
-\input{solution}
-\input{implementation}
-\input{experiment}
-\input{related}
-\input{conclusion}
+\input{introduction}
+
+\input{preliminary}
+
+\input{solution}
+
+\input{implementation}
+
+\input{experiment}
+
+\input{related}
+
+\input{conclusion}
 
 
 \bibliographystyle{IEEEtran}
-
 \bibliography{IEEEabrv,ref}
+
+% \appendix
+
+% \input{appendix}
+
 
 \end{document}

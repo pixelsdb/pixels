@@ -56,8 +56,12 @@ public class TestPixelsWriter
                 x.vector[row] = i;
                 y.vector[row] = i * 2;
                 if (rowBatch.size == rowBatch.getMaxSize()) {
+                    //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);
+                    //System.out.println("add rb:" + (System.currentTimeMillis()-start));
+                    //start = System.currentTimeMillis();
                     rowBatch.reset();
+                    //System.out.println("reset: " + (System.currentTimeMillis()-start));
                 }
             }
             if (rowBatch.size != 0) {
