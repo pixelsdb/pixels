@@ -27,8 +27,9 @@ public class IntegerColumnWriter extends BaseColumnWriter
         for (int i = 0; i < values.length; i++)
         {
             curPixelSize++;
-            long value = values[i];
-            buffer.putLong(value);
+            int value =(int) values[i];
+            buffer.putInt(value);
+            curPixelPosition += Integer.BYTES;
             pixelStatRecorder.updateInteger(value, 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelSize >= pixelStride) {

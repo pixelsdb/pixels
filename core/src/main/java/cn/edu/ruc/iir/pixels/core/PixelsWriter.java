@@ -345,9 +345,12 @@ public class PixelsWriter
         for (int i = 0; i < columnWriters.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
+            PixelsProto.ColumnChunkIndex.Builder chunkIndexBuilder = writer.getColumnChunkIndex();
+            chunkIndexBuilder.setChunkOffset(rowGroupDataLength);
+            chunkIndexBuilder.setChunkLength(writer.getColumnChunkSize());
             rowGroupDataLength += writer.getColumnChunkSize();
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
-            curRowGroupIndex.addColumnChunkIndexEntries(writer.getColumnChunkIndex().build());
+            curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
             // collect columnChunkStatistic into rowGroupStatistic
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // update file column statistic

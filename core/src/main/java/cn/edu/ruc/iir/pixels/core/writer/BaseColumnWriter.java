@@ -27,6 +27,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final List<ByteBuffer> rowBatchBufferList;
 
     int curPixelSize = 0;
+    int pixelPosition = 0;
+    int curPixelPosition = 0;
     int colChunkSize = 0;         // column chunk size in bytes
 
     public BaseColumnWriter(TypeDescription type, int pixelStride)
@@ -63,7 +65,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     public PixelsProto.ColumnStatistic.Builder getColumnChunkStat()
     {
-        return columnChunkStat;
+        return columnChunkStatRecorder.serialize();
     }
 
     public StatsRecorder getColumnChunkStatRecorder()
@@ -74,6 +76,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     public void reset()
     {
         colChunkSize = 0;
+        pixelPosition = 0;
+        curPixelPosition = 0;
         columnChunkIndex.clear();
         columnChunkStat.clear();
         pixelStatRecorder.reset();
@@ -95,7 +99,9 @@ public abstract class BaseColumnWriter implements ColumnWriter
         PixelsProto.PixelStatistic.Builder pixelStat =
                 PixelsProto.PixelStatistic.newBuilder();
         pixelStat.setStatistic(pixelStatRecorder.serialize());
-        // TODO columnChunkIndex add pixel positions
+        // TODO last pixel may not have been newed
+        columnChunkIndex.addPixelPositions(pixelPosition);
+        pixelPosition = curPixelPosition;
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         pixelStatRecorder.reset();
     }

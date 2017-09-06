@@ -22,7 +22,7 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://192.168.124.15:9000/test_big3.pxl";
+        String filePath = "hdfs://127.0.0.1:9000/test4.pxl";
         Path path = new Path(filePath);
 
         Configuration conf = new Configuration();
@@ -50,12 +50,11 @@ public class TestPixelsReader
 
             PixelsProto.Footer footer = fileTail.getFooter();
             PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(0);
-            int rowGroupOffset = (int) rowGroupInfo.getOffset();
-            int rowGroupDataLen = (int) rowGroupInfo.getDataLength();
+            int rowGroupFooterOffset = (int) rowGroupInfo.getFooterOffset();
             int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
 
             ByteBuffer rowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
-            inStream.seek(rowGroupOffset + rowGroupDataLen);
+            inStream.seek(rowGroupFooterOffset);
             inStream.read(rowGroupFooterBuffer);
             PixelsProto.RowGroupFooter rowGroupFooter =
                     PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
