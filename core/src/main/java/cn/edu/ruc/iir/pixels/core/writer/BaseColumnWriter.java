@@ -51,7 +51,15 @@ public abstract class BaseColumnWriter implements ColumnWriter
     @Override
     public abstract int writeBatch(ColumnVector vector, int length);
 
-    public abstract byte[] serializeContent();
+    public byte[] serializeContent()
+    {
+        ByteBuffer tempBuffer = ByteBuffer.allocate(colChunkSize);
+        for (ByteBuffer buffer: rowBatchBufferList)
+        {
+            tempBuffer.put(buffer);
+        }
+        return tempBuffer.array();
+    }
 
     public int getColumnChunkSize()
     {

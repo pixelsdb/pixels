@@ -13,6 +13,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
     private double minimum = Double.MIN_VALUE;
     private double maximum = Double.MAX_VALUE;
     private double sum = 0;
+    private long numberOfValues = 0L;
 
     DoubleStatsRecorder() {}
 
@@ -40,6 +41,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
         this.minimum = Double.MIN_VALUE;
         this.maximum = Double.MAX_VALUE;
         this.sum = 0;
+        this.numberOfValues = 0;
     }
 
     @Override
@@ -57,6 +59,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
             maximum = value;
         }
         sum += value;
+        numberOfValues++;
     }
 
     @Override
@@ -76,6 +79,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
                 maximum = dbStat.maximum;
             }
             sum += dbStat.sum;
+            numberOfValues += dbStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {
@@ -97,6 +101,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
         }
         dbBuilder.setSum(sum);
         builder.setDoubleStatistics(dbBuilder);
+        builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
@@ -129,6 +134,8 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
         }
         buf.append(" sum: ");
         buf.append(sum);
+        buf.append(" numberOfValues: ");
+        buf.append(numberOfValues);
         return buf.toString();
     }
 
@@ -156,6 +163,10 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
             return false;
         }
         if (Double.compare(that.sum, sum) != 0) {
+            return false;
+        }
+
+        if (numberOfValues != that.numberOfValues) {
             return false;
         }
 

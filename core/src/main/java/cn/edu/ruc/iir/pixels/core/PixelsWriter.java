@@ -8,7 +8,7 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.core.writer.BinaryColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.BooleanColumnWriter;
-import cn.edu.ruc.iir.pixels.core.writer.BytesColumnWriter;
+import cn.edu.ruc.iir.pixels.core.writer.ByteColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.CharColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.ColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.DoubleColumnWriter;
@@ -530,7 +530,7 @@ public class PixelsWriter
             case BOOLEAN:
                 return new BooleanColumnWriter(schema, pixelStride);
             case BYTE:
-                return new BytesColumnWriter(schema, pixelStride);
+                return new ByteColumnWriter(schema, pixelStride);
             case SHORT:
             case INT:
             case LONG:

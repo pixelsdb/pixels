@@ -12,6 +12,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
     private String minimum = null;
     private String maximum = null;
     private long sum = 0L;
+    private long numberOfValues = 0L;
 
     StringStatsRecorder() {}
 
@@ -37,6 +38,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
         minimum = null;
         maximum = null;
         sum = 0L;
+        numberOfValues = 0;
     }
 
     @Override
@@ -54,6 +56,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
             }
         }
         sum += value.length() * repetitions;
+        numberOfValues += repetitions;
     }
 
     @Override
@@ -78,6 +81,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
                 }
             }
             sum += strStat.sum;
+            numberOfValues += strStat.numberOfValues;
         }
         else {
             if (isStatsExists() && minimum != null) {
@@ -100,6 +104,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
             strBuilder.setSum(sum);
         }
         builder.setStringStatistics(strBuilder);
+        builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
@@ -137,6 +142,8 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
             buf.append(" sum: ");
             buf.append(sum);
         }
+        buf.append(" numberOfValues: ");
+        buf.append(numberOfValues);
         return buf.toString();
     }
 
@@ -161,6 +168,10 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
             return false;
         }
         if (maximum != null ? !maximum.equals(that.maximum) : that.maximum != null) {
+            return false;
+        }
+
+        if (numberOfValues != that.numberOfValues) {
             return false;
         }
 

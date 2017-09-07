@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -11,9 +12,9 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
-public class IntegerColumnWriter extends BaseColumnWriter
+public class ByteColumnWriter extends BaseColumnWriter
 {
-    public IntegerColumnWriter(TypeDescription schema, int pixelStride)
+    public ByteColumnWriter(TypeDescription schema, int pixelStride)
     {
         super(schema, pixelStride);
     }
@@ -23,14 +24,13 @@ public class IntegerColumnWriter extends BaseColumnWriter
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
-        ByteBuffer buffer = ByteBuffer.allocate(length * Integer.BYTES);
-        for (int i = 0; i < length; i++)
-        {
+        ByteBuffer buffer = ByteBuffer.allocate(length * Long.BYTES);
+        for (int i = 0; i < length; i++) {
             curPixelSize++;
-            int value =(int) values[i];
-            buffer.putInt(value);
-            curPixelPosition += Integer.BYTES;
-            pixelStatRecorder.updateInteger(value, 1);
+            byte v = (byte) values[i];
+            buffer.put(v);
+            curPixelPosition += Byte.BYTES;
+            pixelStatRecorder.updateInteger(v, 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelSize >= pixelStride) {
                 newPixel();
