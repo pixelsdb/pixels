@@ -300,7 +300,7 @@ public class PixelsWriter
         for (int i = 0; i < cvs.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.writeBatch(cvs[i]);
+            curRowGroupDataLength += writer.writeBatch(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
         if (curRowGroupDataLength >= rowGroupSize * Constants.MB1) {

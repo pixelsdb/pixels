@@ -19,12 +19,12 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector)
+    public int writeBatch(ColumnVector vector, int length)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
-        ByteBuffer buffer = ByteBuffer.allocate(values.length * Long.BYTES);
-        for (int i = 0; i < values.length; i++)
+        ByteBuffer buffer = ByteBuffer.allocate(length * Integer.BYTES);
+        for (int i = 0; i < length; i++)
         {
             curPixelSize++;
             int value =(int) values[i];

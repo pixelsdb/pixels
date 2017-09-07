@@ -24,7 +24,7 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://127.0.0.1:9000/test0.pxl";
+        String filePath = "hdfs://127.0.0.1:9000/test3.pxl";
         String metaPath = "/Users/Jelly/Desktop/meta";
         Path path = new Path(filePath);
 
@@ -67,6 +67,8 @@ public class TestPixelsReader
                 metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
                 metaWriter.write(rowGroupFooter.toString() + "\n");
             }
+            metaWriter.flush();
+            metaWriter.close();
         }
         catch (IOException e) {
             e.printStackTrace();

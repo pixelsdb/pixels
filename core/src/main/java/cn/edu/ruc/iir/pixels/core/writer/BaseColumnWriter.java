@@ -49,7 +49,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     // serialize vector into byte buffer, append to rowBatchBufferList
     // update pixel stat, add pixel positions, and update column chunk stat
     @Override
-    public abstract int writeBatch(ColumnVector vector);
+    public abstract int writeBatch(ColumnVector vector, int length);
 
     public abstract byte[] serializeContent();
 

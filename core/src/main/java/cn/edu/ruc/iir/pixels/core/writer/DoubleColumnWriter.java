@@ -16,7 +16,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector)
+    public int writeBatch(ColumnVector vector, int length)
     {
         return 0;
     }

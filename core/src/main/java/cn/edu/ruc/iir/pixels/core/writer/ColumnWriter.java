@@ -11,7 +11,7 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
  */
 public interface ColumnWriter
 {
-    int writeBatch(ColumnVector vector);
+    int writeBatch(ColumnVector vector, int length);
     byte[] serializeContent();
     int getColumnChunkSize();
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();
