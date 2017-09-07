@@ -17,5 +17,6 @@ public interface ColumnWriter
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();
     PixelsProto.ColumnStatistic.Builder getColumnChunkStat();
     StatsRecorder getColumnChunkStatRecorder();
+    void newChunk();
     void reset();
 }

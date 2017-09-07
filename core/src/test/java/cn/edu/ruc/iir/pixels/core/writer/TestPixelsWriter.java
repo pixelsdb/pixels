@@ -25,7 +25,7 @@ public class TestPixelsWriter
     {
         final int ROWNUM = 100000000;
 
-        String fileP = "hdfs://127.0.0.1:9000/test4.pxl";
+        String fileP = "hdfs://127.0.0.1:9000/test0.pxl";
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());

@@ -73,6 +73,13 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStatRecorder;
     }
 
+    public void newChunk()
+    {
+        if (curPixelSize > 0) {
+            newPixel();
+        }
+    }
+
     public void reset()
     {
         colChunkSize = 0;
@@ -99,7 +106,6 @@ public abstract class BaseColumnWriter implements ColumnWriter
         PixelsProto.PixelStatistic.Builder pixelStat =
                 PixelsProto.PixelStatistic.newBuilder();
         pixelStat.setStatistic(pixelStatRecorder.serialize());
-        // TODO last pixel may not have been newed
         columnChunkIndex.addPixelPositions(pixelPosition);
         pixelPosition = curPixelPosition;
         columnChunkIndex.addPixelStatistics(pixelStat.build());
