@@ -14,6 +14,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
     private boolean hasMinimum = false;
     private long minimum = Long.MIN_VALUE;
     private long maximum = Long.MAX_VALUE;
+    private long numberOfValues = 0L;
 
     TimestampStatsRecorder() {}
 
@@ -36,6 +37,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         hasMinimum = false;
         minimum = Long.MIN_VALUE;
         maximum = Long.MAX_VALUE;
+        numberOfValues = 0;
     }
 
     @Override
@@ -52,6 +54,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         else {
             minimum = maximum = value;
         }
+        numberOfValues++;
     }
 
     @Override
@@ -68,6 +71,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         else {
             minimum = maximum = value.getTime();
         }
+        numberOfValues++;
     }
 
     @Override
@@ -87,6 +91,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
                 minimum = tsStat.getMinimum();
                 maximum = tsStat.getMaximum();
             }
+            numberOfValues += tsStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {
@@ -105,6 +110,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         tsBuilder.setMinimum(minimum);
         tsBuilder.setMaximum(maximum);
         builder.setTimestampStatistics(tsBuilder);
+        builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
@@ -129,6 +135,8 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
             buf.append(" max: ");
             buf.append(getMaximum());
         }
+        buf.append(" numberOfValues: ");
+        buf.append(numberOfValues);
         return buf.toString();
     }
 
@@ -150,6 +158,10 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
             return false;
         }
         if (hasMinimum ? !(maximum == that.maximum) : that.hasMinimum) {
+            return false;
+        }
+
+        if (numberOfValues != that.numberOfValues) {
             return false;
         }
 

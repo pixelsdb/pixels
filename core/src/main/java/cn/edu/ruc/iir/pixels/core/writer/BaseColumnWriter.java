@@ -27,6 +27,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final List<ByteBuffer> rowBatchBufferList;
 
     int curPixelSize = 0;
+    int pixelPosition = 0;
+    int curPixelPosition = 0;
     int colChunkSize = 0;         // column chunk size in bytes
 
     public BaseColumnWriter(TypeDescription type, int pixelStride)
@@ -47,9 +49,17 @@ public abstract class BaseColumnWriter implements ColumnWriter
     // serialize vector into byte buffer, append to rowBatchBufferList
     // update pixel stat, add pixel positions, and update column chunk stat
     @Override
-    public abstract int writeBatch(ColumnVector vector);
+    public abstract int writeBatch(ColumnVector vector, int length);
 
-    public abstract byte[] serializeContent();
+    public byte[] serializeContent()
+    {
+        ByteBuffer tempBuffer = ByteBuffer.allocate(colChunkSize);
+        for (ByteBuffer buffer: rowBatchBufferList)
+        {
+            tempBuffer.put(buffer);
+        }
+        return tempBuffer.array();
+    }
 
     public int getColumnChunkSize()
     {
@@ -63,7 +73,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     public PixelsProto.ColumnStatistic.Builder getColumnChunkStat()
     {
-        return columnChunkStat;
+        return columnChunkStatRecorder.serialize();
     }
 
     public StatsRecorder getColumnChunkStatRecorder()
@@ -71,9 +81,18 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStatRecorder;
     }
 
+    public void newChunk()
+    {
+        if (curPixelSize > 0) {
+            newPixel();
+        }
+    }
+
     public void reset()
     {
         colChunkSize = 0;
+        pixelPosition = 0;
+        curPixelPosition = 0;
         columnChunkIndex.clear();
         columnChunkStat.clear();
         pixelStatRecorder.reset();
@@ -95,7 +114,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
         PixelsProto.PixelStatistic.Builder pixelStat =
                 PixelsProto.PixelStatistic.newBuilder();
         pixelStat.setStatistic(pixelStatRecorder.serialize());
-        // TODO columnChunkIndex add pixel positions
+        columnChunkIndex.addPixelPositions(pixelPosition);
+        pixelPosition = curPixelPosition;
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         pixelStatRecorder.reset();
     }
