@@ -8,7 +8,7 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.core.writer.BinaryColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.BooleanColumnWriter;
-import cn.edu.ruc.iir.pixels.core.writer.BytesColumnWriter;
+import cn.edu.ruc.iir.pixels.core.writer.ByteColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.CharColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.ColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.DoubleColumnWriter;
@@ -58,6 +58,7 @@ public class PixelsWriter
 
     private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;
+    private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
     private int curRowGroupDataLength = 0;
 
@@ -299,7 +300,7 @@ public class PixelsWriter
         for (int i = 0; i < cvs.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.writeBatch(cvs[i]);
+            curRowGroupDataLength += writer.writeBatch(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
         if (curRowGroupDataLength >= rowGroupSize * Constants.MB1) {
@@ -341,36 +342,59 @@ public class PixelsWriter
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
                 PixelsProto.RowGroupIndex.newBuilder();
 
-
         for (int i = 0; i < columnWriters.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
+            // new chunk for each writer
+            writer.newChunk();
+            rowGroupDataLength += writer.getColumnChunkSize();
+        }
+
+        // write row group content
+        ByteBuffer curRowGroupDataBuffer = ByteBuffer.allocate(rowGroupDataLength);
+        for (ColumnWriter writer : columnWriters)
+        {
+            curRowGroupDataBuffer.put(writer.serializeContent());
+        }
+        try {
+            curRowGroupOffset = physicalWriter.appendRowGroupBuffer(curRowGroupDataBuffer);
+            physicalWriter.flush();
+        }
+        catch (IOException e) {
+            LOGGER.error(e.getMessage());
+            System.exit(-1);
+        }
+
+        // update index and stats
+        rowGroupDataLength = 0;
+        for (int i = 0; i < columnWriters.length; i++)
+        {
+            ColumnWriter writer = columnWriters[i];
+            PixelsProto.ColumnChunkIndex.Builder chunkIndexBuilder = writer.getColumnChunkIndex();
+            chunkIndexBuilder.setChunkOffset(curRowGroupOffset + rowGroupDataLength);
+            chunkIndexBuilder.setChunkLength(writer.getColumnChunkSize());
             rowGroupDataLength += writer.getColumnChunkSize();
             // collect columnChunkIndex from every column chunk into curRowGroupIndex
-            curRowGroupIndex.addColumnChunkIndexEntries(writer.getColumnChunkIndex().build());
+            curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
             // collect columnChunkStatistic into rowGroupStatistic
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
+            // call children writer reset()
+            writer.reset();
         }
 
         // put curRowGroupIndex into rowGroupFooter
         PixelsProto.RowGroupFooter rowGroupFooter =
                 PixelsProto.RowGroupFooter.newBuilder()
-                .setRowGroupIndexEntry(curRowGroupIndex.build())
-                .build();
+                        .setRowGroupIndexEntry(curRowGroupIndex.build())
+                        .build();
 
-        // serialize data content and row group footer. Append curRowGroupBuffer to rowGroupBufferList
-        ByteBuffer curRowGroupBuffer = ByteBuffer.allocate(rowGroupDataLength + rowGroupFooter.getSerializedSize());
-        for (ColumnWriter writer : columnWriters)
-        {
-            curRowGroupBuffer.put(writer.serializeContent());
-            // call children writer reset()
-            writer.reset();
-        }
-        curRowGroupBuffer.put(rowGroupFooter.toByteArray());
+        // write row group footer
+        ByteBuffer curRowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooter.getSerializedSize());
+        curRowGroupFooterBuffer.put(rowGroupFooter.toByteArray());
         try {
-            curRowGroupOffset = physicalWriter.appendRowGroupBuffer(curRowGroupBuffer);
+            curRowGroupFooterOffset = physicalWriter.appendRowGroupBuffer(curRowGroupFooterBuffer);
             physicalWriter.flush();
         }
         catch (IOException e) {
@@ -379,7 +403,7 @@ public class PixelsWriter
         }
 
         // update RowGroupInformation, and put it into rowGroupInfoList
-        curRowGroupInfo.setFooterOffset(curRowGroupOffset+rowGroupDataLength);
+        curRowGroupInfo.setFooterOffset(curRowGroupFooterOffset);
         curRowGroupInfo.setDataLength(rowGroupDataLength);
         curRowGroupInfo.setFooterLength(rowGroupFooter.getSerializedSize());
         curRowGroupInfo.setNumberOfRows(curRowGroupNumOfRows);
@@ -506,7 +530,7 @@ public class PixelsWriter
             case BOOLEAN:
                 return new BooleanColumnWriter(schema, pixelStride);
             case BYTE:
-                return new BytesColumnWriter(schema, pixelStride);
+                return new ByteColumnWriter(schema, pixelStride);
             case SHORT:
             case INT:
             case LONG:

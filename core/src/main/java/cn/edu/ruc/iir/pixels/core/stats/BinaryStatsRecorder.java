@@ -10,6 +10,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnStats
 {
     private long sum = 0L;
+    private long numberOfValues = 0L;
 
     BinaryStatsRecorder() {}
 
@@ -28,12 +29,14 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
     {
         super.reset();
         this.sum = 0;
+        this.numberOfValues = 0;
     }
 
     @Override
     public void updateBinary(byte[] bytes, int offset, int length, int repetitions)
     {
         sum += (long) length * repetitions;
+        numberOfValues += repetitions;
     }
 
     @Override
@@ -42,6 +45,7 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
         if (other instanceof BinaryColumnStats) {
             BinaryStatsRecorder binaryStat = (BinaryStatsRecorder) other;
             this.sum += binaryStat.sum;
+            this.numberOfValues += binaryStat.numberOfValues;
         }
         else {
             if (isStatsExists() && sum != 0) {
@@ -69,6 +73,7 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
         PixelsProto.BinaryStatistic.Builder binaryBuilder = PixelsProto.BinaryStatistic.newBuilder();
         binaryBuilder.setSum(this.sum);
         builder.setBinaryStatistics(binaryBuilder);
+        builder.setNumberOfValues(this.numberOfValues);
         return builder;
     }
 
@@ -79,6 +84,8 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
             buf.append(" sum: ");
             buf.append(sum);
         }
+        buf.append(" numberOfValues: ")
+                .append(numberOfValues);
         return buf.toString();
     }
 
@@ -97,6 +104,10 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
         BinaryStatsRecorder that = (BinaryStatsRecorder) o;
 
         if (sum != that.sum) {
+            return false;
+        }
+
+        if (numberOfValues != that.numberOfValues) {
             return false;
         }
 

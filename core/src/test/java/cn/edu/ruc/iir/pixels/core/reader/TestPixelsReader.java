@@ -8,6 +8,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -22,22 +24,24 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://192.168.124.15:9000/test_big3.pxl";
+        String filePath = "hdfs://127.0.0.1:9000/test3.pxl";
+        String metaPath = "/Users/Jelly/Desktop/meta";
         Path path = new Path(filePath);
 
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
         try {
+            BufferedWriter metaWriter = new BufferedWriter(new FileWriter(metaPath, false));
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             FSDataInputStream inStream = fs.open(path);
             long length = fs.getFileStatus(path).getLen();
             inStream.seek(length - 8);
             long pos = inStream.readLong();
-            System.out.println("File length: " + pos);
+            metaWriter.write("File length: " + pos + "\n");
             inStream.seek(pos - 4);
             int tailLen = inStream.readInt();
-            System.out.println("Tail length: " + tailLen);
+            metaWriter.write("Tail length: " + tailLen + "\n");
             long tailOffset = length - 8 - 4 - tailLen;
             inStream.seek(tailOffset);
             ByteBuffer tailBuffer = ByteBuffer.allocate(tailLen);
@@ -45,22 +49,26 @@ public class TestPixelsReader
 
             PixelsProto.FileTail fileTail =
                     PixelsProto.FileTail.parseFrom(tailBuffer.array());
-            System.out.println("=========== FILE TAIL ===========");
-            System.out.println(fileTail);
+            metaWriter.write("=========== FILE TAIL ===========\n");
+            metaWriter.write(fileTail.toString() + "\n");
 
             PixelsProto.Footer footer = fileTail.getFooter();
-            PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(0);
-            int rowGroupOffset = (int) rowGroupInfo.getOffset();
-            int rowGroupDataLen = (int) rowGroupInfo.getDataLength();
-            int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
-
-            ByteBuffer rowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
-            inStream.seek(rowGroupOffset + rowGroupDataLen);
-            inStream.read(rowGroupFooterBuffer);
-            PixelsProto.RowGroupFooter rowGroupFooter =
-                    PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
-            System.out.println("========== ROW GROUP ===========");
-            System.out.println(rowGroupFooter);
+            for (int i = 0; i < footer.getRowGroupInfosCount(); i++) {
+                PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(i);
+                int rowGroupFooterOffset = (int) rowGroupInfo.getFooterOffset();
+                int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
+                ByteBuffer rowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
+                inStream.seek(rowGroupFooterOffset);
+                if (inStream.read(rowGroupFooterBuffer) != rowGroupFooterLen) {
+                    System.err.println("Row Group Footer Read Interrupted");
+                }
+                PixelsProto.RowGroupFooter rowGroupFooter =
+                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
+                metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
+                metaWriter.write(rowGroupFooter.toString() + "\n");
+            }
+            metaWriter.flush();
+            metaWriter.close();
         }
         catch (IOException e) {
             e.printStackTrace();

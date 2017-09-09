@@ -10,6 +10,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumnStats
 {
     private long trueCount = 0L;
+    private long numberOfValues = 0L;
 
     BooleanStatsRecorder() {}
 
@@ -25,6 +26,7 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
     {
         super.reset();
         trueCount = 0;
+        numberOfValues = 0;
     }
 
     @Override
@@ -33,6 +35,7 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
         if (value) {
             trueCount += repetitions;
         }
+        numberOfValues += repetitions;
     }
 
     @Override
@@ -41,6 +44,7 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
         if (other instanceof BooleanColumnStats) {
             BooleanStatsRecorder statsRecorder = (BooleanStatsRecorder) other;
             this.trueCount += statsRecorder.trueCount;
+            this.numberOfValues += statsRecorder.numberOfValues;
         }
         else {
             if (isStatsExists() && trueCount != 0) {
@@ -58,6 +62,7 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
                 PixelsProto.BucketStatistic.newBuilder();
         bktBuilder.addCount(trueCount);
         builder.setBucketStatistics(bktBuilder);
+        builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
@@ -88,6 +93,9 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
         BooleanStatsRecorder that = (BooleanStatsRecorder) o;
 
         if (trueCount != that.trueCount) {
+            return false;
+        }
+        if (numberOfValues != that.numberOfValues) {
             return false;
         }
 

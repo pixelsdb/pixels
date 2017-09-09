@@ -12,6 +12,7 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
     private long minimum = Long.MIN_VALUE;
     private long maximum = Long.MAX_VALUE;
     private long sum = 0L;
+    private long numberOfValues = 0L;
     private boolean hasMinimum = false;
     private boolean overflow = false;
 
@@ -44,12 +45,14 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
         minimum = Long.MIN_VALUE;
         maximum = Long.MAX_VALUE;
         sum = 0L;
+        numberOfValues = 0L;
         overflow = false;
     }
 
     @Override
     public void updateInteger(long value, int repetitions)
     {
+        numberOfValues += repetitions;
         if (!hasMinimum) {
             hasMinimum = true;
             minimum = value;
@@ -97,6 +100,8 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
                     overflow = (sum >= 0) != wasPositive;
                 }
             }
+
+            numberOfValues += intStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {
@@ -120,6 +125,7 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
             intBuilder.setSum(sum);
         }
         builder.setIntStatistics(intBuilder);
+        builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
@@ -160,6 +166,8 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
             buf.append(" sum: ");
             buf.append(sum);
         }
+        buf.append(" numberOfValues: ")
+                .append(numberOfValues);
         return buf.toString();
     }
 
@@ -192,6 +200,9 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
         if (overflow != that.overflow) {
             return false;
         }
+        if (numberOfValues != that.numberOfValues) {
+            return false;
+        }
 
         return true;
     }
@@ -202,6 +213,7 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
         result = 31 * result + (int) (minimum ^ (minimum >>> 32));
         result = 31 * result + (int) (maximum ^ (maximum >>> 32));
         result = 31 * result + (int) (sum ^ (sum >>> 32));
+        result = 31 * result + (int) (numberOfValues ^ (numberOfValues >>> 32));
         result = 31 * result + (hasMinimum ? 1 : 0);
         result = 31 * result + (overflow ? 1 : 0);
         return result;
