@@ -17,7 +17,6 @@ import java.nio.ByteBuffer;
 public class PhysicalFSWriter implements PhysicalWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalFSWriter.class);
-    private static final int HDFS_BUFFER_SIZE = 256 * 1024;
 
     private final Path path;
     private final long blockSize;
@@ -32,7 +31,7 @@ public class PhysicalFSWriter implements PhysicalWriter
         this.replication = replication;
         this.addBlockPadding = addBlockPadding;
 
-        rawWriter = fs.create(path, false, HDFS_BUFFER_SIZE, replication, blockSize);
+        rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
     }
 
     public Path getPath()
@@ -65,7 +64,7 @@ public class PhysicalFSWriter implements PhysicalWriter
 
         // see if row group can fit in the current hdfs block, else pad the remaining space in the block
         if (length < blockSize && length > availBlockSpace && addBlockPadding) {
-            byte[] pad = new byte[(int) Math.min(HDFS_BUFFER_SIZE, availBlockSpace)];
+            byte[] pad = new byte[(int) Math.min(Constants.HDFS_BUFFER_SIZE, availBlockSpace)];
             LOGGER.info(String.format("Padding Pixels by %d bytes while appending row group buffer...", availBlockSpace));
             start += availBlockSpace;
             while (availBlockSpace > 0) {

@@ -303,7 +303,7 @@ public class PixelsWriter
             curRowGroupDataLength += writer.writeBatch(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
-        if (curRowGroupDataLength >= rowGroupSize * Constants.MB1) {
+        if (curRowGroupDataLength >= rowGroupSize) {
             writeRowGroup();
             curRowGroupDataLength = 0;
         }
