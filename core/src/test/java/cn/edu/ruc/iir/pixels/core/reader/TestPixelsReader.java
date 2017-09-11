@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.TestParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -44,7 +45,7 @@ public class TestPixelsReader
             long tailOffset = length - 8 - 4 - tailLen;
             inStream.seek(tailOffset);
             byte[] tailBuffer = new byte[tailLen];
-            inStream.read(tailBuffer);
+            inStream.readFully(tailBuffer);
 
             PixelsProto.FileTail fileTail =
                     PixelsProto.FileTail.parseFrom(tailBuffer);
