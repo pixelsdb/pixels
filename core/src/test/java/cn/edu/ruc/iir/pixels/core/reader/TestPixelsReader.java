@@ -12,7 +12,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -44,11 +43,11 @@ public class TestPixelsReader
             metaWriter.write("Tail length: " + tailLen + "\n");
             long tailOffset = length - 8 - 4 - tailLen;
             inStream.seek(tailOffset);
-            ByteBuffer tailBuffer = ByteBuffer.allocate(tailLen);
+            byte[] tailBuffer = new byte[tailLen];
             inStream.read(tailBuffer);
 
             PixelsProto.FileTail fileTail =
-                    PixelsProto.FileTail.parseFrom(tailBuffer.array());
+                    PixelsProto.FileTail.parseFrom(tailBuffer);
             metaWriter.write("=========== FILE TAIL ===========\n");
             metaWriter.write(fileTail.toString() + "\n");
 
@@ -57,13 +56,11 @@ public class TestPixelsReader
                 PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(i);
                 int rowGroupFooterOffset = (int) rowGroupInfo.getFooterOffset();
                 int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
-                ByteBuffer rowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
+                byte[] rowGroupFooterBuffer = new byte[rowGroupFooterLen];
                 inStream.seek(rowGroupFooterOffset);
-                if (inStream.read(rowGroupFooterBuffer) != rowGroupFooterLen) {
-                    System.err.println("Row Group Footer Read Interrupted");
-                }
+                inStream.readFully(rowGroupFooterBuffer);
                 PixelsProto.RowGroupFooter rowGroupFooter =
-                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
+                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer);
                 metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
                 metaWriter.write(rowGroupFooter.toString() + "\n");
             }
