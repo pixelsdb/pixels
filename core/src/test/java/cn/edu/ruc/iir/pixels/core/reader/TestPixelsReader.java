@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.TestParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -12,7 +13,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -24,8 +24,8 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://127.0.0.1:9000/test6.pxl";
-        String metaPath = "/Users/Jelly/Desktop/meta";
+        String filePath = TestParams.filePath;
+        String metaPath = TestParams.metaPath;
         Path path = new Path(filePath);
 
         Configuration conf = new Configuration();
@@ -44,28 +44,24 @@ public class TestPixelsReader
             metaWriter.write("Tail length: " + tailLen + "\n");
             long tailOffset = length - 8 - 4 - tailLen;
             inStream.seek(tailOffset);
-            ByteBuffer tailBuffer = ByteBuffer.allocate(tailLen);
-            inStream.readFully(tailBuffer.array());
+            byte[] tailBuffer = new byte[tailLen];
+            inStream.readFully(tailBuffer);
 
             PixelsProto.FileTail fileTail =
-                    PixelsProto.FileTail.parseFrom(tailBuffer.array());
+                    PixelsProto.FileTail.parseFrom(tailBuffer);
             metaWriter.write("=========== FILE TAIL ===========\n");
             metaWriter.write(fileTail.toString() + "\n");
-            System.out.println(fileTail);
 
             PixelsProto.Footer footer = fileTail.getFooter();
             for (int i = 0; i < footer.getRowGroupInfosCount(); i++) {
                 PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(i);
                 int rowGroupFooterOffset = (int) rowGroupInfo.getFooterOffset();
                 int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
-                ByteBuffer rowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooterLen);
+                byte[] rowGroupFooterBuffer = new byte[rowGroupFooterLen];
                 inStream.seek(rowGroupFooterOffset);
-                if (inStream.read(rowGroupFooterBuffer) != rowGroupFooterLen) {
-                    System.err.println("Row Group Footer Read Interrupted");
-                }
-                System.out.println("Reading row group " + i);
+                inStream.readFully(rowGroupFooterBuffer);
                 PixelsProto.RowGroupFooter rowGroupFooter =
-                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
+                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer);
                 metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
                 metaWriter.write(rowGroupFooter.toString() + "\n");
             }
