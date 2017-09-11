@@ -24,8 +24,8 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://127.0.0.1:9000/test3.pxl";
-        String metaPath = "/Users/Jelly/Desktop/meta";
+        String filePath = "hdfs://127.0.0.1:9000/test2.pxl";
+        String metaPath = System.getProperty("user.home") + "/meta";
         Path path = new Path(filePath);
 
         Configuration conf = new Configuration();
