@@ -8,6 +8,7 @@ target
 .DS_Store
 *.class
 
+TestParams.java
 main-icde-18.aux
 main-icde-18.bbl
 main-icde-18.blg
