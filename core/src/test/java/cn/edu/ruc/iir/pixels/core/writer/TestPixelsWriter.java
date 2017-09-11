@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
@@ -23,9 +24,9 @@ public class TestPixelsWriter
     @Test
     public void test()
     {
-        final int ROWNUM = 10000;
+        final int ROWNUM = 1000000;
 
-        String fileP = "hdfs://127.0.0.1:9000/test3.pxl";
+        String fileP = "hdfs://127.0.0.1:9000/test8.pxl";
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
@@ -42,7 +43,7 @@ public class TestPixelsWriter
                     PixelsWriter.newBuilder()
                             .setSchema(schema)
                             .setPixelStride(1000)
-                            .setRowGroupSize(64)
+                            .setRowGroupSize(1)
                             .setFS(fs)
                             .setFilePath(new Path(fileP))
                             .setBlockSize(1048576000)

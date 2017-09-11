@@ -24,7 +24,7 @@ public class TestPixelsReader
     @Test
     public void validateWriter()
     {
-        String filePath = "hdfs://127.0.0.1:9000/test3.pxl";
+        String filePath = "hdfs://127.0.0.1:9000/test6.pxl";
         String metaPath = "/Users/Jelly/Desktop/meta";
         Path path = new Path(filePath);
 
@@ -45,12 +45,13 @@ public class TestPixelsReader
             long tailOffset = length - 8 - 4 - tailLen;
             inStream.seek(tailOffset);
             ByteBuffer tailBuffer = ByteBuffer.allocate(tailLen);
-            inStream.read(tailBuffer);
+            inStream.readFully(tailBuffer.array());
 
             PixelsProto.FileTail fileTail =
                     PixelsProto.FileTail.parseFrom(tailBuffer.array());
             metaWriter.write("=========== FILE TAIL ===========\n");
             metaWriter.write(fileTail.toString() + "\n");
+            System.out.println(fileTail);
 
             PixelsProto.Footer footer = fileTail.getFooter();
             for (int i = 0; i < footer.getRowGroupInfosCount(); i++) {
@@ -62,6 +63,7 @@ public class TestPixelsReader
                 if (inStream.read(rowGroupFooterBuffer) != rowGroupFooterLen) {
                     System.err.println("Row Group Footer Read Interrupted");
                 }
+                System.out.println("Reading row group " + i);
                 PixelsProto.RowGroupFooter rowGroupFooter =
                         PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer.array());
                 metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
