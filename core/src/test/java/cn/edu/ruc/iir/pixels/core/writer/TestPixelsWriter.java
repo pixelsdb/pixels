@@ -2,8 +2,9 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -24,17 +25,14 @@ public class TestPixelsWriter
     @Test
     public void test()
     {
-        final int ROWNUM = 10000;
-
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
-        String schemaStr = "struct<x:double,y:string>";
         try {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(schemaStr);
+            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             DoubleColumnVector x = (DoubleColumnVector) rowBatch.cols[0];
             BytesColumnVector y = (BytesColumnVector) rowBatch.cols[1];
@@ -51,7 +49,7 @@ public class TestPixelsWriter
                             .setBlockPadding(false)
                             .build();
 
-            for (int i = 0; i < ROWNUM; i++)
+            for (int i = 0; i < TestParams.rowNum; i++)
             {
                 int row = rowBatch.size++;
                 x.vector[row] = i * 1.2;
