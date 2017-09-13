@@ -12,7 +12,6 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
     private String minimum = null;
     private String maximum = null;
     private long sum = 0L;
-    private long numberOfValues = 0L;
 
     StringStatsRecorder() {}
 
@@ -38,7 +37,6 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
         minimum = null;
         maximum = null;
         sum = 0L;
-        numberOfValues = 0;
     }
 
     @Override
@@ -81,7 +79,6 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
                 }
             }
             sum += strStat.sum;
-            numberOfValues += strStat.numberOfValues;
         }
         else {
             if (isStatsExists() && minimum != null) {
