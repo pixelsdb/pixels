@@ -12,9 +12,8 @@ import java.sql.Timestamp;
 public class TimestampStatsRecorder extends StatsRecorder implements TimestampColumnStats
 {
     private boolean hasMinimum = false;
-    private long minimum = Long.MIN_VALUE;
-    private long maximum = Long.MAX_VALUE;
-    private long numberOfValues = 0L;
+    private long minimum = Long.MAX_VALUE;
+    private long maximum = Long.MIN_VALUE;
 
     TimestampStatsRecorder() {}
 
@@ -24,9 +23,11 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         PixelsProto.TimestampStatistic tsState = statistic.getTimestampStatistics();
         if (tsState.hasMinimum()) {
             minimum = tsState.getMinimum();
+            hasMinimum = true;
         }
         if (tsState.hasMaximum()) {
             maximum = tsState.getMaximum();
+            hasMinimum = true;
         }
     }
 
@@ -37,7 +38,6 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         hasMinimum = false;
         minimum = Long.MIN_VALUE;
         maximum = Long.MAX_VALUE;
-        numberOfValues = 0;
     }
 
     @Override
@@ -53,6 +53,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         }
         else {
             minimum = maximum = value;
+            hasMinimum = true;
         }
         numberOfValues++;
     }
@@ -70,6 +71,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
         }
         else {
             minimum = maximum = value.getTime();
+            hasMinimum = true;
         }
         numberOfValues++;
     }
@@ -91,7 +93,6 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
                 minimum = tsStat.getMinimum();
                 maximum = tsStat.getMaximum();
             }
-            numberOfValues += tsStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {

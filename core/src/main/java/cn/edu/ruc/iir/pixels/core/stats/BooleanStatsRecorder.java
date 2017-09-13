@@ -10,7 +10,6 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumnStats
 {
     private long trueCount = 0L;
-    private long numberOfValues = 0L;
 
     BooleanStatsRecorder() {}
 
@@ -26,7 +25,6 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
     {
         super.reset();
         trueCount = 0;
-        numberOfValues = 0;
     }
 
     @Override
@@ -44,7 +42,6 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
         if (other instanceof BooleanColumnStats) {
             BooleanStatsRecorder statsRecorder = (BooleanStatsRecorder) other;
             this.trueCount += statsRecorder.trueCount;
-            this.numberOfValues += statsRecorder.numberOfValues;
         }
         else {
             if (isStatsExists() && trueCount != 0) {
