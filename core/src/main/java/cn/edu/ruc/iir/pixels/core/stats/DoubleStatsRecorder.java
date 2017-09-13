@@ -13,7 +13,6 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
     private double minimum = Double.MIN_VALUE;
     private double maximum = Double.MAX_VALUE;
     private double sum = 0;
-    private long numberOfValues = 0L;
 
     DoubleStatsRecorder() {}
 
@@ -41,7 +40,6 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
         this.minimum = Double.MIN_VALUE;
         this.maximum = Double.MAX_VALUE;
         this.sum = 0;
-        this.numberOfValues = 0;
     }
 
     @Override
@@ -79,7 +77,6 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
                 maximum = dbStat.maximum;
             }
             sum += dbStat.sum;
-            numberOfValues += dbStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {

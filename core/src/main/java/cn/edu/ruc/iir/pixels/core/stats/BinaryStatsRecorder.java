@@ -10,7 +10,6 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnStats
 {
     private long sum = 0L;
-    private long numberOfValues = 0L;
 
     BinaryStatsRecorder() {}
 
@@ -29,7 +28,6 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
     {
         super.reset();
         this.sum = 0;
-        this.numberOfValues = 0;
     }
 
     @Override
@@ -45,7 +43,6 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
         if (other instanceof BinaryColumnStats) {
             BinaryStatsRecorder binaryStat = (BinaryStatsRecorder) other;
             this.sum += binaryStat.sum;
-            this.numberOfValues += binaryStat.numberOfValues;
         }
         else {
             if (isStatsExists() && sum != 0) {
@@ -63,7 +60,7 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
     @Override
     public long getSum()
     {
-        return 0;
+        return this.sum;
     }
 
     @Override
