@@ -16,9 +16,9 @@ public class CompactLayout
         this.layout = new ArrayList<>(rowGroupNumber*columnNumber);
     }
 
-    public void addColumnChunk (int columnId, int rowGroupId)
+    public void addColumnChunk (int rowGroupId, int columnId)
     {
-        this.layout.add(new ColumnChunkInfo(columnId, rowGroupId));
+        this.layout.add(new ColumnChunkInfo(rowGroupId, columnId));
     }
 
     public int size()
