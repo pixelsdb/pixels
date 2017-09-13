@@ -268,9 +268,9 @@ public class PixelsCompactor
         }
     }
 
-    public static PixelsWriter.Builder newBuilder()
+    public static PixelsCompactor.Builder newBuilder()
     {
-        return new PixelsWriter.Builder();
+        return new PixelsCompactor.Builder();
     }
 
     public FileSystem getFs()
@@ -349,6 +349,7 @@ public class PixelsCompactor
                 long rowGroupFooterOffset = physicalWriter.appendRowGroupBuffer(rowGroupFooterBuffer);
                 physicalWriter.flush();
                 this.rowGroupInfoBuilderList.get(i).setFooterOffset(rowGroupFooterOffset);
+                this.rowGroupInfoBuilderList.get(i).setFooterLength(rowGroupFooter.getSerializedSize());
             } catch (IOException e)
             {
                 LOGGER.error(e.getMessage());
