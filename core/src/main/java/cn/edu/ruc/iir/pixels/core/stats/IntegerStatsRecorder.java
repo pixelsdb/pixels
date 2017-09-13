@@ -12,7 +12,6 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
     private long minimum = Long.MIN_VALUE;
     private long maximum = Long.MAX_VALUE;
     private long sum = 0L;
-    private long numberOfValues = 0L;
     private boolean hasMinimum = false;
     private boolean overflow = false;
 
@@ -45,7 +44,6 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
         minimum = Long.MIN_VALUE;
         maximum = Long.MAX_VALUE;
         sum = 0L;
-        numberOfValues = 0L;
         overflow = false;
     }
 
@@ -100,8 +98,6 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
                     overflow = (sum >= 0) != wasPositive;
                 }
             }
-
-            numberOfValues += intStat.numberOfValues;
         }
         else {
             if (isStatsExists() && hasMinimum) {

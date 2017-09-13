@@ -12,7 +12,7 @@ import java.sql.Timestamp;
  */
 public class StatsRecorder implements ColumnStats
 {
-    private long count = 0;
+    long numberOfValues = 0L;
     private boolean hasNull = false;
 
     StatsRecorder() {}
@@ -20,7 +20,7 @@ public class StatsRecorder implements ColumnStats
     StatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         if (statistic.hasNumberOfValues()) {
-            count = statistic.getNumberOfValues();
+            numberOfValues = statistic.getNumberOfValues();
         }
         if (statistic.hasHasNull()) {
             hasNull = statistic.getHasNull();
@@ -30,15 +30,15 @@ public class StatsRecorder implements ColumnStats
         }
     }
 
-    public void increment()
-    {
-        this.count += 1;
-    }
-
-    public void increment(int count)
-    {
-        this.count += count;
-    }
+//    public void increment()
+//    {
+//        this.numberOfValues += 1;
+//    }
+//
+//    public void increment(long count)
+//    {
+//        this.numberOfValues += count;
+//    }
 
     public void setHasNull()
     {
@@ -93,23 +93,23 @@ public class StatsRecorder implements ColumnStats
 
     public boolean isStatsExists()
     {
-        return (count > 0 || hasNull);
+        return (numberOfValues > 0 || hasNull);
     }
 
     public void merge(StatsRecorder stats)
     {
-        count += stats.count;
+        numberOfValues += stats.numberOfValues;
         hasNull |= stats.hasNull;
     }
 
     public void reset()
     {
-        count = 0;
+        numberOfValues = 0;
         hasNull = false;
     }
 
     public long getNumberOfValues() {
-        return count;
+        return numberOfValues;
     }
 
     public boolean hasNull() {
@@ -118,14 +118,14 @@ public class StatsRecorder implements ColumnStats
 
     @Override
     public String toString() {
-        return "count: " + count + " hasNull: " + hasNull;
+        return "numberOfValues: " + numberOfValues + " hasNull: " + hasNull;
     }
 
     public PixelsProto.ColumnStatistic.Builder serialize()
     {
         PixelsProto.ColumnStatistic.Builder builder =
                 PixelsProto.ColumnStatistic.newBuilder();
-        builder.setNumberOfValues(count);
+        builder.setNumberOfValues(numberOfValues);
         builder.setHasNull(hasNull);
         return builder;
     }
