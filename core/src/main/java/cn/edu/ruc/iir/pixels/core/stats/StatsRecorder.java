@@ -156,4 +156,31 @@ public class StatsRecorder implements ColumnStats
                 return new StatsRecorder();
         }
     }
+
+    public static StatsRecorder create(TypeDescription schema, PixelsProto.ColumnStatistic statistic)
+    {
+        switch (schema.getCategory())
+        {
+            case BOOLEAN:
+                return new BooleanStatsRecorder(statistic);
+            case BYTE:
+            case SHORT:
+            case INT:
+            case LONG:
+                return new IntegerStatsRecorder(statistic);
+            case FLOAT:
+            case DOUBLE:
+                return new DoubleStatsRecorder(statistic);
+            case STRING:
+            case CHAR:
+            case VARCHAR:
+                return new StringStatsRecorder(statistic);
+            case TIMESTAMP:
+                return new TimestampStatsRecorder(statistic);
+            case BINARY:
+                return new BinaryStatsRecorder(statistic);
+            default:
+                return new StatsRecorder(statistic);
+        }
+    }
 }
