@@ -40,7 +40,7 @@ public class TestPixelsWriter
             PixelsWriter pixelsWriter =
                     PixelsWriter.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(1000)
+                            .setPixelStride(10000)
                             .setRowGroupSize(64*1024*1024)
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
