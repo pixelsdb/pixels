@@ -63,12 +63,6 @@ public class FastScoa extends Scoa
         long startSeconds = System.currentTimeMillis() / 1000;
         this.currentEnergy = super.getCurrentWorkloadSeekCost();
 
-        //System.out.println("Initial energy of scoa is : " + this.currentEnergy);
-        //System.out.println("SCOA budget : "  + super.getComputationBudget());
-
-        //minCost = this.currentEnergy;
-        //bestColumnOrder = this.getColumnOrder();
-
         for (long currentSeconds = System.currentTimeMillis() / 1000;
              (currentSeconds - startSeconds) < super.getComputationBudget();
              currentSeconds = System.currentTimeMillis() / 1000, ++this.iterations)
@@ -91,8 +85,6 @@ public class FastScoa extends Scoa
                 updateColumnOrder(i, j);
             }
         }
-        //System.out.println("Final energy of scoa is : " + currentEnergy);
-        //this.setColumnOrder(bestColumnOrder);
     }
 
     /**
@@ -164,9 +156,9 @@ public class FastScoa extends Scoa
         double []se = new double[C];
         for (int i = 0; i < C; i ++)
         {
-            sb[i] = (i == 0 ? 0 : sb[i - 1] + this.getColumnOrder().get(i - 1).getSize());
+            sb[i] = (i == 0 ? 0 : (sb[i - 1] + this.getColumnOrder().get(i - 1).getSize()));
             se[i] = (i == 0 ? this.getColumnOrder().get(0).getSize() :
-                                se[i - 1] + this.getColumnOrder().get(i).getSize());
+                    (se[i - 1] + this.getColumnOrder().get(i).getSize()));
         }
 
         double sizeX = this.getColumnOrder().get(x).getSize();
@@ -187,17 +179,25 @@ public class FastScoa extends Scoa
                 {
                     if (prevX >= 0 && succX >= 0)
                     {
+                        //assert sb[succX] - se[prevX] >= 0;
+                        //assert sb[succX] - se[prevX]
+                        //        - sizeX
+                        //        + sizeY >= 0;
                         delta -= sc.calculate(sb[succX] - se[prevX]);
                         delta += sc.calculate(sb[succX] - se[prevX]
-                                                - sizeX
-                                                + sizeY);
+                                - sizeX
+                                + sizeY);
                     }
                     if (prevY >= 0 && succY >= 0)
                     {
+                        //assert sb[succY] - se[prevY] >= 0;
+                        //assert sb[succY] - se[prevY]
+                        //        - sizeY
+                        //        + sizeX >= 0;
                         delta -= sc.calculate(sb[succY] - se[prevY]);
                         delta += sc.calculate(sb[succY] - se[prevY]
-                                                - sizeY
-                                                + sizeX);
+                                - sizeY
+                                + sizeX);
                     }
                 }
             }
@@ -207,10 +207,15 @@ public class FastScoa extends Scoa
             }
             else
             {
+                //int x0 = x;
+                boolean swapped = false;
                 if (curSet.contains(y))
                 {
                     //do swap
                     int t; t = x; x = y; y = t;
+                    // the sizes must be swapped with the indexes
+                    double m = sizeX; sizeX = sizeY; sizeY = m;
+                    swapped = true;
                 }
                 curSet.remove(x);
                 int prevX = getPrev(curSet, x); int succX = getSucc(curSet, x);
@@ -218,52 +223,100 @@ public class FastScoa extends Scoa
                 if (succX == succY) //special case
                 {
                     if (prevX >= 0)
+                    {
+                        //assert sb[x] - se[prevX] >= 0;
                         delta -= sc.calculate(sb[x] - se[prevX]);
+                    }
                     if (succX >= 0)
+                    {
+                        //assert sb[succX] - se[x] >= 0;
                         delta -= sc.calculate(sb[succX] - se[x]);
+                    }
                     //add
                     if (x < y)
                     {
                         if (succX >= 0)
+                        {
+                            //assert sb[succX] - se[y] >= 0;
                             delta += sc.calculate(sb[succX] - se[y]);
+                        }
                         if (prevX >= 0)
+                        {
+                            //assert sb[y] - se[prevX] >= 0;
                             delta += sc.calculate(sb[y] - se[prevX]
-                                                    - sizeX
-                                                    + sizeY);
+                                    - sizeX
+                                    + sizeY);
+                        }
                     }
                     else
                     {
                         if (prevX >= 0)
+                        {
+                            //assert sb[y] - se[prevX] >= 0;
                             delta += sc.calculate(sb[y] - se[prevX]);
+                        }
                         if (succX >= 0)
+                        {
+                            //assert sb[succX] - se[y]
+                            //        - sizeX
+                            //        + sizeY >= 0;
                             delta += sc.calculate(sb[succX] - se[y]
-                                                    - sizeX
-                                                    + sizeY);
+                                    - sizeX
+                                    + sizeY);
+                        }
                     }
                 }
                 else
                 {
                     //minus
                     if (prevX >= 0)
+                    {
+                        //assert sb[x] - se[prevX] >= 0;
                         delta -= sc.calculate(sb[x] - se[prevX]);
+                    }
                     if (succX >= 0)
+                    {
+                        //assert sb[succX] - se[x] >= 0;
                         delta -= sc.calculate(sb[succX] - se[x]);
+                    }
                     if (prevY >= 0 && succY >= 0)
+                    {
+                        //assert sb[succY] - se[prevY] >= 0;
                         delta -= sc.calculate(sb[succY] - se[prevY]);
+                    }
                     //add
                     if (prevY >= 0)
+                    {
+                        //assert sb[y] - se[prevY] >= 0;
                         delta += sc.calculate(sb[y] - se[prevY]);
+                    }
                     if (succY >= 0)
+                    {
+                        //assert sb[succY] - se[y] >= 0;
                         delta += sc.calculate(sb[succY] - se[y]);
+                    }
                     if (prevX >= 0 && succX >= 0)
+                    {
+                        //assert sb[succX] - se[prevX]
+                        //        - sizeX
+                        //        + sizeY >= 0;
                         delta += sc.calculate(sb[succX] - se[prevX]
-                                                - sizeX
-                                                + sizeY);
+                                - sizeX
+                                + sizeY);
+                    }
                 }
                 curSet.add(x);
+                if (swapped)
+                {
+                    // must recover the swapped items
+                    int t; t = x; x = y; y = t;
+                    double m = sizeX; sizeX = sizeY; sizeY = m;
+                }
             }
+            //assert (! Double.isNaN(delta));
             deltaCost += delta * this.getWorkload().get(i).getWeight();
         }
+        assert (! Double.isNaN(deltaCost));
         return originSeekCost + deltaCost;
     }
 }
