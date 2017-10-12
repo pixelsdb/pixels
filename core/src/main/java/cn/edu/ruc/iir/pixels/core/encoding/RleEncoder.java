@@ -50,12 +50,7 @@ public class RleEncoder extends Encoder
         SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA
     }
 
-    private enum FixedBitSizes {
-        ONE, TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, ELEVEN, TWELVE,
-        THIRTEEN, FOURTEEN, FIFTEEN, SIXTEEN, SEVENTEEN, EIGHTEEN, NINETEEN,
-        TWENTY, TWENTYONE, TWENTYTWO, TWENTYTHREE, TWENTYFOUR, TWENTYSIX,
-        TWENTYEIGHT, THIRTY, THIRTYTWO, FORTY, FORTYEIGHT, FIFTYSIX, SIXTYFOUR;
-    }
+
 
     public RleEncoder(boolean isSigned, boolean isAlignedBitpacking)
     {
@@ -136,8 +131,6 @@ public class RleEncoder extends Encoder
         }
 
         if (isFixedDelta) {
-            assert currDelta == initialDelta
-                    : "currDelta should be equal to initialDelta for fixed delta encoding";
             encodingType = EncodingType.DELTA;
             fixedDelta = currDelta;
             return;
@@ -193,16 +186,13 @@ public class RleEncoder extends Encoder
             if ((brBits100p - brBits95p) != 0) {
                 encodingType = EncodingType.PATCHED_BASE;
                 preparePatchedBlob();
-                return;
             } else {
                 encodingType = EncodingType.DIRECT;
-                return;
             }
         } else {
             // if difference in bits between 95th percentile and 100th percentile is
             // 0, then patch length will become 0. Hence we will fallback to direct
             encodingType = EncodingType.DIRECT;
-            return;
         }
     }
 
@@ -219,7 +209,7 @@ public class RleEncoder extends Encoder
 
         // #bit for patch
         patchWidth = brBits100p - brBits95p;
-        patchWidth = getClosestFixedBits(patchWidth);
+        patchWidth = encodingUtils.getClosestFixedBits(patchWidth);
 
         // if patch bit requirement is 64 then it will not possible to pack
         // gap and patch together in a long. To make sure gap and patch can be
@@ -233,7 +223,7 @@ public class RleEncoder extends Encoder
         int gapIdx = 0;
         int patchIdx = 0;
         int prev = 0;
-        int gap = 0;
+        int gap;
         int maxGap = 0;
 
         for(int i = 0; i < numLiterals; i++) {
@@ -442,7 +432,7 @@ public class RleEncoder extends Encoder
 
     private void writeShortRepeatValues() throws IOException
     {
-        long repeatVal = 0L;
+        long repeatVal;
         if (isSigned) {
             repeatVal = zigzagEncode(literals[0]);
         }
@@ -481,7 +471,7 @@ public class RleEncoder extends Encoder
             fb = getClosestAlignedFixedBits(fb);
         }
 
-        final int efb = encodeBitWidth(fb) << 1;
+        final int efb = encodingUtils.encodeBitWidth(fb) << 1;
 
         variableRunLength -= 1;
 
@@ -503,14 +493,14 @@ public class RleEncoder extends Encoder
     private void writePatchedBaseValues() throws IOException
     {
         final int fb = brBits95p;
-        final int efb = encodeBitWidth(fb) << 1;
+        final int efb = encodingUtils.encodeBitWidth(fb) << 1;
         variableRunLength -= 1;
 
         final int tailBits = (variableRunLength & 0x100) >>> 8;
         final int headerFirstByte = getOpcode() | efb | tailBits;
         final int headerSecondByte = variableRunLength & 0xff;
 
-        final boolean isNegative = min < 0 ? true : false;
+        final boolean isNegative = min < 0;
         if (isNegative) {
             min = -min;
         }
@@ -523,7 +513,7 @@ public class RleEncoder extends Encoder
             min |= (1L << ((baseBytes * 8) - 1));
         }
 
-        final int headerThirdByte = bb | encodeBitWidth(patchWidth);
+        final int headerThirdByte = bb | encodingUtils.encodeBitWidth(patchWidth);
         final int headerFourthByte = (patchGapWidth - 1) << 5 | patchLength;
 
         // write header
@@ -537,12 +527,12 @@ public class RleEncoder extends Encoder
             outputStream.write(b);
         }
 
-        int closestFixedBits = getClosestFixedBits(fb);
+        int closestFixedBits = encodingUtils.getClosestFixedBits(fb);
 
         writeInts(baseRedLiterals, 0, numLiterals, closestFixedBits);
 
         // write patch list
-        closestFixedBits = getClosestFixedBits(patchGapWidth + patchWidth);
+        closestFixedBits = encodingUtils.getClosestFixedBits(patchGapWidth + patchWidth);
 
         writeInts(gapVsPatchList, 0, gapVsPatchList.length, closestFixedBits);
 
@@ -552,7 +542,7 @@ public class RleEncoder extends Encoder
 
     private void writeDeltaValues() throws IOException
     {
-        int len = 0;
+        int len;
         int fb = bitsDeltaMax;
         int efb = 0;
 
@@ -579,7 +569,7 @@ public class RleEncoder extends Encoder
             if (fb == 1) {
                 fb = 2;
             }
-            efb = encodeBitWidth(fb);
+            efb = encodingUtils.encodeBitWidth(fb);
             efb = efb << 1;
             len = variableRunLength - 1;
             variableRunLength = 0;
@@ -754,7 +744,7 @@ public class RleEncoder extends Encoder
 
         int[] hist = new int[32];
         for (int i = offset; i < offset + length; i++) {
-            int idx = encodeBitWidth(findClosestNumBits(data[i]));
+            int idx = encodingUtils.encodeBitWidth(findClosestNumBits(data[i]));
             hist[idx] += 1;
         }
 
@@ -763,60 +753,11 @@ public class RleEncoder extends Encoder
         for (int i = hist.length - 1; i >= 0; i--) {
             perLen -= hist[i];
             if (perLen < 0) {
-                return decodeBitWidth(i);
+                return encodingUtils.decodeBitWidth(i);
             }
         }
 
         return 0;
-    }
-
-    private int encodeBitWidth(int n)
-    {
-        n = getClosestFixedBits(n);
-
-        if (n >= 1 && n <= 24) {
-            return n - 1;
-        } else if (n > 24 && n <= 26) {
-            return FixedBitSizes.TWENTYSIX.ordinal();
-        } else if (n > 26 && n <= 28) {
-            return FixedBitSizes.TWENTYEIGHT.ordinal();
-        } else if (n > 28 && n <= 30) {
-            return FixedBitSizes.THIRTY.ordinal();
-        } else if (n > 30 && n <= 32) {
-            return FixedBitSizes.THIRTYTWO.ordinal();
-        } else if (n > 32 && n <= 40) {
-            return FixedBitSizes.FORTY.ordinal();
-        } else if (n > 40 && n <= 48) {
-            return FixedBitSizes.FORTYEIGHT.ordinal();
-        } else if (n > 48 && n <= 56) {
-            return FixedBitSizes.FIFTYSIX.ordinal();
-        } else {
-            return FixedBitSizes.SIXTYFOUR.ordinal();
-        }
-    }
-
-    private int decodeBitWidth(int n)
-    {
-        if (n >= FixedBitSizes.ONE.ordinal()
-                && n <= FixedBitSizes.TWENTYFOUR.ordinal()) {
-            return n + 1;
-        } else if (n == FixedBitSizes.TWENTYSIX.ordinal()) {
-            return 26;
-        } else if (n == FixedBitSizes.TWENTYEIGHT.ordinal()) {
-            return 28;
-        } else if (n == FixedBitSizes.THIRTY.ordinal()) {
-            return 30;
-        } else if (n == FixedBitSizes.THIRTYTWO.ordinal()) {
-            return 32;
-        } else if (n == FixedBitSizes.FORTY.ordinal()) {
-            return 40;
-        } else if (n == FixedBitSizes.FORTYEIGHT.ordinal()) {
-            return 48;
-        } else if (n == FixedBitSizes.FIFTYSIX.ordinal()) {
-            return 56;
-        } else {
-            return 64;
-        }
     }
 
     private int findClosestNumBits(long value)
@@ -826,34 +767,7 @@ public class RleEncoder extends Encoder
             count++;
             value = value >>> 1;
         }
-        return getClosestFixedBits(count);
-    }
-
-    private int getClosestFixedBits(int n)
-    {
-        if (n == 0) {
-            return 1;
-        }
-
-        if (n >= 1 && n <= 24) {
-            return n;
-        } else if (n > 24 && n <= 26) {
-            return 26;
-        } else if (n > 26 && n <= 28) {
-            return 28;
-        } else if (n > 28 && n <= 30) {
-            return 30;
-        } else if (n > 30 && n <= 32) {
-            return 32;
-        } else if (n > 32 && n <= 40) {
-            return 40;
-        } else if (n > 40 && n <= 48) {
-            return 48;
-        } else if (n > 48 && n <= 56) {
-            return 56;
-        } else {
-            return 64;
-        }
+        return encodingUtils.getClosestFixedBits(count);
     }
 
     private int getClosestAlignedFixedBits(int n) {

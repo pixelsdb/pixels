@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.encoding;
 
+import java.io.IOException;
+
 /**
  * pixels
  *
@@ -7,5 +9,5 @@ package cn.edu.ruc.iir.pixels.core.encoding;
  */
 public abstract class IntDecoder extends Decoder
 {
-    public abstract long next();
+    public abstract long next() throws IOException;
 }
