@@ -6,7 +6,6 @@ import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 
 /**
  * pixels run length encoding
@@ -31,7 +30,6 @@ public class RleEncoder extends Encoder
     private boolean isFixedDelta;
     private boolean isSigned;
     private boolean isAlignedBitpacking;
-    private EncodingType encoding;
 
     private int zzBits90p;
     private int zzBits100p;
@@ -74,6 +72,7 @@ public class RleEncoder extends Encoder
         {
             this.write(v);
         }
+        flush();
         return outputStream.toByteArray();
     }
 
@@ -97,7 +96,7 @@ public class RleEncoder extends Encoder
         long deltaMax = 0;
         this.adjDeltas[0] = initialDelta;
 
-        for (int i = 0; i < numLiterals; i++) {
+        for (int i = 1; i < numLiterals; i++) {
             final long l1 = literals[i];
             final long l0 = literals[i - 1];
             currDelta = l1 - l0;
@@ -118,7 +117,7 @@ public class RleEncoder extends Encoder
         // PATCHED_BASE condition as encoding using DIRECT is faster and has less
         // overhead than PATCHED_BASE
         if (isSafeSubtract(max, min)) {
-            encoding = EncodingType.DIRECT;
+            encodingType = EncodingType.DIRECT;
             return;
         }
 
@@ -132,14 +131,14 @@ public class RleEncoder extends Encoder
                     ", isFixedDelta cannot be false";
             assert currDelta == 0 : min + "==" + max + ", currDelta should be zero";
             fixedDelta = 0;
-            encoding = EncodingType.DELTA;
+            encodingType = EncodingType.DELTA;
             return;
         }
 
         if (isFixedDelta) {
             assert currDelta == initialDelta
                     : "currDelta should be equal to initialDelta for fixed delta encoding";
-            encoding = EncodingType.DELTA;
+            encodingType = EncodingType.DELTA;
             fixedDelta = currDelta;
             return;
         }
@@ -153,7 +152,7 @@ public class RleEncoder extends Encoder
 
             // monotonic condition
             if (isIncreasing || isDecreasing) {
-                encoding = EncodingType.DELTA;
+                encodingType = EncodingType.DELTA;
                 return;
             }
         }
@@ -192,17 +191,17 @@ public class RleEncoder extends Encoder
             // The decision to use patched base was based on zigzag values, but the
             // actual patching is done on base reduced literals.
             if ((brBits100p - brBits95p) != 0) {
-                encoding = EncodingType.PATCHED_BASE;
+                encodingType = EncodingType.PATCHED_BASE;
                 preparePatchedBlob();
                 return;
             } else {
-                encoding = EncodingType.DIRECT;
+                encodingType = EncodingType.DIRECT;
                 return;
             }
         } else {
             // if difference in bits between 95th percentile and 100th percentile is
             // 0, then patch length will become 0. Hence we will fallback to direct
-            encoding = EncodingType.DIRECT;
+            encodingType = EncodingType.DIRECT;
             return;
         }
     }
@@ -324,6 +323,9 @@ public class RleEncoder extends Encoder
                 writeDeltaValues();
             }
         }
+
+        // clear all the variables
+        clear();
     }
 
     private void write(long value) throws IOException
@@ -405,6 +407,34 @@ public class RleEncoder extends Encoder
                             writeValues();
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private void flush() throws IOException
+    {
+        if (numLiterals != 0) {
+            if (variableRunLength != 0) {
+                determineEncoding();
+                writeValues();
+            }
+            else if (fixedRunLength != 0) {
+                if (fixedRunLength < Constants.MIN_REPEAT) {
+                    variableRunLength = fixedRunLength;
+                    fixedRunLength = 0;
+                    determineEncoding();
+                    writeValues();
+                }
+                else if (fixedRunLength >= Constants.MIN_REPEAT
+                        && fixedRunLength <= Constants.MAX_SHORT_REPEAT_LENGTH) {
+                    encodingType = EncodingType.SHORT_REPEAT;
+                    writeValues();
+                }
+                else {
+                    encodingType = EncodingType.DELTA;
+                    isFixedDelta = true;
+                    writeValues();
                 }
             }
         }
@@ -668,6 +698,24 @@ public class RleEncoder extends Encoder
 //            current = 0;
 //            bitsLeft = 8;
         }
+    }
+
+    private void clear() {
+        numLiterals = 0;
+        encodingType = null;
+        prevDelta = 0;
+        fixedDelta = 0;
+        zzBits90p = 0;
+        zzBits100p = 0;
+        brBits95p = 0;
+        brBits100p = 0;
+        bitsDeltaMax = 0;
+        patchGapWidth = 0;
+        patchLength = 0;
+        patchWidth = 0;
+        gapVsPatchList = null;
+        min = 0;
+        isFixedDelta = true;
     }
 
     private void initializeLiterals(long val)
