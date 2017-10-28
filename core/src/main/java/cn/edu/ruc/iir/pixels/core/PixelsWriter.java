@@ -50,6 +50,7 @@ public class PixelsWriter
     private final long blockSize;
     private final short replication;
     private final boolean blockPadding;
+    private final boolean encoding;
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
@@ -78,7 +79,8 @@ public class PixelsWriter
             Path filePath,
             long blockSize,
             short replication,
-            boolean blockPadding)
+            boolean blockPadding,
+            boolean encoding)
     {
         this.schema = schema;
         this.pixelStride = pixelStride;
@@ -91,6 +93,7 @@ public class PixelsWriter
         this.blockSize = blockSize;
         this.replication = replication;
         this.blockPadding = blockPadding;
+        this.encoding = encoding;
 
         List<TypeDescription> children = schema.getChildren();
         assert children != null;
@@ -129,6 +132,7 @@ public class PixelsWriter
         private long builderBlockSize;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
+        private boolean encoding = true;
 
         public Builder setSchema(TypeDescription schema)
         {
@@ -207,6 +211,13 @@ public class PixelsWriter
             return this;
         }
 
+        public Builder setEncoding(boolean encoding)
+        {
+            this.encoding = encoding;
+
+            return this;
+        }
+
         public PixelsWriter build()
         {
             return new PixelsWriter(
@@ -220,7 +231,8 @@ public class PixelsWriter
                     builderFilePath,
                     builderBlockSize,
                     builderReplication,
-                    builderBlockPadding);
+                    builderBlockPadding,
+                    encoding);
         }
     }
 
@@ -284,6 +296,11 @@ public class PixelsWriter
         return blockPadding;
     }
 
+    public boolean isEncoding()
+    {
+        return encoding;
+    }
+
     public ColumnWriter[] getColumnWriters()
     {
         return columnWriters;
@@ -295,6 +312,7 @@ public class PixelsWriter
             this.isNewRowGroup = false;
             this.curRowGroupNumOfRows = 0L;
         }
+        curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
         for (int i = 0; i < cvs.length; i++)

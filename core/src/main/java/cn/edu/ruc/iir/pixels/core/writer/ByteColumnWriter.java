@@ -20,7 +20,7 @@ public class ByteColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector, int length)
+    public int writeBatch(ColumnVector vector, int length, boolean encoding)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;

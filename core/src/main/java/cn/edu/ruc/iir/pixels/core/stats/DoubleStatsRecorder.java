@@ -43,7 +43,7 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
     }
 
     @Override
-    public void updateDouble(double value)
+    public void update(double value)
     {
         if (!hasMinimum) {
             hasMinimum = true;

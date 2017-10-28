@@ -13,12 +13,23 @@ public abstract class Encoder
 {
     public byte[] encode(boolean[] values)
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
+        throw new PixelsEncodingException("Encoding boolean values is not supported");
+    }
+
+    public byte[] encode(boolean[] values, long offset, long length)
+    {
+        throw new PixelsEncodingException("Encoding boolean values is not supported");
     }
 
     public byte[] encode(char[] values)
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
+        throw new PixelsEncodingException("Encoding char values is not supported");
+    }
+
+    public byte[] encode(char[] values, long offset, long length)
+    {
+        throw new PixelsEncodingException("Encoding char values is not supported");
+
     }
 
     public byte[] encode(int[] values)
@@ -26,23 +37,28 @@ public abstract class Encoder
         throw new PixelsEncodingException("Encoding int values is not supported");
     }
 
-    public byte[] encode(short[] values)
+    public byte[] encode(int[] values, long offset, long length)
     {
         throw new PixelsEncodingException("Encoding int values is not supported");
+    }
+
+    public byte[] encode(short[] values)
+    {
+        throw new PixelsEncodingException("Encoding short values is not supported");
+    }
+
+    public byte[] encode(short[] values, long offset, long length)
+    {
+        throw new PixelsEncodingException("Encoding short values is not supported");
     }
 
     public byte[] encode(long[] values) throws IOException
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
+        throw new PixelsEncodingException("Encoding long values is not supported");
     }
 
-    public byte[] encode(float[] values)
+    public byte[] encode(long[] values, long offset, long length) throws IOException
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
-    }
-
-    public byte[] encode(double[] values)
-    {
-        throw new PixelsEncodingException("Encoding int values is not supported");
+        throw new PixelsEncodingException("Encoding long values is not supported");
     }
 }

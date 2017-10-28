@@ -48,7 +48,7 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
     }
 
     @Override
-    public void updateInteger(long value, int repetitions)
+    public void update(long value, int repetitions)
     {
         numberOfValues += repetitions;
         if (!hasMinimum) {

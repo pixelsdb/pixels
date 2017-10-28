@@ -19,7 +19,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector, int length)
+    public int writeBatch(ColumnVector vector, int length, boolean encoding)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         double[] values = columnVector.vector;

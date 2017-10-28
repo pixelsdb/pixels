@@ -4,6 +4,8 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
+import java.io.IOException;
+
 /**
  * pixels
  *
@@ -11,7 +13,7 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
  */
 public interface ColumnWriter
 {
-    int writeBatch(ColumnVector vector, int length);
+    int writeBatch(ColumnVector vector, int length) throws IOException;
     byte[] serializeContent();
     int getColumnChunkSize();
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();

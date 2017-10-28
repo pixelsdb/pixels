@@ -50,7 +50,10 @@ public class RleEncoder extends Encoder
         SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA
     }
 
-
+    public RleEncoder()
+    {
+        this(true, true);
+    }
 
     public RleEncoder(boolean isSigned, boolean isAlignedBitpacking)
     {
@@ -60,8 +63,7 @@ public class RleEncoder extends Encoder
         this.encodingUtils = new EncodingUtils();
     }
 
-    @Override
-    public byte[] encode(long[] values) throws IOException
+    public byte[] encode(long[] values, long offset, long length) throws IOException
     {
         for (long v : values)
         {
@@ -69,6 +71,12 @@ public class RleEncoder extends Encoder
         }
         flush();
         return outputStream.toByteArray();
+    }
+
+    @Override
+    public byte[] encode(long[] values) throws IOException
+    {
+        return encode(values, 0, values.length);
     }
 
     private void determineEncoding()

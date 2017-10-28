@@ -30,63 +30,63 @@ public class StatsRecorder implements ColumnStats
         }
     }
 
-//    public void increment()
-//    {
-//        this.numberOfValues += 1;
-//    }
-//
-//    public void increment(long count)
-//    {
-//        this.numberOfValues += count;
-//    }
+    public void increment()
+    {
+        this.numberOfValues += 1;
+    }
+
+    public void increment(long count)
+    {
+        this.numberOfValues += count;
+    }
 
     public void setHasNull()
     {
         this.hasNull = true;
     }
 
-    public void updateBoolean(boolean value, int repetitions)
+    public void update(boolean value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update boolean");
     }
 
-    public void updateInteger(long value, int repetitions)
+    public void update(long value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update integer");
     }
 
-    public void updateFloat(float value)
+    public void update(float value)
     {
         throw new UnsupportedOperationException("Can't update float");
     }
 
-    public void updateDouble(double value)
+    public void update(double value)
     {
         throw new UnsupportedOperationException("Can't update double");
     }
 
-    public void updateString(String value, int repetitions)
+    public void update(String value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update string");
     }
 
-    public void updateBinary(byte[] bytes, int offset, int length,
+    public void update(byte[] bytes, int offset, int length,
                              int repetitions)
     {
         throw new UnsupportedOperationException("Can't update string");
     }
 
-    public void updateDate(int value)
+    public void update(int value)
     {
         throw new UnsupportedOperationException("Can't update date");
     }
 
-    public void updateTimestamp(Timestamp value)
+    public void update(Timestamp value)
     {
         throw new UnsupportedOperationException("Can't update timestamp");
     }
 
-    public void updateTimestamp(long value)
+    public void update(long value)
     {
         throw new UnsupportedOperationException("Can't update timestamp");
     }

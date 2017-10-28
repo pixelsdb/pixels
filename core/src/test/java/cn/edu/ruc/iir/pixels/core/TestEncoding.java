@@ -7,6 +7,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * pixels
@@ -18,7 +19,7 @@ public class TestEncoding
     @Test
     public void runLengthTest()
     {
-        long[] values = {100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L};
+        long[] values = {100L, 100L, 100L, 100L, 100L, 100L, 102L, 101L, 90L, 100L, 100L};
         RleEncoder encoder = new RleEncoder(false, true);
         try
         {
@@ -27,8 +28,8 @@ public class TestEncoding
             while (decoder.hasNext()) {
                 System.out.println(decoder.next());
             }
-//            System.out.println(bytes.length);
-//            System.out.println(Arrays.toString(bytes));
+            System.out.println(bytes.length);
+            System.out.println(Arrays.toString(bytes));
         } catch (IOException e)
         {
             e.printStackTrace();

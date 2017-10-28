@@ -20,7 +20,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector, int length)
+    public int writeBatch(ColumnVector vector, int length, boolean encoding)
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         ByteBuffer buffer = ByteBuffer.allocate(length * Long.BYTES);
