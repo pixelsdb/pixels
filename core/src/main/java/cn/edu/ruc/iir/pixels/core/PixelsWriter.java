@@ -306,6 +306,10 @@ public class PixelsWriter
         return columnWriters;
     }
 
+    /**
+     * Add row batch
+     * currently not support repeating in ColumnVector
+     * */
     public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         if (isNewRowGroup) {

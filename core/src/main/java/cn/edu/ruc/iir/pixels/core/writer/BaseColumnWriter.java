@@ -24,10 +24,9 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final StatsRecorder pixelStatRecorder;
     final StatsRecorder columnChunkStatRecorder;
 
-    int lastPixelPosition = 0;         // ending offset of last pixel in the file
-    int curPixelPosition = 0;                  // current offset of this pixel in the file
+    int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
+    int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
 
-    ColumnVector curPixelVector;               // previous column vector haven't written out yet
     int curPixelEleCount = 0;                  // count of elements in previous vector
 
     Encoder encoder;

@@ -16,7 +16,8 @@ import java.nio.ByteBuffer;
  */
 public class IntegerColumnWriter extends BaseColumnWriter
 {
-    // todo what is pixel position recorded in column chunk index? absolute in pixel or in row group of in file?
+    private final LongColumnVector curPixelVector;        // current pixel value vector haven't written out yet
+
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
@@ -33,10 +34,6 @@ public class IntegerColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;           // starting offset of the partition which belongs to current pixel
         boolean newPixelFlag = false;    // set to true if this batch write triggers a new pixel
 
-        // temp holder of current partition buffer/values
-        ByteBuffer curVecPartitionBuffer;
-        long[] curVecPartitionValues;
-
         // do the calculation to partition the vector into current pixel and next one
         // doing this pre-calculation to eliminate branch prediction inside the for loop
         if ((curPixelEleCount + size) >= pixelStride) {
@@ -47,33 +44,28 @@ public class IntegerColumnWriter extends BaseColumnWriter
             curPartLength = size;
         }
 
-        // update element count of current pixel
+        // fill in current pixel value vector with current partition
+        System.arraycopy(values, 0, curPixelVector.vector, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
-        // update stats inside the for loop
-        for (int i = 0; i < curPartLength; i++)
-        {
-            int value =(int) values[i + curPartOffset];
-            pixelStatRecorder.update(value, 1);
-        }
-
-        // write out
-        // 1. write out curPixelVector
-        // 2. write out curVecPartitionBuffer/curVecPartitionValues
-        // 3. update curPixelVector
+        // write out a new pixel
         if (newPixelFlag)
         {
+            // update stats
+            for (int i = 0; i < curPixelEleCount; i++) {
+                pixelStatRecorder.update((int) curPixelVector.vector[i], 1);
+            }
+
+            // write out current pixel vector
             if (isEncoding)
             {
-                curVecPartitionValues = new long[curPartLength];
-                System.arraycopy(values, curPartOffset, curVecPartitionValues, 0, curPartLength);
-                outputStream.write(encoder.encode(curVecPartitionValues));
+                outputStream.write(encoder.encode(curPixelVector.vector));
             } else
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPartLength * Integer.BYTES);
-                for (int i = 0; i < curPartLength; i++)
+                ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
+                for (int i = 0; i < curPixelEleCount; i++)
                 {
-                    curVecPartitionBuffer.putInt((int) values[i + curPartOffset]);
+                    curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
                 }
                 outputStream.write(curVecPartitionBuffer.array());
             }
@@ -82,7 +74,6 @@ public class IntegerColumnWriter extends BaseColumnWriter
             curPixelPosition = outputStream.size();
 
             // reset and clean up. inline to remove function call newPixel().
-            //
             // 1. set current pixel element count to 0 for the next batch pixel writing
             // 2. update column chunk stat
             // 3. add current pixel stat and position info to columnChunkIndex
@@ -98,6 +89,14 @@ public class IntegerColumnWriter extends BaseColumnWriter
             lastPixelPosition = curPixelPosition;
             pixelStatRecorder.reset();
         }
+
+        // update current pixel vector
+        System.arraycopy(values,
+                curPartOffset + curPartLength,
+                curPixelVector.vector,
+                curPixelEleCount,
+                size - curPartLength);
+        curPixelEleCount += (size - curPartLength);
 
         return outputStream.size();
     }
