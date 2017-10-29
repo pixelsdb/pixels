@@ -41,7 +41,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
     }
 
     @Override
-    public void update(long value)
+    public void updateTimestamp(long value)
     {
         if (hasMinimum) {
             if (value < minimum) {
@@ -59,7 +59,7 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
     }
 
     @Override
-    public void update(Timestamp value)
+    public void updateTimestamp(Timestamp value)
     {
         if (hasMinimum) {
             if (value.getTime() < minimum) {

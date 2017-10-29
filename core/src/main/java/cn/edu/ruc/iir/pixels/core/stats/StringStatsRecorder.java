@@ -40,7 +40,7 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
     }
 
     @Override
-    public void update(String value, int repetitions)
+    public void updateString(String value, int repetitions)
     {
         if (minimum == null) {
             minimum = maximum = value;

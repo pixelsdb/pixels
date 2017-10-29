@@ -28,7 +28,7 @@ public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumn
     }
 
     @Override
-    public void update(boolean value, int repetitions)
+    public void updateBoolean(boolean value, int repetitions)
     {
         if (value) {
             trueCount += repetitions;

@@ -31,7 +31,7 @@ public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnSt
     }
 
     @Override
-    public void update(byte[] bytes, int offset, int length, int repetitions)
+    public void updateBinary(byte[] bytes, int offset, int length, int repetitions)
     {
         sum += (long) length * repetitions;
         numberOfValues += repetitions;

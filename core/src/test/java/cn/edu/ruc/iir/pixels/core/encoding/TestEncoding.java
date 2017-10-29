@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.core;
+package cn.edu.ruc.iir.pixels.core.encoding;
 
 import cn.edu.ruc.iir.pixels.core.encoding.IntDecoder;
 import cn.edu.ruc.iir.pixels.core.encoding.RleDecoder;

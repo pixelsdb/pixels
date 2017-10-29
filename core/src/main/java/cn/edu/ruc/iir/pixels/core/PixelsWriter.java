@@ -322,7 +322,7 @@ public class PixelsWriter
         for (int i = 0; i < cvs.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.writeBatch(cvs[i], rowBatch.size);
+            curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
         if (curRowGroupDataLength >= rowGroupSize) {
@@ -352,7 +352,7 @@ public class PixelsWriter
         }
     }
 
-    private void writeRowGroup()
+    private void writeRowGroup() throws IOException
     {
         this.isNewRowGroup = true;
         int rowGroupDataLength = 0;
@@ -368,7 +368,7 @@ public class PixelsWriter
         for (ColumnWriter writer : columnWriters)
         {
             // new chunk for each writer
-            writer.newChunk();
+            writer.flush();
             rowGroupDataLength += writer.getColumnChunkSize();
         }
 
@@ -559,27 +559,27 @@ public class PixelsWriter
         switch (schema.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(schema, pixelStride);
+                return new BooleanColumnWriter(schema, pixelStride, isEncoding);
             case BYTE:
-                return new ByteColumnWriter(schema, pixelStride);
+                return new ByteColumnWriter(schema, pixelStride, isEncoding);
             case SHORT:
             case INT:
             case LONG:
                 return new IntegerColumnWriter(schema, pixelStride, isEncoding);
             case FLOAT:
-                return new FloatColumnWriter(schema, pixelStride);
+                return new FloatColumnWriter(schema, pixelStride, isEncoding);
             case DOUBLE:
-                return new DoubleColumnWriter(schema, pixelStride);
+                return new DoubleColumnWriter(schema, pixelStride, isEncoding);
             case STRING:
-                return new StringColumnWriter(schema, pixelStride);
+                return new StringColumnWriter(schema, pixelStride, isEncoding);
             case CHAR:
-                return new CharColumnWriter(schema, pixelStride);
+                return new CharColumnWriter(schema, pixelStride, isEncoding);
             case VARCHAR:
-                return new VarcharColumnWriter(schema, pixelStride);
+                return new VarcharColumnWriter(schema, pixelStride, isEncoding);
             case BINARY:
-                return new BinaryColumnWriter(schema, pixelStride);
+                return new BinaryColumnWriter(schema, pixelStride, isEncoding);
             case TIMESTAMP:
-                return new TimestampColumnWriter(schema, pixelStride);
+                return new TimestampColumnWriter(schema, pixelStride, isEncoding);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + schema.getCategory());
         }

@@ -21,6 +21,8 @@ import java.util.TimeZone;
  */
 public class PixelsCompactor
 {
+    // todo applying refactor in PixelsCompactor
+
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriter.class);
 
     private final TypeDescription schema;
@@ -325,7 +327,7 @@ public class PixelsCompactor
                 {
                     readLength += in.read(chunkBuffer);
                 }
-                long offset = this.physicalWriter.appendRowGroupBuffer(chunkBuffer);
+                long offset = this.physicalWriter.append(chunkBuffer);
                 columnChunkIndexBuilder.setChunkOffset(offset);
                 this.physicalWriter.flush();
             } catch (IOException e)
@@ -346,7 +348,7 @@ public class PixelsCompactor
             rowGroupFooterBuffer.put(rowGroupFooter.toByteArray());
             try
             {
-                long rowGroupFooterOffset = physicalWriter.appendRowGroupBuffer(rowGroupFooterBuffer);
+                long rowGroupFooterOffset = physicalWriter.append(rowGroupFooterBuffer);
                 physicalWriter.flush();
                 this.rowGroupInfoBuilderList.get(i).setFooterOffset(rowGroupFooterOffset);
                 this.rowGroupInfoBuilderList.get(i).setFooterLength(rowGroupFooter.getSerializedSize());
@@ -397,7 +399,7 @@ public class PixelsCompactor
                         .setFooterLength(footer.getSerializedSize())
                         .setPostscriptLength(postScript.getSerializedSize())
                         .build();
-        physicalWriter.writeFileTail(fileTail);
+//        physicalWriter.writeFileTail(fileTail);
     }
 
     private PixelsProto.Footer writeFooter()

@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,8 +35,8 @@ public class TestPixelsWriter
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            DoubleColumnVector x = (DoubleColumnVector) rowBatch.cols[0];
-            BytesColumnVector y = (BytesColumnVector) rowBatch.cols[1];
+            LongColumnVector x = (LongColumnVector) rowBatch.cols[0];
+            LongColumnVector y = (LongColumnVector) rowBatch.cols[1];
 
             PixelsWriter pixelsWriter =
                     PixelsWriter.newBuilder()
@@ -52,8 +53,8 @@ public class TestPixelsWriter
             for (int i = 0; i < TestParams.rowNum; i++)
             {
                 int row = rowBatch.size++;
-                x.vector[row] = i * 1.2;
-                y.vector[row] = "test".getBytes();
+                x.vector[row] = i;
+                y.vector[row] = i * 2;
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);

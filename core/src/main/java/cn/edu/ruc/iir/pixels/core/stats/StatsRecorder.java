@@ -45,48 +45,48 @@ public class StatsRecorder implements ColumnStats
         this.hasNull = true;
     }
 
-    public void update(boolean value, int repetitions)
+    public void updateBoolean(boolean value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update boolean");
     }
 
-    public void update(long value, int repetitions)
+    public void updateInteger(long value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update integer");
     }
 
-    public void update(float value)
+    public void updateFloat(float value)
     {
         throw new UnsupportedOperationException("Can't update float");
     }
 
-    public void update(double value)
+    public void updateDouble(double value)
     {
         throw new UnsupportedOperationException("Can't update double");
     }
 
-    public void update(String value, int repetitions)
+    public void updateString(String value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update string");
     }
 
-    public void update(byte[] bytes, int offset, int length,
+    public void updateBinary(byte[] bytes, int offset, int length,
                              int repetitions)
     {
         throw new UnsupportedOperationException("Can't update string");
     }
 
-    public void update(int value)
+    public void updateDate(int value)
     {
         throw new UnsupportedOperationException("Can't update date");
     }
 
-    public void update(Timestamp value)
+    public void updateTimestamp(Timestamp value)
     {
         throw new UnsupportedOperationException("Can't update timestamp");
     }
 
-    public void update(long value)
+    public void updateTimestamp(long value)
     {
         throw new UnsupportedOperationException("Can't update timestamp");
     }

@@ -13,12 +13,12 @@ import java.io.IOException;
  */
 public interface ColumnWriter
 {
-    int writeBatch(ColumnVector vector, int length) throws IOException;
+    int write(ColumnVector vector, int length) throws IOException;
     byte[] getColumnChunkContent();
     int getColumnChunkSize();
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();
     PixelsProto.ColumnStatistic.Builder getColumnChunkStat();
     StatsRecorder getColumnChunkStatRecorder();
-    void newChunk();
     void reset();
+    void flush() throws IOException;
 }

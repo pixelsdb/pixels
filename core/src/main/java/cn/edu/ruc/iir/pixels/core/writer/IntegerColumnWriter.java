@@ -26,7 +26,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int writeBatch(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
@@ -45,59 +45,66 @@ public class IntegerColumnWriter extends BaseColumnWriter
         }
 
         // fill in current pixel value vector with current partition
-        System.arraycopy(values, 0, curPixelVector.vector, curPixelEleCount, curPartLength);
+        System.arraycopy(values, curPartOffset, curPixelVector.vector, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         // write out a new pixel
         if (newPixelFlag)
         {
-            // update stats
-            for (int i = 0; i < curPixelEleCount; i++) {
-                pixelStatRecorder.update((int) curPixelVector.vector[i], 1);
-            }
-
-            // write out current pixel vector
-            if (isEncoding)
-            {
-                outputStream.write(encoder.encode(curPixelVector.vector));
-            } else
-            {
-                ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
-                for (int i = 0; i < curPixelEleCount; i++)
-                {
-                    curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
-                }
-                outputStream.write(curVecPartitionBuffer.array());
-            }
-
-            // update position of current pixel
-            curPixelPosition = outputStream.size();
-
-            // reset and clean up. inline to remove function call newPixel().
-            // 1. set current pixel element count to 0 for the next batch pixel writing
-            // 2. update column chunk stat
-            // 3. add current pixel stat and position info to columnChunkIndex
-            // 4. update lastPixelPosition to current one
-            // 5. reset current pixel stat recorder
-            curPixelEleCount = 0;
-            columnChunkStatRecorder.merge(pixelStatRecorder);
-            PixelsProto.PixelStatistic.Builder pixelStat =
-                    PixelsProto.PixelStatistic.newBuilder();
-            pixelStat.setStatistic(pixelStatRecorder.serialize());
-            columnChunkIndex.addPixelPositions(lastPixelPosition);
-            columnChunkIndex.addPixelStatistics(pixelStat.build());
-            lastPixelPosition = curPixelPosition;
-            pixelStatRecorder.reset();
+            newPixel();
         }
 
+        curPartOffset += curPartLength;
         // update current pixel vector
         System.arraycopy(values,
-                curPartOffset + curPartLength,
+                curPartOffset,
                 curPixelVector.vector,
                 curPixelEleCount,
                 size - curPartLength);
         curPixelEleCount += (size - curPartLength);
 
         return outputStream.size();
+    }
+
+    @Override
+    void newPixel() throws IOException
+    {
+        // update stats
+        for (int i = 0; i < curPixelEleCount; i++) {
+            pixelStatRecorder.updateInteger((int) curPixelVector.vector[i], 1);
+        }
+
+        // write out current pixel vector
+        if (isEncoding)
+        {
+            outputStream.write(encoder.encode(curPixelVector.vector));
+        } else
+        {
+            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
+            for (int i = 0; i < curPixelEleCount; i++)
+            {
+                curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
+            }
+            outputStream.write(curVecPartitionBuffer.array());
+        }
+
+        // update position of current pixel
+        curPixelPosition = outputStream.size();
+
+        // reset and clean up. inline to remove function call newPixel().
+        // 1. set current pixel element count to 0 for the next batch pixel writing
+        // 2. update column chunk stat
+        // 3. add current pixel stat and position info to columnChunkIndex
+        // 4. update lastPixelPosition to current one
+        // 5. reset current pixel stat recorder
+        curPixelEleCount = 0;
+        columnChunkStatRecorder.merge(pixelStatRecorder);
+        PixelsProto.PixelStatistic.Builder pixelStat =
+                PixelsProto.PixelStatistic.newBuilder();
+        pixelStat.setStatistic(pixelStatRecorder.serialize());
+        columnChunkIndex.addPixelPositions(lastPixelPosition);
+        columnChunkIndex.addPixelStatistics(pixelStat.build());
+        lastPixelPosition = curPixelPosition;
+        pixelStatRecorder.reset();
     }
 }
