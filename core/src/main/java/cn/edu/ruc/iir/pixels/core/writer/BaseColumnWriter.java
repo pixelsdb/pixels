@@ -67,7 +67,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     /**
      * Get byte array of column chunk content
      * */
-    public byte[] serializeContent()
+    @Override
+    public byte[] getColumnChunkContent()
     {
         return outputStream.toByteArray();
     }
@@ -122,16 +123,16 @@ public abstract class BaseColumnWriter implements ColumnWriter
      * 4. update lastPixelPosition to current one
      * 5. reset current pixel stat recorder
      */
-//    void newPixel()
-//    {
-//        curPixelEleCount = 0;
-//        columnChunkStatRecorder.merge(pixelStatRecorder);
-//        PixelsProto.PixelStatistic.Builder pixelStat =
-//                PixelsProto.PixelStatistic.newBuilder();
-//        pixelStat.setStatistic(pixelStatRecorder.serialize());
-//        columnChunkIndex.addPixelPositions(lastPixelPosition);
-//        columnChunkIndex.addPixelStatistics(pixelStat.build());
-//        lastPixelPosition = curPixelPosition;
-//        pixelStatRecorder.reset();
-//    }
+    void newPixel()
+    {
+        curPixelEleCount = 0;
+        columnChunkStatRecorder.merge(pixelStatRecorder);
+        PixelsProto.PixelStatistic.Builder pixelStat =
+                PixelsProto.PixelStatistic.newBuilder();
+        pixelStat.setStatistic(pixelStatRecorder.serialize());
+        columnChunkIndex.addPixelPositions(lastPixelPosition);
+        columnChunkIndex.addPixelStatistics(pixelStat.build());
+        lastPixelPosition = curPixelPosition;
+        pixelStatRecorder.reset();
+    }
 }

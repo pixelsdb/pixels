@@ -101,7 +101,7 @@ public class PixelsWriter
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = createColumnWriter(children.get(i));
+            columnWriters[i] = createColumnWriter(children.get(i), encoding);
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -306,7 +306,7 @@ public class PixelsWriter
         return columnWriters;
     }
 
-    public void addRowBatch(VectorizedRowBatch rowBatch)
+    public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         if (isNewRowGroup) {
             this.isNewRowGroup = false;
@@ -360,23 +360,28 @@ public class PixelsWriter
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
                 PixelsProto.RowGroupIndex.newBuilder();
 
-        for (int i = 0; i < columnWriters.length; i++)
+        // reset each column writer and get current row group content size in bytes
+        for (ColumnWriter writer : columnWriters)
         {
-            ColumnWriter writer = columnWriters[i];
             // new chunk for each writer
             writer.newChunk();
             rowGroupDataLength += writer.getColumnChunkSize();
         }
 
-        // write row group content
-        ByteBuffer curRowGroupDataBuffer = ByteBuffer.allocate(rowGroupDataLength);
-        for (ColumnWriter writer : columnWriters)
-        {
-            curRowGroupDataBuffer.put(writer.serializeContent());
-        }
+        // write and flush row group content
         try {
-            curRowGroupOffset = physicalWriter.appendRowGroupBuffer(curRowGroupDataBuffer);
-            physicalWriter.flush();
+            curRowGroupOffset = physicalWriter.prepare(rowGroupDataLength);
+            if (curRowGroupOffset != -1) {
+                for (ColumnWriter writer : columnWriters)
+                {
+                    byte[] rowGroupBuffer = writer.getColumnChunkContent();
+                    physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
+                }
+                physicalWriter.flush();
+            }
+            else {
+                LOGGER.warn("Write row group prepare failed");
+            }
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
@@ -408,11 +413,11 @@ public class PixelsWriter
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
                         .build();
 
-        // write row group footer
-        ByteBuffer curRowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooter.getSerializedSize());
-        curRowGroupFooterBuffer.put(rowGroupFooter.toByteArray());
+        // write and flush row group footer
         try {
-            curRowGroupFooterOffset = physicalWriter.appendRowGroupBuffer(curRowGroupFooterBuffer);
+            byte[] footerBuffer = rowGroupFooter.toByteArray();
+            physicalWriter.prepare(footerBuffer.length);
+            curRowGroupFooterOffset = physicalWriter.append(footerBuffer, 0, footerBuffer.length);
             physicalWriter.flush();
         }
         catch (IOException e) {
@@ -435,21 +440,10 @@ public class PixelsWriter
 
     private void writeFileTail() throws IOException
     {
-        PixelsProto.Footer footer = writeFooter();
-        PixelsProto.PostScript postScript = writePostScript();
+        PixelsProto.Footer footer;
+        PixelsProto.PostScript postScript;
 
-        PixelsProto.FileTail fileTail =
-                PixelsProto.FileTail.newBuilder()
-                        .setFooter(footer)
-                        .setPostscript(postScript)
-                        .setFooterLength(footer.getSerializedSize())
-                        .setPostscriptLength(postScript.getSerializedSize())
-                        .build();
-        physicalWriter.writeFileTail(fileTail);
-    }
-
-    private PixelsProto.Footer writeFooter()
-    {
+        // build Footer
         PixelsProto.Footer.Builder footerBuilder =
                 PixelsProto.Footer.newBuilder();
         writeTypes(footerBuilder, schema);
@@ -465,22 +459,37 @@ public class PixelsWriter
         {
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
+        footer = footerBuilder.build();
 
-        return footerBuilder.build();
-    }
+        // build PostScript
+        postScript = PixelsProto.PostScript.newBuilder()
+                .setVersion(Constants.VERSION)
+                .setContentLength(fileContentLength)
+                .setNumberOfRows(fileRowNum)
+                .setCompression(compressionKind)
+                .setCompressionBlockSize(compressionBlockSize)
+                .setPixelStride(pixelStride)
+                .setWriterTimezone(timeZone.getDisplayName())
+                .setMagic(Constants.MAGIC)
+                .build();
 
-    private PixelsProto.PostScript writePostScript()
-    {
-        return PixelsProto.PostScript.newBuilder()
-                        .setVersion(Constants.VERSION)
-                        .setContentLength(fileContentLength)
-                        .setNumberOfRows(fileRowNum)
-                        .setCompression(compressionKind)
-                        .setCompressionBlockSize(compressionBlockSize)
-                        .setPixelStride(pixelStride)
-                        .setWriterTimezone(timeZone.getDisplayName())
-                        .setMagic(Constants.MAGIC)
+        // build FileTail
+        PixelsProto.FileTail fileTail =
+                PixelsProto.FileTail.newBuilder()
+                        .setFooter(footer)
+                        .setPostscript(postScript)
+                        .setFooterLength(footer.getSerializedSize())
+                        .setPostscriptLength(postScript.getSerializedSize())
                         .build();
+
+        // write and flush FileTail plus FileTail physical offset at the end of the file
+        int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
+        physicalWriter.prepare(fileTailLen);
+        long tailOffset = physicalWriter.append(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
+        ByteBuffer tailOffsetBuffer = ByteBuffer.allocate(Long.BYTES);
+        tailOffsetBuffer.putLong(tailOffset);
+        physicalWriter.append(tailOffsetBuffer);
+        physicalWriter.flush();
     }
 
     private void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
@@ -541,7 +550,7 @@ public class PixelsWriter
         }
     }
 
-    private ColumnWriter createColumnWriter(TypeDescription schema)
+    private ColumnWriter createColumnWriter(TypeDescription schema, boolean isEncoding)
     {
         switch (schema.getCategory())
         {
@@ -552,7 +561,7 @@ public class PixelsWriter
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnWriter(schema, pixelStride);
+                return new IntegerColumnWriter(schema, pixelStride, isEncoding);
             case FLOAT:
                 return new FloatColumnWriter(schema, pixelStride);
             case DOUBLE:

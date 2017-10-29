@@ -18,51 +18,27 @@ public class PhysicalFSWriter implements PhysicalWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalFSWriter.class);
 
-    private final Path path;
     private final long blockSize;
-    private final short replication;
     private final boolean addBlockPadding;
     private final FSDataOutputStream rawWriter;
 
     public PhysicalFSWriter(FileSystem fs, Path path, long blockSize, short replication, boolean addBlockPadding) throws IOException
     {
-        this.path = path;
         this.blockSize = blockSize;
-        this.replication = replication;
         this.addBlockPadding = addBlockPadding;
 
         rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
     }
 
-    public Path getPath()
-    {
-        return path;
-    }
-
-    public long getBlockSize()
-    {
-        return blockSize;
-    }
-
-    public short getReplication()
-    {
-        return replication;
-    }
-
-    public boolean isAddBlockPadding()
-    {
-        return addBlockPadding;
-    }
-
     @Override
-    public long appendRowGroupBuffer(ByteBuffer buffer) throws IOException
+    public long prepare(int length) throws IOException
     {
-        long start = rawWriter.getPos();
-        buffer.flip();
-        int length = buffer.remaining();
-        long availBlockSpace = blockSize - (start % blockSize);
-
+        if (length > blockSize) {
+            return -1L;
+        }
         // see if row group can fit in the current hdfs block, else pad the remaining space in the block
+        long start = rawWriter.getPos();
+        long availBlockSpace = blockSize - (start % blockSize);
         if (length < blockSize && length > availBlockSpace && addBlockPadding) {
             byte[] pad = new byte[(int) Math.min(Constants.HDFS_BUFFER_SIZE, availBlockSpace)];
             LOGGER.info(String.format("Padding Pixels by %d bytes while appending row group buffer...", availBlockSpace));
@@ -73,19 +49,23 @@ public class PhysicalFSWriter implements PhysicalWriter
                 availBlockSpace -= writeLen;
             }
         }
-
-        rawWriter.write(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
         return start;
     }
 
     @Override
-    public void writeFileTail(PixelsProto.FileTail fileTail) throws IOException
+    public long append(ByteBuffer buffer) throws IOException
     {
-        rawWriter.write(fileTail.toByteArray());
-        int tailLen = fileTail.getSerializedSize();
-        rawWriter.writeInt(tailLen);
-        long pos = rawWriter.getPos();
-        rawWriter.writeLong(pos);
+        buffer.flip();
+        int length = buffer.remaining();
+        return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
+    }
+
+    @Override
+    public long append(byte[] buffer, int offset, int length) throws IOException
+    {
+        long start = rawWriter.getPos();
+        rawWriter.write(buffer, offset, length);
+        return start;
     }
 
     @Override
