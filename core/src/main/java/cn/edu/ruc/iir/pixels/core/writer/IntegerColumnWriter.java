@@ -17,12 +17,14 @@ import java.nio.ByteBuffer;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final LongColumnVector curPixelVector;        // current pixel value vector haven't written out yet
+    private final boolean isLong;                         // current column type is long or int
 
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
         curPixelVector = new LongColumnVector(pixelStride);
         encoder = new RleEncoder();
+        this.isLong = schema.getCategory() == TypeDescription.Category.LONG;
     }
 
     @Override
@@ -73,20 +75,30 @@ public class IntegerColumnWriter extends BaseColumnWriter
     void newPixel() throws IOException
     {
         // update stats
-        for (int i = 0; i < curPixelEleCount; i++) {
-            pixelStatRecorder.updateInteger((int) curPixelVector.vector[i], 1);
+        for (int i = 0; i < curPixelEleCount; i++)
+        {
+            pixelStatRecorder.updateInteger(curPixelVector.vector[i], 1);
         }
 
         // write out current pixel vector
-        if (isEncoding)
-        {
+        if (isEncoding) {
             outputStream.write(encoder.encode(curPixelVector.vector));
-        } else
-        {
-            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
-            for (int i = 0; i < curPixelEleCount; i++)
-            {
-                curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
+        }
+        else {
+            ByteBuffer curVecPartitionBuffer;
+            if (isLong) {
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES);
+                for (int i = 0; i < curPixelEleCount; i++)
+                {
+                    curVecPartitionBuffer.putLong(curPixelVector.vector[i]);
+                }
+            }
+            else {
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
+                for (int i = 0; i < curPixelEleCount; i++)
+                {
+                    curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
+                }
             }
             outputStream.write(curVecPartitionBuffer.array());
         }

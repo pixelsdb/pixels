@@ -141,6 +141,8 @@ public class RleEncoder extends Encoder
         }
 
         if (isFixedDelta) {
+            assert currDelta == initialDelta
+                    : "currDelta should be equal to initialDelta for fixed delta encoding";
             encodingType = EncodingType.DELTA;
             fixedDelta = currDelta;
             return;

@@ -95,12 +95,6 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStatRecorder;
     }
 
-//    public void newChunk()
-//    {
-//        if (curPixelEleCount > 0) {
-//            newPixel();
-//        }
-//    }
     @Override
     public void flush() throws IOException
     {
@@ -109,7 +103,19 @@ public abstract class BaseColumnWriter implements ColumnWriter
         }
     }
 
-    abstract void newPixel() throws IOException;
+    void newPixel() throws IOException
+    {
+        curPixelPosition = outputStream.size();
+        curPixelEleCount = 0;
+        columnChunkStatRecorder.merge(pixelStatRecorder);
+        PixelsProto.PixelStatistic.Builder pixelStat =
+                PixelsProto.PixelStatistic.newBuilder();
+        pixelStat.setStatistic(pixelStatRecorder.serialize());
+        columnChunkIndex.addPixelPositions(lastPixelPosition);
+        columnChunkIndex.addPixelStatistics(pixelStat.build());
+        lastPixelPosition = curPixelPosition;
+        pixelStatRecorder.reset();
+    }
 
     @Override
     public void reset()
@@ -120,28 +126,6 @@ public abstract class BaseColumnWriter implements ColumnWriter
         columnChunkStat.clear();
         pixelStatRecorder.reset();
         columnChunkStatRecorder.reset();
-//        rowBatchBufferList.clear();
         outputStream.reset();
     }
-
-    /**
-     * End of a pixel
-     * 1. set current pixel element count to 0 for the next batch pixel writing
-     * 2. update column chunk stat
-     * 3. add current pixel stat and position info to columnChunkIndex
-     * 4. update lastPixelPosition to current one
-     * 5. reset current pixel stat recorder
-     */
-//    void newPixel()
-//    {
-//        curPixelEleCount = 0;
-//        columnChunkStatRecorder.merge(pixelStatRecorder);
-//        PixelsProto.PixelStatistic.Builder pixelStat =
-//                PixelsProto.PixelStatistic.newBuilder();
-//        pixelStat.setStatistic(pixelStatRecorder.serialize());
-//        columnChunkIndex.addPixelPositions(lastPixelPosition);
-//        columnChunkIndex.addPixelStatistics(pixelStat.build());
-//        lastPixelPosition = curPixelPosition;
-//        pixelStatRecorder.reset();
-//    }
 }

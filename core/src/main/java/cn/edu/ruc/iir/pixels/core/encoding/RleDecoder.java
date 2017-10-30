@@ -2,6 +2,8 @@ package cn.edu.ruc.iir.pixels.core.encoding;
 
 import cn.edu.ruc.iir.pixels.core.Constants;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -15,12 +17,14 @@ import java.util.Arrays;
  */
 public class RleDecoder extends IntDecoder
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RleDecoder.class);
+
     private final InputStream inputStream;
     private final boolean isSigned;
     private final long[] literals = new long[Constants.MAX_SCOPE];
     private final EncodingUtils encodingUtils = new EncodingUtils();
 
-    private boolean isRepeating;
+    private boolean isRepeating = false;
     private int used = 0;
     private int numLiterals = 0;
 
@@ -61,7 +65,7 @@ public class RleDecoder extends IntDecoder
         if (firstByte < 0)
         {
             // todo deal with error
-
+            LOGGER.error("error first byte is negative");
             used = numLiterals = 0;
             return;
         }
@@ -82,6 +86,7 @@ public class RleDecoder extends IntDecoder
                 break;
             default:
                 // todo error
+                LOGGER.error("Cannot match any supported encoding strategies");
         }
     }
 
@@ -103,6 +108,7 @@ public class RleDecoder extends IntDecoder
         if (numLiterals != 0)
         {
             // todo error
+            LOGGER.error("numLiterals is not zero");
         }
 
         isRepeating = true;
@@ -170,6 +176,7 @@ public class RleDecoder extends IntDecoder
 
         if ((pw + pgw) > 64) {
             // todo error
+            LOGGER.error("pw add pgw is bigger than 64");
         }
         int bitSize = encodingUtils.getClosestFixedBits(pw + pgw);
         readInts(unpackedPatch, 0, pl, bitSize, inputStream);
