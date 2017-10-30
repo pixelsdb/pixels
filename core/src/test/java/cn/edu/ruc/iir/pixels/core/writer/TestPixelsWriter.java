@@ -48,6 +48,7 @@ public class TestPixelsWriter
                             .setBlockSize(1024*1024*1024)
                             .setReplication((short) 1)
                             .setBlockPadding(false)
+                            .setEncoding(true)
                             .build();
 
             for (int i = 0; i < TestParams.rowNum; i++)
