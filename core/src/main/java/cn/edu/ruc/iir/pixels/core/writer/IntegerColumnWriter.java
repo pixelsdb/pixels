@@ -30,38 +30,41 @@ public class IntegerColumnWriter extends BaseColumnWriter
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
-        int curPartLength;               // size of the partition which belongs to current pixel
+        int curPartLength;           // size of the partition which belongs to current pixel
         int curPartOffset = 0;           // starting offset of the partition which belongs to current pixel
-        boolean newPixelFlag = false;    // set to true if this batch write triggers a new pixel
+        int nextPartLength = size;       // size of the partition which belongs to next pixel
 
         // do the calculation to partition the vector into current pixel and next one
         // doing this pre-calculation to eliminate branch prediction inside the for loop
-        if ((curPixelEleCount + size) >= pixelStride) {
+        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
-            newPixelFlag = true;
+            // fill in current pixel value vector with current partition
+            System.arraycopy(values, curPartOffset, curPixelVector.vector, curPixelEleCount, curPartLength);
+            curPixelEleCount += curPartLength;
+            newPixel();
+            curPartOffset += curPartLength;
+            nextPartLength = size - curPartOffset;
         }
-        else {
-            curPartLength = size;
-        }
+
+        curPartLength = nextPartLength;
 
         // fill in current pixel value vector with current partition
         System.arraycopy(values, curPartOffset, curPixelVector.vector, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
-        // write out a new pixel
-        if (newPixelFlag)
-        {
-            newPixel();
-        }
-
         curPartOffset += curPartLength;
+        nextPartLength = size - curPartOffset;
+
         // update current pixel vector
-        System.arraycopy(values,
-                curPartOffset,
-                curPixelVector.vector,
-                curPixelEleCount,
-                size - curPartLength);
-        curPixelEleCount += (size - curPartLength);
+        // actually this should never be reached!!!
+        if (nextPartLength > 0) {
+            System.arraycopy(values,
+                    curPartOffset,
+                    curPixelVector.vector,
+                    curPixelEleCount,
+                    nextPartLength);
+            curPixelEleCount += nextPartLength;
+        }
 
         return outputStream.size();
     }

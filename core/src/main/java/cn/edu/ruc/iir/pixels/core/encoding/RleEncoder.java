@@ -70,7 +70,9 @@ public class RleEncoder extends Encoder
             this.write(v);
         }
         flush();
-        return outputStream.toByteArray();
+        byte[] result = outputStream.toByteArray();
+        outputStream.reset();
+        return result;
     }
 
     @Override

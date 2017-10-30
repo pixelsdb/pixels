@@ -1,13 +1,12 @@
 package cn.edu.ruc.iir.pixels.core.encoding;
 
-import cn.edu.ruc.iir.pixels.core.encoding.IntDecoder;
-import cn.edu.ruc.iir.pixels.core.encoding.RleDecoder;
-import cn.edu.ruc.iir.pixels.core.encoding.RleEncoder;
+import cn.edu.ruc.iir.pixels.core.TestParams;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Arrays;
+
+import static org.junit.Assert.assertArrayEquals;
 
 /**
  * pixels
@@ -19,17 +18,23 @@ public class TestEncoding
     @Test
     public void runLengthTest()
     {
-        long[] values = {100L, 100L, 100L, 100L, 100L, 100L, 102L, 101L, 90L, 100L, 100L};
+        long[] values = new long[TestParams.rowNum];
+        for (int i = 0; i < TestParams.rowNum; i++)
+        {
+            values[i] = i;
+        }
+        long[] decoderValues = new long[TestParams.rowNum];
         RleEncoder encoder = new RleEncoder(false, true);
         try
         {
             byte[] bytes = encoder.encode(values);
             IntDecoder decoder = new RleDecoder(new ByteArrayInputStream(bytes), false);
+            int i = 0;
             while (decoder.hasNext()) {
-                System.out.println(decoder.next());
+                decoderValues[i++] = decoder.next();
             }
             System.out.println(bytes.length);
-            System.out.println(Arrays.toString(bytes));
+            assertArrayEquals(values, decoderValues);
         } catch (IOException e)
         {
             e.printStackTrace();
