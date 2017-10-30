@@ -15,9 +15,9 @@ import java.util.Arrays;
  *
  * @author guodong
  */
-public class RleDecoder extends IntDecoder
+public class RunLenIntDecoder extends IntDecoder
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(RleDecoder.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(RunLenIntDecoder.class);
 
     private final InputStream inputStream;
     private final boolean isSigned;
@@ -28,11 +28,11 @@ public class RleDecoder extends IntDecoder
     private int used = 0;
     private int numLiterals = 0;
 
-    private RleEncoder.EncodingType currentEncoding;
+    private RunLenIntEncoder.EncodingType currentEncoding;
 
-    private final static RleEncoder.EncodingType[] encodings = RleEncoder.EncodingType.values();
+    private final static RunLenIntEncoder.EncodingType[] encodings = RunLenIntEncoder.EncodingType.values();
 
-    public RleDecoder(InputStream inputStream, boolean isSigned)
+    public RunLenIntDecoder(InputStream inputStream, boolean isSigned)
     {
         this.inputStream = inputStream;
         this.isSigned = isSigned;

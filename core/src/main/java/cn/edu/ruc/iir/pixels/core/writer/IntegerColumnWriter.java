@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.encoding.RleEncoder;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -16,14 +16,13 @@ import java.nio.ByteBuffer;
  */
 public class IntegerColumnWriter extends BaseColumnWriter
 {
-    private final LongColumnVector curPixelVector;        // current pixel value vector haven't written out yet
+    private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                         // current column type is long or int
 
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
-        curPixelVector = new LongColumnVector(pixelStride);
-        encoder = new RleEncoder();
+        encoder = new RunLenIntEncoder();
         this.isLong = schema.getCategory() == TypeDescription.Category.LONG;
     }
 
@@ -41,7 +40,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
             // fill in current pixel value vector with current partition
-            System.arraycopy(values, curPartOffset, curPixelVector.vector, curPixelEleCount, curPartLength);
+            System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             newPixel();
             curPartOffset += curPartLength;
@@ -51,7 +50,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         curPartLength = nextPartLength;
 
         // fill in current pixel value vector with current partition
-        System.arraycopy(values, curPartOffset, curPixelVector.vector, curPixelEleCount, curPartLength);
+        System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         curPartOffset += curPartLength;
@@ -62,7 +61,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         if (nextPartLength > 0) {
             System.arraycopy(values,
                     curPartOffset,
-                    curPixelVector.vector,
+                    curPixelVector,
                     curPixelEleCount,
                     nextPartLength);
             curPixelEleCount += nextPartLength;
@@ -77,12 +76,12 @@ public class IntegerColumnWriter extends BaseColumnWriter
         // update stats
         for (int i = 0; i < curPixelEleCount; i++)
         {
-            pixelStatRecorder.updateInteger(curPixelVector.vector[i], 1);
+            pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
         // write out current pixel vector
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector.vector));
+            outputStream.write(encoder.encode(curPixelVector));
         }
         else {
             ByteBuffer curVecPartitionBuffer;
@@ -90,14 +89,14 @@ public class IntegerColumnWriter extends BaseColumnWriter
                 curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
-                    curVecPartitionBuffer.putLong(curPixelVector.vector[i]);
+                    curVecPartitionBuffer.putLong(curPixelVector[i]);
                 }
             }
             else {
                 curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
-                    curVecPartitionBuffer.putInt((int) curPixelVector.vector[i]);
+                    curVecPartitionBuffer.putInt((int) curPixelVector[i]);
                 }
             }
             outputStream.write(curVecPartitionBuffer.array());

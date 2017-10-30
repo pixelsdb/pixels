@@ -14,7 +14,7 @@ import java.io.OutputStream;
  *
  * @author guodong
  */
-public class RleEncoder extends Encoder
+public class RunLenIntEncoder extends Encoder
 {
     private EncodingType encodingType;
     private int numLiterals;
@@ -50,12 +50,12 @@ public class RleEncoder extends Encoder
         SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA
     }
 
-    public RleEncoder()
+    public RunLenIntEncoder()
     {
         this(true, true);
     }
 
-    public RleEncoder(boolean isSigned, boolean isAlignedBitpacking)
+    public RunLenIntEncoder(boolean isSigned, boolean isAlignedBitpacking)
     {
         this.isSigned = isSigned;
         this.isAlignedBitpacking = isAlignedBitpacking;

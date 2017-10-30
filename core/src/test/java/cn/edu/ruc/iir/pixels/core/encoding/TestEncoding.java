@@ -24,11 +24,11 @@ public class TestEncoding
             values[i] = i;
         }
         long[] decoderValues = new long[TestParams.rowNum];
-        RleEncoder encoder = new RleEncoder(false, true);
+        RunLenIntEncoder encoder = new RunLenIntEncoder(false, true);
         try
         {
             byte[] bytes = encoder.encode(values);
-            IntDecoder decoder = new RleDecoder(new ByteArrayInputStream(bytes), false);
+            IntDecoder decoder = new RunLenIntDecoder(new ByteArrayInputStream(bytes), false);
             int i = 0;
             while (decoder.hasNext()) {
                 decoderValues[i++] = decoder.next();

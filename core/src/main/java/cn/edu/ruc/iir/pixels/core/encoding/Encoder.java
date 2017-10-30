@@ -29,27 +29,16 @@ public abstract class Encoder
     public byte[] encode(char[] values, long offset, long length)
     {
         throw new PixelsEncodingException("Encoding char values is not supported");
-
     }
 
-    public byte[] encode(int[] values)
+    public byte[] encode(byte[] values) throws IOException
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
+        throw new PixelsEncodingException("Encoding byte values is not supported");
     }
 
-    public byte[] encode(int[] values, long offset, long length)
+    public byte[] encode(byte[] values, long offset, long length) throws IOException
     {
-        throw new PixelsEncodingException("Encoding int values is not supported");
-    }
-
-    public byte[] encode(short[] values)
-    {
-        throw new PixelsEncodingException("Encoding short values is not supported");
-    }
-
-    public byte[] encode(short[] values, long offset, long length)
-    {
-        throw new PixelsEncodingException("Encoding short values is not supported");
+        throw new PixelsEncodingException("Encoding byte values is not supported");
     }
 
     public byte[] encode(long[] values) throws IOException

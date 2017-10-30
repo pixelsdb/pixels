@@ -8,7 +8,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * pixels
+ * Boolean column writer.
+ * Boolean values are firstly compacted using bit-wise integers, and then these integers are encoded and written out
  *
  * @author guodong
  */
