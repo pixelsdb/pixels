@@ -36,7 +36,7 @@ public class TestPixelsWriter
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector x = (LongColumnVector) rowBatch.cols[0];
-            LongColumnVector y = (LongColumnVector) rowBatch.cols[1];
+            BytesColumnVector y = (BytesColumnVector) rowBatch.cols[1];
 
             PixelsWriter pixelsWriter =
                     PixelsWriter.newBuilder()
@@ -55,7 +55,7 @@ public class TestPixelsWriter
             {
                 int row = rowBatch.size++;
                 x.vector[row] = i;
-                y.vector[row] = i * 2;
+                y.setVal(row, String.valueOf(i).getBytes());
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);
