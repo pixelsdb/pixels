@@ -61,6 +61,24 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
     }
 
     @Override
+    public void updateFloat(float value)
+    {
+        if (!hasMinimum) {
+            hasMinimum = true;
+            minimum = value;
+            maximum = value;
+        }
+        else if (value < minimum) {
+            minimum = value;
+        }
+        else if (value > maximum) {
+            maximum = value;
+        }
+        sum += value;
+        numberOfValues++;
+    }
+
+    @Override
     public void merge(StatsRecorder other)
     {
         if (other instanceof DoubleColumnStats) {

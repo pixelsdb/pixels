@@ -10,9 +10,16 @@ import java.nio.ByteBuffer;
  */
 public interface PhysicalWriter
 {
-    long appendRowGroupBuffer(ByteBuffer buffer) throws IOException;
+    /**
+     * Prepare the writer to ensure the length can fit into current hdfs block
+     * @param length length of content
+     * @return starting offset after preparing. If -1, means prepare failed. The specified length can not fit
+     * */
+    long prepare(int length) throws IOException;
 
-    void writeFileTail(PixelsProto.FileTail fileTail) throws IOException;
+    long append(ByteBuffer buffer) throws IOException;
+
+    long append(byte[] buffer, int offset, int length) throws IOException;
 
     void close() throws IOException;
 

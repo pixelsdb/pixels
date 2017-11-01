@@ -14,4 +14,6 @@ public final class Constants
     public static int MIN_REPEAT= 3;
     public static int MAX_SCOPE = 512;
     public static int MAX_SHORT_REPEAT_LENGTH = 10;
+    public static float DICT_KEY_SIZE_THRESHOLD = 0.1F;
+    public static int INIT_DICT_SIZE = 4096;
 }

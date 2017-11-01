@@ -50,6 +50,7 @@ public class PixelsWriter
     private final long blockSize;
     private final short replication;
     private final boolean blockPadding;
+    private final boolean encoding;
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
@@ -78,7 +79,8 @@ public class PixelsWriter
             Path filePath,
             long blockSize,
             short replication,
-            boolean blockPadding)
+            boolean blockPadding,
+            boolean encoding)
     {
         this.schema = schema;
         this.pixelStride = pixelStride;
@@ -91,6 +93,7 @@ public class PixelsWriter
         this.blockSize = blockSize;
         this.replication = replication;
         this.blockPadding = blockPadding;
+        this.encoding = encoding;
 
         List<TypeDescription> children = schema.getChildren();
         assert children != null;
@@ -98,7 +101,7 @@ public class PixelsWriter
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = createColumnWriter(children.get(i));
+            columnWriters[i] = createColumnWriter(children.get(i), encoding);
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -129,6 +132,7 @@ public class PixelsWriter
         private long builderBlockSize;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
+        private boolean encoding = true;
 
         public Builder setSchema(TypeDescription schema)
         {
@@ -207,6 +211,13 @@ public class PixelsWriter
             return this;
         }
 
+        public Builder setEncoding(boolean encoding)
+        {
+            this.encoding = encoding;
+
+            return this;
+        }
+
         public PixelsWriter build()
         {
             return new PixelsWriter(
@@ -220,7 +231,8 @@ public class PixelsWriter
                     builderFilePath,
                     builderBlockSize,
                     builderReplication,
-                    builderBlockPadding);
+                    builderBlockPadding,
+                    encoding);
         }
     }
 
@@ -284,23 +296,33 @@ public class PixelsWriter
         return blockPadding;
     }
 
+    public boolean isEncoding()
+    {
+        return encoding;
+    }
+
     public ColumnWriter[] getColumnWriters()
     {
         return columnWriters;
     }
 
-    public void addRowBatch(VectorizedRowBatch rowBatch)
+    /**
+     * Add row batch
+     * currently not support repeating in ColumnVector
+     * */
+    public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         if (isNewRowGroup) {
             this.isNewRowGroup = false;
             this.curRowGroupNumOfRows = 0L;
         }
+        curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
         for (int i = 0; i < cvs.length; i++)
         {
             ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.writeBatch(cvs[i], rowBatch.size);
+            curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
         if (curRowGroupDataLength >= rowGroupSize) {
@@ -330,7 +352,7 @@ public class PixelsWriter
         }
     }
 
-    private void writeRowGroup()
+    private void writeRowGroup() throws IOException
     {
         this.isNewRowGroup = true;
         int rowGroupDataLength = 0;
@@ -342,23 +364,28 @@ public class PixelsWriter
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
                 PixelsProto.RowGroupIndex.newBuilder();
 
-        for (int i = 0; i < columnWriters.length; i++)
+        // reset each column writer and get current row group content size in bytes
+        for (ColumnWriter writer : columnWriters)
         {
-            ColumnWriter writer = columnWriters[i];
             // new chunk for each writer
-            writer.newChunk();
+            writer.flush();
             rowGroupDataLength += writer.getColumnChunkSize();
         }
 
-        // write row group content
-        ByteBuffer curRowGroupDataBuffer = ByteBuffer.allocate(rowGroupDataLength);
-        for (ColumnWriter writer : columnWriters)
-        {
-            curRowGroupDataBuffer.put(writer.serializeContent());
-        }
+        // write and flush row group content
         try {
-            curRowGroupOffset = physicalWriter.appendRowGroupBuffer(curRowGroupDataBuffer);
-            physicalWriter.flush();
+            curRowGroupOffset = physicalWriter.prepare(rowGroupDataLength);
+            if (curRowGroupOffset != -1) {
+                for (ColumnWriter writer : columnWriters)
+                {
+                    byte[] rowGroupBuffer = writer.getColumnChunkContent();
+                    physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
+                }
+                physicalWriter.flush();
+            }
+            else {
+                LOGGER.warn("Write row group prepare failed");
+            }
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
@@ -390,11 +417,11 @@ public class PixelsWriter
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
                         .build();
 
-        // write row group footer
-        ByteBuffer curRowGroupFooterBuffer = ByteBuffer.allocate(rowGroupFooter.getSerializedSize());
-        curRowGroupFooterBuffer.put(rowGroupFooter.toByteArray());
+        // write and flush row group footer
         try {
-            curRowGroupFooterOffset = physicalWriter.appendRowGroupBuffer(curRowGroupFooterBuffer);
+            byte[] footerBuffer = rowGroupFooter.toByteArray();
+            physicalWriter.prepare(footerBuffer.length);
+            curRowGroupFooterOffset = physicalWriter.append(footerBuffer, 0, footerBuffer.length);
             physicalWriter.flush();
         }
         catch (IOException e) {
@@ -417,21 +444,10 @@ public class PixelsWriter
 
     private void writeFileTail() throws IOException
     {
-        PixelsProto.Footer footer = writeFooter();
-        PixelsProto.PostScript postScript = writePostScript();
+        PixelsProto.Footer footer;
+        PixelsProto.PostScript postScript;
 
-        PixelsProto.FileTail fileTail =
-                PixelsProto.FileTail.newBuilder()
-                        .setFooter(footer)
-                        .setPostscript(postScript)
-                        .setFooterLength(footer.getSerializedSize())
-                        .setPostscriptLength(postScript.getSerializedSize())
-                        .build();
-        physicalWriter.writeFileTail(fileTail);
-    }
-
-    private PixelsProto.Footer writeFooter()
-    {
+        // build Footer
         PixelsProto.Footer.Builder footerBuilder =
                 PixelsProto.Footer.newBuilder();
         writeTypes(footerBuilder, schema);
@@ -447,22 +463,37 @@ public class PixelsWriter
         {
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
+        footer = footerBuilder.build();
 
-        return footerBuilder.build();
-    }
+        // build PostScript
+        postScript = PixelsProto.PostScript.newBuilder()
+                .setVersion(Constants.VERSION)
+                .setContentLength(fileContentLength)
+                .setNumberOfRows(fileRowNum)
+                .setCompression(compressionKind)
+                .setCompressionBlockSize(compressionBlockSize)
+                .setPixelStride(pixelStride)
+                .setWriterTimezone(timeZone.getDisplayName())
+                .setMagic(Constants.MAGIC)
+                .build();
 
-    private PixelsProto.PostScript writePostScript()
-    {
-        return PixelsProto.PostScript.newBuilder()
-                        .setVersion(Constants.VERSION)
-                        .setContentLength(fileContentLength)
-                        .setNumberOfRows(fileRowNum)
-                        .setCompression(compressionKind)
-                        .setCompressionBlockSize(compressionBlockSize)
-                        .setPixelStride(pixelStride)
-                        .setWriterTimezone(timeZone.getDisplayName())
-                        .setMagic(Constants.MAGIC)
+        // build FileTail
+        PixelsProto.FileTail fileTail =
+                PixelsProto.FileTail.newBuilder()
+                        .setFooter(footer)
+                        .setPostscript(postScript)
+                        .setFooterLength(footer.getSerializedSize())
+                        .setPostscriptLength(postScript.getSerializedSize())
                         .build();
+
+        // write and flush FileTail plus FileTail physical offset at the end of the file
+        int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
+        physicalWriter.prepare(fileTailLen);
+        long tailOffset = physicalWriter.append(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
+        ByteBuffer tailOffsetBuffer = ByteBuffer.allocate(Long.BYTES);
+        tailOffsetBuffer.putLong(tailOffset);
+        physicalWriter.append(tailOffsetBuffer);
+        physicalWriter.flush();
     }
 
     private void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
@@ -523,32 +554,32 @@ public class PixelsWriter
         }
     }
 
-    private ColumnWriter createColumnWriter(TypeDescription schema)
+    private ColumnWriter createColumnWriter(TypeDescription schema, boolean isEncoding)
     {
         switch (schema.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(schema, pixelStride);
+                return new BooleanColumnWriter(schema, pixelStride, isEncoding);
             case BYTE:
-                return new ByteColumnWriter(schema, pixelStride);
+                return new ByteColumnWriter(schema, pixelStride, isEncoding);
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnWriter(schema, pixelStride);
+                return new IntegerColumnWriter(schema, pixelStride, isEncoding);
             case FLOAT:
-                return new FloatColumnWriter(schema, pixelStride);
+                return new FloatColumnWriter(schema, pixelStride, isEncoding);
             case DOUBLE:
-                return new DoubleColumnWriter(schema, pixelStride);
+                return new DoubleColumnWriter(schema, pixelStride, isEncoding);
             case STRING:
-                return new StringColumnWriter(schema, pixelStride);
+                return new StringColumnWriter(schema, pixelStride, isEncoding);
             case CHAR:
-                return new CharColumnWriter(schema, pixelStride);
+                return new CharColumnWriter(schema, pixelStride, isEncoding);
             case VARCHAR:
-                return new VarcharColumnWriter(schema, pixelStride);
+                return new VarcharColumnWriter(schema, pixelStride, isEncoding);
             case BINARY:
-                return new BinaryColumnWriter(schema, pixelStride);
+                return new BinaryColumnWriter(schema, pixelStride, isEncoding);
             case TIMESTAMP:
-                return new TimestampColumnWriter(schema, pixelStride);
+                return new TimestampColumnWriter(schema, pixelStride, isEncoding);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + schema.getCategory());
         }

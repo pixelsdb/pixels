@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.core.reader;
+package cn.edu.ruc.iir.pixels.core;
 
 /**
  * pixels
