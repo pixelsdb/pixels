@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
+// todo binary column writer. basically the same as string column writer
 public class BinaryColumnWriter extends BaseColumnWriter
 {
     public BinaryColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)

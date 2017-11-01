@@ -13,6 +13,7 @@ import java.nio.charset.Charset;
  *
  * @author guodong
  */
+// todo varchar column writer. basically the same as string column writer
 public class VarcharColumnWriter extends BaseColumnWriter
 {
     private final int maxLength;
@@ -39,7 +40,6 @@ public class VarcharColumnWriter extends BaseColumnWriter
             int itemLength = Math.min(v.length, maxLength);
             buffer.put(v, 0, itemLength);
             curPixelPosition += itemLength;
-            // todo currently only support urf-8
             pixelStatRecorder.updateString(new String(v, 0, itemLength, Charset.forName("UTF-8")), 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleCount >= pixelStride) {

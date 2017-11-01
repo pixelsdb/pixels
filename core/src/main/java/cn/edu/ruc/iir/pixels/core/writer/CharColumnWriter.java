@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
+// todo char column writer. basically the same as string column writer.
 public class CharColumnWriter extends BaseColumnWriter
 {
     public CharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
