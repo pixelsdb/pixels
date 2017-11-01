@@ -147,50 +147,45 @@ abstract class RedBlackTree
     private boolean add(int node, boolean fromLeft, int parent,
                         int grandparent, int greatGrandparent)
     {
-        if (node == NULL)
-        {
-            if (root == NULL)
-            {
+        if (node == NULL) {
+            if (root == NULL) {
                 lastAdd = insert(NULL, NULL, false);   // NIL nodes for leaf ?
                 root = lastAdd;
                 wasAdd = true;
                 return false;
-            } else
-            {
+            }
+            else {
                 lastAdd = insert(NULL, NULL, true);
                 node = lastAdd;
                 wasAdd = true;
                 // connect the new node into the tree
-                if (fromLeft)
-                {
+                if (fromLeft) {
                     setLeft(parent, node);
-                } else
-                {
+                }
+                else {
                     setRight(parent, node);
                 }
             }
-        } else
-        {
+        }
+        else {
             int compare = compareValue(node);
             boolean keepGoing;
 
             // Recurse down to find where the node needs to be added
-            if (compare < 0)
-            {
+            if (compare < 0) {
                 keepGoing = add(getLeft(node), true, node, parent, grandparent);
-            } else if (compare > 0)
-            {
+            }
+            else if (compare > 0) {
                 keepGoing = add(getRight(node), false, node, parent, grandparent);
-            } else
-            {
+            }
+            else {
                 lastAdd = node;
                 wasAdd = false;
                 return false;
             }
 
             // we don't need to fix the root (because it is always set to black)
-            if (node == root || !keepGoing)
-            {
+            if (node == root || !keepGoing) {
                 return false;
             }
         }
@@ -198,23 +193,19 @@ abstract class RedBlackTree
 
         // Do we need to fix this node? Only if there are two reds right under each
         // other.
-        if (isRed(node) && isRed(parent))
-        {
-            if (parent == getLeft(grandparent))
-            {
+        if (isRed(node) && isRed(parent)) {
+            if (parent == getLeft(grandparent)) {
                 int uncle = getRight(grandparent);
-                if (isRed(uncle))
-                {
+                if (isRed(uncle)) {
                     // case 1.1: N is red, P is red, U is red. P is G's left node.
-                    // solution: set P and U as block, set G as red. C(current node, N in the next round) set to G.
+                    // solution: set P and U as black, set G as red. C(current node, N in the next round) set to G.
                     setRed(parent, false);
                     setRed(uncle, false);
                     setRed(grandparent, true);
                     return true;
-                } else
-                {
-                    if (node == getRight(parent))
-                    {
+                }
+                else {
+                    if (node == getRight(parent)) {
                         // case 1.2: N is red, P is red, U is black. N is P's right node.
                         // solution: left-rotate over the node P. C(current node, N in the next round) set to `node` after rotation.
                         // swap node and parent
@@ -235,14 +226,13 @@ abstract class RedBlackTree
                     setRed(grandparent, true);
 
                     // right-rotate on grandparent
-                    if (greatGrandparent == NULL)
-                    {
+                    if (greatGrandparent == NULL) {
                         root = parent;
-                    } else if (getLeft(greatGrandparent) == grandparent)
-                    {
+                    }
+                    else if (getLeft(greatGrandparent) == grandparent) {
                         setLeft(greatGrandparent, parent);
-                    } else
-                    {
+                    }
+                    else {
                         setRight(greatGrandparent, parent);
                     }
                     setLeft(grandparent, getRight(parent));
@@ -251,20 +241,17 @@ abstract class RedBlackTree
                 }
             }
             // symmetry of P as left node of G
-            else
-            {
+            else {
                 int uncle = getLeft(grandparent);
-                if (isRed(uncle))
-                {
+                if (isRed(uncle)) {
                     // case 2.1
                     setRed(parent, false);
                     setRed(uncle, false);
                     setRed(grandparent, true);
                     return true;
-                } else
-                {
-                    if (node == getLeft(parent))
-                    {
+                }
+                else {
+                    if (node == getLeft(parent)) {
                         // case 2.2
                         // swap node and parent
                         int tmp = node;
@@ -279,14 +266,13 @@ abstract class RedBlackTree
                     setRed(parent, false);
                     setRed(grandparent, true);
                     // left-rotate on grandparent
-                    if (greatGrandparent == NULL)
-                    {
+                    if (greatGrandparent == NULL) {
                         root = parent;
-                    } else if (getRight(greatGrandparent) == grandparent)
-                    {
+                    }
+                    else if (getRight(greatGrandparent) == grandparent) {
                         setRight(greatGrandparent, parent);
-                    } else
-                    {
+                    }
+                    else {
                         setLeft(greatGrandparent, parent);
                     }
                     setRight(grandparent, getLeft(parent));
@@ -294,8 +280,8 @@ abstract class RedBlackTree
                     return false;
                 }
             }
-        } else
-        {
+        }
+        else {
             return true;
         }
     }
@@ -309,14 +295,12 @@ abstract class RedBlackTree
     {
         add(root, false, NULL, NULL, NULL);
         // if the element is a new one, set it as black and return true
-        if (wasAdd)
-        {
+        if (wasAdd) {
             setRed(root, false);
             return true;
         }
         // else the element is an old one, return false
-        else
-        {
+        else {
             return false;
         }
     }

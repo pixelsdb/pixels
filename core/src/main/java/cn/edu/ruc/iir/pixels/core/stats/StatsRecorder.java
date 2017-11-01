@@ -70,10 +70,15 @@ public class StatsRecorder implements ColumnStats
         throw new UnsupportedOperationException("Can't update string");
     }
 
+    public void updateString(byte[] bytes, int offset, int length, int repetitions)
+    {
+        throw new UnsupportedOperationException("Can't update string");
+    }
+
     public void updateBinary(byte[] bytes, int offset, int length,
                              int repetitions)
     {
-        throw new UnsupportedOperationException("Can't update string");
+        throw new UnsupportedOperationException("Can't update binary");
     }
 
     public void updateDate(int value)

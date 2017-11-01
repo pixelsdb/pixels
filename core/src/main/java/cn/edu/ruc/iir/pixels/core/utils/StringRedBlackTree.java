@@ -4,6 +4,13 @@ import org.apache.hadoop.io.Text;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
+import java.util.Arrays;
 
 /**
  * A red-black tree that stores strings. The strings are stored as UTF-8 bytes
@@ -11,9 +18,15 @@ import java.io.OutputStream;
  */
 public class StringRedBlackTree extends RedBlackTree
 {
+    private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
+            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
+                    onMalformedInput(CodingErrorAction.REPORT).
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
+
     private final DynamicByteArray byteArray = new DynamicByteArray();
     private final DynamicIntArray keyOffsets;
-    private String newKey;
+    private byte[] keyBytes;
+    private int keyLength;
 
     public StringRedBlackTree(int initialCapacity)
     {
@@ -23,14 +36,57 @@ public class StringRedBlackTree extends RedBlackTree
 
     public int add(String value)
     {
-        newKey = value;
-        // if the newKey is actually new, add it to our byteArray and store the offset & length
-        if (add())
-        {
-            int len = newKey.length();
-            keyOffsets.add(byteArray.add(newKey.getBytes(), 0, len));
+        try {
+            ByteBuffer bb = encode(value, true);
+            keyBytes = bb.array();
+            keyLength = bb.limit();
+            if (add()) {
+                keyOffsets.add(byteArray.add(keyBytes, 0, keyLength));
+            }
+            return lastAdd;
+        }
+        catch (CharacterCodingException e) {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    public int add(byte[] value, int offset, int length)
+    {
+        setCapacity(length, false);
+        System.arraycopy(value, offset, keyBytes, 0, length);
+        this.keyLength = length;
+        if (add()) {
+            keyOffsets.add(byteArray.add(keyBytes, 0, keyLength));
         }
         return lastAdd;
+    }
+
+    private void setCapacity(int len, boolean keepData) {
+        if (keyBytes == null || keyBytes.length < len) {
+            if (keyBytes != null && keepData) {
+                keyBytes = Arrays.copyOf(keyBytes, Math.max(len, keyLength << 1));
+            } else {
+                keyBytes = new byte[len];
+            }
+        }
+    }
+
+    private ByteBuffer encode(String string, boolean replace)
+            throws CharacterCodingException
+    {
+        CharsetEncoder encoder = ENCODER_FACTORY.get();
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPLACE);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+        ByteBuffer bytes =
+                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPORT);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+        }
+        return bytes;
     }
 
     // compare newKey with position specified key
@@ -46,7 +102,7 @@ public class StringRedBlackTree extends RedBlackTree
         {
             end = keyOffsets.get(position + 1);
         }
-        return byteArray.compare(newKey.getBytes(), 0, newKey.length(),
+        return byteArray.compare(keyBytes, 0, keyLength,
                 start, end - start);
     }
 

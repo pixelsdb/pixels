@@ -10,10 +10,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * pixels
+ * Integer column writer.
  *
  * @author guodong
  */
+// todo fixing bug with signed int values encoding
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet

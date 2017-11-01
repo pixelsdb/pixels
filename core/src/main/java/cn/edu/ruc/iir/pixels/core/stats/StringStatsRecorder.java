@@ -58,6 +58,12 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
     }
 
     @Override
+    public void updateString(byte[] value, int offset, int length, int repetitions)
+    {
+        // todo update string byte array
+    }
+
+    @Override
     public void merge(StatsRecorder other)
     {
         if (other instanceof StringStatsRecorder) {
