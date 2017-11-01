@@ -1,8 +1,16 @@
 package cn.edu.ruc.iir.pixels.core.utils;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
 
 /**
  * pixels
@@ -160,6 +168,66 @@ public class EncodingUtils
 
         if (remainder > 0) {
             writeRemainingLongs(output, i, input, remainder, numBytes);
+        }
+    }
+
+    public void writeLongLE(OutputStream output, long value) throws IOException
+    {
+        writeBuffer[0] = (byte) ((value >> 0)  & 0xff);
+        writeBuffer[1] = (byte) ((value >> 8)  & 0xff);
+        writeBuffer[2] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[3] = (byte) ((value >> 24) & 0xff);
+        writeBuffer[4] = (byte) ((value >> 32) & 0xff);
+        writeBuffer[5] = (byte) ((value >> 40) & 0xff);
+        writeBuffer[6] = (byte) ((value >> 48) & 0xff);
+        writeBuffer[7] = (byte) ((value >> 56) & 0xff);
+        output.write(writeBuffer, 0, 8);
+    }
+
+    public long readLongLE(InputStream in) throws IOException
+    {
+        readFully(in, readBuffer, 0, 8);
+        return (((readBuffer[0] & 0xff) << 0)
+                + ((readBuffer[1] & 0xff) << 8)
+                + ((readBuffer[2] & 0xff) << 16)
+                + ((long) (readBuffer[3] & 0xff) << 24)
+                + ((long) (readBuffer[4] & 0xff) << 32)
+                + ((long) (readBuffer[5] & 0xff) << 40)
+                + ((long) (readBuffer[6] & 0xff) << 48)
+                + ((long) (readBuffer[7] & 0xff) << 56));
+    }
+
+    public void writeFloat(OutputStream output, float value) throws IOException
+    {
+        int ser = Float.floatToIntBits(value);
+        writeBuffer[0] = (byte) ((ser >> 0)  & 0xff);
+        writeBuffer[1] = (byte) ((ser >> 8)  & 0xff);
+        writeBuffer[2] = (byte) ((ser >> 16) & 0xff);
+        writeBuffer[3] = (byte) ((ser >> 24) & 0xff);
+        output.write(writeBuffer, 0, 4);
+    }
+
+    public float readFloat(InputStream input) throws IOException
+    {
+        readFully(input, readBuffer, 0, 4);
+        int value = (((readBuffer[0] & 0xff) << 0)
+                + ((readBuffer[1] & 0xff) << 8)
+                + ((readBuffer[2] & 0xff) << 16)
+                + ((readBuffer[3] & 0xff) << 24)
+        );
+        return Float.intBitsToFloat(value);
+    }
+
+    private void readFully(final InputStream in, final byte[] buffer, final int off, final int len)
+            throws IOException
+    {
+        int n = 0;
+        while (n < len) {
+            int count = in.read(buffer, off + n, len - n);
+            if (count < 0) {
+                throw new EOFException("Read past EOF for " + in);
+            }
+            n += count;
         }
     }
 
@@ -810,5 +878,47 @@ public class EncodingUtils
         } else {
             return 64;
         }
+    }
+
+    private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
+            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
+                    onMalformedInput(CodingErrorAction.REPORT).
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
+
+    private static ThreadLocal<CharsetDecoder> DECODER_FACTORY =
+            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newDecoder().
+                    onMalformedInput(CodingErrorAction.REPORT).
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
+
+    public static ByteBuffer encodeString(String string, boolean replace)
+            throws CharacterCodingException
+    {
+        CharsetEncoder encoder = ENCODER_FACTORY.get();
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPLACE);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+        ByteBuffer bytes =
+                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPORT);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+        }
+        return bytes;
+    }
+
+    public static String decodeString(ByteBuffer bytes, boolean replace) throws CharacterCodingException
+    {
+        CharsetDecoder decoder = DECODER_FACTORY.get();
+        if (replace) {
+            decoder.onMalformedInput(CodingErrorAction.REPLACE);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+        String str = decoder.decode(bytes).toString();
+        if (replace) {
+            decoder.onMalformedInput(CodingErrorAction.REPORT);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+        }
+        return str;
     }
 }

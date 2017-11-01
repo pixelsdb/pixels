@@ -2,12 +2,12 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.encoding.Encoder;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
-import java.nio.ByteBuffer;
-import java.util.LinkedList;
-import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /**
  * pixels
@@ -16,54 +16,68 @@ import java.util.List;
  */
 public abstract class BaseColumnWriter implements ColumnWriter
 {
-    final TypeDescription type;
-    final int pixelStride;
+    final int pixelStride;                     // indicate num of elements in a pixel
+    final boolean isEncoding;                  // indicate if encoding enabled during writing
     final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
-    final PixelsProto.ColumnStatistic.Builder columnChunkStat;
+    private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
 
     final StatsRecorder pixelStatRecorder;
     final StatsRecorder columnChunkStatRecorder;
 
-    final List<ByteBuffer> rowBatchBufferList;
+    int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
+    int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
 
-    int curPixelSize = 0;
-    int pixelPosition = 0;
-    int curPixelPosition = 0;
-    int colChunkSize = 0;         // column chunk size in bytes
+    int curPixelEleCount = 0;                  // count of elements in previous vector
 
-    public BaseColumnWriter(TypeDescription type, int pixelStride)
+    Encoder encoder;
+
+    final ByteArrayOutputStream outputStream;  // column chunk content
+
+    public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        this.type = type;
         this.pixelStride = pixelStride;
+        this.isEncoding = isEncoding;
+
         this.columnChunkIndex =
                 PixelsProto.ColumnChunkIndex.newBuilder();
         this.columnChunkStat =
                 PixelsProto.ColumnStatistic.newBuilder();
-
         this.pixelStatRecorder = StatsRecorder.create(type);
         this.columnChunkStatRecorder = StatsRecorder.create(type);
 
-        this.rowBatchBufferList = new LinkedList<>();
+        // todo a good estimation of chunk size is needed as the initial size of output stream
+        this.outputStream = new ByteArrayOutputStream(pixelStride);
     }
 
-    // serialize vector into byte buffer, append to rowBatchBufferList
-    // update pixel stat, add pixel positions, and update column chunk stat
+    /**
+     * Write ColumnVector
+     *
+     * Serialize vector into {@code ByteBufferOutputStream}.
+     * Update pixel statistics and positions.
+     * Update column chunk statistics.
+     *
+     * @param vector vector
+     * @param size size of vector
+     * @return size in bytes of current column chunk
+     * */
     @Override
-    public abstract int writeBatch(ColumnVector vector, int length);
+    public abstract int write(ColumnVector vector, int size) throws IOException;
 
-    public byte[] serializeContent()
+    /**
+     * Get byte array of column chunk content
+     * */
+    @Override
+    public byte[] getColumnChunkContent()
     {
-        ByteBuffer tempBuffer = ByteBuffer.allocate(colChunkSize);
-        for (ByteBuffer buffer: rowBatchBufferList)
-        {
-            tempBuffer.put(buffer);
-        }
-        return tempBuffer.array();
+        return outputStream.toByteArray();
     }
 
+    /**
+     * Get column chunk size in bytes
+     * */
     public int getColumnChunkSize()
     {
-        return colChunkSize;
+        return outputStream.size();
     }
 
     public PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex()
@@ -81,42 +95,37 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStatRecorder;
     }
 
-    public void newChunk()
+    @Override
+    public void flush() throws IOException
     {
-        if (curPixelSize > 0) {
+        if (curPixelEleCount > 0) {
             newPixel();
         }
     }
 
+    void newPixel() throws IOException
+    {
+        curPixelPosition = outputStream.size();
+        curPixelEleCount = 0;
+        columnChunkStatRecorder.merge(pixelStatRecorder);
+        PixelsProto.PixelStatistic.Builder pixelStat =
+                PixelsProto.PixelStatistic.newBuilder();
+        pixelStat.setStatistic(pixelStatRecorder.serialize());
+        columnChunkIndex.addPixelPositions(lastPixelPosition);
+        columnChunkIndex.addPixelStatistics(pixelStat.build());
+        lastPixelPosition = curPixelPosition;
+        pixelStatRecorder.reset();
+    }
+
+    @Override
     public void reset()
     {
-        colChunkSize = 0;
-        pixelPosition = 0;
+        lastPixelPosition = 0;
         curPixelPosition = 0;
         columnChunkIndex.clear();
         columnChunkStat.clear();
         pixelStatRecorder.reset();
         columnChunkStatRecorder.reset();
-        rowBatchBufferList.clear();
-    }
-
-    /**
-     * End of a pixel
-     * 1. set current pixel size to 0 for the next batch pixel writing
-     * 2. update column chunk stat
-     * 3. add pixel stat to columnChunkIndex
-     * 4. reset current pixel stat recorder
-     */
-    void newPixel()
-    {
-        curPixelSize = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(pixelPosition);
-        pixelPosition = curPixelPosition;
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        pixelStatRecorder.reset();
+        outputStream.reset();
     }
 }

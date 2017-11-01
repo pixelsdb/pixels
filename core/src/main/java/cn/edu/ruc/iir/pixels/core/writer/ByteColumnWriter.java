@@ -1,11 +1,12 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenByteEncoder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
 
 /**
  * pixels
@@ -14,32 +15,82 @@ import java.nio.ByteBuffer;
  */
 public class ByteColumnWriter extends BaseColumnWriter
 {
-    public ByteColumnWriter(TypeDescription schema, int pixelStride)
+    private final byte[] curPixelVector = new byte[pixelStride];
+
+    public ByteColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride);
+        super(schema, pixelStride, isEncoding);
+        encoder = new RunLenByteEncoder();
     }
 
     @Override
-    public int writeBatch(ColumnVector vector, int length)
+    public int write(ColumnVector vector, int size) throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
-        ByteBuffer buffer = ByteBuffer.allocate(length * Long.BYTES);
-        for (int i = 0; i < length; i++) {
-            curPixelSize++;
-            byte v = (byte) values[i];
-            buffer.put(v);
-            curPixelPosition += Byte.BYTES;
-            pixelStatRecorder.updateInteger(v, 1);
-            // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
-            if (curPixelSize >= pixelStride) {
-                newPixel();
-            }
+        byte[] bvalues = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bvalues[i] = (byte) values[i];
         }
-        // append buffer of this batch to rowBatchBufferList
-        buffer.flip();
-        rowBatchBufferList.add(buffer);
-        colChunkSize += buffer.limit();
-        return buffer.limit();
+        int curPartLength;
+        int curPartOffset = 0;
+        int nextPartLength = size;
+
+        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelEleCount;
+            System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+            curPixelEleCount += curPartLength;
+            newPixel();
+            curPartOffset += curPartLength;
+            nextPartLength = size - curPartOffset;
+        }
+
+        curPartLength = nextPartLength;
+
+        System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+        curPixelEleCount += curPartLength;
+
+        curPartOffset += curPartLength;
+        nextPartLength = size - curPartOffset;
+
+        if (nextPartLength > 0) {
+            System.arraycopy(bvalues,
+                    curPartOffset,
+                    curPixelVector,
+                    curPixelEleCount,
+                    nextPartLength);
+            curPixelEleCount += nextPartLength;
+        }
+
+        return outputStream.size();
+    }
+
+    @Override
+    public void newPixel() throws IOException
+    {
+        for (int i = 0; i < curPixelEleCount; i++)
+        {
+            pixelStatRecorder.updateInteger(curPixelVector[i], 1);
+        }
+
+        if (isEncoding) {
+            outputStream.write(encoder.encode(curPixelVector));
+        }
+        else {
+            outputStream.write(curPixelVector);
+        }
+
+        curPixelPosition = outputStream.size();
+
+        curPixelEleCount = 0;
+        columnChunkStatRecorder.merge(pixelStatRecorder);
+        PixelsProto.PixelStatistic.Builder pixelStat =
+                PixelsProto.PixelStatistic.newBuilder();
+        pixelStat.setStatistic(pixelStatRecorder.serialize());
+        columnChunkIndex.addPixelPositions(lastPixelPosition);
+        columnChunkIndex.addPixelStatistics(pixelStat.build());
+        lastPixelPosition = curPixelPosition;
+        pixelStatRecorder.reset();
     }
 }
