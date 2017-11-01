@@ -9,11 +9,21 @@ import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 
 /**
- * pixels
+ * String column writer.
+ *
+ * The string column chunk consists of seven fields:
+ * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
+ * 2. origins field (distinct string bytes array)
+ * 3. starts field (starting offsets indicating starting points of each string in the origins field)
+ * 4. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
+ * 5. origins offset field (an integer value indicating offset of the origins field in the chunk)
+ * 6. starts offset field (an integer value indicating offset of the starts field in the chunk)
+ * 7. orders offset field (an integer value indicating offset of the orders field in the chunk)
+ *
+ * Pixels field is necessary in all cases.
+ * Other fields only exist when dictionary encoding is enabled.
  *
  * @author guodong
  */
@@ -28,7 +38,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         super(schema, pixelStride, isEncoding);
         this.useDictionaryEncoding = isEncoding;
-        encoder = new RunLenIntEncoder();
+        encoder = new RunLenIntEncoder(false, true);
     }
 
     @Override
@@ -135,15 +145,62 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void flush() throws IOException
     {
+        // flush out pixels field
         super.flush();
         // check if continue using dictionary encoding or not in the coming chunks
         if (!doneDictionaryEncodingCheck) {
             checkDictionaryEncoding();
         }
-        // flush out dictionary byteArray, keyOffsets and dumpOrder
+        // flush out other fields
         if (useDictionaryEncoding) {
-
+            flushDictionary();
         }
+    }
+
+    private void flushDictionary() throws IOException
+    {
+        int originsFieldOffset;
+        int startsFieldOffset;
+        int ordersFieldOffset;
+        int size = dictionary.size();
+        int[] starts = new int[size];
+        int[] orders = new int[size];
+
+        originsFieldOffset = outputStream.size();
+
+        // recursively visit the red black tree, and fill origins field, get starts array and orders array
+        dictionary.visit(new StringRedBlackTree.Visitor()
+        {
+            private int initStart = 0;
+            private int currentId = 0;
+
+            @Override
+            public void visit(StringRedBlackTree.VisitorContext context) throws IOException
+            {
+                context.writeBytes(outputStream);
+                starts[currentId] = initStart;
+                initStart += context.getLength();
+                orders[context.getOriginalPosition()] = currentId++;
+            }
+        });
+
+        startsFieldOffset = outputStream.size();
+
+        for (int i = 0; i < size; i++)
+        {
+            outputStream.write(starts[i]);
+        }
+
+        ordersFieldOffset = outputStream.size();
+
+        for (int i = 0; i < size; i++)
+        {
+            outputStream.write(orders[i]);
+        }
+
+        outputStream.write(originsFieldOffset);
+        outputStream.write(startsFieldOffset);
+        outputStream.write(ordersFieldOffset);
     }
 
     private void checkDictionaryEncoding()
