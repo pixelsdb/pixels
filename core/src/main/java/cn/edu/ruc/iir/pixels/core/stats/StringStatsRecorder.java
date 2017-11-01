@@ -1,6 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.stats;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 
 /**
  * pixels
@@ -60,7 +64,26 @@ public class StringStatsRecorder extends StatsRecorder implements StringColumnSt
     @Override
     public void updateString(byte[] value, int offset, int length, int repetitions)
     {
-        // todo update string byte array
+        ByteBuffer buffer = ByteBuffer.wrap(value, offset, length);
+        try {
+            String str = EncodingUtils.decodeString(buffer, true);
+            if (minimum == null) {
+                minimum = maximum = str;
+            }
+            else {
+                if (str.compareTo(minimum) < 0) {
+                    minimum = str;
+                }
+                if (str.compareTo(maximum) > 0) {
+                    maximum = str;
+                }
+            }
+            sum += str.length() * repetitions;
+            numberOfValues += repetitions;
+        }
+        catch (CharacterCodingException e) {
+            buffer.clear();
+        }
     }
 
     @Override

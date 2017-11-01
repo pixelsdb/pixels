@@ -4,6 +4,13 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CodingErrorAction;
 
 /**
  * pixels
@@ -871,5 +878,47 @@ public class EncodingUtils
         } else {
             return 64;
         }
+    }
+
+    private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
+            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
+                    onMalformedInput(CodingErrorAction.REPORT).
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
+
+    private static ThreadLocal<CharsetDecoder> DECODER_FACTORY =
+            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newDecoder().
+                    onMalformedInput(CodingErrorAction.REPORT).
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
+
+    public static ByteBuffer encodeString(String string, boolean replace)
+            throws CharacterCodingException
+    {
+        CharsetEncoder encoder = ENCODER_FACTORY.get();
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPLACE);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+        ByteBuffer bytes =
+                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+        if (replace) {
+            encoder.onMalformedInput(CodingErrorAction.REPORT);
+            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+        }
+        return bytes;
+    }
+
+    public static String decodeString(ByteBuffer bytes, boolean replace) throws CharacterCodingException
+    {
+        CharsetDecoder decoder = DECODER_FACTORY.get();
+        if (replace) {
+            decoder.onMalformedInput(CodingErrorAction.REPLACE);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+        }
+        String str = decoder.decode(bytes).toString();
+        if (replace) {
+            decoder.onMalformedInput(CodingErrorAction.REPORT);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+        }
+        return str;
     }
 }

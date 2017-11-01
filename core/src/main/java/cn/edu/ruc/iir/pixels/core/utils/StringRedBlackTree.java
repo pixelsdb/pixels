@@ -18,11 +18,6 @@ import java.util.Arrays;
  */
 public class StringRedBlackTree extends RedBlackTree
 {
-    private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
-            ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
-                    onMalformedInput(CodingErrorAction.REPORT).
-                    onUnmappableCharacter(CodingErrorAction.REPORT));
-
     private final DynamicByteArray byteArray = new DynamicByteArray();
     private final DynamicIntArray keyOffsets;
     private byte[] keyBytes;
@@ -37,7 +32,7 @@ public class StringRedBlackTree extends RedBlackTree
     public int add(String value)
     {
         try {
-            ByteBuffer bb = encode(value, true);
+            ByteBuffer bb = EncodingUtils.encodeString(value, true);
             keyBytes = bb.array();
             keyLength = bb.limit();
             if (add()) {
@@ -72,22 +67,22 @@ public class StringRedBlackTree extends RedBlackTree
         }
     }
 
-    private ByteBuffer encode(String string, boolean replace)
-            throws CharacterCodingException
-    {
-        CharsetEncoder encoder = ENCODER_FACTORY.get();
-        if (replace) {
-            encoder.onMalformedInput(CodingErrorAction.REPLACE);
-            encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
-        }
-        ByteBuffer bytes =
-                encoder.encode(CharBuffer.wrap(string.toCharArray()));
-        if (replace) {
-            encoder.onMalformedInput(CodingErrorAction.REPORT);
-            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
-        }
-        return bytes;
-    }
+//    private ByteBuffer encode(String string, boolean replace)
+//            throws CharacterCodingException
+//    {
+//        CharsetEncoder encoder = ENCODER_FACTORY.get();
+//        if (replace) {
+//            encoder.onMalformedInput(CodingErrorAction.REPLACE);
+//            encoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+//        }
+//        ByteBuffer bytes =
+//                encoder.encode(CharBuffer.wrap(string.toCharArray()));
+//        if (replace) {
+//            encoder.onMalformedInput(CodingErrorAction.REPORT);
+//            encoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+//        }
+//        return bytes;
+//    }
 
     // compare newKey with position specified key
     @Override
