@@ -9,11 +9,11 @@ target
 *.class
 
 TestParams.java
-main-icde-18.aux
-main-icde-18.bbl
-main-icde-18.blg
-main-icde-18.log
-main-icde-18.pdf
-main-icde-18.synctex.gz
+main-vldb-18.aux
+main-vldb-18.bbl
+main-vldb-18.blg
+main-vldb-18.log
+main-vldb-18.pdf
+main-vldb-18.synctex.gz
 pub/*.fls
 pub/*.fdb_latexmk
