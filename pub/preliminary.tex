@@ -1,8 +1,37 @@
 \section{Preliminaries}
 
-In this section, we review today's HDFS-based column stores in which wide tables are stored, and how queries are executed on top of these wide tables \cite{IEEEexample:IEEEwebsite}.
+In this section, we review today's HDFS-based column stores in which wide tables are stored, and how queries are executed on top of these wide tables.
 
-\subsection{Disk Seek Cost}
+\subsection{Cost Model}
+
+In Pixels, we focus on the optimization of data reading cost, which mainly comes from the first map stage of query execution in a MapReduce-like system, and takes a majority of the end-to-end latency for many batch queries~\cite{ColumnOrdering}. Basically, the reading cost of a map task (we assume one row group is read by a map task, although the model can be easily adapted to support multiple row groups) includes three major parts:
+\begin{itemize}
+	\item \textit{Constant overhead}. It includes the cost of task scheduling, metadata parsing, garbage collection, and the initial seek cost to read a row group.
+	
+	\item \textit{Sequential reading cost}. Given the access pattern $AP=\{c_{q,1},c_{q,2},\dots,c_{q,m}\}$ of a query $q$, the sequential reading cost on a row group is $SeqRead(q)=\sum_{i=1}^{m}size(c_{q,i})/b$, where $b$ is the sequential read bandwidth of the disk, $c_{q,i}$ is the $i^{th}$ column that is required by $q$.
+	
+	\item \textit{Seek cost}. Given a column order $S=\{c_1, c_2,\dots,c_n\}$, the column access pattern $AP=\{c_{q,1},c_{q,2},\dots,c_{q,m}\}$ of query $q$, the seek cost of a row group is $Seek(q)=\sum_{i=1}^{m-1}f(dist(c_{q,i},c_{q,i+1}))$, where $dist$ is the distance in bytes between two data items in a file, and $f$ is the seek cost function built by \textit{Seek Evaluator} in Section \ref{subsec:seekEvaluator}.
+\end{itemize}
+
+\begin{Definition}[Query reading cost]\label{equ:qcost}
+	Given a query $q$, a wide table of $N$ row groups, the reading cost of $q$ is
+	\begin{equation}
+	Cost(q) = N\times(\epsilon+SeqRead(q)+Seek(q))
+	\label{equ:querycost}
+	\end{equation}
+\end{Definition} 
+where $\epsilon$ is the constant overhead of reading a row group.
+We assume that the reading cost of each row group is the same.
+The reading cost of the whole workload is then modelled as:
+
+\begin{Definition}[Workload reading cost]\label{equ:wcost}
+	Given a weight $w_q$ for each query $q\in Q$, the reading cost of a workload $Q$ is
+	\begin{equation}
+	Cost(Q) = \sum_{q\in Q}(w_q\times Cost(q))
+	\label{equ:workloadcost}
+	\end{equation}
+\end{Definition}
+The weight $w_q$ implies the frequency/importance of the query $q$. We apply the workload reading cost as the target to be optimized for the layout optimization component.
 
 \subsection{Wide Table Layout in HDFS}
 \todo{1) columnar format in HDFS; 2) wide tables are store in these formats; 3) disk seek cost problem.}

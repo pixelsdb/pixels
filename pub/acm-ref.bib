@@ -4,7 +4,7 @@
 	url = {https://cwiki.apache.org/confluence/display/Hive/Parquet},
 }
 
-@inproceedings{DBLP:conf/icde/HeLHSJZX11,
+@inproceedings{RCFile:paper,
   author    = {Yongqiang He and
                Rubao Lee and
                Yin Huai and
@@ -15,8 +15,33 @@
   title     = {RCFile: {A} fast and space-efficient data placement structure in MapReduce-based
                warehouse systems},
   booktitle = {ICDE},
+  pages = {1199--1208},
   year      = {2011},
 }
+
+@inproceedings{SparkSQL:paper,
+ author = {Armbrust, Michael and Xin, Reynold S. and Lian, Cheng and Huai, Yin and Liu, Davies and Bradley, Joseph K. and Meng, Xiangrui and Kaftan, Tomer and Franklin, Michael J. and Ghodsi, Ali and Zaharia, Matei},
+ title = {Spark SQL: Relational Data Processing in Spark},
+ booktitle = {SIGMOD},
+ year = {2015},
+ pages = {1383--1394},
+}
+
+@inproceedings{peloton:self-driving,
+  title={Self-Driving Database Management Systems.},
+  author={Pavlo, Andrew and Angulo, Gustavo and Arulraj, Joy and Lin, Haibin and Lin, Jiexi and Ma, Lin and Menon, Prashanth and Mowry, Todd C and Perron, Matthew and Quah, Ian and others},
+  booktitle = {CIDR},
+  year      = {2017},
+}
+
+@inproceedings{ColumnOrdering,
+ author = {Bian, Haoqiong and Yan, Ying and Tao, Wenbo and Chen, Liang Jeff and Chen, Yueguo and Du, Xiaoyong and Moscibroda, Thomas},
+ title = {Wide Table Layout Optimization Based on Column Ordering and Duplication},
+ booktitle = {SIGMOD},
+ year = {2017},
+ pages = {299--314}
+} 
+
 
 @inproceedings{DBLP:conf/cloud/JindalQD11,
 	author    = {Alekh Jindal and
@@ -34,19 +59,16 @@
 	year={2005}
 }
 
-@article{DBLP:journals/pvldb/HuaiMLO013,
-	author    = {Yin Huai and
-	Siyuan Ma and
-	Rubao Lee and
-	Owen O'Malley and
-	Xiaodong Zhang},
-	title     = {Understanding Insights into the Basic Structure and Essential Issues
-	of Table Placement Methods in Clusters},
-	journal   = {{PVLDB}},
-	volume    = {6},
-	number    = {14},
-	year      = {2013},
-}
+@article{UnderstandingTablePlacementMothods,
+ author = {Huai, Yin and Ma, Siyuan and Lee, Rubao and O'Malley, Owen and Zhang, Xiaodong},
+ title = {Understanding Insights into the Basic Structure and Essential Issues of Table Placement Methods in Clusters},
+ journal = {PVLDB},
+ volume = {6},
+ number = {14},
+ year = {2013},
+ pages = {1750--1761},
+} 
+
 
 @inproceedings{DBLP:conf/cidr/Abadi07,
 	author    = {Daniel J. Abadi},
@@ -55,15 +77,24 @@
 	year      = {2007},
 }
 
-@online{orcfileManual,
-	title = {https://cwiki.apache.org/confluence/display/Hive
-	/LanguageManual+ORC},
+@online{ORCDDLManual,
+	title = {ORC DDL Manual},
 	url = {https://cwiki.apache.org/confluence/display/Hive/LanguageManual+ORC},
 }
 
+@online{CarbonDataMainPage,
+	title = {CarbonData},
+	url = {http://carbondata.apache.org/},
+}
+
+@online{ORCMainPage,
+	title = {ORC},
+	url = {https://orc.apache.org/},
+}
+
 @online{parquetMainPage,
-	title = {http://parquet.apache.org/documentation/latest/},
-	url = {http://parquet.apache.org/documentation/latest/},
+	title = {Parquet},
+	url = {http://parquet.apache.org/},
 }
 
 @online{TPH-C,
@@ -226,7 +257,7 @@
 	year      = {2008},
 }
 
-@inproceedings{DBLP:conf/icde/ThusooSJSCZALM10,
+@inproceedings{Hive:paper,
 	author    = {Ashish Thusoo and
 	Joydeep Sen Sarma and
 	Namit Jain and
@@ -239,6 +270,7 @@
 	title     = {Hive - a petabyte scale data warehouse using Hadoop},
 	booktitle = {ICDE},
 	year      = {2010},
+	pages={996--1005},
 }
 
 @inproceedings{DBLP:conf/hotcloud/ZahariaCFSS10,
@@ -264,7 +296,7 @@
 	month	= {August},
 }
 
-@incollection{book:hardDiskDrives,
+@incollection{HardDiskDrives:book,
 	author	= "Remzi H. Arpaci-Dusseau and Andrea C. Arpaci-Dusseau",
 	title	= "Hard Disk Drives",
 	booktitle= "Operating Systems: Three Easy Pieces",
@@ -377,18 +409,18 @@
 }
 
 @online{impala,
-	title = {http://impala.io/},
+	title = {Impala},
 	url = {http://impala.io/},
 }
 
 
 @online{presto,
-	title = {https://prestodb.io/},
+	title = {Presto},
 	url = {https://prestodb.io/},
 }
 
 @online{sparksql,
-	title = {http://spark.apache.org/sql/},
+	title = {Spark SQL},
 	url = {http://spark.apache.org/sql/},
 }
 
@@ -490,7 +522,7 @@
 }
 
 
-@article{Computer:an-introduction-to-disk-drive-modeling,
+@article{An-introduction-to-disk-drive-modeling,
   title={An introduction to disk drive modeling},
   author={Ruemmler, Chris and Wilkes, John},
   journal={Computer},
@@ -498,6 +530,22 @@
   number={3},
   year={1994}
 }
+
+@inproceedings{DataSkipping:paper,
+ author = {Sun, Liwen and Franklin, Michael J. and Krishnan, Sanjay and Xin, Reynold S.},
+ title = {Fine-grained Partitioning for Aggressive Data Skipping},
+ booktitle = {SIGMOD},
+ year = {2014},
+ pages = {1115--1126},
+} 
+
+@inproceedings{HAWQ:paper,
+ author = {Chang, Lei and Wang, Zhanwei and Ma, Tao and Jian, Lirong and Ma, Lili and Goldshuv, Alon and Lonergan, Luke and Cohen, Jeffrey and Welton, Caleb and Sherry, Gavin and Bhandarkar, Milind},
+ title = {HAWQ: A Massively Parallel Processing SQL Engine in Hadoop},
+ booktitle = {SIGMOD},
+ year = {2014},
+ pages = {1223--1234},
+} 
 
 
 @book{book:disk-scheduling-algo-based-on-rota-pos,
@@ -554,6 +602,15 @@
   booktitle={SIGMOD},
   year={2014}
 }
+
+@inproceedings{peloton-adaptive-store,
+ author = {Arulraj, Joy and Pavlo, Andrew and Menon, Prashanth},
+ title = {Bridging the Archipelago Between Row-Stores and Column-Stores for Hybrid Workloads},
+ booktitle = {SIGMOD},
+ year = {2016},
+ pages = {583--598},
+} 
+
 
 @inproceedings{o2p-relax-and-let,
   title={Relax and let the database do the partitioning online},
