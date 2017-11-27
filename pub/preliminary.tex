@@ -2,6 +2,22 @@
 
 In this section, we review today's HDFS-based column stores in which wide tables are stored, and how queries are executed on top of these wide tables.
 
+\subsection{Wide Table Layout in HDFS}
+
+Distributed joins on HDFS are very expensive.
+In HDFS environment, data is partitioned into blocks and distributed in the cluster. 
+Physical location of block is controlled by HDFS and transparent to computation on top of HDFS.
+With this limitation, data analytic systems on HDFS are not able to co-locate blocks from related tables.
+So that joins on HDFS are much more expensive than data scans due to that they shuffle large amount of data through the network, consume large amount of memory and dump large amount of intermediate data into disks.
+
+So that a major motivation of using wide tables on HDFS is saving join cost.
+There are research efforts~\cite{WideTable:paper} on assembling normalized narrow tables into wide tables to improve query performance.
+In real data analytic products such as that in Microsoft Bing~\cite{ColumnOrdering}, wide tables are widely used in data analysis in HDFS environment.
+
+By efficient data encoding and compression provided in popular HDFS column stores such as ORC~\cite{ORCMainPage}, Parquet~\cite{parquetMainPage} and CarbonData~\cite{CarbonDataMainPage}, data redundancy in wide tables is not a major problem and the I/O performance is largely improved.
+It is much more efficient than storing data in a set of normalized tables and joining them during query runtime.
+
+
 \subsection{Cost Model}
 
 In Pixels, we focus on the optimization of data reading cost, which mainly comes from the first map stage of query execution in a MapReduce-like system, and takes a majority of the end-to-end latency for many batch queries~\cite{ColumnOrdering}. Basically, the reading cost of a map task (we assume one row group is read by a map task, although the model can be easily adapted to support multiple row groups) includes three major parts:
@@ -10,7 +26,7 @@ In Pixels, we focus on the optimization of data reading cost, which mainly comes
 	
 	\item \textit{Sequential reading cost}. Given the access pattern $AP=\{c_{q,1},c_{q,2},\dots,c_{q,m}\}$ of a query $q$, the sequential reading cost on a row group is $SeqRead(q)=\sum_{i=1}^{m}size(c_{q,i})/b$, where $b$ is the sequential read bandwidth of the disk, $c_{q,i}$ is the $i^{th}$ column that is required by $q$.
 	
-	\item \textit{Seek cost}. Given a column order $S=\{c_1, c_2,\dots,c_n\}$, the column access pattern $AP=\{c_{q,1},c_{q,2},\dots,c_{q,m}\}$ of query $q$, the seek cost of a row group is $Seek(q)=\sum_{i=1}^{m-1}f(dist(c_{q,i},c_{q,i+1}))$, where $dist$ is the distance in bytes between two data items in a file, and $f$ is the seek cost function built by \textit{Seek Evaluator} in Section \ref{subsec:seekEvaluator}.
+	\item \textit{Seek cost}. Given a column order $S=\{c_1, c_2,\dots,c_n\}$, the column access pattern $AP=\{c_{q,1},c_{q,2},\dots,c_{q,m}\}$ of query $q$, the seek cost of a row group is \\$Seek(q)=\sum_{i=1}^{m-1}f(dist(c_{q,i},c_{q,i+1}))$, where $dist$ is the distance in bytes between two data items in a file, and $f$ is the seek cost function built by \textit{Seek Evaluator} in Section \ref{subsec:seekEvaluator}.
 \end{itemize}
 
 \begin{Definition}[Query reading cost]\label{equ:qcost}
@@ -19,7 +35,8 @@ In Pixels, we focus on the optimization of data reading cost, which mainly comes
 	Cost(q) = N\times(\epsilon+SeqRead(q)+Seek(q))
 	\label{equ:querycost}
 	\end{equation}
-\end{Definition} 
+\end{Definition}
+
 where $\epsilon$ is the constant overhead of reading a row group.
 We assume that the reading cost of each row group is the same.
 The reading cost of the whole workload is then modelled as:
@@ -31,13 +48,7 @@ The reading cost of the whole workload is then modelled as:
 	\label{equ:workloadcost}
 	\end{equation}
 \end{Definition}
+
 The weight $w_q$ implies the frequency/importance of the query $q$. We apply the workload reading cost as the target to be optimized for the layout optimization component.
 
-\subsection{Wide Table Layout in HDFS}
-\todo{1) columnar format in HDFS; 2) wide tables are store in these formats; 3) disk seek cost problem.}
-
-
-\subsection{Query Execution on Wide Tables}
-
-\todo{1) one task per split / row group; 2) task schedule and initialization cost; 3) adaptive split size problem.}
 
