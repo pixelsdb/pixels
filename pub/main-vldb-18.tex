@@ -1,0 +1,177 @@
+% THIS IS AN EXAMPLE DOCUMENT FOR VLDB 2012
+% based on ACM SIGPROC-SP.TEX VERSION 2.7
+% Modified by  Gerald Weber <gerald@cs.auckland.ac.nz>
+% Removed the requirement to include *bbl file in here. (AhmetSacan, Sep2012)
+% Fixed the equation on page 3 to prevent line overflow. (AhmetSacan, Sep2012)
+
+\documentclass{vldb}
+\usepackage{graphicx}
+\usepackage{balance}  % for  \balance command ON LAST PAGE  (only there!)
+\usepackage{times,amsmath,epsfig}
+\usepackage{color}
+\newtheorem{Definition}{Definition}{\itshape}{\rmfamily}
+\newtheorem{Theorem}{Theorem}{\itshape}{\rmfamily}
+\newcommand{\todo}[1]{{\footnotesize \textcolor{red}{$\ll$\textsf{TODO #1}$\gg$}}}
+\newcommand{\bluefont}[1]{\textcolor{blue}{#1}}
+\newcommand{\redfont}[1]{\textcolor{red}{#1}}
+\newcommand{\greenfont}[1]{\textcolor{green}{#1}}
+\newcommand{\yellowfont}[1]{\textcolor{yellow}{#1}}
+
+
+% Include information below and uncomment for camera ready
+\vldbTitle{Pixels: Adaptive Column Store for Wide Table Analysis}
+\vldbAuthors{Haoqiong Bian, Guodong Jin, Yueguo Chen, Xiaoyong Du, Xiongpai Qin}
+\vldbDOI{https://doi.org/TBD}
+
+\begin{document}
+	
+	% ****************** TITLE ****************************************
+	
+	\title{Pixels: Adaptive Column Store for Wide Table Analysis}
+	
+	
+	% possible, but not really needed or used for PVLDB:
+	%\subtitle{[Extended Abstract]
+	%\titlenote{A full version of this paper is available as\textit{Author's Guide to Preparing ACM SIG Proceedings Using \LaTeX$2_\epsilon$\ and BibTeX} at \texttt{www.acm.org/eaddress.htm}}}
+	
+	% ****************** AUTHORS **************************************
+	
+	% You need the command \numberofauthors to handle the 'placement
+	% and alignment' of the authors beneath the title.
+	%
+	% For aesthetic reasons, we recommend 'three authors at a time'
+	% i.e. three 'name/affiliation blocks' be placed beneath the title.
+	%
+	% NOTE: You are NOT restricted in how many 'rows' of
+	% "name/affiliations" may appear. We just ask that you restrict
+	% the number of 'columns' to three.
+	%
+	% Because of the available 'opening page real-estate'
+	% we ask you to refrain from putting more than six authors
+	% (two rows with three columns) beneath the article title.
+	% More than six makes the first-page appear very cluttered indeed.
+	%
+	% Use the \alignauthor commands to handle the names
+	% and affiliations for an 'aesthetic maximum' of six authors.
+	% Add names, affiliations, addresses for
+	% the seventh etc. author(s) as the argument for the
+	% \additionalauthors command.
+	% These 'additional authors' will be output/set for you
+	% without further effort on your part as the last section in
+	% the body of your article BEFORE References or any Appendices.
+	
+	\numberofauthors{5} %  in this sample file, there are a *total*
+	% of EIGHT authors. SIX appear on the 'first-page' (for formatting
+	% reasons) and the remaining two appear in the \additionalauthors section.
+	
+	\author{
+		% You can go ahead and credit any number of authors here,
+		% e.g. one 'row of three' or two rows (consisting of one row of three
+		% and a second row of one, two or three).
+		%
+		% The command \alignauthor (no curly braces needed) should
+		% precede each author name, affiliation/snail-mail address and
+		% e-mail address. Additionally, tag each line of
+		% affiliation/address with \affaddr, and tag the
+		% e-mail address with \email.
+		%
+		% 1st. author
+		\alignauthor
+		Haoqiong Bian\\%\titlenote{Dr.~Trovato insisted his name be first.}\\
+		\affaddr{School of Information,\\Renmin University of China}\\
+		%\affaddr{1932 Wallamaloo Lane}\\
+		%\affaddr{Wallamaloo, New Zealand}\\
+		\affaddr{Beijing, China}\\
+		\email{bianhq@ruc.edu.cn}
+		% 2nd. author
+		\alignauthor
+		Guodong Jin\titlenote{Guodong Jin and Haoqiong Bian contributed equally to this work.}\\
+		\affaddr{School of Information,\\Renmin University of China}\\
+		%\affaddr{P.O. Box 1212}\\
+		%\affaddr{Dublin, Ohio 43017-6221}\\
+		\affaddr{Beijing, China}\\
+		\email{jinguodong@ruc.edu.cn}
+		% 3rd. author
+		\alignauthor Yueguo Chen
+		\titlenote{Yueguo Chen is the corresponding author.}\\
+		\affaddr{School of Information,\\Renmin University of China}\\
+		%\affaddr{1 Th{\large{\sf{\o}}}rv{$\ddot{\mbox{a}}$}ld Circle}\\
+		%\affaddr{Hekla, Iceland}\\
+		\affaddr{Beijing, China}\\
+		\email{chenyueguo@ruc.edu.cn}
+		%\and  % use '\and' if you need 'another row' of author names
+	}
+	% There's nothing stopping you putting the seventh, eighth, etc.
+	% author on the opening page (as the 'third row') but we ask,
+	% for aesthetic reasons that you place these 'additional authors'
+	% in the \additional authors block, viz.
+	\additionalauthors{
+		Additional authors: \\
+		Xiaoyong Du
+		(School of Information, Renmin University of China, {\texttt{duyong@ruc.edu.cn}}), \\
+		Xiongpai Qin
+		(School of Information, Renmin University of China, { \texttt{qxp1990@ruc.edu.cn}})}
+	\date{30 July 1999}
+	% Just remember to make sure that the TOTAL number of authors
+	% is the number that will appear on the first page PLUS the
+	% number that will appear in the \additionalauthors section.
+	
+	
+	\maketitle
+	
+	\begin{abstract}
+		The abstract for your paper for the PVLDB Journal submission.
+		The template and the example document are based on the ACM SIG Proceedings  templates. This file is part of a package for preparing the submissions for review. These files are in the camera-ready format, but they do not contain the full copyright note.
+		Note that after the notification of acceptance, there will be an updated style file for the camera-ready submission containing the copyright note.
+	\end{abstract}
+
+
+\input{introduction}
+
+\input{preliminary}
+
+\input{solution}
+
+\input{implementation}
+
+\input{experiment}
+
+\input{related}
+
+\input{conclusion}
+
+
+% The following two commands are all you need in the
+% initial runs of your .tex file to
+% produce the bibliography for the citations in your paper.
+\bibliographystyle{abbrv}
+\bibliography{acm-ref}  % vldb_sample.bib is the name of the Bibliography in this case
+% You must have a proper ".bib" file
+%  and remember to run:
+% latex bibtex latex latex
+% to resolve all references
+
+%\subsection{References}
+%Generated by bibtex from your ~.bib file.  Run latex,
+%then bibtex, then latex twice (to resolve references).
+
+%APPENDIX is optional.
+% ****************** APPENDIX **************************************
+% Example of an appendix; typically would start on a new page
+%pagebreak
+
+\begin{appendix}
+	You can use an appendix for optional proofs or details of your evaluation which are not absolutely necessary to the core understanding of your paper. 
+	
+	\section{Final Thoughts on Good Layout}
+	Please use readable font sizes in the figures and graphs. Avoid tempering with the correct border values, and the spacing (and format) of both text and captions of the PVLDB format (e.g. captions are bold).
+	
+	At the end, please check for an overall pleasant layout, e.g. by ensuring a readable and logical positioning of any floating figures and tables. Please also check for any line overflows, which are only allowed in extraordinary circumstances (such as wide formulas or URLs where a line wrap would be counterintuitive).
+	
+	Use the \texttt{balance} package together with a \texttt{\char'134 balance} command at the end of your document to ensure that the last page has balanced (i.e. same length) columns.
+	
+\end{appendix}
+
+\balance
+
+\end{document}

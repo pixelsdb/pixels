@@ -16,7 +16,7 @@ public interface PixelsReader
      * Get the iterator for reading rows inside the file
      * @return {@code VectorReader}
      * */
-    VectorReader vectors(int[] rowGroups, String[] fieldNames);
+    VectorReader vectors(int[] rowGroups, String[] fieldNames) throws IOException;
 
     PixelsProto.RowGroupFooter readRowGroupFooter(int rowGroupId) throws IOException;
 

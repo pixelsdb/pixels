@@ -139,7 +139,7 @@ public class PixelsReaderImpl implements PixelsReader
      * @return {@code VectorReader}
      */
     @Override
-    public VectorReader vectors(int[] selectedRowGroups, String[] selectedFieldNames)
+    public VectorReader vectors(int[] selectedRowGroups, String[] selectedFieldNames) throws IOException
     {
         List<String> fieldNames = this.fileSchema.getFieldNames();
         int[] selectedFieldIds = new int[selectedFieldNames.length];
