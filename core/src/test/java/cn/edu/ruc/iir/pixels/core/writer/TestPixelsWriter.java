@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
+import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
@@ -51,7 +52,7 @@ public class TestPixelsWriter
             BytesColumnVector z = (BytesColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
-                    PixelsWriter.newBuilder()
+                    PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
                             .setPixelStride(10000)
                             .setRowGroupSize(64*1024*1024)

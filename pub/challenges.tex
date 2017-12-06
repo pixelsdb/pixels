@@ -1,0 +1,14 @@
+\section{Challenges}
+We address the challenges of wide table analysis.
+\subsection{Workload Modeling}
+
+\subsection{Column Chunk Ordering}
+Effective column chunk ordering strategies shall satisfy following constraints:
+\begin{enumerate}
+	\item Colocate frequently paired visited column chunks as close as possible physically.
+	\item Tradeoff between ordering and reconstruction.
+\end{enumerate}
+\subsection{Data Splitting}
+
+\subsection{Column Chunk Caching}
+Nowadays commonly used cache mechanism on HDFS is based on its block, caching on more precise units such as column chunks can help improve query performance.
