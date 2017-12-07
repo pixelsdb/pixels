@@ -23,11 +23,7 @@ public class PixelsCompactor
 {
     // todo applying refactor in PixelsCompactor
 
-<<<<<<< HEAD
-    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriterImpl.class);
-=======
-    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriter.class);
->>>>>>> a98e0d3c466b228a9347cb0fa2fc3f1b03cce52e
+    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsCompactor.class);
 
     private final TypeDescription schema;
     private final int pixelStride;
