@@ -3,18 +3,32 @@
 
 \subsection{Workload Modeling}
 \label{subsec:workload-modeling}
+Assumptions:
+\begin{itemize}
+	\item Mostly queries access most recent ingested data.
+	\item Patterns of query access paths evolves slowly instead of abruptly.
+\end{itemize}
 
+Goals:
+\begin{itemize}
+	\item Detect changes of access paths, and decide to propose a new round of optimization.
+	\item Analyze patterns of access paths.
+\end{itemize}
+
+Basic idea: Reading optimizer collects access column chunks of each query, and send to layout optimizer.
 
 \subsection{Column Chunk Ordering}
 \label{subsec:column-chunk-ordering}
-
+Local cache buffer.
 
 \section{Reading Optimization}
 \label{sec:reading-optimization}
 
 
-\subsection{Individualized Data Splitting}
+\subsection{Data Split Generator}
 \label{subsec:data-splitting}
+The goal of data split generator is to adaptively assign row groups to data splits when query comes.
+When assigning row groups, the generator takes local task parallelism, memory size and query access patterns into consideration. 
 
 \subsection{Column Chunk Caching}
 \label{subsec:chunk-caching}

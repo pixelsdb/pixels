@@ -49,7 +49,7 @@ To achieve these, we face some major challenges:
 %By efficient data encoding and compression provided in popular HDFS column stores such as ORC~\cite{ORCMainPage}, Parquet~\cite{parquetMainPage} and CarbonData~\cite{CarbonDataMainPage}, data redundancy in wide tables is not a major problem and the I/O performance is largely improved.
 %It is much more efficient than storing data in a set of normalized tables and joining them during query runtime.
 
-\subsection{Definitions}
+\subsection{Cost Models}
 
 In Pixels, we focus on the optimization of data reading cost, which mainly comes from the first map stage of query execution in a MapReduce-like system, and takes a majority of the end-to-end latency for many batch queries~\cite{ColumnOrdering}. Basically, the reading cost of a map task (we assume one row group is read by a map task, although the model can be easily adapted to support multiple row groups) includes three major parts:
 \begin{itemize}
