@@ -23,6 +23,7 @@
         <module>presto</module>
         <module>layout</module>
         <module>common</module>
+        <module>cache</module>
     </modules>
 
     <packaging>pom</packaging>
