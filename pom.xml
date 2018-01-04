@@ -14,15 +14,21 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>cn.edu.ruc.iir.pixels</groupId>
+    <groupId>cn.edu.ruc.iir</groupId>
     <artifactId>pixels</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <repositories>
+        <repository>
+            <id>dbiir.mvn.repo</id>
+            <url>https://raw.githubusercontent.com/dbiir/mvn-repo/master</url>
+        </repository>
+    </repositories>
 
     <modules>
-        <module>core</module>
-        <module>presto</module>
-        <module>layout</module>
-        <module>common</module>
+        <module>pixels-core</module>
+        <module>pixels-presto</module>
+        <module>pixels-cache</module>
     </modules>
 
     <packaging>pom</packaging>
