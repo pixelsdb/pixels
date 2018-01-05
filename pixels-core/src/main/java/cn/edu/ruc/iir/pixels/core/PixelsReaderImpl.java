@@ -31,7 +31,7 @@ public class PixelsReaderImpl implements PixelsReader
 
     public PixelsReaderImpl(FileSystem fs, Path path) throws IOException, UnSupportedReaderException
     {
-        this.rawReader = new PhysicalFsReader(fs, path).getRawReader();
+        this.rawReader = new PhysicalFSReader(fs, path).getRawReader();
         // get file length
         long fileLen = fs.getFileStatus(path).getLen();
         // seek to last Long which records FileTail offset
