@@ -11,13 +11,13 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class PhysicalFsReader implements PhysicalReader
+public class PhysicalFSReader implements PhysicalReader
 {
     private final FileSystem fs;
     private final Path path;
     private final FSDataInputStream rawReader;
 
-    public PhysicalFsReader(FileSystem fs, Path path) throws IOException
+    public PhysicalFSReader(FileSystem fs, Path path) throws IOException
     {
         this.fs = fs;
         this.path = path;

@@ -28,7 +28,7 @@
     <modules>
         <module>pixels-core</module>
         <module>pixels-presto</module>
-        <module>pixels-cache</module>
+        <module>pixels-daemon</module>
     </modules>
 
     <packaging>pom</packaging>
