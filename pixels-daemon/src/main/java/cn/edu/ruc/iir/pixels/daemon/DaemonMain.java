@@ -19,7 +19,7 @@ public class DaemonMain
             {
                 // this is the main daemon
                 System.out.println("starting main daemon...");
-                GuardDaemon guardDaemon = new GuardDaemon();
+                Daemon guardDaemon = new Daemon();
                 String[] guardCmd = {"java", "-jar", "pixels-daemon-0.1.0-SNAPSHOT-full.jar", "guard"};
                 guardDaemon.setup(mainFile, guardFile, guardCmd);
                 Thread daemonThread = new Thread(guardDaemon);
@@ -42,7 +42,7 @@ public class DaemonMain
             {
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
-                GuardDaemon guardDaemon = new GuardDaemon();
+                Daemon guardDaemon = new Daemon();
                 String[] guardCmd = {"java", "-jar", "pixels-daemon-0.1.0-SNAPSHOT-full.jar", "main"};
                 guardDaemon.setup(guardFile, mainFile, guardCmd);
                 guardDaemon.run();

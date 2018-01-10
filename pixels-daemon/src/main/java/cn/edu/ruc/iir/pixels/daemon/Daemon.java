@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
-public class GuardDaemon implements Runnable
+public class Daemon implements Runnable
 {
     private FileChannel mainChannel = null;
     private FileChannel guardChannel = null;
