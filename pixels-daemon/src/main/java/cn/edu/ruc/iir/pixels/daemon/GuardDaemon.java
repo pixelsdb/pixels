@@ -93,7 +93,6 @@ public class GuardDaemon implements Runnable
                 {
                     guardLock.release();
                     // the guarded process is not running.
-                    System.out.println("starting guarded process...");
                     ProcessBuilder builder = new ProcessBuilder(this.guardCmd);
                     builder.start();
                 }
