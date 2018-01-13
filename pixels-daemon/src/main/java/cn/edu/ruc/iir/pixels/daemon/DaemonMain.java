@@ -30,10 +30,34 @@ public class DaemonMain
                 // continue the main thread
                 while (true)
                 {
+                    Server server = new TomcatServer();
                     try
                     {
-                        TimeUnit.SECONDS.sleep(1);
-                    } catch (InterruptedException e)
+                        if (server.isRunning() == false)
+                        {
+                            boolean serverIsDown = true;
+
+                            for (int i = 0; i < 3; ++i)
+                            {
+                                // try 3 times
+                                TimeUnit.SECONDS.sleep(1);
+                                if (server.isRunning())
+                                {
+                                    serverIsDown = false;
+                                }
+                            }
+
+                            if (serverIsDown)
+                            {
+                                server.shutDownServer();
+                                Thread serverThread = new Thread(server);
+                                serverThread.start();
+                                TimeUnit.SECONDS.sleep(5);
+                            }
+                        }
+                        TimeUnit.SECONDS.sleep(3);
+
+                    } catch (Exception e)
                     {
                         e.printStackTrace();
                     }

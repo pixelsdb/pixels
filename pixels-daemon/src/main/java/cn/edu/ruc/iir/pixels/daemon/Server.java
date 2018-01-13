@@ -1,5 +1,8 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-public class Server
+public interface Server extends Runnable
 {
+    public boolean isRunning();
+
+    public void shutDownServer ();
 }

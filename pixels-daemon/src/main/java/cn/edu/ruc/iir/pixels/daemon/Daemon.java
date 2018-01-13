@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.util.concurrent.TimeUnit;
 
 public class Daemon implements Runnable
 {
@@ -83,6 +84,7 @@ public class Daemon implements Runnable
             if (mainLock == null)
             {
                 // this process has been started
+                this.clean();
                 System.exit(0);
             }
 
@@ -96,7 +98,7 @@ public class Daemon implements Runnable
                     ProcessBuilder builder = new ProcessBuilder(this.guardCmd);
                     builder.start();
                 }
-                Thread.sleep(3000);
+                TimeUnit.SECONDS.sleep(3);
             }
 
         } catch (Exception e)
