@@ -48,58 +48,126 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
+        <dep.airlift.version>0.161</dep.airlift.version>
+        <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
+        <dep.airlift.units.version>1.0</dep.airlift.units.version>
+        <dep.commons-logging.version>1.2</dep.commons-logging.version>
+        <dep.log4j.version>2.1</dep.log4j.version>
+        <dep.hadoop.version>2.7.3</dep.hadoop.version>
+        <dep.presto.version>0.192</dep.presto.version>
+        <dep.guava.version>21.0</dep.guava.version>
+        <dep.protobuf.version>2.5.0</dep.protobuf.version>
+        <dep.jackson.version>2.8.1</dep.jackson.version>
+        <dep.junit.version>4.12</dep.junit.version>
+        <dep.junit.jupiter.version>5.0.0-M6</dep.junit.jupiter.version>
+        <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
     </properties>
+
+
 
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+                <version>${dep.commons-logging.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-core</artifactId>
+                <version>${dep.log4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>${dep.log4j.version}</version>
+            </dependency>
+
+            <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
-                <version>2.5.0</version>
+                <version>${dep.protobuf.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-spi</artifactId>
-                <version>0.182</version>
+                <version>${dep.presto.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>19.0</version>
+                <version>${dep.guava.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
-                <version>2.7.3</version>
+                <version>${dep.hadoop.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-hdfs</artifactId>
-                <version>2.7.3</version>
+                <version>${dep.hadoop.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>concurrent</artifactId>
+                <version>${dep.airlift.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>log</artifactId>
+                <version>${dep.airlift.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>slice</artifactId>
+                <version>${dep.airlift.slice.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.airlift</groupId>
+                <artifactId>units</artifactId>
+                <version>${dep.airlift.units.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${dep.jackson.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
-                <version>4.12</version>
+                <version>${dep.junit.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.0.0-M6</version>
+                <version>${dep.junit.jupiter.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-launcher</artifactId>
-                <version>1.0.0-M6</version>
+                <version>${dep.junit.platform.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-runner</artifactId>
-                <version>1.0.0-M6</version>
+                <version>${dep.junit.platform.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

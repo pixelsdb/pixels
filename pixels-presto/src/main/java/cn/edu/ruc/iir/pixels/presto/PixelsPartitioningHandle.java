@@ -13,16 +13,10 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import com.facebook.presto.spi.Plugin;
-import com.facebook.presto.spi.connector.ConnectorFactory;
-import com.google.common.collect.ImmutableList;
+import com.facebook.presto.spi.connector.ConnectorPartitioningHandle;
 
-public final class PixelsPlugin
-        implements Plugin
+public enum PixelsPartitioningHandle
+        implements ConnectorPartitioningHandle
 {
-    @Override
-    public Iterable<ConnectorFactory> getConnectorFactories()
-    {
-        return ImmutableList.of(new PixelsConnectorFactory());
-    }
+    INSTANCE
 }
