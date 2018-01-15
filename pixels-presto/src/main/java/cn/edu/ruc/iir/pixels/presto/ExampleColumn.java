@@ -13,32 +13,29 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import com.facebook.presto.spi.ColumnHandle;
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
 
-public final class PixelsColumnHandle
-        implements ColumnHandle
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.util.Objects.requireNonNull;
+
+public final class ExampleColumn
 {
     private final String name;
-    private final Type columnType;
-
-    public PixelsColumnHandle(ColumnMetadata columnMetadata)
-    {
-        this(columnMetadata.getName(), columnMetadata.getType());
-    }
+    private final Type type;
 
     @JsonCreator
-    public PixelsColumnHandle(
+    public ExampleColumn(
             @JsonProperty("name") String name,
-            @JsonProperty("columnType") Type columnType)
+            @JsonProperty("type") Type type)
     {
+        checkArgument(!isNullOrEmpty(name), "name is null or is empty");
         this.name = name;
-        this.columnType = columnType;
+        this.type = requireNonNull(type, "type is null");
     }
 
     @JsonProperty
@@ -48,20 +45,15 @@ public final class PixelsColumnHandle
     }
 
     @JsonProperty
-    public Type getColumnType()
+    public Type getType()
     {
-        return columnType;
-    }
-
-    public ColumnMetadata toColumnMetadata()
-    {
-        return new ColumnMetadata(name, columnType);
+        return type;
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, columnType);
+        return Objects.hash(name, type);
     }
 
     @Override
@@ -73,8 +65,15 @@ public final class PixelsColumnHandle
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        PixelsColumnHandle other = (PixelsColumnHandle) obj;
+
+        ExampleColumn other = (ExampleColumn) obj;
         return Objects.equals(this.name, other.name) &&
-                Objects.equals(this.columnType, other.columnType);
+                Objects.equals(this.type, other.type);
+    }
+
+    @Override
+    public String toString()
+    {
+        return name + ":" + type;
     }
 }

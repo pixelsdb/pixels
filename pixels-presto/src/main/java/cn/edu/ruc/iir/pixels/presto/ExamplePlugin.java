@@ -17,12 +17,12 @@ import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.connector.ConnectorFactory;
 import com.google.common.collect.ImmutableList;
 
-public final class PixelsPlugin
+public class ExamplePlugin
         implements Plugin
 {
     @Override
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
-        return ImmutableList.of(new PixelsConnectorFactory());
+        return ImmutableList.of(new ExampleConnectorFactory());
     }
 }

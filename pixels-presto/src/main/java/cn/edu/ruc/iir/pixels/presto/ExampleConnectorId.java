@@ -13,27 +13,42 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import com.facebook.presto.spi.ConnectorInsertTableHandle;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import io.airlift.units.Duration;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
-public final class PixelsInsertTableHandle
-        implements ConnectorInsertTableHandle
+public final class ExampleConnectorId
 {
-    private final Duration pageProcessingDelay;
+    private final String id;
 
-    @JsonCreator
-    public PixelsInsertTableHandle(@JsonProperty("pageProcessingDelay") Duration pageProcessingDelay)
+    public ExampleConnectorId(String id)
     {
-        this.pageProcessingDelay = requireNonNull(pageProcessingDelay, "pageProcessingDelay is null");
+        this.id = requireNonNull(id, "id is null");
     }
 
-    @JsonProperty
-    public Duration getPageProcessingDelay()
+    @Override
+    public String toString()
     {
-        return pageProcessingDelay;
+        return id;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(id);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if ((obj == null) || (getClass() != obj.getClass())) {
+            return false;
+        }
+
+        ExampleConnectorId other = (ExampleConnectorId) obj;
+        return Objects.equals(this.id, other.id);
     }
 }
