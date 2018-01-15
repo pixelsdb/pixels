@@ -20,7 +20,7 @@ import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 
-import static com.facebook.presto.example.ExampleTransactionHandle.INSTANCE;
+import static cn.edu.ruc.iir.pixels.presto.ExampleTransactionHandle.INSTANCE;
 import static java.util.Objects.requireNonNull;
 
 public class ExampleConnector
