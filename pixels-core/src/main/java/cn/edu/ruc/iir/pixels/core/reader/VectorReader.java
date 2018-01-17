@@ -18,20 +18,20 @@ public interface VectorReader
      *
      * @param batch a row batch object to read into
      * @return were more rows available to read?
-     * @throws IOException
+     * @throws IOException io exception
      * */
     boolean nextBatch(VectorizedRowBatch batch) throws IOException;
 
     /**
      * Get the row number of the row that will be returned by the following call to next().
      * @return the row number from 0 th the number of rows in the file
-     * @throws IOException
+     * @throws IOException io exception
      * */
     long getRowNumber() throws IOException;
 
     /**
      * Release the resources associated with the given reader
-     * @throws IOException
+     * @throws IOException io exception
      * */
     void close() throws IOException;
 }

@@ -26,7 +26,6 @@ public class PhysicalFSWriter implements PhysicalWriter
     {
         this.blockSize = blockSize;
         this.addBlockPadding = addBlockPadding;
-
         rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
     }
 

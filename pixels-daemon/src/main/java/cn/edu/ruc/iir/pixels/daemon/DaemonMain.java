@@ -33,7 +33,7 @@ public class DaemonMain
                     Server server = new TomcatServer();
                     try
                     {
-                        if (server.isRunning() == false)
+                        if (!server.isRunning())
                         {
                             boolean serverIsDown = true;
 
