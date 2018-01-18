@@ -14,7 +14,8 @@ import java.util.List;
  *
  * @author guodong
  */
-public class VectorReaderImpl implements VectorReader
+public class VectorReaderImpl
+        extends VectorReader
 {
     private final PixelsReader fileReader;
     private final ColumnReader[] columnReaders;

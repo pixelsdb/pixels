@@ -22,6 +22,7 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
@@ -35,7 +36,8 @@ import java.util.TimeZone;
  *
  * @author guodong
  */
-public class PixelsWriterImpl implements PixelsWriter
+@NotThreadSafe
+public class PixelsWriterImpl extends PixelsWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriterImpl.class);
 
@@ -45,11 +47,6 @@ public class PixelsWriterImpl implements PixelsWriter
     private final CompressionKind compressionKind;
     private final int compressionBlockSize;
     private final TimeZone timeZone;
-    private final FileSystem fs;
-    private final Path filePath;
-    private final long blockSize;
-    private final short replication;
-    private final boolean blockPadding;
     private final boolean encoding;
 
     private final ColumnWriter[] columnWriters;
@@ -66,7 +63,7 @@ public class PixelsWriterImpl implements PixelsWriter
     private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
     private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
 
-    private PhysicalWriter physicalWriter;
+    private final PhysicalWriter physicalWriter;
 
     private PixelsWriterImpl(
             TypeDescription schema,
@@ -75,11 +72,7 @@ public class PixelsWriterImpl implements PixelsWriter
             CompressionKind compressionKind,
             int compressionBlockSize,
             TimeZone timeZone,
-            FileSystem fs,
-            Path filePath,
-            long blockSize,
-            short replication,
-            boolean blockPadding,
+            PhysicalWriter physicalWriter,
             boolean encoding)
     {
         this.schema = schema;
@@ -88,11 +81,6 @@ public class PixelsWriterImpl implements PixelsWriter
         this.compressionKind = compressionKind;
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = timeZone;
-        this.fs = fs;
-        this.filePath = filePath;
-        this.blockSize = blockSize;
-        this.replication = replication;
-        this.blockPadding = blockPadding;
         this.encoding = encoding;
 
         List<TypeDescription> children = schema.getChildren();
@@ -108,15 +96,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.rowGroupInfoList = new LinkedList<>();
         this.rowGroupStatisticList = new LinkedList<>();
 
-        try
-        {
-            this.physicalWriter = new PhysicalFSWriter(fs, filePath, blockSize, replication, blockPadding);
-        } catch (IOException e)
-        {
-            LOGGER.error(e.getMessage());
-            e.printStackTrace();
-            System.exit(-1);
-        }
+        this.physicalWriter = physicalWriter;
     }
 
     public static class Builder
@@ -218,8 +198,11 @@ public class PixelsWriterImpl implements PixelsWriter
             return this;
         }
 
-        public PixelsWriterImpl build()
+        public PixelsWriterImpl build() throws IOException
         {
+            PhysicalWriter fsWriter = PhysicalFSWriterUtil.newPhysicalFSWriter(
+                    this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
+
             return new PixelsWriterImpl(
                     builderSchema,
                     builderPixelStride,
@@ -227,11 +210,7 @@ public class PixelsWriterImpl implements PixelsWriter
                     builderCompressionKind,
                     builderCompressionBlockSize,
                     builderTimeZone,
-                    builderFS,
-                    builderFilePath,
-                    builderBlockSize,
-                    builderReplication,
-                    builderBlockPadding,
+                    fsWriter,
                     encoding);
         }
     }
@@ -271,31 +250,6 @@ public class PixelsWriterImpl implements PixelsWriter
         return timeZone;
     }
 
-    public FileSystem getFs()
-    {
-        return fs;
-    }
-
-    public Path getFilePath()
-    {
-        return filePath;
-    }
-
-    public long getBlockSize()
-    {
-        return blockSize;
-    }
-
-    public short getReplication()
-    {
-        return replication;
-    }
-
-    public boolean isBlockPadding()
-    {
-        return blockPadding;
-    }
-
     public boolean isEncoding()
     {
         return encoding;
@@ -307,8 +261,8 @@ public class PixelsWriterImpl implements PixelsWriter
     }
 
     /**
-     * Add row batch
-     * currently not support repeating in ColumnVector
+     * Add a row batch
+     * Repeating is not supported currently in ColumnVector
      * */
     @Override
     public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException

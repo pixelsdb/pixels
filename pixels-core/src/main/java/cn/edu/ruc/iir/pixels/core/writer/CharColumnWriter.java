@@ -3,12 +3,13 @@ package cn.edu.ruc.iir.pixels.core.writer;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import org.jboss.netty.buffer.ByteBufferBackedChannelBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * pixels
+ * pixels column writer for <code>Char</code>
  *
  * @author guodong
  */

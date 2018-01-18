@@ -1,13 +1,11 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
  * pixels
