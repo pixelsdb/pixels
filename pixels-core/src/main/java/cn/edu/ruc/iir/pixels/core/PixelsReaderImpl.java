@@ -29,7 +29,9 @@ public class PixelsReaderImpl implements PixelsReader
 
     private final PixelsProto.Footer footer;
 
-    public PixelsReaderImpl(FileSystem fs, Path path) throws IOException, UnSupportedReaderException
+    // todo remove exceptions from constructor
+    public PixelsReaderImpl(FileSystem fs, Path path, boolean cacheEnabled)
+            throws IOException, UnSupportedReaderException
     {
         this.rawReader = new PhysicalFSReader(fs, path).getRawReader();
         // get file length
@@ -64,6 +66,11 @@ public class PixelsReaderImpl implements PixelsReader
         this.fileSchema = TypeDescription.createStruct();
         readTypes();
         this.rowGroupNum = footer.getRowGroupInfosCount();
+    }
+
+    public static class Builder
+    {
+        // todo use builder instead of constructor
     }
     
     private void readTypes()
