@@ -16,6 +16,9 @@ public class CharColumnReader
     }
 
     @Override
-    public void read(byte[] bytes, int offset, int length)
-    {}
+    public char[] readChars(byte[] input, boolean isEncoding, int num)
+    {
+        char[] values = new char[num];
+        return values;
+    }
 }

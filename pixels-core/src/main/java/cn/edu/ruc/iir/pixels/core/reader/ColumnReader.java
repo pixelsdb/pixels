@@ -67,12 +67,12 @@ public abstract class ColumnReader
         throw new UnsupportedOperationException("Cannot read chars");
     }
 
-    public double[] readDoubles(byte[] input, boolean isEncoding, int num)
+    public double[] readDoubles(byte[] input, int num) throws IOException
     {
         throw new UnsupportedOperationException("Cannot read doubles");
     }
 
-    public float[] readFloats(byte[] input, boolean isEncoding, int num)
+    public float[] readFloats(byte[] input, int num) throws IOException
     {
         throw new UnsupportedOperationException("Cannot read floats");
     }
@@ -87,7 +87,7 @@ public abstract class ColumnReader
         throw new UnsupportedOperationException("Cannot read strings");
     }
 
-    public Timestamp[] readTimestamps(byte[] input, boolean isEncoding, int num)
+    public Timestamp[] readTimestamps(byte[] input, boolean isEncoding, int num) throws IOException
     {
         throw new UnsupportedOperationException("Cannot read timestamps");
     }

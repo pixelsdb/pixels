@@ -32,7 +32,6 @@ public class VectorReaderImpl
         if (children != null) {
             for (int i = 0; i < selectedFields.length; i++) {
                 TypeDescription type = children.get(selectedFields[i]);
-                columnReaders[i] = createColumnReader(type);
             }
         }
         for (int i = 0; i < rowGroupFooters.length; i++) {
@@ -67,37 +66,6 @@ public class VectorReaderImpl
             }
             return o1.chunkOffset > o2.chunkOffset ? 1 : -1;
         });
-    }
-
-    private ColumnReader createColumnReader(TypeDescription schema)
-    {
-        switch (schema.getCategory())
-        {
-            case BOOLEAN:
-                return new BooleanColumnReader();
-            case BYTE:
-                return new ByteColumnReader();
-            case SHORT:
-            case INT:
-            case LONG:
-                return new IntegerColumnReader();
-            case FLOAT:
-                return new FloatColumnReader();
-            case DOUBLE:
-                return new DoubleColumnReader();
-            case STRING:
-                return new StringColumnReader();
-            case CHAR:
-                return new CharColumnReader();
-            case VARCHAR:
-                return new VarcharColumnReader();
-            case BINARY:
-                return new BinaryColumnReader();
-            case TIMESTAMP:
-                return new TimestampColumnReader();
-            default:
-                return null;
-        }
     }
 
     /**

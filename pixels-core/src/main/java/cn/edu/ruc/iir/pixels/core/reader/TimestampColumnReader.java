@@ -1,8 +1,12 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.Unpooled;
 
-import java.io.InputStream;
+import java.io.IOException;
 import java.sql.Timestamp;
 
 /**
@@ -19,12 +23,39 @@ public class TimestampColumnReader
         super(type);
     }
 
-    public Timestamp[] readTimestamps(InputStream input)
+    @Override
+    public Timestamp[] readTimestamps(byte[] input, boolean isEncoding, int num) throws IOException
     {
-        Timestamp[] values = new Timestamp[10];
-        long seconds = 1L;
-        long nanos = 10L;
-        Timestamp ts = new Timestamp(seconds + nanos * 1000);
+        ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
+        ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
+        Timestamp[] values = new Timestamp[num];
+        long[] times = new long[num];
+        int[] nanos = new int[num];
+
+        if (isEncoding) {
+            RunLenIntDecoder decoder = new RunLenIntDecoder(inputStream, false);
+            for (int i = 0; i < num; i++) {
+                times[i] = decoder.next();
+            }
+            for (int i = 0; i < num; i++) {
+                nanos[i] = (int) decoder.next();
+            }
+        }
+        else {
+            for (int i = 0; i < num; i++) {
+                times[i] = inputStream.readLong();
+                nanos[i] = inputStream.readInt();
+            }
+        }
+
+        for (int i = 0; i < num; i++) {
+            Timestamp timestamp = new Timestamp(times[i]);
+            timestamp.setNanos(nanos[i]);
+            values[i] = timestamp;
+        }
+
+        inputStream.close();
+        inputBuffer.release();
         return values;
     }
 }
