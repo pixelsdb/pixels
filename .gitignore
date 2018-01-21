@@ -7,13 +7,5 @@ target
 *.iml
 .DS_Store
 *.class
-
 TestParams.java
-main-vldb-18.aux
-main-vldb-18.bbl
-main-vldb-18.blg
-main-vldb-18.log
-main-vldb-18.pdf
-main-vldb-18.synctex.gz
-pub/*.fls
-pub/*.fdb_latexmk
+
