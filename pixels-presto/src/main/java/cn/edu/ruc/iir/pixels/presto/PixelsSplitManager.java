@@ -18,11 +18,9 @@ import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.sun.glass.ui.Pixels;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
