@@ -24,31 +24,42 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-public class ExampleSplit
+/**
+ * @version V1.0
+ * @Package: cn.edu.ruc.iir.pixels.presto
+ * @ClassName: PixelsSplit
+ * @Description:
+ * @author: tao
+ * @date: Create in 2018-01-20 19:15
+ **/
+public class PixelsSplit
         implements ConnectorSplit
 {
     private final String connectorId;
     private final String schemaName;
     private final String tableName;
-    private final URI uri;
-    private final boolean remotelyAccessible;
+    private final String path;
+    private final long start;
+    private final long len;
     private final List<HostAddress> addresses;
 
     @JsonCreator
-    public ExampleSplit(
+    public PixelsSplit(
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("uri") URI uri)
+            @JsonProperty("path") String path,
+            @JsonProperty("start") long start,
+            @JsonProperty("len") long len,
+            @JsonProperty("addresses") List<HostAddress> addresses)
     {
         this.schemaName = requireNonNull(schemaName, "schema name is null");
         this.connectorId = requireNonNull(connectorId, "connector id is null");
         this.tableName = requireNonNull(tableName, "table name is null");
-        this.uri = requireNonNull(uri, "uri is null");
-
-//        if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
-        remotelyAccessible = true;
-        addresses = ImmutableList.of(HostAddress.fromUri(uri));
+        this.path = requireNonNull(path, "path is null");
+        this.start = requireNonNull(start, "start is null");
+        this.len = requireNonNull(len, "len is null");
+        this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
     }
 
     @JsonProperty
@@ -70,16 +81,23 @@ public class ExampleSplit
     }
 
     @JsonProperty
-    public URI getUri()
-    {
-        return uri;
+    public String getPath() {
+        return path;
+    }
+
+    @JsonProperty
+    public long getStart() {
+        return start;
+    }
+
+    @JsonProperty
+    public long getLen() {
+        return len;
     }
 
     @Override
-    public boolean isRemotelyAccessible()
-    {
-        // only http or https is remotely accessible
-        return remotelyAccessible;
+    public boolean isRemotelyAccessible() {
+        return false;
     }
 
     @Override

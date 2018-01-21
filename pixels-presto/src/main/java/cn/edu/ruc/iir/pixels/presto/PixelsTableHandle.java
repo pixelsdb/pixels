@@ -23,22 +23,33 @@ import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
-public final class ExampleTableHandle
+/**
+ * @version V1.0
+ * @Package: cn.edu.ruc.iir.pixels.presto
+ * @ClassName: PixelsTableHandle
+ * @Description:
+ * @author: tao
+ * @date: Create in 2018-01-19 15:21
+ **/
+public final class PixelsTableHandle
         implements ConnectorTableHandle
 {
     private final String connectorId;
     private final String schemaName;
     private final String tableName;
+    private final String path;
 
     @JsonCreator
-    public ExampleTableHandle(
+    public PixelsTableHandle(
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("schemaName") String schemaName,
-            @JsonProperty("tableName") String tableName)
+            @JsonProperty("tableName") String tableName,
+            @JsonProperty("path") String path)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
+        this.path = requireNonNull(path, "path is null");;
     }
 
     @JsonProperty
@@ -59,6 +70,11 @@ public final class ExampleTableHandle
         return tableName;
     }
 
+    @JsonProperty
+    public String getPath() {
+        return path;
+    }
+
     public SchemaTableName toSchemaTableName()
     {
         return new SchemaTableName(schemaName, tableName);
@@ -67,7 +83,7 @@ public final class ExampleTableHandle
     @Override
     public int hashCode()
     {
-        return Objects.hash(connectorId, schemaName, tableName);
+        return Objects.hash(connectorId, schemaName, tableName, path);
     }
 
     @Override
@@ -80,15 +96,16 @@ public final class ExampleTableHandle
             return false;
         }
 
-        ExampleTableHandle other = (ExampleTableHandle) obj;
+        PixelsTableHandle other = (PixelsTableHandle) obj;
         return Objects.equals(this.connectorId, other.connectorId) &&
                 Objects.equals(this.schemaName, other.schemaName) &&
-                Objects.equals(this.tableName, other.tableName);
+                Objects.equals(this.tableName, other.tableName) &&
+                Objects.equals(this.path, other.path);
     }
 
     @Override
     public String toString()
     {
-        return Joiner.on(":").join(connectorId, schemaName, tableName);
+        return Joiner.on(":").join(connectorId, schemaName, tableName, path);
     }
 }

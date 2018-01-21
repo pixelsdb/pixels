@@ -10,12 +10,14 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>pixels-presto</artifactId>
+    <description>Presto - Pixels Connector</description>
+    <packaging>presto-plugin</packaging>
 
     <dependencies>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
-            <scope>provided</scope>
+            <!--<scope>provided</scope>-->
         </dependency>
 
         <dependency>

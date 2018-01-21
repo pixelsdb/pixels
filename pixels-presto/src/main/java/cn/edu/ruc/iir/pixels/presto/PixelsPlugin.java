@@ -13,25 +13,16 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import io.airlift.configuration.Config;
+import com.facebook.presto.spi.Plugin;
+import com.facebook.presto.spi.connector.ConnectorFactory;
+import com.google.common.collect.ImmutableList;
 
-import javax.validation.constraints.NotNull;
-import java.net.URI;
-
-public class ExampleConfig
+public class PixelsPlugin
+        implements Plugin
 {
-    private URI metadata;
-
-    @NotNull
-    public URI getMetadata()
+    @Override
+    public Iterable<ConnectorFactory> getConnectorFactories()
     {
-        return metadata;
-    }
-
-    @Config("metadata-uri")
-    public ExampleConfig setMetadata(URI metadata)
-    {
-        this.metadata = metadata;
-        return this;
+        return ImmutableList.of(new PixelsConnectorFactory());
     }
 }

@@ -35,12 +35,20 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class ExampleRecordCursor
+/**
+ * @version V1.0
+ * @Package: cn.edu.ruc.iir.pixels.presto
+ * @ClassName: PixelsRecordCursor
+ * @Description:
+ * @author: tao
+ * @date: Create in 2018-01-20 22:21
+ **/
+public class PixelsRecordCursor
         implements RecordCursor
 {
     private static final Splitter LINE_SPLITTER = Splitter.on(",").trimResults();
 
-    private final List<ExampleColumnHandle> columnHandles;
+    private final List<PixelsColumnHandle> columnHandles;
     private final int[] fieldToColumnIndex;
 
     private final Iterator<String> lines;
@@ -48,13 +56,13 @@ public class ExampleRecordCursor
 
     private List<String> fields;
 
-    public ExampleRecordCursor(List<ExampleColumnHandle> columnHandles, ByteSource byteSource)
+    public PixelsRecordCursor(List<PixelsColumnHandle> columnHandles, ByteSource byteSource)
     {
         this.columnHandles = columnHandles;
 
         fieldToColumnIndex = new int[columnHandles.size()];
         for (int i = 0; i < columnHandles.size(); i++) {
-            ExampleColumnHandle columnHandle = columnHandles.get(i);
+            PixelsColumnHandle columnHandle = columnHandles.get(i);
             fieldToColumnIndex[i] = columnHandle.getOrdinalPosition();
         }
 

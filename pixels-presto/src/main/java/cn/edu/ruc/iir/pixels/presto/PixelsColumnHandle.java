@@ -24,24 +24,26 @@ import java.util.Objects;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-public final class ExampleColumnHandle
+public final class PixelsColumnHandle
         implements ColumnHandle
 {
     private final String connectorId;
     private final String columnName;
     private final Type columnType;
+    private final String columnComment;
     private final int ordinalPosition;
 
     @JsonCreator
-    public ExampleColumnHandle(
+    public PixelsColumnHandle(
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("columnName") String columnName,
             @JsonProperty("columnType") Type columnType,
-            @JsonProperty("ordinalPosition") int ordinalPosition)
+            @JsonProperty("columnComment") String columnComment, @JsonProperty("ordinalPosition") int ordinalPosition)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.columnName = requireNonNull(columnName, "columnName is null");
         this.columnType = requireNonNull(columnType, "columnType is null");
+        this.columnComment = requireNonNull(columnComment, "columnComment is null");
         this.ordinalPosition = ordinalPosition;
     }
 
@@ -61,6 +63,11 @@ public final class ExampleColumnHandle
     public Type getColumnType()
     {
         return columnType;
+    }
+
+    @JsonProperty
+    public String getColumnComment() {
+        return columnComment;
     }
 
     @JsonProperty
@@ -90,7 +97,7 @@ public final class ExampleColumnHandle
             return false;
         }
 
-        ExampleColumnHandle other = (ExampleColumnHandle) obj;
+        PixelsColumnHandle other = (PixelsColumnHandle) obj;
         return Objects.equals(this.connectorId, other.connectorId) &&
                 Objects.equals(this.columnName, other.columnName);
     }
@@ -102,6 +109,7 @@ public final class ExampleColumnHandle
                 .add("connectorId", connectorId)
                 .add("columnName", columnName)
                 .add("columnType", columnType)
+                .add("columnComment", columnComment)
                 .add("ordinalPosition", ordinalPosition)
                 .toString();
     }
