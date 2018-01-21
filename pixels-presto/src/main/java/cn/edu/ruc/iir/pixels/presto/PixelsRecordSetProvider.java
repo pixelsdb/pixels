@@ -27,13 +27,21 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
-public class ExampleRecordSetProvider
+/**
+ * @version V1.0
+ * @Package: cn.edu.ruc.iir.pixels.presto
+ * @ClassName: PixelsRecordSetProvider
+ * @Description:
+ * @author: tao
+ * @date: Create in 2018-01-20 22:21
+ **/
+public class PixelsRecordSetProvider
         implements ConnectorRecordSetProvider
 {
     private final String connectorId;
 
     @Inject
-    public ExampleRecordSetProvider(ExampleConnectorId connectorId)
+    public PixelsRecordSetProvider(PixelsConnectorId connectorId)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
     }
@@ -42,14 +50,14 @@ public class ExampleRecordSetProvider
     public RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorSplit split, List<? extends ColumnHandle> columns)
     {
         requireNonNull(split, "partitionChunk is null");
-        ExampleSplit exampleSplit = (ExampleSplit) split;
-        checkArgument(exampleSplit.getConnectorId().equals(connectorId), "split is not for this connector");
+        PixelsSplit pixelsSplit = (PixelsSplit) split;
+        checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "split is not for this connector");
 
-        ImmutableList.Builder<ExampleColumnHandle> handles = ImmutableList.builder();
+        ImmutableList.Builder<PixelsColumnHandle> handles = ImmutableList.builder();
         for (ColumnHandle handle : columns) {
-            handles.add((ExampleColumnHandle) handle);
+            handles.add((PixelsColumnHandle) handle);
         }
 
-        return new ExampleRecordSet(exampleSplit, handles.build());
+        return new PixelsRecordSet(pixelsSplit, handles.build());
     }
 }

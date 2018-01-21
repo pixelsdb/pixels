@@ -16,36 +16,30 @@ package cn.edu.ruc.iir.pixels.presto;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 
-public class ExampleHandleResolver
-        implements ConnectorHandleResolver
-{
+public class PixelsHandleResolver
+        implements ConnectorHandleResolver {
     @Override
-    public Class<? extends ConnectorTableLayoutHandle> getTableLayoutHandleClass()
-    {
-        return ExampleTableLayoutHandle.class;
+    public Class<? extends ConnectorTableLayoutHandle> getTableLayoutHandleClass() {
+        return PixelsTableLayoutHandle.class;
     }
 
     @Override
-    public Class<? extends ConnectorTableHandle> getTableHandleClass()
-    {
-        return ExampleTableHandle.class;
+    public Class<? extends ConnectorTableHandle> getTableHandleClass() {
+        return PixelsTableHandle.class;
     }
 
     @Override
-    public Class<? extends ColumnHandle> getColumnHandleClass()
-    {
-        return ExampleColumnHandle.class;
+    public Class<? extends ColumnHandle> getColumnHandleClass() {
+        return PixelsColumnHandle.class;
     }
 
     @Override
-    public Class<? extends ConnectorSplit> getSplitClass()
-    {
-        return ExampleSplit.class;
+    public Class<? extends ConnectorSplit> getSplitClass() {
+        return PixelsSplit.class;
     }
 
     @Override
-    public Class<? extends ConnectorTransactionHandle> getTransactionHandleClass()
-    {
-        return ExampleTransactionHandle.class;
+    public Class<? extends ConnectorTransactionHandle> getTransactionHandleClass() {
+        return PixelsTransactionHandle.class;
     }
 }

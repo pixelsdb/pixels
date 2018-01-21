@@ -20,25 +20,25 @@ import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 
-import static cn.edu.ruc.iir.pixels.presto.ExampleTransactionHandle.INSTANCE;
+import static cn.edu.ruc.iir.pixels.presto.PixelsTransactionHandle.INSTANCE;
 import static java.util.Objects.requireNonNull;
 
-public class ExampleConnector
+public class PixelsConnector
         implements Connector
 {
-    private static final Logger log = Logger.get(ExampleConnector.class);
+    private static final Logger log = Logger.get(PixelsConnector.class);
 
     private final LifeCycleManager lifeCycleManager;
-    private final ExampleMetadata metadata;
-    private final ExampleSplitManager splitManager;
-    private final ExampleRecordSetProvider recordSetProvider;
+    private final PixelsMetadata metadata;
+    private final PixelsSplitManager splitManager;
+    private final PixelsRecordSetProvider recordSetProvider;
 
     @Inject
-    public ExampleConnector(
+    public PixelsConnector(
             LifeCycleManager lifeCycleManager,
-            ExampleMetadata metadata,
-            ExampleSplitManager splitManager,
-            ExampleRecordSetProvider recordSetProvider)
+            PixelsMetadata metadata,
+            PixelsSplitManager splitManager,
+            PixelsRecordSetProvider recordSetProvider)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");

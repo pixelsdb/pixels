@@ -19,19 +19,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
 
-public class ExampleTableLayoutHandle
+public class PixelsTableLayoutHandle
         implements ConnectorTableLayoutHandle
 {
-    private final ExampleTableHandle table;
+    private final PixelsTableHandle table;
 
     @JsonCreator
-    public ExampleTableLayoutHandle(@JsonProperty("table") ExampleTableHandle table)
+    public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table)
     {
         this.table = table;
     }
 
     @JsonProperty
-    public ExampleTableHandle getTable()
+    public PixelsTableHandle getTable()
     {
         return table;
     }
@@ -45,7 +45,7 @@ public class ExampleTableLayoutHandle
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ExampleTableLayoutHandle that = (ExampleTableLayoutHandle) o;
+        PixelsTableLayoutHandle that = (PixelsTableLayoutHandle) o;
         return Objects.equals(table, that.table);
     }
 
