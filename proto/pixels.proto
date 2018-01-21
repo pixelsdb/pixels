@@ -191,6 +191,22 @@ message RowGroupIndex {
     repeated ColumnChunkIndex columnChunkIndexEntries = 1;
 }
 
+message RowGroupEncoding {
+    repeated ColumnEncoding columnEncodings = 1;
+}
+
 message RowGroupFooter {
     optional RowGroupIndex rowGroupIndexEntry = 1;
+    optional RowGroupEncoding rowGroupEncoding = 2;
+}
+
+message ColumnEncoding {
+    enum Kind {
+        NONE = 0;
+        RUNLENGTH = 1;
+        DICTIONARY = 2;
+    }
+
+    required Kind kind = 1;
+    optional uint32 dictionarySize = 2;
 }

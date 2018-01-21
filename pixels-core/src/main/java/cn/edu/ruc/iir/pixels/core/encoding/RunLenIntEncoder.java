@@ -14,7 +14,8 @@ import java.io.OutputStream;
  *
  * @author guodong
  */
-public class RunLenIntEncoder extends Encoder
+public class RunLenIntEncoder
+        extends Encoder
 {
     private EncodingType encodingType;
     private int numLiterals;

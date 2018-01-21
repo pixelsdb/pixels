@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Timestamp column writer.
+ * All timestamp values are converted to standard UTC time before they are stored as long values.
  * Each pixel contains two arrays(time and nano), the two arrays are separately maintained,
  *  and then concatenated and encoded together when writing out.
  * Time and nano values are always positive, thus when encoding, isSigned can be set as true.
@@ -91,9 +92,6 @@ public class TimestampColumnWriter extends BaseColumnWriter
             for (int i = 0; i < curPixelEleCount; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelTimeVector.vector[i]);
-            }
-            for (int i = 0; i < curPixelEleCount; i++)
-            {
                 curVecPartitionBuffer.putInt((int) curPixelNanoVector.vector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());

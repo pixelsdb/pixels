@@ -14,11 +14,18 @@ import java.io.IOException;
 public interface ColumnWriter
 {
     int write(ColumnVector vector, int length) throws IOException;
+
     byte[] getColumnChunkContent();
+
     int getColumnChunkSize();
+
     PixelsProto.ColumnChunkIndex.Builder getColumnChunkIndex();
+
     PixelsProto.ColumnStatistic.Builder getColumnChunkStat();
+
     StatsRecorder getColumnChunkStatRecorder();
+
     void reset();
+
     void flush() throws IOException;
 }

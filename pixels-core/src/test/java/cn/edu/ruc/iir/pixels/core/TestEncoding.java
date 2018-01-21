@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
 import cn.edu.ruc.iir.pixels.core.encoding.IntDecoder;
-import cn.edu.ruc.iir.pixels.core.encoding.RleDecoder;
-import cn.edu.ruc.iir.pixels.core.encoding.RleEncoder;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -19,11 +19,11 @@ public class TestEncoding
     public void runLengthTest()
     {
         long[] values = {100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L, 100L};
-        RleEncoder encoder = new RleEncoder(false, true);
+        RunLenIntEncoder encoder = new RunLenIntEncoder(false, true);
         try
         {
             byte[] bytes = encoder.encode(values);
-            IntDecoder decoder = new RleDecoder(new ByteArrayInputStream(bytes), false);
+            IntDecoder decoder = new RunLenIntDecoder(new ByteArrayInputStream(bytes), false);
             while (decoder.hasNext()) {
                 System.out.println(decoder.next());
             }

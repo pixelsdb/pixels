@@ -11,6 +11,8 @@ import java.nio.ByteBuffer;
 
 /**
  * Integer column writer.
+ * If encoding, use RunLength;
+ * Else isLong(1 byte) + content
  *
  * @author guodong
  */
@@ -87,14 +89,16 @@ public class IntegerColumnWriter extends BaseColumnWriter
         else {
             ByteBuffer curVecPartitionBuffer;
             if (isLong) {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES + 1);
+                curVecPartitionBuffer.put((byte) 1);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
                 }
             }
             else {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES + 1);
+                curVecPartitionBuffer.put((byte) 0);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);

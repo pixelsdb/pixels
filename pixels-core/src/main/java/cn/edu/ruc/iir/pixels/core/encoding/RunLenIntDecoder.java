@@ -15,7 +15,8 @@ import java.util.Arrays;
  *
  * @author guodong
  */
-public class RunLenIntDecoder extends IntDecoder
+public class RunLenIntDecoder
+        extends IntDecoder
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RunLenIntDecoder.class);
 
@@ -30,7 +31,8 @@ public class RunLenIntDecoder extends IntDecoder
 
     private RunLenIntEncoder.EncodingType currentEncoding;
 
-    private final static RunLenIntEncoder.EncodingType[] encodings = RunLenIntEncoder.EncodingType.values();
+    private final static RunLenIntEncoder.EncodingType[] encodings =
+            RunLenIntEncoder.EncodingType.values();
 
     public RunLenIntDecoder(InputStream inputStream, boolean isSigned)
     {

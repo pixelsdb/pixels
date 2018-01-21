@@ -1,13 +1,17 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
+
 /**
  * pixels
  *
  * @author guodong
  */
-public class BinaryColumnReader extends BaseColumnReader
+public class BinaryColumnReader
+        extends ColumnReader
 {
-    public BinaryColumnReader()
+    public BinaryColumnReader(TypeDescription type)
     {
+        super(type);
     }
 }
