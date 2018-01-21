@@ -21,30 +21,39 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.Resources;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-public class ExampleRecordSet
+/**
+ * @version V1.0
+ * @Package: cn.edu.ruc.iir.pixels.presto
+ * @ClassName: PixelsRecordSet
+ * @Description:
+ * @author: tao
+ * @date: Create in 2018-01-20 22:21
+ **/
+public class PixelsRecordSet
         implements RecordSet
 {
-    private final List<ExampleColumnHandle> columnHandles;
+    private final List<PixelsColumnHandle> columnHandles;
     private final List<Type> columnTypes;
     private final ByteSource byteSource;
 
-    public ExampleRecordSet(ExampleSplit split, List<ExampleColumnHandle> columnHandles)
+    public PixelsRecordSet(PixelsSplit split, List<PixelsColumnHandle> columnHandles)
     {
         requireNonNull(split, "split is null");
 
         this.columnHandles = requireNonNull(columnHandles, "column handles is null");
         ImmutableList.Builder<Type> types = ImmutableList.builder();
-        for (ExampleColumnHandle column : columnHandles) {
+        for (PixelsColumnHandle column : columnHandles) {
             types.add(column.getColumnType());
         }
         this.columnTypes = types.build();
 
         try {
-            byteSource = Resources.asByteSource(split.getUri().toURL());
+            byteSource = Resources.asByteSource(URI.create(split.getPath()).toURL());
         }
         catch (MalformedURLException e) {
             throw new RuntimeException(e);
@@ -60,6 +69,6 @@ public class ExampleRecordSet
     @Override
     public RecordCursor cursor()
     {
-        return new ExampleRecordCursor(columnHandles, byteSource);
+        return new PixelsRecordCursor(columnHandles, byteSource);
     }
 }

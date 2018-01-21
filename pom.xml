@@ -12,7 +12,8 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>cn.edu.ruc.iir</groupId>
     <artifactId>pixels</artifactId>
@@ -70,7 +71,6 @@
         <dep.junit.jupiter.version>5.0.0-M6</dep.junit.jupiter.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
     </properties>
-
 
 
     <dependencyManagement>
@@ -190,7 +190,6 @@
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
                 <version>${dep.jackson.version}</version>
-=======
                 <exclusions>
                     <exclusion>
                         <groupId>io.netty</groupId>
@@ -201,8 +200,7 @@
                         <artifactId>netty-all</artifactId>
                     </exclusion>
                 </exclusions>
-                <version>2.7.3</version>
->>>>>>> 405ec707e9f7fe426ef09c2851f0b92a7bfb4344
+                <!--<version>2.7.3</version>-->
             </dependency>
             <dependency>
                 <groupId>io.netty</groupId>
@@ -267,5 +265,14 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-maven-plugin</artifactId>
+                <version>0.3</version>
+                <extensions>true</extensions>
+            </plugin>
+        </plugins>
     </build>
 </project>
