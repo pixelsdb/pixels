@@ -4,9 +4,12 @@ import cn.edu.ruc.iir.pixels.core.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufOutputStream;
 
 import java.io.IOException;
 
@@ -15,21 +18,25 @@ import java.io.IOException;
  *
  * The string column chunk consists of seven fields:
  * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
- * 2. origins field (distinct string bytes array)
- * 3. starts field (starting offsets indicating starting points of each string in the origins field)
- * 4. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
- * 5. origins offset field (an integer value indicating offset of the origins field in the chunk)
- * 6. starts offset field (an integer value indicating offset of the starts field in the chunk)
- * 7. orders offset field (an integer value indicating offset of the orders field in the chunk)
+ * 2. lengths field (run length encoded raw string length)
+ * 3. origins field (distinct string bytes array)
+ * 4. starts field (starting offsets indicating starting points of each string in the origins field)
+ * 5. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
+ * 6. lengths field offset (an integer value indicating offset of the lengths field in the chunk)
+ * 7. origins field offset (an integer value indicating offset of the origins field in the chunk)
+ * 8. starts field offset (an integer value indicating offset of the starts field in the chunk)
+ * 9. orders field offset (an integer value indicating offset of the orders field in the chunk)
  *
  * Pixels field is necessary in all cases.
+ * Lengths field only exists when un-encoded.
  * Other fields only exist when dictionary encoding is enabled.
  *
  * @author guodong
  */
 public class StringColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];   // current vector holding encoded values of string
+    private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
+    private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final StringRedBlackTree dictionary = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
     private boolean useDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
@@ -90,6 +97,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 curPartLength = pixelStride - curPixelEleCount;
                 for (int i = 0; i < curPartLength; i++) {
                     outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                    lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
                 curPixelEleCount += curPartLength;
@@ -101,6 +109,7 @@ public class StringColumnWriter extends BaseColumnWriter
             curPartLength = nextPartLength;
             for (int i = 0; i < curPartLength; i++) {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
             }
             curPixelEleCount += curPartLength;
@@ -155,6 +164,22 @@ public class StringColumnWriter extends BaseColumnWriter
         if (useDictionaryEncoding) {
             flushDictionary();
         }
+        else {
+            flushLens();
+        }
+    }
+
+    private void flushLens() throws IOException
+    {
+        int lensFieldOffset = outputStream.size();
+        int[] tmpLens = new int[lensArray.size()];
+        for (int i = 0; i < lensArray.size(); i++) {
+            tmpLens[i] = lensArray.get(i);
+        }
+        lensArray.clear();
+        outputStream.write(encoder.encode(tmpLens));
+
+        outputStream.write(lensFieldOffset);
     }
 
     private void flushDictionary() throws IOException

@@ -82,7 +82,7 @@ public abstract class ColumnReader
         throw new UnsupportedOperationException("Cannot read integers");
     }
 
-    public String[] readStrings(byte[] input, boolean isEncoding, int num)
+    public String[] readStrings(byte[] input, boolean isEncoding, int num) throws IOException
     {
         throw new UnsupportedOperationException("Cannot read strings");
     }
