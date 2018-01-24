@@ -3,7 +3,6 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Timestamp;
 
 /**
