@@ -13,34 +13,37 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.airlift.log.Logger;
+
+import javax.inject.Inject;
 import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
-public final class PixelsConnectorId
-{
+public final class PixelsConnectorId {
+    private final Logger log = Logger.get(PixelsConnectorId.class);
     private final String id;
 
-    public PixelsConnectorId(String id)
-    {
+    @JsonCreator
+    public PixelsConnectorId(@JsonProperty("id") String id) {
+        log.info("PixelsConnectorId: " + id);
         this.id = requireNonNull(id, "id is null");
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return id;
     }
 
     @Override
-    public int hashCode()
-    {
+    public int hashCode() {
         return Objects.hash(id);
     }
 
     @Override
-    public boolean equals(Object obj)
-    {
+    public boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }

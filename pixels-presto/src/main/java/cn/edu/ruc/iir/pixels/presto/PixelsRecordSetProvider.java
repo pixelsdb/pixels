@@ -13,6 +13,8 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
@@ -20,6 +22,7 @@ import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -36,28 +39,34 @@ import static java.util.Objects.requireNonNull;
  * @date: Create in 2018-01-20 22:21
  **/
 public class PixelsRecordSetProvider
-        implements ConnectorRecordSetProvider
-{
+        implements ConnectorRecordSetProvider {
+    private final Logger log = Logger.get(PixelsRecordSetProvider.class.getName());
     private final String connectorId;
+    private final PixelsMetadataReader pixelsMetadataReader;
+    private final FSFactory fsFactory;
 
     @Inject
-    public PixelsRecordSetProvider(PixelsConnectorId connectorId)
-    {
+    public PixelsRecordSetProvider(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader, FSFactory fsFactory) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
+        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
+        this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
+        log.info("connectorId: " + connectorId.toString());
     }
 
     @Override
-    public RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorSplit split, List<? extends ColumnHandle> columns)
-    {
-        requireNonNull(split, "partitionChunk is null");
+    public RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorSplit split, List<? extends ColumnHandle> columns) {
+        log.info("PixelsRecordSetProvider getRecordSet: " + connectorId.toString());
+        requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
-        checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "split is not for this connector");
+        checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
+
+        PixelsTable pixelsTable = pixelsMetadataReader.getTable(connectorId, pixelsSplit.getSchemaName(), pixelsSplit.getTableName());
 
         ImmutableList.Builder<PixelsColumnHandle> handles = ImmutableList.builder();
         for (ColumnHandle handle : columns) {
             handles.add((PixelsColumnHandle) handle);
         }
-
-        return new PixelsRecordSet(pixelsSplit, handles.build());
+        log.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
+        return new PixelsRecordSet(pixelsSplit, handles.build(), pixelsTable, fsFactory);
     }
 }

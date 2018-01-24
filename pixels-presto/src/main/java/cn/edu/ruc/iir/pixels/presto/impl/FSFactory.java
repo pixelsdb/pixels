@@ -25,69 +25,85 @@ import java.io.IOException;
 import java.nio.file.FileSystemNotFoundException;
 import java.util.*;
 
-public final class FSFactory
-{
+public final class FSFactory {
     private Configuration conf = new Configuration();
+    private FileSystem fileSystem;
     private final PixelsConfig config;
     private final Logger log = Logger.get(FSFactory.class.getName());
 
     @Inject
-    public FSFactory(PixelsConfig config)
-    {
+    public FSFactory(PixelsConfig config) {
         this.config = config;
+        try {
+            this.fileSystem = FileSystem.get(conf);
+            fileSystem.setWorkingDirectory(new Path(config.getHDFSWarehouse()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    public Optional<FileSystem> getFS()
-    {
+    public Optional<FileSystem> getFileSystem() {
+        return Optional.of(fileSystem);
+    }
+
+    public Optional<Boolean> getFS() {
         return getFS(config.getHDFSWarehouse());
     }
 
-    public Optional<FileSystem> getFS(String path)
-    {
+    public Optional<Boolean> getFS(String path) {
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        if (path.isEmpty()) {
+        if (!path.isEmpty()) {
             try {
-                return Optional.of(new Path(config.getHDFSWarehouse()).getFileSystem(conf));
-            }
-            catch (IOException e) {
+                return Optional.of(fileSystem.exists(new Path(config.getHDFSWarehouse())));
+            } catch (IOException e) {
                 log.error(e);
                 return Optional.empty();
             }
         }
-        try {
-            return Optional.of(formPath(path).getFileSystem(conf));
-        }
-        catch (IOException e) {
-            log.error(e);
-            return Optional.empty();
-        }
+        return Optional.empty();
     }
 
-    public Optional<FileSystem> getFS(Path path)
-    {
+    public Optional<FileSystem> getFS(Path path) {
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", LocalFileSystem.class.getName());
         try {
             return Optional.of(path.getFileSystem(conf));
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             log.error(e);
             return Optional.empty();
         }
     }
 
-    public List<Path> listFiles(Path dirPath)
-    {
+    public List<Path> listFiles(Path dirPath) {
         List<Path> files = new ArrayList<>();
         if (!getFS().isPresent()) {
             throw new FileSystemNotFoundException("");
         }
         FileStatus[] fileStatuses = new FileStatus[0];
         try {
-            fileStatuses = getFS().get().listStatus(dirPath);
+            fileStatuses = fileSystem.listStatus(dirPath);
+        } catch (IOException e) {
+            log.error(e);
         }
-        catch (IOException e) {
+        for (FileStatus f : fileStatuses) {
+            if (f.isFile()) {
+                files.add(f.getPath());
+            }
+        }
+        return files;
+    }
+
+    public List<Path> listFiles(String path) {
+        Path dirPath = new Path(path);
+        List<Path> files = new ArrayList<>();
+        if (!getFS().isPresent()) {
+            throw new FileSystemNotFoundException("");
+        }
+        FileStatus[] fileStatuses = new FileStatus[0];
+        try {
+            fileStatuses = fileSystem.listStatus(dirPath);
+        } catch (IOException e) {
             log.error(e);
         }
         for (FileStatus f : fileStatuses) {
@@ -99,33 +115,29 @@ public final class FSFactory
     }
 
     // assume that a file contains only a block
-    public List<HostAddress> getBlockLocations(Path file, long start, long len)
-    {
+    public List<HostAddress> getBlockLocations(Path file, long start, long len) {
         Set<HostAddress> addresses = new HashSet<>();
         if (!getFS().isPresent()) {
             throw new FileSystemNotFoundException("");
         }
         BlockLocation[] locations = new BlockLocation[0];
         try {
-            locations = getFS().get().getFileBlockLocations(file, start, len);
-        }
-        catch (IOException e) {
+            locations = fileSystem.getFileBlockLocations(file, start, len);
+        } catch (IOException e) {
             log.error(e);
         }
-        assert locations.length <= 1;
         for (BlockLocation location : locations) {
             try {
                 addresses.addAll(toHostAddress(location.getHosts()));
-            }
-            catch (IOException e) {
+                log.info("FSFactory addresses: " + toHostAddress(location.getHosts()));
+            } catch (IOException e) {
                 log.error(e);
             }
         }
         return new ArrayList<>(addresses);
     }
 
-    private List<HostAddress> toHostAddress(String[] hosts)
-    {
+    private List<HostAddress> toHostAddress(String[] hosts) {
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
         for (String host : hosts) {
             builder.add(HostAddress.fromString(host));
@@ -133,8 +145,7 @@ public final class FSFactory
         return builder.build();
     }
 
-    private Path formPath(String dirOrFile)
-    {
+    private Path formPath(String dirOrFile) {
         String base = config.getHDFSWarehouse();
         String path = dirOrFile;
         while (base.endsWith("/")) {

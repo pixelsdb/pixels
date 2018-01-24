@@ -9,4 +9,6 @@ target
 *.class
 .mvn
 TestParams.java
-
+core-site.xml
+hdfs-site.xml
+mvnw.cmd
