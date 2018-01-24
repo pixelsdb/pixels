@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
@@ -37,7 +38,8 @@ import java.util.TimeZone;
  * @author guodong
  */
 @NotThreadSafe
-public class PixelsWriterImpl extends PixelsWriter
+public class PixelsWriterImpl
+        extends PixelsWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriterImpl.class);
 
@@ -198,10 +200,15 @@ public class PixelsWriterImpl extends PixelsWriter
             return this;
         }
 
-        public PixelsWriterImpl build() throws IOException
+        public PixelsWriter build() throws PixelsWriterException
         {
             PhysicalWriter fsWriter = PhysicalFSWriterUtil.newPhysicalFSWriter(
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
+
+            if (fsWriter == null) {
+                LOGGER.error("Failed to create PhysicalWriter");
+                throw new PixelsWriterException("Failed to create PixelsWriter due to error of creating PhysicalWriter");
+            }
 
             return new PixelsWriterImpl(
                     builderSchema,

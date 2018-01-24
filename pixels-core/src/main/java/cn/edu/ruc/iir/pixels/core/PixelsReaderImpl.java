@@ -1,80 +1,119 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.exception.UnSupportedReaderException;
-import cn.edu.ruc.iir.pixels.core.reader.VectorReader;
-import cn.edu.ruc.iir.pixels.core.reader.VectorReaderImpl;
-import org.apache.hadoop.fs.FSDataInputStream;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsReaderException;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderOption;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
 
 /**
- * pixels
+ * Pixels reader default implementation
  *
  * @author guodong
  */
-public class PixelsReaderImpl implements PixelsReader
+public class PixelsReaderImpl
+        implements PixelsReader
 {
-    private final int fileVersion;
-    private final long rowNum;
-    private final PixelsProto.CompressionKind compressionKind;
-    private final long compressionBlockSize;
-    private final long pixelStride;
-    private final String writerTimeZone;
-    private final TypeDescription fileSchema;
-    private final int rowGroupNum;
-    private final FSDataInputStream rawReader;
+    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsReaderImpl.class);
 
+    private final FileSystem fs;
+    private final Path path;
+    private final TypeDescription fileSchema;
+    private final PhysicalFSReader physicalFSReader;
+    private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
 
-    // todo remove exceptions from constructor
-    public PixelsReaderImpl(FileSystem fs, Path path, boolean cacheEnabled)
-            throws IOException, UnSupportedReaderException
+    public PixelsReaderImpl(FileSystem fs, Path path,
+                            TypeDescription fileSchema,
+                            PhysicalFSReader physicalFSReader,
+                            PixelsProto.FileTail fileTail)
     {
-        this.rawReader = new PhysicalFSReader(fs, path).getRawReader();
-        // get file length
-        long fileLen = fs.getFileStatus(path).getLen();
-        // seek to last Long which records FileTail offset
-        rawReader.seek(fileLen - Long.BYTES);
-        long tailOffset = rawReader.readLong();
-        // calculate length of FileTail
-        int tailLen = (int) (fileLen - tailOffset - Long.BYTES);
-        // seek to FileTail offset and read FileTail content
-        rawReader.seek(tailOffset);
-        byte[] tailBuffer = new byte[tailLen];
-        rawReader.readFully(tailBuffer);
-        // close raw reader
-        rawReader.close();
-
-        PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(tailBuffer);
-        
-        PixelsProto.PostScript postScript = fileTail.getPostscript();
-        this.fileVersion = postScript.getVersion();
-        this.rowNum = postScript.getNumberOfRows();
-        this.compressionKind = postScript.getCompression();
-        this.compressionBlockSize = postScript.getCompressionBlockSize();
-        this.pixelStride = postScript.getPixelStride();
-        this.writerTimeZone = postScript.getWriterTimezone();
-
-        if (!postScript.getMagic().equals(Constants.MAGIC) && (this.fileVersion > Constants.VERSION)) {
-            throw new UnSupportedReaderException("Current reader is not compatible with this file");
-        }
-        
+        this.fs = fs;
+        this.path = path;
+        this.fileSchema = fileSchema;
+        this.physicalFSReader = physicalFSReader;
+        this.postScript = fileTail.getPostscript();
         this.footer = fileTail.getFooter();
-        this.fileSchema = TypeDescription.createStruct();
-        readTypes();
-        this.rowGroupNum = footer.getRowGroupInfosCount();
     }
 
     public static class Builder
     {
-        // todo use builder instead of constructor
+        private FileSystem builderFS = null;
+        private Path builderPath = null;
+        private TypeDescription builderSchema = null;
+        // todo add layouts information
+
+        public Builder setFS(FileSystem fs)
+        {
+            this.builderFS = fs;
+            return this;
+        }
+
+        public Builder setPath(Path path)
+        {
+            this.builderPath = path;
+            return this;
+        }
+
+        public Builder setSchema(TypeDescription schema)
+        {
+            this.builderSchema = schema;
+            return this;
+        }
+
+        public PixelsReader build() throws IllegalArgumentException, IOException
+        {
+            // check arguments
+            if (builderFS == null || builderPath == null || builderSchema == null) {
+                throw new IllegalArgumentException("Missing argument to build PixelsReader");
+            }
+            // get PhysicalFSReader
+            PhysicalFSReader fsReader = PhysicalFSReaderUtil.newPhysicalFSReader(builderFS, builderPath);
+            if (fsReader == null) {
+                LOGGER.error("Failed to create PhysicalFSReader");
+                throw new PixelsReaderException("Failed to create PixelsReader due to error of creating PhysicalFSReader");
+            }
+            // get FileTail
+            long fileLen = fsReader.getFileLength();
+            fsReader.seek(fileLen - Long.BYTES);
+            long fileTailOffset = fsReader.readLong();
+            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+            fsReader.seek(fileTailOffset);
+            byte[] fileTailBuffer = new byte[fileTailLength];
+            fsReader.readFully(fileTailBuffer);
+            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
+
+            // check file MAGIC and file version
+            PixelsProto.PostScript postScript = fileTail.getPostscript();
+            int fileVersion = postScript.getVersion();
+            String fileMagic = postScript.getMagic();
+            if (!PixelsVersion.matchVersion(fileVersion)) {
+                throw new PixelsFileVersionInvalidException(fileVersion);
+            }
+            if (!fileMagic.contentEquals(Constants.MAGIC)) {
+                throw new PixelsFileMagicInvalidException(fileMagic);
+            }
+
+            // todo check file schema
+
+            // create a default PixelsReader
+            return new PixelsReaderImpl(builderFS, builderPath, builderSchema, fsReader, fileTail);
+        }
     }
-    
-    private void readTypes()
+
+    /**
+     * THIS SHOULD BE USELESS
+     * */
+    private TypeDescription readTypes()
     {
+        TypeDescription schema = TypeDescription.createStruct();
         List<PixelsProto.Type> types = footer.getTypesList();
         for (PixelsProto.Type type : types) {
             String fieldName = type.getName();
@@ -124,36 +163,31 @@ public class PixelsReaderImpl implements PixelsReader
                     throw new IllegalArgumentException("Unknown type: " +
                             type.getKind());
             }
-            fileSchema.addField(fieldName, fieldType);
+            schema.addField(fieldName, fieldType);
         }
+        return schema;
     }
 
-    public PixelsProto.RowGroupFooter readRowGroupFooter(int rowGroupId) throws IOException
+    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException
     {
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
         long footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
         byte[] footer = new byte[(int) footerLength];
-        rawReader.seek(footerOffset);
-        rawReader.readFully(footer);
-        PixelsProto.RowGroupFooter rowGroupFooter =
-                PixelsProto.RowGroupFooter.parseFrom(footer);
-        return rowGroupFooter;
+        physicalFSReader.seek(footerOffset);
+        physicalFSReader.readFully(footer);
+        return PixelsProto.RowGroupFooter.parseFrom(footer);
     }
 
     /**
-     * Get the iterator for reading rows inside the file
+     * Get a <code>PixelsRecordReader</code>
      *
-     * @return {@code VectorReader}
+     * @return record reader
+     * @throws IOException
      */
     @Override
-    public VectorReader vectors(int[] selectedRowGroups, String[] selectedFieldNames) throws IOException
+    public PixelsRecordReader read(PixelsRecordReaderOption option) throws IOException
     {
-        List<String> fieldNames = this.fileSchema.getFieldNames();
-        int[] selectedFieldIds = new int[selectedFieldNames.length];
-        for (int i = 0; i < selectedFieldNames.length; i++) {
-            selectedFieldIds[i] = fieldNames.indexOf(selectedFieldNames[i]);
-        }
-        return new VectorReaderImpl(this, selectedRowGroups, selectedFieldIds);
+        return null;
     }
 
     /**
@@ -162,9 +196,9 @@ public class PixelsReaderImpl implements PixelsReader
      * @return version number
      */
     @Override
-    public int getFileVersion()
+    public PixelsVersion getFileVersion()
     {
-        return this.fileVersion;
+        return PixelsVersion.from(this.postScript.getVersion());
     }
 
     /**
@@ -175,7 +209,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public long getNumberOfRows()
     {
-        return this.rowNum;
+        return this.postScript.getNumberOfRows();
     }
 
     /**
@@ -186,7 +220,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public PixelsProto.CompressionKind getCompressionKind()
     {
-        return this.compressionKind;
+        return this.postScript.getCompression();
     }
 
     /**
@@ -197,7 +231,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public long getCompressionBlockSize()
     {
-        return this.compressionBlockSize;
+        return this.postScript.getCompressionBlockSize();
     }
 
     /**
@@ -208,7 +242,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public long getPixelStride()
     {
-        return this.pixelStride;
+        return this.postScript.getPixelStride();
     }
 
     /**
@@ -219,7 +253,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public String getWriterTimeZone()
     {
-        return this.writerTimeZone;
+        return this.postScript.getWriterTimezone();
     }
 
     /**
@@ -228,7 +262,7 @@ public class PixelsReaderImpl implements PixelsReader
      * @return schema
      */
     @Override
-    public TypeDescription getSchema()
+    public TypeDescription getFileSchema()
     {
         return this.fileSchema;
     }
@@ -241,7 +275,7 @@ public class PixelsReaderImpl implements PixelsReader
     @Override
     public int getRowGroupNum()
     {
-        return this.rowGroupNum;
+        return this.footer.getRowGroupInfosCount();
     }
 
     /**
@@ -315,12 +349,40 @@ public class PixelsReaderImpl implements PixelsReader
 
     /**
      * Get statistics of all row groups
-     *
      * @return row groups statistics
      */
     @Override
     public List<PixelsProto.RowGroupStatistic> getRowGroupStats()
     {
         return footer.getRowGroupStatsList();
+    }
+
+    /**
+     * Get file system
+     * @return file system
+     * */
+    public FileSystem getFs()
+    {
+        return fs;
+    }
+
+    /**
+     * Get file path
+     * @return file path
+     * */
+    public Path getPath()
+    {
+        return path;
+    }
+
+    /**
+     * Cleanup and release resources
+     *
+     * @throws IOException
+     */
+    @Override
+    public void close() throws IOException
+    {
+        physicalFSReader.close();
     }
 }

@@ -5,12 +5,12 @@ package cn.edu.ruc.iir.pixels.core.exception;
  *
  * @author guodong
  */
-public class PixelsEncodingException
+public class PixelsReaderException
         extends PixelsRuntimeException
 {
-    private static final long serialVersionUID = -6915296544890632531L;
+    private static final long serialVersionUID = 8070104534556822132L;
 
-    public PixelsEncodingException(String message)
+    public PixelsReaderException(String message)
     {
         super(message);
     }
