@@ -32,8 +32,7 @@ import static java.util.Objects.requireNonNull;
  * @date: Create in 2018-01-19 15:21
  **/
 public final class PixelsTableHandle
-        implements ConnectorTableHandle
-{
+        implements ConnectorTableHandle {
     private final String connectorId;
     private final String schemaName;
     private final String tableName;
@@ -44,29 +43,25 @@ public final class PixelsTableHandle
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("path") String path)
-    {
+            @JsonProperty("path") String path) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
-        this.path = requireNonNull(path, "path is null");;
+        this.path = requireNonNull(path, "path is null");
     }
 
     @JsonProperty
-    public String getConnectorId()
-    {
+    public String getConnectorId() {
         return connectorId;
     }
 
     @JsonProperty
-    public String getSchemaName()
-    {
+    public String getSchemaName() {
         return schemaName;
     }
 
     @JsonProperty
-    public String getTableName()
-    {
+    public String getTableName() {
         return tableName;
     }
 
@@ -75,20 +70,17 @@ public final class PixelsTableHandle
         return path;
     }
 
-    public SchemaTableName toSchemaTableName()
-    {
+    public SchemaTableName toSchemaTableName() {
         return new SchemaTableName(schemaName, tableName);
     }
 
     @Override
-    public int hashCode()
-    {
+    public int hashCode() {
         return Objects.hash(connectorId, schemaName, tableName, path);
     }
 
     @Override
-    public boolean equals(Object obj)
-    {
+    public boolean equals(Object obj) {
         if (this == obj) {
             return true;
         }
@@ -104,8 +96,7 @@ public final class PixelsTableHandle
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return Joiner.on(":").join(connectorId, schemaName, tableName, path);
     }
 }

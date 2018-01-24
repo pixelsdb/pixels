@@ -13,32 +13,43 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
 
+import static java.util.Objects.requireNonNull;
+
 public class PixelsTableLayoutHandle
-        implements ConnectorTableLayoutHandle
-{
+        implements ConnectorTableLayoutHandle {
     private final PixelsTableHandle table;
 
+    private final TupleDomain<ColumnHandle> constraint;
+
     @JsonCreator
-    public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table)
+    public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table,
+                                   @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint)
+
     {
-        this.table = table;
+        this.table = requireNonNull(table, "table is null");
+        this.constraint = requireNonNull(constraint, "constraint is null");
     }
 
     @JsonProperty
-    public PixelsTableHandle getTable()
-    {
+    public TupleDomain<ColumnHandle> getConstraint() {
+        return constraint;
+    }
+
+    @JsonProperty
+    public PixelsTableHandle getTable() {
         return table;
     }
 
     @Override
-    public boolean equals(Object o)
-    {
+    public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
@@ -46,18 +57,19 @@ public class PixelsTableLayoutHandle
             return false;
         }
         PixelsTableLayoutHandle that = (PixelsTableLayoutHandle) o;
-        return Objects.equals(table, that.table);
+        return Objects.equals(table, that.table) && Objects.equals(constraint, that.constraint);
     }
 
     @Override
-    public int hashCode()
-    {
-        return Objects.hash(table);
+    public int hashCode() {
+        return Objects.hash(table, constraint);
     }
 
     @Override
-    public String toString()
-    {
-        return table.toString();
+    public String toString() {
+        return "PixelsTableLayoutHandle{" +
+                "table=" + table +
+                ", constraint=" + constraint +
+                '}';
     }
 }

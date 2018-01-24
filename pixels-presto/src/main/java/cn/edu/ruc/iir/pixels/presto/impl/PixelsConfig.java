@@ -53,7 +53,6 @@ public class PixelsConfig {
     }
 
     public String getHDFSWarehouse() {
-
-        return null;
+        return "hdfs://presto00:9000/";
     }
 }

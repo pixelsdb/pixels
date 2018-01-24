@@ -18,6 +18,8 @@ import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
@@ -38,6 +40,7 @@ import static java.util.Objects.requireNonNull;
  **/
 public class PixelsSplitManager
         implements ConnectorSplitManager {
+    private final Logger log = Logger.get(PixelsSplitManager.class);
     private final String connectorId;
     private final PixelsMetadataReader pixelsMetadataReader;
     private final FSFactory fsFactory;
@@ -57,18 +60,25 @@ public class PixelsSplitManager
         // this can happen if table is removed during a query
         checkState(table != null, "Table %s.%s no longer exists", tableHandle.getSchemaName(), tableHandle.getTableName());
 
+        String tablePath = tableHandle.getPath();
         List<ConnectorSplit> splits = new ArrayList<>();
 
-        List<Path> files = fsFactory.listFiles(new Path(tableHandle.getPath()));
+        TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
+                .transform(PixelsColumnHandle.class::cast);
 
+        log.info("Path: " + tablePath);
+        List<Path> files = fsFactory.listFiles(tablePath);
+
+        log.info("filename: " + files.get(0).getName());
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,
                 tableHandle.getSchemaName(),
                 tableHandle.getTableName(),
                 file.toString(), 0, -1,
-                fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE))));
+                fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
 
         Collections.shuffle(splits);
 
+        log.info("files forEach: " + files.size());
         return new FixedSplitSource(splits);
     }
 }

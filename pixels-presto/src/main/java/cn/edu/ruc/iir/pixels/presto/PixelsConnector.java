@@ -24,8 +24,7 @@ import static cn.edu.ruc.iir.pixels.presto.PixelsTransactionHandle.INSTANCE;
 import static java.util.Objects.requireNonNull;
 
 public class PixelsConnector
-        implements Connector
-{
+        implements Connector {
     private static final Logger log = Logger.get(PixelsConnector.class);
 
     private final LifeCycleManager lifeCycleManager;
@@ -38,8 +37,7 @@ public class PixelsConnector
             LifeCycleManager lifeCycleManager,
             PixelsMetadata metadata,
             PixelsSplitManager splitManager,
-            PixelsRecordSetProvider recordSetProvider)
-    {
+            PixelsRecordSetProvider recordSetProvider) {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
@@ -47,36 +45,30 @@ public class PixelsConnector
     }
 
     @Override
-    public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
-    {
+    public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly) {
         return INSTANCE;
     }
 
     @Override
-    public ConnectorMetadata getMetadata(ConnectorTransactionHandle transactionHandle)
-    {
+    public ConnectorMetadata getMetadata(ConnectorTransactionHandle transactionHandle) {
         return metadata;
     }
 
     @Override
-    public ConnectorSplitManager getSplitManager()
-    {
+    public ConnectorSplitManager getSplitManager() {
         return splitManager;
     }
 
     @Override
-    public ConnectorRecordSetProvider getRecordSetProvider()
-    {
+    public ConnectorRecordSetProvider getRecordSetProvider() {
         return recordSetProvider;
     }
 
     @Override
-    public final void shutdown()
-    {
+    public final void shutdown() {
         try {
             lifeCycleManager.stop();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             log.error(e, "Error shutting down connector");
         }
     }

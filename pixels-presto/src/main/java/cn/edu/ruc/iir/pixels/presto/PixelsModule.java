@@ -30,23 +30,23 @@ import javax.inject.Inject;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.airlift.json.JsonBinder.jsonBinder;
+import static io.airlift.json.JsonCodec.listJsonCodec;
+import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
 
 public class PixelsModule
-        implements Module
-{
+        implements Module {
     private final String connectorId;
     private final TypeManager typeManager;
 
-    public PixelsModule(String connectorId, TypeManager typeManager)
-    {
+    public PixelsModule(String connectorId, TypeManager typeManager) {
         this.connectorId = requireNonNull(connectorId, "connector id is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
     @Override
-    public void configure(Binder binder)
-    {
+    public void configure(Binder binder) {
         binder.bind(TypeManager.class).toInstance(typeManager);
 
         binder.bind(PixelsConnector.class).in(Scopes.SINGLETON);
@@ -59,23 +59,23 @@ public class PixelsModule
         binder.bind(PixelsHandleResolver.class).in(Scopes.SINGLETON);
         binder.bind(PixelsRecordSetProvider.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(PixelsConfig.class);
+
+        jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
+        jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PixelsTable.class));
     }
 
     public static final class TypeDeserializer
-            extends FromStringDeserializer<Type>
-    {
+            extends FromStringDeserializer<Type> {
         private final TypeManager typeManager;
 
         @Inject
-        public TypeDeserializer(TypeManager typeManager)
-        {
+        public TypeDeserializer(TypeManager typeManager) {
             super(Type.class);
             this.typeManager = requireNonNull(typeManager, "typeManager is null");
         }
 
         @Override
-        protected Type _deserialize(String value, DeserializationContext context)
-        {
+        protected Type _deserialize(String value, DeserializationContext context) {
             Type type = typeManager.getType(parseTypeSignature(value));
             checkArgument(type != null, "Unknown type %s", value);
             return type;
