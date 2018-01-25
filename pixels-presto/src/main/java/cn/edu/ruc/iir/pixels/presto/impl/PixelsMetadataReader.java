@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.Metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
@@ -8,8 +8,6 @@ import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.type.CharType;
-import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
