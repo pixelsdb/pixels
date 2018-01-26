@@ -1,6 +1,5 @@
-package cn.edu.ruc.iir.pixels.metadata.util;
+package cn.edu.ruc.iir.pixels.common;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import io.airlift.log.Logger;
 
 import java.sql.*;
@@ -15,8 +14,8 @@ public class DBUtils {
     private static String USERID;
     private static String USERPASSWORD;
     private static Connection conn = null;
-    private PreparedStatement psmt = null; // 预执行对象
-    private ResultSet rs = null; // 结果集
+    private PreparedStatement psmt = null;
+    private ResultSet rs = null;
     private Statement statement = null;
 
     private DBUtils() {
@@ -30,7 +29,7 @@ public class DBUtils {
             Class.forName(DRIVER);
             conn = DriverManager.getConnection(URL, USERID, USERPASSWORD);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Connection error! errmsg: " + e.getMessage());
         }
     }
 
@@ -52,7 +51,7 @@ public class DBUtils {
             if (conn != null)
                 conn.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Close error! errmsg: " + e.getMessage());
         }
     }
 
@@ -62,7 +61,7 @@ public class DBUtils {
                     ResultSet.CONCUR_READ_ONLY);
             rs = statement.executeQuery(SQL);
         } catch (Exception e) {
-            log.error("Select from sql server error! errmsg: ", e.getMessage());
+            log.error("Select from sql server error! errmsg: " + e.getMessage());
         }
         return rs;
     }
@@ -77,7 +76,7 @@ public class DBUtils {
             }
             rs = psmt.executeQuery();
         } catch (SQLException e) {
-            log.error("Select from sql server error! errmsg: ", e.getMessage());
+            log.error("Select from sql server error! errmsg: " + e.getMessage());
         }
         return rs;
     }
@@ -89,7 +88,7 @@ public class DBUtils {
             statement = conn.createStatement();
             flag = statement.execute(SQL);
         } catch (Exception e) {
-            log.error("Execute sql error! errmsg: ", e.getMessage());
+            log.error("Execute sql error! errmsg: " + e.getMessage());
         }
         return flag;
     }
@@ -105,7 +104,7 @@ public class DBUtils {
             }
             result = psmt.executeUpdate();
         } catch (SQLException e) {
-            log.error("Execute sql error! errmsg: ", e.getMessage());
+            log.error("Execute sql error! errmsg: " + e.getMessage());
         }
         return result;
     }

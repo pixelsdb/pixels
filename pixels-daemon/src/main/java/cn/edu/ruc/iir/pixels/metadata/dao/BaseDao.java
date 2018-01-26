@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.metadata.util.DBUtils;
+import cn.edu.ruc.iir.pixels.common.DBUtils;
 
 import java.io.Serializable;
 import java.util.List;
@@ -21,14 +21,14 @@ public interface BaseDao<T> {
 
     List<T> find(String sql);
 
-    List<T> loadT(String sql);
+    List<T> loadT(String sql, String[] params);
 
-    void update(String sql);
+    boolean update(String sql, String[] params);
 
     List<T> find(T o);
 
     List<T> loadT(T o);
 
-    void update(T o);
+    boolean update(T o, String[] params);
 
 }

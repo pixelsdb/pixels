@@ -79,4 +79,16 @@ public class Table implements Serializable {
     public void setTblLays(Set<Layout> tblLays) {
         this.tblLays = tblLays;
     }
+
+    @Override
+    public String toString() {
+        return "Table{" +
+                "tblId=" + tblId +
+                ", tblName='" + tblName + '\'' +
+                ", tblType='" + tblType + '\'' +
+                ", ts=" + ts +
+                ", tblCols=" + tblCols +
+                ", tblLays=" + tblLays +
+                '}';
+    }
 }

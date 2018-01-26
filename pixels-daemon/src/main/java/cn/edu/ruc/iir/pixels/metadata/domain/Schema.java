@@ -60,4 +60,14 @@ public class Schema implements Serializable {
     public void setSchTbls(Set<Table> schTbls) {
         this.schTbls = schTbls;
     }
+
+    @Override
+    public String toString() {
+        return "Schema{" +
+                "scheId=" + scheId +
+                ", schName='" + schName + '\'' +
+                ", schDesc='" + schDesc + '\'' +
+                ", schTbls=" + schTbls +
+                '}';
+    }
 }

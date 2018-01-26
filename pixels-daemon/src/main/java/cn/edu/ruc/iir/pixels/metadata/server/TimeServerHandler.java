@@ -35,7 +35,7 @@ public class TimeServerHandler extends ChannelInboundHandlerAdapter {
         if (body.equals("Time")) {
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             currentTime = df.format(new Date());
-        } else if (body.equals("Schema")) {
+        } else if (body.equals("getSchemaNames")) {
             BaseDao baseDao = new SchemaDao();
             String sql = "select * from DBS";
             List<Schema> schemas = baseDao.loadT(sql);

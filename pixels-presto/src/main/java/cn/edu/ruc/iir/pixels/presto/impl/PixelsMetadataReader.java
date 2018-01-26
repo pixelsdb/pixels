@@ -1,19 +1,20 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
+import cn.edu.ruc.iir.pixels.presto.client.TimeClient;
+import com.alibaba.fastjson.JSON;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 
@@ -29,22 +30,45 @@ public class PixelsMetadataReader {
 
     private static final Logger log = Logger.get(PixelsMetadataReader.class);
 
-
     public List<String> getSchemaNames() {
         List<String> schemaList = new ArrayList<String>();
-        schemaList.add("default");
-        schemaList.add("schema1");
-        schemaList.add("schema2");
-        schemaList.add("schemaN");
+        List<Schema> schemas = new ArrayList<>();
+        TimeClient client = new TimeClient("getSchemaNames");
+        try {
+            new Thread(() -> {
+                try {
+                    client.connect(18888, "127.0.0.1");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }).start();
+            while (true) {
+                int count = client.getQueue().size();
+                if (count > 0) {
+                    String res = client.getQueue().poll();
+                    schemas = JSON.parseArray(res, Schema.class);
+                    break;
+                }
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        log.info("Schemas: " + schemaList.size());
+        for (Schema s : schemas) {
+            schemaList.add(s.getSchName());
+            log.info("getSchName: " + s.toString());
+        }
         return schemaList;
     }
 
-    public Set<String> getTableNames(String schemaName) {
-        Set<String> tablelist = new HashSet<String>() {{
+    public List<String> getTableNames(String schemaName) {
+        List<String> tablelist = new ArrayList<String>() {{
             add("test");
             add("tab2");
             add("tabN");
         }};
+
         return tablelist;
     }
 
@@ -73,7 +97,6 @@ public class PixelsMetadataReader {
 
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();
         PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
-
         return tableLayout;
     }
 }

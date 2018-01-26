@@ -12,7 +12,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
@@ -69,7 +68,7 @@ public class TimeClient {
     }
 
     public static void main(String[] args) {
-        String action = "Schema";
+        String action = "getSchemaNames";
         Scanner sc = new Scanner(System.in);
         System.out.print("Input your action: ");
         while (sc.hasNext()) {
@@ -91,7 +90,7 @@ public class TimeClient {
                         String res = client.getQueue().poll();
                         if (action.equals("Time")) {
                             System.out.println(res);
-                        } else if (action.equals("Schema")) {
+                        } else if (action.equals("getSchemaNames")) {
                             List<Schema> schemas = JSON.parseArray(res, Schema.class);
                             System.out.println(schemas.size());
                         }

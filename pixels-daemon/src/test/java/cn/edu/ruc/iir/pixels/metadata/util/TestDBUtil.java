@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.metadata.util;
 
+import cn.edu.ruc.iir.pixels.common.DBUtils;
 import org.junit.Test;
 
 import java.sql.ResultSet;

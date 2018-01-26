@@ -29,8 +29,8 @@ public class SchemaDao implements BaseDao<Schema> {
     }
 
     @Override
-    public List<Schema> loadT(String sql) {
-        ResultSet rs = db.getQuery(sql);
+    public List<Schema> loadT(String sql, String[] params) {
+        ResultSet rs = db.getQuery(sql, null);
         List<Schema> l = new ArrayList<Schema>();
         try {
             while (rs.next()) {
@@ -47,8 +47,8 @@ public class SchemaDao implements BaseDao<Schema> {
     }
 
     @Override
-    public void update(String sql) {
-        db.getUpdate(sql);
+    public boolean update(String sql, String[] params) {
+        return db.getUpdate(sql, params) == 1;
     }
 
     @Override
@@ -62,8 +62,8 @@ public class SchemaDao implements BaseDao<Schema> {
     }
 
     @Override
-    public void update(Schema o) {
-
+    public boolean update(Schema o, String[] params) {
+        return false;
     }
 
 }
