@@ -15,24 +15,23 @@ public class ConfigFactory
 		prop = new Properties();
 		String pixelsHome = System.getenv("PIXELS_HOME");
 		InputStream in = null;
-		if (pixelsHome != null)
+		if (pixelsHome == null)
 		{
+			in = this.getClass().getResourceAsStream("/pixels.properties");
+		}
+		else
+		{
+			if (!(pixelsHome.endsWith("/") || pixelsHome.endsWith("\\")))
+			{
+				pixelsHome += "/";
+			}
 			try
 			{
-				if (!pixelsHome.endsWith("/"))
-				{
-					pixelsHome += "/";
-				}
-				pixelsHome += "pixels.properties";
-				in = new FileInputStream(pixelsHome);
+				in = new FileInputStream(pixelsHome + "pixels.properties");
 			} catch (FileNotFoundException e)
 			{
 				e.printStackTrace();
 			}
-		}
-		else
-		{
-			in = this.getClass().getResourceAsStream("/pixels.properties");
 		}
 		try {
 			if (in != null)
@@ -54,31 +53,6 @@ public class ConfigFactory
 	}
 	
 	private Properties prop = null;
-	
-	public void LoadProperties (String propFilePath)
-	{
-		FileInputStream in = null;
-		try
-		{
-			in = new FileInputStream(propFilePath);
-			this.prop.load(in);
-		} catch (IOException e)
-		{
-			e.printStackTrace();
-		} finally
-		{
-			if (in != null)
-			{
-				try
-				{
-					in.close();
-				} catch (IOException e)
-				{
-					e.printStackTrace();
-				}
-			}
-		}
-	}
 	
 	public void addProperty (String key, String value)
 	{

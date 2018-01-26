@@ -3,7 +3,7 @@ package cn.edu.ruc.iir.pixels.common;
 import org.apache.commons.logging.Log;
 
 /**
- * Created by hank on 17-4-29.
+ * Created by hank on 18-1-25.
  */
 public class LogFactory
 {
@@ -21,7 +21,7 @@ public class LogFactory
 
     private LogFactory ()
     {
-        this.log = org.apache.commons.logging.LogFactory.getLog("oil logs");
+        this.log = org.apache.commons.logging.LogFactory.getLog("pixels logs");
     }
 
     public Log getLog ()
