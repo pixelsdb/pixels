@@ -2,7 +2,9 @@ package cn.edu.ruc.iir.pixels.metadata.server;
 
 import cn.edu.ruc.iir.pixels.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.metadata.dao.SchemaDao;
+import cn.edu.ruc.iir.pixels.metadata.dao.TblDao;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -38,7 +40,12 @@ public class TimeServerHandler extends ChannelInboundHandlerAdapter {
         } else if (body.equals("getSchemaNames")) {
             BaseDao baseDao = new SchemaDao();
             String sql = "select * from DBS";
-            List<Schema> schemas = baseDao.loadT(sql);
+            List<Schema> schemas = baseDao.loadT(sql, null);
+            currentTime = JSON.toJSONString(schemas);
+        } else if (body.equals("getTableNames")) {
+            BaseDao baseDao = new TblDao();
+            String sql = "select * from TBLS";
+            List<Table> schemas = baseDao.loadT(sql, null);
             currentTime = JSON.toJSONString(schemas);
         } else {
             currentTime = "action default";

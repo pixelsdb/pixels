@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
@@ -63,12 +64,35 @@ public class PixelsMetadataReader {
     }
 
     public List<String> getTableNames(String schemaName) {
-        List<String> tablelist = new ArrayList<String>() {{
-            add("test");
-            add("tab2");
-            add("tabN");
-        }};
-
+        log.info("Function getTableNames() -> schemaName: " + schemaName);
+        List<String> tablelist = new ArrayList<String>();
+        List<Table> tables = new ArrayList<>();
+        TimeClient client = new TimeClient("getTableNames");
+        try {
+            new Thread(() -> {
+                try {
+                    client.connect(18888, "127.0.0.1");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }).start();
+            while (true) {
+                int count = client.getQueue().size();
+                if (count > 0) {
+                    String res = client.getQueue().poll();
+                    tables = JSON.parseArray(res, Table.class);
+                    break;
+                }
+                Thread.sleep(1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        log.info("Tables: " + tablelist.size());
+        for (Table t : tables) {
+            tablelist.add(t.getTblName());
+            log.info("getTblName: " + t.toString());
+        }
         return tablelist;
     }
 

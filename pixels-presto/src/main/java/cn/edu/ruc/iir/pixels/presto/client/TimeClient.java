@@ -1,8 +1,5 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
-import cn.edu.ruc.iir.pixels.common.DateUtil;
-import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
-import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -12,9 +9,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -67,42 +61,4 @@ public class TimeClient {
         }
     }
 
-    public static void main(String[] args) {
-        String action = "getSchemaNames";
-        Scanner sc = new Scanner(System.in);
-        System.out.print("Input your action: ");
-        while (sc.hasNext()) {
-            action = sc.next();
-            System.out.println();
-            TimeClient client = new TimeClient(action);
-            try {
-                new Thread(() -> {
-                    try {
-                        client.connect(18888, "127.0.0.1");
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }).start();
-                System.out.println(DateUtil.formatTime(new Date()));
-                while (true) {
-                    int count = client.getQueue().size();
-                    if (count > 0) {
-                        String res = client.getQueue().poll();
-                        if (action.equals("Time")) {
-                            System.out.println(res);
-                        } else if (action.equals("getSchemaNames")) {
-                            List<Schema> schemas = JSON.parseArray(res, Schema.class);
-                            System.out.println(schemas.size());
-                        }
-                        break;
-                    }
-                    Thread.sleep(1000);
-                }
-                System.out.println(DateUtil.formatTime(new Date()));
-                System.out.print("Input your action: ");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
 }

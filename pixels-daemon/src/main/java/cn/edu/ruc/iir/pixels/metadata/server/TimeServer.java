@@ -41,12 +41,4 @@ public class TimeServer {
         }
     }
 
-    public static void main(String[] args) {
-        TimeServer server = new TimeServer();
-        try {
-            server.bind(18888);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 }

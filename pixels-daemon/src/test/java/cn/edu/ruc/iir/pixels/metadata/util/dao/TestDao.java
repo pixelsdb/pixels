@@ -4,7 +4,7 @@ import cn.edu.ruc.iir.pixels.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.metadata.dao.SchemaDao;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.metadata.domain.Table;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -44,7 +44,7 @@ public class TestDao {
     public void testTblUpdateDao() throws SQLException {
         BaseDao baseDao = new SchemaDao();
         String sql = "insert into TBLS(TBL_NAME,TBL_TYPE,DBS_DB_ID) values(?,?,?)";
-        String[] params = new String[]{"test", "USER", "4"};
+        String[] params = new String[]{"demo2", "USER", "2"};
         boolean bool = baseDao.update(sql, params);
         System.out.println(bool);
     }
