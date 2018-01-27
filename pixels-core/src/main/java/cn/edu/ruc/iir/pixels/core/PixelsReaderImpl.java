@@ -4,20 +4,25 @@ import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsReaderException;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderImpl;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.util.List;
 
 /**
- * Pixels reader default implementation
+ * Pixels file reader default implementation
+ *
+ * This writer is NOT thread safe!
  *
  * @author guodong
  */
+@NotThreadSafe
 public class PixelsReaderImpl
         implements PixelsReader
 {
@@ -30,7 +35,7 @@ public class PixelsReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
 
-    public PixelsReaderImpl(FileSystem fs, Path path,
+    private PixelsReaderImpl(FileSystem fs, Path path,
                             TypeDescription fileSchema,
                             PhysicalFSReader physicalFSReader,
                             PixelsProto.FileTail fileTail)
@@ -108,64 +113,9 @@ public class PixelsReaderImpl
         }
     }
 
-    /**
-     * THIS SHOULD BE USELESS
-     * */
-    private TypeDescription readTypes()
+    public static Builder newBuilder()
     {
-        TypeDescription schema = TypeDescription.createStruct();
-        List<PixelsProto.Type> types = footer.getTypesList();
-        for (PixelsProto.Type type : types) {
-            String fieldName = type.getName();
-            TypeDescription fieldType;
-            switch (type.getKind())
-            {
-                case INT:
-                    fieldType = TypeDescription.createInt();
-                    break;
-                case BYTE:
-                    fieldType = TypeDescription.createByte();
-                    break;
-                case CHAR:
-                    fieldType = TypeDescription.createChar();
-                    break;
-                case DATE:
-                    fieldType = TypeDescription.createDate();
-                    break;
-                case LONG:
-                    fieldType = TypeDescription.createLong();
-                    break;
-                case FLOAT:
-                    fieldType = TypeDescription.createFloat();
-                    break;
-                case SHORT:
-                    fieldType = TypeDescription.createShort();
-                    break;
-                case BINARY:
-                    fieldType = TypeDescription.createBinary();
-                    break;
-                case DOUBLE:
-                    fieldType = TypeDescription.createDouble();
-                    break;
-                case STRING:
-                    fieldType = TypeDescription.createString();
-                    break;
-                case BOOLEAN:
-                    fieldType = TypeDescription.createBoolean();
-                    break;
-                case VARCHAR:
-                    fieldType = TypeDescription.createVarchar();
-                    break;
-                case TIMESTAMP:
-                    fieldType = TypeDescription.createTimestamp();
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown type: " +
-                            type.getKind());
-            }
-            schema.addField(fieldName, fieldType);
-        }
-        return schema;
+        return new Builder();
     }
 
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException
@@ -185,9 +135,9 @@ public class PixelsReaderImpl
      * @throws IOException
      */
     @Override
-    public PixelsRecordReader read(PixelsRecordReaderOption option) throws IOException
+    public PixelsRecordReader read(PixelsReaderOption option)
     {
-        return null;
+        return new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
     }
 
     /**
@@ -286,7 +236,7 @@ public class PixelsReaderImpl
     @Override
     public List<PixelsProto.ColumnStatistic> getColumnStats()
     {
-        return footer.getColumnStatsList();
+        return this.footer.getColumnStatsList();
     }
 
     /**
@@ -303,7 +253,7 @@ public class PixelsReaderImpl
         if (fieldId == -1) {
             return null;
         }
-        return footer.getColumnStats(fieldId);
+        return this.footer.getColumnStats(fieldId);
     }
 
     /**
@@ -314,7 +264,7 @@ public class PixelsReaderImpl
     @Override
     public List<PixelsProto.RowGroupInformation> getRowGroupInfos()
     {
-        return footer.getRowGroupInfosList();
+        return this.footer.getRowGroupInfosList();
     }
 
     /**
@@ -329,7 +279,7 @@ public class PixelsReaderImpl
         if (rowGroupId < 0) {
             return null;
         }
-        return footer.getRowGroupInfos(rowGroupId);
+        return this.footer.getRowGroupInfos(rowGroupId);
     }
 
     /**
@@ -344,7 +294,7 @@ public class PixelsReaderImpl
         if (rowGroupId < 0) {
             return null;
         }
-        return footer.getRowGroupStats(rowGroupId);
+        return this.footer.getRowGroupStats(rowGroupId);
     }
 
     /**
@@ -354,7 +304,7 @@ public class PixelsReaderImpl
     @Override
     public List<PixelsProto.RowGroupStatistic> getRowGroupStats()
     {
-        return footer.getRowGroupStatsList();
+        return this.footer.getRowGroupStatsList();
     }
 
     /**
@@ -363,7 +313,7 @@ public class PixelsReaderImpl
      * */
     public FileSystem getFs()
     {
-        return fs;
+        return this.fs;
     }
 
     /**
@@ -372,7 +322,7 @@ public class PixelsReaderImpl
      * */
     public Path getPath()
     {
-        return path;
+        return this.path;
     }
 
     /**
@@ -383,6 +333,6 @@ public class PixelsReaderImpl
     @Override
     public void close() throws IOException
     {
-        physicalFSReader.close();
+        this.physicalFSReader.close();
     }
 }

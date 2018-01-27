@@ -14,7 +14,8 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
-public class PhysicalFSWriter implements PhysicalWriter
+public class PhysicalFSWriter
+        implements PhysicalWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalFSWriter.class);
 

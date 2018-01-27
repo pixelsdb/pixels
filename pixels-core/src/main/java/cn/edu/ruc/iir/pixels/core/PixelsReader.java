@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.core;
 
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -20,9 +20,8 @@ public interface PixelsReader
     /**
      * Get a <code>PixelsRecordReader</code>
      * @return record reader
-     * @throws java.io.IOException
      * */
-    PixelsRecordReader read(PixelsRecordReaderOption option) throws IOException;
+    PixelsRecordReader read(PixelsReaderOption option);
 
     /**
      * Get version of the Pixels file

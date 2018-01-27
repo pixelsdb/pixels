@@ -169,15 +169,8 @@ public class PixelsCompactor
             }
         }
 
-        try
-        {
-            this.physicalWriter = new PhysicalFSWriter(fs, filePath, blockSize, replication, blockPadding);
-        } catch (IOException e)
-        {
-            LOGGER.error(e.getMessage());
-            e.printStackTrace();
-            System.exit(-1);
-        }
+        this.physicalWriter =
+                PhysicalFSWriterUtil.newPhysicalFSWriter(fs, filePath, blockSize, replication, blockPadding);
     }
 
     public static class Builder

@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 /**
- * Pixels file writer
+ * Pixels file writer default implementation
  *
  * This writer is NOT thread safe!
  *

@@ -1,18 +1,23 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import cn.edu.ruc.iir.pixels.core.PixelsVersion;
 import cn.edu.ruc.iir.pixels.core.TestParams;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
+import java.util.TimeZone;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * pixels
@@ -25,45 +30,37 @@ public class TestPixelsReader
     public void validateWriter()
     {
         String filePath = TestParams.filePath;
-        String metaPath = TestParams.metaPath;
         Path path = new Path(filePath);
+        TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
 
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        try {
-            BufferedWriter metaWriter = new BufferedWriter(new FileWriter(metaPath, false));
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            FSDataInputStream inStream = fs.open(path);
-            long fileLen = fs.getFileStatus(path).getLen();
-            inStream.seek(fileLen - Long.BYTES);
-            long tailOffset = inStream.readLong();
-            metaWriter.write("File tail offset: " + tailOffset + "\n");
-            int tailLen = (int) (fileLen - tailOffset - Long.BYTES);
-            inStream.seek(tailOffset);
-            byte[] tailBuffer = new byte[tailLen];
-            inStream.readFully(tailBuffer);
 
-            PixelsProto.FileTail fileTail =
-                    PixelsProto.FileTail.parseFrom(tailBuffer);
-            metaWriter.write("=========== FILE TAIL ===========\n");
-            metaWriter.write(fileTail.toString() + "\n");
+        try (FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder().
+                     setFS(fs).setPath(path).setSchema(schema)
+                     .build()) {
+            assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
+            assertEquals(0, pixelsReader.getCompressionBlockSize());
+            assertEquals(schema, pixelsReader.getFileSchema());
+            assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
+            assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
+            assertEquals(10000, pixelsReader.getPixelStride());
+            assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
 
-            PixelsProto.Footer footer = fileTail.getFooter();
-            for (int i = 0; i < footer.getRowGroupInfosCount(); i++) {
-                PixelsProto.RowGroupInformation rowGroupInfo = footer.getRowGroupInfos(i);
-                int rowGroupFooterOffset = (int) rowGroupInfo.getFooterOffset();
-                int rowGroupFooterLen = (int) rowGroupInfo.getFooterLength();
-                byte[] rowGroupFooterBuffer = new byte[rowGroupFooterLen];
-                inStream.seek(rowGroupFooterOffset);
-                inStream.readFully(rowGroupFooterBuffer);
-                PixelsProto.RowGroupFooter rowGroupFooter =
-                        PixelsProto.RowGroupFooter.parseFrom(rowGroupFooterBuffer);
-                metaWriter.write("========== ROW GROUP " +  i + " ===========\n");
-                metaWriter.write(rowGroupFooter.toString() + "\n");
+            PixelsReaderOption option = new PixelsReaderOption();
+            String[] cols = {"a", "b", "c", "d", "e", "z"};
+            option.skipCorruptRecords(true);
+            option.tolerantSchemaEvolution(true);
+            option.includeCols(cols);
+
+            PixelsRecordReader recordReader = pixelsReader.read(option);
+            VectorizedRowBatch rowBatch = schema.createRowBatch(10000);
+            while (recordReader.nextBatch(rowBatch)) {
+                System.out.println("Getting next batch. Current size : " + rowBatch.size);
             }
-            metaWriter.flush();
-            metaWriter.close();
+            recordReader.close();
         }
         catch (IOException e) {
             e.printStackTrace();

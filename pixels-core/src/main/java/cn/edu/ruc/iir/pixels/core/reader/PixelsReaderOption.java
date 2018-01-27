@@ -2,41 +2,46 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 
+import java.util.Optional;
+
 /**
  * pixels
  *
  * @author guodong
  */
-public class PixelsRecordReaderOption
+public class PixelsReaderOption
 {
-    private String[] columnNames = null;
-    private SearchArgument predicates = null;
+    private String[] includedCols = new String[0];
+    private SearchArgument predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private long offset = 0;
     private long length = Long.MAX_VALUE;
 
-    public PixelsRecordReaderOption()
+    public PixelsReaderOption()
     {}
 
-    public void columnNames(String[] columnNames)
+    public void includeCols(String[] columnNames)
     {
-        this.columnNames = columnNames;
+        this.includedCols = columnNames;
     }
 
-    public String[] getColumnNames()
+    public String[] getIncludedCols()
     {
-        return columnNames;
+        return includedCols;
     }
 
-    public void predicates(SearchArgument predicates)
+    public void predicate(SearchArgument predicates)
     {
-        this.predicates = predicates;
+        this.predicate = predicates;
     }
 
-    public SearchArgument getPredicates()
+    public Optional<SearchArgument> getPredicate()
     {
-        return predicates;
+        if (predicate == null) {
+            return Optional.empty();
+        }
+        return Optional.of(predicate);
     }
 
     public void skipCorruptRecords(boolean skipCorruptRecords)
