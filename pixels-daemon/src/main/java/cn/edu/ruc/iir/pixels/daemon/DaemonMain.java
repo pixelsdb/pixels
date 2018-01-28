@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.LogFactory;
+import cn.edu.ruc.iir.pixels.metadata.server.TimeServer;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -85,6 +86,15 @@ public class DaemonMain
                 {
                     LogFactory.Instance().getLog().error("error when killing pixels daemons.", e);
                 }
+            }
+        }
+        else
+        {
+            TimeServer server = new TimeServer();
+            try {
+                server.bind(18888);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
