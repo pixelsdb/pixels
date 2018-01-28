@@ -96,6 +96,7 @@ public final class FSFactory {
 
     public List<Path> listFiles(String path) {
         Path dirPath = new Path(path);
+        log.info("path: " + path);
         List<Path> files = new ArrayList<>();
         if (!getFS().isPresent()) {
             throw new FileSystemNotFoundException("");
@@ -111,6 +112,7 @@ public final class FSFactory {
                 files.add(f.getPath());
             }
         }
+        log.info("files size: " + files.size());
         return files;
     }
 

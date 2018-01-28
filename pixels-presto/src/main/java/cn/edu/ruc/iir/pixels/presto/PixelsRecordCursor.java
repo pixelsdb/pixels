@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.toSet;
  **/
 public class PixelsRecordCursor
         implements RecordCursor {
-    static Logger logger = Logger.get(PixelsRecordCursor.class);
+    private static Logger logger = Logger.get(PixelsRecordCursor.class);
     private static final Splitter LINE_SPLITTER = Splitter.on(",").trimResults();
 
     // TODO This should be a config option as it may be different for different log files
@@ -203,7 +203,7 @@ public class PixelsRecordCursor
     }
 
     private static class FilesReader {
-        static Logger logger = Logger.get(FilesReader.class);
+        private static Logger logger = Logger.get(FilesReader.class);
         private final Iterator<Path> files;
         private final Optional<Domain> domain;
         private final OptionalInt timestampOrdinalPosition;
