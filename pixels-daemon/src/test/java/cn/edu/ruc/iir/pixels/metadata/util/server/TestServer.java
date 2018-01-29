@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.metadata.util.server;
 
-import cn.edu.ruc.iir.pixels.metadata.server.TimeServer;
-import org.junit.Test;
+import cn.edu.ruc.iir.pixels.metadata.server.MetadataServer;
 
 /**
  * @version V1.0
@@ -14,23 +13,11 @@ import org.junit.Test;
 public class TestServer {
 
     public static void main(String[] args) {
-        TimeServer server = new TimeServer();
+        MetadataServer server = new MetadataServer();
         try {
             server.bind(18888);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-    @Test
-    public void testSplit(){
-        String body = "123==";
-        String split[] = body.split("==");
-        System.out.println(split.length);
-        String action = split[0];
-        System.out.println(split[1]);
-        String params[] =  split[1] == null ? new String[]{} : split[1].split("||");
-    }
-
-
 }

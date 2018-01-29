@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.metadata.domain.Table;
@@ -7,7 +8,7 @@ import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
-import cn.edu.ruc.iir.pixels.presto.client.TimeClient;
+import cn.edu.ruc.iir.pixels.presto.client.MetadataClient;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -29,16 +30,20 @@ import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharTyp
  **/
 public class PixelsMetadataReader {
 
+    ConfigFactory config = ConfigFactory.Instance();
+    String host = config.getProperty("host");
+    int port = Integer.valueOf(config.getProperty("port"));
+
     private static final Logger log = Logger.get(PixelsMetadataReader.class);
 
     public List<String> getSchemaNames() {
         List<String> schemaList = new ArrayList<String>();
         List<Schema> schemas = new ArrayList<>();
-        TimeClient client = new TimeClient("getSchemaNames");
+        MetadataClient client = new MetadataClient("getSchemaNames");
         try {
             new Thread(() -> {
                 try {
-                    client.connect(18888, "127.0.0.1", null);
+                    client.connect(port, host, null);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -67,11 +72,11 @@ public class PixelsMetadataReader {
         log.info("Function getTableNames() -> schemaName: " + schemaName);
         List<String> tablelist = new ArrayList<String>();
         List<Table> tables = new ArrayList<>();
-        TimeClient client = new TimeClient("getTableNames");
+        MetadataClient client = new MetadataClient("getTableNames");
         try {
             new Thread(() -> {
                 try {
-                    client.connect(18888, "127.0.0.1", schemaName);
+                    client.connect(port, host, schemaName);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

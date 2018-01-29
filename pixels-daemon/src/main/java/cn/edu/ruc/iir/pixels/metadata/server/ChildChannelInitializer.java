@@ -14,6 +14,6 @@ import io.netty.channel.socket.SocketChannel;
 public class ChildChannelInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void initChannel(SocketChannel channel) throws Exception {
-        channel.pipeline().addLast("timeServerHandler", new TimeServerHandler());
+        channel.pipeline().addLast("MetadataServerHandler", new MetadataServerHandler());
     }
 }
