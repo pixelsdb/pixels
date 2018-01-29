@@ -3,8 +3,6 @@ package cn.edu.ruc.iir.pixels.metadata.util.server;
 import cn.edu.ruc.iir.pixels.metadata.server.TimeServer;
 import org.junit.Test;
 
-import java.sql.SQLException;
-
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.metadata.util.server
@@ -22,6 +20,16 @@ public class TestServer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void testSplit(){
+        String body = "123==";
+        String split[] = body.split("==");
+        System.out.println(split.length);
+        String action = split[0];
+        System.out.println(split[1]);
+        String params[] =  split[1] == null ? new String[]{} : split[1].split("||");
     }
 
 

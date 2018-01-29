@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.metadata.server;
 
 import cn.edu.ruc.iir.pixels.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.metadata.dao.SchemaDao;
-import cn.edu.ruc.iir.pixels.metadata.dao.TblDao;
+import cn.edu.ruc.iir.pixels.metadata.dao.TableDao;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
@@ -32,20 +32,25 @@ public class TimeServerHandler extends ChannelInboundHandlerAdapter {
         ByteBuf buf = (ByteBuf) msg;
         byte[] req = new byte[buf.readableBytes()];
         buf.readBytes(req);
-        String body = new String(req, "UTF-8");
+        String body = new String(req, "UTF-8").trim();
         String currentTime = null;
-        if (body.equals("Time")) {
+        String split[] = body.split("==");
+        String action = split[0];
+        String params[] = new String[]{};
+        if (split.length > 1)
+            params = split[1].split("=");
+        if (action.equals("Time")) {
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             currentTime = df.format(new Date());
-        } else if (body.equals("getSchemaNames")) {
+        } else if (action.equals("getSchemaNames")) {
             BaseDao baseDao = new SchemaDao();
             String sql = "select * from DBS";
-            List<Schema> schemas = baseDao.loadT(sql, null);
+            List<Schema> schemas = baseDao.loadT(sql, params);
             currentTime = JSON.toJSONString(schemas);
-        } else if (body.equals("getTableNames")) {
-            BaseDao baseDao = new TblDao();
-            String sql = "select * from TBLS";
-            List<Table> schemas = baseDao.loadT(sql, null);
+        } else if (action.equals("getTableNames")) {
+            BaseDao baseDao = new TableDao();
+            String sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
+            List<Table> schemas = baseDao.loadT(sql, params);
             currentTime = JSON.toJSONString(schemas);
         } else {
             currentTime = "action default";

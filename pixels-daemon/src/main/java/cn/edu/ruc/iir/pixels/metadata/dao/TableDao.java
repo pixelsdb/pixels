@@ -11,12 +11,12 @@ import java.util.List;
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.metadata.dao
- * @ClassName: TblDao
+ * @ClassName: TableDao
  * @Description: TblsDao
  * @author: tao
  * @date: Create in 2018-01-26 10:37
  **/
-public class TblDao implements BaseDao<Table> {
+public class TableDao implements BaseDao<Table> {
     @Override
     public Table get(Serializable id) {
         return null;
@@ -29,7 +29,7 @@ public class TblDao implements BaseDao<Table> {
 
     @Override
     public List<Table> loadT(String sql, String[] params) {
-        ResultSet rs = db.getQuery(sql);
+        ResultSet rs = db.getQuery(sql, params);
         List<Table> l = new ArrayList<Table>();
         try {
             while (rs.next()) {

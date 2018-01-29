@@ -10,19 +10,20 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.presto.client
- * @ClassName: MetadataCLientHandler
+ * @ClassName: MetadataClientHandler
  * @Description:
  * @author: taoyouxian
  * @date: Create in 2018-01-26 15:13
  **/
-public class MetadataCLientHandler extends ChannelInboundHandlerAdapter {
+public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
     private final ByteBuf firstMSG;
 
     private ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<String>();
 
-    public MetadataCLientHandler(String action, ConcurrentLinkedQueue queue) {
+    public MetadataClientHandler(String action, ConcurrentLinkedQueue queue, String paras) {
         this.queue = queue;
-        byte[] req = action.getBytes();
+        String param = action + "==" + (paras != null ? paras : "");
+        byte[] req = param.getBytes();
         firstMSG = Unpooled.buffer(req.length);
         firstMSG.writeBytes(req);
     }

@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.metadata.util.dao;
 
 import cn.edu.ruc.iir.pixels.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.metadata.dao.SchemaDao;
+import cn.edu.ruc.iir.pixels.metadata.dao.TableDao;
 import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.metadata.domain.Table;
 import org.junit.Test;
@@ -27,6 +28,18 @@ public class TestDao {
         List<Schema> schemas = baseDao.loadT(sql);
         for (Schema s : schemas) {
             System.out.println(s.getScheId() + "\t" + s.getSchName() + "\t" + s.getSchDesc());
+        }
+    }
+
+    @Test
+    public void testTblDao() throws SQLException {
+        String params[] = new String[]{"default"};
+//        String params[] = new String[]{};
+        BaseDao baseDao = new TableDao();
+        String sql = "select * from TBLS " + ( params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" :  "");
+        List<Table> t = baseDao.loadT(sql, params);
+        for (Table s : t) {
+            System.out.println(s.toString());
         }
     }
 
