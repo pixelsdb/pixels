@@ -67,6 +67,6 @@ public class PixelsRecordSetProvider
             handles.add((PixelsColumnHandle) handle);
         }
         log.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
-        return new PixelsRecordSet(pixelsSplit, handles.build(), pixelsTable, fsFactory);
+        return new PixelsRecordSet(pixelsSplit, handles.build(), pixelsTable, fsFactory, pixelsSplit.getPath());
     }
 }

@@ -46,8 +46,9 @@ public class PixelsRecordSet
     private final SchemaTableName tableName;
     private final PixelsTable pixelsTable;
     private final FSFactory fsFactory;
+    private final String path;
 
-    public PixelsRecordSet(PixelsSplit split, List<PixelsColumnHandle> columnHandles, PixelsTable pixelsTable, FSFactory fsFactory) {
+    public PixelsRecordSet(PixelsSplit split, List<PixelsColumnHandle> columnHandles, PixelsTable pixelsTable, FSFactory fsFactory, String path) {
         requireNonNull(split, "split is null");
 
         this.effectivePredicate = split.getConstraint();
@@ -71,7 +72,8 @@ public class PixelsRecordSet
         this.tableName = split.toSchemaTableName();
         this.pixelsTable = requireNonNull(pixelsTable, "pixelsTable is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
-        log.info("PixelsRecordSet Constructor");
+        this.path = path;
+        log.info("PixelsRecordSet Constructor: " + path);
     }
 
     private final TupleDomain<PixelsColumnHandle> effectivePredicate;
@@ -84,6 +86,6 @@ public class PixelsRecordSet
     @Override
     public RecordCursor cursor() {
         log.info("new PixelsRecordCursor");
-        return new PixelsRecordCursor(pixelsTable, columnHandles, tableName, address, effectivePredicate, fsFactory);
+        return new PixelsRecordCursor(pixelsTable, columnHandles, tableName, address, effectivePredicate, fsFactory, path);
     }
 }
