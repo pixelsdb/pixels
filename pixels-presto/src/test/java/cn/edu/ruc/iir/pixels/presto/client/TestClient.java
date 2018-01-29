@@ -19,7 +19,7 @@ import java.util.Scanner;
 public class TestClient {
 
     public static void main(String[] args) {
-        String action = "getSchemaNames";
+        String action = "getTableNames";
         Scanner sc = new Scanner(System.in);
         System.out.print("Input your action: ");
         while (sc.hasNext()) {
@@ -29,7 +29,7 @@ public class TestClient {
             try {
                 new Thread(() -> {
                     try {
-                        client.connect(18888, "127.0.0.1");
+                        client.connect(18888, "127.0.0.1", "default");
                     } catch (Exception e) {
                         e.printStackTrace();
                     }

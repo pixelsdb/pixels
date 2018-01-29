@@ -32,7 +32,7 @@ public class TimeClient {
         return queue;
     }
 
-    public void connect(int port, String host) throws Exception {
+    public void connect(int port, String host, String paras) throws Exception {
         //配置客户端NIO 线程组
         EventLoopGroup group = new NioEventLoopGroup();
 
@@ -46,7 +46,7 @@ public class TimeClient {
                         @Override
                         protected void initChannel(SocketChannel ch) throws Exception {
                             ch.pipeline().addLast(
-                                    new MetadataCLientHandler(action, queue));
+                                    new MetadataClientHandler(action, queue, paras));
                         }
                     });
 

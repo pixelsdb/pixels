@@ -30,7 +30,7 @@ public class SchemaDao implements BaseDao<Schema> {
 
     @Override
     public List<Schema> loadT(String sql, String[] params) {
-        ResultSet rs = db.getQuery(sql, null);
+        ResultSet rs = db.getQuery(sql, params);
         List<Schema> l = new ArrayList<Schema>();
         try {
             while (rs.next()) {

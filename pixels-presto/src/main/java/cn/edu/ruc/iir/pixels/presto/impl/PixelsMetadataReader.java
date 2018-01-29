@@ -38,7 +38,7 @@ public class PixelsMetadataReader {
         try {
             new Thread(() -> {
                 try {
-                    client.connect(18888, "127.0.0.1");
+                    client.connect(18888, "127.0.0.1", null);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -71,7 +71,7 @@ public class PixelsMetadataReader {
         try {
             new Thread(() -> {
                 try {
-                    client.connect(18888, "127.0.0.1");
+                    client.connect(18888, "127.0.0.1", schemaName);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
