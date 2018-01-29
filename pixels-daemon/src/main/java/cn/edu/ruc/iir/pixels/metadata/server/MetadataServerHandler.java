@@ -13,19 +13,17 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.metadata.server
- * @ClassName: TimeServerHandler
+ * @ClassName: MetadataServerHandler
  * @Description:
  * @author: taoyouxian
  * @date: Create in 2018-01-26 15:11
  **/
-public class TimeServerHandler extends ChannelInboundHandlerAdapter {
+public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 //        System.out.println("Server -> read");
@@ -33,30 +31,27 @@ public class TimeServerHandler extends ChannelInboundHandlerAdapter {
         byte[] req = new byte[buf.readableBytes()];
         buf.readBytes(req);
         String body = new String(req, "UTF-8").trim();
-        String currentTime = null;
+        String curResponse = null;
         String split[] = body.split("==");
         String action = split[0];
         String params[] = new String[]{};
         if (split.length > 1)
-            params = split[1].split("=");
-        if (action.equals("Time")) {
-            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            currentTime = df.format(new Date());
-        } else if (action.equals("getSchemaNames")) {
+            params = split[1].split("&");
+        if (action.equals("getSchemaNames")) {
             BaseDao baseDao = new SchemaDao();
             String sql = "select * from DBS";
             List<Schema> schemas = baseDao.loadT(sql, params);
-            currentTime = JSON.toJSONString(schemas);
+            curResponse = JSON.toJSONString(schemas);
         } else if (action.equals("getTableNames")) {
             BaseDao baseDao = new TableDao();
             String sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
             List<Table> schemas = baseDao.loadT(sql, params);
-            currentTime = JSON.toJSONString(schemas);
+            curResponse = JSON.toJSONString(schemas);
         } else {
-            currentTime = "action default";
+            curResponse = "action default";
         }
         //response
-        ByteBuf resp = Unpooled.copiedBuffer(currentTime.getBytes());
+        ByteBuf resp = Unpooled.copiedBuffer(curResponse.getBytes());
         //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
         ChannelFuture future = ctx.writeAndFlush(resp);
         // Thread close

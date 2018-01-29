@@ -14,17 +14,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.presto.client
- * @ClassName: TimeClient
+ * @ClassName: MetadataClient
  * @Description: 时间服务器 客户端
  * @author: taoyouxian
  * @date: Create in 2018-01-26 15:13
  **/
-public class TimeClient {
+public class MetadataClient {
 
     private String action;
     private ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<String>();
 
-    public TimeClient(String action) {
+    public MetadataClient(String action) {
         this.action = action;
     }
 

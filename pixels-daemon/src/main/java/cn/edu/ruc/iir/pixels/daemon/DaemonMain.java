@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.LogFactory;
-import cn.edu.ruc.iir.pixels.metadata.server.TimeServer;
+import cn.edu.ruc.iir.pixels.metadata.server.MetadataServer;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -90,9 +90,12 @@ public class DaemonMain
         }
         else
         {
-            TimeServer server = new TimeServer();
+            ConfigFactory config = ConfigFactory.Instance();
+            int port = Integer.valueOf(config.getProperty("port"));
+            System.out.println("Metadata Server binding port " + port);
+            MetadataServer server = new MetadataServer();
             try {
-                server.bind(18888);
+                server.bind(port);
             } catch (Exception e) {
                 e.printStackTrace();
             }

@@ -25,7 +25,7 @@ public class TestClient {
         while (sc.hasNext()) {
             action = sc.next();
             System.out.println();
-            TimeClient client = new TimeClient(action);
+            MetadataClient client = new MetadataClient(action);
             try {
                 new Thread(() -> {
                     try {

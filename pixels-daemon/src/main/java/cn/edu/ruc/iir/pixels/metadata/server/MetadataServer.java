@@ -10,12 +10,12 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.metadata.server
- * @ClassName: TimeServer
+ * @ClassName: MetadataServer
  * @Description: 时间服务器 服务端
  * @author: taoyouxian
  * @date: Create in 2018-01-26 15:09
  **/
-public class TimeServer {
+public class MetadataServer {
     public void bind(int port) throws Exception {
         //配置服务端NIO 线程组
         EventLoopGroup boss = new NioEventLoopGroup();
