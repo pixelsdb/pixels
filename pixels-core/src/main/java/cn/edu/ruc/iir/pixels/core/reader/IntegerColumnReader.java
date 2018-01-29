@@ -1,7 +1,9 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
@@ -26,29 +28,28 @@ public class IntegerColumnReader
     }
 
     /**
-     * read int values
-     * @param input input bytes
-     * @return values (maybe should return ByteBuf or OutputStream?)
-     * @throws IOException io exception thrown by <code>RunLenIntDecoder</code>
-     * */
+     * Read input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param size     number of values to read
+     * @param vector   vector to read into
+     */
     @Override
-    public long[] readInts(byte[] input, boolean isEncoding, int num)
-            throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, ColumnVector vector) throws IOException
     {
         ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
         ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
-        long[] values = new long[num];
         // if run length encoded
-        if (isEncoding) {
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
             RunLenIntDecoder decoder = new RunLenIntDecoder(inputStream, true);
             ByteBufAllocator allocator = PooledByteBufAllocator.DEFAULT;
             ByteBuf buf = allocator.buffer();
-            while (decoder.hasNext()) {
-                buf.writeLong(decoder.next());
-                num++;
-            }
-            for (int i = 0; i < num; i++) {
-                values[i] = buf.getLong(i);
+            int readIdx = 0;
+            while (decoder.hasNext() && readIdx < size) {
+                vector.add(decoder.next());
+                readIdx++;
             }
             verify(!buf.isReadable());
             buf.release();
@@ -59,20 +60,19 @@ public class IntegerColumnReader
             boolean isLong = firstByte == (byte) 1;
             // if long
             if (isLong) {
-                for (int i = 0; i < num; i++) {
-                    values[i] = inputStream.readLong();
+                for (int i = 0; i < size; i++) {
+                    vector.add(inputStream.readLong());
                 }
             }
             // if int
             else {
-                for (int i = 0; i < num; i++) {
-                    values[i] = inputStream.readInt();
+                for (int i = 0; i < size; i++) {
+                    vector.add(inputStream.readInt());
                 }
             }
             verify(inputStream.available() == 0);
         }
         inputStream.close();
         inputBuffer.release();
-        return values;
     }
 }

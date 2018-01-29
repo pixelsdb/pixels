@@ -1,8 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
 import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
@@ -23,13 +25,22 @@ public class StringColumnReader
         super(type);
     }
 
+    /**
+     * Read values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param size     number of values to read
+     * @param vector   vector to read into
+     * @throws IOException
+     */
     @Override
-    public String[] readStrings(byte[] input, boolean isEncoding, int num) throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, ColumnVector vector) throws IOException
     {
         ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
-        String[] values = new String[num];
         // if dictionary encoded
-        if (isEncoding) {
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
             // read offsets
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(input.length - 12);
@@ -69,20 +80,20 @@ public class StringColumnReader
             origins[originNum - 1] = new String(tmp, Charset.forName("UTF-8"));
 
             // read encoded values
-            int[] encodedValues = new int[num];
+            int[] encodedValues = new int[size];
             RunLenIntDecoder decoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 encodedValues[i] = (int) decoder.next();
             }
 
             // read original bytes
-            for (int i = 0; i < num; i++) {
-                values[i] = origins[orders[encodedValues[i]]];
+            for (int i = 0; i < size; i++) {
+                vector.add(origins[orders[encodedValues[i]]]);
             }
         }
         // if un-encoded
         else {
-            int[] lens = new int[num];
+            int[] lens = new int[size];
             // read lens field offset
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(input.length - 4);
@@ -91,20 +102,19 @@ public class StringColumnReader
             // read lens field
             ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - 4 - lensOffset);
             RunLenIntDecoder decoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 lens[i] = (int) decoder.next();
             }
             // read strings
             ByteBuf contentBuf = inputBuffer.slice(0, lensOffset);
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 CharSequence str = contentBuf.readCharSequence(lens[i], Charset.forName("UTF-8"));
-                values[i] = str.toString();
+                vector.add(str.toString());
             }
             lensBuf.release();
             contentBuf.release();
         }
-        inputBuffer.release();
 
-        return values;
+        inputBuffer.release();
     }
 }

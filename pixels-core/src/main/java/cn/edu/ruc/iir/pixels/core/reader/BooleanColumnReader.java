@@ -1,6 +1,8 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -17,19 +19,27 @@ public class BooleanColumnReader
         super(type);
     }
 
-    public boolean[] readBooleans(byte[] input, int num)
+    /**
+     * Read input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param size     number of values to read
+     * @param vector   vector to read into
+     */
+    @Override
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, ColumnVector vector)
     {
-        boolean[] values = new boolean[num];
         int index = 0;
         // input byte length should be GE than (num * 8) and be L than (num + 1) * 8
-        checkArgument(input.length >= num * 8 && input.length < (num + 1) * 8,
+        checkArgument(input.length >= size * 8 && input.length < (size + 1) * 8,
                 "Input bytes length is not correct");
-        for (int i = 0; i < input.length && index < num; i++) {
+        for (int i = 0; i < input.length && index < size; i++) {
             for (int j = 7; j >= 0; j--) {
-                values[index] = ((0x1 << i) & input[i]) == (byte) 1;
+                vector.add(((0x1 << i) & input[i]) == (byte) 1);
                 index++;
             }
         }
-        return values;
     }
 }

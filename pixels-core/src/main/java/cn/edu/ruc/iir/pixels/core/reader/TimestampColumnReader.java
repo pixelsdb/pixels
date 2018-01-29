@@ -1,7 +1,9 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
@@ -23,39 +25,47 @@ public class TimestampColumnReader
         super(type);
     }
 
+    /**
+     * Read values from input buffer.
+     *
+     * @param input    input buffer
+     * @param encoding encoding type
+     * @param size     number of values to read
+     * @param vector   vector to read into
+     * @throws IOException
+     */
     @Override
-    public Timestamp[] readTimestamps(byte[] input, boolean isEncoding, int num) throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, ColumnVector vector) throws IOException
     {
         ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
         ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
-        Timestamp[] values = new Timestamp[num];
-        long[] times = new long[num];
-        int[] nanos = new int[num];
+        long[] times = new long[size];
+        int[] nanos = new int[size];
 
-        if (isEncoding) {
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
             RunLenIntDecoder decoder = new RunLenIntDecoder(inputStream, false);
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 times[i] = decoder.next();
             }
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 nanos[i] = (int) decoder.next();
             }
         }
         else {
-            for (int i = 0; i < num; i++) {
+            for (int i = 0; i < size; i++) {
                 times[i] = inputStream.readLong();
                 nanos[i] = inputStream.readInt();
             }
         }
 
-        for (int i = 0; i < num; i++) {
+        for (int i = 0; i < size; i++) {
             Timestamp timestamp = new Timestamp(times[i]);
             timestamp.setNanos(nanos[i]);
-            values[i] = timestamp;
+            vector.add(timestamp);
         }
 
         inputStream.close();
         inputBuffer.release();
-        return values;
     }
 }

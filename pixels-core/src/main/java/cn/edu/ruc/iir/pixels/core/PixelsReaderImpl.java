@@ -137,7 +137,7 @@ public class PixelsReaderImpl
     @Override
     public PixelsRecordReader read(PixelsReaderOption option)
     {
-        return new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
+        return new PixelsRecordReaderImpl(physicalFSReader, footer, option);
     }
 
     /**

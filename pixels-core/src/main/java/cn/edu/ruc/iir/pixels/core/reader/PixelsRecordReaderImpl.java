@@ -5,9 +5,11 @@ import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,30 +25,29 @@ public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
     private final PhysicalFSReader physicalFSReader;
-    private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
 
-    private TypeDescription fileSchema;
     private TypeDescription readerSchema;
     private boolean checkValid = false;
-    private boolean readValid = false;
+    private boolean everRead = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
-    private boolean[] includedRGs;       // row groups included by reader option; if included, set true
-    private int[] targetRGs;
-    private int[] targetColumns;
-    private int includedColumnsNum;
+    private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
+    private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
 
-    private ByteBuf[][] chunkBuffers;
+    private int readerCurRGIdx = 0;      // index of current reading row group in targetRGs
+    private int readerCurRGOffset = 0;   // starting index of values to read by reader in current row group
+
+    private PixelsProto.RowGroupFooter[] rowGroupFooters;
+    private ByteBuf[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private ColumnReader[] readers;      // column readers for each target columns
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
-                                  PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
                                   PixelsReaderOption option)
     {
         this.physicalFSReader = physicalFSReader;
-        this.postScript = postScript;
         this.footer = footer;
         this.option = option;
         checkBeforeRead();
@@ -60,7 +61,7 @@ public class PixelsRecordReaderImpl
             checkValid = false;
             return;
         }
-        this.fileSchema = TypeDescription.createSchema(colTypes);
+        TypeDescription fileSchema = TypeDescription.createSchema(colTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
             checkValid = false;
             return;
@@ -69,6 +70,7 @@ public class PixelsRecordReaderImpl
         // check if predicate matches file schema
 
         // get included columns
+        int includedColumnsNum = 0;
         String[] cols = option.getIncludedCols();
         List<String> colsList = ImmutableList.copyOf(cols);
         if (cols.length == 0) {
@@ -79,16 +81,23 @@ public class PixelsRecordReaderImpl
         for (int i = 0; i < colTypes.size(); i++) {
             if (colsList.contains(colTypes.get(i).getName())) {
                 includedColumns[i] = true;
+                includedColumnsNum++;
             }
         }
 
         // check included columns
-        for (boolean col : includedColumns) {
-            includedColumnsNum += col ? 1 : 0;
-        }
         if (includedColumnsNum != cols.length && !option.isTolerantSchemaEvolution()) {
             checkValid = false;
             return;
+        }
+
+        // assign target columns
+        targetColumns = new int[includedColumnsNum];
+        int targetColIdx = 0;
+        for (int i = 0; i < includedColumns.length; i++) {
+            if (includedColumns[i]) {
+                targetColumns[targetColIdx] = i;
+            }
         }
 
         // get reader schema
@@ -104,22 +113,29 @@ public class PixelsRecordReaderImpl
             return;
         }
 
+        // get column readers
+        readers = new ColumnReader[includedColumnsNum];
+        List<TypeDescription> columnSchemas = readerSchema.getChildren();
+        for (int i = 0; i < includedColumnsNum; i++) {
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(i));
+        }
+
         checkValid = true;
     }
 
-    private void read()
+    private boolean read()
     {
         if (!checkValid) {
-            readValid = false;
-            return;
+            return false;
         }
+
+        everRead = true;
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
                 = footer.getRowGroupStatsList();
-        this.includedRGs = new boolean[rowGroupStatistics.size()];
+        boolean[] includedRGs = new boolean[rowGroupStatistics.size()];
         if (includedRGs.length == 0) {
-            readValid = false;
-            return;
+            return false;
         }
 
         // read row group statistics and find target row groups
@@ -135,7 +151,7 @@ public class PixelsRecordReaderImpl
         }
 
         // read row group footers
-        PixelsProto.RowGroupFooter[] rowGroupFooters =
+        rowGroupFooters =
                 new PixelsProto.RowGroupFooter[includedRGs.length];
         for (int i = 0; i < includedRGs.length; i++) {
             if (includedRGs[i]) {
@@ -152,26 +168,18 @@ public class PixelsRecordReaderImpl
                 }
                 catch (IOException e) {
                     e.printStackTrace();
-                    readValid = false;
-                    return;
+                    return false;
                 }
             }
         }
 
         // read chunk offset and length of each target column chunks
         List<ChunkId> chunks = new ArrayList<>();
-        targetColumns = new int[includedColumnsNum];      // index of included columns
-        int targetColumnsIdx = 0;
-        for (int i = 0; i < includedColumns.length; i++) {
-            if (includedColumns[i]) {
-                targetColumns[targetColumnsIdx] = i;
-            }
-        }
         for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
             PixelsProto.RowGroupIndex rowGroupIndex =
                     rowGroupFooters[rgIdx].getRowGroupIndexEntry();
             for (int targetColIdx = 0; targetColIdx < targetColumns.length; targetColIdx++) {
-                int colIdx = targetColumns[targetColumnsIdx];
+                int colIdx = targetColumns[targetColIdx];
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupIndex.getColumnChunkIndexEntries(colIdx);
                 ChunkId chunk = new ChunkId(rgIdx, colIdx,
@@ -196,6 +204,29 @@ public class PixelsRecordReaderImpl
 
         // read chunk blocks into buffers
         this.chunkBuffers = new ByteBuf[includedRGs.length][includedColumns.length];
+        try {
+            for (ChunkBlock block : chunkBlocks) {
+                int offset = (int) block.getOffset();
+                int length = (int) block.getLength();
+                byte[] chunkBlockBuffer = new byte[length];
+                physicalFSReader.readFully(chunkBlockBuffer, offset, length);
+                ByteBuf chunkBlockBuf = Unpooled.wrappedBuffer(chunkBlockBuffer);
+                List<ChunkId> chunkIds = block.getSortedChunks();
+                int chunkSliceOffset = 0;
+                for (ChunkId chunkId : chunkIds) {
+                    int chunkLength = (int) chunkId.getLength();
+                    int rgId = chunkId.getRowGroupId();
+                    int colId = chunkId.getColumnId();
+                    ByteBuf chunkBuf = chunkBlockBuf.slice(chunkSliceOffset, chunkLength);
+                    chunkBuffers[rgId][colId] = chunkBuf;
+                }
+            }
+        }
+        catch (IOException e) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -208,9 +239,44 @@ public class PixelsRecordReaderImpl
     @Override
     public boolean nextBatch(VectorizedRowBatch batch) throws IOException
     {
-        if (!checkValid || !readValid) {
+        if (!checkValid) {
             return false;
         }
+
+        if (!everRead) {
+            if (!read()) {
+                return false;
+            }
+        }
+
+        ColumnVector[] columnVectors = batch.cols;
+        if (columnVectors.length != includedColumns.length) {
+            return false;
+        }
+
+        PixelsProto.RowGroupInformation rowGroupInformation =
+                footer.getRowGroupInfos(targetRGs[readerCurRGIdx]);
+        int curBatchSize = (int) rowGroupInformation.getNumberOfRows() - readerCurRGOffset;
+        if (batch.size + curBatchSize >= batch.getMaxSize()) {
+            curBatchSize = batch.getMaxSize() - batch.size;
+        }
+
+        // add record
+        for (int i = 0; i < includedColumns.length; i++) {
+            PixelsProto.ColumnEncoding encoding =
+                    rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
+                            .getColumnEncodings(targetColumns[i]);
+            byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumns[i]].array();
+            readers[i].read(input, encoding, readerCurRGOffset, curBatchSize, columnVectors[i]);
+        }
+
+        readerCurRGOffset += curBatchSize;
+        rowIndex += curBatchSize;
+        if (readerCurRGOffset >= rowGroupInformation.getNumberOfRows()) {
+            readerCurRGIdx++;
+            readerCurRGOffset = 0;
+        }
+
         return true;
     }
 
@@ -266,7 +332,6 @@ public class PixelsRecordReaderImpl
 
     /**
      * Cleanup and release resources
-     *
      */
     @Override
     public void close()

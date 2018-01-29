@@ -1,6 +1,9 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -46,55 +49,33 @@ public abstract class ColumnReader
         }
     }
 
-    public byte[][] readBinaries(byte[] input, boolean isEncoding, int num)
+    /**
+     * Read values from input buffer.
+     * All values are gonna be put into the specified vector.
+     * @param input input buffer
+     * @param encoding encoding type
+     * @param size number of values to read
+     * @param vector vector to read into
+     * @throws java.io.IOException
+     * */
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                              int size, ColumnVector vector) throws IOException
     {
-        throw new UnsupportedOperationException("Cannot read binaries");
+        read(input, encoding, 0, size, vector);
     }
 
-    public boolean[] readBooleans(byte[] input, int num)
-    {
-        throw new UnsupportedOperationException("Cannot read booleans");
-    }
-
-    public byte[] readBytes(byte[] input, boolean isEncoding, int num)
-    {
-        throw new UnsupportedOperationException("Cannot read bytes");
-    }
-
-    public char[] readChars(byte[] input, boolean isEncoding, int num)
-    {
-        throw new UnsupportedOperationException("Cannot read chars");
-    }
-
-    public double[] readDoubles(byte[] input, int num) throws IOException
-    {
-        throw new UnsupportedOperationException("Cannot read doubles");
-    }
-
-    public float[] readFloats(byte[] input, int num) throws IOException
-    {
-        throw new UnsupportedOperationException("Cannot read floats");
-    }
-
-    public long[] readInts(byte[] input, boolean isEncoding, int num) throws IOException
-    {
-        throw new UnsupportedOperationException("Cannot read integers");
-    }
-
-    public String[] readStrings(byte[] input, boolean isEncoding, int num) throws IOException
-    {
-        throw new UnsupportedOperationException("Cannot read strings");
-    }
-
-    public Timestamp[] readTimestamps(byte[] input, boolean isEncoding, int num) throws IOException
-    {
-        throw new UnsupportedOperationException("Cannot read timestamps");
-    }
-
-    public char[][] readVarchars(byte[] input, boolean isEncoding, int num)
-    {
-        throw new UnsupportedOperationException("Cannot read varchars");
-    }
+    /**
+     * Read values from input buffer.
+     * Values after specified offset are gonna be put into the specified vector.
+     * @param input input buffer
+     * @param encoding encoding type
+     * @param offset starting reading offset of values
+     * @param size number of values to read
+     * @param vector vector to read into
+     * @throws java.io.IOException
+     * */
+    public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                              int offset, int size, ColumnVector vector) throws IOException;
 
     public ColumnReader(TypeDescription type)
     {
