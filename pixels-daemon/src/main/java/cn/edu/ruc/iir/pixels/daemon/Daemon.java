@@ -103,7 +103,7 @@ public class Daemon implements Runnable
 
         } catch (Exception e)
         {
-            LogFactory.Instance().getLog().error("Exception when running.", e);
+            LogFactory.Instance().getLog().error("exception when running.", e);
         }
     }
 }

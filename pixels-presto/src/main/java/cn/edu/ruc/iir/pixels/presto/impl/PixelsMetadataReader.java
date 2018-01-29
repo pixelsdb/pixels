@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.metadata.MetadataService;
-import cn.edu.ruc.iir.pixels.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
