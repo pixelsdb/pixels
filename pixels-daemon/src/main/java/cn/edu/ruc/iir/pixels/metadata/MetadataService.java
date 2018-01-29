@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.Metadata;
+package cn.edu.ruc.iir.pixels.metadata;
 
 import com.facebook.presto.spi.ColumnMetadata;
 

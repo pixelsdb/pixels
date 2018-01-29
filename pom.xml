@@ -67,6 +67,8 @@
         <dep.jackson.version>2.8.1</dep.jackson.version>
         <dep.junit.version>4.12</dep.junit.version>
         <dep.java.inject.version>1</dep.java.inject.version>
+        <dep.mysql.version>5.1.38</dep.mysql.version>
+        <dep.json.version>1.2.31</dep.json.version>
         <dep.netty.version>4.1.19.Final</dep.netty.version>
         <dep.google.inject.version>4.0</dep.google.inject.version>
         <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
@@ -76,6 +78,18 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>fastjson</artifactId>
+                <version>${dep.json.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>${dep.mysql.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>cn.edu.ruc.iir</groupId>
                 <artifactId>pixels-core</artifactId>

@@ -24,6 +24,7 @@ import io.airlift.log.Logger;
 
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -135,29 +136,19 @@ public class PixelsSplit
 
         PixelsSplit that = (PixelsSplit) o;
 
-        if (start != that.start) return false;
-        if (len != that.len) return false;
-        if (log != null ? !log.equals(that.log) : that.log != null) return false;
-        if (connectorId != null ? !connectorId.equals(that.connectorId) : that.connectorId != null) return false;
-        if (schemaName != null ? !schemaName.equals(that.schemaName) : that.schemaName != null) return false;
-        if (tableName != null ? !tableName.equals(that.tableName) : that.tableName != null) return false;
-        if (path != null ? !path.equals(that.path) : that.path != null) return false;
-        if (addresses != null ? !addresses.equals(that.addresses) : that.addresses != null) return false;
-        return constraint != null ? constraint.equals(that.constraint) : that.constraint == null;
+        return Objects.equals(this.connectorId, that.connectorId) &&
+                Objects.equals(this.schemaName, that.schemaName) &&
+                Objects.equals(this.tableName, that.tableName) &&
+                Objects.equals(this.path, that.path) &&
+                Objects.equals(this.start, that.start) &&
+                Objects.equals(this.len, that.len) &&
+                Objects.equals(this.addresses, that.addresses) &&
+                Objects.equals(this.constraint, that.constraint);
     }
 
     @Override
     public int hashCode() {
-        int result = log != null ? log.hashCode() : 0;
-        result = 31 * result + (connectorId != null ? connectorId.hashCode() : 0);
-        result = 31 * result + (schemaName != null ? schemaName.hashCode() : 0);
-        result = 31 * result + (tableName != null ? tableName.hashCode() : 0);
-        result = 31 * result + (path != null ? path.hashCode() : 0);
-        result = 31 * result + (int) (start ^ (start >>> 32));
-        result = 31 * result + (int) (len ^ (len >>> 32));
-        result = 31 * result + (addresses != null ? addresses.hashCode() : 0);
-        result = 31 * result + (constraint != null ? constraint.hashCode() : 0);
-        return result;
+        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, constraint);
     }
 
     @Override

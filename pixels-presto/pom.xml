@@ -15,6 +15,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
             <!--<scope>provided</scope>-->
