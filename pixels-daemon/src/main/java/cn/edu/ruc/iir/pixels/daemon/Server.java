@@ -4,5 +4,5 @@ public interface Server extends Runnable
 {
     public boolean isRunning();
 
-    public void shutDownServer ();
+    public void shutdown();
 }
