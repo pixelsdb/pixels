@@ -50,6 +50,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         } else {
             curResponse = "action default";
         }
+
         //response
         ByteBuf resp = Unpooled.copiedBuffer(curResponse.getBytes());
         //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
