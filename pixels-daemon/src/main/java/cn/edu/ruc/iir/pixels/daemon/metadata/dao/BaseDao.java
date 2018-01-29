@@ -21,13 +21,13 @@ public interface BaseDao<T> {
 
     List<T> find(String sql);
 
-    List<T> loadT(String sql, String[] params);
+    List<T> loadAll(String sql, String[] params);
 
     boolean update(String sql, String[] params);
 
     List<T> find(T o);
 
-    List<T> loadT(T o);
+    List<T> loadAll(T o);
 
     boolean update(T o, String[] params);
 
