@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import io.airlift.configuration.Config;
 
 import javax.validation.constraints.NotNull;
@@ -53,6 +54,8 @@ public class PixelsConfig {
     }
 
     public String getHDFSWarehouse() {
-        return "hdfs://presto00:9000/";
+        ConfigFactory config = ConfigFactory.Instance();
+        String warehouse = config.getProperty("HDFSWarehouse");
+        return warehouse;
     }
 }

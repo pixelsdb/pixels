@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.toSet;
  **/
 public class PixelsRecordCursor
         implements RecordCursor {
-    static Logger logger = Logger.get(PixelsRecordCursor.class);
+    private static Logger logger = Logger.get(PixelsRecordCursor.class);
     private static final Splitter LINE_SPLITTER = Splitter.on(",").trimResults();
 
     // TODO This should be a config option as it may be different for different log files
@@ -77,8 +77,9 @@ public class PixelsRecordCursor
     private final FilesReader reader;
     private List<String> fields;
     private static FSFactory fsFactory;
+    private static String path;
 
-    public PixelsRecordCursor(PixelsTable pixelsTable, List<PixelsColumnHandle> columns, SchemaTableName tableName, HostAddress address, TupleDomain<PixelsColumnHandle> predicate, FSFactory fsFactory) {
+    public PixelsRecordCursor(PixelsTable pixelsTable, List<PixelsColumnHandle> columns, SchemaTableName tableName, HostAddress address, TupleDomain<PixelsColumnHandle> predicate, FSFactory fsFactory, String path) {
         this.columns = requireNonNull(columns, "columns is null");
         this.address = requireNonNull(address, "address is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
@@ -87,8 +88,9 @@ public class PixelsRecordCursor
         for (int i = 0; i < columns.size(); i++) {
             PixelsColumnHandle columnHandle = columns.get(i);
             fieldToColumnIndex[i] = columnHandle.getOrdinalPosition();
-            logger.info("columns" + columns.get(i).getColumnName());
+            logger.info("columns: " + columns.get(i).getColumnName());
         }
+        this.path = path;
         logger.info("getFilesReader begin");
         this.reader = getFilesReader(pixelsTable, tableName, predicate);
         logger.info("PixelsRecordCursor Constructor");
@@ -96,9 +98,12 @@ public class PixelsRecordCursor
 
     private static FilesReader getFilesReader(PixelsTable pixelsTable, SchemaTableName tableName, TupleDomain<PixelsColumnHandle> predicate) {
         PixelsTableHandle table = pixelsTable.getTableHandle();
-        String path = table.getPath();
+//        String path = table.getPath();
         logger.info("PixelsRecordCursor path: " + path);
-        List<Path> fileNames = fsFactory.listFiles(path);
+//        List<Path> fileNames = fsFactory.listFiles(path);
+        List<Path> fileNames = new ArrayList<>();
+        fileNames.add(new Path(path));
+        logger.info("PixelsRecordCursor fileNames size: " + fileNames.size());
         try {
             return new FilesReader(OptionalInt.empty(), fileNames.iterator(), predicate);
         } catch (IOException e) {
@@ -203,7 +208,7 @@ public class PixelsRecordCursor
     }
 
     private static class FilesReader {
-        static Logger logger = Logger.get(FilesReader.class);
+        private static Logger logger = Logger.get(FilesReader.class);
         private final Iterator<Path> files;
         private final Optional<Domain> domain;
         private final OptionalInt timestampOrdinalPosition;
