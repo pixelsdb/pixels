@@ -1,8 +1,10 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.BaseDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.CatalogDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Catalog;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
@@ -32,21 +34,28 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         buf.readBytes(req);
         String body = new String(req, "UTF-8").trim();
         String curResponse = null;
+        String sql = null;
         String split[] = body.split("==");
         String action = split[0];
         String params[] = new String[]{};
+        System.out.println("Action: " + action);
         if (split.length > 1)
             params = split[1].split("&");
-        if (action.equals("getSchemaNames")) {
+        if (action.equals("getSchemas")) {
             BaseDao baseDao = new SchemaDao();
-            String sql = "select * from DBS";
-            List<Schema> schemas = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(schemas);
-        } else if (action.equals("getTableNames")) {
+            sql = "select * from DBS";
+            List<Schema> schemaList = baseDao.loadAll(sql, params);
+            curResponse = JSON.toJSONString(schemaList);
+        } else if (action.equals("getTables")) {
             BaseDao baseDao = new TableDao();
-            String sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
-            List<Table> schemas = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(schemas);
+            sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
+            List<Table> tableList = baseDao.loadAll(sql, params);
+            curResponse = JSON.toJSONString(tableList);
+        } else if (action.equals("getCatalogs")) {
+            BaseDao baseDao = new CatalogDao();
+            sql = "select * from CATALOG " + (params.length > 0 ? "where LAYOUTS_LAYOUT_ID in (select LAYOUT_ID from LAYOUTS where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) )" : "");
+            List<Catalog> catalogList = baseDao.loadAll(sql, params);
+            curResponse = JSON.toJSONString(catalogList);
         } else {
             curResponse = "action default";
         }
