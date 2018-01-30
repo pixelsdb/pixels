@@ -13,3 +13,4 @@ core-site.xml
 hdfs-site.xml
 mvnw.cmd
 logs/
+package-info.java
