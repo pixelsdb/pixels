@@ -25,6 +25,7 @@ public class ConfigFactory
 			{
 				pixelsHome += "/";
 			}
+			prop.setProperty("pixels.home", pixelsHome);
 			try
 			{
 				in = new FileInputStream(pixelsHome + "pixels.properties");

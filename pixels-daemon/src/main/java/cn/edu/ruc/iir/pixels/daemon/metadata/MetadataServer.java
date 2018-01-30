@@ -59,11 +59,12 @@ public class MetadataServer implements Server {
                     .childHandler(new ChildChannelInitializer());
 
             //绑定端口, 同步等待成功
+            //System.out.println("port: " + port);
+            this.running = true;
             ChannelFuture future = server.bind(port).sync();
 
             //等待服务端监听端口关闭
             future.channel().closeFuture().sync();
-            this.running = true;
         } catch (InterruptedException e)
         {
             LogFactory.Instance().getLog().error("error while binding port in metadata server.", e);

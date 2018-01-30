@@ -16,8 +16,10 @@ public class DaemonMain
         {
             String mainFile = ConfigFactory.Instance().getProperty("file.lock.main");
             String guardFile = ConfigFactory.Instance().getProperty("file.lock.guard");
-            String daemonJarPath = ConfigFactory.Instance().getProperty("rainbow.home") +
+            String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") +
                     ConfigFactory.Instance().getProperty("daemon.jar");
+
+//            System.out.println(daemonJarPath);
 
             if (args[0].equalsIgnoreCase("main"))
             {
