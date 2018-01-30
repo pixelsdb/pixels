@@ -19,7 +19,7 @@ import java.util.Scanner;
 public class TestClient {
 
     public static void main(String[] args) {
-        String action = "getTableNames";
+        String action = "getTables";
         Scanner sc = new Scanner(System.in);
         System.out.print("Input your action: ");
         while (sc.hasNext()) {
@@ -27,13 +27,11 @@ public class TestClient {
             System.out.println();
             MetadataClient client = new MetadataClient(action);
             try {
-                new Thread(() -> {
-                    try {
-                        client.connect(18888, "127.0.0.1", "default");
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }).start();
+                try {
+                    client.connect(18888, "127.0.0.1", "default");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 System.out.println("Begin: " + DateUtil.formatTime(new Date()));
                 while (true) {
                     int count = client.getQueue().size();
@@ -41,10 +39,10 @@ public class TestClient {
                         String res = client.getQueue().poll();
                         if (action.equals("Time")) {
                             System.out.println(res);
-                        } else if (action.equals("getSchemaNames")) {
+                        } else if (action.equals("getSchemas")) {
                             List<Schema> schemas = JSON.parseArray(res, Schema.class);
                             System.out.println(schemas.size());
-                        } else if (action.equals("getTableNames")) {
+                        } else if (action.equals("getTables")) {
                             System.out.println(res);
                         } else {
                             System.out.println(res);

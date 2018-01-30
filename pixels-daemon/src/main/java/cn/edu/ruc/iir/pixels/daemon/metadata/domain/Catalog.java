@@ -10,7 +10,7 @@ import java.io.Serializable;
  * @author: tao
  * @date: Create in 2018-01-26 10:10
  **/
-public class Catalog implements Serializable{
+public class Catalog implements Serializable {
 
     private int cataId;
     private String cataPath;
@@ -47,5 +47,14 @@ public class Catalog implements Serializable{
 
     public void setCl(Layout cl) {
         this.cl = cl;
+    }
+
+    @Override
+    public String toString() {
+        return "Catalog{" +
+                "cataId=" + cataId +
+                ", cataPath='" + cataPath + '\'' +
+                ", cl=" + cl +
+                '}';
     }
 }
