@@ -5,11 +5,11 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface DoubleColumnStats
+public interface DoubleColumnStats extends RangeStats<Double>
 {
-    double getMinimum();
+    Double getMinimum();
 
-    double getMaximum();
+    Double getMaximum();
 
     double getSum();
 }

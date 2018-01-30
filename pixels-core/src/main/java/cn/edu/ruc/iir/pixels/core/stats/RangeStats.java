@@ -5,9 +5,9 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface BooleanColumnStats
+public interface RangeStats<T>
 {
-    long getFalseCount();
+    T getMinimum();
 
-    long getTrueCount();
+    T getMaximum();
 }

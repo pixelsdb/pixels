@@ -9,7 +9,8 @@ import java.sql.Timestamp;
  *
  * @author guodong
  */
-public class TimestampStatsRecorder extends StatsRecorder implements TimestampColumnStats
+public class TimestampStatsRecorder
+        extends StatsRecorder implements TimestampColumnStats
 {
     private boolean hasMinimum = false;
     private long minimum = Long.MAX_VALUE;
@@ -116,13 +117,13 @@ public class TimestampStatsRecorder extends StatsRecorder implements TimestampCo
     }
 
     @Override
-    public long getMinimum()
+    public Long getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public long getMaximum()
+    public Long getMaximum()
     {
         return maximum;
     }
