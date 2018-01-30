@@ -15,6 +15,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Pixels file reader default implementation
  *
@@ -53,23 +55,25 @@ public class PixelsReaderImpl
         private FileSystem builderFS = null;
         private Path builderPath = null;
         private TypeDescription builderSchema = null;
-        // todo add layouts information
+
+        private Builder()
+        {}
 
         public Builder setFS(FileSystem fs)
         {
-            this.builderFS = fs;
+            this.builderFS = requireNonNull(fs);
             return this;
         }
 
         public Builder setPath(Path path)
         {
-            this.builderPath = path;
+            this.builderPath = requireNonNull(path);
             return this;
         }
 
         public Builder setSchema(TypeDescription schema)
         {
-            this.builderSchema = schema;
+            this.builderSchema = requireNonNull(schema);
             return this;
         }
 
@@ -80,7 +84,7 @@ public class PixelsReaderImpl
                 throw new IllegalArgumentException("Missing argument to build PixelsReader");
             }
             // get PhysicalFSReader
-            PhysicalFSReader fsReader = PhysicalFSReaderUtil.newPhysicalFSReader(builderFS, builderPath);
+            PhysicalFSReader fsReader = PhysicalReaderUtil.newPhysicalFSReader(builderFS, builderPath);
             if (fsReader == null) {
                 LOGGER.error("Failed to create PhysicalFSReader");
                 throw new PixelsReaderException("Failed to create PixelsReader due to error of creating PhysicalFSReader");

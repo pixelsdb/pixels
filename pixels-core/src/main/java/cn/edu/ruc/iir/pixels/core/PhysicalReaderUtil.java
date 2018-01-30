@@ -11,9 +11,9 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class PhysicalFSReaderUtil
+public class PhysicalReaderUtil
 {
-    private PhysicalFSReaderUtil()
+    private PhysicalReaderUtil()
     {}
 
     public static PhysicalFSReader newPhysicalFSReader(FileSystem fs, Path path)

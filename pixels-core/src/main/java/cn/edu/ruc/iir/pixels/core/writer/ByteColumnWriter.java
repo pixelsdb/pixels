@@ -93,4 +93,15 @@ public class ByteColumnWriter extends BaseColumnWriter
         lastPixelPosition = curPixelPosition;
         pixelStatRecorder.reset();
     }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (isEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
 }

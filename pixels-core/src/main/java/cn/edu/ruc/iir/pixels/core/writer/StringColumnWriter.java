@@ -38,19 +38,22 @@ public class StringColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
     private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final StringRedBlackTree dictionary = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
-    private boolean useDictionaryEncoding;
+    private boolean futureUseDictionaryEncoding;
+    private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
 
     public StringColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
-        this.useDictionaryEncoding = isEncoding;
+        this.futureUseDictionaryEncoding = isEncoding;
+        this.currentUseDictionaryEncoding = isEncoding;
         encoder = new RunLenIntEncoder(false, true);
     }
 
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
+        currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         byte[][] values = columnVector.vector;
         int[] vLens = columnVector.length;
@@ -59,7 +62,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             while ((curPixelEleCount + nextPartLength) >= pixelStride) {
                 curPartLength = pixelStride - curPixelEleCount;
                 for (int i = 0; i < curPartLength; i++) {
@@ -132,7 +135,7 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             // for dictionary encoding. run length encode again.
             outputStream.write(encoder.encode(curPixelVector));
         }
@@ -161,12 +164,23 @@ public class StringColumnWriter extends BaseColumnWriter
             checkDictionaryEncoding();
         }
         // flush out other fields
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             flushDictionary();
         }
         else {
             flushLens();
         }
+    }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (currentUseDictionaryEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     private void flushLens() throws IOException
@@ -232,7 +246,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         int valueNum = outputStream.size() / Integer.BYTES;
         float ratio = valueNum > 0 ? (float) dictionary.size() / valueNum : 0.0f;
-        useDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
+        futureUseDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
         doneDictionaryEncodingCheck = true;
     }
 }

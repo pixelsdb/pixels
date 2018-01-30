@@ -23,6 +23,8 @@ public interface ColumnWriter
 
     PixelsProto.ColumnStatistic.Builder getColumnChunkStat();
 
+    PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding();
+
     StatsRecorder getColumnChunkStatRecorder();
 
     void reset();

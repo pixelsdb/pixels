@@ -265,7 +265,7 @@ public class PixelsRecordReaderImpl
         for (int i = 0; i < includedColumns.length; i++) {
             PixelsProto.ColumnEncoding encoding =
                     rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
-                            .getColumnEncodings(targetColumns[i]);
+                            .getColumnChunkEncodings(targetColumns[i]);
             byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumns[i]].array();
             readers[i].read(input, encoding, readerCurRGOffset, curBatchSize, columnVectors[i]);
         }

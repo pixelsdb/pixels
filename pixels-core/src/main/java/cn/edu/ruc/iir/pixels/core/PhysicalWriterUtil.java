@@ -11,9 +11,9 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class PhysicalFSWriterUtil
+public class PhysicalWriterUtil
 {
-    private PhysicalFSWriterUtil()
+    private PhysicalWriterUtil()
     {}
 
     /**
@@ -25,7 +25,7 @@ public class PhysicalFSWriterUtil
      * @param addBlockPadding add block padding or not
      * @return physical writer
      * */
-    public static PhysicalWriter newPhysicalFSWriter(
+    public static PhysicalFSWriter newPhysicalFSWriter(
             FileSystem fs, Path path, long blockSize, short replication, boolean addBlockPadding)
     {
         FSDataOutputStream rawWriter = null;

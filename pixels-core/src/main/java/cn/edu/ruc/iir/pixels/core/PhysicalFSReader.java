@@ -43,6 +43,24 @@ public class PhysicalFSReader
     }
 
     @Override
+    public int readInt() throws IOException
+    {
+        return rawReader.readInt();
+    }
+
+    @Override
+    public int read(byte[] buffer) throws IOException
+    {
+        return rawReader.read(buffer);
+    }
+
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException
+    {
+        return rawReader.read(buffer, offset, length);
+    }
+
+    @Override
     public void readFully(byte[] buffer) throws IOException
     {
         rawReader.readFully(buffer);

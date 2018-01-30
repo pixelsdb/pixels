@@ -30,6 +30,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TimeZone;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Pixels file writer default implementation
  *
@@ -116,9 +118,12 @@ public class PixelsWriterImpl
         private boolean builderBlockPadding = true;
         private boolean encoding = true;
 
+        private Builder()
+        {}
+
         public Builder setSchema(TypeDescription schema)
         {
-            this.builderSchema = schema;
+            this.builderSchema = requireNonNull(schema);
 
             return this;
         }
@@ -139,7 +144,7 @@ public class PixelsWriterImpl
 
         public Builder setCompressionKind(CompressionKind compressionKind)
         {
-            this.builderCompressionKind = compressionKind;
+            this.builderCompressionKind = requireNonNull(compressionKind);
 
             return this;
         }
@@ -153,21 +158,21 @@ public class PixelsWriterImpl
 
         public Builder setTimeZone(TimeZone timeZone)
         {
-            this.builderTimeZone = timeZone;
+            this.builderTimeZone = requireNonNull(timeZone);
 
             return this;
         }
 
         public Builder setFS(FileSystem fs)
         {
-            this.builderFS = fs;
+            this.builderFS = requireNonNull(fs);
 
             return this;
         }
 
         public Builder setFilePath(Path filePath)
         {
-            this.builderFilePath = filePath;
+            this.builderFilePath = requireNonNull(filePath);
 
             return this;
         }
@@ -202,7 +207,7 @@ public class PixelsWriterImpl
 
         public PixelsWriter build() throws PixelsWriterException
         {
-            PhysicalWriter fsWriter = PhysicalFSWriterUtil.newPhysicalFSWriter(
+            PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
 
             if (fsWriter == null) {
@@ -262,11 +267,6 @@ public class PixelsWriterImpl
         return encoding;
     }
 
-    public ColumnWriter[] getColumnWriters()
-    {
-        return columnWriters;
-    }
-
     /**
      * Add a row batch
      * Repeating is not supported currently in ColumnVector
@@ -309,9 +309,7 @@ public class PixelsWriterImpl
         } catch (IOException e)
         {
             LOGGER.error(e.getMessage());
-            System.out.println("Error writing file tail out.");
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
@@ -326,6 +324,8 @@ public class PixelsWriterImpl
                 PixelsProto.RowGroupInformation.newBuilder();
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
                 PixelsProto.RowGroupIndex.newBuilder();
+        PixelsProto.RowGroupEncoding.Builder curRowGroupEncoding =
+                PixelsProto.RowGroupEncoding.newBuilder();
 
         // reset each column writer and get current row group content size in bytes
         for (ColumnWriter writer : columnWriters)
@@ -352,7 +352,7 @@ public class PixelsWriterImpl
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
-            System.exit(-1);
+            return;
         }
 
         // update index and stats
@@ -368,6 +368,8 @@ public class PixelsWriterImpl
             curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
             // collect columnChunkStatistic into rowGroupStatistic
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
+            // collect columnChunkEncoding
+            curRowGroupEncoding.addColumnChunkEncodings(writer.getColumnChunkEncoding().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             // call children writer reset()
@@ -389,7 +391,7 @@ public class PixelsWriterImpl
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
-            System.exit(-1);
+            return;
         }
 
         // update RowGroupInformation, and put it into rowGroupInfoList
@@ -459,11 +461,13 @@ public class PixelsWriterImpl
         physicalWriter.flush();
     }
 
-    private void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
+    public static void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
     {
         List<TypeDescription> children = schema.getChildren();
         List<String> names = schema.getFieldNames();
-        assert children != null;
+        if (children == null || children.isEmpty()) {
+            return;
+        }
         for (int i = 0; i < children.size(); i++)
         {
             PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();
