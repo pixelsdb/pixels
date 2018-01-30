@@ -40,12 +40,12 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         if (action.equals("getSchemaNames")) {
             BaseDao baseDao = new SchemaDao();
             String sql = "select * from DBS";
-            List<Schema> schemas = baseDao.loadT(sql, params);
+            List<Schema> schemas = baseDao.loadAll(sql, params);
             curResponse = JSON.toJSONString(schemas);
         } else if (action.equals("getTableNames")) {
             BaseDao baseDao = new TableDao();
             String sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
-            List<Table> schemas = baseDao.loadT(sql, params);
+            List<Table> schemas = baseDao.loadAll(sql, params);
             curResponse = JSON.toJSONString(schemas);
         } else {
             curResponse = "action default";

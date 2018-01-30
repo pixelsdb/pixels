@@ -28,7 +28,7 @@ public class TableDao implements BaseDao<Table> {
     }
 
     @Override
-    public List<Table> loadT(String sql, String[] params) {
+    public List<Table> loadAll(String sql, String[] params) {
         ResultSet rs = db.getQuery(sql, params);
         List<Table> l = new ArrayList<Table>();
         try {
@@ -56,7 +56,7 @@ public class TableDao implements BaseDao<Table> {
     }
 
     @Override
-    public List<Table> loadT(Table o) {
+    public List<Table> loadAll(Table o) {
         return null;
     }
 

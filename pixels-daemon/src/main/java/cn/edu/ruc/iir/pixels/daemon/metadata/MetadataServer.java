@@ -20,6 +20,8 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 public class MetadataServer implements Server {
     private boolean running = false;
     private int port;
+    private EventLoopGroup boss = null;
+    private EventLoopGroup worker = null;
 
     public MetadataServer(int port)
     {
@@ -37,14 +39,16 @@ public class MetadataServer implements Server {
     {
         // close the netty server here.
         this.running = false;
+        boss.shutdownGracefully();
+        worker.shutdownGracefully();
     }
 
     @Override
     public void run()
     {
         //配置服务端NIO 线程组
-        EventLoopGroup boss = new NioEventLoopGroup();
-        EventLoopGroup worker = new NioEventLoopGroup();
+        this.boss = new NioEventLoopGroup();
+        this.worker = new NioEventLoopGroup();
 
         ServerBootstrap server = new ServerBootstrap();
 
@@ -65,6 +69,7 @@ public class MetadataServer implements Server {
             LogFactory.Instance().getLog().error("error while binding port in metadata server.", e);
         } finally {
             //优雅关闭 线程组
+            this.running = false;
             boss.shutdownGracefully();
             worker.shutdownGracefully();
         }
