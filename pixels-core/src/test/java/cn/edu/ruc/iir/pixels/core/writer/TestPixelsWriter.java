@@ -29,7 +29,7 @@ import java.util.Random;
 public class TestPixelsWriter
 {
     @Test
-    public void test()
+    public void testWriter()
     {
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();

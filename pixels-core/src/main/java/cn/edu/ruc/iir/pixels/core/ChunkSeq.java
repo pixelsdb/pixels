@@ -10,19 +10,19 @@ import java.util.List;
  *
  * @author guodong
  */
-public class ChunkBlock
+public class ChunkSeq
 {
     private final List<ChunkId> chunks;
     private long offset = 0;
     private long length = 0;
 
-    public ChunkBlock()
+    public ChunkSeq()
     {
         chunks = new ArrayList<>();
     }
 
-    public ChunkBlock(List<ChunkId> sortedChunks,
-                      long offset, long length)
+    public ChunkSeq(List<ChunkId> sortedChunks,
+                    long offset, long length)
     {
         this.chunks = sortedChunks;
         this.offset = offset;

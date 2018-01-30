@@ -8,8 +8,6 @@ import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
 
 import java.io.IOException;
 
@@ -124,6 +122,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 curPartLength = nextPartLength;
                 for (int i = 0; i < curPartLength; i++) {
                     outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                    lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
                 curPixelEleCount += nextPartLength;

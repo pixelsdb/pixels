@@ -27,7 +27,7 @@ import static org.junit.Assert.assertEquals;
 public class TestPixelsReader
 {
     @Test
-    public void validateWriter()
+    public void testReader()
     {
         String filePath = TestParams.filePath;
         Path path = new Path(filePath);

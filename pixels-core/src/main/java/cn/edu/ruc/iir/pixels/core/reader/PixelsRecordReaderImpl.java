@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.core.ChunkBlock;
+import cn.edu.ruc.iir.pixels.core.ChunkSeq;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
@@ -193,19 +193,19 @@ public class PixelsRecordReaderImpl
         chunks.sort(Comparator.comparingLong(ChunkId::getOffset));
 
         // get chunk blocks
-        List<ChunkBlock> chunkBlocks = new ArrayList<>();
-        ChunkBlock chunkBlock = new ChunkBlock();
+        List<ChunkSeq> chunkSeqs = new ArrayList<>();
+        ChunkSeq chunkSeq = new ChunkSeq();
         for (ChunkId chunk : chunks) {
-            if (!chunkBlock.addChunk(chunk)) {
-                chunkBlocks.add(chunkBlock);
-                chunkBlock = new ChunkBlock();
+            if (!chunkSeq.addChunk(chunk)) {
+                chunkSeqs.add(chunkSeq);
+                chunkSeq = new ChunkSeq();
             }
         }
 
         // read chunk blocks into buffers
         this.chunkBuffers = new ByteBuf[includedRGs.length][includedColumns.length];
         try {
-            for (ChunkBlock block : chunkBlocks) {
+            for (ChunkSeq block : chunkSeqs) {
                 int offset = (int) block.getOffset();
                 int length = (int) block.getLength();
                 byte[] chunkBlockBuffer = new byte[length];
