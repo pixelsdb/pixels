@@ -11,6 +11,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -26,41 +28,92 @@ import static org.junit.Assert.assertEquals;
  */
 public class TestPixelsReader
 {
-    @Test
-    public void testReader()
+    private TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+    private PixelsReader pixelsReader = null;
+
+    @Before
+    public void setup()
     {
         String filePath = TestParams.filePath;
         Path path = new Path(filePath);
-        TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
-
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+        try {
+            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setFS(fs)
+                    .setPath(path)
+                    .setSchema(schema)
+                    .build();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-        try (FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder().
-                     setFS(fs).setPath(path).setSchema(schema)
-                     .build()) {
-            assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
-            assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
-            assertEquals(schema, pixelsReader.getFileSchema());
-            assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
-            assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
-            assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
-            assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
+    @Test
+    public void testMetadata()
+    {
+        if (pixelsReader == null) {
+            return;
+        }
 
-            PixelsReaderOption option = new PixelsReaderOption();
-            String[] cols = {"a", "b", "c", "d", "e", "z"};
-            option.skipCorruptRecords(true);
-            option.tolerantSchemaEvolution(true);
-            option.includeCols(cols);
+        assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
+        assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
+        assertEquals(schema, pixelsReader.getFileSchema());
+        assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
+        assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
+        assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
+        assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
 
-            PixelsRecordReader recordReader = pixelsReader.read(option);
-            VectorizedRowBatch rowBatch = schema.createRowBatch(10000);
-            while (recordReader.nextBatch(rowBatch)) {
-                System.out.println("Getting next batch. Current size : " + rowBatch.size);
+        System.out.println(">>Footer: " + pixelsReader.getFooter().toString());
+        System.out.println(">>Postscript: " + pixelsReader.getPostScript().toString());
+
+        int rowGroupNum = pixelsReader.getRowGroupNum();
+        System.out.println(">>Row group num: " + rowGroupNum);
+
+        try {
+            for (int i = 0; i < rowGroupNum; i++) {
+                PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
+                System.out.println(">>Row group " + i + " footer");
+                System.out.println(rowGroupFooter);
             }
-            recordReader.close();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testContent()
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"a", "b", "c", "d", "e", "z"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+
+        PixelsRecordReader recordReader = pixelsReader.read(option);
+        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
+        try {
+            while (recordReader.nextBatch(rowBatch))
+            {
+                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println(rowBatch.toString());
+    }
+
+    @After
+    public void cleanUp()
+    {
+        try {
+            pixelsReader.close();
         }
         catch (IOException e) {
             e.printStackTrace();

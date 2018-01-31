@@ -41,7 +41,7 @@ public class ChunkSeq
             return true;
         }
         else {
-            if (chunk.getOffset() - offset - length == 1) {
+            if (chunk.getOffset() - offset - length == 0) {
                 chunks.add(chunk);
                 length += chunk.getLength();
                 return true;

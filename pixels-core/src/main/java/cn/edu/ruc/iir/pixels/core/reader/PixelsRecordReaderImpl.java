@@ -97,6 +97,7 @@ public class PixelsRecordReaderImpl
         for (int i = 0; i < includedColumns.length; i++) {
             if (includedColumns[i]) {
                 targetColumns[targetColIdx] = i;
+                targetColIdx++;
             }
         }
 
@@ -201,15 +202,20 @@ public class PixelsRecordReaderImpl
                 chunkSeq = new ChunkSeq();
             }
         }
+        chunkSeqs.add(chunkSeq);
 
         // read chunk blocks into buffers
         this.chunkBuffers = new ByteBuf[includedRGs.length][includedColumns.length];
         try {
             for (ChunkSeq block : chunkSeqs) {
+                if (block.getLength() == 0) {
+                    continue;
+                }
                 int offset = (int) block.getOffset();
                 int length = (int) block.getLength();
                 byte[] chunkBlockBuffer = new byte[length];
-                physicalFSReader.readFully(chunkBlockBuffer, offset, length);
+                physicalFSReader.seek(offset);
+                physicalFSReader.readFully(chunkBlockBuffer);
                 ByteBuf chunkBlockBuf = Unpooled.wrappedBuffer(chunkBlockBuffer);
                 List<ChunkId> chunkIds = block.getSortedChunks();
                 int chunkSliceOffset = 0;
@@ -223,6 +229,7 @@ public class PixelsRecordReaderImpl
             }
         }
         catch (IOException e) {
+            e.printStackTrace();
             return false;
         }
 
@@ -257,7 +264,7 @@ public class PixelsRecordReaderImpl
         PixelsProto.RowGroupInformation rowGroupInformation =
                 footer.getRowGroupInfos(targetRGs[readerCurRGIdx]);
         int curBatchSize = (int) rowGroupInformation.getNumberOfRows() - readerCurRGOffset;
-        if (batch.size + curBatchSize >= batch.getMaxSize()) {
+        if (batch.size + curBatchSize > batch.getMaxSize()) {
             curBatchSize = batch.getMaxSize() - batch.size;
         }
 
@@ -339,7 +346,10 @@ public class PixelsRecordReaderImpl
         // release chunk buffer
         for (int i = 0; i < targetRGs.length; i++) {
             for (int j = 0; j < targetColumns.length; j++) {
-                chunkBuffers[i][j].release();
+                ByteBuf chunkBuf = chunkBuffers[targetRGs[i]][targetColumns[j]];
+                if (chunkBuf != null) {
+                    chunkBuf.release();
+                }
             }
         }
     }

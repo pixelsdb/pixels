@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -36,6 +37,7 @@ public class PixelsReaderImpl
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
+    private final List<PixelsRecordReader> recordReaders;
 
     private PixelsReaderImpl(FileSystem fs, Path path,
                             TypeDescription fileSchema,
@@ -48,6 +50,7 @@ public class PixelsReaderImpl
         this.physicalFSReader = physicalFSReader;
         this.postScript = fileTail.getPostscript();
         this.footer = fileTail.getFooter();
+        this.recordReaders = new LinkedList<>();
     }
 
     public static class Builder
@@ -311,22 +314,14 @@ public class PixelsReaderImpl
         return this.footer.getRowGroupStatsList();
     }
 
-    /**
-     * Get file system
-     * @return file system
-     * */
-    public FileSystem getFs()
+    public PixelsProto.PostScript getPostScript()
     {
-        return this.fs;
+        return postScript;
     }
 
-    /**
-     * Get file path
-     * @return file path
-     * */
-    public Path getPath()
+    public PixelsProto.Footer getFooter()
     {
-        return this.path;
+        return footer;
     }
 
     /**
@@ -337,6 +332,9 @@ public class PixelsReaderImpl
     @Override
     public void close() throws IOException
     {
+        for (PixelsRecordReader recordReader : recordReaders) {
+            recordReader.close();
+        }
         this.physicalFSReader.close();
     }
 }

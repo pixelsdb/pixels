@@ -121,6 +121,13 @@ public interface PixelsReader
      * */
     List<PixelsProto.RowGroupStatistic> getRowGroupStats();
 
+    // Just for test
+    public PixelsProto.PostScript getPostScript();
+
+
+    // Just for test
+    public PixelsProto.Footer getFooter();
+
     /**
      * Cleanup and release resources
      * @throws java.io.IOException

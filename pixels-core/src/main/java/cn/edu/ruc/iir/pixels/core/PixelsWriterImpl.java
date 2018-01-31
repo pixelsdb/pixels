@@ -386,6 +386,7 @@ public class PixelsWriterImpl
         PixelsProto.RowGroupFooter rowGroupFooter =
                 PixelsProto.RowGroupFooter.newBuilder()
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
+                        .setRowGroupEncoding(curRowGroupEncoding.build())
                         .build();
 
         // write and flush row group footer

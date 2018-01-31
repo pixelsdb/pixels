@@ -78,12 +78,8 @@ public class TestPixelsWriter
                 e.vector[row] = i > 25000 ? 0 : 1;
                 z.setVal(row, String.valueOf(key).getBytes());
                 if (rowBatch.size == rowBatch.getMaxSize()) {
-                    //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);
-                    //System.out.println("add rb:" + (System.currentTimeMillis()-start));
-                    //start = System.currentTimeMillis();
                     rowBatch.reset();
-                    //System.out.println("reset: " + (System.currentTimeMillis()-start));
                 }
             }
             if (rowBatch.size != 0) {
