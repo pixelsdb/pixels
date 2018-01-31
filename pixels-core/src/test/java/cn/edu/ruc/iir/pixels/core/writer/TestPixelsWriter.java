@@ -62,6 +62,7 @@ public class TestPixelsWriter
                             .setReplication((short) 1)
                             .setBlockPadding(false)
                             .setEncoding(true)
+                            .setCompressionBlockSize(1)
                             .build();
 
             for (int i = 0; i < TestParams.rowNum; i++)

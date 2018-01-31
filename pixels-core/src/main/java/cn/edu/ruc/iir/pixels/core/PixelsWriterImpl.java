@@ -30,6 +30,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TimeZone;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -79,16 +80,19 @@ public class PixelsWriterImpl
             PhysicalWriter physicalWriter,
             boolean encoding)
     {
-        this.schema = schema;
+        this.schema = requireNonNull(schema, "schema is null");
+        checkArgument(pixelStride > 0, "pixel stripe is not positive");
         this.pixelStride = pixelStride;
+        checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
-        this.compressionKind = compressionKind;
+        this.compressionKind = requireNonNull(compressionKind);
+        checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
-        this.timeZone = timeZone;
+        this.timeZone = requireNonNull(timeZone);
         this.encoding = encoding;
 
         List<TypeDescription> children = schema.getChildren();
-        assert children != null;
+        checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
@@ -209,6 +213,8 @@ public class PixelsWriterImpl
         {
             PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
+            checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
+                    "schema is empty");
 
             if (fsWriter == null) {
                 LOGGER.error("Failed to create PhysicalWriter");

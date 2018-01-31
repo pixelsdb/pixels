@@ -87,16 +87,16 @@ public class StatRecorderTest
         recorder.updateInteger(-20, 3);
         recorder.updateInteger(3500, 4);
         assertEquals(10, recorder.getNumberOfValues());
-        assertEquals(-20, recorder.getMinimum());
-        assertEquals(3500, recorder.getMaximum());
+        assertEquals(-20, recorder.getMinimum().longValue());
+        assertEquals(3500, recorder.getMaximum().longValue());
         assertEquals(13961, recorder.getSum());
 
         IntegerStatsRecorder mRecorder = new IntegerStatsRecorder();
         mRecorder.updateInteger(4000, 1);
         recorder.merge(mRecorder);
         assertEquals(11, recorder.getNumberOfValues());
-        assertEquals(-20, recorder.getMinimum());
-        assertEquals(4000, recorder.getMaximum());
+        assertEquals(-20, recorder.getMinimum().longValue());
+        assertEquals(4000, recorder.getMaximum().longValue());
         assertEquals(17961, recorder.getSum());
     }
 
@@ -109,15 +109,15 @@ public class StatRecorderTest
         recorder.updateTimestamp(Timestamp.valueOf("1992-04-04 19:24:44").getTime());
         recorder.updateTimestamp(Timestamp.valueOf("2018-04-09 14:25:49").getTime());
         assertEquals(4, recorder.getNumberOfValues());
-        assertEquals(Timestamp.valueOf("1992-04-04 19:24:44").getTime(), recorder.getMinimum());
-        assertEquals(Timestamp.valueOf("2018-04-09 14:25:49").getTime(), recorder.getMaximum());
+        assertEquals(Timestamp.valueOf("1992-04-04 19:24:44").getTime(), recorder.getMinimum().longValue());
+        assertEquals(Timestamp.valueOf("2018-04-09 14:25:49").getTime(), recorder.getMaximum().longValue());
 
         TimestampStatsRecorder mRecorder = new TimestampStatsRecorder();
         mRecorder.updateTimestamp(Timestamp.valueOf("1990-03-02 10:10:10"));
         recorder.merge(mRecorder);
         assertEquals(5, recorder.getNumberOfValues());
-        assertEquals(Timestamp.valueOf("1990-03-02 10:10:10").getTime(), recorder.getMinimum());
-        assertEquals(Timestamp.valueOf("2018-04-09 14:25:49").getTime(), recorder.getMaximum());
+        assertEquals(Timestamp.valueOf("1990-03-02 10:10:10").getTime(), recorder.getMinimum().longValue());
+        assertEquals(Timestamp.valueOf("2018-04-09 14:25:49").getTime(), recorder.getMaximum().longValue());
     }
 
     @Test
