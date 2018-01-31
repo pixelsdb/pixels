@@ -11,7 +11,7 @@ import static org.junit.Assert.assertEquals;
  *
  * @author guodong
  */
-public class StatRecorderTest
+public class TestStatRecorder
 {
     @Test
     public void testBinaryStatsRecorder()

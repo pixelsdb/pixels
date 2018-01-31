@@ -42,11 +42,11 @@ public class TestPixelsReader
                      setFS(fs).setPath(path).setSchema(schema)
                      .build()) {
             assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
-            assertEquals(0, pixelsReader.getCompressionBlockSize());
+            assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
             assertEquals(schema, pixelsReader.getFileSchema());
             assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
             assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
-            assertEquals(10000, pixelsReader.getPixelStride());
+            assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
             assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
 
             PixelsReaderOption option = new PixelsReaderOption();

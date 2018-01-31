@@ -54,15 +54,15 @@ public class TestPixelsWriter
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(10000)
-                            .setRowGroupSize(64*1024*1024)
+                            .setPixelStride(TestParams.pixelStride)
+                            .setRowGroupSize(TestParams.rowGroupSize)
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
-                            .setBlockSize(1024*1024*1024)
-                            .setReplication((short) 1)
-                            .setBlockPadding(false)
-                            .setEncoding(true)
-                            .setCompressionBlockSize(1)
+                            .setBlockSize(TestParams.blockSize)
+                            .setReplication(TestParams.blockReplication)
+                            .setBlockPadding(TestParams.blockPadding)
+                            .setEncoding(TestParams.encoding)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
             for (int i = 0; i < TestParams.rowNum; i++)

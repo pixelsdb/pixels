@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.core.writer;
+package cn.edu.ruc.iir.pixels.core.compactor;
 
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;

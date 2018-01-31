@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
-public class ByteBufTest
+public class TestByteBuf
 {
     @Test
     public void testAllocation()
