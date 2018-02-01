@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Random;
 
 import static org.junit.Assert.assertArrayEquals;
 
@@ -18,9 +19,10 @@ public class TestEncoding
     @Test
     public void runLengthTest()
     {
+        Random random = new Random();
         long[] values = new long[TestParams.rowNum];
         for (int i = 0; i < TestParams.rowNum; i++) {
-            values[i] = i;
+            values[i] = random.nextInt(10000000);
         }
         long[] decoderValues = new long[TestParams.rowNum];
         RunLenIntEncoder encoder = new RunLenIntEncoder(true, true);
