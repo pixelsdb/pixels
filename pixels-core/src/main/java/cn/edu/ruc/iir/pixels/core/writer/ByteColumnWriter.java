@@ -9,7 +9,7 @@ import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import java.io.IOException;
 
 /**
- * pixels
+ * pixels byte column writer
  *
  * @author guodong
  */

@@ -19,25 +19,57 @@ public class TestEncoding
     public void runLengthTest()
     {
         long[] values = new long[TestParams.rowNum];
-        for (int i = 0; i < TestParams.rowNum; i++)
-        {
+        for (int i = 0; i < TestParams.rowNum; i++) {
             values[i] = i;
         }
         long[] decoderValues = new long[TestParams.rowNum];
-        RunLenIntEncoder encoder = new RunLenIntEncoder(false, true);
-        try
-        {
+        RunLenIntEncoder encoder = new RunLenIntEncoder(true, true);
+        try {
             byte[] bytes = encoder.encode(values);
-            IntDecoder decoder = new RunLenIntDecoder(new ByteArrayInputStream(bytes), false);
+            IntDecoder decoder = new RunLenIntDecoder(new ByteArrayInputStream(bytes), true);
             int i = 0;
             while (decoder.hasNext()) {
                 decoderValues[i++] = decoder.next();
             }
             System.out.println(bytes.length);
             assertArrayEquals(values, decoderValues);
-        } catch (IOException e)
-        {
+        }
+        catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void longTest()
+    {
+        long value = 0L;
+        int high = (int) Math.pow(2, 30);
+        long highL = (long) high;
+        int low = 2;
+        value |= (highL << 32);
+        value |= low;
+        System.out.println(value);
+
+        long lowMask = 0x0000ffff;
+        long highMask = 0xffff0000;
+        int l = (int) (value & lowMask);
+        long temp = (value & highMask);
+        int h = (int) ((value & highMask) >>> 32);
+        System.out.println("temp: " + temp + ", high: " + h + ", low: " + l);
+    }
+
+    @Test
+    public void byteTest()
+    {
+        int[] bytes = new int[256];
+        for (int i = 0; i < 256; i++) {
+            int b = (Byte.MIN_VALUE + i) & 0xff;
+            bytes[i] = b;
+            System.out.println(b);
+        }
+        for (int i = 0; i < 256; i++) {
+            byte b = (byte) (bytes[i]);
+            System.out.println(b);
         }
     }
 }

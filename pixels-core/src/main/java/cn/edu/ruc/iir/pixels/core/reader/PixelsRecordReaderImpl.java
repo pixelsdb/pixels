@@ -256,8 +256,15 @@ public class PixelsRecordReaderImpl
             }
         }
 
+        // column vector projection
         ColumnVector[] columnVectors = batch.cols;
         if (columnVectors.length != includedColumns.length) {
+            return false;
+        }
+        batch.projectionSize = targetColumns.length;
+        System.arraycopy(targetColumns, 0, batch.projectedColumns, 0, targetColumns.length);
+
+        if (readerCurRGIdx >= targetRGs.length) {
             return false;
         }
 
@@ -269,7 +276,7 @@ public class PixelsRecordReaderImpl
         }
 
         // add record
-        for (int i = 0; i < includedColumns.length; i++) {
+        for (int i = 0; i < targetColumns.length; i++) {
             PixelsProto.ColumnEncoding encoding =
                     rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
                             .getColumnChunkEncodings(targetColumns[i]);
@@ -279,6 +286,7 @@ public class PixelsRecordReaderImpl
 
         readerCurRGOffset += curBatchSize;
         rowIndex += curBatchSize;
+        batch.size += curBatchSize;
         if (readerCurRGOffset >= rowGroupInformation.getNumberOfRows()) {
             readerCurRGIdx++;
             readerCurRGOffset = 0;
