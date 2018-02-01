@@ -2,10 +2,10 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.TestParams;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
@@ -18,7 +18,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.Random;
 
 /**
@@ -72,11 +71,14 @@ public class TestPixelsWriter
                 double sd = randomSf.nextDouble();
                 int row = rowBatch.size++;
                 a.vector[row] = i;
-                b.vector[row] = sf * key;
-                c.vector[row] = sd * key;
-                d.set(row, Timestamp.from(Instant.now()));
-                e.vector[row] = i > 25000 ? 0 : 1;
-                z.setVal(row, String.valueOf(key).getBytes());
+                b.vector[row] = i * 3.1415f;
+                c.vector[row] = i * 3.14159d;
+                long curT = System.currentTimeMillis();
+                System.out.println(curT);
+                Timestamp timestamp = new Timestamp(curT);
+                d.set(row, timestamp);
+                e.vector[row] = i > 25000 ? 1 : 0;
+                z.setVal(row, String.valueOf(i).getBytes());
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();

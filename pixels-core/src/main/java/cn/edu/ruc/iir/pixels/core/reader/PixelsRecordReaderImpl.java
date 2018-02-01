@@ -115,9 +115,9 @@ public class PixelsRecordReaderImpl
         }
 
         // get column readers
-        readers = new ColumnReader[includedColumnsNum];
         List<TypeDescription> columnSchemas = readerSchema.getChildren();
-        for (int i = 0; i < includedColumnsNum; i++) {
+        readers = new ColumnReader[columnSchemas.size()];
+        for (int i = 0; i < columnSchemas.size(); i++) {
             readers[i] = ColumnReader.newColumnReader(columnSchemas.get(i));
         }
 
@@ -281,7 +281,8 @@ public class PixelsRecordReaderImpl
                     rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
                             .getColumnChunkEncodings(targetColumns[i]);
             byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumns[i]].array();
-            readers[i].read(input, encoding, readerCurRGOffset, curBatchSize, columnVectors[i]);
+            readers[targetColumns[i]].read(input, encoding, readerCurRGOffset, curBatchSize,
+                    columnVectors[targetColumns[i]]);
         }
 
         readerCurRGOffset += curBatchSize;
