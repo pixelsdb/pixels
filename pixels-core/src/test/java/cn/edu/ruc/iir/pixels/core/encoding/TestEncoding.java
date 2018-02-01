@@ -21,8 +21,11 @@ public class TestEncoding
     {
         Random random = new Random();
         long[] values = new long[TestParams.rowNum];
-        for (int i = 0; i < TestParams.rowNum; i++) {
-            values[i] = random.nextInt(10000000);
+        values[0] = 0;
+        values[1] = -1;
+        values[2] = -2;
+        for (int i = 3; i < TestParams.rowNum; i++) {
+            values[i] = random.nextInt();
         }
         long[] decoderValues = new long[TestParams.rowNum];
         RunLenIntEncoder encoder = new RunLenIntEncoder(true, true);
