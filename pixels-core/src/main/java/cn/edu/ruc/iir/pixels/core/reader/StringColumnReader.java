@@ -20,7 +20,7 @@ import java.nio.charset.Charset;
 public class StringColumnReader
         extends ColumnReader
 {
-    public StringColumnReader(TypeDescription type)
+    StringColumnReader(TypeDescription type)
     {
         super(type);
     }

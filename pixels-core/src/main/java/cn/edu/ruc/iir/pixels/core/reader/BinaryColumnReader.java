@@ -12,7 +12,7 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 public class BinaryColumnReader
         extends ColumnReader
 {
-    public BinaryColumnReader(TypeDescription type)
+    BinaryColumnReader(TypeDescription type)
     {
         super(type);
     }

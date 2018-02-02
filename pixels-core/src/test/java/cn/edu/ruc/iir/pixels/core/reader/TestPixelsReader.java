@@ -89,7 +89,7 @@ public class TestPixelsReader
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"d"};
+        String[] cols = {"z"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
@@ -106,7 +106,7 @@ public class TestPixelsReader
             e.printStackTrace();
         }
 
-//        System.out.println(rowBatch.toString());
+        System.out.println(rowBatch.toString());
     }
 
     @After

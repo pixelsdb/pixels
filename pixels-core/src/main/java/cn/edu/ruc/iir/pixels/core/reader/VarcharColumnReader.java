@@ -14,7 +14,7 @@ import java.io.IOException;
 public class VarcharColumnReader
         extends ColumnReader
 {
-    public VarcharColumnReader(TypeDescription type)
+    VarcharColumnReader(TypeDescription type)
     {
         super(type);
     }

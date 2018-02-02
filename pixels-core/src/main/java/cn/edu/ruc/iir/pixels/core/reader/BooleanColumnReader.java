@@ -14,7 +14,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class BooleanColumnReader
         extends ColumnReader
 {
-    public BooleanColumnReader(TypeDescription type)
+    BooleanColumnReader(TypeDescription type)
     {
         super(type);
     }
@@ -31,15 +31,37 @@ public class BooleanColumnReader
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, ColumnVector vector)
     {
-        int index = 0;
         // input byte length should be GE than (num * 8) and be L than (num + 1) * 8
-        checkArgument(input.length >= size * 8 && input.length < (size + 1) * 8,
+        checkArgument(input.length >= size / 8 && input.length <= (size + 8) / 8,
                 "Input bytes length " + input.length + " is not correct");
-        for (int i = 0; i < input.length && index < size; i++) {
-            for (int j = 7; j >= 0; j--) {
-                vector.add(((0x1 << i) & input[i]) == (byte) 1);
+        byte[] bits = bitWiseDeCompact(input, size);
+        for (int i = 0; i < size; i++) {
+            vector.add(bits[i] == 1);
+        }
+    }
+
+    private byte[] bitWiseDeCompact(byte[] input, int size)
+    {
+        byte[] result = new byte[size];
+
+        int bitsToRead = 1;
+        int bitsLeft = 8;
+        int current = 0;
+        byte mask = 0x01;
+
+        int index = 0;
+        for (byte b : input) {
+            while (bitsLeft > 0) {
+                if (index >= size) {
+                    return result;
+                }
+                bitsLeft -= bitsToRead;
+                current = mask & (b >> bitsLeft);
+                result[index] = (byte) current;
                 index++;
             }
+            bitsLeft = 8;
         }
+        return result;
     }
 }

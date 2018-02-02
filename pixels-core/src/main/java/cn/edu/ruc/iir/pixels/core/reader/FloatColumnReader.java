@@ -20,7 +20,7 @@ public class FloatColumnReader
 {
     private final EncodingUtils encodingUtils;
 
-    public FloatColumnReader(TypeDescription type)
+    FloatColumnReader(TypeDescription type)
     {
         super(type);
         this.encodingUtils = new EncodingUtils();

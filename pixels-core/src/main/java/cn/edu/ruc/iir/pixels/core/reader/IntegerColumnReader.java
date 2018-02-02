@@ -22,7 +22,7 @@ import static com.google.common.base.Verify.verify;
 public class IntegerColumnReader
         extends ColumnReader
 {
-    public IntegerColumnReader(TypeDescription type)
+    IntegerColumnReader(TypeDescription type)
     {
         super(type);
     }

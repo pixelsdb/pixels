@@ -20,7 +20,7 @@ public class DoubleColumnReader
 {
     private final EncodingUtils encodingUtils;
 
-    public DoubleColumnReader(TypeDescription type)
+    DoubleColumnReader(TypeDescription type)
     {
         super(type);
         this.encodingUtils = new EncodingUtils();
