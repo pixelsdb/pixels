@@ -2,11 +2,9 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 
 /**
  * pixels column reader.
@@ -59,9 +57,9 @@ public abstract class ColumnReader
      * @throws java.io.IOException
      * */
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                              int size, ColumnVector vector) throws IOException
+                              int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        read(input, encoding, 0, size, vector);
+        read(input, encoding, 0, size, pixelStride, vector);
     }
 
     /**
@@ -75,7 +73,7 @@ public abstract class ColumnReader
      * @throws java.io.IOException
      * */
     public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                              int offset, int size, ColumnVector vector) throws IOException;
+                              int offset, int size, int pixelStride, ColumnVector vector) throws IOException;
 
     public ColumnReader(TypeDescription type)
     {

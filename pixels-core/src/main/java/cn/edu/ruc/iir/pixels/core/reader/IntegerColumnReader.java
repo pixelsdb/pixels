@@ -37,7 +37,7 @@ public class IntegerColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, ColumnVector vector) throws IOException
+                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
     {
         ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
         ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);

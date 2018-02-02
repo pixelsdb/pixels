@@ -25,6 +25,7 @@ public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
     private final PhysicalFSReader physicalFSReader;
+    private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
 
@@ -44,10 +45,12 @@ public class PixelsRecordReaderImpl
     private ColumnReader[] readers;      // column readers for each target columns
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
+                                  PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
                                   PixelsReaderOption option)
     {
         this.physicalFSReader = physicalFSReader;
+        this.postScript = postScript;
         this.footer = footer;
         this.option = option;
         checkBeforeRead();
@@ -179,8 +182,7 @@ public class PixelsRecordReaderImpl
         for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
             PixelsProto.RowGroupIndex rowGroupIndex =
                     rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-            for (int targetColIdx = 0; targetColIdx < targetColumns.length; targetColIdx++) {
-                int colIdx = targetColumns[targetColIdx];
+            for (int colIdx : targetColumns) {
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupIndex.getColumnChunkIndexEntries(colIdx);
                 ChunkId chunk = new ChunkId(rgIdx, colIdx,
@@ -276,13 +278,13 @@ public class PixelsRecordReaderImpl
         }
 
         // add record
-        for (int i = 0; i < targetColumns.length; i++) {
+        for (int targetColumn : targetColumns) {
             PixelsProto.ColumnEncoding encoding =
                     rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
-                            .getColumnChunkEncodings(targetColumns[i]);
-            byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumns[i]].array();
-            readers[targetColumns[i]].read(input, encoding, readerCurRGOffset, curBatchSize,
-                    columnVectors[targetColumns[i]]);
+                            .getColumnChunkEncodings(targetColumn);
+            byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumn].array();
+            readers[targetColumn].read(input, encoding, readerCurRGOffset, curBatchSize,
+                    postScript.getPixelStride(), columnVectors[targetColumn]);
         }
 
         readerCurRGOffset += curBatchSize;
@@ -353,9 +355,9 @@ public class PixelsRecordReaderImpl
     public void close()
     {
         // release chunk buffer
-        for (int i = 0; i < targetRGs.length; i++) {
-            for (int j = 0; j < targetColumns.length; j++) {
-                ByteBuf chunkBuf = chunkBuffers[targetRGs[i]][targetColumns[j]];
+        for (int targetRG : targetRGs) {
+            for (int targetColumn : targetColumns) {
+                ByteBuf chunkBuf = chunkBuffers[targetRG][targetColumn];
                 if (chunkBuf != null) {
                     chunkBuf.release();
                 }

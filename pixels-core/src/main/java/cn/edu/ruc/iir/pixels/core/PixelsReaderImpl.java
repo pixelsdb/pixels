@@ -31,21 +31,16 @@ public class PixelsReaderImpl
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsReaderImpl.class);
 
-    private final FileSystem fs;
-    private final Path path;
     private final TypeDescription fileSchema;
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final List<PixelsRecordReader> recordReaders;
 
-    private PixelsReaderImpl(FileSystem fs, Path path,
-                            TypeDescription fileSchema,
+    private PixelsReaderImpl(TypeDescription fileSchema,
                             PhysicalFSReader physicalFSReader,
                             PixelsProto.FileTail fileTail)
     {
-        this.fs = fs;
-        this.path = path;
         this.fileSchema = fileSchema;
         this.physicalFSReader = physicalFSReader;
         this.postScript = fileTail.getPostscript();
@@ -116,7 +111,7 @@ public class PixelsReaderImpl
             // todo check file schema
 
             // create a default PixelsReader
-            return new PixelsReaderImpl(builderFS, builderPath, builderSchema, fsReader, fileTail);
+            return new PixelsReaderImpl(builderSchema, fsReader, fileTail);
         }
     }
 
@@ -139,12 +134,11 @@ public class PixelsReaderImpl
      * Get a <code>PixelsRecordReader</code>
      *
      * @return record reader
-     * @throws IOException
      */
     @Override
     public PixelsRecordReader read(PixelsReaderOption option)
     {
-        return new PixelsRecordReaderImpl(physicalFSReader, footer, option);
+        return new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
     }
 
     /**

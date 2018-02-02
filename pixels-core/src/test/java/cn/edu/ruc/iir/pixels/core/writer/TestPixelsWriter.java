@@ -64,6 +64,9 @@ public class TestPixelsWriter
                             .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
+            long curT = System.currentTimeMillis();
+            Timestamp timestamp = new Timestamp(curT);
+            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
             for (int i = 0; i < TestParams.rowNum; i++)
             {
                 int key = randomKey.nextInt(50000);
@@ -73,9 +76,6 @@ public class TestPixelsWriter
                 a.vector[row] = i;
                 b.vector[row] = i * 3.1415f;
                 c.vector[row] = i * 3.14159d;
-                long curT = System.currentTimeMillis();
-                System.out.println(curT);
-                Timestamp timestamp = new Timestamp(curT);
                 d.set(row, timestamp);
                 e.vector[row] = i > 25000 ? 1 : 0;
                 z.setVal(row, String.valueOf(i).getBytes());

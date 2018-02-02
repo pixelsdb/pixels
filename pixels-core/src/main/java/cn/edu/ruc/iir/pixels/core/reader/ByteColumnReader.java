@@ -27,7 +27,7 @@ public class ByteColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, ColumnVector vector)
+                     int offset, int size, int pixelStride, ColumnVector vector)
     {
     }
 }
