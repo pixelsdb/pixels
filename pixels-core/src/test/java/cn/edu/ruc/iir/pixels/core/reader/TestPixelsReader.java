@@ -89,13 +89,13 @@ public class TestPixelsReader
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"b","d","z"};
+        String[] cols = {"a","b","c","d","e"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
-        VectorizedRowBatch rowBatch = schema.createRowBatch();
+        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
         try {
             recordReader.readBatch(rowBatch);
             System.out.println(">>Getting next batch. Current size : " + rowBatch.size);

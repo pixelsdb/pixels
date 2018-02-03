@@ -188,7 +188,7 @@ public class StringColumnWriter extends BaseColumnWriter
     private void flushLens() throws IOException
     {
         int lensFieldOffset = outputStream.size();
-        int[] tmpLens = new int[lensArray.size()];
+        long[] tmpLens = new long[lensArray.size()];
         for (int i = 0; i < lensArray.size(); i++) {
             tmpLens[i] = lensArray.get(i);
         }
