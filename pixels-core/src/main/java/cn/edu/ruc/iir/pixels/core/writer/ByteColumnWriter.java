@@ -75,10 +75,10 @@ public class ByteColumnWriter extends BaseColumnWriter
         }
 
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         else {
-            outputStream.write(curPixelVector);
+            outputStream.write(curPixelVector, 0, curPixelEleCount);
         }
 
         curPixelPosition = outputStream.size();

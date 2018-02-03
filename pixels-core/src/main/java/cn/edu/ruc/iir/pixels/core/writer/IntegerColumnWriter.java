@@ -16,7 +16,6 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
-// todo fixing bug with signed int values encoding
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
@@ -84,7 +83,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
 
         // write out current pixel vector
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         else {
             ByteBuffer curVecPartitionBuffer;

@@ -88,7 +88,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
             outputStream.write(encoder.encode(values));
         }
         else {
-            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES + curPixelEleCount * Integer.BYTES);
+            ByteBuffer curVecPartitionBuffer =
+                    ByteBuffer.allocate(curPixelEleCount * Long.BYTES + curPixelEleCount * Integer.BYTES);
             for (int i = 0; i < curPixelEleCount; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelTimeVector.vector[i]);

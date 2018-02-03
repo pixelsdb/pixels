@@ -8,6 +8,8 @@ import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 
@@ -136,7 +138,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         if (currentUseDictionaryEncoding) {
             // for dictionary encoding. run length encode again.
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         // else ignore outputStream
 
@@ -192,7 +194,10 @@ public class StringColumnWriter extends BaseColumnWriter
         lensArray.clear();
         outputStream.write(encoder.encode(tmpLens));
 
-        outputStream.write(lensFieldOffset);
+        ByteBuf buf = Unpooled.buffer();
+        buf.writeInt(lensFieldOffset);
+        outputStream.write(buf.array());
+        buf.release();
     }
 
     private void flushDictionary() throws IOException
@@ -224,21 +229,29 @@ public class StringColumnWriter extends BaseColumnWriter
 
         startsFieldOffset = outputStream.size();
 
-        for (int i = 0; i < size; i++)
-        {
-            outputStream.write(starts[i]);
+        ByteBuf buf = Unpooled.buffer();
+        for (int i = 0; i < size; i++) {
+            buf.writeInt(starts[i]);
         }
+        buf.slice();
+        outputStream.write(buf.array());
+        buf.clear();
 
         ordersFieldOffset = outputStream.size();
 
-        for (int i = 0; i < size; i++)
-        {
-            outputStream.write(orders[i]);
+        for (int i = 0; i < size; i++) {
+            buf.writeInt(orders[i]);
         }
+        buf.slice();
+        outputStream.write(buf.array());
+        buf.clear();
 
-        outputStream.write(originsFieldOffset);
-        outputStream.write(startsFieldOffset);
-        outputStream.write(ordersFieldOffset);
+        buf.writeInt(originsFieldOffset);
+        buf.writeInt(startsFieldOffset);
+        buf.writeInt(ordersFieldOffset);
+        buf.slice();
+        outputStream.write(buf.array());
+        buf.release();
     }
 
     private void checkDictionaryEncoding()

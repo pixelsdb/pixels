@@ -11,8 +11,6 @@ import io.netty.buffer.Unpooled;
 import java.io.IOException;
 import java.sql.Timestamp;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 /**
  * pixels timestamp column reader
  * All timestamp values are translated to the specified time zone after read from file.
@@ -53,16 +51,12 @@ public class TimestampColumnReader
                 int pixelIdx = pixelOff;
                 for (; decoder.hasNext() && i < pixelStride && pixelIdx < size; i++) {
                     times[pixelOff + i] = decoder.next();
-                    checkArgument(times[pixelOff + i] == 1517551844468L,
-                            "time current index : " + pixelOff + i + ", value: " + times[pixelOff + i]);
                     pixelIdx++;
                 }
                 i = 0;
                 pixelIdx = pixelOff;
                 for (; decoder.hasNext() && i < pixelStride && pixelIdx < size; i++) {
                     nanos[pixelOff + i] = (int) decoder.next();
-                    checkArgument(times[pixelOff + i] == 1517551844468L,
-                            "nanos current index : " + pixelOff + i);
                     pixelIdx++;
                 }
                 pixelOff += i;

@@ -43,7 +43,7 @@ public class StringColumnReader
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
             // read offsets
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - 12);
+            inputBuffer.skipBytes(input.length - 3 * Integer.BYTES);
             int originsOffset = inputBuffer.readInt();
             int startsOffset = inputBuffer.readInt();
             int ordersOffset = inputBuffer.readInt();
