@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.core.ChunkSeq;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
+import cn.edu.ruc.iir.pixels.core.ChunkSeq;
 import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
@@ -13,6 +13,7 @@ import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
@@ -202,6 +203,7 @@ public class PixelsRecordReaderImpl
             if (!chunkSeq.addChunk(chunk)) {
                 chunkSeqs.add(chunkSeq);
                 chunkSeq = new ChunkSeq();
+                chunkSeq.addChunk(chunk);
             }
         }
         chunkSeqs.add(chunkSeq);
@@ -218,15 +220,17 @@ public class PixelsRecordReaderImpl
                 byte[] chunkBlockBuffer = new byte[length];
                 physicalFSReader.seek(offset);
                 physicalFSReader.readFully(chunkBlockBuffer);
-                ByteBuf chunkBlockBuf = Unpooled.wrappedBuffer(chunkBlockBuffer);
                 List<ChunkId> chunkIds = block.getSortedChunks();
                 int chunkSliceOffset = 0;
                 for (ChunkId chunkId : chunkIds) {
                     int chunkLength = (int) chunkId.getLength();
                     int rgId = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
-                    ByteBuf chunkBuf = chunkBlockBuf.slice(chunkSliceOffset, chunkLength);
+                    byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
+                            chunkSliceOffset, chunkSliceOffset + chunkLength);
+                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
                     chunkBuffers[rgId][colId] = chunkBuf;
+                    chunkSliceOffset += chunkLength;
                 }
             }
         }

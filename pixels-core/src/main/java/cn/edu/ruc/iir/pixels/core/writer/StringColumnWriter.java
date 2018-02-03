@@ -230,6 +230,8 @@ public class StringColumnWriter extends BaseColumnWriter
 
         startsFieldOffset = outputStream.size();
 
+        // todo run length encode starts and orders array
+
         ByteBuffer startsBuf = ByteBuffer.allocate(size * Integer.BYTES);
         for (int i = 0; i < size; i++) {
             startsBuf.putInt(starts[i]);
