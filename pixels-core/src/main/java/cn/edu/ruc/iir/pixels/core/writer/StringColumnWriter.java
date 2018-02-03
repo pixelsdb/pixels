@@ -12,6 +12,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * String column writer.
@@ -229,29 +230,25 @@ public class StringColumnWriter extends BaseColumnWriter
 
         startsFieldOffset = outputStream.size();
 
-        ByteBuf buf = Unpooled.buffer();
+        ByteBuffer startsBuf = ByteBuffer.allocate(size * Integer.BYTES);
         for (int i = 0; i < size; i++) {
-            buf.writeInt(starts[i]);
+            startsBuf.putInt(starts[i]);
         }
-        buf.slice();
-        outputStream.write(buf.array());
-        buf.clear();
+        outputStream.write(startsBuf.array());
 
         ordersFieldOffset = outputStream.size();
 
+        ByteBuffer ordersBuf = ByteBuffer.allocate(size * Integer.BYTES);
         for (int i = 0; i < size; i++) {
-            buf.writeInt(orders[i]);
+            ordersBuf.putInt(orders[i]);
         }
-        buf.slice();
-        outputStream.write(buf.array());
-        buf.clear();
+        outputStream.write(ordersBuf.array());
 
-        buf.writeInt(originsFieldOffset);
-        buf.writeInt(startsFieldOffset);
-        buf.writeInt(ordersFieldOffset);
-        buf.slice();
-        outputStream.write(buf.array());
-        buf.release();
+        ByteBuffer offsetsBuf = ByteBuffer.allocate(3 * Integer.BYTES);
+        offsetsBuf.putInt(originsFieldOffset);
+        offsetsBuf.putInt(startsFieldOffset);
+        offsetsBuf.putInt(ordersFieldOffset);
+        outputStream.write(offsetsBuf.array());
     }
 
     private void checkDictionaryEncoding()

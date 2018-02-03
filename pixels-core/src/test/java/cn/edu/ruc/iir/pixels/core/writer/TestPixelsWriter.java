@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
@@ -67,8 +68,7 @@ public class TestPixelsWriter
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
             System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 0; i < TestParams.rowNum; i++)
-            {
+            for (int i = 0; i < TestParams.rowNum; i++) {
                 int key = randomKey.nextInt(50000);
                 float sf = randomSf.nextFloat();
                 double sd = randomSf.nextDouble();
@@ -90,7 +90,7 @@ public class TestPixelsWriter
             }
             pixelsWriter.close();
         }
-        catch (IOException e) {
+        catch (IOException | PixelsWriterException e) {
             e.printStackTrace();
         }
     }
