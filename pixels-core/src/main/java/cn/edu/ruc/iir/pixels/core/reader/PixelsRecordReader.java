@@ -18,14 +18,14 @@ public interface PixelsRecordReader
      * @return more rows available
      * @throws java.io.IOException
      * */
-    boolean nextBatch(VectorizedRowBatch batch) throws IOException;
+    boolean readBatch(VectorizedRowBatch batch) throws IOException;
 
     /**
      * Read the next row batch
      * @return row batch
      * @throws java.io.IOException
      * */
-    VectorizedRowBatch nextBatch() throws IOException;
+    VectorizedRowBatch readBatch() throws IOException;
 
     /**
      * Read the next row batch
@@ -33,7 +33,7 @@ public interface PixelsRecordReader
      * @return row batch
      * @throws java.io.IOException
      * */
-    VectorizedRowBatch nextBatch(int max) throws IOException;
+    VectorizedRowBatch readBatch(int max) throws IOException;
 
     /**
      * Get current row number
@@ -57,6 +57,7 @@ public interface PixelsRecordReader
      * @return skip success
      * @throws java.io.IOException
      * */
+    @Deprecated
     boolean skip(long rowNum) throws IOException;
 
     /**

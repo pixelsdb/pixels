@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
+import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 
 import java.util.Optional;
 
@@ -12,7 +12,7 @@ import java.util.Optional;
 public class PixelsReaderOption
 {
     private String[] includedCols = new String[0];
-    private SearchArgument predicate = null;
+    private PixelsPredicate predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private long offset = 0;
@@ -31,12 +31,12 @@ public class PixelsReaderOption
         return includedCols;
     }
 
-    public void predicate(SearchArgument predicates)
+    public void predicate(PixelsPredicate predicate)
     {
-        this.predicate = predicates;
+        this.predicate = predicate;
     }
 
-    public Optional<SearchArgument> getPredicate()
+    public Optional<PixelsPredicate> getPredicate()
     {
         if (predicate == null) {
             return Optional.empty();

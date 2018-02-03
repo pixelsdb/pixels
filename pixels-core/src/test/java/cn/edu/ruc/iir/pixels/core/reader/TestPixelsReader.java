@@ -89,24 +89,22 @@ public class TestPixelsReader
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a","b","d","e","z"};
+        String[] cols = {"b","d","z"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
-        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
+        VectorizedRowBatch rowBatch = schema.createRowBatch();
         try {
-            while (recordReader.nextBatch(rowBatch))
-            {
-                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
-            }
+            recordReader.readBatch(rowBatch);
+            System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+            System.out.println(rowBatch.toString());
+            rowBatch.reset();
         }
         catch (IOException e) {
             e.printStackTrace();
         }
-
-        System.out.println(rowBatch.toString());
     }
 
     @After

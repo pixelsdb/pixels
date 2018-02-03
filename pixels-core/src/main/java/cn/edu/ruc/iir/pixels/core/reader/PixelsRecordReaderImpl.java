@@ -250,7 +250,7 @@ public class PixelsRecordReaderImpl
      * @throws java.io.IOException
      */
     @Override
-    public boolean nextBatch(VectorizedRowBatch batch) throws IOException
+    public boolean readBatch(VectorizedRowBatch batch) throws IOException
     {
         if (!checkValid) {
             return false;
@@ -303,18 +303,18 @@ public class PixelsRecordReaderImpl
     }
 
     @Override
-    public VectorizedRowBatch nextBatch() throws IOException
+    public VectorizedRowBatch readBatch() throws IOException
     {
         VectorizedRowBatch rowBatch = readerSchema.createRowBatch();
-        nextBatch(rowBatch);
+        readBatch(rowBatch);
         return rowBatch;
     }
 
     @Override
-    public VectorizedRowBatch nextBatch(int max) throws IOException
+    public VectorizedRowBatch readBatch(int max) throws IOException
     {
         VectorizedRowBatch rowBatch = readerSchema.createRowBatch(max);
-        nextBatch(rowBatch);
+        readBatch(rowBatch);
         return rowBatch;
     }
 
