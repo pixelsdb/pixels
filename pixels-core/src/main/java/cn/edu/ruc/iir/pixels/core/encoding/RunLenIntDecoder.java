@@ -10,12 +10,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * pixels
  *
  * @author guodong
  */
-public class RunLenIntDecoder extends IntDecoder
+public class RunLenIntDecoder
+        extends IntDecoder
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RunLenIntDecoder.class);
 
@@ -30,7 +33,8 @@ public class RunLenIntDecoder extends IntDecoder
 
     private RunLenIntEncoder.EncodingType currentEncoding;
 
-    private final static RunLenIntEncoder.EncodingType[] encodings = RunLenIntEncoder.EncodingType.values();
+    private final static RunLenIntEncoder.EncodingType[] encodings =
+            RunLenIntEncoder.EncodingType.values();
 
     public RunLenIntDecoder(InputStream inputStream, boolean isSigned)
     {
@@ -42,8 +46,7 @@ public class RunLenIntDecoder extends IntDecoder
     public long next() throws IOException
     {
         long result;
-        if (used == numLiterals)
-        {
+        if (used == numLiterals) {
             numLiterals = 0;
             used = 0;
             readValues();
@@ -60,18 +63,17 @@ public class RunLenIntDecoder extends IntDecoder
 
     private void readValues() throws IOException
     {
+        // read the first 2 bits and determine the encoding type
         isRepeating = false;
         int firstByte = inputStream.read();
-        if (firstByte < 0)
-        {
+        if (firstByte < 0) {
             // todo deal with error
             LOGGER.error("error first byte is negative");
             used = numLiterals = 0;
             return;
         }
         currentEncoding = encodings[(firstByte >>> 6) & 0x03];
-        switch (currentEncoding)
-        {
+        switch (currentEncoding) {
             case SHORT_REPEAT:
                 readShortRepeatValues(firstByte);
                 break;
@@ -85,35 +87,40 @@ public class RunLenIntDecoder extends IntDecoder
                 readDeltaValues(firstByte);
                 break;
             default:
-                // todo error
                 LOGGER.error("Cannot match any supported encoding strategies");
         }
     }
 
     private void readShortRepeatValues(int firstByte) throws IOException
     {
+        // read the number of bytes occupied by the value
         int size = (firstByte >>> 3) & 0x07;
+        // number of bytes are one off
         size += 1;
 
+        // read the run length
         int len = firstByte & 0x07;
+        // run length values are stored only after MIN_REPEAT value is met
         len += Constants.MIN_REPEAT;
 
+        // read the repeated value which is stored using fixed bytes
         long val = bytesToLongBE(inputStream, size);
 
-        if (isSigned)
-        {
+        if (isSigned) {
             val = zigzagDecode(val);
         }
 
-        if (numLiterals != 0)
-        {
-            // todo error
+        if (numLiterals != 0) {
+            // currently this always holds, which makes peekNextAvailLength simpler.
+            // if this changes, peekNextAvailLength should be adjusted accordingly.
             LOGGER.error("numLiterals is not zero");
+            return;
         }
 
+        // repeat the value for length times
         isRepeating = true;
-        for (int i = 0; i < len; i++)
-        {
+        // TODO: this is not so useful and V1 reader doesn't do that. Fix? Same if delta == 0
+        for (int i = 0; i < len; i++) {
             literals[i] = val;
         }
         numLiterals = len;
@@ -121,13 +128,17 @@ public class RunLenIntDecoder extends IntDecoder
 
     private void readDirectValues(int firstByte) throws IOException
     {
+        // extract the number of fixed bits
         int fbo = (firstByte >>> 1) & 0x1f;
         int fb = encodingUtils.decodeBitWidth(fbo);
 
+        // extract run length
         int len = (firstByte & 0x01) << 8;
         len |= inputStream.read();
+        // runs are one off
         len += 1;
 
+        // write the unpacked values and zigzag decode to result buffer
         readInts(literals, numLiterals, len, fb, inputStream);
         if (isSigned) {
             for (int i = 0; i < len; i++) {
@@ -142,45 +153,59 @@ public class RunLenIntDecoder extends IntDecoder
 
     private void readPatchedBaseValues(int firstByte) throws IOException
     {
+        // extract the number of fixed bits
         int fbo = (firstByte >>> 1) & 0x1f;
         int fb = encodingUtils.decodeBitWidth(fbo);
 
+        // extract the run length of data blob
         int len = (firstByte & 0x01) << 8;
         len |= inputStream.read();
+        // runs are always one off
         len += 1;
 
+        // extract the number of bytes occupied by base
         int thirdByte = inputStream.read();
         int bw = (thirdByte >>> 5) & 0x07;
+        // base width is one off
         bw += 1;
 
+        // extract patch width
         int pwo = thirdByte & 0x1f;
         int pw = encodingUtils.decodeBitWidth(pwo);
 
+        // read fourth byte and extract patch gap width
         int fourthByte = inputStream.read();
         int pgw = (fourthByte >>> 5) & 0x07;
+        // patch gao width is one off
         pgw += 1;
 
+        // extract the length of the patch list
         int pl = fourthByte & 0x1f;
 
+        // read the next base width number of bytes to extract base value
         long base = bytesToLongBE(inputStream, bw);
         long mask = (1L << ((bw * 8) - 1));
+        // if MSB of base value is 1 then base is negative value else positive
         if ((base & mask) != 0) {
             base = base & ~mask;
             base = -base;
         }
 
+        // unpack the data blob
         long[] unpacked = new long[len];
         readInts(unpacked, 0, len, fb, inputStream);
 
+        // unpack the patch blob
         long[] unpackedPatch = new long[pl];
 
         if ((pw + pgw) > 64) {
-            // todo error
             LOGGER.error("pw add pgw is bigger than 64");
+            return;
         }
         int bitSize = encodingUtils.getClosestFixedBits(pw + pgw);
         readInts(unpackedPatch, 0, pl, bitSize, inputStream);
 
+        // apply the patch directly when adding the packed data
         int patchIdx = 0;
         long currGap = 0;
         long currPatch = 0;
@@ -189,35 +214,49 @@ public class RunLenIntDecoder extends IntDecoder
         currPatch = unpackedPatch[patchIdx] & patchMask;
         long actualGap = 0;
 
+        // special case: gap is greater than 255 then patch value will be 0
+        // if gap is smaller or equal than 255 then patch value cannot be 0
         while (currGap == 255 && currPatch == 0) {
             actualGap += 255;
             patchIdx++;
             currGap = unpackedPatch[patchIdx] >>> pw;
             currPatch = unpackedPatch[patchIdx] & patchMask;
         }
+        // and the left over gap
         actualGap += currGap;
 
+        // unpack data blob, patch it (if required), add base to get final result
         for (int i = 0; i < unpacked.length; i++) {
             if (i == actualGap) {
+                // extract the patch value
                 long patchedVal = unpacked[i] | (currPatch << fb);
+                // add base to patched value
                 literals[numLiterals++] = base + patchedVal;
+                // increment the patch to point to next entry in patch list
                 patchIdx++;
                 if (patchIdx < pl) {
+                    // read the next gap and patch
                     currGap = unpackedPatch[patchIdx] >>> pw;
                     currPatch = unpackedPatch[patchIdx] & patchMask;
                     actualGap = 0;
 
+                    // special case: gap is grater than 255 then patch will be 0
+                    // if gap is smaller or equal than 255 then patch cannot be 0
                     while (currGap == 255 && currPatch == 0) {
                         actualGap += 255;
                         patchIdx++;
                         currGap = unpackedPatch[patchIdx] >>> pw;
                         currPatch = unpackedPatch[patchIdx] & patchMask;
                     }
+                    // add the left over gap
                     actualGap += currGap;
+
+                    // next gap is relative to the current gap
                     actualGap += i;
                 }
             }
             else {
+                // no patching required. add base to unpacked value to get final value
                 literals[numLiterals++] = base + unpacked[i];
             }
         }
@@ -225,14 +264,17 @@ public class RunLenIntDecoder extends IntDecoder
 
     private void readDeltaValues(int firstByte) throws IOException
     {
+        // extract the number of fixed bits
         int fb = (firstByte >>> 1) & 0x1f;
         if (fb != 0) {
             fb = encodingUtils.decodeBitWidth(fb);
         }
 
+        // extract the blob run length
         int len = (firstByte & 0x01) << 8;
         len |= inputStream.read();
 
+        // read the first value stored as vint
         long firstVal = 0;
         if (isSigned) {
             firstVal = readVslong(inputStream);
@@ -241,18 +283,23 @@ public class RunLenIntDecoder extends IntDecoder
             firstVal = readVulong(inputStream);
         }
 
+        // store first value to result buffer
         long prevVal = firstVal;
         literals[numLiterals++] = firstVal;
 
+        // if fixed bits is 0 then all values have fixed delta
         if (fb == 0) {
+            // read the fixed delta value stored as vint (deltas
+            // can be negative even if all number are positive)
             long fd = readVslong(inputStream);
             if (fd == 0) {
                 isRepeating = true;
-                assert numLiterals == 1;
+                checkArgument(numLiterals == 1, "num literals is not equal to 1");
                 Arrays.fill(literals, numLiterals, numLiterals + len, literals[0]);
                 numLiterals += len;
             }
             else {
+                // add fixed deltas to adjacent values
                 for (int i = 0; i < len; i++) {
                     literals[numLiterals++] = literals[numLiterals - 2] + fd;
                 }
@@ -260,10 +307,14 @@ public class RunLenIntDecoder extends IntDecoder
         }
         else {
             long deltaBase = readVslong(inputStream);
+            // add delta base and first value
             literals[numLiterals++] = firstVal + deltaBase;
             prevVal = literals[numLiterals - 1];
             len -= 1;
 
+            // write the unpacked values, add it to previous values and store final
+            // value to result buffer. if the delta base value is negative then it
+            // is a decreasing sequence else an increasing sequence
             readInts(literals, numLiterals, len, fb, inputStream);
             while (len > 0) {
                 if (deltaBase < 0) {
@@ -279,6 +330,9 @@ public class RunLenIntDecoder extends IntDecoder
         }
     }
 
+    /**
+     * Read bitpacked integers from input stream
+     * */
     private void readInts(long[] buffer, int offset, int len, int bitSize,
                          InputStream input) throws IOException {
         int bitsLeft = 0;
@@ -357,9 +411,12 @@ public class RunLenIntDecoder extends IntDecoder
         return out;
     }
 
+    /**
+     * zigzag decode given value
+     * */
     private long zigzagDecode(long val)
     {
-        return (val << 1) ^ (val >> 63);
+        return (val >>> 1) ^ -(val & 1);
     }
 
     private long readVulong(InputStream in) throws IOException {

@@ -1,15 +1,12 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
-import cn.edu.ruc.iir.pixels.presto.client.MetadataClient;
-import com.alibaba.fastjson.JSON;
+import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -30,36 +27,11 @@ import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharTyp
  **/
 public class PixelsMetadataReader {
 
-    ConfigFactory config = ConfigFactory.Instance();
-    String host = config.getProperty("host");
-    int port = Integer.valueOf(config.getProperty("port"));
-
     private static final Logger log = Logger.get(PixelsMetadataReader.class);
 
     public List<String> getSchemaNames() {
         List<String> schemaList = new ArrayList<String>();
-        List<Schema> schemas = new ArrayList<>();
-        MetadataClient client = new MetadataClient("getSchemaNames");
-        try {
-            new Thread(() -> {
-                try {
-                    client.connect(port, host, null);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }).start();
-            while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
-                    schemas = JSON.parseArray(res, Schema.class);
-                    break;
-                }
-                Thread.sleep(1000);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        List<Schema> schemas = MetadataService.getSchemas();
         log.info("Schemas: " + schemaList.size());
         for (Schema s : schemas) {
             schemaList.add(s.getSchName());
@@ -71,28 +43,7 @@ public class PixelsMetadataReader {
     public List<String> getTableNames(String schemaName) {
         log.info("Function getTableNames() -> schemaName: " + schemaName);
         List<String> tablelist = new ArrayList<String>();
-        List<Table> tables = new ArrayList<>();
-        MetadataClient client = new MetadataClient("getTableNames");
-        try {
-            new Thread(() -> {
-                try {
-                    client.connect(port, host, schemaName);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }).start();
-            while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
-                    tables = JSON.parseArray(res, Table.class);
-                    break;
-                }
-                Thread.sleep(1000);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        List<Table> tables = MetadataService.getTablesBySchemaName(schemaName);
         log.info("Tables: " + tablelist.size());
         for (Table t : tables) {
             tablelist.add(t.getTblName());

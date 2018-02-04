@@ -34,8 +34,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
 
         while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
-            for (int i = 0; i < curPartLength; i++)
-            {
+            for (int i = 0; i < curPartLength; i++) {
                 long v = values[i + curPartOffset];
                 curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
             }
@@ -46,8 +45,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
         }
 
         curPartLength = nextPartLength;
-        for (int i = 0; i < curPartLength; i++)
-        {
+        for (int i = 0; i < curPartLength; i++) {
             long v = values[i + curPartOffset];
             curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
         }
@@ -56,8 +54,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
         nextPartLength = size - curPartOffset;
 
         if (nextPartLength > 0) {
-            for (int i = 0; i < curPartLength; i++)
-            {
+            for (int i = 0; i < curPartLength; i++) {
                 long v = values[i + curPartOffset];
                 curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
             }
@@ -75,7 +72,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateBoolean(curPixelVector[i] != 0, 1);
         }
 
-        outputStream.write(bitWiseCompact(curPixelVector));
+        outputStream.write(bitWiseCompact(curPixelVector, curPixelEleCount));
 
         curPixelPosition = outputStream.size();
         curPixelEleCount = 0;
@@ -89,15 +86,15 @@ public class BooleanColumnWriter extends BaseColumnWriter
         pixelStatRecorder.reset();
     }
 
-    private byte[] bitWiseCompact(long[] values)
+    private byte[] bitWiseCompact(long[] values, int length)
     {
         ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
         int bitsToWrite = 1;
         int bitsLeft = 8;
         byte current = 0;
 
-        for (long v : values)
-        {
+        for (int i = 0; i < length; i++) {
+            long v = values[i];
             bitsLeft -= bitsToWrite;
             current |= v << bitsLeft;
             if (bitsLeft == 0) {

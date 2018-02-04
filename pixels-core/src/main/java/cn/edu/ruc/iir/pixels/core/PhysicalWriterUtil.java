@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
@@ -10,9 +11,9 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class PhysicalFSWriterUtil
+public class PhysicalWriterUtil
 {
-    private PhysicalFSWriterUtil()
+    private PhysicalWriterUtil()
     {}
 
     /**
@@ -24,10 +25,20 @@ public class PhysicalFSWriterUtil
      * @param addBlockPadding add block padding or not
      * @return physical writer
      * */
-    public static PhysicalWriter newPhysicalFSWriter(
+    public static PhysicalFSWriter newPhysicalFSWriter(
             FileSystem fs, Path path, long blockSize, short replication, boolean addBlockPadding)
-            throws IOException
     {
-        return new PhysicalFSWriter(fs, path, blockSize, replication, addBlockPadding);
+        FSDataOutputStream rawWriter = null;
+        try {
+            rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (rawWriter == null) {
+            return null;
+        }
+        return new PhysicalFSWriter(fs, path, blockSize, replication, addBlockPadding, rawWriter);
     }
 }

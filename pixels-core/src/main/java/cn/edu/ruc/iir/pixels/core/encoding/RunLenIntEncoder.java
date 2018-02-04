@@ -7,6 +7,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * pixels run length encoding
  * there are four kinds of encodings: SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA.
@@ -14,7 +16,8 @@ import java.io.OutputStream;
  *
  * @author guodong
  */
-public class RunLenIntEncoder extends Encoder
+public class RunLenIntEncoder
+        extends Encoder
 {
     private EncodingType encodingType;
     private int numLiterals;
@@ -61,6 +64,7 @@ public class RunLenIntEncoder extends Encoder
         this.isAlignedBitpacking = isAlignedBitpacking;
         this.outputStream = new ByteArrayOutputStream();
         this.encodingUtils = new EncodingUtils();
+        clear();
     }
 
     public byte[] encode(long[] values, long offset, long length) throws IOException
@@ -83,13 +87,20 @@ public class RunLenIntEncoder extends Encoder
 
     private void determineEncoding()
     {
+        // compute zigzag values for DIRECT encoding if we decide to
+        // break early for delta overflows or for shorter runs
         computeZigZagLiterals();
         zzBits100p = percentileBits(zigzagLiterals, 0, numLiterals, 1.0);
+
+        // not a big win for shorter runs to determine encoding
         if (numLiterals <= Constants.MIN_REPEAT) {
             encodingType = EncodingType.DIRECT;
             return;
         }
 
+        // DELTA encoding check
+
+        // variables for identifying monotonic sequences
         boolean isIncreasing = true;
         boolean isDecreasing = true;
         this.isFixedDelta = true;
@@ -121,7 +132,7 @@ public class RunLenIntEncoder extends Encoder
         // its faster to exit under delta overflow condition without checking for
         // PATCHED_BASE condition as encoding using DIRECT is faster and has less
         // overhead than PATCHED_BASE
-        if (isSafeSubtract(max, min)) {
+        if (!isSafeSubtract(max, min)) {
             encodingType = EncodingType.DIRECT;
             return;
         }
@@ -132,17 +143,16 @@ public class RunLenIntEncoder extends Encoder
         // if min is equal to max then the delta is 0, this condition happens for
         // fixed values run >10 which cannot be encoded with SHORT_REPEAT
         if (min == max) {
-            assert isFixedDelta : min + "==" + max +
-                    ", isFixedDelta cannot be false";
-            assert currDelta == 0 : min + "==" + max + ", currDelta should be zero";
+            checkArgument(isFixedDelta, min + "==" + max + ", isFixedDelta cannot be false");
+            checkArgument(currDelta == 0, min + "==" + max + ", currDelta should be zero");
             fixedDelta = 0;
             encodingType = EncodingType.DELTA;
             return;
         }
 
         if (isFixedDelta) {
-            assert currDelta == initialDelta
-                    : "currDelta should be equal to initialDelta for fixed delta encoding";
+            checkArgument(currDelta == initialDelta,
+                    "currDelta should be equal to initalDelta for fixed delta encoding");
             encodingType = EncodingType.DELTA;
             fixedDelta = currDelta;
             return;
@@ -198,10 +208,12 @@ public class RunLenIntEncoder extends Encoder
             if ((brBits100p - brBits95p) != 0) {
                 encodingType = EncodingType.PATCHED_BASE;
                 preparePatchedBlob();
-            } else {
+            }
+            else {
                 encodingType = EncodingType.DIRECT;
             }
-        } else {
+        }
+        else {
             // if difference in bits between 95th percentile and 100th percentile is
             // 0, then patch length will become 0. Hence we will fallback to direct
             encodingType = EncodingType.DIRECT;
@@ -287,7 +299,8 @@ public class RunLenIntEncoder extends Encoder
             // for gap = 511, we need two additional entries in patch list
             if (maxGap == 511) {
                 patchLength += 2;
-            } else {
+            }
+            else {
                 patchLength += 1;
             }
         }
@@ -324,10 +337,10 @@ public class RunLenIntEncoder extends Encoder
             else {
                 writeDeltaValues();
             }
-        }
 
-        // clear all the variables
-        clear();
+            // clear all the variables
+            clear();
+        }
     }
 
     private void write(long value) throws IOException
@@ -339,6 +352,7 @@ public class RunLenIntEncoder extends Encoder
             if (numLiterals == 1) {
                 prevDelta = value - literals[0];
                 literals[numLiterals++] = value;
+                // if both values are same then treated as fixed run else variable run
                 if (value == literals[0]) {
                     fixedRunLength = 2;
                     variableRunLength = 0;
@@ -350,13 +364,18 @@ public class RunLenIntEncoder extends Encoder
             }
             else {
                 long curDelta = value - literals[numLiterals - 1];
+                // current values are fixed delta run
                 if (prevDelta == 0 && curDelta == 0) {
                     literals[numLiterals++] = value;
+                    // if variable run is non-zero, then we are seeing repeating values at
+                    // the end of variable run in which case keep updating variable and fixed runs
                     if (variableRunLength > 0) {
                         fixedRunLength = 2;
                     }
                     fixedRunLength += 1;
 
+                    // if fixed run meets the minimum repeat condition and if variable run is non-zero,
+                    // then flush the variable run and shift the tail fixed runs to the start of the buffer
                     if (fixedRunLength >= Constants.MIN_REPEAT && variableRunLength > 0) {
                         numLiterals -= Constants.MIN_REPEAT;
                         variableRunLength -= Constants.MIN_REPEAT - 1;
@@ -376,7 +395,11 @@ public class RunLenIntEncoder extends Encoder
                         writeValues();
                     }
                 }
+                // current values are variable delta run
                 else {
+                    // if fixed run length is non-zero and if it satisfies the minimum repeat
+                    // and the short repeat condition, then write the values as short repeats
+                    // else use delta encoding
                     if (fixedRunLength >= Constants.MIN_REPEAT) {
                         if (fixedRunLength <= Constants.MAX_SHORT_REPEAT_LENGTH) {
                             encodingType = EncodingType.SHORT_REPEAT;
@@ -389,6 +412,9 @@ public class RunLenIntEncoder extends Encoder
                         }
                     }
 
+                    // if fixed run length is smaller than MIN_REPEAT
+                    // and current value is different from previous
+                    // then treat it as variable run
                     if (fixedRunLength >0 && fixedRunLength < Constants.MIN_REPEAT) {
                         if (value != literals[numLiterals - 1]) {
                             variableRunLength = fixedRunLength;
@@ -396,14 +422,17 @@ public class RunLenIntEncoder extends Encoder
                         }
                     }
 
+                    // if done writing values, re-initialize value literals
                     if (numLiterals == 0) {
                         initializeLiterals(value);
                     }
+                    // keep updating variable run lengths
                     else {
                         prevDelta = value - literals[numLiterals - 1];
                         literals[numLiterals++] = value;
                         variableRunLength += 1;
 
+                        // if variable run length reach the max scope, write it
                         if (variableRunLength == Constants.MAX_SCOPE) {
                             determineEncoding();
                             writeValues();
@@ -440,9 +469,10 @@ public class RunLenIntEncoder extends Encoder
                 }
             }
         }
+        outputStream.flush();
     }
 
-    private void writeShortRepeatValues() throws IOException
+    private void writeShortRepeatValues()
     {
         long repeatVal;
         if (isSigned) {
@@ -465,8 +495,10 @@ public class RunLenIntEncoder extends Encoder
         fixedRunLength -= Constants.MIN_REPEAT;
         header |= fixedRunLength;
 
+        // write header
         outputStream.write(header);
 
+        // write the repeating values in big endian byte order
         for (int i = numBytesRepeatVal - 1; i >= 0; i--) {
             int b = (int) ((repeatVal >>> (i * 8)) & 0xff);
             outputStream.write(b);
@@ -477,6 +509,7 @@ public class RunLenIntEncoder extends Encoder
 
     private void writeDirectValues() throws IOException
     {
+        // write the number of fixed bits required in next 5 bits
         int fb = zzBits100p;
 
         if (isAlignedBitpacking) {
@@ -485,8 +518,10 @@ public class RunLenIntEncoder extends Encoder
 
         final int efb = encodingUtils.encodeBitWidth(fb) << 1;
 
+        // adjust variable run length
         variableRunLength -= 1;
 
+        // extract the 9th bit of run length
         final int tailBits = (variableRunLength & 0x100) >>> 8;
 
         // header(2 bytes):
@@ -496,36 +531,59 @@ public class RunLenIntEncoder extends Encoder
         final int headerFirstByte = getOpcode() | efb | tailBits;
         final int headerSecondByte = variableRunLength & 0xff;
 
+        // write header
         outputStream.write(headerFirstByte);
         outputStream.write(headerSecondByte);
 
         writeInts(zigzagLiterals, 0, numLiterals, fb);
+
+        // reset run length
+        variableRunLength = 0;
     }
 
     private void writePatchedBaseValues() throws IOException
     {
+        // NOTE: Aligned bit packing cannot be applied for PATCHED_BASE encoding
+        // because patch is applied to MSB bits. For example: If fixed bit width of
+        // base value is 7 bits and if patch is 3 bits, the actual value is
+        // constructed by shifting the patch to left by 7 positions.
+        // actual_value = patch << 7 | base_value
+        // So, if we align base_value then actual_value can not be reconstructed.
+
+        // write the number of fixed bits required in next 5 bits
         final int fb = brBits95p;
         final int efb = encodingUtils.encodeBitWidth(fb) << 1;
+        // adjust variable run length, they are one off
         variableRunLength -= 1;
 
+        // extract the 9th bit of run length
         final int tailBits = (variableRunLength & 0x100) >>> 8;
+        // create first byte of the header
         final int headerFirstByte = getOpcode() | efb | tailBits;
+        // second byte of the header stores the remaining 8 bits of run length
         final int headerSecondByte = variableRunLength & 0xff;
 
+        // if the min value if negative, toggle the sign
         final boolean isNegative = min < 0;
         if (isNegative) {
             min = -min;
         }
 
+        // find the number of bytes required for base and shift it by 5 bits to
+        // accommodate patch width. The additional bit is used to store the sign of the base value
         final int baseWidth = findClosestNumBits(min) + 1;
         final int baseBytes = baseWidth % 8 == 0 ? baseWidth / 8 : (baseWidth / 8) + 1;
         final int bb = (baseBytes - 1) << 5;
 
+        // if the base value if negative, then set MSB to 1
         if (isNegative) {
             min |= (1L << ((baseBytes * 8) - 1));
         }
 
+        // third byte contains 3 bits for number of bytes occupied by base
+        // and 5 bits for patchWidth
         final int headerThirdByte = bb | encodingUtils.encodeBitWidth(patchWidth);
+        // fourth byte contains 3 bits for page gap width and 5 bits for patch length
         final int headerFourthByte = (patchGapWidth - 1) << 5 | patchLength;
 
         // write header
@@ -534,11 +592,13 @@ public class RunLenIntEncoder extends Encoder
         outputStream.write(headerThirdByte);
         outputStream.write(headerFourthByte);
 
+        // write the base value using fixed bytes in big endian order
         for(int i = baseBytes - 1; i >= 0; i--) {
             byte b = (byte) ((min >>> (i * 8)) & 0xff);
             outputStream.write(b);
         }
 
+        // base reduced literals are bit packed
         int closestFixedBits = encodingUtils.getClosestFixedBits(fb);
 
         writeInts(baseRedLiterals, 0, numLiterals, closestFixedBits);
@@ -570,12 +630,14 @@ public class RunLenIntEncoder extends Encoder
                 // ex. sequence: 2 2 2 2 2 2 2 2
                 len = fixedRunLength - 1;
                 fixedRunLength = 0;
-            } else {
+            }
+            else {
                 // ex. sequence: 4 6 8 10 12 14 16
                 len = variableRunLength - 1;
                 variableRunLength = 0;
             }
-        } else {
+        }
+        else {
             // fixed width 0 is used for long repeating values.
             // sequences that require only 1 bit to encode will have an additional bit
             if (fb == 1) {
@@ -607,14 +669,16 @@ public class RunLenIntEncoder extends Encoder
         // store the first value from zigzag literal array
         if (isSigned) {
             writeVslong(outputStream, literals[0]);
-        } else {
+        }
+        else {
             writeVulong(outputStream, literals[0]);
         }
 
         if (isFixedDelta) {
             // if delta is fixed then we don't need to store delta blob
             writeVslong(outputStream, fixedDelta);
-        } else {
+        }
+        else {
             // store the first value as delta value using zigzag encoding
             writeVslong(outputStream, adjDeltas[0]);
 
@@ -626,6 +690,9 @@ public class RunLenIntEncoder extends Encoder
         }
     }
 
+    /**
+     * Bitpack and write the input values to underlying output stream
+     * */
     private void writeInts(long[] input, int offset, int len, int bitSize) throws IOException
     {
         if (input == null || input.length < 1 || offset < 0 || len < 1 || bitSize < 1) {
@@ -678,8 +745,11 @@ public class RunLenIntEncoder extends Encoder
             long value = input[i];
             int bitsToWrite = bitSize;
             while (bitsToWrite > bitsLeft) {
+                // add the bits to the bottom of the current word
                 current |= value >>> (bitsToWrite - bitsLeft);
+                // subtract out the bits we just added
                 bitsToWrite -= bitsLeft;
+                // zero out the bits above bitsToWrite
                 value &= (1L << bitsToWrite) - 1;
                 outputStream.write(current);
                 current = 0;
@@ -697,8 +767,8 @@ public class RunLenIntEncoder extends Encoder
         // flush
         if (bitsLeft != 8) {
             outputStream.write(current);
-//            current = 0;
-//            bitsLeft = 8;
+            current = 0;
+            bitsLeft = 8;
         }
     }
 
@@ -729,10 +799,13 @@ public class RunLenIntEncoder extends Encoder
 
     private void computeZigZagLiterals()
     {
+        long zzEncVal = 0;
         for (int i = 0; i < numLiterals; i++) {
-            long zzEncVal = literals[i];
             if (isSigned) {
-                zzEncVal = (zzEncVal << 1) ^ (zzEncVal >> 63);
+                zzEncVal = zigzagEncode(literals[i]);
+            }
+            else {
+                zzEncVal = literals[i];
             }
            zigzagLiterals[i] = zzEncVal;
         }
@@ -748,14 +821,20 @@ public class RunLenIntEncoder extends Encoder
         return encodingType.ordinal() << 6;
     }
 
+    /**
+     * Compute the number of bits required to represent pth percentile value
+     * */
     private int percentileBits(long[] data, int offset, int length, double p)
     {
         if ((p > 1.0) || (p <= 0.0)) {
             return -1;
         }
 
+        // histogram that stores the encoded bit requirement for each values.
+        // maximum number of bits that can be encoded is 32
         int[] hist = new int[32];
-        for (int i = offset; i < offset + length; i++) {
+        // compute histogram
+        for (int i = offset; i < (offset + length); i++) {
             int idx = encodingUtils.encodeBitWidth(findClosestNumBits(data[i]));
             hist[idx] += 1;
         }
@@ -772,6 +851,9 @@ public class RunLenIntEncoder extends Encoder
         return 0;
     }
 
+    /**
+     * Count the number of bits required to encode the given value
+     * */
     private int findClosestNumBits(long value)
     {
         int count = 0;
@@ -818,7 +900,8 @@ public class RunLenIntEncoder extends Encoder
             if ((value & ~0x7f) == 0) {
                 output.write((byte) value);
                 return;
-            } else {
+            }
+            else {
                 output.write((byte) (0x80 | (value & 0x7f)));
                 value >>>= 7;
             }

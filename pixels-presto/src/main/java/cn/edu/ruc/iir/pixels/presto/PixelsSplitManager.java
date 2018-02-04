@@ -13,6 +13,8 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Catalog;
+import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static cn.edu.ruc.iir.pixels.presto.client.MetadataService.getCatalogsByTblName;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -66,10 +69,14 @@ public class PixelsSplitManager
         TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
                 .transform(PixelsColumnHandle.class::cast);
 
+        List<Catalog> catalogList = MetadataService.getCatalogsByTblName(tableHandle.getTableName());
+        List<Path> files = new ArrayList<>();
+        for (Catalog c : catalogList) {
+            files.addAll(fsFactory.listFiles(c.getCataPath()));
+            log.info("Path: " + c.getCataPath());
+        }
         log.info("Path: " + tablePath);
-        List<Path> files = fsFactory.listFiles(tablePath);
 
-        log.info("filename: " + files.get(0).getName());
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,
                 tableHandle.getSchemaName(),
                 tableHandle.getTableName(),

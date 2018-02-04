@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import org.apache.hadoop.fs.FSDataInputStream;
-
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
@@ -10,10 +9,23 @@ import java.io.IOException;
  * @author guodong
  */
 public interface PhysicalReader
+        extends Closeable
 {
     long getFileLength() throws IOException;
 
-    FSDataInputStream getRawReader();
+    void seek(long desired) throws IOException;
+
+    int read(byte[] buffer) throws IOException;
+
+    int read(byte[] buffer, int offset, int length) throws IOException;
+
+    void readFully(byte[] buffer) throws IOException;
+
+    void readFully(byte[] buffer, int offset, int length) throws IOException;
+
+    long readLong() throws IOException;
+
+    int readInt() throws IOException;
 
     void close() throws IOException;
 }

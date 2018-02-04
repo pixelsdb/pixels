@@ -118,6 +118,37 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(float value)
+    {
+        add((double) value);
+    }
+
+    @Override
+    public void add(float[] values)
+    {
+        for (float v : values) {
+            add(v);
+        }
+    }
+
+    @Override
+    public void add(double value)
+    {
+        if (writeIndex >= getLength()) {
+            ensureSize(writeIndex * 2, true);
+        }
+        vector[writeIndex++] = value;
+    }
+
+    @Override
+    public void add(double[] values)
+    {
+        for (double v : values) {
+            add(v);
+        }
+    }
+
+    @Override
     public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector) {
         if (inputVector.isRepeating) {
             inputElementNum = 0;

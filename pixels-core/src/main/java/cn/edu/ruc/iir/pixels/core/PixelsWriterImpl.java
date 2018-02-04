@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
@@ -29,15 +30,19 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TimeZone;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
- * Pixels file writer
+ * Pixels file writer default implementation
  *
  * This writer is NOT thread safe!
  *
  * @author guodong
  */
 @NotThreadSafe
-public class PixelsWriterImpl extends PixelsWriter
+public class PixelsWriterImpl
+        extends PixelsWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriterImpl.class);
 
@@ -75,16 +80,19 @@ public class PixelsWriterImpl extends PixelsWriter
             PhysicalWriter physicalWriter,
             boolean encoding)
     {
-        this.schema = schema;
+        this.schema = requireNonNull(schema, "schema is null");
+        checkArgument(pixelStride > 0, "pixel stripe is not positive");
         this.pixelStride = pixelStride;
+        checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
-        this.compressionKind = compressionKind;
+        this.compressionKind = requireNonNull(compressionKind);
+        checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
-        this.timeZone = timeZone;
+        this.timeZone = requireNonNull(timeZone);
         this.encoding = encoding;
 
         List<TypeDescription> children = schema.getChildren();
-        assert children != null;
+        checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
@@ -114,9 +122,12 @@ public class PixelsWriterImpl extends PixelsWriter
         private boolean builderBlockPadding = true;
         private boolean encoding = true;
 
+        private Builder()
+        {}
+
         public Builder setSchema(TypeDescription schema)
         {
-            this.builderSchema = schema;
+            this.builderSchema = requireNonNull(schema);
 
             return this;
         }
@@ -137,7 +148,7 @@ public class PixelsWriterImpl extends PixelsWriter
 
         public Builder setCompressionKind(CompressionKind compressionKind)
         {
-            this.builderCompressionKind = compressionKind;
+            this.builderCompressionKind = requireNonNull(compressionKind);
 
             return this;
         }
@@ -151,21 +162,21 @@ public class PixelsWriterImpl extends PixelsWriter
 
         public Builder setTimeZone(TimeZone timeZone)
         {
-            this.builderTimeZone = timeZone;
+            this.builderTimeZone = requireNonNull(timeZone);
 
             return this;
         }
 
         public Builder setFS(FileSystem fs)
         {
-            this.builderFS = fs;
+            this.builderFS = requireNonNull(fs);
 
             return this;
         }
 
         public Builder setFilePath(Path filePath)
         {
-            this.builderFilePath = filePath;
+            this.builderFilePath = requireNonNull(filePath);
 
             return this;
         }
@@ -198,10 +209,17 @@ public class PixelsWriterImpl extends PixelsWriter
             return this;
         }
 
-        public PixelsWriterImpl build() throws IOException
+        public PixelsWriter build() throws PixelsWriterException
         {
-            PhysicalWriter fsWriter = PhysicalFSWriterUtil.newPhysicalFSWriter(
+            PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
+            checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
+                    "schema is empty");
+
+            if (fsWriter == null) {
+                LOGGER.error("Failed to create PhysicalWriter");
+                throw new PixelsWriterException("Failed to create PixelsWriter due to error of creating PhysicalWriter");
+            }
 
             return new PixelsWriterImpl(
                     builderSchema,
@@ -255,11 +273,6 @@ public class PixelsWriterImpl extends PixelsWriter
         return encoding;
     }
 
-    public ColumnWriter[] getColumnWriters()
-    {
-        return columnWriters;
-    }
-
     /**
      * Add a row batch
      * Repeating is not supported currently in ColumnVector
@@ -302,9 +315,7 @@ public class PixelsWriterImpl extends PixelsWriter
         } catch (IOException e)
         {
             LOGGER.error(e.getMessage());
-            System.out.println("Error writing file tail out.");
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
@@ -319,6 +330,8 @@ public class PixelsWriterImpl extends PixelsWriter
                 PixelsProto.RowGroupInformation.newBuilder();
         PixelsProto.RowGroupIndex.Builder curRowGroupIndex =
                 PixelsProto.RowGroupIndex.newBuilder();
+        PixelsProto.RowGroupEncoding.Builder curRowGroupEncoding =
+                PixelsProto.RowGroupEncoding.newBuilder();
 
         // reset each column writer and get current row group content size in bytes
         for (ColumnWriter writer : columnWriters)
@@ -345,7 +358,7 @@ public class PixelsWriterImpl extends PixelsWriter
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
-            System.exit(-1);
+            return;
         }
 
         // update index and stats
@@ -361,6 +374,8 @@ public class PixelsWriterImpl extends PixelsWriter
             curRowGroupIndex.addColumnChunkIndexEntries(chunkIndexBuilder.build());
             // collect columnChunkStatistic into rowGroupStatistic
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
+            // collect columnChunkEncoding
+            curRowGroupEncoding.addColumnChunkEncodings(writer.getColumnChunkEncoding().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             // call children writer reset()
@@ -371,6 +386,7 @@ public class PixelsWriterImpl extends PixelsWriter
         PixelsProto.RowGroupFooter rowGroupFooter =
                 PixelsProto.RowGroupFooter.newBuilder()
                         .setRowGroupIndexEntry(curRowGroupIndex.build())
+                        .setRowGroupEncoding(curRowGroupEncoding.build())
                         .build();
 
         // write and flush row group footer
@@ -382,7 +398,7 @@ public class PixelsWriterImpl extends PixelsWriter
         }
         catch (IOException e) {
             LOGGER.error(e.getMessage());
-            System.exit(-1);
+            return;
         }
 
         // update RowGroupInformation, and put it into rowGroupInfoList
@@ -452,11 +468,13 @@ public class PixelsWriterImpl extends PixelsWriter
         physicalWriter.flush();
     }
 
-    private void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
+    public static void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
     {
         List<TypeDescription> children = schema.getChildren();
         List<String> names = schema.getFieldNames();
-        assert children != null;
+        if (children == null || children.isEmpty()) {
+            return;
+        }
         for (int i = 0; i < children.size(); i++)
         {
             PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();

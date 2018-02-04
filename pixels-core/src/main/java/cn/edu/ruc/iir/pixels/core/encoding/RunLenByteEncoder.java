@@ -9,7 +9,8 @@ import java.io.IOException;
  * If the bytes is -1 to -128, 1 to 128 literal byte values follow.
  *
  */
-public class RunLenByteEncoder extends Encoder
+public class RunLenByteEncoder
+        extends Encoder
 {
     private static final int MIN_REPEAT_SIZE = 3;
     private static final int MAX_LITERAL_SIZE = 128;

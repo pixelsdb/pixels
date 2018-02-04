@@ -11,7 +11,8 @@ import java.nio.charset.CharacterCodingException;
  *
  * @author guodong
  */
-public class StringStatsRecorder extends StatsRecorder implements StringColumnStats
+public class StringStatsRecorder
+        extends StatsRecorder implements StringColumnStats
 {
     private String minimum = null;
     private String maximum = null;
