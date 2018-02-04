@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Timestamp column writer.
+ * All timestamp values are converted to standard UTC time before they are stored as long values.
  * Each pixel contains two arrays(time and nano), the two arrays are separately maintained,
  *  and then concatenated and encoded together when writing out.
  * Time and nano values are always positive, thus when encoding, isSigned can be set as true.
@@ -87,13 +88,11 @@ public class TimestampColumnWriter extends BaseColumnWriter
             outputStream.write(encoder.encode(values));
         }
         else {
-            ByteBuffer curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES + curPixelEleCount * Integer.BYTES);
+            ByteBuffer curVecPartitionBuffer =
+                    ByteBuffer.allocate(curPixelEleCount * Long.BYTES + curPixelEleCount * Integer.BYTES);
             for (int i = 0; i < curPixelEleCount; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelTimeVector.vector[i]);
-            }
-            for (int i = 0; i < curPixelEleCount; i++)
-            {
                 curVecPartitionBuffer.putInt((int) curPixelNanoVector.vector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
@@ -110,5 +109,16 @@ public class TimestampColumnWriter extends BaseColumnWriter
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         lastPixelPosition = curPixelPosition;
         pixelStatRecorder.reset();
+    }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (isEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 }

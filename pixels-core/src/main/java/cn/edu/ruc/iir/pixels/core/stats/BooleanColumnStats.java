@@ -5,7 +5,7 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface BooleanColumnStats extends ColumnStats
+public interface BooleanColumnStats
 {
     long getFalseCount();
 

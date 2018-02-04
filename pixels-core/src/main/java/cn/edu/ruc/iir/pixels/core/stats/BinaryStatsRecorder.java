@@ -7,7 +7,8 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
  *
  * @author guodong
  */
-public class BinaryStatsRecorder extends StatsRecorder implements BinaryColumnStats
+public class BinaryStatsRecorder
+        extends StatsRecorder implements BinaryColumnStats
 {
     private long sum = 0L;
 

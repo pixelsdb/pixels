@@ -5,8 +5,11 @@ package cn.edu.ruc.iir.pixels.core.exception;
  *
  * @author guodong
  */
-public class PixelsRuntimeException extends RuntimeException
+public class PixelsRuntimeException
+        extends RuntimeException
 {
+    private static final long serialVersionUID = -5885819000511734187L;
+
     public PixelsRuntimeException()
     {
         super();

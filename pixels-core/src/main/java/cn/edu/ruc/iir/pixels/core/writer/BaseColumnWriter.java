@@ -95,6 +95,12 @@ public abstract class BaseColumnWriter implements ColumnWriter
         return columnChunkStatRecorder;
     }
 
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
     @Override
     public void flush() throws IOException
     {

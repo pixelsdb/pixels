@@ -9,7 +9,7 @@ import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import java.io.IOException;
 
 /**
- * pixels
+ * pixels byte column writer
  *
  * @author guodong
  */
@@ -75,10 +75,10 @@ public class ByteColumnWriter extends BaseColumnWriter
         }
 
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         else {
-            outputStream.write(curPixelVector);
+            outputStream.write(curPixelVector, 0, curPixelEleCount);
         }
 
         curPixelPosition = outputStream.size();
@@ -92,5 +92,16 @@ public class ByteColumnWriter extends BaseColumnWriter
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         lastPixelPosition = curPixelPosition;
         pixelStatRecorder.reset();
+    }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (isEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 }

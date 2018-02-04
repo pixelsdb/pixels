@@ -138,6 +138,62 @@ public final class TypeDescription
         return new TypeDescription(Category.BINARY);
     }
 
+    public static TypeDescription createSchema(List<PixelsProto.Type> types)
+    {
+        TypeDescription schema = TypeDescription.createStruct();
+        for (PixelsProto.Type type : types) {
+            String fieldName = type.getName();
+            TypeDescription fieldType;
+            switch (type.getKind())
+            {
+                case INT:
+                    fieldType = TypeDescription.createInt();
+                    break;
+                case BYTE:
+                    fieldType = TypeDescription.createByte();
+                    break;
+                case CHAR:
+                    fieldType = TypeDescription.createChar();
+                    break;
+                case DATE:
+                    fieldType = TypeDescription.createDate();
+                    break;
+                case LONG:
+                    fieldType = TypeDescription.createLong();
+                    break;
+                case FLOAT:
+                    fieldType = TypeDescription.createFloat();
+                    break;
+                case SHORT:
+                    fieldType = TypeDescription.createShort();
+                    break;
+                case BINARY:
+                    fieldType = TypeDescription.createBinary();
+                    break;
+                case DOUBLE:
+                    fieldType = TypeDescription.createDouble();
+                    break;
+                case STRING:
+                    fieldType = TypeDescription.createString();
+                    break;
+                case BOOLEAN:
+                    fieldType = TypeDescription.createBoolean();
+                    break;
+                case VARCHAR:
+                    fieldType = TypeDescription.createVarchar();
+                    break;
+                case TIMESTAMP:
+                    fieldType = TypeDescription.createTimestamp();
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown type: " +
+                            type.getKind());
+            }
+            schema.addField(fieldName, fieldType);
+        }
+        return schema;
+    }
+
     static class StringPosition {
         final String value;
         int position;
@@ -161,7 +217,7 @@ public final class TypeDescription
         }
     }
 
-    static Category parseCategory(StringPosition source) {
+    private static Category parseCategory(StringPosition source) {
         int start = source.position;
         while (source.position < source.length) {
             char ch = source.value.charAt(source.position);
@@ -181,7 +237,7 @@ public final class TypeDescription
         throw new IllegalArgumentException("Can't parse category at " + source);
     }
 
-    static int parseInt(StringPosition source) {
+    private static int parseInt(StringPosition source) {
         int start = source.position;
         int result = 0;
         while (source.position < source.length) {
@@ -198,7 +254,7 @@ public final class TypeDescription
         return result;
     }
 
-    static String parseName(StringPosition source) {
+    private static String parseName(StringPosition source) {
         if (source.position == source.length) {
             throw new IllegalArgumentException("Missing name at " + source);
         }
@@ -245,7 +301,7 @@ public final class TypeDescription
         }
     }
 
-    static void requireChar(StringPosition source, char required) {
+    private static void requireChar(StringPosition source, char required) {
         if (source.position >= source.length ||
                 source.value.charAt(source.position) != required) {
             throw new IllegalArgumentException("Missing required char '" +
@@ -254,7 +310,7 @@ public final class TypeDescription
         source.position += 1;
     }
 
-    static boolean consumeChar(StringPosition source, char ch) {
+    private static boolean consumeChar(StringPosition source, char ch) {
         boolean result = source.position < source.length &&
                 source.value.charAt(source.position) == ch;
         if (result) {
@@ -263,7 +319,7 @@ public final class TypeDescription
         return result;
     }
 
-    static void parseStruct(TypeDescription type, StringPosition source) {
+    private static void parseStruct(TypeDescription type, StringPosition source) {
         requireChar(source, '<');
         do {
             String fieldName = parseName(source);
@@ -273,7 +329,7 @@ public final class TypeDescription
         requireChar(source, '>');
     }
 
-    static TypeDescription parseType(StringPosition source) {
+    private static TypeDescription parseType(StringPosition source) {
         TypeDescription result = new TypeDescription(parseCategory(source));
         switch (result.getCategory()) {
             case BINARY:

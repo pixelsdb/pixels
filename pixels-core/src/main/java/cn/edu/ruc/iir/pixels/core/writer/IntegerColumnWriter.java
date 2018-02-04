@@ -11,10 +11,11 @@ import java.nio.ByteBuffer;
 
 /**
  * Integer column writer.
+ * If encoding, use RunLength;
+ * Else isLong(1 byte) + content
  *
  * @author guodong
  */
-// todo fixing bug with signed int values encoding
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
@@ -82,19 +83,21 @@ public class IntegerColumnWriter extends BaseColumnWriter
 
         // write out current pixel vector
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         else {
             ByteBuffer curVecPartitionBuffer;
             if (isLong) {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES + 1);
+                curVecPartitionBuffer.put((byte) 1);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
                 }
             }
             else {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES + 1);
+                curVecPartitionBuffer.put((byte) 0);
                 for (int i = 0; i < curPixelEleCount; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);
@@ -121,5 +124,16 @@ public class IntegerColumnWriter extends BaseColumnWriter
         columnChunkIndex.addPixelStatistics(pixelStat.build());
         lastPixelPosition = curPixelPosition;
         pixelStatRecorder.reset();
+    }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (isEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 }

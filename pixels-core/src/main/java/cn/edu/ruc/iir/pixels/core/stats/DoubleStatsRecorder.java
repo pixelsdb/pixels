@@ -7,7 +7,8 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
  *
  * @author guodong
  */
-public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnStats
+public class DoubleStatsRecorder
+        extends StatsRecorder implements DoubleColumnStats
 {
     private boolean hasMinimum = false;
     private double minimum = Double.MIN_VALUE;
@@ -121,13 +122,13 @@ public class DoubleStatsRecorder extends StatsRecorder implements DoubleColumnSt
     }
 
     @Override
-    public double getMinimum()
+    public Double getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public double getMaximum()
+    public Double getMaximum()
     {
         return maximum;
     }

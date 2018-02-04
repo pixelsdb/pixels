@@ -14,19 +14,28 @@ import java.nio.ByteBuffer;
  *
  * @author guodong
  */
-public class PhysicalFSWriter implements PhysicalWriter
+public class PhysicalFSWriter
+        implements PhysicalWriter
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalFSWriter.class);
 
+    private final FileSystem fs;
+    private final Path path;
     private final long blockSize;
+    private final short replication;
     private final boolean addBlockPadding;
     private final FSDataOutputStream rawWriter;
 
-    public PhysicalFSWriter(FileSystem fs, Path path, long blockSize, short replication, boolean addBlockPadding) throws IOException
+    public PhysicalFSWriter(FileSystem fs, Path path, long blockSize,
+                            short replication, boolean addBlockPadding,
+                            FSDataOutputStream rawWriter)
     {
+        this.fs = fs;
+        this.path = path;
         this.blockSize = blockSize;
+        this.replication = replication;
         this.addBlockPadding = addBlockPadding;
-        rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+        this.rawWriter = rawWriter;
     }
 
     @Override
@@ -77,5 +86,30 @@ public class PhysicalFSWriter implements PhysicalWriter
     public void flush() throws IOException
     {
         rawWriter.flush();
+    }
+
+    public FileSystem getFs()
+    {
+        return fs;
+    }
+
+    public Path getPath()
+    {
+        return path;
+    }
+
+    public long getBlockSize()
+    {
+        return blockSize;
+    }
+
+    public short getReplication()
+    {
+        return replication;
+    }
+
+    public boolean isAddBlockPadding()
+    {
+        return addBlockPadding;
     }
 }

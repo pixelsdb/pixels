@@ -5,11 +5,11 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface IntegerColumnStats extends ColumnStats
+public interface IntegerColumnStats extends RangeStats<Long>
 {
-    long getMinimum();
+    Long getMinimum();
 
-    long getMaximum();
+    Long getMaximum();
 
     boolean isSumDefined();
 

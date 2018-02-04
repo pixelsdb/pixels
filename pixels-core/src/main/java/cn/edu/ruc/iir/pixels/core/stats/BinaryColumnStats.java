@@ -5,7 +5,7 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface BinaryColumnStats extends ColumnStats
+public interface BinaryColumnStats
 {
     /**
      * Get the total length of the binary blob
