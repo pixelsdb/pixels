@@ -111,8 +111,6 @@ public class StringColumnReader
                 CharSequence str = contentBuf.readCharSequence(lens[i], Charset.forName("UTF-8"));
                 vector.add(str.toString());
             }
-            lensBuf.release();
-            contentBuf.release();
         }
 
         inputBuffer.release();
