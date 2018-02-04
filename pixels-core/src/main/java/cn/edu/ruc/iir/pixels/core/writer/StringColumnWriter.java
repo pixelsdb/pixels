@@ -8,8 +8,6 @@ import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -195,10 +193,9 @@ public class StringColumnWriter extends BaseColumnWriter
         lensArray.clear();
         outputStream.write(encoder.encode(tmpLens));
 
-        ByteBuf buf = Unpooled.buffer();
-        buf.writeInt(lensFieldOffset);
-        outputStream.write(buf.array());
-        buf.release();
+        ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
+        offsetBuf.putInt(lensFieldOffset);
+        outputStream.write(offsetBuf.array());
     }
 
     private void flushDictionary() throws IOException

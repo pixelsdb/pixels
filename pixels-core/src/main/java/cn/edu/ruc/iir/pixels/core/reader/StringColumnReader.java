@@ -96,11 +96,11 @@ public class StringColumnReader
             int[] lens = new int[size];
             // read lens field offset
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - 4);
+            inputBuffer.skipBytes(input.length - Integer.BYTES);
             int lensOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read lens field
-            ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - 4 - lensOffset);
+            ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - Integer.BYTES - lensOffset);
             RunLenIntDecoder decoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
             for (int i = 0; i < size; i++) {
                 lens[i] = (int) decoder.next();
