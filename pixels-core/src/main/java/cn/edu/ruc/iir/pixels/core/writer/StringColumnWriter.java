@@ -204,8 +204,8 @@ public class StringColumnWriter extends BaseColumnWriter
         int startsFieldOffset;
         int ordersFieldOffset;
         int size = dictionary.size();
-        int[] starts = new int[size];
-        int[] orders = new int[size];
+        long[] starts = new long[size];
+        long[] orders = new long[size];
 
         originsFieldOffset = outputStream.size();
 
@@ -227,21 +227,12 @@ public class StringColumnWriter extends BaseColumnWriter
 
         startsFieldOffset = outputStream.size();
 
-        // todo run length encode starts and orders array
-
-        ByteBuffer startsBuf = ByteBuffer.allocate(size * Integer.BYTES);
-        for (int i = 0; i < size; i++) {
-            startsBuf.putInt(starts[i]);
-        }
-        outputStream.write(startsBuf.array());
-
+        // write out run length starts array
+        outputStream.write(encoder.encode(starts));
         ordersFieldOffset = outputStream.size();
 
-        ByteBuffer ordersBuf = ByteBuffer.allocate(size * Integer.BYTES);
-        for (int i = 0; i < size; i++) {
-            ordersBuf.putInt(orders[i]);
-        }
-        outputStream.write(ordersBuf.array());
+        // write out run length orders array
+        outputStream.write(encoder.encode(orders));
 
         ByteBuffer offsetsBuf = ByteBuffer.allocate(3 * Integer.BYTES);
         offsetsBuf.putInt(originsFieldOffset);

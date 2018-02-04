@@ -55,17 +55,19 @@ public class StringColumnReader
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, input.length - ordersOffset);
             int originNum = 0;
             DynamicIntArray startsArray = new DynamicIntArray();
-            while (startsBuf.isReadable()) {
-                startsArray.add(startsBuf.readInt());
+            RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
+            while (startsDecoder.hasNext()) {
+                startsArray.add((int) startsDecoder.next());
                 originNum++;
             }
 
             // read starts and orders
+            RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
             int[] starts = new int[originNum];
             int[] orders = new int[originNum];
-            for (int i = 0; i < originNum; i++) {
+            for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++) {
                 starts[i] = startsArray.get(i);
-                orders[i] = ordersBuf.readInt();
+                orders[i] = (int) ordersDecoder.next();
             }
             // read origins
             String[] origins = new String[originNum];
