@@ -1,0 +1,7 @@
+# seek cost
+# TYPE Histogram
+seek
+
+# sequential read cost
+# TYPE Histogram
+read
