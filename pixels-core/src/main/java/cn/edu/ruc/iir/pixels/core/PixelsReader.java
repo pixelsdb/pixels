@@ -78,7 +78,7 @@ public interface PixelsReader
     List<PixelsProto.ColumnStatistic> getColumnStats();
 
     /**
-     * Get file level metric of the specified column
+     * Get file level statistic of the specified column
      *
      * @param columnName column name
      * @return column stat

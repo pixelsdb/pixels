@@ -20,7 +20,7 @@ public interface PixelsPredicate
      *
      * @param numberOfRows number of rows
      * @param statisticsByColumnIndex statistics map. key: column index in user specified schema,
-     *                                value: column metric
+     *                                value: column statistic
      * */
     boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex);
 }

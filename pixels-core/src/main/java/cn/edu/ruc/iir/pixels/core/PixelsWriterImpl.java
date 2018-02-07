@@ -66,7 +66,7 @@ public class PixelsWriterImpl
     private int curRowGroupDataLength = 0;
 
     private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
-    private final List<RowGroupStatistic> rowGroupStatisticList; // row group metric in footer
+    private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
 
     private final PhysicalWriter physicalWriter;
 
@@ -376,7 +376,7 @@ public class PixelsWriterImpl
             curRowGroupStatistic.addColumnChunkStats(writer.getColumnChunkStat().build());
             // collect columnChunkEncoding
             curRowGroupEncoding.addColumnChunkEncodings(writer.getColumnChunkEncoding().build());
-            // update file column metric
+            // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
             // call children writer reset()
             writer.reset();

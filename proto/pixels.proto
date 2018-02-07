@@ -118,8 +118,8 @@ message RowGroupInformation {
     optional uint64 numberOfRows = 4;
 }
 
-// Row group metric
-// columnChunkStats: metric for each column chunk.
+// Row group statistic
+// columnChunkStats: statistic for each column chunk.
 // for example, min/max for col0 in this row group
 // this can be used to filter row groups.
 message RowGroupStatistic {
@@ -171,8 +171,8 @@ message ColumnStatistic {
     optional bool hasNull = 8;
 }
 
-// Pixel metric
-// metric: metric for this pixel
+// Pixel statistic
+// statistic: statistic for this pixel
 message PixelStatistic {
     optional ColumnStatistic statistic = 1;
 }
