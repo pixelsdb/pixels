@@ -241,7 +241,7 @@ public class PixelsReaderImpl
     }
 
     /**
-     * Get file level statistic of the specified column
+     * Get file level metric of the specified column
      *
      * @param columnName column name
      * @return column stat

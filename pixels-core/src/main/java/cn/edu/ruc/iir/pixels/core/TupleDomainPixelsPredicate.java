@@ -49,7 +49,7 @@ public class TupleDomainPixelsPredicate<C>
      *
      * @param numberOfRows            number of rows
      * @param statisticsByColumnIndex statistics map. key: column index in user specified schema,
-     *                                value: column statistic
+     *                                value: column metric
      */
     @Override
     public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)

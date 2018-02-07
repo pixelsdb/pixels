@@ -49,7 +49,7 @@ public class PixelsCompactor
     private final StatsRecorder[] fileColStatRecorders;
 
     private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList;    // row group information in footer
-    private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList; // row group statistic in footer
+    private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList; // row group metric in footer
     private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList; // row group fotters
     private final List<Path> rowGroupPaths;
 
