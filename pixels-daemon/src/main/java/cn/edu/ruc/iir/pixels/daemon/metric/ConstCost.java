@@ -5,6 +5,14 @@ public class ConstCost
     private String name;
     private double ms;
 
+    public ConstCost() {}
+
+    public ConstCost(String name, double ms)
+    {
+        this.name = name;
+        this.ms = ms;
+    }
+
     public String getName()
     {
         return name;
