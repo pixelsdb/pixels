@@ -23,7 +23,7 @@ public class TestJsonParse
         String jsonString = json.toString();
         long start = System.currentTimeMillis();
         ReadPerfMetrics metrics = JSON.parseObject(jsonString, ReadPerfMetrics.class);
-        ConstCost constCost = new ConstCost();
+        NamedCost constCost = new NamedCost();
         constCost.setName(JSON.toJSONString(metrics));
         constCost.setMs(1.2);
         metrics.addLambda(constCost);
