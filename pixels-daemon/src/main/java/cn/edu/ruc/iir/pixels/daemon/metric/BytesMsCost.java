@@ -5,6 +5,14 @@ public class BytesMsCost
     private long bytes;
     private double ms;
 
+    public BytesMsCost() {}
+
+    public BytesMsCost(long bytes, double ms)
+    {
+        this.bytes = bytes;
+        this.ms = ms;
+    }
+
     public void setBytes(long bytes)
     {
         this.bytes = bytes;

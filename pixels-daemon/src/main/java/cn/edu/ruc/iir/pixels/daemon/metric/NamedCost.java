@@ -1,9 +1,17 @@
 package cn.edu.ruc.iir.pixels.daemon.metric;
 
-public class ConstCost
+public class NamedCost
 {
     private String name;
     private double ms;
+
+    public NamedCost() {}
+
+    public NamedCost(String name, double ms)
+    {
+        this.name = name;
+        this.ms = ms;
+    }
 
     public String getName()
     {

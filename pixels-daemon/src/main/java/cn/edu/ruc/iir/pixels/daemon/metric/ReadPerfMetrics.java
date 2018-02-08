@@ -7,7 +7,7 @@ public class ReadPerfMetrics
 {
     private List<BytesMsCost> seqRead = new ArrayList<>();
     private List<BytesMsCost> seek = new ArrayList<>();
-    private List<ConstCost> lambda = new ArrayList<>();
+    private List<NamedCost> lambda = new ArrayList<>();
 
     public List<BytesMsCost> getSeqRead()
     {
@@ -39,17 +39,17 @@ public class ReadPerfMetrics
         this.seek.add(b);
     }
 
-    public List<ConstCost> getLambda()
+    public List<NamedCost> getLambda()
     {
         return lambda;
     }
 
-    public void setLambda(List<ConstCost> lambda)
+    public void setLambda(List<NamedCost> lambda)
     {
         this.lambda = lambda;
     }
 
-    public void addLambda(ConstCost c)
+    public void addLambda(NamedCost c)
     {
         this.lambda.add(c);
     }
