@@ -7,7 +7,8 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
  *
  * @author guodong
  */
-public class BooleanStatsRecorder extends StatsRecorder implements BooleanColumnStats
+public class BooleanStatsRecorder
+        extends StatsRecorder implements BooleanColumnStats
 {
     private long trueCount = 0L;
 

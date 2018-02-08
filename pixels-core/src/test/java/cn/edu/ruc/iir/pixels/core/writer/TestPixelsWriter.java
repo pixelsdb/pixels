@@ -2,10 +2,11 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.TestParams;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
@@ -18,7 +19,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.Random;
 
 /**
@@ -29,7 +29,7 @@ import java.util.Random;
 public class TestPixelsWriter
 {
     @Test
-    public void test()
+    public void testWriter()
     {
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
@@ -54,35 +54,34 @@ public class TestPixelsWriter
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(10000)
-                            .setRowGroupSize(64*1024*1024)
+                            .setPixelStride(TestParams.pixelStride)
+                            .setRowGroupSize(TestParams.rowGroupSize)
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
-                            .setBlockSize(1024*1024*1024)
-                            .setReplication((short) 1)
-                            .setBlockPadding(false)
-                            .setEncoding(true)
+                            .setBlockSize(TestParams.blockSize)
+                            .setReplication(TestParams.blockReplication)
+                            .setBlockPadding(TestParams.blockPadding)
+                            .setEncoding(TestParams.encoding)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
-            for (int i = 0; i < TestParams.rowNum; i++)
-            {
+            long curT = System.currentTimeMillis();
+            Timestamp timestamp = new Timestamp(curT);
+            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
+            for (int i = 0; i < TestParams.rowNum; i++) {
                 int key = randomKey.nextInt(50000);
                 float sf = randomSf.nextFloat();
                 double sd = randomSf.nextDouble();
                 int row = rowBatch.size++;
                 a.vector[row] = i;
-                b.vector[row] = sf * key;
-                c.vector[row] = sd * key;
-                d.set(row, Timestamp.from(Instant.now()));
-                e.vector[row] = i > 25000 ? 0 : 1;
-                z.setVal(row, String.valueOf(key).getBytes());
+                b.vector[row] = i * 3.1415f;
+                c.vector[row] = i * 3.14159d;
+                d.set(row, timestamp);
+                e.vector[row] = i > 25000 ? 1 : 0;
+                z.setVal(row, String.valueOf(i).getBytes());
                 if (rowBatch.size == rowBatch.getMaxSize()) {
-                    //long start = System.currentTimeMillis();
                     pixelsWriter.addRowBatch(rowBatch);
-                    //System.out.println("add rb:" + (System.currentTimeMillis()-start));
-                    //start = System.currentTimeMillis();
                     rowBatch.reset();
-                    //System.out.println("reset: " + (System.currentTimeMillis()-start));
                 }
             }
             if (rowBatch.size != 0) {
@@ -91,7 +90,7 @@ public class TestPixelsWriter
             }
             pixelsWriter.close();
         }
-        catch (IOException e) {
+        catch (IOException | PixelsWriterException e) {
             e.printStackTrace();
         }
     }

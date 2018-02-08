@@ -5,14 +5,13 @@ import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
- * pixels
+ * pixels binary column writer.
+ * each element consists of content length and content binary.
  *
  * @author guodong
  */
-// todo binary column writer. basically the same as string column writer
 public class BinaryColumnWriter extends BaseColumnWriter
 {
     public BinaryColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
@@ -21,34 +20,49 @@ public class BinaryColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int length) throws IOException
+    public int write(ColumnVector vector, int size) throws IOException
     {
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         byte[][] values = columnVector.vector;
-        int size = 0;
-        for (byte[] v : values) {
-            size += v.length;
-        }
-        ByteBuffer buffer = ByteBuffer.allocate(size);
-        for (int i = 0; i < length; i++) {
-            curPixelEleCount++;
-            byte[] v = values[i];
-            buffer.put(v);
-            curPixelPosition += v.length;
-            pixelStatRecorder.updateBinary(v, 0, v.length, 1);
-            // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
-            if (curPixelEleCount >= pixelStride) {
-                newPixel();
-            }
-        }
-        // append buffer of this batch to rowBatchBufferList
-        buffer.flip();
-//        rowBatchBufferList.add(buffer);
-//        colChunkSize += buffer.limit();
-        return buffer.limit();
-    }
+        int curPartLength;
+        int curPartOffset = 0;
+        int nextPartLength = size;
 
-    @Override
-    public void newPixel() throws IOException
-    {}
+        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelEleCount;
+            for (int i = 0; i < curPartLength; i++) {
+                byte[] bytes = values[curPartOffset + i];
+                outputStream.write(bytes.length);
+                outputStream.write(bytes);
+                pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
+            }
+            curPixelEleCount += curPartLength;
+            newPixel();
+            curPartOffset += curPartLength;
+            nextPartLength = size - curPartOffset;
+        }
+
+        curPartLength = nextPartLength;
+        for (int i = 0; i < curPartLength; i++) {
+            byte[] bytes = values[curPartOffset + i];
+            outputStream.write(bytes.length);
+            outputStream.write(bytes);
+            pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
+        }
+        curPixelEleCount += curPartLength;
+        curPartOffset += curPartLength;
+        nextPartLength = size - curPartOffset;
+
+        if (nextPartLength > 0) {
+            curPartLength = nextPartLength;
+            for (int i = 0; i < curPartLength; i++) {
+                byte[] bytes = values[curPartOffset + i];
+                outputStream.write(bytes.length);
+                outputStream.write(bytes);
+                pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
+            }
+            curPixelEleCount += nextPartLength;
+        }
+        return outputStream.size();
+    }
 }

@@ -7,7 +7,8 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
  *
  * @author guodong
  */
-public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumnStats
+public class IntegerStatsRecorder
+        extends StatsRecorder implements IntegerColumnStats
 {
     private long minimum = Long.MIN_VALUE;
     private long maximum = Long.MAX_VALUE;
@@ -126,13 +127,13 @@ public class IntegerStatsRecorder extends StatsRecorder implements IntegerColumn
     }
 
     @Override
-    public long getMinimum()
+    public Long getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public long getMaximum()
+    public Long getMaximum()
     {
         return maximum;
     }

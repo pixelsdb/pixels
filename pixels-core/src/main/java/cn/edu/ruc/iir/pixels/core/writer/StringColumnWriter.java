@@ -4,46 +4,55 @@ import cn.edu.ruc.iir.pixels.core.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * String column writer.
  *
  * The string column chunk consists of seven fields:
  * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
- * 2. origins field (distinct string bytes array)
- * 3. starts field (starting offsets indicating starting points of each string in the origins field)
- * 4. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
- * 5. origins offset field (an integer value indicating offset of the origins field in the chunk)
- * 6. starts offset field (an integer value indicating offset of the starts field in the chunk)
- * 7. orders offset field (an integer value indicating offset of the orders field in the chunk)
+ * 2. lengths field (run length encoded raw string length)
+ * 3. origins field (distinct string bytes array)
+ * 4. starts field (starting offsets indicating starting points of each string in the origins field)
+ * 5. orders field (dumped orders array mapping dictionary encoded value to final sorted order)
+ * 6. lengths field offset (an integer value indicating offset of the lengths field in the chunk)
+ * 7. origins field offset (an integer value indicating offset of the origins field in the chunk)
+ * 8. starts field offset (an integer value indicating offset of the starts field in the chunk)
+ * 9. orders field offset (an integer value indicating offset of the orders field in the chunk)
  *
  * Pixels field is necessary in all cases.
+ * Lengths field only exists when un-encoded.
  * Other fields only exist when dictionary encoding is enabled.
  *
  * @author guodong
  */
 public class StringColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];   // current vector holding encoded values of string
+    private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
+    private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final StringRedBlackTree dictionary = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
-    private boolean useDictionaryEncoding;
+    private boolean futureUseDictionaryEncoding;
+    private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
 
     public StringColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
-        this.useDictionaryEncoding = isEncoding;
+        this.futureUseDictionaryEncoding = isEncoding;
+        this.currentUseDictionaryEncoding = isEncoding;
         encoder = new RunLenIntEncoder(false, true);
     }
 
     @Override
     public int write(ColumnVector vector, int size) throws IOException
     {
+        currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         byte[][] values = columnVector.vector;
         int[] vLens = columnVector.length;
@@ -52,7 +61,7 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             while ((curPixelEleCount + nextPartLength) >= pixelStride) {
                 curPartLength = pixelStride - curPixelEleCount;
                 for (int i = 0; i < curPartLength; i++) {
@@ -90,6 +99,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 curPartLength = pixelStride - curPixelEleCount;
                 for (int i = 0; i < curPartLength; i++) {
                     outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                    lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
                 curPixelEleCount += curPartLength;
@@ -101,6 +111,7 @@ public class StringColumnWriter extends BaseColumnWriter
             curPartLength = nextPartLength;
             for (int i = 0; i < curPartLength; i++) {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
             }
             curPixelEleCount += curPartLength;
@@ -112,6 +123,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 curPartLength = nextPartLength;
                 for (int i = 0; i < curPartLength; i++) {
                     outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                    lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
                 curPixelEleCount += nextPartLength;
@@ -123,9 +135,9 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             // for dictionary encoding. run length encode again.
-            outputStream.write(encoder.encode(curPixelVector));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         // else ignore outputStream
 
@@ -152,9 +164,38 @@ public class StringColumnWriter extends BaseColumnWriter
             checkDictionaryEncoding();
         }
         // flush out other fields
-        if (useDictionaryEncoding) {
+        if (currentUseDictionaryEncoding) {
             flushDictionary();
         }
+        else {
+            flushLens();
+        }
+    }
+
+    @Override
+    public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
+    {
+        if (currentUseDictionaryEncoding) {
+            return PixelsProto.ColumnEncoding.newBuilder()
+                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
+        }
+        return PixelsProto.ColumnEncoding.newBuilder()
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
+    private void flushLens() throws IOException
+    {
+        int lensFieldOffset = outputStream.size();
+        long[] tmpLens = new long[lensArray.size()];
+        for (int i = 0; i < lensArray.size(); i++) {
+            tmpLens[i] = lensArray.get(i);
+        }
+        lensArray.clear();
+        outputStream.write(encoder.encode(tmpLens));
+
+        ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
+        offsetBuf.putInt(lensFieldOffset);
+        outputStream.write(offsetBuf.array());
     }
 
     private void flushDictionary() throws IOException
@@ -163,8 +204,8 @@ public class StringColumnWriter extends BaseColumnWriter
         int startsFieldOffset;
         int ordersFieldOffset;
         int size = dictionary.size();
-        int[] starts = new int[size];
-        int[] orders = new int[size];
+        long[] starts = new long[size];
+        long[] orders = new long[size];
 
         originsFieldOffset = outputStream.size();
 
@@ -186,28 +227,25 @@ public class StringColumnWriter extends BaseColumnWriter
 
         startsFieldOffset = outputStream.size();
 
-        for (int i = 0; i < size; i++)
-        {
-            outputStream.write(starts[i]);
-        }
-
+        // write out run length starts array
+        outputStream.write(encoder.encode(starts));
         ordersFieldOffset = outputStream.size();
 
-        for (int i = 0; i < size; i++)
-        {
-            outputStream.write(orders[i]);
-        }
+        // write out run length orders array
+        outputStream.write(encoder.encode(orders));
 
-        outputStream.write(originsFieldOffset);
-        outputStream.write(startsFieldOffset);
-        outputStream.write(ordersFieldOffset);
+        ByteBuffer offsetsBuf = ByteBuffer.allocate(3 * Integer.BYTES);
+        offsetsBuf.putInt(originsFieldOffset);
+        offsetsBuf.putInt(startsFieldOffset);
+        offsetsBuf.putInt(ordersFieldOffset);
+        outputStream.write(offsetsBuf.array());
     }
 
     private void checkDictionaryEncoding()
     {
         int valueNum = outputStream.size() / Integer.BYTES;
         float ratio = valueNum > 0 ? (float) dictionary.size() / valueNum : 0.0f;
-        useDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
+        futureUseDictionaryEncoding = ratio <= Constants.DICT_KEY_SIZE_THRESHOLD;
         doneDictionaryEncodingCheck = true;
     }
 }

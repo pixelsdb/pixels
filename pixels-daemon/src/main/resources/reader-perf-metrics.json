@@ -1,0 +1,18 @@
+{
+  "seqRead":
+  [
+    {"bytes":1024, "ms":1.1},
+    {"bytes":2048, "ms":1.6}
+  ],
+  "seek":
+  [
+    {"bytes":1024, "ms":1.8},
+    {"bytes":2048, "ms":2.1}
+  ],
+  "lambda":
+  [
+    {"name":"cpu", "ms":1.5},
+    {"name":"network", "ms":2.7},
+    {"name":"init_seek", "ms":5.1}
+  ]
+}

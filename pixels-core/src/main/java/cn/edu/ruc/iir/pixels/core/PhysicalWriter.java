@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -9,6 +10,7 @@ import java.nio.ByteBuffer;
  * @author guodong
  */
 public interface PhysicalWriter
+        extends Closeable
 {
     /**
      * Prepare the writer to ensure the length can fit into current hdfs block

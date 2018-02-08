@@ -1,30 +1,33 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.reader.VectorReader;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
 /**
- * pixels
+ * Pixels file reader.
+ * This interface is for reading pixels content as
+ * {@link cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch}.
  *
  * @author guodong
  */
 public interface PixelsReader
+        extends Closeable
 {
     /**
-     * Get the iterator for reading rows inside the file
-     * @return {@code VectorReader}
+     * Get a <code>PixelsRecordReader</code>
+     * @return record reader
      * */
-    VectorReader vectors(int[] rowGroups, String[] fieldNames) throws IOException;
-
-    PixelsProto.RowGroupFooter readRowGroupFooter(int rowGroupId) throws IOException;
+    PixelsRecordReader read(PixelsReaderOption option);
 
     /**
      * Get version of the Pixels file
      * @return version number
      * */
-    int getFileVersion();
+    PixelsVersion getFileVersion();
 
     /**
      * Get the number of rows of the file
@@ -60,7 +63,7 @@ public interface PixelsReader
      * Get schema of this file
      * @return schema
      * */
-    TypeDescription getSchema();
+    TypeDescription getFileSchema();
 
     /**
      * Get the number of row groups in this file
@@ -81,6 +84,14 @@ public interface PixelsReader
      * @return column stat
      * */
     PixelsProto.ColumnStatistic getColumnStat(String columnName);
+
+    /**
+     * Get row group footer
+     * @param rowGroupId row group id
+     * @return row group footer
+     * @throws java.io.IOException
+     * */
+    PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException;
 
     /**
      * Get information of all row groups
@@ -109,4 +120,18 @@ public interface PixelsReader
      * @return row groups statistics
      * */
     List<PixelsProto.RowGroupStatistic> getRowGroupStats();
+
+    // Just for test
+    public PixelsProto.PostScript getPostScript();
+
+
+    // Just for test
+    public PixelsProto.Footer getFooter();
+
+    /**
+     * Cleanup and release resources
+     * @throws java.io.IOException
+     * */
+    @Override
+    void close() throws IOException;
 }

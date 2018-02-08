@@ -5,7 +5,7 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface StringColumnStats extends ColumnStats
+public interface StringColumnStats extends RangeStats<String>
 {
     String getMinimum();
 

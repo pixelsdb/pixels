@@ -38,6 +38,38 @@ public class LongColumnVector extends ColumnVector
         vector = new long[len];
     }
 
+    @Override
+    public void add(boolean value)
+    {
+        add(value ? 1 : 0);
+    }
+
+    @Override
+    public void add(boolean[] values)
+    {
+        for (boolean v : values)
+        {
+            add(v ? 1 : 0);
+        }
+    }
+
+    @Override
+    public void add(long v)
+    {
+        if (writeIndex >= getLength()) {
+            ensureSize(writeIndex * 2, true);
+        }
+        vector[writeIndex++] = v;
+    }
+
+    @Override
+    public void add(long[] values)
+    {
+        for (long v : values) {
+            add(v);
+        }
+    }
+
     // Copy the current object contents into the output. Only copy selected entries,
     // as indicated by selectedInUse and the sel array.
     public void copySelected(

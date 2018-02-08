@@ -5,9 +5,9 @@ package cn.edu.ruc.iir.pixels.core.stats;
  *
  * @author guodong
  */
-public interface TimestampColumnStats extends ColumnStats
+public interface TimestampColumnStats extends RangeStats<Long>
 {
-    long getMinimum();
+    Long getMinimum();
 
-    long getMaximum();
+    Long getMaximum();
 }
