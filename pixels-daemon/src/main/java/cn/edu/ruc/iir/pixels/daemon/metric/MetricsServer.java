@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metric;
 
+import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import com.alibaba.fastjson.JSON;
@@ -36,7 +37,8 @@ public class MetricsServer implements Server
             try
             {
                 // parse the json files under /dev/shm/pixels/
-                File dir = new File("");
+                String jsonDir = ConfigFactory.Instance().getProperty("metric.reader.json.dir");
+                File dir = new File(jsonDir);
                 File[] jsonFiles = dir.listFiles((file, s) -> s.endsWith(".json"));
                 List<ReadPerfMetrics> metricsList = new ArrayList<>();
                 for (File jsonFile : jsonFiles)
@@ -59,6 +61,7 @@ public class MetricsServer implements Server
 
                 // calculate the histogram.
                 // save it as prom file under the text file dir of prometheus node exporter.
+                String textDir = ConfigFactory.Instance().getProperty("metric.node.text.dir");
                 TimeUnit.SECONDS.sleep(600);
             } catch (InterruptedException e)
             {
