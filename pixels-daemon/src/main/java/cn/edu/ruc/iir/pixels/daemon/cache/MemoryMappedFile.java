@@ -32,6 +32,9 @@ import java.nio.channels.FileChannel;
  * It can reader and write memory mapped file which is larger than 2GB.
  * When the backing file is located under /dev/shm/, it works as a shared memory.
  * The random read/write latency is sub-nanosecond.
+ *
+ * Other modifications:
+ * change the visibility of some methods from protect to public
  */
 
 /**
@@ -94,7 +97,7 @@ public class MemoryMappedFile
 		mapAndSetOffset();
 	}
 
-	protected void unmap() throws Exception {
+	public void unmap() throws Exception {
 		unmmap.invoke(null, addr, this.size);
 	}
 	
@@ -112,7 +115,7 @@ public class MemoryMappedFile
 	 * @param pos the position in the memory mapped file
 	 * @return the value read
 	 */
-	protected byte getByteVolatile(long pos) {
+	public byte getByteVolatile(long pos) {
 		return unsafe.getByteVolatile(null, pos + addr);
 	}
  
@@ -130,7 +133,7 @@ public class MemoryMappedFile
 	 * @param pos position in the memory mapped file
 	 * @return the value read
 	 */
-	protected int getIntVolatile(long pos) {
+	public int getIntVolatile(long pos) {
 		return unsafe.getIntVolatile(null, pos + addr);
 	}
 
@@ -166,7 +169,7 @@ public class MemoryMappedFile
 	 * @param pos the position in the memory mapped file
 	 * @param val the value to write
 	 */
-	protected void putByteVolatile(long pos, byte val) {
+	public void putByteVolatile(long pos, byte val) {
 		unsafe.putByteVolatile(null, pos + addr, val);
 	}
 
@@ -184,7 +187,7 @@ public class MemoryMappedFile
 	 * @param pos the position in the memory mapped file
 	 * @param val the value to write
 	 */
-	protected void putIntVolatile(long pos, int val) {
+	public void putIntVolatile(long pos, int val) {
 		unsafe.putIntVolatile(null, pos + addr, val);
 	}
 
@@ -228,11 +231,11 @@ public class MemoryMappedFile
 		unsafe.copyMemory(data, BYTE_ARRAY_OFFSET + offset, null, pos + addr, length);
 	}
 
-	protected boolean compareAndSwapInt(long pos, int expected, int value) {
+	public boolean compareAndSwapInt(long pos, int expected, int value) {
 		return unsafe.compareAndSwapInt(null, pos + addr, expected, value);
 	}
 		
-	protected boolean compareAndSwapLong(long pos, long expected, long value) {
+	public boolean compareAndSwapLong(long pos, long expected, long value) {
 		return unsafe.compareAndSwapLong(null, pos + addr, expected, value);
 	}
 
