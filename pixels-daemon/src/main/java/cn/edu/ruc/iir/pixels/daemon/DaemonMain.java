@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.LogFactory;
-import cn.edu.ruc.iir.pixels.daemon.core.CoreServer;
+import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
 
@@ -24,7 +24,8 @@ public class DaemonMain
             String jarName = ConfigFactory.Instance().getProperty("daemon.jar");
             String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") + jarName;
 
-            if (role.equalsIgnoreCase("main"))
+            if (role.equalsIgnoreCase("main") && args.length == 1 &&
+                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the main daemon
                 System.out.println("starting main daemon...");
@@ -39,16 +40,24 @@ public class DaemonMain
                 ServerContainer container = new ServerContainer();
 
                 ConfigFactory config = ConfigFactory.Instance();
-                int port = Integer.valueOf(config.getProperty("port"));
+                int port = Integer.valueOf(config.getProperty("metadata.server.port"));
                 MetadataServer metadataServer = new MetadataServer(port);
 
-                CoreServer coreServer = new CoreServer();
+                CacheServer cacheServer = new CacheServer();
 
                 MetricsServer metricsServer = new MetricsServer();
 
-                container.addServer("metadata", metadataServer);
-                container.addServer("core", coreServer);
-                container.addServer("metrics", metricsServer);
+                if (args[0].equalsIgnoreCase("metadata"))
+                {
+                    // start metadata
+                    container.addServer("metadata", metadataServer);
+                }
+                else
+                {
+                    // start data node
+                    container.addServer("cache", cacheServer);
+                    container.addServer("metrics", metricsServer);
+                }
 
                 // continue the main thread
                 while (true)
@@ -109,12 +118,12 @@ public class DaemonMain
             }
             else
             {
-                System.err.println("Run with -Drole=[main,guard,kill]");
+                System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be a args [metadata/datanode]");
             }
         }
         else
         {
-            System.err.println("Run with -Drole=[main,guard,kill]");
+            System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be a args [metadata/datanode]");
         }
     }
 }

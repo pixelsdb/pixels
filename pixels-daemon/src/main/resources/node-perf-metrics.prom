@@ -1,7 +1,11 @@
-# seek cost
-# TYPE Histogram
-seek
-
-# sequential read cost
-# TYPE Histogram
-read
+# HELP pixels_seq_read_cost pixels sequential read cost
+# TYPE pixels_seq_read_cost gauge
+pixels_seq_read_cost{length="0",} 1.35
+# HELP pixels_seek_cost pixels seek cost
+# TYPE pixels_seek_cost gauge
+pixels_seek_cost{distance="0",} 1.9500000000000002
+# HELP pixels_read_lambda_cost pixels read task lambda cost
+# TYPE pixels_read_lambda_cost gauge
+pixels_read_lambda_cost{name="init_seek",} 5.1
+pixels_read_lambda_cost{name="cpu",} 1.5
+pixels_read_lambda_cost{name="network",} 2.7

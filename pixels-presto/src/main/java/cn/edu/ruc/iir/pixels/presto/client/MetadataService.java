@@ -22,8 +22,8 @@ import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharTyp
  **/
 public class MetadataService {
     static ConfigFactory config = ConfigFactory.Instance();
-    static String host = config.getProperty("host");
-    static int port = Integer.valueOf(config.getProperty("port"));
+    static String host = config.getProperty("metadata.server.host");
+    static int port = Integer.valueOf(config.getProperty("metadata.server.port"));
 
 
     public static List<ColumnMetadata> getColumnMetadata() {

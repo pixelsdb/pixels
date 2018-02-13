@@ -21,10 +21,10 @@ public class DBUtils {
     private DBUtils() {
         try {
             ConfigFactory config = ConfigFactory.Instance();
-            DRIVER = config.getProperty("driver");
-            URL = config.getProperty("url");
-            USERID = config.getProperty("user");
-            USERPASSWORD = config.getProperty("password");
+            DRIVER = config.getProperty("metadata.db.driver");
+            URL = config.getProperty("metadata.db.url");
+            USERID = config.getProperty("metadata.db.user");
+            USERPASSWORD = config.getProperty("metadata.db.password");
 
             Class.forName(DRIVER);
             conn = DriverManager.getConnection(URL, USERID, USERPASSWORD);
