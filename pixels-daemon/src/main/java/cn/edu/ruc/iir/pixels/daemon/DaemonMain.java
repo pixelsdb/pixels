@@ -40,7 +40,7 @@ public class DaemonMain
                 ServerContainer container = new ServerContainer();
 
                 ConfigFactory config = ConfigFactory.Instance();
-                int port = Integer.valueOf(config.getProperty("port"));
+                int port = Integer.valueOf(config.getProperty("metadata.server.port"));
                 MetadataServer metadataServer = new MetadataServer(port);
 
                 CacheServer cacheServer = new CacheServer();
