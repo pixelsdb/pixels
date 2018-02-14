@@ -13,6 +13,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-cache</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
         </dependency>
