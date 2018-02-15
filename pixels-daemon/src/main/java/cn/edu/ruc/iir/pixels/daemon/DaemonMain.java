@@ -30,7 +30,7 @@ public class DaemonMain
                 // this is the main daemon
                 System.out.println("starting main daemon...");
                 Daemon guardDaemon = new Daemon();
-                String[] guardCmd = {"java", "-Drole=guard", "-jar", daemonJarPath, "guard"};
+                String[] guardCmd = {"java", "-Drole=guard", "-jar", daemonJarPath, args[0]};
                 guardDaemon.setup(mainFile, guardFile, guardCmd);
                 Thread daemonThread = new Thread(guardDaemon);
                 daemonThread.setName("main daemon thread");
@@ -78,12 +78,13 @@ public class DaemonMain
                         LogFactory.Instance().getLog().error("error in the main loop of daemon.", e);
                     }
                 }
-            } else if (role.equalsIgnoreCase("guard"))
+            } else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
+                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
                 Daemon guardDaemon = new Daemon();
-                String[] guardCmd = {"java", "-Drole=main", "-jar", daemonJarPath, "main"};
+                String[] guardCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
                 guardDaemon.setup(guardFile, mainFile, guardCmd);
                 guardDaemon.run();
             } else if (role.equalsIgnoreCase("kill"))
@@ -118,12 +119,12 @@ public class DaemonMain
             }
             else
             {
-                System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be a args [metadata/datanode]");
+                System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be an args [metadata/datanode]");
             }
         }
         else
         {
-            System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be a args [metadata/datanode]");
+            System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be an args [metadata/datanode]");
         }
     }
 }
