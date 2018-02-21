@@ -36,6 +36,7 @@
         <module>pixels-presto</module>
         <module>pixels-daemon</module>
         <module>pixels-common</module>
+        <module>pixels-cache</module>
     </modules>
 
     <packaging>pom</packaging>

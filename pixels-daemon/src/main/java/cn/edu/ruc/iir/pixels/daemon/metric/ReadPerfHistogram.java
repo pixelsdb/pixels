@@ -9,6 +9,10 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
 
+/**
+ * This class is not thread safe.
+ * It is only to be used by metrics server, which is a single thread.
+ */
 public class ReadPerfHistogram
 {
     private static final int Interval;
@@ -29,7 +33,7 @@ public class ReadPerfHistogram
         long length = cost.getBytes() / Interval * Interval;
         if (cost.getBytes() % Interval > Interval / 2)
         {
-            length++;
+            length += Interval;
         }
         if (costs.containsKey(length))
         {
@@ -107,11 +111,17 @@ public class ReadPerfHistogram
             lambda.labels(cost.getName()).inc(cost.getMs());
         }
 
+        Gauge interval = Gauge.build().help("the interval between two continuous bytesms metrics")
+                .name("pixels_bytesms_interval").create();
+        interval.inc(Interval);
+
         Vector<Collector.MetricFamilySamples> seqReadVector = new Vector<>(seqRead.collect());
         Vector<Collector.MetricFamilySamples> seekVector = new Vector<>(seek.collect());
         Vector<Collector.MetricFamilySamples> lambdaVector = new Vector<>(lambda.collect());
+        Vector<Collector.MetricFamilySamples> intervalVector = new Vector<>(interval.collect());
 
         StringWriter writer = new StringWriter();
+        TextFormat.write004(writer, intervalVector.elements());
         TextFormat.write004(writer, seqReadVector.elements());
         TextFormat.write004(writer, seekVector.elements());
         TextFormat.write004(writer, lambdaVector.elements());
