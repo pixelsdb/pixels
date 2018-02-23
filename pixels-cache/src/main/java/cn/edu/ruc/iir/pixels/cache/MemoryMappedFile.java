@@ -17,7 +17,7 @@
 /*
 * This class was inspired from an entry in Bryce Nyeggen's blog 
 */
-package cn.edu.ruc.iir.pixels.daemon.cache;
+package cn.edu.ruc.iir.pixels.cache;
 import sun.misc.Unsafe;
 import sun.nio.ch.FileChannelImpl;
 

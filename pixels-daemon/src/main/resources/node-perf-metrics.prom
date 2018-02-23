@@ -1,7 +1,30 @@
-# seek cost
-# TYPE Histogram
-seek
-
-# sequential read cost
-# TYPE Histogram
-read
+# HELP pixels_bytesms_interval the interval between two continuous bytesms metrics
+# TYPE pixels_bytesms_interval gauge
+pixels_bytesms_interval 51200.0
+# HELP pixels_seq_read_cost pixels sequential read cost
+# TYPE pixels_seq_read_cost gauge
+pixels_seq_read_cost{length="0",} 0
+pixels_seq_read_cost{length="51200",} 1
+pixels_seq_read_cost{length="102400",} 2
+pixels_seq_read_cost{length="153600",} 3
+pixels_seq_read_cost{length="204800",} 4
+pixels_seq_read_cost{length="256000",} 5
+pixels_seq_read_cost{length="307200",} 6
+pixels_seq_read_cost{length="358400",} 7
+pixels_seq_read_cost{length="409600",} 8
+# HELP pixels_seek_cost pixels seek cost
+# TYPE pixels_seek_cost gauge
+pixels_seek_cost{distance="0",} 0
+pixels_seek_cost{distance="51200",} 1
+pixels_seek_cost{distance="102400",} 2
+pixels_seek_cost{distance="153600",} 3
+pixels_seek_cost{distance="204800",} 4
+pixels_seek_cost{distance="256000",} 5
+pixels_seek_cost{distance="307200",} 6
+pixels_seek_cost{distance="358400",} 7
+pixels_seek_cost{distance="409600",} 8
+# HELP pixels_read_lambda_cost pixels read task lambda cost
+# TYPE pixels_read_lambda_cost gauge
+pixels_read_lambda_cost{name="init_seek",} 5.1
+pixels_read_lambda_cost{name="cpu",} 1.5
+pixels_read_lambda_cost{name="network",} 2.7

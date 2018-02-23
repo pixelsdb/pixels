@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.daemon.cache;
+package cn.edu.ruc.iir.pixels.cache;
 
 import org.junit.Test;
 

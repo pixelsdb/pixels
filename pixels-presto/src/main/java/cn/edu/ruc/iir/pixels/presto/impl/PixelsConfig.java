@@ -55,7 +55,7 @@ public class PixelsConfig {
 
     public String getHDFSWarehouse() {
         ConfigFactory config = ConfigFactory.Instance();
-        String warehouse = config.getProperty("HDFSWarehouse");
+        String warehouse = config.getProperty("pixels.warehouse.path");
         return warehouse;
     }
 }
