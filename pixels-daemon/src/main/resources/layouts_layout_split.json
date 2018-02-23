@@ -1,0 +1,18 @@
+{
+  "numRowGroupInBlock":4,
+  "splitPatterns":
+  [
+    {
+      "accessedColumns":"Column_311,Column_314,Column_315,Column_332,Column_361,Column_438,Column_316,Column_397,Column_396,Column_11,Column_375,Column_392,Column_530,Column_368",
+      "numRowGroupInSplit":1
+    },
+    {
+      "accessedColumns":"Column_364,Column_315,Column_438,Column_397,Column_396,Column_11,Column_368",
+      "numRowGroupInSplit":2
+    },
+    {
+      "accessedColumns":"Column_311,Column_680,Column_332,Column_361,Column_438,Column_362,Column_316,Column_397,Column_11",
+      "numRowGroupInSplit":2
+    }
+  ]
+}
