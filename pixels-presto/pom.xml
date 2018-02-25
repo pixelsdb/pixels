@@ -16,6 +16,12 @@
     <dependencies>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>rainbow-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
             <version>${project.version}</version>
         </dependency>

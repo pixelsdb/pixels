@@ -44,6 +44,8 @@ public class TestClient {
                             System.out.println(schemas.size());
                         } else if (action.equals("getTables")) {
                             System.out.println(res);
+                        } else if (action.equals("getLayouts")) {
+                            System.out.println(res);
                         } else {
                             System.out.println(res);
                         }
