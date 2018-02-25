@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
@@ -10,11 +11,17 @@ import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.type.IntegerType;
+import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 
 /**
@@ -59,14 +66,26 @@ public class PixelsMetadataReader {
         PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
 
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
-        PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, "id", createUnboundedVarcharType(), "", 0);
-        columns.add(pixelsColumnHandle);
-        PixelsColumnHandle pixelsColumnHandle1 = new PixelsColumnHandle(connectorId, "x", createUnboundedVarcharType(), "", 1);
-        columns.add(pixelsColumnHandle1);
-        PixelsColumnHandle pixelsColumnHandle2 = new PixelsColumnHandle(connectorId, "y", createUnboundedVarcharType(), "", 2);
-        columns.add(pixelsColumnHandle2);
+        List<ColumnMetadata> columnsMetadata = new ArrayList<ColumnMetadata>();
 
-        List<ColumnMetadata> columnsMetadata = MetadataService.getColumnMetadata();
+        List<Column> columnsList = MetadataService.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+        for (Column c : columnsList) {
+            Type columnType = null;
+            String name = c.getColName();
+            String type = c.getColType().toLowerCase();
+            if (type.equals("int")) {
+                columnType = INTEGER;
+            } else if (type.equals("double")) {
+                columnType = DOUBLE;
+            } else if (type.equals("varchar")) {
+                columnType = createUnboundedVarcharType();
+            }
+            ColumnMetadata columnMetadata = new ColumnMetadata(name, columnType);
+            PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", 0);
+
+            columns.add(pixelsColumnHandle);
+            columnsMetadata.add(columnMetadata);
+        }
 
         PixelsTable table = new PixelsTable(tableHandle, tableLayout, columns, columnsMetadata);
         return table;

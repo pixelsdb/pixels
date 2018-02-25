@@ -1,8 +1,12 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Catalog;
+import cn.edu.ruc.iir.pixels.common.FileUtils;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.Split;
+import com.alibaba.fastjson.JSON;
 import org.junit.Test;
 
 import java.sql.SQLException;
@@ -61,13 +65,34 @@ public class TestDao {
     }
 
     @Test
-    public void testCatalogDao() throws SQLException {
-        String params[] = new String[]{"test"};
-        BaseDao baseDao = new CatalogDao();
-        String sql = "select * from CATALOG " + (params.length > 0 ? "where LAYOUTS_LAYOUT_ID in (select LAYOUT_ID from LAYOUTS where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) )" : "");
-        List<Catalog> t = baseDao.loadAll(sql, params);
-        for (Catalog c : t) {
-            System.out.println(c.toString());
+    public void testLayoutLoadDao() throws SQLException {
+        String params[] = new String[]{"point"};
+        BaseDao baseDao = new LayoutDao();
+        String sql = "select * from LAYOUTS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) " : "");
+        List<Layout> layoutList = baseDao.loadAll(sql, params);
+        for (Layout layout : layoutList) {
+            System.out.println(layout.toString());
         }
+    }
+
+    @Test
+    public void testLayoutUpdateDao() throws SQLException {
+        String splitInfo = FileUtils.readFileToString("/home/tao/software/station/bitbucket/pixels/pixels-daemon/src/main/resources/layouts_layout_split.json");
+        System.out.println(splitInfo);
+        Split split = JSON.parseObject(splitInfo, Split.class);
+        String params[] = new String[]{splitInfo, "1"};
+        BaseDao baseDao = new LayoutDao();
+        String sql = "update LAYOUTS set LAYOUT_SPLIT = ? where LAYOUT_ID = ?";
+        boolean flag = baseDao.update(sql, params);
+        System.out.println(flag);
+    }
+
+    @Test
+    public void testColumnLoadDao() {
+        String params[] = new String[]{"point", "pixels"};
+        BaseDao baseDao = new ColumnDao();
+        String sql = "select * from COLS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ?)) " : "");
+        List<Column> columnList = baseDao.loadAll(sql, params);
+        System.out.println(columnList.size());
     }
 }

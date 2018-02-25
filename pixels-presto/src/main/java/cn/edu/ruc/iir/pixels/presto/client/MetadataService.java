@@ -1,7 +1,8 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
 import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Catalog;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
@@ -26,20 +27,32 @@ public class MetadataService {
     static int port = Integer.valueOf(config.getProperty("metadata.server.port"));
 
 
-    public static List<ColumnMetadata> getColumnMetadata() {
-        List<ColumnMetadata> list = new ArrayList<ColumnMetadata>();
-        ColumnMetadata c1 = new ColumnMetadata("id", createUnboundedVarcharType(), "", false);
-        list.add(c1);
-        ColumnMetadata c2 = new ColumnMetadata("x", createUnboundedVarcharType(), "", false);
-        list.add(c2);
-        ColumnMetadata c3 = new ColumnMetadata("y", createUnboundedVarcharType(), "", false);
-        list.add(c3);
-        return list;
+    public static List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
+        List<Column> columns = new ArrayList<Column>();
+        MetadataClient client = new MetadataClient(Action.getColumns.toString());
+        try {
+            try {
+                client.connect(port, host, tableName + "&" + schemaName);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            while (true) {
+                int count = client.getQueue().size();
+                if (count > 0) {
+                    String res = client.getQueue().poll();
+                    columns = JSON.parseArray(res, Column.class);
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return columns;
     }
 
-    public static List<Catalog> getCatalogsByTblName(String tableName) {
-        List<Catalog> catalogs = new ArrayList<>();
-        MetadataClient client = new MetadataClient(Action.getCatalogs.toString());
+    public static List<Layout> getLayoutsByTblName(String tableName) {
+        List<Layout> layouts = new ArrayList<>();
+        MetadataClient client = new MetadataClient(Action.getLayouts.toString());
         try {
             try {
                 client.connect(port, host, tableName);
@@ -50,14 +63,14 @@ public class MetadataService {
                 int count = client.getQueue().size();
                 if (count > 0) {
                     String res = client.getQueue().poll();
-                    catalogs = JSON.parseArray(res, Catalog.class);
+                    layouts = JSON.parseArray(res, Layout.class);
                     break;
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return catalogs;
+        return layouts;
     }
 
     public static List<Table> getTablesBySchemaName(String schemaName) {

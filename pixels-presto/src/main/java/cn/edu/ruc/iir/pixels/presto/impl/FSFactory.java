@@ -20,6 +20,10 @@ import io.airlift.log.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
+import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import java.io.IOException;
 import java.nio.file.FileSystemNotFoundException;
@@ -36,7 +40,7 @@ public final class FSFactory {
         this.config = config;
         try {
             this.fileSystem = FileSystem.get(conf);
-            fileSystem.setWorkingDirectory(new Path(config.getHDFSWarehouse()));
+//            fileSystem.setWorkingDirectory(new Path(config.getHDFSWarehouse()));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -158,4 +162,26 @@ public final class FSFactory {
         }
         return Path.mergePaths(new Path(base), new Path(path));
     }
+
+    public List<LocatedBlock> listLocatedBlocks(Path path) {
+        FSDataInputStream in = null;
+        try {
+            in = fileSystem.open(path);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        HdfsDataInputStream hdis = (HdfsDataInputStream) in;
+        List<LocatedBlock> allBlocks = null;
+        try {
+            allBlocks = hdis.getAllBlocks();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return allBlocks;
+    }
+
+    public List<LocatedBlock> listLocatedBlocks(String path) {
+        return listLocatedBlocks(new Path(path));
+    }
+
 }

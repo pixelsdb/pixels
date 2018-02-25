@@ -11,6 +11,6 @@ package cn.edu.ruc.iir.pixels.presto.client;
 public enum Action {
     getSchemas,
     getTables,
-    getCatalogs,
-
+    getLayouts,
+    getColumns;
 }

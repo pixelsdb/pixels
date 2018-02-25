@@ -1,9 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.domain;
 
 import java.io.Serializable;
-import java.sql.Timestamp;
-import java.util.HashSet;
-import java.util.Set;
+import java.math.BigInteger;
 
 /**
  * @version V1.0
@@ -16,30 +14,34 @@ import java.util.Set;
 public class Layout implements Serializable {
 
     private int layId;
-    private String layVer;
-    private String layVal;
-    private Timestamp layTime;
+    private int layVerion;
+    private BigInteger layCreateAt;
+    private Integer layActive;
+    private Integer layEnabled;
+    private BigInteger layEnabledAt;
+    private String layInitOrder;
+    private String layInitPath;
+    private String layCompact;
+    private String layCompactPath;
+    private String laySplit;
     private Table lt;
-    private Set<Catalog> layCatalogs = new HashSet(0);
 
     public Layout() {
     }
 
-    public Layout(int layId, String layVer, String layVal, Timestamp layTime, Table lt, Set<Catalog> layCatalogs) {
+    public Layout(int layId, int layVerion, BigInteger layCreateAt, Integer layActive, Integer layEnabled, BigInteger layEnabledAt, String layInitOrder, String layInitPath, String layCompact, String layCompactPath, String laySplit, Table lt) {
         this.layId = layId;
-        this.layVer = layVer;
-        this.layVal = layVal;
-        this.layTime = layTime;
+        this.layVerion = layVerion;
+        this.layCreateAt = layCreateAt;
+        this.layActive = layActive;
+        this.layEnabled = layEnabled;
+        this.layEnabledAt = layEnabledAt;
+        this.layInitOrder = layInitOrder;
+        this.layInitPath = layInitPath;
+        this.layCompact = layCompact;
+        this.layCompactPath = layCompactPath;
+        this.laySplit = laySplit;
         this.lt = lt;
-        this.layCatalogs = layCatalogs;
-    }
-
-    public Timestamp getLayTime() {
-        return layTime;
-    }
-
-    public void setLayTime(Timestamp layTime) {
-        this.layTime = layTime;
     }
 
     public int getLayId() {
@@ -50,20 +52,84 @@ public class Layout implements Serializable {
         this.layId = layId;
     }
 
-    public String getLayVer() {
-        return layVer;
+    public int getLayVerion() {
+        return layVerion;
     }
 
-    public void setLayVer(String layVer) {
-        this.layVer = layVer;
+    public void setLayVerion(int layVerion) {
+        this.layVerion = layVerion;
     }
 
-    public String getLayVal() {
-        return layVal;
+    public BigInteger getLayCreateAt() {
+        return layCreateAt;
     }
 
-    public void setLayVal(String layVal) {
-        this.layVal = layVal;
+    public void setLayCreateAt(BigInteger layCreateAt) {
+        this.layCreateAt = layCreateAt;
+    }
+
+    public Integer getLayActive() {
+        return layActive;
+    }
+
+    public void setLayActive(Integer layActive) {
+        this.layActive = layActive;
+    }
+
+    public Integer getLayEnabled() {
+        return layEnabled;
+    }
+
+    public void setLayEnabled(Integer layEnabled) {
+        this.layEnabled = layEnabled;
+    }
+
+    public BigInteger getLayEnabledAt() {
+        return layEnabledAt;
+    }
+
+    public void setLayEnabledAt(BigInteger layEnabledAt) {
+        this.layEnabledAt = layEnabledAt;
+    }
+
+    public String getLayInitOrder() {
+        return layInitOrder;
+    }
+
+    public void setLayInitOrder(String layInitOrder) {
+        this.layInitOrder = layInitOrder;
+    }
+
+    public String getLayInitPath() {
+        return layInitPath;
+    }
+
+    public void setLayInitPath(String layInitPath) {
+        this.layInitPath = layInitPath;
+    }
+
+    public String getLayCompact() {
+        return layCompact;
+    }
+
+    public void setLayCompact(String layCompact) {
+        this.layCompact = layCompact;
+    }
+
+    public String getLayCompactPath() {
+        return layCompactPath;
+    }
+
+    public void setLayCompactPath(String layCompactPath) {
+        this.layCompactPath = layCompactPath;
+    }
+
+    public String getLaySplit() {
+        return laySplit;
+    }
+
+    public void setLaySplit(String laySplit) {
+        this.laySplit = laySplit;
     }
 
     public Table getLt() {
@@ -74,11 +140,21 @@ public class Layout implements Serializable {
         this.lt = lt;
     }
 
-    public Set<Catalog> getLayCatalogs() {
-        return layCatalogs;
-    }
-
-    public void setLayCatalogs(Set<Catalog> layCatalogs) {
-        this.layCatalogs = layCatalogs;
+    @Override
+    public String toString() {
+        return "Layout{" +
+                "layId=" + layId +
+                ", layVerion=" + layVerion +
+                ", layCreateAt=" + layCreateAt +
+                ", layActive=" + layActive +
+                ", layEnabled=" + layEnabled +
+                ", layEnabledAt=" + layEnabledAt +
+                ", layInitOrder='" + layInitOrder + '\'' +
+                ", layInitPath='" + layInitPath + '\'' +
+                ", layCompact='" + layCompact + '\'' +
+                ", layCompactPath='" + layCompactPath + '\'' +
+                ", laySplit='" + laySplit + '\'' +
+                ", lt=" + lt +
+                '}';
     }
 }

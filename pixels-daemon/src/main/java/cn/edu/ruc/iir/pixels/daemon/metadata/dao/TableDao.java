@@ -47,7 +47,7 @@ public class TableDao implements BaseDao<Table> {
 
     @Override
     public boolean update(String sql, String[] params) {
-        return false;
+        return db.getUpdate(sql, params) == 1;
     }
 
     @Override
