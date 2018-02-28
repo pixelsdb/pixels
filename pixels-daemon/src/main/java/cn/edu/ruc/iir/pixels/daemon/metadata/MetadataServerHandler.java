@@ -1,10 +1,8 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.BaseDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.CatalogDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Catalog;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.*;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
@@ -51,11 +49,16 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
             sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
             List<Table> tableList = baseDao.loadAll(sql, params);
             curResponse = JSON.toJSONString(tableList);
-        } else if (action.equals("getCatalogs")) {
-            BaseDao baseDao = new CatalogDao();
-            sql = "select * from CATALOG " + (params.length > 0 ? "where LAYOUTS_LAYOUT_ID in (select LAYOUT_ID from LAYOUTS where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) )" : "");
-            List<Catalog> catalogList = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(catalogList);
+        } else if (action.equals("getLayouts")) {
+            BaseDao baseDao = new LayoutDao();
+            sql = "select * from LAYOUTS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) " : "");
+            List<Layout> layoutList = baseDao.loadAll(sql, params);
+            curResponse = JSON.toJSONString(layoutList);
+        } else if (action.equals("getColumns")) {
+            BaseDao baseDao = new ColumnDao();
+            sql = "select * from COLS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ?)) " : "");
+            List<Column> columnList = baseDao.loadAll(sql, params);
+            curResponse = JSON.toJSONString(columnList);
         } else {
             curResponse = "action default";
         }
