@@ -26,14 +26,12 @@ import static org.junit.Assert.assertEquals;
  *
  * @author guodong
  */
-public class TestPixelsReader
-{
+public class TestPixelsReader {
     private TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
     private PixelsReader pixelsReader = null;
 
     @Before
-    public void setup()
-    {
+    public void setup() {
         String filePath = TestParams.filePath;
         Path path = new Path(filePath);
         Configuration conf = new Configuration();
@@ -46,15 +44,13 @@ public class TestPixelsReader
                     .setPath(path)
                     .setSchema(schema)
                     .build();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @Test
-    public void testMetadata()
-    {
+    public void testMetadata() {
         if (pixelsReader == null) {
             return;
         }
@@ -79,17 +75,15 @@ public class TestPixelsReader
                 System.out.println(">>Row group " + i + " footer");
                 System.out.println(rowGroupFooter);
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @Test
-    public void testContent()
-    {
+    public void testContent() {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a","b","e","z"};
+        String[] cols = {"a", "b", "e", "z"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
@@ -101,19 +95,36 @@ public class TestPixelsReader
             System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
             System.out.println(rowBatch.toString());
             rowBatch.reset();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        catch (IOException e) {
+    }
+
+    @Test
+    public void testContent2() {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"a", "b", "c"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+
+        PixelsRecordReader recordReader = pixelsReader.read(option);
+        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
+        try {
+            recordReader.readBatch(rowBatch);
+            System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+//            System.out.println(rowBatch.toString());
+            rowBatch.reset();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @After
-    public void cleanUp()
-    {
+    public void cleanUp() {
         try {
             pixelsReader.close();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

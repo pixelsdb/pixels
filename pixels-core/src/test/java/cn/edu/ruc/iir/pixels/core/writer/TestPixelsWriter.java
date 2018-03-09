@@ -26,11 +26,9 @@ import java.util.Random;
  *
  * @author guodong
  */
-public class TestPixelsWriter
-{
+public class TestPixelsWriter {
     @Test
-    public void testWriter()
-    {
+    public void testWriter() {
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
@@ -89,8 +87,63 @@ public class TestPixelsWriter
                 rowBatch.reset();
             }
             pixelsWriter.close();
+        } catch (IOException | PixelsWriterException e) {
+            e.printStackTrace();
         }
-        catch (IOException | PixelsWriterException e) {
+    }
+
+
+    public void testWriter2() {
+        String filePath = TestParams.filePath;
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+
+        Random randomKey = new Random();
+        Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
+
+        // schema: struct<a:int,b:double,b:double>
+        try {
+            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+            VectorizedRowBatch rowBatch = schema.createRowBatch();
+            LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
+            DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // double
+            DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
+
+            PixelsWriter pixelsWriter =
+                    PixelsWriterImpl.newBuilder()
+                            .setSchema(schema)
+                            .setPixelStride((int) TestParams.pixelStride)
+                            .setRowGroupSize(TestParams.rowGroupSize)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(TestParams.blockSize)
+                            .setReplication(TestParams.blockReplication)
+                            .setBlockPadding(TestParams.blockPadding)
+                            .setEncoding(TestParams.encoding)
+                            .setCompressionBlockSize((int) TestParams.compressionBlockSize)
+                            .build();
+
+            long curT = System.currentTimeMillis();
+            Timestamp timestamp = new Timestamp(curT);
+            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
+            for (int i = 0; i < TestParams.rowNum; i++) {
+                int row = rowBatch.size++;
+                a.vector[row] = i;
+                b.vector[row] = i * 1;
+                c.vector[row] = i * 2;
+                if (rowBatch.size == rowBatch.getMaxSize()) {
+                    pixelsWriter.addRowBatch(rowBatch);
+                    rowBatch.reset();
+                }
+            }
+            if (rowBatch.size != 0) {
+                pixelsWriter.addRowBatch(rowBatch);
+                rowBatch.reset();
+            }
+            pixelsWriter.close();
+        } catch (IOException | PixelsWriterException e) {
             e.printStackTrace();
         }
     }
