@@ -38,12 +38,14 @@ public class TestHdfs {
             System.out.println("BlockSize: " + block.getBlockSize());
             System.out.println(
                     block.getStartOffset());
+            System.out.println(eBlock.getGenerationStamp());
             // 获取当前的数据块所在的DataNode的信息
             DatanodeInfo[] locations =
                     block.getLocations();
             for (DatanodeInfo info : locations) {
                 System.out.println("IpAddr: " + info.getIpAddr());
                 System.out.println("HostName: " + info.getHostName());
+                System.out.println(info.getName());
             }
         }
     }
