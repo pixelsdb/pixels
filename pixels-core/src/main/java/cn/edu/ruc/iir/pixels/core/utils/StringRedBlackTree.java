@@ -5,11 +5,7 @@ import org.apache.hadoop.io.Text;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
 import java.util.Arrays;
 
 /**
@@ -90,11 +86,10 @@ public class StringRedBlackTree extends RedBlackTree
     {
         int start = keyOffsets.get(position);
         int end;
-        if (position + 1 == keyOffsets.size())
-        {
+        if (position + 1 == keyOffsets.size()) {
             end = byteArray.size();
-        } else
-        {
+        }
+        else {
             end = keyOffsets.get(position + 1);
         }
         return byteArray.compare(keyBytes, 0, keyLength,

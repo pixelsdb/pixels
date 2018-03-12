@@ -183,6 +183,7 @@ public class PixelsWriterImpl
 
         public Builder setBlockSize(long blockSize)
         {
+            checkArgument(blockSize > 0, "block size should be positive");
             this.builderBlockSize = blockSize;
 
             return this;
@@ -190,6 +191,7 @@ public class PixelsWriterImpl
 
         public Builder setReplication(short replication)
         {
+            checkArgument(replication > 0, "num of replicas should be positive");
             this.builderReplication = replication;
 
             return this;

@@ -112,8 +112,9 @@ public class TestPixelsReader {
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
         try {
-            recordReader.readBatch(rowBatch);
-            System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+            while(recordReader.readBatch(rowBatch)) {
+                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+            }
 //            System.out.println(rowBatch.toString());
             while(recordReader.readBatch(rowBatch)){
                 System.out.println(">>Getting next batch. Current size : " + rowBatch.size);

@@ -36,7 +36,7 @@ public class TupleDomainPixelsPredicate<C>
         implements PixelsPredicate
 {
     private final TupleDomain<C> predicate;
-    private final List<ColumnReference<C>> columnReferences;
+    public final List<ColumnReference<C>> columnReferences;
 
     public TupleDomainPixelsPredicate(TupleDomain<C> predicate, List<ColumnReference<C>> columnReferences)
     {

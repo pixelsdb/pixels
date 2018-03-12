@@ -10,7 +10,8 @@ import java.sql.Timestamp;
  *
  * @author guodong
  */
-public class StatsRecorder implements ColumnStats
+public class StatsRecorder
+        implements ColumnStats
 {
     long numberOfValues = 0L;
     private boolean hasNull = false;
