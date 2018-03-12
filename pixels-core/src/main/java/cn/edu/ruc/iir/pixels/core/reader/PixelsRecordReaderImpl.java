@@ -43,6 +43,7 @@ public class PixelsRecordReaderImpl
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
     private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
 
+    private int targetRGNum = 0;         // number of target row groups
     private int readerCurRGIdx = 0;      // index of current reading row group in targetRGs
     private int readerCurRGOffset = 0;   // starting index of values to read by reader in current row group
 
@@ -189,8 +190,10 @@ public class PixelsRecordReaderImpl
         for (int i = 0; i < includedRGs.length; i++) {
             if (includedRGs[i]) {
                 targetRGs[targetRGIdx] = i;
+                targetRGIdx++;
             }
         }
+        targetRGNum = targetRGIdx;
 
         // read row group footers
         rowGroupFooters =
@@ -307,7 +310,7 @@ public class PixelsRecordReaderImpl
         batch.projectionSize = targetColumns.length;
         System.arraycopy(targetColumns, 0, batch.projectedColumns, 0, targetColumns.length);
 
-        if (readerCurRGIdx >= targetRGs.length) {
+        if (readerCurRGIdx >= targetRGNum) {
             return false;
         }
 
