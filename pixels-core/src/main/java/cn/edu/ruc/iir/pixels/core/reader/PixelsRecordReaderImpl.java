@@ -3,8 +3,11 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.ChunkSeq;
 import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
+import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import com.google.common.collect.ImmutableList;
@@ -15,7 +18,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * pixels
@@ -38,6 +43,7 @@ public class PixelsRecordReaderImpl
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
     private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
 
+    private int targetRGNum = 0;         // number of target row groups
     private int readerCurRGIdx = 0;      // index of current reading row group in targetRGs
     private int readerCurRGOffset = 0;   // starting index of values to read by reader in current row group
 
@@ -71,7 +77,9 @@ public class PixelsRecordReaderImpl
             return;
         }
 
-        // check if predicate matches file schema
+        if (option.getPredicate().isPresent()) {
+            // todo check if predicate matches file schema
+        }
 
         // get included columns
         int includedColumnsNum = 0;
@@ -143,17 +151,49 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
+        Map<Integer, ColumnStats> columnStatsMap = new HashMap<>();
         // read row group statistics and find target row groups
-        for (int i = 0; i < rowGroupStatistics.size(); i++) {
-            includedRGs[i] = true;
+        if (option.getPredicate().isPresent()) {
+            List<TypeDescription> columnSchemas = readerSchema.getChildren();
+            PixelsPredicate predicate = option.getPredicate().get();
+
+            // first, get file level column statistic, if not matches, skip this file
+            List<PixelsProto.ColumnStatistic> fileColumnStatistics = footer.getColumnStatsList();
+            for (int idx : targetColumns) {
+                columnStatsMap.put(idx,
+                        StatsRecorder.create(columnSchemas.get(idx), fileColumnStatistics.get(idx)));
+            }
+            if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap)) {
+                return false;
+            }
+            columnStatsMap.clear();
+
+            // second, get row group statistics, if not matches, skip the row group
+            for (int i = 0; i < includedRGs.length; i++) {
+                PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(i);
+                List<PixelsProto.ColumnStatistic> rgColumnStatistics =
+                        rowGroupStatistic.getColumnChunkStatsList();
+                for (int idx : targetColumns) {
+                    columnStatsMap.put(idx,
+                            StatsRecorder.create(columnSchemas.get(idx), rgColumnStatistics.get(idx)));
+                }
+                includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
+            }
+        }
+        else {
+            for (int i = 0; i < rowGroupStatistics.size(); i++) {
+                includedRGs[i] = true;
+            }
         }
         targetRGs = new int[includedRGs.length];
         int targetRGIdx = 0;
         for (int i = 0; i < includedRGs.length; i++) {
             if (includedRGs[i]) {
                 targetRGs[targetRGIdx] = i;
+                targetRGIdx++;
             }
         }
+        targetRGNum = targetRGIdx;
 
         // read row group footers
         rowGroupFooters =
@@ -270,7 +310,7 @@ public class PixelsRecordReaderImpl
         batch.projectionSize = targetColumns.length;
         System.arraycopy(targetColumns, 0, batch.projectedColumns, 0, targetColumns.length);
 
-        if (readerCurRGIdx >= targetRGs.length) {
+        if (readerCurRGIdx >= targetRGNum) {
             return false;
         }
 
