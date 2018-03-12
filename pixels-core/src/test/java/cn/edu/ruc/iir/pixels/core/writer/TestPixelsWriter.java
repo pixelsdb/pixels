@@ -102,10 +102,10 @@ public class TestPixelsWriter {
         Random randomKey = new Random();
         Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
 
-        // schema: struct<a:int,b:double,b:double>
+        String schemaStr = "struct<a:int,b:double,b:double>";
         try {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+            TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // double

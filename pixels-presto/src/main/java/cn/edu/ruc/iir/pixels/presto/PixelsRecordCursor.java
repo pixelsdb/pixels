@@ -13,6 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.RecordCursor;
@@ -75,11 +76,12 @@ public class PixelsRecordCursor
     private final int[] fieldToColumnIndex;
     private final HostAddress address;
     private final FilesReader reader;
+    private final PixelsReader pixelsReader;
     private List<String> fields;
     private static FSFactory fsFactory;
     private static String path;
 
-    public PixelsRecordCursor(PixelsTable pixelsTable, List<PixelsColumnHandle> columns, SchemaTableName tableName, HostAddress address, TupleDomain<PixelsColumnHandle> predicate, FSFactory fsFactory, String path) {
+    public PixelsRecordCursor(PixelsTable pixelsTable, List<PixelsColumnHandle> columns, SchemaTableName tableName, HostAddress address, TupleDomain<PixelsColumnHandle> predicate, FSFactory fsFactory, String path, PixelsReader pixelsReader) {
         this.columns = requireNonNull(columns, "columns is null");
         this.address = requireNonNull(address, "address is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
@@ -92,8 +94,13 @@ public class PixelsRecordCursor
         }
         this.path = path;
         logger.info("getFilesReader begin");
+        this.pixelsReader = pixelsReader;
         this.reader = getFilesReader(pixelsTable, tableName, predicate);
         logger.info("PixelsRecordCursor Constructor");
+    }
+
+    public PixelsReader getPixelsReader() {
+        return pixelsReader;
     }
 
     private static FilesReader getFilesReader(PixelsTable pixelsTable, SchemaTableName tableName, TupleDomain<PixelsColumnHandle> predicate) {
