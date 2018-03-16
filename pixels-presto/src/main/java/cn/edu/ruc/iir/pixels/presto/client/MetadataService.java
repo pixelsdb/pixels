@@ -6,12 +6,10 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import com.alibaba.fastjson.JSON;
-import com.facebook.presto.spi.ColumnMetadata;
+import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 
 /**
  * @version V1.0
@@ -25,7 +23,11 @@ public class MetadataService {
     static ConfigFactory config = ConfigFactory.Instance();
     static String host = config.getProperty("metadata.server.host");
     static int port = Integer.valueOf(config.getProperty("metadata.server.port"));
+    private static Logger logger = Logger.get(MetadataService.class);
 
+    static {
+        logger.info("MetadataService Request Addr = " + host + ":" + port);
+    }
 
     public static List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
         List<Column> columns = new ArrayList<Column>();

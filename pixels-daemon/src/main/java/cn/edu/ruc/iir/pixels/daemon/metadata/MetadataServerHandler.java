@@ -36,7 +36,9 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         String split[] = body.split("==");
         String action = split[0];
         String params[] = new String[]{};
+        System.out.println("Body: " + body);
         System.out.println("Action: " + action);
+        System.out.println();
         if (split.length > 1)
             params = split[1].split("&");
         if (action.equals("getSchemas")) {

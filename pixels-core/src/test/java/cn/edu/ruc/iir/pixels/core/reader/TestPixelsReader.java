@@ -63,8 +63,8 @@ public class TestPixelsReader {
         assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
         assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
 
-//        System.out.println(">>Footer: " + pixelsReader.getFooter().toString());
-//        System.out.println(">>Postscript: " + pixelsReader.getPostScript().toString());
+        System.out.println(">>Footer: " + pixelsReader.getFooter().toString());
+        System.out.println(">>Postscript: " + pixelsReader.getPostScript().toString());
 
         int rowGroupNum = pixelsReader.getRowGroupNum();
         System.out.println(">>Row group num: " + rowGroupNum);
@@ -115,11 +115,13 @@ public class TestPixelsReader {
             while(recordReader.readBatch(rowBatch)) {
                 System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
             }
-//            System.out.println(rowBatch.toString());
-            while(recordReader.readBatch(rowBatch)){
+            System.out.println(rowBatch.toString());
+            rowBatch.reset();
+
+            while(recordReader.readBatch(rowBatch)) {
                 System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
             }
-            rowBatch.reset();
+            System.out.println(rowBatch.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }

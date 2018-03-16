@@ -2,6 +2,8 @@ package cn.edu.ruc.iir.pixels.core;
 
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.Type;
 
 import java.io.Closeable;
 import java.io.IOException;

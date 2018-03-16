@@ -1,6 +1,8 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.Type;
 
 import java.io.IOException;
 
@@ -66,4 +68,6 @@ public interface PixelsRecordReader
      * */
     @Override
     void close() throws IOException;
+
+    Block readBlock(Type type, int columnIndex);
 }

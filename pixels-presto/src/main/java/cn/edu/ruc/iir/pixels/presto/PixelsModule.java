@@ -16,7 +16,8 @@ package cn.edu.ruc.iir.pixels.presto;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsConfig;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
-import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
+import com.facebook.presto.spi.ConnectorPageSource;
+import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -54,10 +55,12 @@ public class PixelsModule
         binder.bind(PixelsMetadata.class).in(Scopes.SINGLETON);
         binder.bind(FSFactory.class).in(Scopes.SINGLETON);
         binder.bind(PixelsMetadataReader.class).in(Scopes.SINGLETON);
+        binder.bind(ConnectorPageSourceProvider.class).to(PixelsPageSourceProvider.class).in(Scopes.SINGLETON);
+        binder.bind(ConnectorPageSource.class).to(PixelsPageSource.class).in(Scopes.SINGLETON);
         binder.bind(PixelsSplitManager.class).in(Scopes.SINGLETON);
-        binder.bind(ConnectorRecordSetProvider.class).to(PixelsRecordSetProvider.class).in(Scopes.SINGLETON);
         binder.bind(PixelsHandleResolver.class).in(Scopes.SINGLETON);
-        binder.bind(PixelsRecordSetProvider.class).in(Scopes.SINGLETON);
+        binder.bind(PixelsPageSourceProvider.class).in(Scopes.SINGLETON);
+        binder.bind(PixelsPageSource.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(PixelsConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);

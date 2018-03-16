@@ -1,23 +1,27 @@
 package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import com.facebook.presto.hadoop.$internal.com.google.common.base.Throwables;
-import com.facebook.presto.spi.*;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.LazyBlock;
-import com.facebook.presto.spi.block.LazyBlockLoader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import com.facebook.presto.spi.ConnectorPageSource;
+import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PageBuilder;
+import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.type.Type;
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import org.apache.pixels.presto.readers.StreamReader;
-import org.apache.pixels.presto.readers.StreamReaders;
-import org.apache.pixels.processing.loading.exception.CarbonDataLoadingException;
+import org.apache.hadoop.fs.Path;
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -26,30 +30,102 @@ import static java.util.Objects.requireNonNull;
 class PixelsPageSource implements ConnectorPageSource {
 
     private static Logger logger = Logger.get(PixelsPageSource.class);
-    private final RecordCursor cursor;
-    private final List<Type> types;
-    private final PageBuilder pageBuilder;
+    private final int MAX_BATCH_SIZE = 1024;
+    private final int NULL_ENTRY_SIZE = 0;
+    private List<PixelsColumnHandle> columns;
+    private List<Type> types;
+    private FSFactory fsFactory;
+    private PageBuilder pageBuilder;
+    private static String path;
     private boolean closed;
-    private PixelsReader vectorReader;
+    private PixelsReader pixelsReader;
+    private PixelsRecordReader recordReader;
     private long sizeOfData = 0;
-
-    private final StreamReader[] readers;
+    private TypeDescription schema;
+    private PixelsReaderOption option;
+    private Block[] constantBlocks;
+    private int[] pixelsColumnIndexes;
+    private final String connectorId;
     private int batchId;
 
     private long nanoStart;
     private long nanoEnd;
 
-    PixelsPageSource(RecordSet recordSet) {
-        this(requireNonNull(recordSet, "recordSet is null").getColumnTypes(),
-                recordSet.cursor());
+    @Inject
+    public PixelsPageSource(PixelsConnectorId connectorId) {
+        this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
     }
 
-    private PixelsPageSource(List<Type> types, RecordCursor cursor) {
-        this.cursor = requireNonNull(cursor, "cursor is null");
-        this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
+    public PixelsPageSource(PixelsTable pixelsTable, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String path, String connectorId) {
+        this.connectorId = connectorId;
+        ImmutableList.Builder<Type> columnTypes = ImmutableList.builder();
+        for (PixelsColumnHandle column : columnHandles) {
+
+            columnTypes.add(column.getColumnType());
+        }
+        this.types = new ArrayList<>(columnTypes.build());
         this.pageBuilder = new PageBuilder(this.types);
-        this.vectorReader = ((PixelsRecordCursor) cursor).getPixelsReader();
-        this.readers = createStreamReaders();
+        this.fsFactory = fsFactory;
+        this.columns = columnHandles;
+        this.path = path;
+
+        getPixelsReaderBySchema();
+
+        int size = columnHandles.size();
+        this.constantBlocks = new Block[size];
+        this.pixelsColumnIndexes = new int[size];
+        this.recordReader = pixelsReader.read(option);
+
+        for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
+            pixelsColumnIndexes[columnIndex] = columnIndex;
+
+            BlockBuilder blockBuilder = this.types.get(columnIndex).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
+            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
+                blockBuilder.appendNull();
+            }
+            constantBlocks[columnIndex] = blockBuilder.build();
+        }
+    }
+
+    private void getPixelsReaderBySchema() {
+        StringBuffer colStr = new StringBuffer();
+        String schemaStr = "struct<";
+        for (PixelsColumnHandle columnHandle : this.columns) {
+            String name = columnHandle.getColumnName();
+            String type = columnHandle.getColumnType().toString();
+            colStr.append(name + ",");
+            if (type.equals("integer")) {
+                type = "int";
+            }
+            schemaStr += name + ":" + type + ",";
+        }
+        String colsStr = colStr.toString();
+        logger.info("getPixelsReaderBySchema colStr: " + colsStr);
+        String[] cols = colsStr.substring(0, colsStr.length() - 1).split(",");
+
+        schemaStr = schemaStr.substring(0, schemaStr.length() - 1) + ">";
+        logger.info("PixelsRecordCursor Schema: " + schemaStr);
+        this.schema = TypeDescription.fromString(schemaStr);
+
+        this.option = new PixelsReaderOption();
+        this.option.skipCorruptRecords(true);
+        this.option.tolerantSchemaEvolution(true);
+        this.option.includeCols(cols);
+
+        schemaStr = schemaStr.substring(0, schemaStr.length() - 1) + ">";
+        logger.info("PixelsPageResource Schema: " + schemaStr);
+        this.schema = TypeDescription.fromString(schemaStr);
+
+        try {
+            this.pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setFS(fsFactory.getFileSystem().get())
+                    .setPath(new Path(path))
+                    .setSchema(schema)
+                    .build();
+        } catch (IOException e) {
+            e.printStackTrace();
+
+        }
     }
 
     @Override
@@ -73,45 +149,37 @@ class PixelsPageSource implements ConnectorPageSource {
         if (nanoStart == 0) {
             nanoStart = System.nanoTime();
         }
-        CarbonVectorBatch columnarBatch = null;
-        int batchSize = 0;
+        VectorizedRowBatch rowBatch = schema.createRowBatch();
         try {
             batchId++;
-            if (vectorReader.nextKeyValue()) {
-                Object vectorBatch = vectorReader.getCurrentValue();
-                if (vectorBatch != null && vectorBatch instanceof CarbonVectorBatch) {
-                    columnarBatch = (CarbonVectorBatch) vectorBatch;
-                    batchSize = columnarBatch.numRows();
-                    if (batchSize == 0) {
-                        close();
-                        return null;
-                    }
-                }
-            } else {
+            recordReader.readBatch(rowBatch);
+            int batchSize = rowBatch.size;
+            if (batchSize <= 0) {
                 close();
                 return null;
             }
-            if (columnarBatch == null) {
-                return null;
-            }
+            logger.info("getNextPage batchId: " + batchId);
+            logger.info("getNextPage rowBatch: " + rowBatch.size);
+            logger.info("getNextPage pixelsColumnIndexes: " + pixelsColumnIndexes.length);
+            Block[] blocks = new Block[pixelsColumnIndexes.length];
+            logger.info("getNextPage blocks: " + blocks.length);
 
-            Block[] blocks = new Block[types.size()];
-            for (int column = 0; column < blocks.length; column++) {
-                Type type = types.get(column);
-                readers[column].setBatchSize(columnarBatch.numRows());
-                readers[column].setVectorReader(true);
-                readers[column].setVector(columnarBatch.column(column));
-                blocks[column] = new LazyBlock(batchSize, new PixelsBlockLoader(column, type));
+            for (int fieldId = 0; fieldId < blocks.length; fieldId++) {
+                Type type = types.get(fieldId);
+                if (constantBlocks[fieldId] != null) {
+                    logger.info("constantBlocks[fieldId] != null");
+                    blocks[fieldId] = constantBlocks[fieldId].getRegion(0, batchSize);
+                } else {
+                    logger.info("constantBlocks[fieldId] == null");
+                    blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(pixelsColumnIndexes[fieldId], type));
+                }
             }
-            Page page = new Page(batchSize, blocks);
-            sizeOfData += columnarBatch.capacity();
-            return page;
-        } catch (PrestoException e) {
-            closeWithSuppression(e);
-            throw e;
-        } catch (RuntimeException | InterruptedException | IOException e) {
-            closeWithSuppression(e);
+            logger.info("getNextPage batchSize: " + batchSize);
+            return new Page(batchSize, blocks);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        return null;
     }
 
     @Override
@@ -127,8 +195,7 @@ class PixelsPageSource implements ConnectorPageSource {
         }
         closed = true;
         try {
-            vectorReader.close();
-            cursor.close();
+            pixelsReader.close();
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.info("close error: " + e.getMessage());
@@ -154,6 +221,9 @@ class PixelsPageSource implements ConnectorPageSource {
      */
     private final class PixelsBlockLoader
             implements LazyBlockLoader<LazyBlock> {
+
+        private Logger logger = Logger.get(PixelsBlockLoader.class);
+
         private final int expectedBatchId = batchId;
         private final int columnIndex;
         private final Type type;
@@ -170,30 +240,10 @@ class PixelsPageSource implements ConnectorPageSource {
                 return;
             }
             checkState(batchId == expectedBatchId);
-            try {
-                Block block = readers[columnIndex].readBlock(type);
-                lazyBlock.setBlock(block);
-            } catch (IOException e) {
-            }
+            Block block = recordReader.readBlock(type, columnIndex);
+            lazyBlock.setBlock(block);
             loaded = true;
         }
-    }
-
-
-    /**
-     * Create the Stream Reader for every column based on their type
-     * This method will be initialized only once based on the types.
-     *
-     * @return
-     */
-    private StreamReader[] createStreamReaders() {
-        requireNonNull(types);
-        StreamReader[] readers = new StreamReader[types.size()];
-        for (int i = 0; i < types.size(); i++) {
-            readers[i] = StreamReaders.createStreamReader(types.get(i), readSupport
-                    .getSliceArrayBlock(i), readSupport.getDictionaries()[i]);
-        }
-        return readers;
     }
 
 }
