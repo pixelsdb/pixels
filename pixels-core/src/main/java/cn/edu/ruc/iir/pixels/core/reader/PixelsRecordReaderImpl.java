@@ -10,10 +10,6 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -26,17 +22,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static java.lang.Math.max;
-import static java.lang.Math.min;
-import static java.lang.Math.toIntExact;
-
 /**
  * pixels
  *
  * @author guodong
  */
 public class PixelsRecordReaderImpl
-        implements PixelsRecordReader {
+        implements PixelsRecordReader
+{
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
@@ -61,7 +54,8 @@ public class PixelsRecordReaderImpl
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
                                   PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
-                                  PixelsReaderOption option) {
+                                  PixelsReaderOption option)
+    {
         this.physicalFSReader = physicalFSReader;
         this.postScript = postScript;
         this.footer = footer;
@@ -69,7 +63,8 @@ public class PixelsRecordReaderImpl
         checkBeforeRead();
     }
 
-    private void checkBeforeRead() {
+    private void checkBeforeRead()
+    {
         // get file schema
         List<PixelsProto.Type> colTypes = footer.getTypesList();
         if (colTypes == null || colTypes.isEmpty()) {
@@ -141,7 +136,8 @@ public class PixelsRecordReaderImpl
         checkValid = true;
     }
 
-    private boolean read() {
+    private boolean read()
+    {
         if (!checkValid) {
             return false;
         }
@@ -183,7 +179,8 @@ public class PixelsRecordReaderImpl
                 }
                 includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
             }
-        } else {
+        }
+        else {
             for (int i = 0; i < rowGroupStatistics.size(); i++) {
                 includedRGs[i] = true;
             }
@@ -213,7 +210,8 @@ public class PixelsRecordReaderImpl
                     physicalFSReader.readFully(footerBuffer);
                     rowGroupFooters[i] =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                     e.printStackTrace();
                     return false;
                 }
@@ -275,7 +273,8 @@ public class PixelsRecordReaderImpl
                     chunkSliceOffset += chunkLength;
                 }
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return false;
         }
@@ -288,10 +287,11 @@ public class PixelsRecordReaderImpl
      *
      * @param batch the row batch to read into
      * @return more rows available
-     * @throws java.io.IOException
+     * @throws IOException
      */
     @Override
-    public boolean readBatch(VectorizedRowBatch batch) throws IOException {
+    public boolean readBatch(VectorizedRowBatch batch) throws IOException
+    {
         if (!checkValid) {
             return false;
         }
@@ -343,14 +343,16 @@ public class PixelsRecordReaderImpl
     }
 
     @Override
-    public VectorizedRowBatch readBatch() throws IOException {
+    public VectorizedRowBatch readBatch() throws IOException
+    {
         VectorizedRowBatch rowBatch = readerSchema.createRowBatch();
         readBatch(rowBatch);
         return rowBatch;
     }
 
     @Override
-    public VectorizedRowBatch readBatch(int max) throws IOException {
+    public VectorizedRowBatch readBatch(int max) throws IOException
+    {
         VectorizedRowBatch rowBatch = readerSchema.createRowBatch(max);
         readBatch(rowBatch);
         return rowBatch;
@@ -362,7 +364,8 @@ public class PixelsRecordReaderImpl
      * @return number of the row currently being read
      */
     @Override
-    public long getRowNumber() {
+    public long getRowNumber()
+    {
         if (!checkValid) {
             return -1L;
         }
@@ -378,12 +381,14 @@ public class PixelsRecordReaderImpl
      */
     @Deprecated
     @Override
-    public boolean seekToRow(long rowIndex) {
+    public boolean seekToRow(long rowIndex)
+    {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean skip(long rowNum) {
+    public boolean skip(long rowNum)
+    {
         return false;
     }
 
@@ -391,7 +396,8 @@ public class PixelsRecordReaderImpl
      * Cleanup and release resources
      */
     @Override
-    public void close() {
+    public void close()
+    {
         // release chunk buffer
         for (int targetRG : targetRGs) {
             for (int targetColumn : targetColumns) {
@@ -401,11 +407,5 @@ public class PixelsRecordReaderImpl
                 }
             }
         }
-    }
-
-    @Override
-    public Block readBlock(Type type, int columnIndex) {
-        BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), VectorizedRowBatch.DEFAULT_SIZE);
-        return builder.build();
     }
 }

@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
@@ -47,7 +48,7 @@ class PixelsPageSource implements ConnectorPageSource {
     private int[] pixelsColumnIndexes;
     private final String connectorId;
     private int batchId;
-
+    private VectorizedRowBatch rowBatch;
     private long nanoStart;
     private long nanoEnd;
 
@@ -68,8 +69,8 @@ class PixelsPageSource implements ConnectorPageSource {
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
         this.path = path;
-
         getPixelsReaderBySchema();
+        this.rowBatch = this.schema.createRowBatch();
 
         int size = columnHandles.size();
         this.constantBlocks = new Block[size];
@@ -80,9 +81,19 @@ class PixelsPageSource implements ConnectorPageSource {
             pixelsColumnIndexes[columnIndex] = columnIndex;
 
             BlockBuilder blockBuilder = this.types.get(columnIndex).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
-            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
-                blockBuilder.appendNull();
+            StringBuilder b = new StringBuilder();
+            for (int i = 0; i < this.rowBatch.size; i++) {
+                int projIndex = this.rowBatch.projectedColumns[columnIndex];
+                ColumnVector cv = this.rowBatch.cols[projIndex];
+                if (cv != null) {
+                    cv.stringifyValue(b, i);
+                }
+                blockBuilder.writeLong(Long.parseLong(b.toString()));
             }
+
+//            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
+//                blockBuilder.appendNull();
+//            }
             constantBlocks[columnIndex] = blockBuilder.build();
         }
     }
@@ -104,7 +115,6 @@ class PixelsPageSource implements ConnectorPageSource {
         String[] cols = colsStr.substring(0, colsStr.length() - 1).split(",");
 
         schemaStr = schemaStr.substring(0, schemaStr.length() - 1) + ">";
-        logger.info("PixelsRecordCursor Schema: " + schemaStr);
         this.schema = TypeDescription.fromString(schemaStr);
 
         this.option = new PixelsReaderOption();
@@ -149,7 +159,6 @@ class PixelsPageSource implements ConnectorPageSource {
         if (nanoStart == 0) {
             nanoStart = System.nanoTime();
         }
-        VectorizedRowBatch rowBatch = schema.createRowBatch();
         try {
             batchId++;
             recordReader.readBatch(rowBatch);
@@ -240,7 +249,8 @@ class PixelsPageSource implements ConnectorPageSource {
                 return;
             }
             checkState(batchId == expectedBatchId);
-            Block block = recordReader.readBlock(type, columnIndex);
+            BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE);
+            Block block = builder.build();
             lazyBlock.setBlock(block);
             loaded = true;
         }

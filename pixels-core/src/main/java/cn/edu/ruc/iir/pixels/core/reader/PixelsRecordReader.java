@@ -1,8 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.type.Type;
 
 import java.io.IOException;
 
@@ -18,14 +16,14 @@ public interface PixelsRecordReader
      * Read the next row batch.
      * @param batch the row batch to read into
      * @return more rows available
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     boolean readBatch(VectorizedRowBatch batch) throws IOException;
 
     /**
      * Read the next row batch
      * @return row batch
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     VectorizedRowBatch readBatch() throws IOException;
 
@@ -33,7 +31,7 @@ public interface PixelsRecordReader
      * Read the next row batch
      * @param max max num of rows in this batch
      * @return row batch
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     VectorizedRowBatch readBatch(int max) throws IOException;
 
@@ -47,7 +45,7 @@ public interface PixelsRecordReader
      * Seek to specified row
      * @param rowIndex row index
      * @return seek success
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     @Deprecated
     boolean seekToRow(long rowIndex) throws IOException;
@@ -57,17 +55,15 @@ public interface PixelsRecordReader
      *
      * @param rowNum number of rows to skip
      * @return skip success
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     @Deprecated
     boolean skip(long rowNum) throws IOException;
 
     /**
      * Cleanup and release resources
-     * @throws java.io.IOException
+     * @throws IOException
      * */
     @Override
     void close() throws IOException;
-
-    Block readBlock(Type type, int columnIndex);
 }
