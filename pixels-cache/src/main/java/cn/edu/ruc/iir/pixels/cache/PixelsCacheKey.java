@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import java.nio.ByteBuffer;
+
 /**
  * pixels
  *
@@ -7,11 +9,12 @@ package cn.edu.ruc.iir.pixels.cache;
  */
 public class PixelsCacheKey
 {
+    public static final int SIZE = Long.BYTES + 2 * Short.BYTES;
     private final long blockId;
-    private final int rowGroupId;
-    private final int columnId;
+    private final short rowGroupId;
+    private final short columnId;
 
-    public PixelsCacheKey(long blockId, int rowGroupId, int columnId)
+    public PixelsCacheKey(long blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
@@ -31,5 +34,15 @@ public class PixelsCacheKey
     public int getColumnId()
     {
         return columnId;
+    }
+
+    public byte[] getBytes()
+    {
+        ByteBuffer buffer = ByteBuffer.allocate(SIZE);
+        buffer.putLong(blockId);
+        buffer.putShort(rowGroupId);
+        buffer.putShort(columnId);
+
+        return buffer.array();
     }
 }

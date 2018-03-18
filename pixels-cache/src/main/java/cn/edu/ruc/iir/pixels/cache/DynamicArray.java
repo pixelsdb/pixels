@@ -103,6 +103,8 @@ public class DynamicArray<T>
 
     /**
      * Set value of the specified index.
+     *
+     * @throws ArrayIndexOutOfBoundsException array index out of bounds
      * */
     public void set(int index, T v)
     {
@@ -116,6 +118,8 @@ public class DynamicArray<T>
 
     /**
      * Get value of the specified index.
+     *
+     * @throws ArrayIndexOutOfBoundsException array index out of bounds
      * */
     @SuppressWarnings("unchecked")
     public T get(int index)
@@ -138,6 +142,8 @@ public class DynamicArray<T>
     /**
      * Release reference of specified index.
      * After release, the object may be cleared to let GC do its work.
+     *
+     * @throws ArrayIndexOutOfBoundsException array index out of bounds
      * */
     public void release(int index)
     {

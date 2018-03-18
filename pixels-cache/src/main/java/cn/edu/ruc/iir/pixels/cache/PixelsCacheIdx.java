@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import java.nio.ByteBuffer;
+
 /**
  * pixels
  *
@@ -7,6 +9,7 @@ package cn.edu.ruc.iir.pixels.cache;
  */
 public class PixelsCacheIdx
 {
+    public static final int SIZE = 2 * Long.BYTES + 2 * Integer.BYTES;
     private final long offset;
     private final long timestamp;
     private final int length;
@@ -38,5 +41,16 @@ public class PixelsCacheIdx
     public int getCounter()
     {
         return counter;
+    }
+
+    public byte[] getBytes()
+    {
+        ByteBuffer buffer = ByteBuffer.allocate(SIZE);
+        buffer.putLong(offset);
+        buffer.putLong(timestamp);
+        buffer.putInt(length);
+        buffer.putInt(counter);
+
+        return buffer.array();
     }
 }

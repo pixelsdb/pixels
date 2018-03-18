@@ -9,10 +9,10 @@ import java.nio.ByteBuffer;
  */
 public class RadixNode
 {
-    private boolean isKey;          // does this node contains a key? [1 bit]
-    private boolean isNull;         // associated value is NULL [1 bit]
-    private boolean isCompressed;   // node is compressed [1 bit]
-    private int size;               // number of children, or length of compressed bytes [29 bit]
+    private boolean isKey = false;          // does this node contains a key? [1 bit]
+    private boolean isNull = true;          // associated value is NULL [1 bit]
+    private boolean isCompressed = false;   // node is compressed [1 bit]
+    private int size = 0;                   // number of children, or length of compressed bytes [29 bit]
 
     // if node is not compressed, size is the num of children,
     // data has `size` bytes of content, one for each child byte, and `size` pointers, point to each child node.
@@ -24,7 +24,7 @@ public class RadixNode
 
     // if the node has an associated key (isKey=1) and is not null (isNull=0),
     // then after the node pointers, an additional value pointer is present.
-    private byte[] data = null;     // node data
+    private byte[] data = null;             // node data
 
     public RadixNode()
     {}
