@@ -160,9 +160,8 @@ public class PixelsCache
      * @param rowGroupId row group id
      * @param columnId column id
      * @param content columnlet content
-     * @param pin should this columnlet be pinned or not
      * */
-    public void put(long blockId, int rowGroupId, int columnId, byte[] content, boolean pin)
+    public void put(long blockId, int rowGroupId, int columnId, byte[] content)
     {
         long cacheOffset = indexFile.getLongVolatile(64);
         long indexOffset = indexFile.getLongVolatile(128) + 192;

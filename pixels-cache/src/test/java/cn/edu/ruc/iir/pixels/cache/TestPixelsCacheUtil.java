@@ -36,4 +36,20 @@ public class TestPixelsCacheUtil
         System.out.println(PixelsCacheUtil.getHeaderRW(header));
         System.out.println(PixelsCacheUtil.getReadCount(header));
     }
+
+    @Test
+    public void test()
+    {
+        int header = 0;
+        int size = 536_870_911;
+        System.out.println(size);
+        header = header | (1 << 31);
+        header = header | (1 << 30);
+        header = header | (1 << 29);
+        header = header | size;
+        System.out.println(header >> 31 & 1);
+        System.out.println(header >> 30 & 1);
+        System.out.println(header >> 29 & 1);
+        System.out.println(header & 0x1fffffff);
+    }
 }
