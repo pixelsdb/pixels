@@ -1,6 +1,8 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * pixels
@@ -13,6 +15,10 @@ public class RadixNode
     private boolean isNull = true;          // associated value is NULL [1 bit]
     private boolean isCompressed = false;   // node is compressed [1 bit]
     private int size = 0;                   // number of children, or length of compressed bytes [29 bit]
+    private byte[] edge = null;
+//    private RadixNode[] children = null;
+    private Map<Byte, RadixNode> children = new HashMap<>();
+    private PixelsCacheIdx value = null;
 
     // if node is not compressed, size is the num of children,
     // data has `size` bytes of content, one for each child byte, and `size` pointers, point to each child node.
@@ -24,10 +30,11 @@ public class RadixNode
 
     // if the node has an associated key (isKey=1) and is not null (isNull=0),
     // then after the node pointers, an additional value pointer is present.
-    private byte[] data = null;             // node data
+//    private byte[] data = null;             // node data
 
     public RadixNode()
-    {}
+    {
+    }
 
     public boolean isKey()
     {
@@ -69,14 +76,54 @@ public class RadixNode
         this.size = size;
     }
 
-    public byte[] getData()
+    public void setEdge(byte[] edge)
     {
-        return data;
+        this.edge = edge;
     }
 
-    public void setData(byte[] data)
+    public byte[] getEdge()
     {
-        this.data = data;
+        return edge;
+    }
+
+    public void addChild(RadixNode child, boolean overwrite)
+    {
+        byte firstByte = child.edge[0];
+        if (!overwrite && children.containsKey(firstByte)) {
+            return;
+        }
+        children.put(firstByte, child);
+    }
+
+    public void removeChild(RadixNode child)
+    {
+        byte firstByte = child.edge[0];
+        children.remove(firstByte);
+    }
+
+    public RadixNode getChild(byte firstByte)
+    {
+        return children.get(firstByte);
+    }
+
+    public void setChildren(Map<Byte, RadixNode> children)
+    {
+        this.children = children;
+    }
+
+    public Map<Byte, RadixNode> getChildren()
+    {
+        return children;
+    }
+
+    public void setValue(PixelsCacheIdx value)
+    {
+        this.value = value;
+    }
+
+    public PixelsCacheIdx getValue()
+    {
+        return value;
     }
 
     public byte[] getBytes()
@@ -94,14 +141,14 @@ public class RadixNode
         header = header | size;
 
         int bytesSize = Integer.BYTES;
-        if (data != null) {
-            bytesSize += data.length;
-        }
+//        if (data != null) {
+//            bytesSize += data.length;
+//        }
         ByteBuffer byteBuffer = ByteBuffer.allocate(bytesSize);
         byteBuffer.putInt(header);
-        if (data != null) {
-            byteBuffer.put(data);
-        }
+//        if (data != null) {
+//            byteBuffer.put(data);
+//        }
 
         return byteBuffer.array();
     }
