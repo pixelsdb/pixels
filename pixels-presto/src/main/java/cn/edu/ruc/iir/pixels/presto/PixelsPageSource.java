@@ -82,18 +82,18 @@ class PixelsPageSource implements ConnectorPageSource {
 
             BlockBuilder blockBuilder = this.types.get(columnIndex).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
             StringBuilder b = new StringBuilder();
-            for (int i = 0; i < this.rowBatch.size; i++) {
-                int projIndex = this.rowBatch.projectedColumns[columnIndex];
-                ColumnVector cv = this.rowBatch.cols[projIndex];
-                if (cv != null) {
-                    cv.stringifyValue(b, i);
-                }
-                blockBuilder.writeLong(Long.parseLong(b.toString()));
-            }
-
-//            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
-//                blockBuilder.appendNull();
+//            for (int i = 0; i < this.rowBatch.size; i++) {
+//                int projIndex = this.rowBatch.projectedColumns[columnIndex];
+//                ColumnVector cv = this.rowBatch.cols[projIndex];
+//                if (cv != null) {
+//                    cv.stringifyValue(b, i);
+//                }
+//                blockBuilder.writeLong(Long.parseLong(b.toString()));
 //            }
+
+            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
+                blockBuilder.appendNull();
+            }
             constantBlocks[columnIndex] = blockBuilder.build();
         }
     }
@@ -169,21 +169,22 @@ class PixelsPageSource implements ConnectorPageSource {
             }
             logger.info("getNextPage batchId: " + batchId);
             logger.info("getNextPage rowBatch: " + rowBatch.size);
-            logger.info("getNextPage pixelsColumnIndexes: " + pixelsColumnIndexes.length);
+            logger.info("getNextPage batchSize: " + batchSize);
             Block[] blocks = new Block[pixelsColumnIndexes.length];
             logger.info("getNextPage blocks: " + blocks.length);
 
             for (int fieldId = 0; fieldId < blocks.length; fieldId++) {
                 Type type = types.get(fieldId);
                 if (constantBlocks[fieldId] != null) {
-                    logger.info("constantBlocks[fieldId] != null");
+                    logger.info("constantBlocks[" + fieldId + "] != null");
                     blocks[fieldId] = constantBlocks[fieldId].getRegion(0, batchSize);
                 } else {
-                    logger.info("constantBlocks[fieldId] == null");
+                    logger.info("constantBlocks[" + fieldId + "] == null");
                     blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(pixelsColumnIndexes[fieldId], type));
                 }
             }
             logger.info("getNextPage batchSize: " + batchSize);
+            rowBatch.reset();
             return new Page(batchSize, blocks);
         } catch (IOException e) {
             e.printStackTrace();

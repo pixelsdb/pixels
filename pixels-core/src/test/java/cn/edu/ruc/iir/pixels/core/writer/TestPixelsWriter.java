@@ -29,7 +29,7 @@ import java.util.Random;
 public class TestPixelsWriter {
     @Test
     public void testWriter() {
-        String filePath = TestParams.filePath;
+        String filePath = TestParams.filePath_6;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
@@ -40,7 +40,7 @@ public class TestPixelsWriter {
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr_6);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
