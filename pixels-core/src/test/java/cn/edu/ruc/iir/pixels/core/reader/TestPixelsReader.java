@@ -6,6 +6,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.PixelsVersion;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -112,16 +113,50 @@ public class TestPixelsReader {
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
         try {
-            while(recordReader.readBatch(rowBatch)) {
+            while (recordReader.readBatch(rowBatch)) {
                 System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
             }
             System.out.println(rowBatch.toString());
             rowBatch.reset();
 
-            while(recordReader.readBatch(rowBatch)) {
+            while (recordReader.readBatch(rowBatch)) {
                 System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
             }
             System.out.println(rowBatch.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testContent3() {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"id", "x", "y"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+
+        PixelsRecordReader recordReader = pixelsReader.read(option);
+        VectorizedRowBatch rowBatch = schema.createRowBatch();
+        try {
+            while (recordReader.readBatch(rowBatch)) {
+                for (int columnIndex = 0; columnIndex < cols.length; columnIndex++) {
+                    System.out.println("Column " + cols[columnIndex] + " begin");
+                    for (int i = 0; i < rowBatch.size; i++) {
+                        StringBuilder b = new StringBuilder();
+                        int projIndex = rowBatch.projectedColumns[columnIndex];
+                        ColumnVector cv = rowBatch.cols[projIndex];
+                        if (cv != null) {
+                            cv.stringifyValue(b, i);
+                        }
+                        if (b.toString().equals("0.0")) {
+                            System.out.println(Long.valueOf(Integer.valueOf(b.toString())));
+                        }
+                        System.out.println(b);
+                    }
+                    System.out.println("Column " + cols[columnIndex] + " end");
+                }
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -94,7 +94,7 @@ public class TestPixelsWriter {
 
     @Test
     public void testWriter2() {
-        String filePath = "hdfs://10.77.40.236:9000/pixels/v2/point.pxl";
+        String filePath = "hdfs://10.77.40.236:9000/pixels/v1/point.pxl";
         int rowNum = 6;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
@@ -103,7 +103,7 @@ public class TestPixelsWriter {
         Random randomKey = new Random();
         Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
 
-        String schemaStr = "struct<a:int,b:double,c:double>";
+        String schemaStr = "struct<id:int,x:double,y:double>";
         try {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             TypeDescription schema = TypeDescription.fromString(schemaStr);
@@ -129,7 +129,7 @@ public class TestPixelsWriter {
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
             System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 0; i < rowNum; i++) {
+            for (int i = 1; i <= rowNum; i++) {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
                 b.vector[row] = i * 2d;

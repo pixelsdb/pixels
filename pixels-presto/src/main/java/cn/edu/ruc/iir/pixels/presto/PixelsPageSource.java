@@ -15,13 +15,16 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -77,25 +80,29 @@ class PixelsPageSource implements ConnectorPageSource {
         this.pixelsColumnIndexes = new int[size];
         this.recordReader = pixelsReader.read(option);
 
-        for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
-            pixelsColumnIndexes[columnIndex] = columnIndex;
-
-            BlockBuilder blockBuilder = this.types.get(columnIndex).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
-            StringBuilder b = new StringBuilder();
-//            for (int i = 0; i < this.rowBatch.size; i++) {
-//                int projIndex = this.rowBatch.projectedColumns[columnIndex];
-//                ColumnVector cv = this.rowBatch.cols[projIndex];
-//                if (cv != null) {
-//                    cv.stringifyValue(b, i);
+//        for (int columnIndex = 0; columnIndex < columns.size(); columnIndex++) {
+//            pixelsColumnIndexes[columnIndex] = columnIndex;
+//            BlockBuilder blockBuilder = this.types.get(columnIndex).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
+//            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
+//                StringBuilder b = new StringBuilder();
+//                if (i < this.rowBatch.size) {
+//                    int projIndex = this.rowBatch.projectedColumns[columnIndex];
+//                    ColumnVector cv = this.rowBatch.cols[projIndex];
+//                    if (cv != null) {
+//                        cv.stringifyValue(b, i);
+//                    }
+//                    if (type.equals("integer")) {
+//                        blockBuilder.writeInt(Integer.valueOf(b.toString()));
+//                    } else if (type.equals("double")) {
+//                        blockBuilder.writeLong(Long.valueOf(i));
+//                    }
+//                } else {
+//                    blockBuilder.appendNull();
 //                }
-//                blockBuilder.writeLong(Long.parseLong(b.toString()));
+//                logger.info(i + " " + b.toString());
+//                constantBlocks[columnIndex] = blockBuilder.build();
 //            }
-
-            for (int i = 0; i < MAX_BATCH_SIZE; i++) {
-                blockBuilder.appendNull();
-            }
-            constantBlocks[columnIndex] = blockBuilder.build();
-        }
+//        }
     }
 
     private void getPixelsReaderBySchema() {
@@ -162,6 +169,7 @@ class PixelsPageSource implements ConnectorPageSource {
         try {
             batchId++;
             recordReader.readBatch(rowBatch);
+            logger.info("rowBatch content: " + rowBatch.toString() != null ? rowBatch.toString() : "is null");
             int batchSize = rowBatch.size;
             if (batchSize <= 0) {
                 close();
@@ -174,14 +182,35 @@ class PixelsPageSource implements ConnectorPageSource {
             logger.info("getNextPage blocks: " + blocks.length);
 
             for (int fieldId = 0; fieldId < blocks.length; fieldId++) {
-                Type type = types.get(fieldId);
-                if (constantBlocks[fieldId] != null) {
-                    logger.info("constantBlocks[" + fieldId + "] != null");
-                    blocks[fieldId] = constantBlocks[fieldId].getRegion(0, batchSize);
-                } else {
-                    logger.info("constantBlocks[" + fieldId + "] == null");
-                    blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(pixelsColumnIndexes[fieldId], type));
+                BlockBuilder blockBuilder = this.types.get(fieldId).createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE, NULL_ENTRY_SIZE);
+                String typeName = this.types.get(fieldId).getDisplayName();
+                logger.info("Type: " + typeName);
+                for (int i = 0; i < this.rowBatch.size; i++) {
+                    StringBuilder b = new StringBuilder();
+                    int projIndex = this.rowBatch.projectedColumns[fieldId];
+                    ColumnVector cv = this.rowBatch.cols[projIndex];
+                    if (cv != null) {
+                        cv.stringifyValue(b, i);
+                    }
+                    if (typeName.equals("integer")) {
+                        blockBuilder.writeInt(Integer.valueOf(b.toString()));
+                        logger.info(i + " integer " + b.toString());
+                    } else if (typeName.equals("double")) {
+                        blockBuilder.writeLong(Long.valueOf(i));
+                        logger.info(i + " double " + b.toString());
+                    } else {
+                        blockBuilder.appendNull();
+                        logger.info(i + " null " + b.toString());
+                    }
                 }
+                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+//                if (constantBlocks[fieldId] != null) {
+//                    logger.info("constantBlocks[" + fieldId + "] != null");
+//                    blocks[fieldId] = constantBlocks[fieldId].getRegion(0, batchSize);
+//                } else {
+//                    logger.info("constantBlocks[" + fieldId + "] == null");
+//                    blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(pixelsColumnIndexes[fieldId], type));
+//                }
             }
             logger.info("getNextPage batchSize: " + batchSize);
             rowBatch.reset();
