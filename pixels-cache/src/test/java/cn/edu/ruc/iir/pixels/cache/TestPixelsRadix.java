@@ -36,6 +36,10 @@ public class TestPixelsRadix
         assertEquals(cacheIdx0, radix.get(cacheKey0));
         assertEquals(cacheIdx2, radix.get(cacheKey2));
         assertEquals(cacheIdx3, radix.get(cacheKey3));
+
+        radix.remove(cacheKey0);
+        radix.remove(cacheKey3);
+        radix.remove(cacheKey2);
     }
 
     @Test

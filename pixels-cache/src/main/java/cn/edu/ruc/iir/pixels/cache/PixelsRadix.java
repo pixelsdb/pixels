@@ -219,7 +219,7 @@ public class PixelsRadix
                     while (parentChildrenIterator.hasNext()) {
                         RadixNode node = parentChildrenIterator.next();
                         if (node != nodeFound) {
-                            parentChildrenNodes.add(parentChildrenIterator.next());
+                            parentChildrenNodes.add(node);
                         }
                     }
 
