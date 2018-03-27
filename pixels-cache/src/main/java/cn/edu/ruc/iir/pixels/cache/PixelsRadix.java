@@ -19,7 +19,9 @@ public class PixelsRadix
     public PixelsRadix()
     {
         this.nodes = new DynamicArray<>();
-        nodes.add(new RadixNode());                 // add root node
+        RadixNode root = new RadixNode();
+        root.setEdge(new byte[0]);
+        nodes.add(root);                 // add root node
     }
 
     public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheItem)
@@ -84,11 +86,7 @@ public class PixelsRadix
                     return;
                 }
                 // if overwrite is allowed, then replace existing node
-                RadixNode replacementNode = new RadixNode();
-                replacementNode.setEdge(nodeFound.getEdge());
-                replacementNode.setChildren(nodeFound.getChildren());
-                replacementNode.setValue(cacheIdx);
-                searchResult.parentNode.addChild(nodeFound, true);
+                nodeFound.setValue(cacheIdx);
                 return;
             }
 
@@ -148,13 +146,13 @@ public class PixelsRadix
                 RadixNode childNode1 = new RadixNode();
                 RadixNode childNode2 = new RadixNode();
                 parentNode.setEdge(commonPrefix);
-                parentNode.addChild(childNode1, true);
-                parentNode.addChild(childNode2, true);
                 childNode1.setEdge(keySuffix);
                 childNode1.setValue(cacheIdx);
                 childNode2.setEdge(edgeSuffix);
                 childNode2.setValue(nodeFound.getValue());
                 childNode2.setChildren(nodeFound.getChildren());
+                parentNode.addChild(childNode1, true);
+                parentNode.addChild(childNode2, true);
 
                 searchResult.parentNode.addChild(parentNode, true);
                 return;
@@ -169,7 +167,7 @@ public class PixelsRadix
     {
         RadixNode root = nodes.get(0);
         // if tree is empty, return null
-        if (root.getSize() == 0) {
+        if (root.getChildren().isEmpty()) {
             return null;
         }
         SearchResult searchResult = searchInternal(cacheKey.getBytes());

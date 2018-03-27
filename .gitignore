@@ -13,4 +13,5 @@ core-site.xml
 hdfs-site.xml
 mvnw.cmd
 logs/
+pixels-core/logs
 package-info.java
