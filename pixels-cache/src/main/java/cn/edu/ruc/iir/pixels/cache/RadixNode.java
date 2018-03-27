@@ -1,8 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * pixels
@@ -12,12 +10,10 @@ import java.util.Map;
 public class RadixNode
 {
     private boolean isKey = false;          // does this node contains a key? [1 bit]
-    private boolean isNull = true;          // associated value is NULL [1 bit]
-    private boolean isCompressed = false;   // node is compressed [1 bit]
-    private int size = 0;                   // number of children, or length of compressed bytes [29 bit]
+    private int size = 0;                   // number of children
     private byte[] edge = null;
-//    private RadixNode[] children = null;
-    private Map<Byte, RadixNode> children = new HashMap<>();
+    private RadixNode[] children = null;
+//    private Map<Byte, RadixNode> children = new HashMap<>();
     private PixelsCacheIdx value = null;
 
     // if node is not compressed, size is the num of children,
@@ -34,6 +30,7 @@ public class RadixNode
 
     public RadixNode()
     {
+        this.children = new RadixNode[256];
     }
 
     public boolean isKey()
@@ -44,26 +41,6 @@ public class RadixNode
     public void setKey(boolean key)
     {
         isKey = key;
-    }
-
-    public boolean isNull()
-    {
-        return isNull;
-    }
-
-    public void setNull(boolean aNull)
-    {
-        isNull = aNull;
-    }
-
-    public boolean isCompressed()
-    {
-        return isCompressed;
-    }
-
-    public void setCompressed(boolean compressed)
-    {
-        isCompressed = compressed;
     }
 
     public int getSize()
@@ -89,29 +66,35 @@ public class RadixNode
     public void addChild(RadixNode child, boolean overwrite)
     {
         byte firstByte = child.edge[0];
-        if (!overwrite && children.containsKey(firstByte)) {
+        int index = firstByte + 128;
+        if (!overwrite && children[index] != null) {
             return;
         }
-        children.put(firstByte, child);
+        children[index] = child;
+        size++;
     }
 
     public void removeChild(RadixNode child)
     {
         byte firstByte = child.edge[0];
-        children.remove(firstByte);
+        int index = firstByte + 128;
+        children[index] = null;
+        size--;
     }
 
     public RadixNode getChild(byte firstByte)
     {
-        return children.get(firstByte);
+        int index = firstByte + 128;
+        return children[index];
     }
 
-    public void setChildren(Map<Byte, RadixNode> children)
+    public void setChildren(RadixNode[] children, int size)
     {
         this.children = children;
+        this.size = size;
     }
 
-    public Map<Byte, RadixNode> getChildren()
+    public RadixNode[] getChildren()
     {
         return children;
     }
@@ -132,13 +115,6 @@ public class RadixNode
         if (isKey) {
             header = header | (1 << 31);
         }
-        if (isNull) {
-            header = header | (1 << 30);
-        }
-        if (isCompressed) {
-            header = header | ( 1 <<29);
-        }
-        header = header | size;
 
         int bytesSize = Integer.BYTES;
 //        if (data != null) {

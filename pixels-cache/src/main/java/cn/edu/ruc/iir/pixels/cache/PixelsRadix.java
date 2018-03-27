@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -109,7 +108,7 @@ public class PixelsRadix
                 newParent.addChild(newChild, true);
                 newChild.setEdge(edgeSuffix);
                 newChild.setValue(nodeFound.getValue());
-                newChild.setChildren(nodeFound.getChildren());
+                newChild.setChildren(nodeFound.getChildren(), nodeFound.getSize());
 
                 searchResult.parentNode.addChild(newParent, true);
                 return;
@@ -150,7 +149,7 @@ public class PixelsRadix
                 childNode1.setValue(cacheIdx);
                 childNode2.setEdge(edgeSuffix);
                 childNode2.setValue(nodeFound.getValue());
-                childNode2.setChildren(nodeFound.getChildren());
+                childNode2.setChildren(nodeFound.getChildren(), nodeFound.getSize());
                 parentNode.addChild(childNode1, true);
                 parentNode.addChild(childNode2, true);
 
@@ -167,7 +166,7 @@ public class PixelsRadix
     {
         RadixNode root = nodes.get(0);
         // if tree is empty, return null
-        if (root.getChildren().isEmpty()) {
+        if (root.getSize() == 0) {
             return null;
         }
         SearchResult searchResult = searchInternal(cacheKey.getBytes());
@@ -189,7 +188,7 @@ public class PixelsRadix
                 if (nodeFound.getValue() == null) {
                     return false;
                 }
-                int childrenNum = nodeFound.getChildren().size();
+                int childrenNum = nodeFound.getSize();
                 // if node has more than one child, just delete the associated value, and keep the node
                 if (childrenNum > 1) {
                     nodeFound.setValue(null);
@@ -200,28 +199,46 @@ public class PixelsRadix
                 if (childrenNum == 1) {
                     RadixNode node = new RadixNode();
                     byte[] currentNodeEdge = nodeFound.getEdge();
-                    RadixNode childNode = nodeFound.getChildren().values().iterator().next();
+                    RadixNode childNode = null;
+                    // find the child
+                    for (RadixNode radixNode : nodeFound.getChildren()) {
+                        if (radixNode != null) {
+                            childNode = node;
+                            break;
+                        }
+                    }
+                    if (childNode == null) {
+                        // todo fix exception, though this cannot happen due to logically constraints
+                        return false;
+                    }
                     byte[] childNodeEdge = childNode.getEdge();
                     byte[] edge = new byte[currentNodeEdge.length + childNodeEdge.length];
                     System.arraycopy(currentNodeEdge, 0, edge, 0, currentNodeEdge.length);
                     System.arraycopy(childNodeEdge, 0, edge, currentNodeEdge.length, childNodeEdge.length);
                     node.setEdge(edge);
-                    node.setChildren(childNode.getChildren());
+                    node.setChildren(childNode.getChildren(), childNode.getSize());
                     node.setValue(childNode.getValue());
                     searchResult.parentNode.addChild(node, true);
+                    nodeFound = null;
                 }
                 // if node has no children, delete this node from parent.
                 // and if after deletion, the parent itself with only one child left and has no value,
                 // then we need also merge the parent and its remaining child.
                 else {
-                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values().iterator();
+//                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values().iterator();
+                    RadixNode[] parentChildren = searchResult.parentNode.getChildren();
                     List<RadixNode> parentChildrenNodes = new ArrayList<>();
-                    while (parentChildrenIterator.hasNext()) {
-                        RadixNode node = parentChildrenIterator.next();
-                        if (node != nodeFound) {
-                            parentChildrenNodes.add(node);
+                    for (RadixNode radixNode : parentChildren) {
+                        if (radixNode != null && radixNode != nodeFound) {
+                            parentChildrenNodes.add(radixNode);
                         }
                     }
+//                    while (parentChildrenIterator.hasNext()) {
+//                        RadixNode node = parentChildrenIterator.next();
+//                        if (node != nodeFound) {
+//                            parentChildrenNodes.add(node);
+//                        }
+//                    }
 
                     RadixNode newNode = new RadixNode();
                     // if parent has only one child left and has no value, then we can merge parent as a new node
@@ -235,7 +252,7 @@ public class PixelsRadix
                         System.arraycopy(parentEdge, 0, edge, 0, parentEdge.length);
                         System.arraycopy(childEdge, 0, edge, parentEdge.length, childEdge.length);
                         newNode.setEdge(edge);
-                        newNode.setChildren(remainingChild.getChildren());
+                        newNode.setChildren(remainingChild.getChildren(), remainingChild.getSize());
                         newNode.setValue(remainingChild.getValue());
                         searchResult.grandParentNode.addChild(newNode, true);
                     }
@@ -244,6 +261,7 @@ public class PixelsRadix
                     else {
                         searchResult.parentNode.removeChild(nodeFound);
                     }
+                    nodeFound = null;
                 }
                 return true;
             }
