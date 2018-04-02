@@ -89,9 +89,9 @@ public class VectorizedRowBatch
     /**
      * Returns the maximum size of the batch (number of rows it can hold)
      */
-    public int getMaxSize() {
-        return selected.length;
-    }
+//    public int getMaxSize() {
+//        return selected.length;
+//    }
 
     /**
      * Return count of qualifying rows.

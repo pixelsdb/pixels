@@ -80,8 +80,7 @@ public class PixelsRadix
                 // check if found node has value.
                 // if overwrite is not allowed and the node has a value, then return early.
                 PixelsCacheIdx existingValue = nodeFound.getValue();
-                if (!overwrite && existingValue != null)
-                {
+                if (!overwrite && existingValue != null) {
                     return;
                 }
                 // if overwrite is allowed, then replace existing node

@@ -88,17 +88,20 @@ public class DynamicArray<T>
     /**
      * Add an element.
      * */
-    public void add(T v)
+    public int add(T v)
     {
-        int chunkIndex = size / chunkSize;
-        int chunkOffset = size % chunkSize;
+        int index = size;
+        int chunkIndex = index / chunkSize;
+        int chunkOffset = index % chunkSize;
         // check capacity
-        if (size >= chunkSize * initializedChunkNum) {
+        if (index >= chunkSize * initializedChunkNum) {
             grow(chunkIndex);
         }
         // add element
         content[chunkIndex][chunkOffset] = v;
         size++;
+
+        return index;
     }
 
     /**

@@ -83,18 +83,24 @@ public class TestPixelsReader {
     @Test
     public void testContent() {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "e", "z"};
+        String[] cols = {"a", "b", "c", "a"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
-        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
+        VectorizedRowBatch rowBatch;
         try {
-            recordReader.readBatch(rowBatch);
-            System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
-            System.out.println(rowBatch.toString());
-            rowBatch.reset();
+            rowBatch = recordReader.readBatch(TestParams.rowNum);
+            if (rowBatch.size != 0)
+            {
+                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+                System.out.println(rowBatch.toString());
+                rowBatch.reset();
+            }
+            if (rowBatch.endOfFile) {
+                System.out.println("End of file");
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -109,16 +115,7 @@ public class TestPixelsReader {
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
-        VectorizedRowBatch rowBatch = schema.createRowBatch(TestParams.rowNum);
-        try {
-            while(recordReader.readBatch(rowBatch)) {
-                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
-            }
-//            System.out.println(rowBatch.toString());
-            rowBatch.reset();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        VectorizedRowBatch rowBatch;
     }
 
     @After
