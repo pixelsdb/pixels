@@ -19,6 +19,8 @@ public class FloatColumnReader
         extends ColumnReader
 {
     private final EncodingUtils encodingUtils;
+    private ByteBuf inputBuffer = null;
+    private ByteBufInputStream inputStream = null;
 
     FloatColumnReader(TypeDescription type)
     {
@@ -38,14 +40,18 @@ public class FloatColumnReader
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
-        ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
-
+        if (offset == 0) {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (inputBuffer != null) {
+                inputBuffer.release();
+            }
+            inputBuffer = Unpooled.copiedBuffer(input);
+            inputStream = new ByteBufInputStream(inputBuffer);
+        }
         for (int i = 0; i < size; i++) {
             vector.add(encodingUtils.readFloat(inputStream));
         }
-
-        inputStream.close();
-        inputBuffer.release();
     }
 }

@@ -17,7 +17,7 @@ import java.util.Arrays;
  */
 public abstract class ColumnVector
 {
-    private final int length;
+    int length;
     int writeIndex = 0;
 
     /**
@@ -176,6 +176,7 @@ public abstract class ColumnVector
         isRepeating = false;
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
+        writeIndex = 0;
     }
 
     /**

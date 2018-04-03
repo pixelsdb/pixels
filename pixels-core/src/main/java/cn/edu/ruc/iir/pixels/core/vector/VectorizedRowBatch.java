@@ -17,6 +17,7 @@ public class VectorizedRowBatch
     public int[] selected;        // array of positions of selected values
     public int[] projectedColumns;
     public int projectionSize;
+    public int maxSize;
 
     private int dataColumnCount;
     private int partitionColumnCount;
@@ -58,6 +59,7 @@ public class VectorizedRowBatch
     public VectorizedRowBatch(int numCols, int size) {
         this.numCols = numCols;
         this.size = size;
+        this.maxSize = size;
         selected = new int[size];
         selectedInUse = false;
         this.cols = new ColumnVector[numCols];
@@ -89,9 +91,9 @@ public class VectorizedRowBatch
     /**
      * Returns the maximum size of the batch (number of rows it can hold)
      */
-//    public int getMaxSize() {
-//        return selected.length;
-//    }
+    public int getMaxSize() {
+        return maxSize;
+    }
 
     /**
      * Return count of qualifying rows.

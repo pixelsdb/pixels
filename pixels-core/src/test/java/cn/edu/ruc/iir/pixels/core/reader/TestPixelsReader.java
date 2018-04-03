@@ -83,24 +83,27 @@ public class TestPixelsReader {
     @Test
     public void testContent() {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "c", "a"};
+        String[] cols = {"c", "b", "a", "a"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch;
+        int batchSize = 10000;
         try {
-            rowBatch = recordReader.readBatch(TestParams.rowNum);
-            if (rowBatch.size != 0)
-            {
-                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
-                System.out.println(rowBatch.toString());
-                rowBatch.reset();
+            long start = System.currentTimeMillis();
+            while (true) {
+                rowBatch = recordReader.readBatch(batchSize);
+                if (rowBatch.endOfFile) {
+                    System.out.println("End of file");
+                    break;
+                }
+//                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
+//                System.out.println(rowBatch.toString());
             }
-            if (rowBatch.endOfFile) {
-                System.out.println("End of file");
-            }
+            long end = System.currentTimeMillis();
+            System.out.println(recordReader.getRowNumber() + ", time: " + (end - start));
         } catch (IOException e) {
             e.printStackTrace();
         }

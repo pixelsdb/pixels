@@ -22,6 +22,10 @@ import static com.google.common.base.Verify.verify;
 public class IntegerColumnReader
         extends ColumnReader
 {
+    private RunLenIntDecoder decoder;
+    private ByteBuf inputBuffer;
+    private ByteBufInputStream inputStream;
+
     IntegerColumnReader(TypeDescription type)
     {
         super(type);
@@ -39,11 +43,20 @@ public class IntegerColumnReader
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
-        ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
+        // if read from start, init the stream and decoder
+        if (offset == 0) {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (inputBuffer != null) {
+                inputBuffer.release();
+            }
+            inputBuffer = Unpooled.copiedBuffer(input);
+            inputStream = new ByteBufInputStream(inputBuffer);
+            decoder = new RunLenIntDecoder(inputStream, true);
+        }
         // if run length encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
-            RunLenIntDecoder decoder = new RunLenIntDecoder(inputStream, true);
             ByteBufAllocator allocator = PooledByteBufAllocator.DEFAULT;
             ByteBuf buf = allocator.buffer();
             int readIdx = 0;
@@ -72,7 +85,5 @@ public class IntegerColumnReader
             }
             verify(inputStream.available() == 0);
         }
-        inputStream.close();
-        inputBuffer.release();
     }
 }

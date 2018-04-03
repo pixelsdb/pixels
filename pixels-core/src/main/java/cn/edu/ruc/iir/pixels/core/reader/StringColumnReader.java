@@ -90,7 +90,7 @@ public class StringColumnReader
 
             // read original bytes
             for (int i = 0; i < size; i++) {
-                vector.add(origins[orders[encodedValues[i]]]);
+                vector.add(origins[orders[encodedValues[i + offset]]]);
             }
         }
         // if un-encoded
@@ -109,6 +109,11 @@ public class StringColumnReader
             }
             // read strings
             ByteBuf contentBuf = inputBuffer.slice(0, lensOffset);
+            // skip values before offset
+            for (int i = 0; i < offset; i++) {
+                contentBuf.readCharSequence(lens[i], Charset.forName("UTF-8"));
+            }
+            // read values
             for (int i = 0; i < size; i++) {
                 CharSequence str = contentBuf.readCharSequence(lens[i], Charset.forName("UTF-8"));
                 vector.add(str.toString());

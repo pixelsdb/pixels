@@ -381,6 +381,7 @@ public class TimestampColumnVector extends ColumnVector
         long[] oldNanos = nanos;
         time = new long[size];
         nanos = new long[size];
+        length = size;
         if (preserveData) {
             if (isRepeating) {
                 time[0] = oldTime[0];

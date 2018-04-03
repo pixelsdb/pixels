@@ -4,8 +4,6 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 /**
  * pixels
  *
@@ -32,11 +30,11 @@ public class BooleanColumnReader
                      int offset, int size, int pixelStride, ColumnVector vector)
     {
         // input byte length should be GE than (num * 8) and be L than (num + 1) * 8
-        checkArgument(input.length >= size / 8 && input.length <= (size + 8) / 8,
-                "Input bytes length " + input.length + " is not correct");
+//        checkArgument(input.length >= size / 8 && input.length <= (size + 8) / 8,
+//                "Input bytes length " + input.length + " is not correct");
         byte[] bits = bitWiseDeCompact(input, size);
         for (int i = 0; i < size; i++) {
-            vector.add(bits[i] == 1);
+            vector.add(bits[i + offset] == 1);
         }
     }
 
