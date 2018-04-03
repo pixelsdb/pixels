@@ -53,32 +53,34 @@ public class TimestampColumnReader
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, false);
         }
-        long[] times = new long[size];
-        int[] nanos = new int[size];
 
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
             for (int i = 0; decoder.hasNext() && i < size; i++) {
-                times[i] = decoder.next();
-                nanos[i] = (int) decoder.next();
+                Timestamp timestamp = new Timestamp(decoder.next());
+                int nanos = (int) decoder.next();
+                try {
+                    timestamp.setNanos(nanos);
+                }
+                catch (IllegalArgumentException e) {
+                    e.printStackTrace();
+                    System.out.println("Nanos: " + nanos);
+                }
+                vector.add(timestamp);
             }
         }
         else {
             for (int i = 0; i < size; i++) {
-                times[i] = inputStream.readLong();
-                nanos[i] = inputStream.readInt();
+                Timestamp timestamp = new Timestamp(inputStream.readLong());
+                int nanos = inputStream.readInt();
+                try {
+                    timestamp.setNanos(nanos);
+                }
+                catch (IllegalArgumentException e) {
+                    e.printStackTrace();
+                    System.out.println("Nanos: " + nanos);
+                }
+                vector.add(timestamp);
             }
-        }
-
-        for (int i = 0; i < size; i++) {
-            Timestamp timestamp = new Timestamp(times[i]);
-            try {
-                timestamp.setNanos(nanos[i]);
-            }
-            catch (IllegalArgumentException e) {
-                e.printStackTrace();
-                System.out.println("Nanos: " + nanos[i]);
-            }
-            vector.add(timestamp);
         }
     }
 }

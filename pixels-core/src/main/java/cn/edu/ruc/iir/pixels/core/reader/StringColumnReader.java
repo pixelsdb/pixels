@@ -61,7 +61,7 @@ public class StringColumnReader
             }
             // read original bytes
             for (int i = 0; i < size; i++) {
-                vector.add(origins[orders[encodedValues[i + offset]]]);
+                vector.add(origins[orders[encodedValues[i]]]);
             }
         }
         // if un-encoded

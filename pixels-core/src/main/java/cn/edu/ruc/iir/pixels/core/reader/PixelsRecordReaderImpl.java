@@ -157,7 +157,7 @@ public class PixelsRecordReaderImpl
         resultRowBatch.selectedInUse = false;
         resultRowBatch.selected = null;
         resultRowBatch.projectionSize = resultColumns.length;
-        System.arraycopy(resultColumns, 0, resultRowBatch.projectedColumns, 0, resultColumns.length);
+//        System.arraycopy(resultColumns, 0, resultRowBatch.projectedColumns, 0, resultColumns.length);
 
         checkValid = true;
     }
