@@ -80,10 +80,10 @@ public class TimestampColumnWriter extends BaseColumnWriter
 
         if (isEncoding) {
             long[] values = new long[2 * curPixelEleCount];
-            for (int i = 0; i < curPixelEleCount; i++)
+            for (int i = 0; i < curPixelEleCount; i = i + 2)
             {
                 values[i] = curPixelTimeVector.vector[i];
-                values[i + curPixelEleCount] = curPixelNanoVector.vector[i];
+                values[i + 1] = curPixelNanoVector.vector[i];
             }
             outputStream.write(encoder.encode(values));
         }
