@@ -110,18 +110,6 @@ public class TestPixelsReader {
         }
     }
 
-    @Test
-    public void testContent2() {
-        PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "c"};
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.includeCols(cols);
-
-        PixelsRecordReader recordReader = pixelsReader.read(option);
-        VectorizedRowBatch rowBatch;
-    }
-
     @After
     public void cleanUp() {
         try {

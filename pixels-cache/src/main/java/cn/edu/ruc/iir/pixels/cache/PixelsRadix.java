@@ -7,7 +7,7 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * pixels
+ * a radix tree implementation
  *
  * @author guodong
  */

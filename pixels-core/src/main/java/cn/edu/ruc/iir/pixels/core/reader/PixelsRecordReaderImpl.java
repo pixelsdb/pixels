@@ -148,8 +148,8 @@ public class PixelsRecordReaderImpl
 
         // create result vectorized row batch
         List<PixelsProto.Type> resultTypes = new ArrayList<>();
-        for (int i = 0; i < resultColumns.length; i++) {
-            resultTypes.add(colTypes.get(resultColumns[i]));
+        for (int resultColumn : resultColumns) {
+            resultTypes.add(colTypes.get(resultColumn));
         }
         TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
         this.resultRowBatch = resultSchema.createRowBatch();
@@ -157,7 +157,6 @@ public class PixelsRecordReaderImpl
         resultRowBatch.selectedInUse = false;
         resultRowBatch.selected = null;
         resultRowBatch.projectionSize = resultColumns.length;
-//        System.arraycopy(resultColumns, 0, resultRowBatch.projectedColumns, 0, resultColumns.length);
 
         checkValid = true;
     }
