@@ -25,6 +25,7 @@ public class StringColumnReader
     private int[] orders = null;
     private ByteBuf contentBuf = null;
     private RunLenIntDecoder lensDecoder = null;
+    private RunLenIntDecoder contentDecoder = null;
 
     StringColumnReader(TypeDescription type)
     {
@@ -53,15 +54,9 @@ public class StringColumnReader
         }
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
-            // read encoded values
-            int[] encodedValues = new int[size];
-            RunLenIntDecoder decoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
-            for (int i = 0; i < size; i++) {
-                encodedValues[i] = (int) decoder.next();
-            }
             // read original bytes
             for (int i = 0; i < size; i++) {
-                vector.add(origins[orders[encodedValues[i]]]);
+                vector.add(origins[orders[(int) contentDecoder.next()]]);
             }
         }
         // if un-encoded
@@ -117,6 +112,7 @@ public class StringColumnReader
             byte[] tmp = new byte[tmpLen];
             originBuf.readBytes(tmp);
             origins[originNum - 1] = new String(tmp, Charset.forName("UTF-8"));
+            contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
         else {
             // read lens field offset

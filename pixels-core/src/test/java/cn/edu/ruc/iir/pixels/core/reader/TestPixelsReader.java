@@ -88,7 +88,7 @@ public class TestPixelsReader {
         PixelsReaderOption option = new PixelsReaderOption();
         BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/result"));
 //        String[] cols = {"c", "b", "a", "e", "z", "d"};
-        String[] cols = {"d"};
+        String[] cols = {"z"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
