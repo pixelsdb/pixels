@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 public final class TypeDescription
     implements Comparable<TypeDescription>, Serializable, Cloneable
 {
+    private static final long serialVersionUID = 4270695889340023552L;
     private static final int MAX_PRECISION = 38;
     private static final int MAX_SCALE = 38;
     private static final int DEFAULT_PRECISION = 38;

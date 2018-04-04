@@ -82,8 +82,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
             long[] values = new long[2 * curPixelEleCount];
             for (int i = 0; i < curPixelEleCount; i++)
             {
-                values[i] = curPixelTimeVector.vector[i];
-                values[i + curPixelEleCount] = curPixelNanoVector.vector[i];
+                values[i * 2] = curPixelTimeVector.vector[i];
+                values[i * 2 + 1] = curPixelNanoVector.vector[i];
             }
             outputStream.write(encoder.encode(values));
         }

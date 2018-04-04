@@ -52,7 +52,7 @@ public class TestPixelsWriter {
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride((int) TestParams.pixelStride)
+                            .setPixelStride(TestParams.pixelStride)
                             .setRowGroupSize(TestParams.rowGroupSize)
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
@@ -60,7 +60,7 @@ public class TestPixelsWriter {
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
                             .setEncoding(TestParams.encoding)
-                            .setCompressionBlockSize((int) TestParams.compressionBlockSize)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
             long curT = System.currentTimeMillis();
@@ -114,7 +114,7 @@ public class TestPixelsWriter {
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride((int) TestParams.pixelStride)
+                            .setPixelStride(TestParams.pixelStride)
                             .setRowGroupSize(TestParams.rowGroupSize)
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
@@ -122,7 +122,7 @@ public class TestPixelsWriter {
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
                             .setEncoding(TestParams.encoding)
-                            .setCompressionBlockSize((int) TestParams.compressionBlockSize)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
                             .build();
 
             long curT = System.currentTimeMillis();

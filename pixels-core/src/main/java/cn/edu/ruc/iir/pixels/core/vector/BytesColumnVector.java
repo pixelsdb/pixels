@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.core.vector;
 
 import com.google.common.primitives.Chars;
 
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -31,7 +30,7 @@ public class BytesColumnVector extends ColumnVector
      * The length of each field. If the value repeats for every entry, then it is stored
      * in vector[0] and isRepeating from the superclass is set to true.
      */
-    public int[] length;
+    public int[] lens;
 
     // A call to increaseBufferSpace() or ensureValPreallocated() will ensure that buffer[] points to
     // a byte[] with sufficient space for the specified size.
@@ -70,7 +69,7 @@ public class BytesColumnVector extends ColumnVector
         super(size);
         vector = new byte[size][];
         start = new int[size];
-        length = new int[size];
+        lens = new int[size];
     }
 
     /**
@@ -92,7 +91,7 @@ public class BytesColumnVector extends ColumnVector
     public void setRef(int elementNum, byte[] sourceBuf, int start, int length) {
         vector[elementNum] = sourceBuf;
         this.start[elementNum] = start;
-        this.length[elementNum] = length;
+        this.lens[elementNum] = length;
     }
 
     /**
@@ -210,7 +209,7 @@ public class BytesColumnVector extends ColumnVector
         System.arraycopy(sourceBuf, start, buffer, nextFree, length);
         vector[elementNum] = buffer;
         this.start[elementNum] = nextFree;
-        this.length[elementNum] = length;
+        this.lens[elementNum] = length;
         nextFree += length;
     }
 
@@ -254,7 +253,7 @@ public class BytesColumnVector extends ColumnVector
     public void setValPreallocated(int elementNum, int length) {
         vector[elementNum] = buffer;
         this.start[elementNum] = nextFree;
-        this.length[elementNum] = length;
+        this.lens[elementNum] = length;
         nextFree += length;
     }
 
@@ -278,7 +277,7 @@ public class BytesColumnVector extends ColumnVector
         }
         vector[elementNum] = buffer;
         this.start[elementNum] = nextFree;
-        this.length[elementNum] = newLen;
+        this.lens[elementNum] = newLen;
 
         System.arraycopy(leftSourceBuf, leftStart, buffer, nextFree, leftLen);
         nextFree += leftLen;
@@ -355,7 +354,7 @@ public class BytesColumnVector extends ColumnVector
 
         // Handle repeating case
         if (isRepeating) {
-            output.setVal(0, vector[0], start[0], length[0]);
+            output.setVal(0, vector[0], start[0], lens[0]);
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
             return;
@@ -367,12 +366,12 @@ public class BytesColumnVector extends ColumnVector
         if (selectedInUse) {
             for (int j = 0; j < size; j++) {
                 int i = sel[j];
-                output.setVal(i, vector[i], start[i], length[i]);
+                output.setVal(i, vector[i], start[i], lens[i]);
             }
         }
         else {
             for (int i = 0; i < size; i++) {
-                output.setVal(i, vector[i], start[i], length[i]);
+                output.setVal(i, vector[i], start[i], lens[i]);
             }
         }
 
@@ -412,11 +411,11 @@ public class BytesColumnVector extends ColumnVector
                 if (selectedInUse) {
                     for (int j = 1; j < size; j++) {
                         int i = sel[j];
-                        this.setRef(i, vector[0], start[0], length[0]);
+                        this.setRef(i, vector[0], start[0], lens[0]);
                     }
                 } else {
                     for (int i = 1; i < size; i++) {
-                        this.setRef(i, vector[0], start[0], length[0]);
+                        this.setRef(i, vector[0], start[0], lens[0]);
                     }
                 }
             }
@@ -449,7 +448,7 @@ public class BytesColumnVector extends ColumnVector
             isNull[outElementNum] = false;
             BytesColumnVector in = (BytesColumnVector) inputVector;
             setVal(outElementNum, in.vector[inputElementNum],
-                    in.start[inputElementNum], in.length[inputElementNum]);
+                    in.start[inputElementNum], in.lens[inputElementNum]);
         } else {
             isNull[outElementNum] = true;
             noNulls = false;
@@ -466,7 +465,7 @@ public class BytesColumnVector extends ColumnVector
             row = 0;
         }
         if (noNulls || !isNull[row]) {
-            return new String(vector[row], start[row], length[row]);
+            return new String(vector[row], start[row], lens[row]);
         } else {
             return null;
         }
@@ -479,7 +478,7 @@ public class BytesColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row]) {
             buffer.append('"');
-            buffer.append(new String(vector[row], start[row], length[row]));
+            buffer.append(new String(vector[row], start[row], lens[row]));
             buffer.append('"');
         } else {
             buffer.append("null");
@@ -492,15 +491,16 @@ public class BytesColumnVector extends ColumnVector
         if (size > vector.length) {
             int[] oldStart = start;
             start = new int[size];
-            int[] oldLength = length;
-            length = new int[size];
+            int[] oldLength = lens;
+            lens = new int[size];
             byte[][] oldVector = vector;
             vector = new byte[size][];
+            length = size;
             if (preserveData) {
                 if (isRepeating) {
                     vector[0] = oldVector[0];
                     start[0] = oldStart[0];
-                    length[0] = oldLength[0];
+                    lens[0] = oldLength[0];
                 } else {
                     System.arraycopy(oldVector, 0, vector, 0, oldVector.length);
                     System.arraycopy(oldStart, 0, start, 0 , oldStart.length);

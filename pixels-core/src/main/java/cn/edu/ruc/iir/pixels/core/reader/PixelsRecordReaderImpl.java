@@ -10,7 +10,6 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -19,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -42,10 +42,12 @@ public class PixelsRecordReaderImpl
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
     private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
+    private int[] resultColumns;           // columns specified in option by user to read
+    private VectorizedRowBatch resultRowBatch;
 
     private int targetRGNum = 0;         // number of target row groups
-    private int readerCurRGIdx = 0;      // index of current reading row group in targetRGs
-    private int readerCurRGOffset = 0;   // starting index of values to read by reader in current row group
+    private int curRGIdx = 0;      // index of current reading row group in targetRGs
+    private int curRowInRG = 0;   // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
     private ByteBuf[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
@@ -77,23 +79,28 @@ public class PixelsRecordReaderImpl
             return;
         }
 
+        // check predicate schemas
         if (option.getPredicate().isPresent()) {
             // todo check if predicate matches file schema
         }
 
-        // get included columns
+        // filter included columns
         int includedColumnsNum = 0;
         String[] cols = option.getIncludedCols();
-        List<String> colsList = ImmutableList.copyOf(cols);
         if (cols.length == 0) {
             checkValid = false;
             return;
         }
+        List<Integer> userColsList = new ArrayList<>();
         this.includedColumns = new boolean[colTypes.size()];
-        for (int i = 0; i < colTypes.size(); i++) {
-            if (colsList.contains(colTypes.get(i).getName())) {
-                includedColumns[i] = true;
-                includedColumnsNum++;
+        for (String col : cols) {
+            for (int j = 0; j < colTypes.size(); j++) {
+                if (col.equalsIgnoreCase(colTypes.get(j).getName())) {
+                    userColsList.add(j);
+                    includedColumns[j] = true;
+                    includedColumnsNum++;
+                    break;
+                }
             }
         }
 
@@ -103,8 +110,15 @@ public class PixelsRecordReaderImpl
             return;
         }
 
+        // create result columns storing result column ids by user specified order
+        this.resultColumns = new int[includedColumnsNum];
+        for (int i = 0; i < userColsList.size(); i++) {
+            this.resultColumns[i] = userColsList.get(i);
+        }
+
         // assign target columns
-        targetColumns = new int[includedColumnsNum];
+        int targetColumnsNum = new HashSet<>(userColsList).size();
+        targetColumns = new int[targetColumnsNum];
         int targetColIdx = 0;
         for (int i = 0; i < includedColumns.length; i++) {
             if (includedColumns[i]) {
@@ -113,10 +127,8 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        // get reader schema
+        // get and check reader schema
         this.readerSchema = TypeDescription.createSchema(colTypes);
-
-        // check reader schema
         if (readerSchema.getChildren() == null) {
             checkValid = false;
             return;
@@ -126,12 +138,25 @@ public class PixelsRecordReaderImpl
             return;
         }
 
-        // get column readers
+        // create column readers
         List<TypeDescription> columnSchemas = readerSchema.getChildren();
-        readers = new ColumnReader[columnSchemas.size()];
-        for (int i = 0; i < columnSchemas.size(); i++) {
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(i));
+        readers = new ColumnReader[resultColumns.length];
+        for (int i = 0; i < resultColumns.length; i++) {
+            int index = resultColumns[i];
+            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
         }
+
+        // create result vectorized row batch
+        List<PixelsProto.Type> resultTypes = new ArrayList<>();
+        for (int resultColumn : resultColumns) {
+            resultTypes.add(colTypes.get(resultColumn));
+        }
+        TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
+        this.resultRowBatch = resultSchema.createRowBatch();
+        // forbid selected array
+        resultRowBatch.selectedInUse = false;
+        resultRowBatch.selected = null;
+        resultRowBatch.projectionSize = resultColumns.length;
 
         checkValid = true;
     }
@@ -285,77 +310,81 @@ public class PixelsRecordReaderImpl
     /**
      * Read the next row batch.
      *
-     * @param batch the row batch to read into
+     * @param batchSize the row batch to read into
      * @return more rows available
      * @throws java.io.IOException
      */
     @Override
-    public boolean readBatch(VectorizedRowBatch batch) throws IOException
+    public VectorizedRowBatch readBatch(int batchSize) throws IOException
     {
+        resultRowBatch.reset();
+
         if (!checkValid) {
-            return false;
+            resultRowBatch.endOfFile = true;
+            return resultRowBatch;
         }
 
         if (!everRead) {
             if (!read()) {
-                return false;
+                resultRowBatch.endOfFile = true;
+                return resultRowBatch;
             }
         }
 
-        // column vector projection
-        ColumnVector[] columnVectors = batch.cols;
-        if (columnVectors.length != includedColumns.length) {
-            return false;
-        }
-        batch.projectionSize = targetColumns.length;
-        System.arraycopy(targetColumns, 0, batch.projectedColumns, 0, targetColumns.length);
+        // ensure size for result row batch
+        resultRowBatch.ensureSize(batchSize);
 
-        if (readerCurRGIdx >= targetRGNum) {
-            return false;
+        int rgRowCount = 0;
+        int curBatchSize = 0;
+        if (curRGIdx < targetRGNum) {
+            rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
-        PixelsProto.RowGroupInformation rowGroupInformation =
-                footer.getRowGroupInfos(targetRGs[readerCurRGIdx]);
-        int curBatchSize = (int) rowGroupInformation.getNumberOfRows() - readerCurRGOffset;
-        if (batch.size + curBatchSize > batch.getMaxSize()) {
-            curBatchSize = batch.getMaxSize() - batch.size;
+        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount) {
+            // update current batch size
+            curBatchSize = rgRowCount - curRowInRG;
+            if (curBatchSize + resultRowBatch.size >= batchSize) {
+                curBatchSize = batchSize - resultRowBatch.size;
+            }
+
+            // read vectors
+            ColumnVector[] columnVectors = resultRowBatch.cols;
+            for (int i = 0; i < resultColumns.length; i++) {
+                PixelsProto.ColumnEncoding encoding =
+                        rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
+                                .getColumnChunkEncodings(resultColumns[i]);
+                byte[] input = chunkBuffers[targetRGs[curRGIdx]][resultColumns[i]].array();
+                readers[i].read(input, encoding, curRowInRG, curBatchSize,
+                        postScript.getPixelStride(), columnVectors[i]);
+            }
+
+            // update current row index in the row group
+            curRowInRG += curBatchSize;
+            rowIndex += curBatchSize;
+            resultRowBatch.size += curBatchSize;
+            // update row group index if current row index exceeds max row count in the row group
+            if (curRowInRG >= rgRowCount) {
+                curRGIdx++;
+                // if not end of file, update row count
+                if (curRGIdx < targetRGNum) {
+                    rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                }
+                // if end of file, set result vectorized row batch endOfFile
+                else {
+                    resultRowBatch.endOfFile = true;
+                    break;
+                }
+                curRowInRG = 0;
+            }
         }
 
-        // add record
-        for (int targetColumn : targetColumns) {
-            PixelsProto.ColumnEncoding encoding =
-                    rowGroupFooters[targetRGs[readerCurRGIdx]].getRowGroupEncoding()
-                            .getColumnChunkEncodings(targetColumn);
-            byte[] input = chunkBuffers[targetRGs[readerCurRGIdx]][targetColumn].array();
-            readers[targetColumn].read(input, encoding, readerCurRGOffset, curBatchSize,
-                    postScript.getPixelStride(), columnVectors[targetColumn]);
-        }
-
-        readerCurRGOffset += curBatchSize;
-        rowIndex += curBatchSize;
-        batch.size += curBatchSize;
-        if (readerCurRGOffset >= rowGroupInformation.getNumberOfRows()) {
-            readerCurRGIdx++;
-            readerCurRGOffset = 0;
-        }
-
-        return true;
+        return resultRowBatch;
     }
 
     @Override
     public VectorizedRowBatch readBatch() throws IOException
     {
-        VectorizedRowBatch rowBatch = readerSchema.createRowBatch();
-        readBatch(rowBatch);
-        return rowBatch;
-    }
-
-    @Override
-    public VectorizedRowBatch readBatch(int max) throws IOException
-    {
-        VectorizedRowBatch rowBatch = readerSchema.createRowBatch(max);
-        readBatch(rowBatch);
-        return rowBatch;
+        return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
     /**

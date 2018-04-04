@@ -55,7 +55,7 @@ public class StringColumnWriter extends BaseColumnWriter
         currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         byte[][] values = columnVector.vector;
-        int[] vLens = columnVector.length;
+        int[] vLens = columnVector.lens;
         int[] vOffsets = columnVector.start;
         int curPartLength;
         int curPartOffset = 0;

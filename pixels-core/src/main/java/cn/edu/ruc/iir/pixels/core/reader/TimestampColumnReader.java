@@ -20,6 +20,10 @@ import java.sql.Timestamp;
 public class TimestampColumnReader
         extends ColumnReader
 {
+    private ByteBuf inputBuffer = null;
+    private ByteBufInputStream inputStream = null;
+    private RunLenIntDecoder decoder = null;
+
     TimestampColumnReader(TypeDescription type)
     {
         super(type);
@@ -38,50 +42,45 @@ public class TimestampColumnReader
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        ByteBuf inputBuffer = Unpooled.copiedBuffer(input);
-        ByteBufInputStream inputStream = new ByteBufInputStream(inputBuffer);
-        long[] times = new long[size];
-        int[] nanos = new int[size];
-        RunLenIntDecoder decoder = new RunLenIntDecoder(inputStream, false);
+        if (offset == 0) {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (inputBuffer != null) {
+                inputBuffer.release();
+            }
+            inputBuffer = Unpooled.copiedBuffer(input);
+            inputStream = new ByteBufInputStream(inputBuffer);
+            decoder = new RunLenIntDecoder(inputStream, false);
+        }
 
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
-            int pixelOff = 0;
-            while (pixelOff < size) {
-                int i = 0;
-                int pixelIdx = pixelOff;
-                for (; decoder.hasNext() && i < pixelStride && pixelIdx < size; i++) {
-                    times[pixelOff + i] = decoder.next();
-                    pixelIdx++;
+            for (int i = 0; decoder.hasNext() && i < size; i++) {
+                Timestamp timestamp = new Timestamp(decoder.next());
+                int nanos = (int) decoder.next();
+                try {
+                    timestamp.setNanos(nanos);
                 }
-                i = 0;
-                pixelIdx = pixelOff;
-                for (; decoder.hasNext() && i < pixelStride && pixelIdx < size; i++) {
-                    nanos[pixelOff + i] = (int) decoder.next();
-                    pixelIdx++;
+                catch (IllegalArgumentException e) {
+                    e.printStackTrace();
+                    System.out.println("Nanos: " + nanos);
                 }
-                pixelOff += i;
+                vector.add(timestamp);
             }
         }
         else {
             for (int i = 0; i < size; i++) {
-                times[i] = inputStream.readLong();
-                nanos[i] = inputStream.readInt();
+                Timestamp timestamp = new Timestamp(inputStream.readLong());
+                int nanos = inputStream.readInt();
+                try {
+                    timestamp.setNanos(nanos);
+                }
+                catch (IllegalArgumentException e) {
+                    e.printStackTrace();
+                    System.out.println("Nanos: " + nanos);
+                }
+                vector.add(timestamp);
             }
         }
-
-        for (int i = 0; i < size; i++) {
-            Timestamp timestamp = new Timestamp(times[i]);
-            try {
-                timestamp.setNanos(nanos[i]);
-            }
-            catch (IllegalArgumentException e) {
-                e.printStackTrace();
-                System.out.println("Nanos: " + nanos[i]);
-            }
-            vector.add(timestamp);
-        }
-
-        inputStream.close();
-        inputBuffer.release();
     }
 }

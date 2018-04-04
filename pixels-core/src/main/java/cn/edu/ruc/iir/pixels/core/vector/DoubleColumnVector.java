@@ -181,6 +181,7 @@ public class DoubleColumnVector extends ColumnVector
         if (size > vector.length) {
             double[] oldArray = vector;
             vector = new double[size];
+            length = size;
             if (preserveData) {
                 if (isRepeating) {
                     vector[0] = oldArray[0];

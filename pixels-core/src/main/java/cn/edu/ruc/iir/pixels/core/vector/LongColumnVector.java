@@ -182,6 +182,7 @@ public class LongColumnVector extends ColumnVector
         if (size > vector.length) {
             long[] oldArray = vector;
             vector = new long[size];
+            length = size;
             if (preserveData) {
                 if (isRepeating) {
                     vector[0] = oldArray[0];
