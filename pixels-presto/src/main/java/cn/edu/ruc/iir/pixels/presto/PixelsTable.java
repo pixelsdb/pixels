@@ -45,7 +45,7 @@ public class PixelsTable {
         this.table = requireNonNull(table, "table is null");
         this.tableLayout = requireNonNull(tableLayout, "name is null");
         this.columns = requireNonNull(columns, "columns is null");
-        this.columnsMetadata = requireNonNull(columnsMetadata, "columns is null");
+        this.columnsMetadata = requireNonNull(columnsMetadata, "columnsMetadata is null");
     }
 
     @JsonProperty

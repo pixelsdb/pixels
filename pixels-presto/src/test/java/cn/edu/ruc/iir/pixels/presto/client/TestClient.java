@@ -19,16 +19,18 @@ import java.util.Scanner;
 public class TestClient {
 
     public static void main(String[] args) {
-        String action = "getTables";
+        String action = "getColumns";
+        String paras = "test&default";
         Scanner sc = new Scanner(System.in);
         System.out.print("Input your action: ");
         while (sc.hasNext()) {
             action = sc.next();
-            System.out.println();
+            System.out.print("Input your paras(Separated by &): ");
+            paras = sc.next();
             MetadataClient client = new MetadataClient(action);
             try {
                 try {
-                    client.connect(18888, "127.0.0.1", "default");
+                    client.connect(18888, "127.0.0.1", paras);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -46,6 +48,8 @@ public class TestClient {
                             System.out.println(res);
                         } else if (action.equals("getLayouts")) {
                             System.out.println(res);
+                        } else if (action.equals("getColumns")) {
+                            System.out.println(res);
                         } else {
                             System.out.println(res);
                         }
@@ -54,6 +58,7 @@ public class TestClient {
                     Thread.sleep(1000);
                 }
                 System.out.println("End: " + DateUtil.formatTime(new Date()));
+                System.out.println();
                 System.out.print("Input your action: ");
             } catch (Exception e) {
                 e.printStackTrace();

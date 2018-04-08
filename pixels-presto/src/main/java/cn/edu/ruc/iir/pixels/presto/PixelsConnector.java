@@ -13,7 +13,10 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import com.facebook.presto.spi.connector.*;
+import com.facebook.presto.spi.connector.Connector;
+import com.facebook.presto.spi.connector.ConnectorMetadata;
+import com.facebook.presto.spi.connector.ConnectorSplitManager;
+import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
@@ -30,18 +33,18 @@ public class PixelsConnector
     private final LifeCycleManager lifeCycleManager;
     private final PixelsMetadata metadata;
     private final PixelsSplitManager splitManager;
-    private final PixelsRecordSetProvider recordSetProvider;
+    private final PixelsPageSourceProvider pageSourceProvider;
 
     @Inject
     public PixelsConnector(
             LifeCycleManager lifeCycleManager,
             PixelsMetadata metadata,
             PixelsSplitManager splitManager,
-            PixelsRecordSetProvider recordSetProvider) {
+            PixelsPageSourceProvider pageSourceProvider) {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
-        this.recordSetProvider = requireNonNull(recordSetProvider, "recordSetProvider is null");
+        this.pageSourceProvider = requireNonNull(pageSourceProvider, "recordSetProvider is null");
     }
 
     @Override
@@ -60,8 +63,8 @@ public class PixelsConnector
     }
 
     @Override
-    public ConnectorRecordSetProvider getRecordSetProvider() {
-        return recordSetProvider;
+    public PixelsPageSourceProvider getPageSourceProvider() {
+        return pageSourceProvider;
     }
 
     @Override

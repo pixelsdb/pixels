@@ -39,7 +39,6 @@ public class PixelsMetadataReader {
     public List<String> getSchemaNames() {
         List<String> schemaList = new ArrayList<String>();
         List<Schema> schemas = MetadataService.getSchemas();
-        log.info("Schemas: " + schemaList.size());
         for (Schema s : schemas) {
             schemaList.add(s.getSchName());
             log.info("getSchName: " + s.toString());
@@ -48,10 +47,8 @@ public class PixelsMetadataReader {
     }
 
     public List<String> getTableNames(String schemaName) {
-        log.info("Function getTableNames() -> schemaName: " + schemaName);
         List<String> tablelist = new ArrayList<String>();
         List<Table> tables = MetadataService.getTablesBySchemaName(schemaName);
-        log.info("Tables: " + tablelist.size());
         for (Table t : tables) {
             tablelist.add(t.getTblName());
             log.info("getTblName: " + t.toString());
@@ -60,14 +57,14 @@ public class PixelsMetadataReader {
     }
 
     public static PixelsTable getTable(String connectorId, String schemaName, String tableName) {
-        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, "default", "test", "pixels/db/default/test");
+        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, "no meaning path");
 
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();
         PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
 
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
         List<ColumnMetadata> columnsMetadata = new ArrayList<ColumnMetadata>();
-
+        log.info("getTable: " + tableHandle.toString());
         List<Column> columnsList = MetadataService.getColumnsBySchemaNameAndTblName(schemaName, tableName);
         for (Column c : columnsList) {
             Type columnType = null;
@@ -86,13 +83,13 @@ public class PixelsMetadataReader {
             columns.add(pixelsColumnHandle);
             columnsMetadata.add(columnMetadata);
         }
-
         PixelsTable table = new PixelsTable(tableHandle, tableLayout, columns, columnsMetadata);
+        log.info("getTable: " + table.toString());
         return table;
     }
 
     public static PixelsTableLayoutHandle getTableLayout(String connectorId, String schemaName, String tableName) {
-        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, "default", "test", "pixels/db/default/test");
+        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, "no meaning path");
 
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();
         PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
