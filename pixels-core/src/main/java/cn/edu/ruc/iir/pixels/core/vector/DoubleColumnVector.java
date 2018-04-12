@@ -118,6 +118,13 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(String value)
+    {
+        Double v = Double.parseDouble(value);
+        add(v);
+    }
+
+    @Override
     public void add(float value)
     {
         add((double) value);

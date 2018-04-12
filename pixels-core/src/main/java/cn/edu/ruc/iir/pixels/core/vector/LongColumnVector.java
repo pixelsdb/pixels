@@ -39,6 +39,13 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(String value)
+    {
+        Long v = Long.parseLong(value);
+        add(v);
+    }
+
+    @Override
     public void add(boolean value)
     {
         add(value ? 1 : 0);

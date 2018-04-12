@@ -18,7 +18,9 @@ import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -26,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -166,4 +169,62 @@ public class PixelsMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
+
+    @Override
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+        createPixelsTable(session, tableMetadata, ignoreExisting);
+    }
+
+    private void createPixelsTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+        SchemaTableName schemaTableName = tableMetadata.getTable();
+        String schemaName = schemaTableName.getSchemaName();
+        String tableName = schemaTableName.getTableName();
+        logger.info("User " + session.getUser() + " " + ignoreExisting);
+        logger.info("tableMetadata " + tableMetadata.toString());
+        Map<String, Object> map = tableMetadata.getProperties();
+        for (String key : map.keySet()) {
+            logger.info(key + " " + map.get(key));
+        }
+
+//        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
+//        Optional<HiveBucketProperty> bucketProperty = getBucketProperty(tableMetadata.getProperties());
+//        if (bucketProperty.isPresent() && !bucketWritingEnabled) {
+//            throw new PrestoException(NOT_SUPPORTED, "Writing to bucketed Hive table has been temporarily disabled");
+//        }
+//        List<HiveColumnHandle> columnHandles = getColumnHandles(tableMetadata, ImmutableSet.copyOf(partitionedBy), typeTranslator);
+//        HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(tableMetadata.getProperties());
+//        Map<String, String> tableProperties = getTableProperties(tableMetadata);
+//
+//        hiveStorageFormat.validateColumns(columnHandles);
+//
+//        Path targetPath;
+//        boolean external;
+//        String externalLocation = getExternalLocation(tableMetadata.getProperties());
+//        if (externalLocation != null) {
+//            external = true;
+//            targetPath = getExternalPath(new HdfsContext(session, schemaName, tableName), externalLocation);
+//        }
+//        else {
+//            external = false;
+//            LocationHandle locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName);
+//            targetPath = locationService.targetPathRoot(locationHandle);
+//        }
+//
+//        Table table = buildTableObject(
+//                session.getQueryId(),
+//                schemaName,
+//                tableName,
+//                session.getUser(),
+//                columnHandles,
+//                hiveStorageFormat,
+//                partitionedBy,
+//                bucketProperty,
+//                tableProperties,
+//                targetPath,
+//                external,
+//                prestoVersion);
+//        PrincipalPrivileges principalPrivileges = buildInitialPrivilegeSet(table.getOwner());
+//        metastore.createTable(session, table, principalPrivileges, Optional.empty(), ignoreExisting);
+    }
+
 }
