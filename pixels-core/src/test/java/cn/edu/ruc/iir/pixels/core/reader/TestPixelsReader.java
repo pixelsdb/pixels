@@ -1,11 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
-import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
-import cn.edu.ruc.iir.pixels.core.PixelsVersion;
-import cn.edu.ruc.iir.pixels.core.TestParams;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -72,8 +67,9 @@ public class TestPixelsReader {
         try {
             for (int i = 0; i < rowGroupNum; i++) {
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
-                System.out.println(">>Row group " + i + " footer");
-                System.out.println(rowGroupFooter);
+                System.out.println(pixelsReader.getRowGroupInfo(i));
+//                System.out.println(">>Row group " + i + " footer");
+//                System.out.println(rowGroupFooter);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -81,10 +77,9 @@ public class TestPixelsReader {
     }
 
     @Test
-    public void testContent()
-    {
+    public void testContent() {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a","c","b","a"};
+        String[] cols = {"a", "c", "b", "a"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);

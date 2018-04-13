@@ -92,20 +92,18 @@ public class TestPixelsWriter {
         }
     }
 
-
+    @Test
     public void testWriter2() {
-        String filePath = TestParams.filePath;
+        String filePath = "hdfs://10.77.40.236:9000/pixels/v1/point.pxl";
+        int rowNum = 6;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
-        Random randomKey = new Random();
-        Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
-
-        // schema: struct<a:int,b:double,b:double>
         try {
+            String schemaStr = "struct<id:int,x:double,y:double>";
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+            TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // double
@@ -128,11 +126,11 @@ public class TestPixelsWriter {
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
             System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 0; i < TestParams.rowNum; i++) {
+            for (int i = 1; i <= rowNum; i++) {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
-                b.vector[row] = i * 1;
-                c.vector[row] = i * 2;
+                b.vector[row] = i * 2d;
+                c.vector[row] = i * 3d;
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();

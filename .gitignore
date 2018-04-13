@@ -15,3 +15,6 @@ mvnw.cmd
 logs/
 pixels-core/logs
 package-info.java
+*.sql
+*.log
+*.txt

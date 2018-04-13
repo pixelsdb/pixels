@@ -9,11 +9,11 @@ public class DBUtils {
     private static Logger log = Logger.get(DBUtils.class);
     private static DBUtils instance = null;
 
-    private static String DRIVER;
-    private static String URL;
-    private static String USERID;
-    private static String USERPASSWORD;
-    private static Connection conn = null;
+    private String DRIVER;
+    private String URL;
+    private String USERID;
+    private String USERPASSWORD;
+    private Connection conn = null;
     private PreparedStatement psmt = null;
     private ResultSet rs = null;
     private Statement statement = null;
@@ -86,7 +86,8 @@ public class DBUtils {
         Statement statement = null;
         try {
             statement = conn.createStatement();
-            flag = statement.execute(SQL);
+            statement.execute(SQL);
+            flag = true;
         } catch (Exception e) {
             log.error("Execute sql error! errmsg: " + e.getMessage());
         }
@@ -94,6 +95,9 @@ public class DBUtils {
     }
 
     public int getUpdate(String sql, String[] arr) {
+        if (arr == null) {
+            return getUpdate(sql) == true ? 1 : 0;
+        }
         int result = 0;
         try {
             psmt = conn.prepareStatement(sql);
@@ -107,5 +111,18 @@ public class DBUtils {
             log.error("Execute sql error! errmsg: " + e.getMessage());
         }
         return result;
+    }
+
+    public Connection getConn() {
+        return conn;
+    }
+
+    public PreparedStatement getPsmt() {
+        try {
+            psmt = conn.prepareStatement("");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return psmt;
     }
 }
