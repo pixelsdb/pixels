@@ -64,4 +64,19 @@ public class TableDao implements BaseDao<Table> {
     public boolean update(Table o, String[] params) {
         return false;
     }
+
+    public int getDbIdbyDbName(String dbName) {
+        int res = 0;
+        String sql = "SELECT TBL_ID from TBLS where TBL_NAME = ?";
+        ResultSet rs = db.getQuery(sql, new String[]{dbName});
+        try {
+            while (rs.next()) {
+                res = rs.getInt("TBL_ID");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return res;
+    }
+
 }

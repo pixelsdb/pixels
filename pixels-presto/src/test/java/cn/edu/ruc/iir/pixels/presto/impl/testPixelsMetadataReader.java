@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import org.apache.log4j.Logger;
 import org.junit.Test;
 
@@ -33,5 +34,13 @@ public class testPixelsMetadataReader {
     @Test
     public void testLog() {
         log.info("Hello World");
+    }
+
+    @Test
+    public void getTable() {
+        PixelsTable table = pixelsMetadataReader.getTable("pixels", "default", "test");
+        System.out.println(table.getTableHandle().toString());
+        System.out.println(table.getTableLayout().toString());
+        System.out.println(table.getColumns().toString());
     }
 }

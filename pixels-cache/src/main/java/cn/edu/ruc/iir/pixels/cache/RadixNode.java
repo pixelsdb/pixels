@@ -141,7 +141,7 @@ public class RadixNode
         int len = 2 + edge.length;
         len += 8 * children.size();
         if (isKey) {
-            len += 24;
+            len += PixelsCacheIdx.SIZE;
         }
         return len;
     }

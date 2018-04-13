@@ -21,8 +21,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import java.io.IOException;
@@ -118,6 +116,13 @@ public final class FSFactory {
         }
         log.info("files size: " + files.size());
         return files;
+    }
+
+    // file isExist
+    public boolean isTableExists(String metatable) throws IOException {
+        Path path = new Path(metatable);
+        boolean exist = fileSystem.exists(path);
+        return exist;
     }
 
     // assume that a file contains only a block

@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 
 import java.io.Closeable;
 import java.io.IOException;

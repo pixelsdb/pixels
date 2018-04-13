@@ -43,7 +43,6 @@ public class PixelsCacheKey
         keyBuffer.putLong(blockId);
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-//
         return keyBuffer.array();
     }
 }
