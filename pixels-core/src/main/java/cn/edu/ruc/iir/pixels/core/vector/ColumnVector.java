@@ -38,6 +38,16 @@ public abstract class ColumnVector
     }
 
     /**
+     * If this column vector is a duplication of another column vector
+     * */
+    public boolean duplicated = false;
+
+    /**
+     * The id of the origin column vector
+     * */
+    public int originVecId = -1;
+
+    /**
      * If hasNulls is true, then this array contains true if the value
      * is null, otherwise false. The array is always allocated, so a batch can be re-used
      * later and nulls added.

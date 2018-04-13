@@ -156,7 +156,7 @@ public class PixelsRecordReaderImpl
         // forbid selected array
         resultRowBatch.selectedInUse = false;
         resultRowBatch.selected = null;
-        resultRowBatch.projectionSize = resultColumns.length;
+        resultRowBatch.projectionSize = includedColumnsNum;
 
         checkValid = true;
     }

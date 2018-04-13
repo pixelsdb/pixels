@@ -21,14 +21,19 @@ public class PixelsCacheManager
     private final Map<ColumnletId, ColumnletIdx> index;
     private final MappedBusReader mqReader;
     private final Map<ColumnletId, Integer> missingCounter;
+    private final PixelsRadix radix;
 
-    public PixelsCacheManager(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusReader mqReader)
+    public PixelsCacheManager(MemoryMappedFile cacheFile,
+                              MemoryMappedFile indexFile,
+                              MappedBusReader mqReader,
+                              PixelsRadix radix)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
         this.index = new HashMap<>();
         this.mqReader = mqReader;
         this.missingCounter = new HashMap<>();
+        this.radix = radix;
     }
 
     @Override

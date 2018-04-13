@@ -3,9 +3,7 @@ package cn.edu.ruc.iir.pixels.cache;
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusWriter;
 
 import java.io.EOFException;
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
+import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -14,19 +12,19 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
-public class PixelsCacheReader
+public class PixelsCacheReader implements AutoCloseable
 {
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final Map<ColumnletId, ColumnletIdx> index;
     private final MappedBusWriter mqWriter;
-    private int indexVersion = 0;
+    private final long childrenOffsetMask = 0x00FFFFFFFFFFFFFFL;
+    private int version = 1;
+    private PixelsRadix cachedRadix;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.index = new HashMap<>();
         this.mqWriter = mqWriter;
     }
 
@@ -133,82 +131,108 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(long blockId, int rowGroupId, int columnId) throws EOFException
+    public byte[] get(long blockId, short rowGroupId, short columnId) throws EOFException
     {
         byte[] content = new byte[0];
-        ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);
-        int header = indexFile.getIntVolatile(0);
         // check rw flag
-        if (PixelsCacheUtil.getHeaderRW(header)) {
+        short rwFlag = indexFile.getShortVolatile(0);
+        if (rwFlag != 0) {
             return content;
         }
-        // increase reader count
-        int newHeader = PixelsCacheUtil.incrementReadCount(header);
-        while (!indexFile.compareAndSwapInt(0, header, newHeader)) {
-            header = indexFile.getIntVolatile(0);
-            newHeader = PixelsCacheUtil.incrementReadCount(header);
-        }
-        int version = indexFile.getInt(32);
-        if (version > indexVersion) {
-            updateIndex();
-            indexVersion = version;
-        }
-        if (index.containsKey(columnletId)) {
-            ColumnletIdx idx = index.get(columnletId);
-            // read content
-            long contentOffset = idx.getOffset();
-            int contentLength = idx.getLength();
-            content = new byte[contentLength];
-            cacheFile.getBytes(contentOffset, content, 0, contentLength);
-        }
 
-        ByteBuffer idBuf = ByteBuffer.allocate(16);
-        idBuf.putLong(blockId);
-        idBuf.putInt(rowGroupId);
-        idBuf.putInt(columnId);
-        idBuf.flip();
-        mqWriter.write(idBuf.array(), 0, 16);
+        // check if reader count reaches its max value (short max value)
+        int readerCount = indexFile.getShortVolatile(2);
+        if (readerCount >= Short.MAX_VALUE) {
+            return content;
+        }
+        // update reader count
+        readerCount = readerCount + 1;
+        indexFile.putShortVolatile(2, (short) readerCount);
+
+        // search index file for columnlet id
+        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
+        byte[] cacheKeyBytes = cacheKey.getBytes();
+
+        // search cache key
+        PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
+        // if found, read content from cache
+        if (cacheIdx != null) {
+            long offset = cacheIdx.getOffset();
+            int length = cacheIdx.getLength();
+            content = new byte[length];
+            cacheFile.getBytes(offset, content, 0, length);
+        }
+        // if not found, send cache miss message
+        else {
+            mqWriter.write(cacheKeyBytes, 0, 16);
+        }
 
         // decrease reader count
-        newHeader = PixelsCacheUtil.decrementReadCount(header);
-        while (!indexFile.compareAndSwapInt(0, header, newHeader)) {
-            header = indexFile.getIntVolatile(0);
-            newHeader = PixelsCacheUtil.decrementReadCount(header);
+        readerCount = indexFile.getShortVolatile(2);
+        if (readerCount >= 1) {
+            readerCount--;
         }
+        indexFile.putShortVolatile(2, (short) readerCount);
 
         return content;
     }
 
     private void updateIndex()
     {
-        long indexSize = indexFile.getLongVolatile(128);
-        int offset = PixelsCacheUtil.INDEX_FIELD_OFFSET;
-        while (indexSize > 0) {
-            // get key
-            long blockId = indexFile.getLongVolatile(offset);
-            offset += Long.BYTES;
-            long keyright = indexFile.getLongVolatile(offset);
-            int rowGroupId = (int)(keyright >> 32);
-            int columndId = (int)(keyright & 0x00000000FFFFFFFFL);
-            offset += Long.BYTES;
-
-            // get value
-            long vOffset = indexFile.getLongVolatile(offset);
-            offset += Long.BYTES;
-            long valueright = indexFile.getLongVolatile(offset);
-            offset += Long.BYTES;
-            int length = (int)(valueright >> 32);
-            int count = (int)(valueright & 0x00000000FFFFFFFFL);
-
-            ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columndId);
-            ColumnletIdx columnletIdx = new ColumnletIdx(offset, length, count);
-            index.put(columnletId, columnletIdx);
-        }
     }
 
-    public void pin(long blockId, int rowGroupId, int columnId)
-    {}
+    /**
+     * Search key from radix tree.
+     * If found, update counter in cache idx.
+     * Else, return null
+     * */
+    private PixelsCacheIdx search(byte[] key)
+    {
+        long nodeOffset = 0;
+        final int keyLen = key.length;
+        int bytesMatched = 0;
+        int childrenNum = 0;
+        int edgeSize = 0;
+        byte[] nodeHeader = new byte[2];
+        while (bytesMatched < keyLen) {
+            boolean matched = false;
+            nodeHeader = new byte[2];
+            indexFile.getBytes(nodeOffset, nodeHeader, 0, 2);
+            // get children num, if 0, return empty
+            childrenNum = nodeHeader[1] + 128;
+            if (childrenNum == 0) {
+                return null;
+            }
+            for (int i = 0; i < childrenNum; i++) {
+                byte childLead = indexFile.getByte(nodeOffset + 2 + i * 8);
+                if (childLead == key[bytesMatched]) {
+                    nodeOffset = indexFile.getLong(nodeOffset + 2 + i * 8);
+                    nodeOffset = nodeOffset & childrenOffsetMask;
+                    bytesMatched++;
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                return null;
+            }
+        }
+        // found matching key, check if it has value
+        if ((nodeHeader[0] >> 7 & 0x01) == 1) {
+            // if it has value, get idx and increment counter
+            long valueOffset = nodeOffset + 2 + childrenNum + edgeSize;
+            long offset = indexFile.getLong(valueOffset);
+            long timestamp = indexFile.getLong(valueOffset + 8);
+            int length = indexFile.getInt(valueOffset + 16);
+            int counter = indexFile.getInt(valueOffset + 20);
+            indexFile.putInt(valueOffset + 20, counter+1);
+            return new PixelsCacheIdx(offset, timestamp, length, counter);
+        }
+        return null;
+    }
 
-    public void unPin(long blockId, int rowGroupId, int columnId)
-    {}
+    public void close() throws IOException
+    {
+        mqWriter.close();
+    }
 }

@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
  */
 public class PixelsCacheKey
 {
-    public static final int SIZE = Long.BYTES + 2 * Short.BYTES;
+    private static final int SIZE = Long.BYTES + 2 * Short.BYTES;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
     private final long blockId;
     private final short rowGroupId;
@@ -39,14 +39,10 @@ public class PixelsCacheKey
 
     public byte[] getBytes()
     {
-//        ByteBuffer buffer = ByteBuffer.allocate(SIZE);
         keyBuffer.clear();
         keyBuffer.putLong(blockId);
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-//        buffer.putLong(blockId);
-//        buffer.putShort(rowGroupId);
-//        buffer.putShort(columnId);
 //
         return keyBuffer.array();
     }

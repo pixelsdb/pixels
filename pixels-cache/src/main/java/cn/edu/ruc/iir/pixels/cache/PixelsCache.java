@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusReader;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
@@ -19,6 +20,8 @@ public class PixelsCache
     private final int scheduledSeconds;
     private final ScheduledExecutorService executorService;
     private final MappedBusReader mqReader;
+    private final PixelsRadix radix;
+    private long currentIndexOffset = 0L;
 
     private PixelsCache(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, int scheduledSeconds,
                         MappedBusReader mqReader)
@@ -28,6 +31,7 @@ public class PixelsCache
         this.scheduledSeconds = scheduledSeconds;
         this.executorService = new ScheduledThreadPoolExecutor(1);
         this.mqReader = mqReader;
+        this.radix = new PixelsRadix();
     }
 
     public static class Builder
@@ -131,63 +135,69 @@ public class PixelsCache
      * */
     public void start()
     {
-        initialize();
+        PixelsCacheManager cacheManager = new PixelsCacheManager(
+                cacheFile, indexFile, mqReader, radix);
 //        executorService.schedule(new PixelsCacheManager(cacheFile, indexFile, mqReader),
 //                scheduledSeconds, TimeUnit.SECONDS);
-        while (true) {
+    }
+
+    private void writeRadix(RadixNode node)
+    {
+        flushNode(node);
+        for (RadixNode n : node.getChildren().values()) {
+            writeRadix(n);
         }
     }
 
     /**
-     * Initialize cache.
-     * 1. Check if index already exists
-     * 2. If not exists, create a index file with version 1.
+     * Flush node content to the index file based on {@code currentIndexOffset}
+     * Header(2 bytes) + [Child(1 byte)]{n} + edge(variable size) + value(optional)
      * */
-    private void initialize()
+    private void flushNode(RadixNode node)
     {
-        int version = indexFile.getInt(32);
-        if (version == 0) {
-            indexFile.putInt(32, 1);
-            indexFile.putLong(64, 0);
-            indexFile.putLong(128, 0);
+        node.offset = currentIndexOffset;
+        currentIndexOffset += node.getLengthInBytes();
+        ByteBuffer nodeBuffer = ByteBuffer.allocate(node.getLengthInBytes());
+        int header = 0;
+        int isKeyMask = 0x0001 << 15;
+        if (node.isKey()) {
+            header = header | isKeyMask;
         }
+        int edgeSize = node.getEdge().length;
+        header = header | (edgeSize << 7);
+        header = header | node.getChildren().size();
+        nodeBuffer.putShort((short) header);  // header
+        for (RadixNode n : node.getChildren().values()) {   // children
+            int len = n.getLengthInBytes();
+            n.offset = currentIndexOffset;
+            currentIndexOffset += len;
+            long childId = 0L;
+            long leader = n.getEdge()[0];  // 1 byte
+            childId = childId & (leader << 56);  // leader
+            childId = childId | n.offset;  // offset
+            nodeBuffer.putLong(childId);
+        }
+        nodeBuffer.put(node.getEdge()); // edge
+        if (node.isKey()) {  // value
+            nodeBuffer.put(node.getValue().getBytes());
+        }
+        // flush bytes
+        indexFile.putBytes(node.offset, nodeBuffer.array());
     }
 
     /**
-     * Put specified columnlet into cache.
-     * This operation has very high priority, it will trigger eviction if not enough space left.
-     * @param blockId block id
-     * @param rowGroupId row group id
-     * @param columnId column id
-     * @param content columnlet content
+     * Flush out index content
      * */
-    public void put(long blockId, int rowGroupId, int columnId, byte[] content)
+    private void flushIndex()
     {
-        long cacheOffset = indexFile.getLongVolatile(64);
-        long indexOffset = indexFile.getLongVolatile(128) + 192;
-//        long timestamp = System.currentTimeMillis();
-        int length = content.length;
-        int count = 0;
-
-        cacheFile.setBytes(cacheOffset, content, 0, length);
-        indexFile.putLong(indexOffset, blockId);
-        indexOffset += Long.BYTES;
-        long keyright = (long)rowGroupId << 32 | columnId;
-        indexFile.putLong(indexOffset, keyright);
-        indexOffset += Long.BYTES;
-        indexFile.putLong(indexOffset, cacheOffset);
-//        indexOffset += Long.BYTES;
-//        indexFile.putLong(indexOffset, timestamp);
-        indexOffset += Long.BYTES;
-        long valueright;
-//        if (pin) {
-//            valueright = (long)length << 32 | count | 0x01;
-//        }
-//        else {
-//            valueright = ((long)length << 32 | count) & 0xFFFFFFFFFFFFF0L;
-//        }
-        valueright = (long) length << 32 | count;
-        indexFile.putLong(indexOffset, valueright);
-        indexFile.putLong(128, indexOffset);
+        // 1. change rwFlag to 1
+        indexFile.putShortVolatile(0, (short) 1);
+        // 2. increase version number
+        int version = indexFile.getInt(4) + 1;
+        indexFile.putIntVolatile(4, version);
+        // 3. traverse radix tree;
+        if (radix.getRoot().getSize() != 0) {
+            writeRadix(radix.getRoot());
+        }
     }
 }

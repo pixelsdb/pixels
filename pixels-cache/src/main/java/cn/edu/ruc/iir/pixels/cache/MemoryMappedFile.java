@@ -121,7 +121,17 @@ public class MemoryMappedFile
     {
         return unsafe.getByteVolatile(null, pos + addr);
     }
- 
+
+    public short getShort(long pos)
+    {
+        return unsafe.getShort(pos + addr);
+    }
+
+    public short getShortVolatile(long pos)
+    {
+        return unsafe.getShortVolatile(null, pos + addr);
+    }
+
     /**
      * Reads an int from the specified position.
      * @param pos the position in the memory mapped file
@@ -171,6 +181,13 @@ public class MemoryMappedFile
     {
         unsafe.putByte(pos + addr, val);
     }
+
+    public void putBytes(long pos, byte[] val)
+    {
+        for (byte v : val) {
+            unsafe.putByte(pos++, v);
+        }
+    }
     
     /**
      * Writes a byte (volatile) to the specified position.
@@ -180,6 +197,16 @@ public class MemoryMappedFile
     public void putByteVolatile(long pos, byte val)
     {
         unsafe.putByteVolatile(null, pos + addr, val);
+    }
+
+    public void putShort(long pos, short val)
+    {
+        unsafe.putShort(pos + addr, val);
+    }
+
+    public void putShortVolatile(long pos, short val)
+    {
+        unsafe.putShortVolatile(null, pos + addr, val);
     }
 
     /**
