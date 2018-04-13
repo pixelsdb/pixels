@@ -23,7 +23,7 @@ public class TestWriter {
     @Test
     public void testWriter() {
 
-        String filePath = "hdfs://presto00:9000/po_compare/point_20.pxl";
+        String filePath = "hdfs://presto00:9000/po_compare/point_10.pxl";
         String tSchema = "struct<orderkey:int,orderstatus:double,totalprice:double>";
         int rowNum = 20;
 

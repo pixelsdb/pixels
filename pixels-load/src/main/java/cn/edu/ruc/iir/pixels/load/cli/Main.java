@@ -9,6 +9,8 @@ import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
+import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsConfig;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -153,6 +155,13 @@ public class Main {
                         String dataPath = namespace1.getString("data_path");
                         String filePath = namespace1.getString("hdfs_file");
                         String schemaFile = namespace1.getString("schema_file");
+
+                        PixelsConfig config = new PixelsConfig();
+                        FSFactory fsFactory = new FSFactory(config);
+                        if (fsFactory.isTableExists(filePath)) {
+                            System.out.println("Illegal Action： hdfs_file is already existed");
+                            continue;
+                        }
 
                         String sql = FileUtils.readFileToString(schemaFile);
                         CreateTable createTable = (CreateTable) parser.createStatement(sql);

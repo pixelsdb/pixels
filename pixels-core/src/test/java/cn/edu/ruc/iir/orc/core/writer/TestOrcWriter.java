@@ -11,7 +11,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.sql.Timestamp;
-import java.util.Random;
 
 import static org.apache.orc.CompressionKind.NONE;
 
@@ -65,9 +64,9 @@ public class TestOrcWriter {
 
 
     @Test
-    public void testWriter2() {
+    public void testWriterAll() {
         Configuration conf = new Configuration();
-        TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+        TypeDescription schema = TypeDescription.fromString("struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>");
         Writer writer = null;
         try {
             writer = OrcFile.createWriter(new Path(TestParams.orcPath),
@@ -112,12 +111,12 @@ public class TestOrcWriter {
             } catch (IOException e1) {
                 e1.printStackTrace();
             }
+            batch.reset();
         }
         try {
             writer.close();
         } catch (IOException e1) {
             e1.printStackTrace();
         }
-
     }
 }
