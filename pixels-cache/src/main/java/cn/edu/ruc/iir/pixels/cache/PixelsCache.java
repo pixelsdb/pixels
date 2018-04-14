@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusReader;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
@@ -21,7 +20,6 @@ public class PixelsCache
     private final ScheduledExecutorService executorService;
     private final MappedBusReader mqReader;
     private final PixelsRadix radix;
-    private long currentIndexOffset = 0L;
 
     private PixelsCache(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, int scheduledSeconds,
                         MappedBusReader mqReader)
@@ -141,63 +139,5 @@ public class PixelsCache
 //                scheduledSeconds, TimeUnit.SECONDS);
     }
 
-    private void writeRadix(RadixNode node)
-    {
-        flushNode(node);
-        for (RadixNode n : node.getChildren().values()) {
-            writeRadix(n);
-        }
-    }
 
-    /**
-     * Flush node content to the index file based on {@code currentIndexOffset}
-     * Header(2 bytes) + [Child(1 byte)]{n} + edge(variable size) + value(optional)
-     * */
-    private void flushNode(RadixNode node)
-    {
-        node.offset = currentIndexOffset;
-        currentIndexOffset += node.getLengthInBytes();
-        ByteBuffer nodeBuffer = ByteBuffer.allocate(node.getLengthInBytes());
-        int header = 0;
-        int isKeyMask = 0x0001 << 15;
-        if (node.isKey()) {
-            header = header | isKeyMask;
-        }
-        int edgeSize = node.getEdge().length;
-        header = header | (edgeSize << 7);
-        header = header | node.getChildren().size();
-        nodeBuffer.putShort((short) header);  // header
-        for (RadixNode n : node.getChildren().values()) {   // children
-            int len = n.getLengthInBytes();
-            n.offset = currentIndexOffset;
-            currentIndexOffset += len;
-            long childId = 0L;
-            long leader = n.getEdge()[0];  // 1 byte
-            childId = childId & (leader << 56);  // leader
-            childId = childId | n.offset;  // offset
-            nodeBuffer.putLong(childId);
-        }
-        nodeBuffer.put(node.getEdge()); // edge
-        if (node.isKey()) {  // value
-            nodeBuffer.put(node.getValue().getBytes());
-        }
-        // flush bytes
-        indexFile.putBytes(node.offset, nodeBuffer.array());
-    }
-
-    /**
-     * Flush out index content
-     * */
-    private void flushIndex()
-    {
-        // 1. change rwFlag to 1
-        indexFile.putShortVolatile(0, (short) 1);
-        // 2. increase version number
-        int version = indexFile.getInt(4) + 1;
-        indexFile.putIntVolatile(4, version);
-        // 3. traverse radix tree;
-        if (radix.getRoot().getSize() != 0) {
-            writeRadix(radix.getRoot());
-        }
-    }
 }

@@ -2,10 +2,11 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusReader;
 
-import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * pixels cache manager.
@@ -16,12 +17,14 @@ import java.util.Map;
 public class PixelsCacheManager
         extends Thread
 {
+    private final static short READABLE = 0;
+    private final static short WRITE = 1;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final Map<ColumnletId, ColumnletIdx> index;
     private final MappedBusReader mqReader;
-    private final Map<ColumnletId, Integer> missingCounter;
+    private final List<ColumnletId> columnletIds;
     private final PixelsRadix radix;
+    private long currentIndexOffset = 0L;
 
     public PixelsCacheManager(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -30,35 +33,160 @@ public class PixelsCacheManager
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.index = new HashMap<>();
         this.mqReader = mqReader;
-        this.missingCounter = new HashMap<>();
+        this.columnletIds = new LinkedList<>();
         this.radix = radix;
     }
 
     @Override
     public void run()
     {
-        try {
+        // set rwFlag as write
+        indexFile.putShortVolatile(0, (short) 1);
+        // wait until readerCount is 0
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < 3000) {
+            if (indexFile.getShortVolatile(2) == 0) {
+                break;
+            }
+        }
+        indexFile.putShortVolatile(2, (short) 0);
+        // collect cache missing messages from mq, and sort cache missings by their missing counts
+        try
+        {
+            mqReader.open();
             while (mqReader.next()) {
-                byte[] columnlet = new byte[16];
-                mqReader.readBuffer(columnlet, 0);
-                ByteBuffer columnletBuf = ByteBuffer.wrap(columnlet);
-                ColumnletId columnletId = new ColumnletId(columnletBuf.getLong(),
-                        columnletBuf.getInt(), columnletBuf.getInt());
-                if (missingCounter.containsKey(columnletId)) {
-                    missingCounter.put(columnletId, missingCounter.get(columnletId) + 1);
+                ColumnletId columnletId = new ColumnletId();
+                mqReader.readMessage(columnletId);
+                int index = columnletIds.indexOf(columnletId);
+                if (index >= 0) {
+                    ColumnletId target = columnletIds.get(index);
+                    target.missingCount++;
                 }
                 else {
-                    missingCounter.put(columnletId, 0);
+                    columnletIds.add(columnletId);
                 }
             }
         }
-        catch (EOFException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
+        }
+        // read all columnlets in cache, and sort by their access counts
+        traverseRadix(columnletIds);
+        columnletIds.sort(Comparator.comparingInt(o -> o.missingCount));
+        // decide which columnlets to evict and which ones to insert
+        evict(columnletIds);
+        // get offsets of all remaining cached columnlets, sort by their offsets
+        List<ColumnletId> remainingCaches = new LinkedList<>();
+        for (ColumnletId columnletId : columnletIds) {
+            if (columnletId.cached) {
+                remainingCaches.add(columnletId);
+            }
+        }
+        remainingCaches.sort(Comparator.comparingLong(o -> o.cacheOffset));
+        // write all remaining cached columnlets by order, reset their counts
+        compact(remainingCaches);
+        // flush index
+        flushIndex();
+        // set rwFlag as readable
+        indexFile.putShortVolatile(0, READABLE);
+        // read missing columnlets to be inserted into memory
+
+        // append missing columnlets into cache file
+
+        // set rwFlag as write
+        indexFile.putShortVolatile(0, WRITE);
+        // wait until readerCount is 0
+        start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < 3000) {
+            if (indexFile.getShortVolatile(2) == 0) {
+                break;
+            }
+        }
+        indexFile.putShortVolatile(2, (short) 0);
+        // flush index
+        flushIndex();
+        // increase version
+        indexFile.getAndAddLong(4, 1);
+        // set raFlag as readable
+        indexFile.putShortVolatile(0, READABLE);
+    }
+
+    /**
+     * Evict caches from radix tree.
+     * Remove cache keys evicted or not to be inserted from cacheKeys list.
+     * */
+    private void evict(List<ColumnletId> cachedColumnlets)
+    {}
+
+    /**
+     * Compact remaining caches in the cache file.
+     * */
+    private void compact(List<ColumnletId> remainingColumnlets)
+    {}
+
+    /**
+     * Traverse radix to get all cached values, and put them into cacheKeys list.
+     * */
+    private void traverseRadix(List<ColumnletId> cacheColumnlets)
+    {}
+
+    /**
+     * Write radix tree node.
+     * */
+    private void writeRadix(RadixNode node)
+    {
+        flushNode(node);
+        for (RadixNode n : node.getChildren().values()) {
+            writeRadix(n);
         }
     }
 
-    private void compact()
-    {}
+    /**
+     * Flush node content to the index file based on {@code currentIndexOffset}.
+     * Header(2 bytes) + [Child(1 byte)]{n} + edge(variable size) + value(optional).
+     * */
+    private void flushNode(RadixNode node)
+    {
+        node.offset = currentIndexOffset;
+        currentIndexOffset += node.getLengthInBytes();
+        ByteBuffer nodeBuffer = ByteBuffer.allocate(node.getLengthInBytes());
+        int header = 0;
+        int isKeyMask = 0x0001 << 15;
+        if (node.isKey()) {
+            header = header | isKeyMask;
+        }
+        int edgeSize = node.getEdge().length;
+        header = header | (edgeSize << 7);
+        header = header | node.getChildren().size();
+        nodeBuffer.putShort((short) header);  // header
+        for (RadixNode n : node.getChildren().values()) {   // children
+            int len = n.getLengthInBytes();
+            n.offset = currentIndexOffset;
+            currentIndexOffset += len;
+            long childId = 0L;
+            long leader = n.getEdge()[0];  // 1 byte
+            childId = childId & (leader << 56);  // leader
+            childId = childId | n.offset;  // offset
+            nodeBuffer.putLong(childId);
+        }
+        nodeBuffer.put(node.getEdge()); // edge
+        if (node.isKey()) {  // value
+            nodeBuffer.put(node.getValue().getBytes());
+        }
+        // flush bytes
+        indexFile.putBytes(node.offset, nodeBuffer.array());
+    }
+
+    /**
+     * Flush out index to index file from start.
+     * */
+    private void flushIndex()
+    {
+        currentIndexOffset = 0;
+        if (radix.getRoot().getSize() != 0) {
+            writeRadix(radix.getRoot());
+        }
+    }
 }

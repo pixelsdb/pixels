@@ -14,7 +14,6 @@ public class PixelsCacheIdx
     private static ByteBuffer buffer = ByteBuffer.allocate(SIZE);
     private final long offset;
     private final int length;
-    private int counter;
 
     public PixelsCacheIdx(long offset, int length)
     {
@@ -30,11 +29,6 @@ public class PixelsCacheIdx
     public int getLength()
     {
         return length;
-    }
-
-    public int getCounter()
-    {
-        return counter;
     }
 
     public byte[] getBytes()

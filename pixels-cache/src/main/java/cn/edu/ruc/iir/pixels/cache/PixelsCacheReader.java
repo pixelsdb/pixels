@@ -14,13 +14,12 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PixelsCacheReader implements AutoCloseable
 {
-    private static int keyHeaderSize = 2;
+    private final static int KEY_HEADER_SIZE = 2;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final MappedBusWriter mqWriter;
     private final long childrenOffsetMask = 0x00FFFFFFFFFFFFFFL;
     private int version = 1;
-    private PixelsRadix cachedRadix;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
     {
@@ -151,8 +150,8 @@ public class PixelsCacheReader implements AutoCloseable
         indexFile.putShortVolatile(2, (short) readerCount);
 
         // search index file for columnlet id
-        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        byte[] cacheKeyBytes = cacheKey.getBytes();
+        ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);
+        byte[] cacheKeyBytes = columnletId.getBytes();
 
         // search cache key
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
@@ -168,7 +167,7 @@ public class PixelsCacheReader implements AutoCloseable
         }
         // if not found, send cache miss message
         else {
-            mqWriter.write(cacheKeyBytes, 0, 16);
+            mqWriter.write(columnletId);
         }
 
         // decrease reader count
@@ -179,10 +178,6 @@ public class PixelsCacheReader implements AutoCloseable
         indexFile.putShortVolatile(2, (short) readerCount);
 
         return content;
-    }
-
-    private void updateIndex()
-    {
     }
 
     /**
@@ -249,7 +244,7 @@ public class PixelsCacheReader implements AutoCloseable
         // found matching key, check if it has value
         if ((nodeHeader[0] >> 7 & 0x01) == 1) {
             // if it has value, get idx and increment counter
-            long valueOffset = nodeOffset + keyHeaderSize + childrenNum + edgeSize;
+            long valueOffset = nodeOffset + KEY_HEADER_SIZE + childrenNum + edgeSize;
             long offset = indexFile.getLong(valueOffset);
             int length = indexFile.getInt(valueOffset + 8);
             return new PixelsCacheIdx(offset, length);
