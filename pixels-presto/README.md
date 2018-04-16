@@ -7,6 +7,21 @@ All the following commands are done in the master node `presto00`
 Upload the following files to the catalog of `presto-server-0.192`
 - pixels.properties
 - pixels-daemon-0.1.0-SNAPSHOT-full.jar
+- pixels-load-0.1.0-SNAPSHOT.jar
+
+## Run ETL Tool
+- DDL
+
+`DDL -s schema_file -d db_name`
+```
+DDL -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/DDL.txt -d pixels
+```
+- LOAD
+
+`LOAD -p data_path -s schema_file -f hdfs_file`
+```
+LOAD -p /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/data/ -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/Test.sql -f hdfs://presto00:9000/po_compare/test.pxl
+```
 
 ## Run Metadata Server
 Run the server, we need to use the `Root` command

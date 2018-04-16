@@ -156,7 +156,7 @@ class PixelsPageSource
                     if (typeName.equals("integer"))
                         blockBuilder.writeInt(Integer.valueOf(b.toString()).intValue());
                     else if (typeName.equals("double"))
-                        blockBuilder.writeLong(Long.valueOf(i).longValue());
+                        blockBuilder.writeLong(Long.valueOf(b.toString()).longValue());
                     else {
                         blockBuilder.appendNull();
                     }
