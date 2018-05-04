@@ -23,6 +23,7 @@ public class ColumnletId
     public int missingCount = 0;
     public boolean cached = false;
     public long cacheOffset;
+    public int cacheLength;
 
     public ColumnletId(long blockId, short rowGroupId, short columnId)
     {

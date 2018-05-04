@@ -14,42 +14,27 @@ import java.io.IOException;
 public class TestOrcReader {
 
     @Test
-    public void testReader() throws IOException {
+    public void testReader()
+    {
         Configuration conf = new Configuration();
         Reader reader = null;
         try {
             reader = OrcFile.createReader(new Path(TestParams.orcPath),
                     OrcFile.readerOptions(conf));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        RecordReader rows = null;
-        try {
+            RecordReader rows = null;
             rows = reader.rows();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        VectorizedRowBatch batch = reader.getSchema().createRowBatch();
-        try {
-            int i = 0;
+            VectorizedRowBatch batch = reader.getSchema().createRowBatch();
+            long num = 0;
+            long begin = System.currentTimeMillis();
             while (rows.nextBatch(batch)) {
-                System.out.println(i++);
-                System.out.println("Row Number: " + rows.getRowNumber());
-                System.out.println("Batch Size: " + batch.size);
-                for (int r = 0; r < batch.size; ++r) {
-                    System.out.println(batch.toString());
-                    break;
-                }
-                break;
+                num += batch.size;
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
+            long end = System.currentTimeMillis();
+            System.out.println("Size: " + num);
+            System.out.println("Time: " + (end - begin));
             rows.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
 }

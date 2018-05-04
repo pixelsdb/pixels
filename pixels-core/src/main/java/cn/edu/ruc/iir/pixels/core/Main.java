@@ -1,46 +1,80 @@
-package cn.edu.ruc.iir.pixels.core.writer;
+package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.PixelsWriter;
-import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
-import cn.edu.ruc.iir.pixels.core.TestParams;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.util.Random;
 
 /**
  * pixels
  *
  * @author guodong
  */
-public class TestPixelsWriter {
-    @Test
-    public void testWriter() {
-        String filePath = TestParams.filePath;
+public class Main
+{
+    private static String schemaStr = "struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>";
+
+    public static void main(String[] args)
+    {
+        if (args.length < 3) {
+            System.out.println("prog write path rowNum\nprog read fileDir col col ...");
+            System.exit(-1);
+        }
+        String rwFlag = args[0];
+        String path = args[1];
+
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
-        Random randomKey = new Random();
-        Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
+        if (rwFlag.equalsIgnoreCase("write")) {
+            int count = Integer.parseInt(args[2]);
+            write(path, conf, count);
+        }
+        else if (rwFlag.equalsIgnoreCase("read")) {
+            String[] schema = new String[args.length - 2];
+            System.arraycopy(args, 2, schema, 0, args.length - 2);
+            try {
+                FileSystem fs = FileSystem.get(URI.create(path), conf);
+                FileStatus[] fileStatuses = fs.listStatus(new Path(path));
+                long processBegin = System.currentTimeMillis();
+                for (FileStatus fileStatus : fileStatuses) {
+                    MockPixelsReader mockPixelsReader =
+                            new MockPixelsReader(fs, fileStatus.getPath(), schema, schemaStr);
+                    Thread mockThread = new Thread(mockPixelsReader);
+                    mockThread.start();
+                    mockThread.join();
+                }
+                long processEnd = System.currentTimeMillis();
+                System.out.println("[process] " + processBegin + processEnd + ", cost: " + (processEnd - processBegin));
+            }
+            catch (IOException | InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        else {
+            System.out.println("prog write path rowNum\nprog read fileDir col col ...");
+            System.exit(-1);
+        }
+    }
 
+    private static void write(String path, Configuration conf, int count)
+    {
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
-        try {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
+        try
+        {
+            FileSystem fs = FileSystem.get(URI.create(path), conf);
+            TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
@@ -52,24 +86,21 @@ public class TestPixelsWriter {
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
                             .setSchema(schema)
-                            .setPixelStride(TestParams.pixelStride)
-                            .setRowGroupSize(TestParams.rowGroupSize)
+                            .setPixelStride(10000)
+                            .setRowGroupSize(64 * 1024 * 1024)
                             .setFS(fs)
-                            .setFilePath(new Path(filePath))
-                            .setBlockSize(TestParams.blockSize)
-                            .setReplication(TestParams.blockReplication)
-                            .setBlockPadding(TestParams.blockPadding)
-                            .setEncoding(TestParams.encoding)
-                            .setCompressionBlockSize(TestParams.compressionBlockSize)
+                            .setFilePath(new Path(path))
+                            .setBlockSize(1024 * 1024 * 1024)
+                            .setReplication((short) 1)
+                            .setBlockPadding(true)
+                            .setEncoding(true)
+                            .setCompressionBlockSize(1)
                             .build();
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
             System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 0; i < TestParams.rowNum; i++) {
-                int key = randomKey.nextInt(50000);
-                float sf = randomSf.nextFloat();
-                double sd = randomSf.nextDouble();
+            for (int i = 0; i < count; i++) {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
                 b.vector[row] = i * 3.1415f;
@@ -87,7 +118,8 @@ public class TestPixelsWriter {
                 rowBatch.reset();
             }
             pixelsWriter.close();
-        } catch (IOException | PixelsWriterException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

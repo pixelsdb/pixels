@@ -210,15 +210,15 @@ public class Main {
                         PixelsWriter pixelsWriter =
                                 PixelsWriterImpl.newBuilder()
                                         .setSchema(schema)
-                                        .setPixelStride(TestParams.pixelStride)
-                                        .setRowGroupSize(TestParams.rowGroupSize)
+                                        .setPixelStride(10000)
+                                        .setRowGroupSize(64 * 1024 * 1024)
                                         .setFS(fs)
                                         .setFilePath(new Path(filePath))
-                                        .setBlockSize(TestParams.blockSize)
-                                        .setReplication(TestParams.blockReplication)
-                                        .setBlockPadding(TestParams.blockPadding)
-                                        .setEncoding(TestParams.encoding)
-                                        .setCompressionBlockSize(TestParams.compressionBlockSize)
+                                        .setBlockSize(128 * 1024 * 1024)
+                                        .setReplication((short) 1)
+                                        .setBlockPadding(true)
+                                        .setEncoding(true)
+                                        .setCompressionBlockSize(1)
                                         .build();
 
                         Collection<File> files = FileUtils.listFiles(dataPath);

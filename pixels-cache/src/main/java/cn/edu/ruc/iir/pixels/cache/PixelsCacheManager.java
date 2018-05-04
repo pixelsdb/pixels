@@ -91,9 +91,7 @@ public class PixelsCacheManager
         flushIndex();
         // set rwFlag as readable
         indexFile.putShortVolatile(0, READABLE);
-        // read missing columnlets to be inserted into memory
-
-        // append missing columnlets into cache file
+        // todo read missing columnlets and append them into cache file, and change radix accordingly.
 
         // set rwFlag as write
         indexFile.putShortVolatile(0, WRITE);
@@ -124,13 +122,50 @@ public class PixelsCacheManager
      * Compact remaining caches in the cache file.
      * */
     private void compact(List<ColumnletId> remainingColumnlets)
-    {}
+    {
+        long currentOffset = 0;
+        for (ColumnletId columnletId : remainingColumnlets) {
+            long columnletOffset = columnletId.cacheOffset;
+            int columnletLength = columnletId.cacheLength;
+            if (columnletOffset != currentOffset) {
+                byte[] columnlet = new byte[columnletLength];
+                cacheFile.getBytes(columnletOffset, columnlet, 0, columnletLength);
+                cacheFile.putBytes(currentOffset, columnlet);
+            }
+            currentOffset += columnletLength;
+        }
+    }
 
     /**
-     * Traverse radix to get all cached values, and put them into cacheKeys list.
+     * Traverse radix to get all cached values, and put them into cacheColumnlets list.
      * */
     private void traverseRadix(List<ColumnletId> cacheColumnlets)
-    {}
+    {
+        RadixNode root = radix.getRoot();
+        if (root.getSize() == 0) {
+            return;
+        }
+        visitRadix(cacheColumnlets, root);
+    }
+
+    /**
+     * Visit radix recursively in depth first way.
+     * Maybe considering using a stack to store edge values along the visitation path.
+     * Push edges in as going deeper, and pop out as going shallower.
+     * */
+    private void visitRadix(List<ColumnletId> cacheColumnlets, RadixNode node)
+    {
+        if (node.isKey()) {
+            PixelsCacheIdx value = node.getValue();
+            ColumnletId columnletId = new ColumnletId();
+            columnletId.cacheOffset = value.getOffset();
+            columnletId.cacheLength = value.getLength();
+            cacheColumnlets.add(columnletId);
+        }
+        for (RadixNode n : node.getChildren().values()) {
+            visitRadix(cacheColumnlets, n);
+        }
+    }
 
     /**
      * Write radix tree node.

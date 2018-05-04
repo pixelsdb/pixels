@@ -10,8 +10,6 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,7 +48,7 @@ public class PixelsRecordReaderImpl
     private int curRowInRG = 0;   // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private ByteBuf[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private byte[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
@@ -274,8 +272,9 @@ public class PixelsRecordReaderImpl
         chunkSeqs.add(chunkSeq);
 
         // read chunk blocks into buffers
-        this.chunkBuffers = new ByteBuf[includedRGs.length][includedColumns.length];
+        this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
         try {
+            long readDiskBegin = System.currentTimeMillis();
             for (ChunkSeq block : chunkSeqs) {
                 if (block.getLength() == 0) {
                     continue;
@@ -293,11 +292,14 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
-                    chunkBuffers[rgId][colId] = chunkBuf;
+//                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
+                    chunkBuffers[rgId * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
             }
+            long readDiskEnd = System.currentTimeMillis();
+            System.out.println("[" + physicalFSReader.getPath().getName() + "] " + readDiskBegin + " " + readDiskEnd +
+                    ", disk cost: " + (readDiskEnd - readDiskBegin));
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -353,7 +355,8 @@ public class PixelsRecordReaderImpl
                 PixelsProto.ColumnEncoding encoding =
                         rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
                                 .getColumnChunkEncodings(resultColumns[i]);
-                byte[] input = chunkBuffers[targetRGs[curRGIdx]][resultColumns[i]].array();
+                int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
+                byte[] input = chunkBuffers[index];
                 readers[i].read(input, encoding, curRowInRG, curBatchSize,
                         postScript.getPixelStride(), columnVectors[i]);
             }
@@ -430,10 +433,8 @@ public class PixelsRecordReaderImpl
         // release chunk buffer
         for (int targetRG : targetRGs) {
             for (int targetColumn : targetColumns) {
-                ByteBuf chunkBuf = chunkBuffers[targetRG][targetColumn];
-                if (chunkBuf != null) {
-                    chunkBuf.release();
-                }
+                byte[] chunkBuf = chunkBuffers[targetRG * includedColumns.length + targetColumn];
+                chunkBuf = null;
             }
         }
     }

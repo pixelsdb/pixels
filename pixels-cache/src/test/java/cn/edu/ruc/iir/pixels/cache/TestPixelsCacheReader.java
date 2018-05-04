@@ -24,7 +24,7 @@ public class TestPixelsCacheReader
                     .setMQAppend(true)
                     .build();
 
-            byte[] content = cacheReader.get(1, 1, 1);
+            byte[] content = cacheReader.get(1, (short) 1, (short) 1);
         }
         catch (Exception e) {
             e.printStackTrace();
