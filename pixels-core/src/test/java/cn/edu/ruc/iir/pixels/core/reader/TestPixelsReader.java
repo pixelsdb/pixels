@@ -10,6 +10,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.util.TimeZone;
@@ -77,7 +79,7 @@ public class TestPixelsReader {
     }
 
     @Test
-    public void testContent()
+    public void testContent() throws IOException
     {
         PixelsReaderOption option = new PixelsReaderOption();
         String[] cols = {"a", "b", "c", "d", "e", "z"};
@@ -86,6 +88,7 @@ public class TestPixelsReader {
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
+        BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/result"));
         VectorizedRowBatch rowBatch;
         int batchSize = 10000;
         long num = 0;
@@ -97,15 +100,18 @@ public class TestPixelsReader {
                 if (rowBatch.endOfFile) {
 //                    System.out.println("End of file");
                     num += rowBatch.size;
+                    writer.write(rowBatch.toString() + "\n");
                     break;
                 }
 //                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
 //                System.out.println(rowBatch.toString());
                 num += rowBatch.size;
+                writer.write(rowBatch.toString() + "\n");
             }
             long end = System.currentTimeMillis();
-            System.out.println("Reader end " + end);
+            System.out.println("Reader end " + end + ", cost: " + (end - start));
             System.out.println("Num " + num);
+            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

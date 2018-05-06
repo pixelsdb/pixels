@@ -14,6 +14,8 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * pixels
@@ -48,12 +50,19 @@ public class Main
                 FileSystem fs = FileSystem.get(URI.create(path), conf);
                 FileStatus[] fileStatuses = fs.listStatus(new Path(path));
                 long processBegin = System.currentTimeMillis();
+                List<Thread> threads = new ArrayList<>();
                 for (FileStatus fileStatus : fileStatuses) {
+                    if (fileStatus.getPath().getName().startsWith(".")) {
+                        continue;
+                    }
                     MockPixelsReader mockPixelsReader =
                             new MockPixelsReader(fs, fileStatus.getPath(), schema, schemaStr);
                     Thread mockThread = new Thread(mockPixelsReader);
+                    threads.add(mockThread);
                     mockThread.start();
-                    mockThread.join();
+                }
+                for (Thread t : threads) {
+                    t.join();
                 }
                 long processEnd = System.currentTimeMillis();
                 System.out.println("[process] " + processBegin + processEnd + ", cost: " + (processEnd - processBegin));
