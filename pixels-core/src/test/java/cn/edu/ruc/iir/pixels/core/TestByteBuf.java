@@ -40,4 +40,13 @@ public class TestByteBuf
         long end = System.currentTimeMillis();
         System.out.println("Elapsing time: " + (end - start));
     }
+
+    @Test
+    public void testStringBytes()
+    {
+        String s = "123456";
+        char[] sChars = s.toCharArray();
+        System.out.println(s.getBytes().length);
+        System.out.println(sChars.length * Character.BYTES);
+    }
 }

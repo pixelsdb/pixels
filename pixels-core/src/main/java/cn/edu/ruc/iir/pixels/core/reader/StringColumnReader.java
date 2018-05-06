@@ -21,11 +21,6 @@ public class StringColumnReader
         extends ColumnReader
 {
     private ByteBuf inputBuffer = null;
-    private String[] origins = null;
-    private int[] orders = null;
-    private ByteBuf contentBuf = null;
-    private RunLenIntDecoder lensDecoder = null;
-    private RunLenIntDecoder contentDecoder = null;
 
     StringColumnReader(TypeDescription type)
     {
@@ -49,30 +44,10 @@ public class StringColumnReader
             if (inputBuffer != null) {
                 inputBuffer.release();
             }
-            inputBuffer = Unpooled.copiedBuffer(input);
-            readContent(input, encoding);
+            inputBuffer = Unpooled.wrappedBuffer(input);
         }
         // if dictionary encoded
-        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
-            // read original bytes
-            for (int i = 0; i < size; i++) {
-                vector.add(origins[orders[(int) contentDecoder.next()]]);
-            }
-        }
-        // if un-encoded
-        else {
-            // read values
-            for (int i = 0; i < size; i++) {
-                int len = (int) lensDecoder.next();
-                CharSequence str = contentBuf.readCharSequence(len, Charset.forName("UTF-8"));
-                vector.add(str.toString());
-            }
-        }
-    }
-
-    private void readContent(byte[] input, PixelsProto.ColumnEncoding encoding)
-            throws IOException
-    {
+        ByteBuf contentBuf;
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
             // read offsets
             inputBuffer.markReaderIndex();
@@ -86,6 +61,7 @@ public class StringColumnReader
             ByteBuf originBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, input.length - ordersOffset);
+            // fill starts array
             int originNum = 0;
             DynamicIntArray startsArray = new DynamicIntArray();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
@@ -93,27 +69,23 @@ public class StringColumnReader
                 startsArray.add((int) startsDecoder.next());
                 originNum++;
             }
-            // read starts and orders
+            // fill orders array
             RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
-            int[] starts = new int[originNum];
-            orders = new int[originNum];
+            int[] orders = new int[originNum];
             for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++) {
-                starts[i] = startsArray.get(i);
                 orders[i] = (int) ordersDecoder.next();
             }
-            // read origins
-            origins = new String[originNum];
-            for (int i = 0; i < originNum - 1; i++) {
-                byte[] tmp = new byte[starts[i + 1] - starts[i]];
-                originBuf.readBytes(tmp);
-                origins[i] = new String(tmp, Charset.forName("UTF-8"));
+            // content decoder
+            RunLenIntDecoder contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
+            // read original bytes
+            for (int i = 0; i < size; i++) {
+                int originId = orders[(int) contentDecoder.next()];
+                int tmpLen = startsArray.get(originId + 1) - startsArray.get(originId);
+                ByteBuf tmpBuf = originBuf.slice(startsArray.get(originId), tmpLen);
+                vector.add(new String(tmpBuf.array(), Charset.forName("UTF-8")));
             }
-            int tmpLen = originBuf.readableBytes();
-            byte[] tmp = new byte[tmpLen];
-            originBuf.readBytes(tmp);
-            origins[originNum - 1] = new String(tmp, Charset.forName("UTF-8"));
-            contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
+        // if un-encoded
         else {
             // read lens field offset
             inputBuffer.markReaderIndex();
@@ -124,7 +96,13 @@ public class StringColumnReader
             contentBuf = inputBuffer.slice(0, lensOffset);
             // read lens field
             ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - Integer.BYTES - lensOffset);
-            lensDecoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
+            RunLenIntDecoder lensDecoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
+            // read values
+            for (int i = 0; i < size; i++) {
+                int len = (int) lensDecoder.next();
+                CharSequence str = contentBuf.readCharSequence(len, Charset.forName("UTF-8"));
+                vector.add(str.toString());
+            }
         }
     }
 }

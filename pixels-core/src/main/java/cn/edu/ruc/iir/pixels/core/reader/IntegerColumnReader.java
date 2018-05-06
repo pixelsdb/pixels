@@ -51,7 +51,7 @@ public class IntegerColumnReader
             if (inputBuffer != null) {
                 inputBuffer.release();
             }
-            inputBuffer = Unpooled.copiedBuffer(input);
+            inputBuffer = Unpooled.wrappedBuffer(input);
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, true);
         }

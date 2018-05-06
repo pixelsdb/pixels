@@ -17,58 +17,6 @@ import static org.apache.orc.CompressionKind.NONE;
 public class TestOrcWriter {
 
     @Test
-    public void testWriter() {
-        Configuration conf = new Configuration();
-        TypeDescription schema = TypeDescription.fromString("struct<id:int,x:double,y:double>");
-        Writer writer = null;
-        try {
-            writer = OrcFile.createWriter(new Path(TestParams.orcPath),
-                    OrcFile.writerOptions(conf)
-                            .blockSize(TestParams.blockSize)
-                            .blockPadding(true)
-                            .stripeSize(TestParams.rowGroupSize)
-                            .rowIndexStride(TestParams.pixelStride)
-                            .setSchema(schema)
-                            .compress(NONE));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        VectorizedRowBatch batch = schema.createRowBatch();
-        LongColumnVector id = (LongColumnVector) batch.cols[0];
-        DoubleColumnVector x = (DoubleColumnVector) batch.cols[1];
-        DoubleColumnVector y = (DoubleColumnVector) batch.cols[2];
-        for (int r = 0; r < TestParams.rowNum; ++r) {
-            int row = batch.size++;
-            id.vector[row] = r;
-            x.vector[row] = r * 1;
-            y.vector[row] = r * 2;
-            // If the batch is full, write it out and start over.
-            if (batch.size == batch.getMaxSize()) {
-                try {
-                    writer.addRowBatch(batch);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                batch.reset();
-            }
-        }
-        if (batch.size != 0) {
-            try {
-                writer.addRowBatch(batch);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            batch.reset();
-        }
-        try {
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-
-    @Test
     public void testWriterAll() {
         Configuration conf = new Configuration();
         TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
