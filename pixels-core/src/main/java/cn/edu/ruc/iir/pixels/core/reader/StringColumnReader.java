@@ -81,8 +81,9 @@ public class StringColumnReader
             for (int i = 0; i < size; i++) {
                 int originId = orders[(int) contentDecoder.next()];
                 int tmpLen = startsArray.get(originId + 1) - startsArray.get(originId);
-                ByteBuf tmpBuf = originBuf.slice(startsArray.get(originId), tmpLen);
-                vector.add(new String(tmpBuf.array(), Charset.forName("UTF-8")));
+                byte[] tmpBytes = new byte[tmpLen];
+                originBuf.getBytes(startsArray.get(originId), tmpBytes);
+                vector.add(new String(tmpBytes, Charset.forName("UTF-8")));
             }
         }
         // if un-encoded
