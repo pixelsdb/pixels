@@ -1,6 +1,11 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.core.*;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import cn.edu.ruc.iir.pixels.core.PixelsVersion;
+import cn.edu.ruc.iir.pixels.core.TestParams;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -10,8 +15,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.util.TimeZone;
@@ -88,7 +91,6 @@ public class TestPixelsReader {
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
-        BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/result"));
         VectorizedRowBatch rowBatch;
         int batchSize = 10000;
         long num = 0;
@@ -100,18 +102,15 @@ public class TestPixelsReader {
                 if (rowBatch.endOfFile) {
 //                    System.out.println("End of file");
                     num += rowBatch.size;
-                    writer.write(rowBatch.toString() + "\n");
                     break;
                 }
 //                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
 //                System.out.println(rowBatch.toString());
                 num += rowBatch.size;
-                writer.write(rowBatch.toString() + "\n");
             }
             long end = System.currentTimeMillis();
             System.out.println("Reader end " + end + ", cost: " + (end - start));
             System.out.println("Num " + num);
-            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
