@@ -40,15 +40,16 @@ public class PixelsRecordReaderImpl
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
     private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
-    private int[] resultColumns;           // columns specified in option by user to read
+    private int[] resultColumns;         // columns specified in option by user to read
     private VectorizedRowBatch resultRowBatch;
 
     private int targetRGNum = 0;         // number of target row groups
-    private int curRGIdx = 0;      // index of current reading row group in targetRGs
-    private int curRowInRG = 0;   // starting index of values to read by reader in current row group
+    private int curRGIdx = 0;            // index of current reading row group in targetRGs
+    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private int curChunkIdx = -1;        // current chunk id being read
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private byte[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private byte[][] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
@@ -347,6 +348,10 @@ public class PixelsRecordReaderImpl
                                     .getColumnChunkEncodings(resultColumns[i]);
                     int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
                     byte[] input = chunkBuffers[index];
+                    if (curChunkIdx != -1 && curChunkIdx != index) {
+                        chunkBuffers[curChunkIdx] = null;
+                    }
+                    curChunkIdx = index;
                     readers[i].read(input, encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), columnVectors[i]);
                 }
