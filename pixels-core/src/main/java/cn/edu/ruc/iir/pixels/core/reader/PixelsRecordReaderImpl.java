@@ -33,7 +33,7 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
 
-    private TypeDescription readerSchema;
+    private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
     private long rowIndex = 0L;
@@ -71,7 +71,7 @@ public class PixelsRecordReaderImpl
             checkValid = false;
             return;
         }
-        TypeDescription fileSchema = TypeDescription.createSchema(colTypes);
+        fileSchema = TypeDescription.createSchema(colTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
             checkValid = false;
             return;
@@ -125,19 +125,8 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        // get and check reader schema
-        this.readerSchema = TypeDescription.createSchema(colTypes);
-        if (readerSchema.getChildren() == null) {
-            checkValid = false;
-            return;
-        }
-        if (readerSchema.getChildren().size() != includedColumnsNum && !option.isTolerantSchemaEvolution()) {
-            checkValid = false;
-            return;
-        }
-
         // create column readers
-        List<TypeDescription> columnSchemas = readerSchema.getChildren();
+        List<TypeDescription> columnSchemas = fileSchema.getChildren();
         readers = new ColumnReader[resultColumns.length];
         for (int i = 0; i < resultColumns.length; i++) {
             int index = resultColumns[i];
@@ -177,7 +166,7 @@ public class PixelsRecordReaderImpl
         Map<Integer, ColumnStats> columnStatsMap = new HashMap<>();
         // read row group statistics and find target row groups
         if (option.getPredicate().isPresent()) {
-            List<TypeDescription> columnSchemas = readerSchema.getChildren();
+            List<TypeDescription> columnSchemas = fileSchema.getChildren();
             PixelsPredicate predicate = option.getPredicate().get();
 
             // first, get file level column statistic, if not matches, skip this file
@@ -342,6 +331,7 @@ public class PixelsRecordReaderImpl
             rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
+        ColumnVector[] columnVectors = resultRowBatch.cols;
         while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount) {
             // update current batch size
             curBatchSize = rgRowCount - curRowInRG;
@@ -350,15 +340,16 @@ public class PixelsRecordReaderImpl
             }
 
             // read vectors
-            ColumnVector[] columnVectors = resultRowBatch.cols;
             for (int i = 0; i < resultColumns.length; i++) {
-                PixelsProto.ColumnEncoding encoding =
-                        rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
-                                .getColumnChunkEncodings(resultColumns[i]);
-                int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
-                byte[] input = chunkBuffers[index];
-                readers[i].read(input, encoding, curRowInRG, curBatchSize,
-                        postScript.getPixelStride(), columnVectors[i]);
+                if (!columnVectors[i].duplicated) {
+                    PixelsProto.ColumnEncoding encoding =
+                            rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
+                                    .getColumnChunkEncodings(resultColumns[i]);
+                    int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
+                    byte[] input = chunkBuffers[index];
+                    readers[i].read(input, encoding, curRowInRG, curBatchSize,
+                            postScript.getPixelStride(), columnVectors[i]);
+                }
             }
 
             // update current row index in the row group
@@ -378,6 +369,12 @@ public class PixelsRecordReaderImpl
                     break;
                 }
                 curRowInRG = 0;
+            }
+        }
+
+        for (ColumnVector cv : columnVectors) {
+            if (cv.duplicated) {
+                cv.copyFrom(columnVectors[cv.originVecId]);
             }
         }
 

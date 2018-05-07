@@ -271,6 +271,8 @@ public abstract class ColumnVector
     public abstract void setElement(int outElementNum, int inputElementNum,
                                     ColumnVector inputVector);
 
+    public abstract void copyFrom(ColumnVector inputVector);
+
     /**
      * Initialize the column vector. This method can be overridden by specific column vector types.
      * Use this method only if the individual type of the column vector is not known, otherwise its
