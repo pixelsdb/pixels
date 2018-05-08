@@ -57,28 +57,12 @@ public class TimestampColumnReader
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
             for (int i = 0; decoder.hasNext() && i < size; i++) {
                 Timestamp timestamp = new Timestamp(decoder.next());
-                int nanos = (int) decoder.next();
-                try {
-                    timestamp.setNanos(nanos);
-                }
-                catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                    System.out.println("Nanos: " + nanos);
-                }
                 vector.add(timestamp);
             }
         }
         else {
             for (int i = 0; i < size; i++) {
                 Timestamp timestamp = new Timestamp(inputStream.readLong());
-                int nanos = inputStream.readInt();
-                try {
-                    timestamp.setNanos(nanos);
-                }
-                catch (IllegalArgumentException e) {
-                    e.printStackTrace();
-                    System.out.println("Nanos: " + nanos);
-                }
                 vector.add(timestamp);
             }
         }

@@ -108,7 +108,7 @@ public class Main
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
+//            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
             for (int i = 0; i < count; i++) {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
