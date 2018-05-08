@@ -462,21 +462,14 @@ public class BytesColumnVector extends ColumnVector
             BytesColumnVector srcVector = (BytesColumnVector) inputVector;
             for (int i = 0; i < vector.length; i++) {
                 if (srcVector.vector[i] != null) {
-                    this.vector[i] = new byte[srcVector.vector[i].length];
-                    System.arraycopy(srcVector.vector[i], 0, this.vector[i], 0, this.vector[i].length);
+                    this.vector[i] = srcVector.vector[i];
                 }
             }
             System.arraycopy(srcVector.start, 0, this.start, 0, start.length);
             System.arraycopy(srcVector.lens, 0, this.lens, 0, lens.length);
-            if (srcVector.buffer != null) {
-                this.buffer = new byte[srcVector.buffer.length];
-                System.arraycopy(srcVector.buffer, 0, this.buffer, 0, buffer.length);
-            }
-            if (srcVector.smallBuffer != null) {
-                this.smallBuffer = new byte[srcVector.smallBuffer.length];
-                System.arraycopy(srcVector.smallBuffer, 0, this.smallBuffer, 0, smallBuffer.length);
-            }
             System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
+            this.buffer = null;
+            this.smallBuffer = null;
             this.nextFree = srcVector.nextFree;
             this.smallBufferNextFree = srcVector.smallBufferNextFree;
             this.bufferAllocationCount = srcVector.bufferAllocationCount;

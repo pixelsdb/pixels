@@ -271,6 +271,11 @@ public abstract class ColumnVector
     public abstract void setElement(int outElementNum, int inputElementNum,
                                     ColumnVector inputVector);
 
+    /**
+     * Copy from input vector.
+     * This is used for duplicated reference column vector.
+     * This method does not guarantee deep clone of vector content.
+     * */
     public abstract void copyFrom(ColumnVector inputVector);
 
     /**
