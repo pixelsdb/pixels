@@ -10,8 +10,6 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,22 +33,23 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
 
-    private TypeDescription readerSchema;
+    private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
     private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
-    private int[] resultColumns;           // columns specified in option by user to read
+    private int[] resultColumns;         // columns specified in option by user to read
     private VectorizedRowBatch resultRowBatch;
 
     private int targetRGNum = 0;         // number of target row groups
-    private int curRGIdx = 0;      // index of current reading row group in targetRGs
-    private int curRowInRG = 0;   // starting index of values to read by reader in current row group
+    private int curRGIdx = 0;            // index of current reading row group in targetRGs
+    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private int curChunkIdx = -1;        // current chunk id being read
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private ByteBuf[][] chunkBuffers;    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private byte[][] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
@@ -73,7 +72,7 @@ public class PixelsRecordReaderImpl
             checkValid = false;
             return;
         }
-        TypeDescription fileSchema = TypeDescription.createSchema(colTypes);
+        fileSchema = TypeDescription.createSchema(colTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
             checkValid = false;
             return;
@@ -127,19 +126,8 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        // get and check reader schema
-        this.readerSchema = TypeDescription.createSchema(colTypes);
-        if (readerSchema.getChildren() == null) {
-            checkValid = false;
-            return;
-        }
-        if (readerSchema.getChildren().size() != includedColumnsNum && !option.isTolerantSchemaEvolution()) {
-            checkValid = false;
-            return;
-        }
-
         // create column readers
-        List<TypeDescription> columnSchemas = readerSchema.getChildren();
+        List<TypeDescription> columnSchemas = fileSchema.getChildren();
         readers = new ColumnReader[resultColumns.length];
         for (int i = 0; i < resultColumns.length; i++) {
             int index = resultColumns[i];
@@ -156,7 +144,7 @@ public class PixelsRecordReaderImpl
         // forbid selected array
         resultRowBatch.selectedInUse = false;
         resultRowBatch.selected = null;
-        resultRowBatch.projectionSize = resultColumns.length;
+        resultRowBatch.projectionSize = includedColumnsNum;
 
         checkValid = true;
     }
@@ -179,7 +167,7 @@ public class PixelsRecordReaderImpl
         Map<Integer, ColumnStats> columnStatsMap = new HashMap<>();
         // read row group statistics and find target row groups
         if (option.getPredicate().isPresent()) {
-            List<TypeDescription> columnSchemas = readerSchema.getChildren();
+            List<TypeDescription> columnSchemas = fileSchema.getChildren();
             PixelsPredicate predicate = option.getPredicate().get();
 
             // first, get file level column statistic, if not matches, skip this file
@@ -274,8 +262,9 @@ public class PixelsRecordReaderImpl
         chunkSeqs.add(chunkSeq);
 
         // read chunk blocks into buffers
-        this.chunkBuffers = new ByteBuf[includedRGs.length][includedColumns.length];
+        this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
         try {
+            long readDiskBegin = System.currentTimeMillis();
             for (ChunkSeq block : chunkSeqs) {
                 if (block.getLength() == 0) {
                     continue;
@@ -293,11 +282,14 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
-                    chunkBuffers[rgId][colId] = chunkBuf;
+//                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
+                    chunkBuffers[rgId * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
             }
+            long readDiskEnd = System.currentTimeMillis();
+            System.out.println("[" + physicalFSReader.getPath().getName() + "] " + readDiskBegin + " " + readDiskEnd +
+                    ", disk cost: " + (readDiskEnd - readDiskBegin));
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -340,6 +332,7 @@ public class PixelsRecordReaderImpl
             rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
+        ColumnVector[] columnVectors = resultRowBatch.cols;
         while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount) {
             // update current batch size
             curBatchSize = rgRowCount - curRowInRG;
@@ -348,14 +341,20 @@ public class PixelsRecordReaderImpl
             }
 
             // read vectors
-            ColumnVector[] columnVectors = resultRowBatch.cols;
             for (int i = 0; i < resultColumns.length; i++) {
-                PixelsProto.ColumnEncoding encoding =
-                        rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
-                                .getColumnChunkEncodings(resultColumns[i]);
-                byte[] input = chunkBuffers[targetRGs[curRGIdx]][resultColumns[i]].array();
-                readers[i].read(input, encoding, curRowInRG, curBatchSize,
-                        postScript.getPixelStride(), columnVectors[i]);
+                if (!columnVectors[i].duplicated) {
+                    PixelsProto.ColumnEncoding encoding =
+                            rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
+                                    .getColumnChunkEncodings(resultColumns[i]);
+                    int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
+                    byte[] input = chunkBuffers[index];
+                    if (curChunkIdx != -1 && curChunkIdx != index) {
+                        chunkBuffers[curChunkIdx] = null;
+                    }
+                    curChunkIdx = index;
+                    readers[i].read(input, encoding, curRowInRG, curBatchSize,
+                            postScript.getPixelStride(), columnVectors[i]);
+                }
             }
 
             // update current row index in the row group
@@ -375,6 +374,12 @@ public class PixelsRecordReaderImpl
                     break;
                 }
                 curRowInRG = 0;
+            }
+        }
+
+        for (ColumnVector cv : columnVectors) {
+            if (cv.duplicated) {
+                cv.copyFrom(columnVectors[cv.originVecId]);
             }
         }
 
@@ -430,10 +435,8 @@ public class PixelsRecordReaderImpl
         // release chunk buffer
         for (int targetRG : targetRGs) {
             for (int targetColumn : targetColumns) {
-                ByteBuf chunkBuf = chunkBuffers[targetRG][targetColumn];
-                if (chunkBuf != null) {
-                    chunkBuf.release();
-                }
+                byte[] chunkBuf = chunkBuffers[targetRG * includedColumns.length + targetColumn];
+                chunkBuf = null;
             }
         }
     }

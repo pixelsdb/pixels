@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * pixels
@@ -12,25 +13,15 @@ public class RadixNode
     private boolean isKey = false;          // does this node contains a key? [1 bit]
     private int size = 0;                   // number of children
     private byte[] edge = null;
-    private RadixNode[] children = null;
-//    private Map<Byte, RadixNode> children = new HashMap<>();
+//    private RadixNode[] children = null;
+    private Map<Byte, RadixNode> children;
     private PixelsCacheIdx value = null;
-
-    // if node is not compressed, size is the num of children,
-    // data has `size` bytes of content, one for each child byte, and `size` pointers, point to each child node.
-    // [abc][a-ptr][b-ptr][c-ptr][value-ptr?]
-
-    // if node is compressed, size is the length of compressed bytes,
-    // data has `size` bytes of content stored represent a sequence of successive nodes,
-    // [xyz][z-ptr][value-ptr?]
-
-    // if the node has an associated key (isKey=1) and is not null (isNull=0),
-    // then after the node pointers, an additional value pointer is present.
-//    private byte[] data = null;             // node data
+    public long offset;
 
     public RadixNode()
     {
-        this.children = new RadixNode[256];
+//        this.children = new RadixNode[256];
+        this.children = new HashMap<>();
     }
 
     public boolean isKey()
@@ -63,38 +54,71 @@ public class RadixNode
         return edge;
     }
 
+//    public void addChild(RadixNode child, boolean overwrite)
+//    {
+//        byte firstByte = child.edge[0];
+//        int index = firstByte + 128;
+//        if (!overwrite && children[index] != null) {
+//            return;
+//        }
+//        children[index] = child;
+//        size++;
+//    }
+
     public void addChild(RadixNode child, boolean overwrite)
     {
         byte firstByte = child.edge[0];
-        int index = firstByte + 128;
-        if (!overwrite && children[index] != null) {
+        if (!overwrite && children.containsKey(firstByte)) {
             return;
         }
-        children[index] = child;
+        children.put(firstByte, child);
         size++;
     }
+
+//    public void removeChild(RadixNode child)
+//    {
+//        byte firstByte = child.edge[0];
+//        int index = firstByte + 128;
+//        children[index] = null;
+//        size--;
+//    }
 
     public void removeChild(RadixNode child)
     {
         byte firstByte = child.edge[0];
-        int index = firstByte + 128;
-        children[index] = null;
+        children.put(firstByte, null);
         size--;
     }
 
+//    public RadixNode getChild(byte firstByte)
+//    {
+//        int index = firstByte + 128;
+//        return children[index];
+//    }
+
     public RadixNode getChild(byte firstByte)
     {
-        int index = firstByte + 128;
-        return children[index];
+        return children.get(firstByte);
     }
 
-    public void setChildren(RadixNode[] children, int size)
+//    public void setChildren(RadixNode[] children, int size)
+//    {
+//        this.children = children;
+//        this.size = size;
+//    }
+
+    public void setChildren(Map<Byte, RadixNode> children, int size)
     {
         this.children = children;
         this.size = size;
     }
 
-    public RadixNode[] getChildren()
+//    public RadixNode[] getChildren()
+//    {
+//        return children;
+//    }
+
+    public Map<Byte, RadixNode> getChildren()
     {
         return children;
     }
@@ -109,23 +133,16 @@ public class RadixNode
         return value;
     }
 
-    public byte[] getBytes()
+    /**
+     * Content length in bytes
+     * */
+    public int getLengthInBytes()
     {
-        int header = 0;
+        int len = 2 + edge.length;
+        len += 8 * children.size();
         if (isKey) {
-            header = header | (1 << 31);
+            len += PixelsCacheIdx.SIZE;
         }
-
-        int bytesSize = Integer.BYTES;
-//        if (data != null) {
-//            bytesSize += data.length;
-//        }
-        ByteBuffer byteBuffer = ByteBuffer.allocate(bytesSize);
-        byteBuffer.putInt(header);
-//        if (data != null) {
-//            byteBuffer.put(data);
-//        }
-
-        return byteBuffer.array();
+        return len;
     }
 }

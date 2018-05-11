@@ -171,6 +171,21 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
+    public void copyFrom(ColumnVector inputVector)
+    {
+        if (inputVector instanceof DoubleColumnVector) {
+            DoubleColumnVector srcVector = (DoubleColumnVector) inputVector;
+//            System.arraycopy(srcVector.vector, 0,  this.vector, 0, vector.length);
+//            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
+            this.vector = srcVector.vector;
+            this.isNull = srcVector.isNull;
+            this.writeIndex = srcVector.writeIndex;
+            this.noNulls = srcVector.noNulls;
+            this.isRepeating = srcVector.isRepeating;
+        }
+    }
+
+    @Override
     public void stringifyValue(StringBuilder buffer, int row) {
         if (isRepeating) {
             row = 0;

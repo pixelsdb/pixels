@@ -5,10 +5,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
-
-import java.io.IOException;
 
 /**
  * pixels
@@ -20,7 +17,6 @@ public class DoubleColumnReader
 {
     private final EncodingUtils encodingUtils;
     private ByteBuf inputBuffer;
-    private ByteBufInputStream inputStream;
 
     DoubleColumnReader(TypeDescription type)
     {
@@ -38,20 +34,18 @@ public class DoubleColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
+                     int offset, int size, int pixelStride, ColumnVector vector)
     {
         if (offset == 0) {
-            if (inputStream != null) {
-                inputStream.close();
-            }
             if (inputBuffer != null) {
                 inputBuffer.release();
             }
-            inputBuffer = Unpooled.copiedBuffer(input);
-            inputStream = new ByteBufInputStream(inputBuffer);
+            inputBuffer = Unpooled.wrappedBuffer(input);
         }
         for (int i = 0; i < size; i++) {
-            vector.add(Double.longBitsToDouble(encodingUtils.readLongLE(inputStream)));
+            byte[] inputBytes = new byte[8];
+            inputBuffer.readBytes(inputBytes);
+            vector.add(Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes)));
         }
     }
 }

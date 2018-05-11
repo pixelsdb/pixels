@@ -13,22 +13,18 @@ import java.nio.ByteBuffer;
 /**
  * Timestamp column writer.
  * All timestamp values are converted to standard UTC time before they are stored as long values.
- * Each pixel contains two arrays(time and nano), the two arrays are separately maintained,
- *  and then concatenated and encoded together when writing out.
- * Time and nano values are always positive, thus when encoding, isSigned can be set as true.
+ * Currently not support nanos
  *
  * @author guodong
  */
 public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final LongColumnVector curPixelTimeVector;
-    private final LongColumnVector curPixelNanoVector;
 
     public TimestampColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
         curPixelTimeVector = new LongColumnVector(pixelStride);
-        curPixelNanoVector = new LongColumnVector(pixelStride);
         encoder = new RunLenIntEncoder(false, true);
     }
 
@@ -37,7 +33,6 @@ public class TimestampColumnWriter extends BaseColumnWriter
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         long[] times = columnVector.time;
-        long[] nanos = columnVector.nanos;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -45,7 +40,6 @@ public class TimestampColumnWriter extends BaseColumnWriter
         while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
             System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, curPartLength);
-            System.arraycopy(nanos, curPartOffset, curPixelNanoVector.vector, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             newPixel();
             curPartOffset += curPartLength;
@@ -55,7 +49,6 @@ public class TimestampColumnWriter extends BaseColumnWriter
         curPartLength = nextPartLength;
 
         System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, curPartLength);
-        System.arraycopy(nanos, curPartOffset, curPixelNanoVector.vector, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         curPartOffset += curPartLength;
@@ -63,7 +56,6 @@ public class TimestampColumnWriter extends BaseColumnWriter
 
         if (nextPartLength > 0) {
             System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, nextPartLength);
-            System.arraycopy(nanos, curPartOffset, curPixelNanoVector.vector, curPixelEleCount, curPartLength);
             curPixelEleCount += nextPartLength;
         }
 
@@ -79,21 +71,19 @@ public class TimestampColumnWriter extends BaseColumnWriter
         }
 
         if (isEncoding) {
-            long[] values = new long[2 * curPixelEleCount];
+            long[] values = new long[curPixelEleCount];
             for (int i = 0; i < curPixelEleCount; i++)
             {
-                values[i * 2] = curPixelTimeVector.vector[i];
-                values[i * 2 + 1] = curPixelNanoVector.vector[i];
+                values[i] = curPixelTimeVector.vector[i];
             }
             outputStream.write(encoder.encode(values));
         }
         else {
             ByteBuffer curVecPartitionBuffer =
-                    ByteBuffer.allocate(curPixelEleCount * Long.BYTES + curPixelEleCount * Integer.BYTES);
+                    ByteBuffer.allocate(curPixelEleCount * Long.BYTES);
             for (int i = 0; i < curPixelEleCount; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelTimeVector.vector[i]);
-                curVecPartitionBuffer.putInt((int) curPixelNanoVector.vector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
         }

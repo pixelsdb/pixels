@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -21,6 +22,11 @@ public class PixelsRadix
         RadixNode root = new RadixNode();
         root.setEdge(new byte[0]);
         nodes.add(root);                 // add root node
+    }
+
+    public RadixNode getRoot()
+    {
+        return nodes.get(0);
     }
 
     public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheItem)
@@ -198,14 +204,14 @@ public class PixelsRadix
                 if (childrenNum == 1) {
                     RadixNode node = new RadixNode();
                     byte[] currentNodeEdge = nodeFound.getEdge();
-                    RadixNode childNode = null;
+                    RadixNode childNode = nodeFound.getChildren().values().iterator().next();
                     // find the child
-                    for (RadixNode radixNode : nodeFound.getChildren()) {
-                        if (radixNode != null) {
-                            childNode = node;
-                            break;
-                        }
-                    }
+//                    for (RadixNode radixNode : nodeFound.getChildren()) {
+//                        if (radixNode != null) {
+//                            childNode = node;
+//                            break;
+//                        }
+//                    }
                     if (childNode == null) {
                         // todo fix exception, though this cannot happen due to logically constraints
                         return false;
@@ -224,20 +230,20 @@ public class PixelsRadix
                 // and if after deletion, the parent itself with only one child left and has no value,
                 // then we need also merge the parent and its remaining child.
                 else {
-//                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values().iterator();
-                    RadixNode[] parentChildren = searchResult.parentNode.getChildren();
+                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values().iterator();
+//                    RadixNode[] parentChildren = searchResult.parentNode.getChildren();
                     List<RadixNode> parentChildrenNodes = new ArrayList<>();
-                    for (RadixNode radixNode : parentChildren) {
-                        if (radixNode != null && radixNode != nodeFound) {
-                            parentChildrenNodes.add(radixNode);
-                        }
-                    }
-//                    while (parentChildrenIterator.hasNext()) {
-//                        RadixNode node = parentChildrenIterator.next();
-//                        if (node != nodeFound) {
-//                            parentChildrenNodes.add(node);
+//                    for (RadixNode radixNode : parentChildren) {
+//                        if (radixNode != null && radixNode != nodeFound) {
+//                            parentChildrenNodes.add(radixNode);
 //                        }
 //                    }
+                    while (parentChildrenIterator.hasNext()) {
+                        RadixNode node = parentChildrenIterator.next();
+                        if (node != nodeFound) {
+                            parentChildrenNodes.add(node);
+                        }
+                    }
 
                     RadixNode newNode = new RadixNode();
                     // if parent has only one child left and has no value, then we can merge parent as a new node

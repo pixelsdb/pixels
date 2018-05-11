@@ -38,6 +38,16 @@ public abstract class ColumnVector
     }
 
     /**
+     * If this column vector is a duplication of another column vector
+     * */
+    public boolean duplicated = false;
+
+    /**
+     * The id of the origin column vector
+     * */
+    public int originVecId = -1;
+
+    /**
      * If hasNulls is true, then this array contains true if the value
      * is null, otherwise false. The array is always allocated, so a batch can be re-used
      * later and nulls added.
@@ -260,6 +270,13 @@ public abstract class ColumnVector
      */
     public abstract void setElement(int outElementNum, int inputElementNum,
                                     ColumnVector inputVector);
+
+    /**
+     * Copy from input vector.
+     * This is used for duplicated reference column vector.
+     * This method does not guarantee deep clone of vector content.
+     * */
+    public abstract void copyFrom(ColumnVector inputVector);
 
     /**
      * Initialize the column vector. This method can be overridden by specific column vector types.

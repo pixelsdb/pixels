@@ -173,7 +173,7 @@ public class EncodingUtils
 
     public void writeLongLE(OutputStream output, long value) throws IOException
     {
-        writeBuffer[0] = (byte) ((value >> 0)  & 0xff);
+        writeBuffer[0] = (byte) ((value)  & 0xff);
         writeBuffer[1] = (byte) ((value >> 8)  & 0xff);
         writeBuffer[2] = (byte) ((value >> 16) & 0xff);
         writeBuffer[3] = (byte) ((value >> 24) & 0xff);
@@ -184,36 +184,34 @@ public class EncodingUtils
         output.write(writeBuffer, 0, 8);
     }
 
-    public long readLongLE(InputStream in) throws IOException
+    public long readLongLE(byte[] inputBytes)
     {
-        readFully(in, readBuffer, 0, 8);
-        return (((readBuffer[0] & 0xff) << 0)
-                + ((readBuffer[1] & 0xff) << 8)
-                + ((readBuffer[2] & 0xff) << 16)
-                + ((long) (readBuffer[3] & 0xff) << 24)
-                + ((long) (readBuffer[4] & 0xff) << 32)
-                + ((long) (readBuffer[5] & 0xff) << 40)
-                + ((long) (readBuffer[6] & 0xff) << 48)
-                + ((long) (readBuffer[7] & 0xff) << 56));
+        return (((inputBytes[0] & 0xff))
+                + ((inputBytes[1] & 0xff) << 8)
+                + ((inputBytes[2] & 0xff) << 16)
+                + ((long) (inputBytes[3] & 0xff) << 24)
+                + ((long) (inputBytes[4] & 0xff) << 32)
+                + ((long) (inputBytes[5] & 0xff) << 40)
+                + ((long) (inputBytes[6] & 0xff) << 48)
+                + ((long) (inputBytes[7] & 0xff) << 56));
     }
 
     public void writeFloat(OutputStream output, float value) throws IOException
     {
         int ser = Float.floatToIntBits(value);
-        writeBuffer[0] = (byte) ((ser >> 0)  & 0xff);
+        writeBuffer[0] = (byte) ((ser)  & 0xff);
         writeBuffer[1] = (byte) ((ser >> 8)  & 0xff);
         writeBuffer[2] = (byte) ((ser >> 16) & 0xff);
         writeBuffer[3] = (byte) ((ser >> 24) & 0xff);
         output.write(writeBuffer, 0, 4);
     }
 
-    public float readFloat(InputStream input) throws IOException
+    public float readFloat(byte[] inputBytes)
     {
-        readFully(input, readBuffer, 0, 4);
-        int value = (((readBuffer[0] & 0xff) << 0)
-                + ((readBuffer[1] & 0xff) << 8)
-                + ((readBuffer[2] & 0xff) << 16)
-                + ((readBuffer[3] & 0xff) << 24)
+        int value = (((inputBytes[0] & 0xff))
+                + ((inputBytes[1] & 0xff) << 8)
+                + ((inputBytes[2] & 0xff) << 16)
+                + ((inputBytes[3] & 0xff) << 24)
         );
         return Float.intBitsToFloat(value);
     }
@@ -235,7 +233,7 @@ public class EncodingUtils
 
         switch (numBytes) {
             case 1:
-                writeBuffer[0] = (byte) (input[offset + 0] & 255);
+                writeBuffer[0] = (byte) (input[offset] & 255);
                 writeBuffer[1] = (byte) (input[offset + 1] & 255);
                 writeBuffer[2] = (byte) (input[offset + 2] & 255);
                 writeBuffer[3] = (byte) (input[offset + 3] & 255);
@@ -245,7 +243,7 @@ public class EncodingUtils
                 writeBuffer[7] = (byte) (input[offset + 7] & 255);
                 break;
             case 2:
-                writeLongBE2(output, input[offset + 0], 0);
+                writeLongBE2(output, input[offset], 0);
                 writeLongBE2(output, input[offset + 1], 2);
                 writeLongBE2(output, input[offset + 2], 4);
                 writeLongBE2(output, input[offset + 3], 6);
@@ -255,7 +253,7 @@ public class EncodingUtils
                 writeLongBE2(output, input[offset + 7], 14);
                 break;
             case 3:
-                writeLongBE3(output, input[offset + 0], 0);
+                writeLongBE3(output, input[offset], 0);
                 writeLongBE3(output, input[offset + 1], 3);
                 writeLongBE3(output, input[offset + 2], 6);
                 writeLongBE3(output, input[offset + 3], 9);
@@ -265,7 +263,7 @@ public class EncodingUtils
                 writeLongBE3(output, input[offset + 7], 21);
                 break;
             case 4:
-                writeLongBE4(output, input[offset + 0], 0);
+                writeLongBE4(output, input[offset], 0);
                 writeLongBE4(output, input[offset + 1], 4);
                 writeLongBE4(output, input[offset + 2], 8);
                 writeLongBE4(output, input[offset + 3], 12);
@@ -275,7 +273,7 @@ public class EncodingUtils
                 writeLongBE4(output, input[offset + 7], 28);
                 break;
             case 5:
-                writeLongBE5(output, input[offset + 0], 0);
+                writeLongBE5(output, input[offset], 0);
                 writeLongBE5(output, input[offset + 1], 5);
                 writeLongBE5(output, input[offset + 2], 10);
                 writeLongBE5(output, input[offset + 3], 15);
@@ -285,7 +283,7 @@ public class EncodingUtils
                 writeLongBE5(output, input[offset + 7], 35);
                 break;
             case 6:
-                writeLongBE6(output, input[offset + 0], 0);
+                writeLongBE6(output, input[offset], 0);
                 writeLongBE6(output, input[offset + 1], 6);
                 writeLongBE6(output, input[offset + 2], 12);
                 writeLongBE6(output, input[offset + 3], 18);
@@ -295,7 +293,7 @@ public class EncodingUtils
                 writeLongBE6(output, input[offset + 7], 42);
                 break;
             case 7:
-                writeLongBE7(output, input[offset + 0], 0);
+                writeLongBE7(output, input[offset], 0);
                 writeLongBE7(output, input[offset + 1], 7);
                 writeLongBE7(output, input[offset + 2], 14);
                 writeLongBE7(output, input[offset + 3], 21);
@@ -305,7 +303,7 @@ public class EncodingUtils
                 writeLongBE7(output, input[offset + 7], 49);
                 break;
             case 8:
-                writeLongBE8(output, input[offset + 0], 0);
+                writeLongBE8(output, input[offset], 0);
                 writeLongBE8(output, input[offset + 1], 8);
                 writeLongBE8(output, input[offset + 2], 16);
                 writeLongBE8(output, input[offset + 3], 24);
@@ -323,59 +321,59 @@ public class EncodingUtils
     }
 
     private void writeLongBE2(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 1] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset] =  (byte) (val >>> 8);
+        writeBuffer[wbOffset + 1] =  (byte) (val);
     }
 
     private void writeLongBE3(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 16);
+        writeBuffer[wbOffset] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 2] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 2] =  (byte) (val);
     }
 
     private void writeLongBE4(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 24);
+        writeBuffer[wbOffset] =  (byte) (val >>> 24);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 2] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 3] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 3] =  (byte) (val);
     }
 
     private void writeLongBE5(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 32);
+        writeBuffer[wbOffset] =  (byte) (val >>> 32);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 24);
         writeBuffer[wbOffset + 2] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 3] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 4] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 4] =  (byte) (val);
     }
 
     private void writeLongBE6(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 40);
+        writeBuffer[wbOffset] =  (byte) (val >>> 40);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 32);
         writeBuffer[wbOffset + 2] =  (byte) (val >>> 24);
         writeBuffer[wbOffset + 3] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 4] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 5] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 5] =  (byte) (val);
     }
 
     private void writeLongBE7(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 48);
+        writeBuffer[wbOffset] =  (byte) (val >>> 48);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 40);
         writeBuffer[wbOffset + 2] =  (byte) (val >>> 32);
         writeBuffer[wbOffset + 3] =  (byte) (val >>> 24);
         writeBuffer[wbOffset + 4] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 5] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 6] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 6] =  (byte) (val);
     }
 
     private void writeLongBE8(OutputStream output, long val, int wbOffset) {
-        writeBuffer[wbOffset + 0] =  (byte) (val >>> 56);
+        writeBuffer[wbOffset] =  (byte) (val >>> 56);
         writeBuffer[wbOffset + 1] =  (byte) (val >>> 48);
         writeBuffer[wbOffset + 2] =  (byte) (val >>> 40);
         writeBuffer[wbOffset + 3] =  (byte) (val >>> 32);
         writeBuffer[wbOffset + 4] =  (byte) (val >>> 24);
         writeBuffer[wbOffset + 5] =  (byte) (val >>> 16);
         writeBuffer[wbOffset + 6] =  (byte) (val >>> 8);
-        writeBuffer[wbOffset + 7] =  (byte) (val >>> 0);
+        writeBuffer[wbOffset + 7] =  (byte) (val);
     }
 
     private void writeRemainingLongs(OutputStream output, int offset, long[] input, int remainder,

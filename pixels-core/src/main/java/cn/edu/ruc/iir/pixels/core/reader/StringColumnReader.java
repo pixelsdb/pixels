@@ -10,7 +10,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 /**
  * pixels
@@ -20,9 +19,12 @@ import java.nio.charset.Charset;
 public class StringColumnReader
         extends ColumnReader
 {
+    private int originsOffset;
+    private int startsOffset;
     private ByteBuf inputBuffer = null;
-    private String[] origins = null;
+    private ByteBuf originsBuf = null;
     private int[] orders = null;
+    private int[] starts = null;
     private ByteBuf contentBuf = null;
     private RunLenIntDecoder lensDecoder = null;
     private RunLenIntDecoder contentDecoder = null;
@@ -49,14 +51,24 @@ public class StringColumnReader
             if (inputBuffer != null) {
                 inputBuffer.release();
             }
-            inputBuffer = Unpooled.copiedBuffer(input);
+            inputBuffer = Unpooled.wrappedBuffer(input);
             readContent(input, encoding);
         }
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
             // read original bytes
             for (int i = 0; i < size; i++) {
-                vector.add(origins[orders[(int) contentDecoder.next()]]);
+                int originId = orders[(int) contentDecoder.next()];
+                int tmpLen;
+                if (originId < starts.length - 1) {
+                    tmpLen = starts[originId + 1] - starts[originId];
+                }
+                else {
+                    tmpLen = startsOffset - originsOffset - starts[originId];
+                }
+                byte[] tmpBytes = new byte[tmpLen];
+                originsBuf.getBytes(starts[originId], tmpBytes);
+                vector.add(tmpBytes);
             }
         }
         // if un-encoded
@@ -64,8 +76,9 @@ public class StringColumnReader
             // read values
             for (int i = 0; i < size; i++) {
                 int len = (int) lensDecoder.next();
-                CharSequence str = contentBuf.readCharSequence(len, Charset.forName("UTF-8"));
-                vector.add(str.toString());
+                byte[] tmpBytes = new byte[len];
+                contentBuf.readBytes(tmpBytes);
+                vector.add(tmpBytes);
             }
         }
     }
@@ -77,13 +90,13 @@ public class StringColumnReader
             // read offsets
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(input.length - 3 * Integer.BYTES);
-            int originsOffset = inputBuffer.readInt();
-            int startsOffset = inputBuffer.readInt();
+            originsOffset = inputBuffer.readInt();
+            startsOffset = inputBuffer.readInt();
             int ordersOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read buffers
             contentBuf = inputBuffer.slice(0, originsOffset);
-            ByteBuf originBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
+            originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, input.length - ordersOffset);
             int originNum = 0;
@@ -95,23 +108,12 @@ public class StringColumnReader
             }
             // read starts and orders
             RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
-            int[] starts = new int[originNum];
+            starts = new int[originNum];
             orders = new int[originNum];
             for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++) {
                 starts[i] = startsArray.get(i);
                 orders[i] = (int) ordersDecoder.next();
             }
-            // read origins
-            origins = new String[originNum];
-            for (int i = 0; i < originNum - 1; i++) {
-                byte[] tmp = new byte[starts[i + 1] - starts[i]];
-                originBuf.readBytes(tmp);
-                origins[i] = new String(tmp, Charset.forName("UTF-8"));
-            }
-            int tmpLen = originBuf.readableBytes();
-            byte[] tmp = new byte[tmpLen];
-            originBuf.readBytes(tmp);
-            origins[originNum - 1] = new String(tmp, Charset.forName("UTF-8"));
             contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
         else {

@@ -19,6 +19,7 @@ public class PixelsCache
     private final int scheduledSeconds;
     private final ScheduledExecutorService executorService;
     private final MappedBusReader mqReader;
+    private final PixelsRadix radix;
 
     private PixelsCache(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, int scheduledSeconds,
                         MappedBusReader mqReader)
@@ -28,6 +29,7 @@ public class PixelsCache
         this.scheduledSeconds = scheduledSeconds;
         this.executorService = new ScheduledThreadPoolExecutor(1);
         this.mqReader = mqReader;
+        this.radix = new PixelsRadix();
     }
 
     public static class Builder
@@ -131,63 +133,11 @@ public class PixelsCache
      * */
     public void start()
     {
-        initialize();
+        PixelsCacheManager cacheManager = new PixelsCacheManager(
+                cacheFile, indexFile, mqReader, radix);
 //        executorService.schedule(new PixelsCacheManager(cacheFile, indexFile, mqReader),
 //                scheduledSeconds, TimeUnit.SECONDS);
-        while (true) {
-        }
     }
 
-    /**
-     * Initialize cache.
-     * 1. Check if index already exists
-     * 2. If not exists, create a index file with version 1.
-     * */
-    private void initialize()
-    {
-        int version = indexFile.getInt(32);
-        if (version == 0) {
-            indexFile.putInt(32, 1);
-            indexFile.putLong(64, 0);
-            indexFile.putLong(128, 0);
-        }
-    }
 
-    /**
-     * Put specified columnlet into cache.
-     * This operation has very high priority, it will trigger eviction if not enough space left.
-     * @param blockId block id
-     * @param rowGroupId row group id
-     * @param columnId column id
-     * @param content columnlet content
-     * */
-    public void put(long blockId, int rowGroupId, int columnId, byte[] content)
-    {
-        long cacheOffset = indexFile.getLongVolatile(64);
-        long indexOffset = indexFile.getLongVolatile(128) + 192;
-//        long timestamp = System.currentTimeMillis();
-        int length = content.length;
-        int count = 0;
-
-        cacheFile.setBytes(cacheOffset, content, 0, length);
-        indexFile.putLong(indexOffset, blockId);
-        indexOffset += Long.BYTES;
-        long keyright = (long)rowGroupId << 32 | columnId;
-        indexFile.putLong(indexOffset, keyright);
-        indexOffset += Long.BYTES;
-        indexFile.putLong(indexOffset, cacheOffset);
-//        indexOffset += Long.BYTES;
-//        indexFile.putLong(indexOffset, timestamp);
-        indexOffset += Long.BYTES;
-        long valueright;
-//        if (pin) {
-//            valueright = (long)length << 32 | count | 0x01;
-//        }
-//        else {
-//            valueright = ((long)length << 32 | count) & 0xFFFFFFFFFFFFF0L;
-//        }
-        valueright = (long) length << 32 | count;
-        indexFile.putLong(indexOffset, valueright);
-        indexFile.putLong(128, indexOffset);
-    }
 }

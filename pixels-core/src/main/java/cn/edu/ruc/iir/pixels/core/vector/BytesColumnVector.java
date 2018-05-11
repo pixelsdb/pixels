@@ -456,6 +456,30 @@ public class BytesColumnVector extends ColumnVector
     }
 
     @Override
+    public void copyFrom(ColumnVector inputVector)
+    {
+        if (inputVector instanceof BytesColumnVector) {
+            BytesColumnVector srcVector = (BytesColumnVector) inputVector;
+            for (int i = 0; i < vector.length; i++) {
+                if (srcVector.vector[i] != null) {
+                    this.vector[i] = srcVector.vector[i];
+                }
+            }
+            System.arraycopy(srcVector.start, 0, this.start, 0, start.length);
+            System.arraycopy(srcVector.lens, 0, this.lens, 0, lens.length);
+            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
+            this.buffer = null;
+            this.smallBuffer = null;
+            this.nextFree = srcVector.nextFree;
+            this.smallBufferNextFree = srcVector.smallBufferNextFree;
+            this.bufferAllocationCount = srcVector.bufferAllocationCount;
+            this.noNulls = srcVector.noNulls;
+            this.isRepeating = srcVector.isRepeating;
+            this.writeIndex = srcVector.writeIndex;
+        }
+    }
+
+    @Override
     public void init() {
         initBuffer(0);
     }

@@ -10,18 +10,15 @@ import java.util.Objects;
  */
 public class PixelsCacheIdx
 {
-    public static final int SIZE = 2 * Long.BYTES + 2 * Integer.BYTES;
+    public static final int SIZE = Long.BYTES + Integer.BYTES;
+    private static ByteBuffer buffer = ByteBuffer.allocate(SIZE);
     private final long offset;
-    private final long timestamp;
     private final int length;
-    private final int counter;
 
-    public PixelsCacheIdx(long offset, long timestamp, int length, int content)
+    public PixelsCacheIdx(long offset, int length)
     {
         this.offset = offset;
-        this.timestamp = timestamp;
         this.length = length;
-        this.counter = content;
     }
 
     public long getOffset()
@@ -29,28 +26,16 @@ public class PixelsCacheIdx
         return offset;
     }
 
-    public long getTimestamp()
-    {
-        return timestamp;
-    }
-
     public int getLength()
     {
         return length;
     }
 
-    public int getCounter()
-    {
-        return counter;
-    }
-
     public byte[] getBytes()
     {
-        ByteBuffer buffer = ByteBuffer.allocate(SIZE);
+        buffer.clear();
         buffer.putLong(offset);
-        buffer.putLong(timestamp);
         buffer.putInt(length);
-        buffer.putInt(counter);
 
         return buffer.array();
     }
@@ -60,9 +45,7 @@ public class PixelsCacheIdx
     {
         StringBuilder sb = new StringBuilder();
         sb.append(offset).append(", ");
-        sb.append(timestamp).append(", ");
         sb.append(length).append(", ");
-        sb.append(counter);
         return sb.toString();
     }
 
@@ -75,9 +58,7 @@ public class PixelsCacheIdx
         if (other != null && other instanceof PixelsCacheIdx) {
             PixelsCacheIdx o = (PixelsCacheIdx) other;
             return Objects.equals(offset, o.offset) &&
-                    Objects.equals(timestamp, o.timestamp) &&
-                    Objects.equals(length, o.length) &&
-                    Objects.equals(counter, o.counter);
+                    Objects.equals(length, o.length);
         }
         return false;
     }
@@ -85,6 +66,6 @@ public class PixelsCacheIdx
     @Override
     public int hashCode()
     {
-        return Objects.hash(offset, timestamp, length, counter);
+        return Objects.hash(offset, length);
     }
 }
