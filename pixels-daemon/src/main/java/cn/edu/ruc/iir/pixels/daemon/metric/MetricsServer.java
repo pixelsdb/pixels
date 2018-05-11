@@ -78,7 +78,6 @@ public class MetricsServer implements Server
                 LogFactory.Instance().getLog().error("interrupted in main loop of metrics server.", e);
             } catch (IOException e)
             {
-                e.printStackTrace();
                 LogFactory.Instance().getLog().error("I/O error in main loop of metrics server.", e);
             }
         }
