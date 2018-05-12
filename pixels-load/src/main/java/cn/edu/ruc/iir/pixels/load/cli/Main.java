@@ -222,6 +222,7 @@ public class Main {
                         PixelsWriter pixelsWriter =
                                 PixelsWriterImpl.newBuilder()
                                         .setSchema(schema)
+
                                         .setPixelStride(pixelStride)
                                         .setRowGroupSize(rowGroupSize)
                                         .setFS(fs)

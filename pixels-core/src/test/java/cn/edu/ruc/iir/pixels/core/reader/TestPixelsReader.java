@@ -1,6 +1,11 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.core.*;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import cn.edu.ruc.iir.pixels.core.PixelsVersion;
+import cn.edu.ruc.iir.pixels.core.TestParams;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -77,9 +82,10 @@ public class TestPixelsReader {
     }
 
     @Test
-    public void testContent() {
+    public void testContent() throws IOException
+    {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "c", "b", "a"};
+        String[] cols = {"id", "x", "y"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
@@ -87,19 +93,24 @@ public class TestPixelsReader {
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch;
         int batchSize = 10000;
+        long num = 0;
         try {
             long start = System.currentTimeMillis();
+            System.out.println("Reader begin " + start);
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
                 if (rowBatch.endOfFile) {
-                    System.out.println("End of file");
+//                    System.out.println("End of file");
+                    num += rowBatch.size;
                     break;
                 }
 //                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
 //                System.out.println(rowBatch.toString());
+                num += rowBatch.size;
             }
             long end = System.currentTimeMillis();
-            System.out.println(recordReader.getRowNumber() + ", time: " + (end - start));
+            System.out.println("Reader end " + end + ", cost: " + (end - start));
+            System.out.println("Num " + num);
         } catch (IOException e) {
             e.printStackTrace();
         }

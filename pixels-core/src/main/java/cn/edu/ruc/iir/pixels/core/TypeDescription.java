@@ -586,8 +586,19 @@ public final class TypeDescription
         VectorizedRowBatch result;
         if (category == Category.STRUCT) {
             result = new VectorizedRowBatch(children.size(), maxSize);
+            List<String> columnNames = new ArrayList<>();
             for(int i=0; i < result.cols.length; ++i) {
-                result.cols[i] = children.get(i).createColumn(maxSize);
+                String fieldName = fieldNames.get(i);
+                ColumnVector cv = children.get(i).createColumn(maxSize);
+                int originId = columnNames.indexOf(fieldName);
+                if (originId >= 0) {
+                    cv.duplicated = true;
+                    cv.originVecId = originId;
+                }
+                else {
+                    columnNames.add(fieldName);
+                }
+                result.cols[i] = cv;
             }
         } else {
             result = new VectorizedRowBatch(1, maxSize);

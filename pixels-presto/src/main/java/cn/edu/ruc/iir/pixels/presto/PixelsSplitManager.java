@@ -16,7 +16,6 @@ package cn.edu.ruc.iir.pixels.presto;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;

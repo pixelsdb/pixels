@@ -11,9 +11,12 @@ import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
-import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.block.LazyBlock;
+import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.type.Type;
-import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
@@ -34,7 +37,7 @@ class PixelsPageSource
     private List<Type> types;
     private FSFactory fsFactory;
     private PageBuilder pageBuilder;
-    private static String path;
+    private String path;
     private boolean closed;
     private PixelsReader pixelsReader;
     private PixelsRecordReader recordReader;
@@ -51,16 +54,16 @@ class PixelsPageSource
 
     //    @Inject
     public PixelsPageSource(PixelsConnectorId connectorId) {
-        this.connectorId = ((PixelsConnectorId) requireNonNull(connectorId, "connectorId is null")).toString();
+        this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
     }
 
     public PixelsPageSource(PixelsTable pixelsTable, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String path, String connectorId) {
         this.connectorId = connectorId;
-        ImmutableList.Builder columnTypes = ImmutableList.builder();
+        ArrayList<Type> columnTypes = new ArrayList<>();
         for (PixelsColumnHandle column : columnHandles) {
             columnTypes.add(column.getColumnType());
         }
-        this.types = new ArrayList(columnTypes.build());
+        this.types = columnTypes;
         this.pageBuilder = new PageBuilder(this.types);
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
