@@ -12,6 +12,7 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -42,14 +43,19 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
 
-        logger.info("PixelsPageSourceProvider createPageSource: " + columns.size());
+        logger.info("PixelsPageSourceProvider columns: " + columns.size());
+        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.size());
+
+        List<PixelsColumnHandle> hdfsColumns = columns.stream()
+                .map(col -> (PixelsColumnHandle) col)
+                .collect(Collectors.toList());
+        logger.info("PixelsPageSourceProvider hdfsColumns: " + hdfsColumns.size());
+
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        PixelsTable pixelsTable = pixelsMetadataReader.getTable(connectorId, pixelsSplit.getSchemaName(), pixelsSplit.getTableName());
-        logger.info("PixelsRecordSetProvider ColumnHandle columns: " + columns.size() + " " + columns.toString());
-        logger.info("PixelsRecordSetProvider getRecordSet columns: " + pixelsColumns.size() + " " + pixelsColumns.toString());
+        PixelsTable pixelsTable = pixelsMetadataReader.getTable(connectorId, pixelsSplit.getSchemaName(), pixelsSplit.getTableName(), pixelsSplit.getPath());
 
         logger.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
         return new PixelsPageSource(pixelsTable, pixelsTable.getColumns(), fsFactory, pixelsSplit.getPath(), connectorId);

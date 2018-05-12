@@ -15,7 +15,7 @@ import java.util.List;
  * @date: Create in 2018-01-27 11:15
  **/
 public class testPixelsMetadataReader {
-    PixelsMetadataReader pixelsMetadataReader = new PixelsMetadataReader();
+    PixelsMetadataReader pixelsMetadataReader = PixelsMetadataReader.Instance();
     private final Logger log = Logger.getLogger(testPixelsMetadataReader.class.getName());
 
     @Test

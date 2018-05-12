@@ -15,5 +15,6 @@ public class TestServer {
     @Test
     public void test() {
         MetadataServer server = new MetadataServer(18888);
+        server.run();
     }
 }

@@ -89,10 +89,13 @@ public class TestDao {
 
     @Test
     public void testColumnLoadDao() {
-        String params[] = new String[]{"point", "pixels"};
+        String params[] = new String[]{"test", "pixels"};
         BaseDao baseDao = new ColumnDao();
         String sql = "select * from COLS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ?)) " : "");
         List<Column> columnList = baseDao.loadAll(sql, params);
+        System.out.println(columnList.size());
+
+        columnList = baseDao.loadAll(sql, params);
         System.out.println(columnList.size());
     }
 }

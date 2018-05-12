@@ -5,6 +5,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -18,10 +20,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
     private final ByteBuf firstMSG;
 
-    private ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<String>();
+    private String token;
+    private Map<String, String> map = new HashMap<String, String>();
 
-    public MetadataClientHandler(String action, ConcurrentLinkedQueue queue, String paras) {
-        this.queue = queue;
+    public MetadataClientHandler(String action, String token, Map<String, String> map, String paras) {
+        this.token = token;
+        this.map = map;
         String param = action + "==" + (paras != null ? paras : "");
         byte[] req = param.getBytes();
         firstMSG = Unpooled.buffer(req.length);
@@ -42,11 +46,13 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
         buf.readBytes(req);
         String body = new String(req, "UTF-8");
 //        System.out.println("NOW is: " + body);
-        queue.add(body);
+        map.put(token, body);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        System.out.println("Client Exception: ");
+        cause.printStackTrace();
         ctx.close();
     }
 }
