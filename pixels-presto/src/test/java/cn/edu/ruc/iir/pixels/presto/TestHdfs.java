@@ -29,7 +29,7 @@ public class TestHdfs {
     @Test
     public void testReadBlock() {
         String filePath = "hdfs://presto00:9000/pixels/point.txt";
-        FSFactory fsFactory = new FSFactory(null);
+        FSFactory fsFactory = new FSFactory();
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
             ExtendedBlock eBlock = block.getBlock();
