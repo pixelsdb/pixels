@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
+import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.DBUtils;
 import cn.edu.ruc.iir.pixels.common.DateUtil;
 import cn.edu.ruc.iir.pixels.common.FileUtils;
@@ -209,18 +210,27 @@ public class Main {
                             }
                         }
 
+                        ConfigFactory instance = ConfigFactory.Instance();
+                        int pixelStride = Integer.parseInt(instance.getProperty("pixelStride"));
+                        int rowGroupSize = Integer.parseInt(instance.getProperty("rowGroupSize"));
+                        int blockSize = 256 * 1024 * 1024;
+                        short blockReplication = 3;
+                        boolean blockPadding = true;
+                        boolean encoding = true;
+                        int compressionBlockSize = 1;
+
                         PixelsWriter pixelsWriter =
                                 PixelsWriterImpl.newBuilder()
                                         .setSchema(schema)
-                                        .setPixelStride(TestParams.pixelStride)
-                                        .setRowGroupSize(TestParams.rowGroupSize)
+                                        .setPixelStride(pixelStride)
+                                        .setRowGroupSize(rowGroupSize)
                                         .setFS(fs)
                                         .setFilePath(new Path(filePath))
-                                        .setBlockSize(TestParams.blockSize)
-                                        .setReplication(TestParams.blockReplication)
-                                        .setBlockPadding(TestParams.blockPadding)
-                                        .setEncoding(TestParams.encoding)
-                                        .setCompressionBlockSize(TestParams.compressionBlockSize)
+                                        .setBlockSize(blockSize)
+                                        .setReplication(blockReplication)
+                                        .setBlockPadding(blockPadding)
+                                        .setEncoding(encoding)
+                                        .setCompressionBlockSize(compressionBlockSize)
                                         .build();
 
                         Collection<File> files = FileUtils.listFiles(dataPath);
@@ -253,7 +263,7 @@ public class Main {
 
                                 // at the end of each col, judge the size of the file
                                 fileS = writeLine.toString().getBytes().length;
-                                fileSize = df.format((double) fileS / TestParams.blockSize);
+                                fileSize = df.format((double) fileS / blockSize);
                                 if (Double.valueOf(fileSize) >= 1) {
                                     fileNum++;
                                     pixelsWriter.addRowBatch(rowBatch);
@@ -264,15 +274,15 @@ public class Main {
                                     pixelsWriter =
                                             PixelsWriterImpl.newBuilder()
                                                     .setSchema(schema)
-                                                    .setPixelStride(TestParams.pixelStride)
-                                                    .setRowGroupSize(TestParams.rowGroupSize)
+                                                    .setPixelStride(pixelStride)
+                                                    .setRowGroupSize(rowGroupSize)
                                                     .setFS(fs)
                                                     .setFilePath(new Path(filePath))
-                                                    .setBlockSize(TestParams.blockSize)
-                                                    .setReplication(TestParams.blockReplication)
-                                                    .setBlockPadding(TestParams.blockPadding)
-                                                    .setEncoding(TestParams.encoding)
-                                                    .setCompressionBlockSize(TestParams.compressionBlockSize)
+                                                    .setBlockSize(blockSize)
+                                                    .setReplication(blockReplication)
+                                                    .setBlockPadding(blockPadding)
+                                                    .setEncoding(encoding)
+                                                    .setCompressionBlockSize(compressionBlockSize)
                                                     .build();
                                     writeLine = new StringBuilder();
                                     fileS = 0;

@@ -49,7 +49,7 @@ class PixelsPageSource
     private long nanoStart;
     private long nanoEnd;
 
-    @Inject
+    //    @Inject
     public PixelsPageSource(PixelsConnectorId connectorId) {
         this.connectorId = ((PixelsConnectorId) requireNonNull(connectorId, "connectorId is null")).toString();
     }
@@ -140,12 +140,12 @@ class PixelsPageSource
             logger.info(new StringBuilder().append("getNextPage rowBatch: ").append(this.rowBatch.size).toString());
             logger.info(new StringBuilder().append("getNextPage batchSize: ").append(batchSize).toString());
             Block[] blocks = new Block[this.pixelsColumnIndexes.length];
-            logger.info(new StringBuilder().append("getNextPage blocks: ").append(blocks.length).toString());
+//            logger.info(new StringBuilder().append("getNextPage blocks: ").append(blocks.length).toString());
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId) {
-                BlockBuilder blockBuilder = this.types.get(fieldId).createBlockBuilder(new BlockBuilderStatus(), 1024, 0);
-                String typeName = this.types.get(fieldId).getDisplayName();
-                logger.info(new StringBuilder().append("Type: ").append(typeName).toString());
+                Type type = types.get(fieldId);
+                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), 1024, 0);
+                String typeName = type.getDisplayName();
                 for (int i = 0; i < this.rowBatch.size; ++i) {
                     StringBuilder b = new StringBuilder();
                     int projIndex = this.rowBatch.projectedColumns[fieldId];
@@ -154,15 +154,22 @@ class PixelsPageSource
                         cv.stringifyValue(b, i);
                     }
                     if (typeName.equals("integer"))
-                        blockBuilder.writeInt(Integer.valueOf(b.toString()).intValue());
+//                        blockBuilder.writeInt(Integer.valueOf(b.toString()).intValue());
+                        type.writeLong(blockBuilder, Integer.valueOf(b.toString()).intValue());
                     else if (typeName.equals("double"))
-                        blockBuilder.writeLong(Long.valueOf(b.toString()).longValue());
+//                        blockBuilder.writeLong(Long.valueOf(b.substring(0, b.indexOf(".") == -1 ? b.length() : b.indexOf("."))).longValue());
+                        type.writeDouble(blockBuilder, Double.valueOf(b.substring(0, b.indexOf(".") == -1 ? b.length() : b.indexOf("."))).doubleValue());
                     else {
                         blockBuilder.appendNull();
                     }
-                    logger.info(new StringBuilder().append(this.rowBatch).append(", ").append(b.length()).append(", ").append(b.toString()).toString());
                 }
-                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+//                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                blocks[fieldId] = new LazyBlock(batchSize, new LazyBlockLoader<LazyBlock>() {
+                    @Override
+                    public void load(LazyBlock block) {
+                        block.setBlock(blockBuilder.build());
+                    }
+                });
             }
 
             if (this.rowBatch.endOfFile) {
@@ -182,17 +189,19 @@ class PixelsPageSource
 
     @Override
     public void close() {
-        // some hive input formats are broken and bad things can happen if you close them multiple times
-        if (closed) {
-            return;
-        }
-        closed = true;
         try {
             pixelsReader.close();
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.info("close error: " + e.getMessage());
         }
+
+        // some hive input formats are broken and bad things can happen if you close them multiple times
+        if (closed) {
+            return;
+        }
+        closed = true;
+
 
     }
 

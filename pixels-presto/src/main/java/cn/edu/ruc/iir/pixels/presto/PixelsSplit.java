@@ -66,11 +66,6 @@ public class PixelsSplit
         this.len = requireNonNull(len, "len is null");
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.constraint = requireNonNull(constraint, "constraint is null");
-        try {
-            log.info("Address Size: " + addresses.size() + ", " + addresses.get(0).toInetAddress().toString());
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        }
         log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
     }
 

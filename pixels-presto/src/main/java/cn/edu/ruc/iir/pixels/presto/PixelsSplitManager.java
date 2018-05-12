@@ -20,18 +20,15 @@ import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.facebook.presto.spi.predicate.Domain;
-import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.type.Type;
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -46,13 +43,13 @@ public class PixelsSplitManager
         implements ConnectorSplitManager {
     private final Logger log = Logger.get(PixelsSplitManager.class);
     private final String connectorId;
-    private final PixelsMetadataReader pixelsMetadataReader;
+    //    private final PixelsMetadataReader pixelsMetadataReader;
     private final FSFactory fsFactory;
 
     @Inject
-    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader, FSFactory fsFactory) {
+    public PixelsSplitManager(PixelsConnectorId connectorId, FSFactory fsFactory) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
+//        this.pixelsMetadataReader = requireNonNull(PixelsMetadataReader.Instance(), "pixelsMetadataReader is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
     }
 
@@ -60,41 +57,38 @@ public class PixelsSplitManager
     public ConnectorSplitSource getSplits(ConnectorTransactionHandle handle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy) {
         PixelsTableLayoutHandle layoutHandle = (PixelsTableLayoutHandle) layout;
         PixelsTableHandle tableHandle = layoutHandle.getTable();
-        PixelsTable table = pixelsMetadataReader.getTable(connectorId, tableHandle.getSchemaName(), tableHandle.getTableName());
+//        PixelsTable table = pixelsMetadataReader.getTable(connectorId, tableHandle.getSchemaName(), tableHandle.getTableName());
         // this can happen if table is removed during a query
-        checkState(table != null, "Table %s.%s no longer exists", tableHandle.getSchemaName(), tableHandle.getTableName());
+//        checkState(table != null, "Table %s.%s no longer exists", tableHandle.getSchemaName(), tableHandle.getTableName());
 
-        String tablePath = tableHandle.getPath();
         List<ConnectorSplit> splits = new ArrayList<>();
 
-        log.info("PixelsColumnHandle layoutHandle: " + layoutHandle.toString());
         TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
                 .transform(PixelsColumnHandle.class::cast);
-        log.info("PixelsColumnHandle constraint: " + constraint.toString());
+//        log.info("PixelsColumnHandle constraint: " + constraint.toString());
         // push down
-        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
-        log.info("domains size: " + domains.size());
-        List<PixelsColumnHandle> indexedColumns = new ArrayList<>();
-        // compose partitionId by using indexed column
-        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
-            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
-            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
-            Domain domain = entry.getValue();
-            if (domain.isSingleValue()) {
-                indexedColumns.add(column);
-                // Only one indexed column predicate can be pushed down.
-            }
-            log.info("domain: " + domain.isSingleValue());
-        }
-        log.info("indexedColumns: " + indexedColumns.toString());
-
-        List<Layout> catalogList = MetadataService.getLayoutsByTblName(tableHandle.getTableName());
+//        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
+//        log.info("domains size: " + domains.size());
+//        List<PixelsColumnHandle> indexedColumns = new ArrayList<>();
+//        // compose partitionId by using indexed column
+//        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
+//            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
+//            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
+//            Domain domain = entry.getValue();
+//            if (domain.isSingleValue()) {
+//                indexedColumns.add(column);
+//                // Only one indexed column predicate can be pushed down.
+//            }
+//            log.info("domain: " + domain.isSingleValue());
+//        }
+//        log.info("indexedColumns: " + indexedColumns.toString());
+        MetadataService metadataService = MetadataService.Instance();
+        List<Layout> catalogList = metadataService.getLayoutsByTblName(tableHandle.getTableName());
         List<Path> files = new ArrayList<>();
         for (Layout l : catalogList) {
             files.addAll(fsFactory.listFiles(l.getLayInitPath()));
-            log.info("Path: " + l.getLayInitPath());
+//            log.info("Path: " + l.getLayInitPath());
         }
-        log.info("Path: " + tablePath);
 
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,
                 tableHandle.getSchemaName(),
@@ -104,7 +98,7 @@ public class PixelsSplitManager
 
         Collections.shuffle(splits);
 
-        log.info("files forEach: " + files.size());
+//        log.info("files forEach: " + files.size());
         return new FixedSplitSource(splits);
     }
 }

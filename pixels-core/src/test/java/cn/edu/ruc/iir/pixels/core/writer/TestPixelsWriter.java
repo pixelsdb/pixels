@@ -94,8 +94,8 @@ public class TestPixelsWriter {
 
     @Test
     public void testWriter2() {
-        String filePath = "hdfs://10.77.40.236:9000/pixels/v1/point.pxl";
-        int rowNum = 6;
+        String filePath = "hdfs://10.77.40.236:9000/pixels/v1/point10001_9.pxl";
+        int rowNum = 10001;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());

@@ -34,8 +34,8 @@ public class PixelsConnectorFactory
 
     private final String name = "pixels";
 
-    public PixelsConnectorFactory() {
-        logger.info("Connector " + name + "initialized.");
+    public PixelsConnectorFactory()  {
+        logger.info("Connector " + name + " initialized.");
     }
 
     @Override

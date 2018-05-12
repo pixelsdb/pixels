@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
+import cn.edu.ruc.iir.pixels.common.DBUtils;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.*;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
@@ -36,9 +37,9 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         String split[] = body.split("==");
         String action = split[0];
         String params[] = new String[]{};
-        System.out.println("Body: " + body);
-        System.out.println("Action: " + action);
-        System.out.println();
+//        System.out.println("Body: " + body);
+//        System.out.println("Action: " + action);
+//        System.out.println();
         if (split.length > 1)
             params = split[1].split("&");
         if (action.equals("getSchemas")) {
@@ -59,6 +60,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
         } else if (action.equals("getColumns")) {
             BaseDao baseDao = new ColumnDao();
             sql = "select * from COLS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ?)) " : "");
+//            sql = "select * from COLS where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = '" + params[0] + "' and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = '" + params[1] + "'))";
             List<Column> columnList = baseDao.loadAll(sql, params);
             curResponse = JSON.toJSONString(columnList);
         } else {
@@ -79,12 +81,16 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
 //        System.out.println("Server -> read complete");
         //将发送缓冲区中数据全部写入SocketChannel
-        //ctx.flush();
+        ctx.flush();
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        System.out.println("Server Exception: ");
+        cause.printStackTrace();
         //释放资源
         ctx.close();
+        DBUtils db = DBUtils.Instance();
+        db.closeConn();
     }
 }

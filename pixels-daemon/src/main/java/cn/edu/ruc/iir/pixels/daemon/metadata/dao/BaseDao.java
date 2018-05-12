@@ -30,5 +30,4 @@ public interface BaseDao<T> {
     List<T> loadAll(T o);
 
     boolean update(T o, String[] params);
-
 }

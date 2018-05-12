@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
+import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import org.junit.Test;
 
@@ -14,10 +15,35 @@ import java.util.List;
  * @date: Create in 2018-01-30 15:36
  **/
 public class TestMetadataService {
+    MetadataService instance = MetadataService.Instance();
 
     @Test
     public void testGetSchemaNames() {
-        List<Schema> schemas = MetadataService.getSchemas();
-        System.out.println(schemas.size());
+        for (int i = 1; i <= 5; i++) {
+            Thread t = new Thread(() -> {
+                List<Schema> schemas = instance.getSchemas();
+                System.out.println("Thread: " + schemas.size());
+            });
+            t.start();
+        }
+
+        List<Schema> schemas = instance.getSchemas();
+        System.out.println("Command: " + schemas.size());
+    }
+
+    @Test
+    public void testGetColumnsBySchemaNameAndTblName() {
+        String schemaName = "pixels";
+        String tableName = "test";
+        for (int i = 1; i <= 20; i++) {
+            Thread t = new Thread(() -> {
+                List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+                if (columns.size() != 0)
+                    System.out.println("Thread: " + columns.size());
+            });
+            t.start();
+        }
+        List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+        System.out.println("Command: " + columns.size());
     }
 }

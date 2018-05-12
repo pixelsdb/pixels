@@ -12,5 +12,5 @@ public enum Action {
     getSchemas,
     getTables,
     getLayouts,
-    getColumns;
+    getColumns
 }
