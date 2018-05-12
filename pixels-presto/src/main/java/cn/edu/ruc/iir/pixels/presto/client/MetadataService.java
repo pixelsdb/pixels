@@ -10,6 +10,7 @@ import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * @version V1.0
@@ -20,18 +21,29 @@ import java.util.List;
  * @date: Create in 2018-01-21 21:54
  **/
 public class MetadataService {
-    static ConfigFactory config = ConfigFactory.Instance();
-    static String host = config.getProperty("metadata.server.host");
-    static int port = Integer.valueOf(config.getProperty("metadata.server.port"));
+    private static MetadataService instance = null;
+    private String host;
+    private int port;
     private static Logger logger = Logger.get(MetadataService.class);
 
-    static {
-        logger.info("MetadataService Request Addr = " + host + ":" + port);
+    private MetadataService() {
+        ConfigFactory config = ConfigFactory.Instance();
+//        host = "127.0.0.1";
+        host = config.getProperty("metadata.server.host");
+        port = Integer.valueOf(config.getProperty("metadata.server.port"));
     }
 
-    public static List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
-        List<Column> columns = new ArrayList<Column>();
-        MetadataClient client = new MetadataClient(Action.getColumns.toString());
+    public static MetadataService Instance() {
+        if (instance == null) {
+            instance = new MetadataService();
+        }
+        return instance;
+    }
+
+    public List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
+        List<Column> columns = new ArrayList<>();
+        String token = UUID.randomUUID().toString();
+        MetadataClient client = new MetadataClient(Action.getColumns.toString(), token);
         try {
             try {
                 client.connect(port, host, tableName + "&" + schemaName);
@@ -39,10 +51,10 @@ public class MetadataService {
                 e.printStackTrace();
             }
             while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
+                String res = client.getMap().get(token);
+                if (res != null) {
                     columns = JSON.parseArray(res, Column.class);
+                    client.getMap().remove(token);
                     break;
                 }
             }
@@ -52,9 +64,10 @@ public class MetadataService {
         return columns;
     }
 
-    public static List<Layout> getLayoutsByTblName(String tableName) {
+    public List<Layout> getLayoutsByTblName(String tableName) {
         List<Layout> layouts = new ArrayList<>();
-        MetadataClient client = new MetadataClient(Action.getLayouts.toString());
+        String token = UUID.randomUUID().toString();
+        MetadataClient client = new MetadataClient(Action.getLayouts.toString(), token);
         try {
             try {
                 client.connect(port, host, tableName);
@@ -62,9 +75,8 @@ public class MetadataService {
                 e.printStackTrace();
             }
             while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
+                String res = client.getMap().get(token);
+                if (res != null) {
                     layouts = JSON.parseArray(res, Layout.class);
                     break;
                 }
@@ -75,9 +87,10 @@ public class MetadataService {
         return layouts;
     }
 
-    public static List<Table> getTablesBySchemaName(String schemaName) {
+    public List<Table> getTablesBySchemaName(String schemaName) {
         List<Table> tables = new ArrayList<>();
-        MetadataClient client = new MetadataClient(Action.getTables.toString());
+        String token = UUID.randomUUID().toString();
+        MetadataClient client = new MetadataClient(Action.getTables.toString(), token);
         try {
             try {
                 client.connect(port, host, schemaName);
@@ -85,9 +98,8 @@ public class MetadataService {
                 e.printStackTrace();
             }
             while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
+                String res = client.getMap().get(token);
+                if (res != null) {
                     tables = JSON.parseArray(res, Table.class);
                     break;
                 }
@@ -98,9 +110,10 @@ public class MetadataService {
         return tables;
     }
 
-    public static List<Schema> getSchemas() {
+    public List<Schema> getSchemas() {
         List<Schema> schemas = new ArrayList<>();
-        MetadataClient client = new MetadataClient(Action.getSchemas.toString());
+        String token = UUID.randomUUID().toString();
+        MetadataClient client = new MetadataClient(Action.getSchemas.toString(), token);
         try {
             try {
                 client.connect(port, host, null);
@@ -108,9 +121,8 @@ public class MetadataService {
                 e.printStackTrace();
             }
             while (true) {
-                int count = client.getQueue().size();
-                if (count > 0) {
-                    String res = client.getQueue().poll();
+                String res = client.getMap().get(token);
+                if (res != null) {
                     schemas = JSON.parseArray(res, Schema.class);
                     break;
                 }

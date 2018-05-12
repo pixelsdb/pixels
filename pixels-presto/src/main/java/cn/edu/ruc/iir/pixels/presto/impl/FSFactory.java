@@ -98,7 +98,7 @@ public final class FSFactory {
 
     public List<Path> listFiles(String path) {
         Path dirPath = new Path(path);
-        log.info("path: " + path);
+//        log.info("path: " + path);
         List<Path> files = new ArrayList<>();
         if (!getFS().isPresent()) {
             throw new FileSystemNotFoundException("");
@@ -114,7 +114,7 @@ public final class FSFactory {
                 files.add(f.getPath());
             }
         }
-        log.info("files size: " + files.size());
+//        log.info("files size: " + files.size());
         return files;
     }
 
@@ -140,7 +140,7 @@ public final class FSFactory {
         for (BlockLocation location : locations) {
             try {
                 addresses.addAll(toHostAddress(location.getHosts()));
-                log.info("FSFactory addresses: " + toHostAddress(location.getHosts()));
+//                log.info("FSFactory addresses: " + toHostAddress(location.getHosts()));
             } catch (IOException e) {
                 log.error(e);
             }

@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
+import cn.edu.ruc.iir.pixels.common.DBUtils;
 import cn.edu.ruc.iir.pixels.common.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import io.netty.bootstrap.ServerBootstrap;
@@ -18,6 +19,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
  * @date: Create in 2018-01-26 15:09
  **/
 public class MetadataServer implements Server {
+    DBUtils db = DBUtils.Instance();
     private boolean running = false;
     private int port;
     private EventLoopGroup boss = null;
@@ -73,6 +75,7 @@ public class MetadataServer implements Server {
             this.running = false;
             boss.shutdownGracefully();
             worker.shutdownGracefully();
+            db.closeConn();
         }
     }
 }

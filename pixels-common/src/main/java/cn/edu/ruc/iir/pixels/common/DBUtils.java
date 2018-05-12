@@ -4,6 +4,7 @@ import io.airlift.log.Logger;
 
 import java.sql.*;
 
+
 public class DBUtils {
 
     private static Logger log = Logger.get(DBUtils.class);
@@ -48,11 +49,31 @@ public class DBUtils {
                 statement.close();
             if (psmt != null)
                 psmt.close();
+        } catch (Exception e) {
+            log.error("Close error! errmsg: " + e.getMessage());
+        }
+    }
+
+    public void closeConn() {
+        try {
             if (conn != null)
                 conn.close();
         } catch (Exception e) {
             log.error("Close error! errmsg: " + e.getMessage());
         }
+    }
+
+    public Connection getConnection() {
+        try {
+            if (conn != null && conn.isValid(1000 * 30)) {
+                return conn;
+            } else {
+                conn = DriverManager.getConnection(URL, USERID, USERPASSWORD);
+            }
+        } catch (Exception e) {
+            log.error("Get connection error: " + e.getMessage());
+        }
+        return conn;
     }
 
     public ResultSet getQuery(String SQL) {

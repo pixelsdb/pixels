@@ -7,6 +7,7 @@ import com.alibaba.fastjson.JSON;
 import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
+import java.util.UUID;
 
 /**
  * @version V1.0
@@ -20,14 +21,15 @@ public class TestClient {
 
     public static void main(String[] args) {
         String action = "getColumns";
-        String paras = "test&default";
+        String paras = "test&pixels";
         Scanner sc = new Scanner(System.in);
         System.out.print("Input your action: ");
         while (sc.hasNext()) {
             action = sc.next();
             System.out.print("Input your paras(Separated by &): ");
             paras = sc.next();
-            MetadataClient client = new MetadataClient(action);
+            String token = UUID.randomUUID().toString();
+            MetadataClient client = new MetadataClient(action, token);
             try {
                 try {
                     client.connect(18888, "127.0.0.1", paras);
@@ -36,9 +38,8 @@ public class TestClient {
                 }
                 System.out.println("Begin: " + DateUtil.formatTime(new Date()));
                 while (true) {
-                    int count = client.getQueue().size();
-                    if (count > 0) {
-                        String res = client.getQueue().poll();
+                    String res = client.getMap().get(token);
+                    if (res != null) {
                         if (action.equals("Time")) {
                             System.out.println(res);
                         } else if (action.equals("getSchemas")) {

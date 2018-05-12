@@ -9,6 +9,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -22,14 +24,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class MetadataClient {
 
     private String action;
-    private ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<String>();
+    private String token;
+    private Map<String, String> map = new HashMap<String, String>();
 
-    public MetadataClient(String action) {
+    public MetadataClient(String action, String token) {
         this.action = action;
+        this.token = token;
     }
 
-    public ConcurrentLinkedQueue<String> getQueue() {
-        return queue;
+    public Map<String, String> getMap() {
+        return map;
     }
 
     public void connect(int port, String host, String paras) throws Exception {
@@ -46,7 +50,7 @@ public class MetadataClient {
                         @Override
                         protected void initChannel(SocketChannel ch) throws Exception {
                             ch.pipeline().addLast(
-                                    new MetadataClientHandler(action, queue, paras));
+                                    new MetadataClientHandler(action, token, map, paras));
                         }
                     });
 

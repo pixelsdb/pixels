@@ -52,7 +52,7 @@ public class PixelsMetadata
     @Inject
     public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
+        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader.Instance(), "pixelsMetadataReader is null");
     }
 
     @Override
@@ -62,6 +62,7 @@ public class PixelsMetadata
 
     public List<String> listSchemaNamesInternal() {
         List<String> schemaNameList = pixelsMetadataReader.getSchemaNames();
+        logger.info("PixelsMetadata listSchemaNames： " + schemaNameList.toString());
         return schemaNameList;
     }
 
@@ -82,7 +83,7 @@ public class PixelsMetadata
         SchemaTableName tableName = tableHandle.toSchemaTableName();
 
         // create PixelsTableLayoutHandle
-        PixelsTableLayoutHandle tableLayout = PixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
+        PixelsTableLayoutHandle tableLayout = pixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
 
         ConnectorTableLayout layout = getTableLayout(session, tableLayout);
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
@@ -102,7 +103,7 @@ public class PixelsMetadata
     }
 
     public ConnectorTableMetadata getTableMetadata(SchemaTableName tableName) {
-        PixelsTable table = PixelsMetadataReader.getTable(connectorId, tableName.getSchemaName(), tableName.getTableName());
+        PixelsTable table = pixelsMetadataReader.getTable(connectorId, tableName.getSchemaName(), tableName.getTableName());
         List<ColumnMetadata> columns = table.getColumns().stream().map(PixelsColumnHandle::getColumnMetadata)
                 .collect(toList());
         return new ConnectorTableMetadata(tableName, columns);
@@ -123,6 +124,7 @@ public class PixelsMetadata
                 builder.add(new SchemaTableName(schemaName, tableName));
             }
         }
+        logger.info("PixelsMetadata listTables： " + builder.build().toString());
         return builder.build();
     }
 
@@ -140,6 +142,7 @@ public class PixelsMetadata
         for (PixelsColumnHandle column : table.getColumns()) {
             columnHandles.put(column.getColumnName(), column);
         }
+        logger.info("PixelsMetadata getColumnHandles： " + columnHandles.build().values());
         return columnHandles.build();
     }
 
@@ -154,6 +157,7 @@ public class PixelsMetadata
                 columns.put(tableName, tableMetadata.getColumns());
             }
         }
+        logger.info("PixelsMetadata listTableColumns： " + columns.build().values());
         return columns.build();
     }
 
@@ -167,6 +171,7 @@ public class PixelsMetadata
 
     @Override
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
+        logger.info("PixelsMetadata getColumnMetadata： " + columnHandle.toString());
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
 
