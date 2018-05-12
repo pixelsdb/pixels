@@ -44,12 +44,12 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
                 .collect(toList());
 
         logger.info("PixelsPageSourceProvider columns: " + columns.size());
-        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.size());
+        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.toString());
 
         List<PixelsColumnHandle> hdfsColumns = columns.stream()
                 .map(col -> (PixelsColumnHandle) col)
                 .collect(Collectors.toList());
-        logger.info("PixelsPageSourceProvider hdfsColumns: " + hdfsColumns.size());
+        logger.info("PixelsPageSourceProvider hdfsColumns: " + hdfsColumns.toString());
 
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;

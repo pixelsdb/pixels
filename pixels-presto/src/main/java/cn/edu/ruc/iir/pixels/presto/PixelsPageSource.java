@@ -144,7 +144,7 @@ class PixelsPageSource
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId) {
                 Type type = types.get(fieldId);
-                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), 1024, 0);
+                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
                 String typeName = type.getDisplayName();
                 for (int i = 0; i < this.rowBatch.size; ++i) {
                     StringBuilder b = new StringBuilder();
