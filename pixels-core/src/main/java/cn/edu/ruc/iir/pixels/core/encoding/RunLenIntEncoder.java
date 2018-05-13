@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.encoding;
 
-import cn.edu.ruc.iir.pixels.core.Constants;
+import cn.edu.ruc.iir.pixels.common.Constants;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 
 import java.io.ByteArrayOutputStream;

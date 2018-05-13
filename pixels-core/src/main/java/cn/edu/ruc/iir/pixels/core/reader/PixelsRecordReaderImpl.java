@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.ChunkSeq;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;

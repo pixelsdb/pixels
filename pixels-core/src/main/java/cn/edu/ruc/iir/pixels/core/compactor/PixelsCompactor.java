@@ -1,10 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.compactor;
 
-import cn.edu.ruc.iir.pixels.core.Constants;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSWriter;
-import cn.edu.ruc.iir.pixels.core.PhysicalReaderUtil;
-import cn.edu.ruc.iir.pixels.core.PhysicalWriterUtil;
+import cn.edu.ruc.iir.pixels.common.Constants;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSWriter;
+import cn.edu.ruc.iir.pixels.common.PhysicalReaderUtil;
+import cn.edu.ruc.iir.pixels.common.PhysicalWriterUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
