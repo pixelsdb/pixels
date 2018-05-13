@@ -6,21 +6,18 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.facebook.presto.spi.block.LazyBlock;
-import com.facebook.presto.spi.block.LazyBlockLoader;
+import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
-import javax.inject.Inject;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +25,7 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-class PixelsPageSource
-        implements ConnectorPageSource {
+class PixelsPageSource implements ConnectorPageSource {
     private static Logger logger = Logger.get(PixelsPageSource.class);
     private final int MAX_BATCH_SIZE = 1024;
     private final int NULL_ENTRY_SIZE = 0;
@@ -145,24 +141,33 @@ class PixelsPageSource
             Block[] blocks = new Block[this.pixelsColumnIndexes.length];
 //            logger.info(new StringBuilder().append("getNextPage blocks: ").append(blocks.length).toString());
 
-            for (int fieldId = 0; fieldId < blocks.length; ++fieldId) {
+            for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
+            {
                 Type type = types.get(fieldId);
                 BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
                 String typeName = type.getDisplayName();
-                for (int i = 0; i < this.rowBatch.size; ++i) {
-                    StringBuilder b = new StringBuilder();
-                    int projIndex = this.rowBatch.projectedColumns[fieldId];
-                    ColumnVector cv = this.rowBatch.cols[projIndex];
-                    if (cv != null) {
-                        cv.stringifyValue(b, i);
+                int projIndex = this.rowBatch.projectedColumns[fieldId];
+                ColumnVector cv = this.rowBatch.cols[projIndex];
+                if (typeName.equals("integer"))
+                {
+                    LongColumnVector lcv = (LongColumnVector) cv;
+                    for (int i = 0; i < this.rowBatch.size; ++i)
+                    {
+                        type.writeLong(blockBuilder, lcv.vector[i]);
                     }
-                    if (typeName.equals("integer"))
-//                        blockBuilder.writeInt(Integer.valueOf(b.toString()).intValue());
-                        type.writeLong(blockBuilder, Integer.valueOf(b.toString()).intValue());
-                    else if (typeName.equals("double"))
-//                        blockBuilder.writeLong(Long.valueOf(b.substring(0, b.indexOf(".") == -1 ? b.length() : b.indexOf("."))).longValue());
-                        type.writeDouble(blockBuilder, Double.valueOf(b.substring(0, b.indexOf(".") == -1 ? b.length() : b.indexOf("."))).doubleValue());
-                    else {
+                }
+                else if (typeName.equals("double"))
+                {
+                    DoubleColumnVector dcv = (DoubleColumnVector) cv;
+                    for (int i = 0; i < this.rowBatch.size; ++i)
+                    {
+                        type.writeDouble(blockBuilder, dcv.vector[i]);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < this.rowBatch.size; ++i)
+                    {
                         blockBuilder.appendNull();
                     }
                 }

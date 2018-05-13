@@ -13,6 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.ConfigFactory;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -23,68 +24,57 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
+import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystemNotFoundException;
 import java.util.*;
 
 public final class FSFactory {
-    private Configuration conf = new Configuration();
-    private FileSystem fileSystem;
-    private final PixelsConfig config;
-    private final Logger log = Logger.get(FSFactory.class.getName());
+    private static FileSystem FileSystem;
+    private static final PixelsConfig PixelsConfig;
+    private static final Logger log = Logger.get(FSFactory.class.getName());
 
-    @Inject
-    public FSFactory(PixelsConfig config) {
-        this.config = config;
+    static
+    {
+        PixelsConfig = new PixelsConfig();
+        Configuration hdfsConfig = new Configuration(false);
+        File hdfsConfigDir = new File(ConfigFactory.Instance().getProperty("hdfs.config.dir"));
+        hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
         try {
-            this.fileSystem = FileSystem.get(conf);
+            if (hdfsConfigDir.exists() && hdfsConfigDir.isDirectory())
+            {
+                File[] hdfsConfigFiles = hdfsConfigDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
+                if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2)
+                {
+                    hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
+                    hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
+                }
+            }
+            else
+            {
+                log.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
+            }
+
+            FileSystem = FileSystem.get(hdfsConfig);
 //            fileSystem.setWorkingDirectory(new Path(config.getHDFSWarehouse()));
         } catch (IOException e) {
             e.printStackTrace();
+            log.error(e);
         }
     }
+
+    @Inject
+    public FSFactory() { }
 
     public Optional<FileSystem> getFileSystem() {
-        return Optional.of(fileSystem);
-    }
-
-    public Optional<Boolean> getFS() {
-        return getFS(config.getHDFSWarehouse());
-    }
-
-    public Optional<Boolean> getFS(String path) {
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        if (!path.isEmpty()) {
-            try {
-                return Optional.of(fileSystem.exists(new Path(config.getHDFSWarehouse())));
-            } catch (IOException e) {
-                log.error(e);
-                return Optional.empty();
-            }
-        }
-        return Optional.empty();
-    }
-
-    public Optional<FileSystem> getFS(Path path) {
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        try {
-            return Optional.of(path.getFileSystem(conf));
-        } catch (IOException e) {
-            log.error(e);
-            return Optional.empty();
-        }
+        return Optional.of(FileSystem);
     }
 
     public List<Path> listFiles(Path dirPath) {
         List<Path> files = new ArrayList<>();
-        if (!getFS().isPresent()) {
-            throw new FileSystemNotFoundException("");
-        }
         FileStatus[] fileStatuses = new FileStatus[0];
         try {
-            fileStatuses = fileSystem.listStatus(dirPath);
+            fileStatuses = FileSystem.listStatus(dirPath);
         } catch (IOException e) {
             log.error(e);
         }
@@ -100,12 +90,10 @@ public final class FSFactory {
         Path dirPath = new Path(path);
 //        log.info("path: " + path);
         List<Path> files = new ArrayList<>();
-        if (!getFS().isPresent()) {
-            throw new FileSystemNotFoundException("");
-        }
+
         FileStatus[] fileStatuses = new FileStatus[0];
         try {
-            fileStatuses = fileSystem.listStatus(dirPath);
+            fileStatuses = FileSystem.listStatus(dirPath);
         } catch (IOException e) {
             log.error(e);
         }
@@ -121,19 +109,16 @@ public final class FSFactory {
     // file isExist
     public boolean isTableExists(String metatable) throws IOException {
         Path path = new Path(metatable);
-        boolean exist = fileSystem.exists(path);
+        boolean exist = FileSystem.exists(path);
         return exist;
     }
 
     // assume that a file contains only a block
     public List<HostAddress> getBlockLocations(Path file, long start, long len) {
         Set<HostAddress> addresses = new HashSet<>();
-        if (!getFS().isPresent()) {
-            throw new FileSystemNotFoundException("");
-        }
         BlockLocation[] locations = new BlockLocation[0];
         try {
-            locations = fileSystem.getFileBlockLocations(file, start, len);
+            locations = FileSystem.getFileBlockLocations(file, start, len);
         } catch (IOException e) {
             log.error(e);
         }
@@ -157,7 +142,7 @@ public final class FSFactory {
     }
 
     private Path formPath(String dirOrFile) {
-        String base = config.getHDFSWarehouse();
+        String base = PixelsConfig.getHDFSWarehouse();
         String path = dirOrFile;
         while (base.endsWith("/")) {
             base = base.substring(0, base.length() - 2);
@@ -171,7 +156,7 @@ public final class FSFactory {
     public List<LocatedBlock> listLocatedBlocks(Path path) {
         FSDataInputStream in = null;
         try {
-            in = fileSystem.open(path);
+            in = FileSystem.open(path);
         } catch (IOException e) {
             e.printStackTrace();
         }
