@@ -17,11 +17,11 @@ import java.util.List;
  * @date: Create in 2018-01-22 21:53
  **/
 public class TestFSFactory {
-    private final FSFactory fsFactory = new FSFactory(new PixelsConfig());
+    private final FSFactory fsFactory = new FSFactory();
 
     @Test
     public void testListFiles() {
-        String tablePath = "pixels/db/default/test";
+        String tablePath = "/pixels/v2";
         List<Path> files = fsFactory.listFiles(tablePath);
         for (Path s : files) {
             System.out.println(s.getName());

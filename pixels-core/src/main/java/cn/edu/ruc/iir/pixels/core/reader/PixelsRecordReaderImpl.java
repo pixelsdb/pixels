@@ -36,6 +36,7 @@ public class PixelsRecordReaderImpl
     private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
+    private boolean enableCache = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
@@ -232,6 +233,9 @@ public class PixelsRecordReaderImpl
         }
 
         // read chunk offset and length of each target column chunks
+        // cache
+        if (enableCache) {
+        }
         List<ChunkId> chunks = new ArrayList<>();
         for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
             PixelsProto.RowGroupIndex rowGroupIndex =
@@ -282,7 +286,6 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-//                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
                     chunkBuffers[rgId * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
