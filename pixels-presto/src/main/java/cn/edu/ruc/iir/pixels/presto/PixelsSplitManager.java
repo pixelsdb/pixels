@@ -67,21 +67,21 @@ public class PixelsSplitManager
         TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
                 .transform(PixelsColumnHandle.class::cast);
         // push down
-        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
-        log.info("domains size: " + domains.size());
-        log.info("domains values: " + domains.values());
+//        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
+//        log.info("domains size: " + domains.size());
+//        log.info("domains values: " + domains.values());
 //        List<PixelsColumnHandle> indexedColumns = new ArrayList<>();
         // compose partitionId by using indexed column
-        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
-            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
-            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
-            Domain domain = entry.getValue();
+//        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
+//            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
+//            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
+//            Domain domain = entry.getValue();
 //            if (domain.isSingleValue()) {
 //                indexedColumns.add(column);
 //                // Only one indexed column predicate can be pushed down.
 //            }
-            log.info("domain: " + domain.isSingleValue());
-        }
+//            log.info("domain: " + domain.isSingleValue());
+//        }
 //        log.info("indexedColumns: " + indexedColumns.toString());
         MetadataService metadataService = MetadataService.Instance();
         List<Layout> catalogList = metadataService.getLayoutsByTblName(tableHandle.getTableName());

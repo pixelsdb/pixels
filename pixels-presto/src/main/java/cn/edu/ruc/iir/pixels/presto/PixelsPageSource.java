@@ -1,8 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -14,13 +12,16 @@ import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -54,7 +55,7 @@ class PixelsPageSource implements ConnectorPageSource {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
     }
 
-    public PixelsPageSource(List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String path, String connectorId) {
+    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String connectorId) {
         this.connectorId = connectorId;
         ArrayList<Type> columnTypes = new ArrayList<>();
         for (PixelsColumnHandle column : columnHandles) {
@@ -65,8 +66,9 @@ class PixelsPageSource implements ConnectorPageSource {
         this.pageBuilder = new PageBuilder(this.types);
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
-//        this.path = path;
-        getPixelsReaderBySchema();
+//        this.path = split.getPath();
+
+        getPixelsReaderBySchema(split);
 
         this.size = columnHandles.size();
 //        this.constantBlocks = new Block[size];
@@ -74,9 +76,8 @@ class PixelsPageSource implements ConnectorPageSource {
         this.recordReader = this.pixelsReader.read(this.option);
     }
 
-    private void getPixelsReaderBySchema() {
+    private void getPixelsReaderBySchema(PixelsSplit split) {
         StringBuffer colStr = new StringBuffer();
-//        String schemaStr = "struct<";
         for (PixelsColumnHandle columnHandle : this.columns) {
             String name = columnHandle.getColumnName();
             String type = columnHandle.getColumnType().toString();
@@ -84,29 +85,32 @@ class PixelsPageSource implements ConnectorPageSource {
             if (type.equals("integer")) {
                 type = "int";
             }
-//            schemaStr = new StringBuilder().append(schemaStr).append(name).append(":").append(type).append(",").toString();
         }
         String colsStr = colStr.toString();
         logger.info(new StringBuilder().append("getPixelsReaderBySchema colStr: ").append(colsStr).toString());
         String[] cols = colsStr.substring(0, colsStr.length() - 1).split(",");
 
-//        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
-//        this.schema = TypeDescription.fromString(schemaStr);
+//        Map<PixelsColumnHandle, Domain> domains = split.getConstraint().getDomains().get();
+//        List<TupleDomainPixelsPredicate.ColumnReference<String>> columnReferences = ImmutableList.<TupleDomainPixelsPredicate.ColumnReference<String>>builder().build();
+//        int num = 0;
+//        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
+//            PixelsColumnHandle column = entry.getKey();
+//            logger.info("column: " + column.getColumnName() + " " + column.getColumnType());
+//            columnReferences.add(new TupleDomainPixelsPredicate.ColumnReference<>(column.getColumnName(), num++, column.getColumnType()));
+//        }
+//        PixelsPredicate predicate = new TupleDomainPixelsPredicate(split.getConstraint(), columnReferences);
 
         this.option = new PixelsReaderOption();
         this.option.skipCorruptRecords(true);
         this.option.tolerantSchemaEvolution(true);
         this.option.includeCols(cols);
+//        this.option.predicate(predicate);
 
-//        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
-//        logger.info(new StringBuilder().append("PixelsPageResource Schema: ").append(schemaStr).toString());
-//        this.schema = TypeDescription.fromString(schemaStr);
         try {
             this.pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(this.fsFactory
                             .getFileSystem().get())
-                    .setPath(new Path(path))
-//                    .setSchema(this.schema)
+                    .setPath(new Path(split.getPath()))
                     .build();
         } catch (IOException e) {
             e.printStackTrace();
@@ -114,7 +118,7 @@ class PixelsPageSource implements ConnectorPageSource {
     }
 
     public long getCompletedBytes() {
-        return this.sizeOfData;
+        return recordReader.getCompletedBytes();
     }
 
     public long getReadTimeNanos() {
@@ -129,7 +133,6 @@ class PixelsPageSource implements ConnectorPageSource {
         if (this.nanoStart == 0L)
             this.nanoStart = System.nanoTime();
         try {
-//            logger.info(new StringBuilder().append("getNextPage batchId: ").append(this.batchId).toString());
             this.batchId += 1;
             this.rowBatch = this.recordReader.readBatch(10000);
             int batchSize = this.rowBatch.size;
@@ -138,9 +141,7 @@ class PixelsPageSource implements ConnectorPageSource {
                 logger.info("getNextPage close");
                 return null;
             }
-//            logger.info(new StringBuilder().append("getNextPage batchSize: ").append(batchSize).toString());
             Block[] blocks = new Block[this.size];
-//            logger.info(new StringBuilder().append("getNextPage blocks: ").append(blocks.length).toString());
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
             {

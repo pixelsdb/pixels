@@ -50,6 +50,6 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
         logger.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
-        return new PixelsPageSource(pixelsColumns, fsFactory, pixelsSplit.getPath(), connectorId);
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
     }
 }

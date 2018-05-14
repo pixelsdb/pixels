@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.ChunkSeq;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
@@ -36,6 +36,7 @@ public class PixelsRecordReaderImpl
     private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
+    private boolean enableCache = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
@@ -52,6 +53,8 @@ public class PixelsRecordReaderImpl
     private byte[][] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
+    private long completedBytes = 0L;
+
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
                                   PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
@@ -67,12 +70,12 @@ public class PixelsRecordReaderImpl
     private void checkBeforeRead()
     {
         // get file schema
-        List<PixelsProto.Type> colTypes = footer.getTypesList();
-        if (colTypes == null || colTypes.isEmpty()) {
+        List<PixelsProto.Type> fileColTypes = footer.getTypesList();
+        if (fileColTypes == null || fileColTypes.isEmpty()) {
             checkValid = false;
             return;
         }
-        fileSchema = TypeDescription.createSchema(colTypes);
+        fileSchema = TypeDescription.createSchema(fileColTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
             checkValid = false;
             return;
@@ -86,15 +89,20 @@ public class PixelsRecordReaderImpl
         // filter included columns
         int includedColumnsNum = 0;
         String[] cols = option.getIncludedCols();
+        // if size of cols is 0, create an empty row batch
         if (cols.length == 0) {
-            checkValid = false;
+            TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
+            this.resultRowBatch = resultSchema.createRowBatch(0);
+            resultRowBatch.selectedInUse = false;
+            resultRowBatch.selected = null;
+            resultRowBatch.projectionSize = 0;
             return;
         }
         List<Integer> userColsList = new ArrayList<>();
-        this.includedColumns = new boolean[colTypes.size()];
+        this.includedColumns = new boolean[fileColTypes.size()];
         for (String col : cols) {
-            for (int j = 0; j < colTypes.size(); j++) {
-                if (col.equalsIgnoreCase(colTypes.get(j).getName())) {
+            for (int j = 0; j < fileColTypes.size(); j++) {
+                if (col.equalsIgnoreCase(fileColTypes.get(j).getName())) {
                     userColsList.add(j);
                     includedColumns[j] = true;
                     includedColumnsNum++;
@@ -137,7 +145,7 @@ public class PixelsRecordReaderImpl
         // create result vectorized row batch
         List<PixelsProto.Type> resultTypes = new ArrayList<>();
         for (int resultColumn : resultColumns) {
-            resultTypes.add(colTypes.get(resultColumn));
+            resultTypes.add(fileColTypes.get(resultColumn));
         }
         TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
         this.resultRowBatch = resultSchema.createRowBatch();
@@ -232,6 +240,9 @@ public class PixelsRecordReaderImpl
         }
 
         // read chunk offset and length of each target column chunks
+        // cache
+        if (enableCache) {
+        }
         List<ChunkId> chunks = new ArrayList<>();
         for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
             PixelsProto.RowGroupIndex rowGroupIndex =
@@ -265,16 +276,17 @@ public class PixelsRecordReaderImpl
         this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
         try {
             long readDiskBegin = System.currentTimeMillis();
-            for (ChunkSeq block : chunkSeqs) {
-                if (block.getLength() == 0) {
+            for (ChunkSeq seq : chunkSeqs) {
+                if (seq.getLength() == 0) {
                     continue;
                 }
-                int offset = (int) block.getOffset();
-                int length = (int) block.getLength();
+                int offset = (int) seq.getOffset();
+                int length = (int) seq.getLength();
+                completedBytes += length;
                 byte[] chunkBlockBuffer = new byte[length];
                 physicalFSReader.seek(offset);
                 physicalFSReader.readFully(chunkBlockBuffer);
-                List<ChunkId> chunkIds = block.getSortedChunks();
+                List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
                 for (ChunkId chunkId : chunkIds) {
                     int chunkLength = (int) chunkId.getLength();
@@ -282,7 +294,6 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-//                    ByteBuf chunkBuf = Unpooled.wrappedBuffer(chunkBytes);
                     chunkBuffers[rgId * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
@@ -309,6 +320,13 @@ public class PixelsRecordReaderImpl
     @Override
     public VectorizedRowBatch readBatch(int batchSize) throws IOException
     {
+        // project nothing, must be count(*)
+        if (resultRowBatch.projectionSize == 0) {
+            resultRowBatch.size = postScript.getNumberOfRows();
+            resultRowBatch.endOfFile = true;
+            return resultRowBatch;
+        }
+
         resultRowBatch.reset();
 
         if (!checkValid) {
@@ -426,17 +444,25 @@ public class PixelsRecordReaderImpl
         return false;
     }
 
+    @Override
+    public long getCompletedBytes()
+    {
+        return completedBytes;
+    }
+
     /**
      * Cleanup and release resources
      */
     @Override
     public void close()
     {
+        completedBytes = 0;
         // release chunk buffer
-        for (int targetRG : targetRGs) {
-            for (int targetColumn : targetColumns) {
-                byte[] chunkBuf = chunkBuffers[targetRG * includedColumns.length + targetColumn];
-                chunkBuf = null;
+        if (targetRGs != null) {
+            for (int targetRG : targetRGs) {
+                for (int targetColumn : targetColumns) {
+                    chunkBuffers[targetRG * includedColumns.length + targetColumn] = null;
+                }
             }
         }
     }

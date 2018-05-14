@@ -52,6 +52,8 @@ public interface PixelsRecordReader
     @Deprecated
     boolean skip(long rowNum) throws IOException;
 
+    long getCompletedBytes();
+
     /**
      * Cleanup and release resources
      * @throws java.io.IOException

@@ -51,9 +51,8 @@ public class PixelsCacheManager
             }
         }
         indexFile.putShortVolatile(2, (short) 0);
-        // collect cache missing messages from mq, and sort cache missings by their missing counts
-        try
-        {
+        // collect cache missing messages from mq, and sort caches by their missing counts
+        try {
             mqReader.open();
             while (mqReader.next()) {
                 ColumnletId columnletId = new ColumnletId();
@@ -68,8 +67,7 @@ public class PixelsCacheManager
                 }
             }
         }
-        catch (IOException e)
-        {
+        catch (IOException e) {
             e.printStackTrace();
         }
         // read all columnlets in cache, and sort by their access counts
