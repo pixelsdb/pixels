@@ -1,6 +1,6 @@
-package cn.edu.ruc.iir.pixels.daemon.metric;
+package cn.edu.ruc.iir.pixels.common.metrics;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import io.prometheus.client.Collector;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.common.TextFormat;

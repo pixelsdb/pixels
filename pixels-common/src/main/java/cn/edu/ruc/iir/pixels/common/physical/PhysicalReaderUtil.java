@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.common;
+package cn.edu.ruc.iir.pixels.common.physical;
 
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;

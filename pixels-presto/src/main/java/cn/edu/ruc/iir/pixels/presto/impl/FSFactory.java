@@ -13,7 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;

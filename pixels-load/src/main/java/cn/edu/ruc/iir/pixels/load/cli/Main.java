@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.common.DBUtils;
-import cn.edu.ruc.iir.pixels.common.DateUtil;
-import cn.edu.ruc.iir.pixels.common.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;

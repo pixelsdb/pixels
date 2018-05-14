@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.common.LogFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;

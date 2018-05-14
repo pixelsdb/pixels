@@ -25,6 +25,12 @@
         </dependency>
 
         <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
         </dependency>

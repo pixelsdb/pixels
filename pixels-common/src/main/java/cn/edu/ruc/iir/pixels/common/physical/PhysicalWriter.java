@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.common;
+package cn.edu.ruc.iir.pixels.common.physical;
 
 import java.io.Closeable;
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.common;
+package cn.edu.ruc.iir.pixels.common.utils;
 
 import io.airlift.log.Logger;
 

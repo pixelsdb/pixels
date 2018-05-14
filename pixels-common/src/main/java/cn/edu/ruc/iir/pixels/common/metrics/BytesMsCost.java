@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.daemon.metric;
+package cn.edu.ruc.iir.pixels.common.metrics;
 
 public class BytesMsCost
 {

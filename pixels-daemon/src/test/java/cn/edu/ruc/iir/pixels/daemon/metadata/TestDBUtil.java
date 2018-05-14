@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.DBUtils;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
 import org.junit.Test;
 
 import java.sql.ResultSet;

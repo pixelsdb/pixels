@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metric;
 
+import cn.edu.ruc.iir.pixels.common.metrics.NamedCost;
+import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import com.alibaba.fastjson.JSON;
 import org.junit.Test;
 

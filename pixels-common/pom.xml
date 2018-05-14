@@ -29,6 +29,14 @@
             <groupId>io.airlift</groupId>
             <artifactId>log</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_pushgateway</artifactId>
+        </dependency>
         <!-- testing -->
         <dependency>
             <groupId>org.junit.platform</groupId>

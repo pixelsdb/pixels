@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.split.cmd;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.presto.split.domain.AccessPattern;
 import cn.edu.ruc.iir.pixels.presto.split.domain.ColumnSet;
 import cn.edu.ruc.iir.pixels.presto.split.index.IndexFactory;

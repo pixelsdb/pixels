@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metric;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import org.junit.Test;
 

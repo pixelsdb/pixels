@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
-import cn.edu.ruc.iir.pixels.common.DateUtil;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import com.alibaba.fastjson.JSON;
 

@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.daemon.metric;
+package cn.edu.ruc.iir.pixels.common.metrics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,5 +52,12 @@ public class ReadPerfMetrics
     public void addLambda(NamedCost c)
     {
         this.lambda.add(c);
+    }
+
+    public void clear()
+    {
+        seqRead.clear();
+        seek.clear();
+        lambda.clear();
     }
 }

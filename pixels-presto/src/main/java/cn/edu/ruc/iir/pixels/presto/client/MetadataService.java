@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
