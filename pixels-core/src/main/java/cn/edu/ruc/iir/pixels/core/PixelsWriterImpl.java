@@ -1,5 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
+import cn.edu.ruc.iir.pixels.common.Constants;
+import cn.edu.ruc.iir.pixels.common.PhysicalWriter;
+import cn.edu.ruc.iir.pixels.common.PhysicalWriterUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
@@ -57,7 +60,7 @@ public class PixelsWriterImpl
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
     private long fileContentLength;
-    private long fileRowNum;
+    private int fileRowNum;
 
     private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;

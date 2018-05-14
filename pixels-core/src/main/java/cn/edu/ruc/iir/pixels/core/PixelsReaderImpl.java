@@ -1,5 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
+import cn.edu.ruc.iir.pixels.common.Constants;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsReaderException;
@@ -69,16 +72,10 @@ public class PixelsReaderImpl
             return this;
         }
 
-        public Builder setSchema(TypeDescription schema)
-        {
-            this.builderSchema = requireNonNull(schema);
-            return this;
-        }
-
         public PixelsReader build() throws IllegalArgumentException, IOException
         {
             // check arguments
-            if (builderFS == null || builderPath == null || builderSchema == null) {
+            if (builderFS == null || builderPath == null) {
                 throw new IllegalArgumentException("Missing argument to build PixelsReader");
             }
             // get PhysicalFSReader
@@ -109,6 +106,7 @@ public class PixelsReaderImpl
             }
 
             // todo check file schema
+            builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
 
             // create a default PixelsReader
             return new PixelsReaderImpl(builderSchema, fsReader, fileTail);
@@ -138,7 +136,9 @@ public class PixelsReaderImpl
     @Override
     public PixelsRecordReader read(PixelsReaderOption option)
     {
-        return new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
+        PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
+        recordReaders.add(recordReader);
+        return recordReader;
     }
 
     /**

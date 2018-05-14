@@ -42,7 +42,6 @@ public class TestPixelsReader {
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(path)
-                    .setSchema(schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();
@@ -82,10 +81,10 @@ public class TestPixelsReader {
     }
 
     @Test
-    public void testContent() throws IOException
+    public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"id", "x", "y"};
+        String[] cols = {};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);

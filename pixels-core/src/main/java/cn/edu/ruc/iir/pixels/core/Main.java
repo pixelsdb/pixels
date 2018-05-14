@@ -56,7 +56,7 @@ public class Main
                         continue;
                     }
                     MockPixelsReader mockPixelsReader =
-                            new MockPixelsReader(fs, fileStatus.getPath(), schema, schemaStr);
+                            new MockPixelsReader(fs, fileStatus.getPath(), schema);
                     Thread mockThread = new Thread(mockPixelsReader);
                     threads.add(mockThread);
                     mockThread.start();

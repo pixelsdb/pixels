@@ -1,10 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.compactor;
 
-import cn.edu.ruc.iir.pixels.core.Constants;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.PhysicalFSWriter;
-import cn.edu.ruc.iir.pixels.core.PhysicalReaderUtil;
-import cn.edu.ruc.iir.pixels.core.PhysicalWriterUtil;
+import cn.edu.ruc.iir.pixels.common.Constants;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.PhysicalFSWriter;
+import cn.edu.ruc.iir.pixels.common.PhysicalReaderUtil;
+import cn.edu.ruc.iir.pixels.common.PhysicalWriterUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
@@ -42,7 +42,7 @@ public class PixelsCompactor
     private final int compressionBlockSize;
     private final TimeZone timeZone;
     private final long fileContentLength;
-    private final long fileRowNum;
+    private final int fileRowNum;
 
     private final FileSystem fs;
     private final PhysicalFSWriter fsWriter;
@@ -61,7 +61,7 @@ public class PixelsCompactor
             int compressionBlockSize,
             TimeZone timeZone,
             long fileContentLength,
-            long fileRowNum,
+            int fileRowNum,
             FileSystem fs,
             PhysicalFSWriter fsWriter,
             StatsRecorder[] fileColStatRecorders,
@@ -114,7 +114,7 @@ public class PixelsCompactor
         private int compressionBlockSize = 0;
         private int pixelStride = 0;
         private long fileContentLength = 0L;
-        private long fileRowNum = 0;
+        private int fileRowNum = 0;
         private PhysicalFSWriter fsWriter = null;
         private List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
         private List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();
