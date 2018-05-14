@@ -456,6 +456,7 @@ public class PixelsRecordReaderImpl
     @Override
     public void close()
     {
+        completedBytes = 0;
         // release chunk buffer
         if (targetRGs != null) {
             for (int targetRG : targetRGs) {
