@@ -42,7 +42,7 @@ public class PixelsCompactor
     private final int compressionBlockSize;
     private final TimeZone timeZone;
     private final long fileContentLength;
-    private final long fileRowNum;
+    private final int fileRowNum;
 
     private final FileSystem fs;
     private final PhysicalFSWriter fsWriter;
@@ -61,7 +61,7 @@ public class PixelsCompactor
             int compressionBlockSize,
             TimeZone timeZone,
             long fileContentLength,
-            long fileRowNum,
+            int fileRowNum,
             FileSystem fs,
             PhysicalFSWriter fsWriter,
             StatsRecorder[] fileColStatRecorders,
@@ -114,7 +114,7 @@ public class PixelsCompactor
         private int compressionBlockSize = 0;
         private int pixelStride = 0;
         private long fileContentLength = 0L;
-        private long fileRowNum = 0;
+        private int fileRowNum = 0;
         private PhysicalFSWriter fsWriter = null;
         private List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
         private List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();

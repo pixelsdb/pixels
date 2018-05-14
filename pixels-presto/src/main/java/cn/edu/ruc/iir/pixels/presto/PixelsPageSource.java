@@ -111,7 +111,7 @@ class PixelsPageSource implements ConnectorPageSource {
     }
 
     public long getCompletedBytes() {
-        return this.sizeOfData;
+        return recordReader.getCompletedBytes();
     }
 
     public long getReadTimeNanos() {

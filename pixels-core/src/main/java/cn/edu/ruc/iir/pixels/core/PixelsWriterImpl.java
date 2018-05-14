@@ -60,7 +60,7 @@ public class PixelsWriterImpl
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
     private long fileContentLength;
-    private long fileRowNum;
+    private int fileRowNum;
 
     private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;
