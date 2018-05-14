@@ -87,8 +87,15 @@ class PixelsPageSource implements ConnectorPageSource {
             }
         }
         String colsStr = colStr.toString();
-        logger.info(new StringBuilder().append("getPixelsReaderBySchema colStr: ").append(colsStr).toString());
-        String[] cols = colsStr.substring(0, colsStr.length() - 1).split(",");
+        logger.info("getPixelsReaderBySchema col: " + colsStr);
+        logger.info("getPixelsReaderBySchema col: " + colsStr.length());
+
+        String[] cols = new String[0];
+        if(colsStr.length() > 0){
+            String col = colsStr.substring(0, colsStr.length() - 1);
+            cols = col.split(",");
+            logger.info("getPixelsReaderBySchema col: " + col);
+        }
 
 //        Map<PixelsColumnHandle, Domain> domains = split.getConstraint().getDomains().get();
 //        List<TupleDomainPixelsPredicate.ColumnReference<String>> columnReferences = ImmutableList.<TupleDomainPixelsPredicate.ColumnReference<String>>builder().build();
@@ -136,7 +143,7 @@ class PixelsPageSource implements ConnectorPageSource {
             this.batchId += 1;
             this.rowBatch = this.recordReader.readBatch(10000);
             int batchSize = this.rowBatch.size;
-            if (batchSize <= 0) {
+            if (batchSize <= 0 || (batchSize > 10000 && batchId >1) ) {
                 close();
                 logger.info("getNextPage close");
                 return null;
