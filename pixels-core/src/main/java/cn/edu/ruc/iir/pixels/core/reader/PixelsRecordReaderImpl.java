@@ -506,7 +506,10 @@ public class PixelsRecordReaderImpl
         // write out read performance metrics
         if (enableMetrics) {
             String metrics = JSON.toJSONString(readPerfMetrics);
-            Path metricsFilePath = Paths.get(metricsDir, String.valueOf(System.currentTimeMillis()), ".json");
+            Path metricsFilePath = Paths.get(metricsDir,
+                    String.valueOf(System.nanoTime()) +
+                    physicalFSReader.getPath().getName() +
+                    ".json");
             try {
                 RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
                 raf.seek(0L);
