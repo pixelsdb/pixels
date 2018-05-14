@@ -19,14 +19,12 @@ public class MockPixelsReader
     private final FileSystem fs;
     private final Path filePath;
     private final String[] schema;
-    private final String schemaStr;
 
-    public MockPixelsReader(FileSystem fs, Path filePath, String[] schema, String schemaStr)
+    public MockPixelsReader(FileSystem fs, Path filePath, String[] schema)
     {
         this.fs = fs;
         this.filePath = filePath;
         this.schema = schema;
-        this.schemaStr = schemaStr;
     }
 
     @Override
@@ -41,7 +39,6 @@ public class MockPixelsReader
             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(filePath)
-                    .setSchema(TypeDescription.fromString(schemaStr))
                     .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             VectorizedRowBatch rowBatch;

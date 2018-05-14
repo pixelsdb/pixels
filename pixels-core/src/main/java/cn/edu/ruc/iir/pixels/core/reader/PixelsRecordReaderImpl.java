@@ -438,8 +438,7 @@ public class PixelsRecordReaderImpl
         // release chunk buffer
         for (int targetRG : targetRGs) {
             for (int targetColumn : targetColumns) {
-                byte[] chunkBuf = chunkBuffers[targetRG * includedColumns.length + targetColumn];
-                chunkBuf = null;
+                chunkBuffers[targetRG * includedColumns.length + targetColumn] = null;
             }
         }
     }

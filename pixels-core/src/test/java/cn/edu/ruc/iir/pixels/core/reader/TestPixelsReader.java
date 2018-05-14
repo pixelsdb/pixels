@@ -42,7 +42,6 @@ public class TestPixelsReader {
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(path)
-                    .setSchema(schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();

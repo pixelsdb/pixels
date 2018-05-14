@@ -104,7 +104,6 @@ class PixelsPageSource implements ConnectorPageSource {
                     .setFS(this.fsFactory
                             .getFileSystem().get())
                     .setPath(new Path(path))
-                    .setSchema(this.schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();

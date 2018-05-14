@@ -2,8 +2,6 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
-import cn.edu.ruc.iir.pixels.core.TestParams;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -24,7 +22,6 @@ public class TestReader {
     static String tSchema = "struct<id:int,x:double,y:double>";
     static String[] cols = {"x", "y", "id"};
 
-    private static TypeDescription schema = TypeDescription.fromString(tSchema);
     private static PixelsReader pixelsReader = null;
 
     @Test
@@ -39,7 +36,6 @@ public class TestReader {
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(path)
-                    .setSchema(schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();
@@ -104,7 +100,6 @@ public class TestReader {
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(path)
-                    .setSchema(schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();
