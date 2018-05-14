@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.common;
+package cn.edu.ruc.iir.pixels.common.utils;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;

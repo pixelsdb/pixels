@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import io.airlift.configuration.Config;
 
 import javax.validation.constraints.NotNull;

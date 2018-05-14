@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.benchmark;
 
-import cn.edu.ruc.iir.pixels.common.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;

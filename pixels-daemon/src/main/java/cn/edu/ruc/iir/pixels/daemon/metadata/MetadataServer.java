@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.DBUtils;
-import cn.edu.ruc.iir.pixels.common.LogFactory;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;

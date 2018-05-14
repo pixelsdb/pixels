@@ -1,8 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.common.metrics.BytesMsCost;
+import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
+import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
 import cn.edu.ruc.iir.pixels.core.ChunkSeq;
-import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
@@ -10,8 +12,12 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import com.alibaba.fastjson.JSON;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -32,11 +38,14 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
+    private final boolean enableMetrics;
+    private final boolean enableCache;
+    private final String metricsDir;
+    private final ReadPerfMetrics readPerfMetrics;
 
     private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
-    private boolean enableCache = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
     private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
@@ -58,12 +67,19 @@ public class PixelsRecordReaderImpl
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
                                   PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
-                                  PixelsReaderOption option)
+                                  PixelsReaderOption option,
+                                  boolean enableMetrics,
+                                  boolean enableCache,
+                                  String metricsDir)
     {
         this.physicalFSReader = physicalFSReader;
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
+        this.enableMetrics = enableMetrics;
+        this.enableCache = enableCache;
+        this.metricsDir = metricsDir;
+        this.readPerfMetrics = new ReadPerfMetrics();
         checkBeforeRead();
     }
 
@@ -275,6 +291,7 @@ public class PixelsRecordReaderImpl
         // read chunk blocks into buffers
         this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
         try {
+            long offsetBeforeSeek = 0;
             long readDiskBegin = System.currentTimeMillis();
             for (ChunkSeq seq : chunkSeqs) {
                 if (seq.getLength() == 0) {
@@ -284,8 +301,29 @@ public class PixelsRecordReaderImpl
                 int length = (int) seq.getLength();
                 completedBytes += length;
                 byte[] chunkBlockBuffer = new byte[length];
-                physicalFSReader.seek(offset);
-                physicalFSReader.readFully(chunkBlockBuffer);
+                if (enableMetrics)
+                {
+                    long seekStart = System.currentTimeMillis();
+                    physicalFSReader.seek(offset);
+                    long seekEnd = System.currentTimeMillis();
+                    BytesMsCost seekCost = new BytesMsCost();
+                    seekCost.setBytes(Math.abs(offsetBeforeSeek - offset));
+                    seekCost.setMs(seekEnd - seekStart);
+                    readPerfMetrics.addSeek(seekCost);
+                    offsetBeforeSeek = offset;
+
+                    long readStart = System.currentTimeMillis();
+                    physicalFSReader.readFully(chunkBlockBuffer);
+                    long readEnd = System.currentTimeMillis();
+                    BytesMsCost readCost = new BytesMsCost();
+                    readCost.setBytes(length);
+                    readCost.setMs(readEnd - readStart);
+                    readPerfMetrics.addSeqRead(readCost);
+                }
+                else {
+                    physicalFSReader.seek(offset);
+                    physicalFSReader.readFully(chunkBlockBuffer);
+                }
                 List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
                 for (ChunkId chunkId : chunkIds) {
@@ -465,5 +503,21 @@ public class PixelsRecordReaderImpl
                 }
             }
         }
+        // write out read performance metrics
+        if (enableMetrics) {
+            String metrics = JSON.toJSONString(readPerfMetrics);
+            Path metricsFilePath = Paths.get(metricsDir, String.valueOf(System.currentTimeMillis()), ".json");
+            try {
+                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
+                raf.seek(0L);
+                raf.writeChars(metrics);
+                raf.close();
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        // reset read performance metrics
+        readPerfMetrics.clear();
     }
 }

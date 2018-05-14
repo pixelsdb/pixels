@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-import cn.edu.ruc.iir.pixels.common.LogFactory;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;

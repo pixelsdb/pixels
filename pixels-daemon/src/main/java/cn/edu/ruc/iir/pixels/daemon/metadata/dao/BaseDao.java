@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.DBUtils;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
 
 import java.io.Serializable;
 import java.util.List;

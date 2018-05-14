@@ -1,23 +1,28 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.common.Constants;
-import cn.edu.ruc.iir.pixels.common.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.common.PhysicalReaderUtil;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
+import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
+import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsMetricsCollectProbOutOfRange;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsMetricsDirNotFoundException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsReaderException;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderImpl;
+import cn.edu.ruc.iir.pixels.core.utils.PixelsCoreConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
+import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 import static java.util.Objects.requireNonNull;
 
@@ -39,16 +44,27 @@ public class PixelsReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final List<PixelsRecordReader> recordReaders;
+    private final String metricsDir;
+    private final float metricsCollectProb;
+    private final boolean enableCache;
+    private final Random random;
 
     private PixelsReaderImpl(TypeDescription fileSchema,
                             PhysicalFSReader physicalFSReader,
-                            PixelsProto.FileTail fileTail)
+                            PixelsProto.FileTail fileTail,
+                             String metricsDir,
+                             float metricsCollectProb,
+                             boolean enableCache)
     {
         this.fileSchema = fileSchema;
         this.physicalFSReader = physicalFSReader;
         this.postScript = fileTail.getPostscript();
         this.footer = fileTail.getFooter();
         this.recordReaders = new LinkedList<>();
+        this.metricsDir = metricsDir;
+        this.metricsCollectProb = metricsCollectProb;
+        this.enableCache = enableCache;
+        this.random = new Random();
     }
 
     public static class Builder
@@ -56,6 +72,7 @@ public class PixelsReaderImpl
         private FileSystem builderFS = null;
         private Path builderPath = null;
         private TypeDescription builderSchema = null;
+        private boolean enableCache = false;
 
         private Builder()
         {}
@@ -69,6 +86,12 @@ public class PixelsReaderImpl
         public Builder setPath(Path path)
         {
             this.builderPath = requireNonNull(path);
+            return this;
+        }
+
+        public Builder setEnableCache(boolean enableCache)
+        {
+            this.enableCache = enableCache;
             return this;
         }
 
@@ -108,8 +131,22 @@ public class PixelsReaderImpl
             // todo check file schema
             builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
 
+            // check metrics file
+            PixelsCoreConfig coreConfig = new PixelsCoreConfig();
+            String metricsDir = coreConfig.getMetricsDir();
+            File file = new File(metricsDir);
+            if (!file.isDirectory() || !file.exists()) {
+                throw new PixelsMetricsDirNotFoundException(metricsDir);
+            }
+
+            // check metrics collect probability
+            float metricCollectProb = coreConfig.getMetricsCollectProb();
+            if (metricCollectProb > 1.0f || metricCollectProb < 0.0f) {
+                throw new PixelsMetricsCollectProbOutOfRange(metricCollectProb);
+            }
+
             // create a default PixelsReader
-            return new PixelsReaderImpl(builderSchema, fsReader, fileTail);
+            return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb, enableCache);
         }
     }
 
@@ -136,7 +173,13 @@ public class PixelsReaderImpl
     @Override
     public PixelsRecordReader read(PixelsReaderOption option)
     {
-        PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option);
+        float diceValue = random.nextFloat();
+        boolean enableMetrics = false;
+        if (diceValue < metricsCollectProb) {
+            enableMetrics = true;
+        }
+        PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
+                enableMetrics, enableCache, metricsDir);
         recordReaders.add(recordReader);
         return recordReader;
     }

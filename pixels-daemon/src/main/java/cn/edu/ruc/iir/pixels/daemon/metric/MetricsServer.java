@@ -1,7 +1,9 @@
 package cn.edu.ruc.iir.pixels.daemon.metric;
 
-import cn.edu.ruc.iir.pixels.common.ConfigFactory;
-import cn.edu.ruc.iir.pixels.common.LogFactory;
+import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfHistogram;
+import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import com.alibaba.fastjson.JSON;
 

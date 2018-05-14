@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.common.Constants;
-import cn.edu.ruc.iir.pixels.common.PhysicalWriter;
-import cn.edu.ruc.iir.pixels.common.PhysicalWriterUtil;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
+import cn.edu.ruc.iir.pixels.common.physical.PhysicalWriter;
+import cn.edu.ruc.iir.pixels.common.physical.PhysicalWriterUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;

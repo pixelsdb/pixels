@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;

@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
-import cn.edu.ruc.iir.pixels.common.Constants;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
