@@ -99,6 +99,27 @@ public class PixelsMetadataReader {
         return table;
     }
 
+    public List<PixelsColumnHandle> getTableColumn(String connectorId, String schemaName, String tableName) {
+
+        List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
+        List<Column> columnsList = metadataService.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+        for (Column c : columnsList) {
+            Type columnType = null;
+            String name = c.getColName();
+            String type = c.getColType().toLowerCase();
+            if (type.equals("int")) {
+                columnType = INTEGER;
+            } else if (type.equals("double")) {
+                columnType = DOUBLE;
+            } else if (type.equals("varchar")) {
+                columnType = VARCHAR;
+            }
+            PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", 0);
+            columns.add(pixelsColumnHandle);
+        }
+        return columns;
+    }
+
     public PixelsTableLayoutHandle getTableLayout(String connectorId, String schemaName, String tableName) {
         PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, "no meaning path");
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();

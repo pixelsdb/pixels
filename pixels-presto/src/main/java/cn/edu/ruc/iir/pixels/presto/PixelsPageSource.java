@@ -43,6 +43,7 @@ class PixelsPageSource implements ConnectorPageSource {
     private Block[] constantBlocks;
     private int[] pixelsColumnIndexes;
     private final String connectorId;
+    private int size;
     private int batchId;
     private VectorizedRowBatch rowBatch;
     private long nanoStart;
@@ -53,28 +54,29 @@ class PixelsPageSource implements ConnectorPageSource {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
     }
 
-    public PixelsPageSource(PixelsTable pixelsTable, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String path, String connectorId) {
+    public PixelsPageSource(List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String path, String connectorId) {
         this.connectorId = connectorId;
         ArrayList<Type> columnTypes = new ArrayList<>();
         for (PixelsColumnHandle column : columnHandles) {
+            logger.info("column type: " + column.getColumnType());
             columnTypes.add(column.getColumnType());
         }
         this.types = columnTypes;
         this.pageBuilder = new PageBuilder(this.types);
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
-        this.path = path;
+//        this.path = path;
         getPixelsReaderBySchema();
 
-        int size = columnHandles.size();
-        this.constantBlocks = new Block[size];
-        this.pixelsColumnIndexes = new int[size];
+        this.size = columnHandles.size();
+//        this.constantBlocks = new Block[size];
+//        this.pixelsColumnIndexes = new int[size];
         this.recordReader = this.pixelsReader.read(this.option);
     }
 
     private void getPixelsReaderBySchema() {
         StringBuffer colStr = new StringBuffer();
-        String schemaStr = "struct<";
+//        String schemaStr = "struct<";
         for (PixelsColumnHandle columnHandle : this.columns) {
             String name = columnHandle.getColumnName();
             String type = columnHandle.getColumnType().toString();
@@ -82,29 +84,29 @@ class PixelsPageSource implements ConnectorPageSource {
             if (type.equals("integer")) {
                 type = "int";
             }
-            schemaStr = new StringBuilder().append(schemaStr).append(name).append(":").append(type).append(",").toString();
+//            schemaStr = new StringBuilder().append(schemaStr).append(name).append(":").append(type).append(",").toString();
         }
         String colsStr = colStr.toString();
         logger.info(new StringBuilder().append("getPixelsReaderBySchema colStr: ").append(colsStr).toString());
         String[] cols = colsStr.substring(0, colsStr.length() - 1).split(",");
 
-        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
-        this.schema = TypeDescription.fromString(schemaStr);
+//        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
+//        this.schema = TypeDescription.fromString(schemaStr);
 
         this.option = new PixelsReaderOption();
         this.option.skipCorruptRecords(true);
         this.option.tolerantSchemaEvolution(true);
         this.option.includeCols(cols);
 
-        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
-        logger.info(new StringBuilder().append("PixelsPageResource Schema: ").append(schemaStr).toString());
-        this.schema = TypeDescription.fromString(schemaStr);
+//        schemaStr = new StringBuilder().append(schemaStr.substring(0, schemaStr.length() - 1)).append(">").toString();
+//        logger.info(new StringBuilder().append("PixelsPageResource Schema: ").append(schemaStr).toString());
+//        this.schema = TypeDescription.fromString(schemaStr);
         try {
             this.pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(this.fsFactory
                             .getFileSystem().get())
                     .setPath(new Path(path))
-                    .setSchema(this.schema)
+//                    .setSchema(this.schema)
                     .build();
         } catch (IOException e) {
             e.printStackTrace();
@@ -127,6 +129,7 @@ class PixelsPageSource implements ConnectorPageSource {
         if (this.nanoStart == 0L)
             this.nanoStart = System.nanoTime();
         try {
+//            logger.info(new StringBuilder().append("getNextPage batchId: ").append(this.batchId).toString());
             this.batchId += 1;
             this.rowBatch = this.recordReader.readBatch(10000);
             int batchSize = this.rowBatch.size;
@@ -135,19 +138,17 @@ class PixelsPageSource implements ConnectorPageSource {
                 logger.info("getNextPage close");
                 return null;
             }
-            logger.info(new StringBuilder().append("getNextPage batchId: ").append(this.batchId).toString());
-            logger.info(new StringBuilder().append("getNextPage rowBatch: ").append(this.rowBatch.size).toString());
-            logger.info(new StringBuilder().append("getNextPage batchSize: ").append(batchSize).toString());
-            Block[] blocks = new Block[this.pixelsColumnIndexes.length];
+//            logger.info(new StringBuilder().append("getNextPage batchSize: ").append(batchSize).toString());
+            Block[] blocks = new Block[this.size];
 //            logger.info(new StringBuilder().append("getNextPage blocks: ").append(blocks.length).toString());
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
             {
                 Type type = types.get(fieldId);
-                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
                 String typeName = type.getDisplayName();
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
+                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
                 if (typeName.equals("integer"))
                 {
                     LongColumnVector lcv = (LongColumnVector) cv;
@@ -171,15 +172,15 @@ class PixelsPageSource implements ConnectorPageSource {
                         blockBuilder.appendNull();
                     }
                 }
-//                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
-                blocks[fieldId] = new LazyBlock(batchSize, new LazyBlockLoader<LazyBlock>() {
-                    @Override
-                    public void load(LazyBlock block) {
-                        block.setBlock(blockBuilder.build());
-                    }
-                });
+                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+//                blocks[fieldId] = new LazyBlock(batchSize, new LazyBlockLoader<LazyBlock>() {
+//                    @Override
+//                    public void load(LazyBlock block) {
+//                        block.setBlock(blockBuilder.build());
+//                    }
+//                });
             }
-
+            sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 System.out.println("End of file");
             }

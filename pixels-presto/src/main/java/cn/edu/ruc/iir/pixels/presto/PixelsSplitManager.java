@@ -19,6 +19,7 @@ import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
@@ -27,6 +28,7 @@ import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 
@@ -64,22 +66,22 @@ public class PixelsSplitManager
 
         TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
                 .transform(PixelsColumnHandle.class::cast);
-//        log.info("PixelsColumnHandle constraint: " + constraint.toString());
         // push down
-//        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
-//        log.info("domains size: " + domains.size());
+        Map<PixelsColumnHandle, Domain> domains = constraint.getDomains().get();
+        log.info("domains size: " + domains.size());
+        log.info("domains values: " + domains.values());
 //        List<PixelsColumnHandle> indexedColumns = new ArrayList<>();
-//        // compose partitionId by using indexed column
-//        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
-//            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
-//            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
-//            Domain domain = entry.getValue();
+        // compose partitionId by using indexed column
+        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
+            PixelsColumnHandle column = (PixelsColumnHandle) entry.getKey();
+            log.info("column: " + column.getColumnName() + " " + column.getColumnType());
+            Domain domain = entry.getValue();
 //            if (domain.isSingleValue()) {
 //                indexedColumns.add(column);
 //                // Only one indexed column predicate can be pushed down.
 //            }
-//            log.info("domain: " + domain.isSingleValue());
-//        }
+            log.info("domain: " + domain.isSingleValue());
+        }
 //        log.info("indexedColumns: " + indexedColumns.toString());
         MetadataService metadataService = MetadataService.Instance();
         List<Layout> catalogList = metadataService.getLayoutsByTblName(tableHandle.getTableName());
