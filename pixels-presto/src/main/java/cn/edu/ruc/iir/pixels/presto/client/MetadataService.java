@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
 import com.google.inject.Inject;
@@ -27,9 +28,14 @@ public class MetadataService {
     private static Logger logger = Logger.get(MetadataService.class);
 
     @Inject
-    public MetadataService(PixelsPrestoConfig config)
+    public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
     {
-        String[] splits = config.getMetadataServerUri().split(":");
+        String uri = config.getMetadataServerUri();
+        if (uri.startsWith("pixels://") == false || uri.contains(":") == false)
+        {
+            throw new PixelsUriExceotion("invalid pixels uri: " + uri);
+        }
+        String[] splits = uri.substring(9).split(":");
         this.host = splits[0];
         this.port = Integer.parseInt(splits[1]);
     }

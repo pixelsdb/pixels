@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
+import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
@@ -21,7 +22,7 @@ public class testPixelsMetadataReader {
     private final Logger log = Logger.getLogger(testPixelsMetadataReader.class.getName());
 
     @Before
-    public void init ()
+    public void init () throws PixelsUriExceotion
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
         this.pixelsMetadataReader = new PixelsMetadataReader(new MetadataService(config));
