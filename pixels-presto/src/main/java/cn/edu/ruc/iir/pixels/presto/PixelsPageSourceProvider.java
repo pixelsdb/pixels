@@ -43,21 +43,13 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
 
-        logger.info("PixelsPageSourceProvider columns: " + columns.size());
-        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.size());
-
-        List<PixelsColumnHandle> hdfsColumns = columns.stream()
-                .map(col -> (PixelsColumnHandle) col)
-                .collect(Collectors.toList());
-        logger.info("PixelsPageSourceProvider hdfsColumns: " + hdfsColumns.size());
+        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.toString());
 
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        PixelsTable pixelsTable = pixelsMetadataReader.getTable(connectorId, pixelsSplit.getSchemaName(), pixelsSplit.getTableName(), pixelsSplit.getPath());
-
         logger.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
-        return new PixelsPageSource(pixelsTable, pixelsTable.getColumns(), fsFactory, pixelsSplit.getPath(), connectorId);
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
     }
 }

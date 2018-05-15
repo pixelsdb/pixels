@@ -28,7 +28,7 @@ public class TestHdfs {
      */
     @Test
     public void testReadBlock() {
-        String filePath = "hdfs://presto00:9000/pixels/point.txt";
+        String filePath = "hdfs://presto00:9000/pixels/v2/point2000w-10.pxl";
         FSFactory fsFactory = new FSFactory();
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
