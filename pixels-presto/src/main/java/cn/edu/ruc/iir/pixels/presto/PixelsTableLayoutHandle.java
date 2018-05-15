@@ -27,7 +27,7 @@ public class PixelsTableLayoutHandle
         implements ConnectorTableLayoutHandle {
     private final PixelsTableHandle table;
 
-    private final TupleDomain<ColumnHandle> constraint;
+    private TupleDomain<ColumnHandle> constraint;
 
     @JsonCreator
     public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table,
@@ -41,6 +41,11 @@ public class PixelsTableLayoutHandle
     @JsonProperty
     public TupleDomain<ColumnHandle> getConstraint() {
         return constraint;
+    }
+
+    public void setConstraint(TupleDomain<ColumnHandle> constraint)
+    {
+        this.constraint = constraint;
     }
 
     @JsonProperty

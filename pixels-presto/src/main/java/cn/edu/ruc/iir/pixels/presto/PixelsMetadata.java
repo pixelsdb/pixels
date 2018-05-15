@@ -18,9 +18,7 @@ import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
-import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -28,7 +26,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -72,9 +69,8 @@ public class PixelsMetadata
         if (!listSchemaNames(session).contains(tableName.getSchemaName())) {
             return null;
         }
-
-        PixelsTable table = pixelsMetadataReader.getTable(connectorId, tableName.getSchemaName(), tableName.getTableName());
-        return table.getTableHandle();
+        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
+        return tableHandle;
     }
 
     @Override
@@ -84,7 +80,9 @@ public class PixelsMetadata
 
         // create PixelsTableLayoutHandle
         PixelsTableLayoutHandle tableLayout = pixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
-
+        logger.info("getTableLayouts tableLayout： " + tableLayout.toString());
+        logger.info("getTableLayouts size： " + constraint.getSummary().getColumnDomains().get().size());
+        tableLayout.setConstraint(constraint.getSummary());
         ConnectorTableLayout layout = getTableLayout(session, tableLayout);
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }
@@ -98,13 +96,19 @@ public class PixelsMetadata
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table) {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
         checkArgument(tableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
-        SchemaTableName tableName = new SchemaTableName(tableHandle.getSchemaName(), tableHandle.getTableName());
-        return getTableMetadata(tableName);
+        return getTableMetadata(tableHandle.getSchemaName(), tableHandle.getTableName());
+    }
+
+    public ConnectorTableMetadata getTableMetadata(String schemaName, String tableName) {
+        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, schemaName, tableName);
+        List<ColumnMetadata> columns = columnHandleList.stream().map(PixelsColumnHandle::getColumnMetadata)
+                .collect(toList());
+        return new ConnectorTableMetadata(new SchemaTableName(schemaName, tableName), columns);
     }
 
     public ConnectorTableMetadata getTableMetadata(SchemaTableName tableName) {
-        PixelsTable table = pixelsMetadataReader.getTable(connectorId, tableName.getSchemaName(), tableName.getTableName());
-        List<ColumnMetadata> columns = table.getColumns().stream().map(PixelsColumnHandle::getColumnMetadata)
+        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, tableName.getSchemaName(), tableName.getTableName());
+        List<ColumnMetadata> columns = columnHandleList.stream().map(PixelsColumnHandle::getColumnMetadata)
                 .collect(toList());
         return new ConnectorTableMetadata(tableName, columns);
     }
@@ -133,13 +137,13 @@ public class PixelsMetadata
         PixelsTableHandle pixelsTableHandle = (PixelsTableHandle) tableHandle;
         checkArgument(pixelsTableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
 
-        PixelsTable table = pixelsMetadataReader.getTable(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
-        if (table == null) {
+        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
+        if (columnHandleList == null) {
             throw new TableNotFoundException(pixelsTableHandle.toSchemaTableName());
         }
 
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
-        for (PixelsColumnHandle column : table.getColumns()) {
+        for (PixelsColumnHandle column : columnHandleList) {
             columnHandles.put(column.getColumnName(), column);
         }
         logger.info("PixelsMetadata getColumnHandles： " + columnHandles.build().values());
