@@ -1,6 +1,9 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.core.*;
+import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -10,11 +13,9 @@ import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
-import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
@@ -42,7 +43,7 @@ class PixelsPageSource implements ConnectorPageSource {
     private PixelsReaderOption option;
 //    private Block[] constantBlocks;
     private final String connectorId;
-    private int size;
+    private int numColumnToRead;
     private int batchId;
     private VectorizedRowBatch rowBatch;
     private long nanoStart;
@@ -62,7 +63,7 @@ class PixelsPageSource implements ConnectorPageSource {
 
         getPixelsReaderBySchema(split);
 
-        this.size = columnHandles.size();
+        this.numColumnToRead = columnHandles.size();
 //        this.constantBlocks = new Block[size];
 //        this.pixelsColumnIndexes = new int[size];
         this.recordReader = this.pixelsReader.read(this.option);
@@ -95,7 +96,7 @@ class PixelsPageSource implements ConnectorPageSource {
         this.option.skipCorruptRecords(true);
         this.option.tolerantSchemaEvolution(true);
         this.option.includeCols(cols);
-//        this.option.predicate(predicate);
+        this.option.predicate(predicate);
 
         try {
             if(this.fsFactory.getFileSystem().isPresent()){
@@ -129,7 +130,7 @@ class PixelsPageSource implements ConnectorPageSource {
         if (this.nanoStart == 0L)
             this.nanoStart = System.nanoTime();
         try {
-            this.batchId += 1;
+            this.batchId++;
             this.rowBatch = this.recordReader.readBatch(10000);
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
@@ -137,7 +138,7 @@ class PixelsPageSource implements ConnectorPageSource {
                 logger.info("getNextPage close");
                 return null;
             }
-            Block[] blocks = new Block[this.size];
+            Block[] blocks = new Block[this.numColumnToRead];
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
             {
