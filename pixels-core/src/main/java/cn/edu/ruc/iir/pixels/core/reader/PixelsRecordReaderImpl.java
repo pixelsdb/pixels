@@ -261,15 +261,17 @@ public class PixelsRecordReaderImpl
         }
         List<ChunkId> chunks = new ArrayList<>();
         for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
-            PixelsProto.RowGroupIndex rowGroupIndex =
-                    rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-            for (int colIdx : targetColumns) {
-                PixelsProto.ColumnChunkIndex chunkIndex =
-                        rowGroupIndex.getColumnChunkIndexEntries(colIdx);
-                ChunkId chunk = new ChunkId(rgIdx, colIdx,
-                        chunkIndex.getChunkOffset(),
-                        chunkIndex.getChunkLength());
-                chunks.add(chunk);
+            if (includedRGs[rgIdx]) {
+                PixelsProto.RowGroupIndex rowGroupIndex =
+                        rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                for (int colIdx : targetColumns) {
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupIndex.getColumnChunkIndexEntries(colIdx);
+                    ChunkId chunk = new ChunkId(rgIdx, colIdx,
+                            chunkIndex.getChunkOffset(),
+                            chunkIndex.getChunkLength());
+                    chunks.add(chunk);
+                }
             }
         }
 
