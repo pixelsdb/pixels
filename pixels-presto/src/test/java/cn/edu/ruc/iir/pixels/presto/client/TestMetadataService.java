@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.presto.client;
 
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import org.junit.Before;
 import org.junit.Test;
@@ -20,7 +21,7 @@ public class TestMetadataService {
     MetadataService instance = null;
 
     @Before
-    public void init ()
+    public void init () throws PixelsUriExceotion
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
         this.instance = new MetadataService(config);
