@@ -11,7 +11,8 @@ public class TestMetadataService
     @Test
     public void testGetColumnsBySchemaNameAndTblName ()
     {
-        List<Column> columns = MetadataService.Instance().getColumnsBySchemaNameAndTblName("pixels", "test");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
+        List<Column> columns = new MetadataService(config).getColumnsBySchemaNameAndTblName("pixels", "test");
         for (Column column : columns)
         {
             System.out.println(column.getColName() + ", " + column.getColType());

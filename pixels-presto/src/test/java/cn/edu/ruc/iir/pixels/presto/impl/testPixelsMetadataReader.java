@@ -1,7 +1,9 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
+import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import org.apache.log4j.Logger;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
@@ -15,8 +17,15 @@ import java.util.List;
  * @date: Create in 2018-01-27 11:15
  **/
 public class testPixelsMetadataReader {
-    PixelsMetadataReader pixelsMetadataReader = PixelsMetadataReader.Instance();
+    private PixelsMetadataReader pixelsMetadataReader = null;
     private final Logger log = Logger.getLogger(testPixelsMetadataReader.class.getName());
+
+    @Before
+    public void init ()
+    {
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
+        this.pixelsMetadataReader = new PixelsMetadataReader(new MetadataService(config));
+    }
 
     @Test
     public void testGetSchemaNames() {

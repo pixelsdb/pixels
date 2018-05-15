@@ -9,7 +9,18 @@ import java.util.Properties;
 public class ConfigFactory
 {
     private static ConfigFactory instance = null;
-    
+
+    public static ConfigFactory Instance ()
+    {
+        if (instance == null)
+        {
+            instance = new ConfigFactory();
+        }
+        return instance;
+    }
+
+    private Properties prop = null;
+
     private ConfigFactory()
     {
         prop = new Properties();
@@ -43,18 +54,7 @@ public class ConfigFactory
             e.printStackTrace();
         }
     }
-    
-    public static ConfigFactory Instance ()
-    {
-        if (instance == null)
-        {
-            instance = new ConfigFactory();
-        }
-        return instance;
-    }
-    
-    private Properties prop = null;
-    
+
     public void addProperty (String key, String value)
     {
         this.prop.setProperty(key, value);

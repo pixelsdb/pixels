@@ -32,7 +32,7 @@ public class PixelsConnectorFactory
 
     Logger logger = Logger.get(PixelsConnectorFactory.class);
 
-    private final String name = "pixels";
+    private final String name = "pixels-presto";
 
     public PixelsConnectorFactory()  {
         logger.info("Connector " + name + " initialized.");
