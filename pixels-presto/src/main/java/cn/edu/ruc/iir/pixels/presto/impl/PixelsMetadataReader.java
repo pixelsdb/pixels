@@ -32,19 +32,11 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
  **/
 public class PixelsMetadataReader {
     private static final Logger log = Logger.get(PixelsMetadataReader.class);
-    private static PixelsMetadataReader instance = null;
-    private MetadataService metadataService = MetadataService.Instance();
+    private MetadataService metadataService = null;
 
     @Inject
-    private PixelsMetadataReader() {
-
-    }
-
-    public static PixelsMetadataReader Instance() {
-        if (instance == null) {
-            instance = new PixelsMetadataReader();
-        }
-        return instance;
+    public PixelsMetadataReader(MetadataService metadataService) {
+        this.metadataService = metadataService;
     }
 
     public List<String> getSchemaNames() {

@@ -49,7 +49,7 @@ public class PixelsMetadata
     @Inject
     public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader.Instance(), "pixelsMetadataReader is null");
+        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
     }
 
     @Override

@@ -17,10 +17,11 @@ import java.util.List;
  * @date: Create in 2018-01-22 21:53
  **/
 public class TestFSFactory {
-    private final FSFactory fsFactory = new FSFactory();
 
     @Test
     public void testListFiles() {
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        FSFactory fsFactory = new FSFactory(config);
         String tablePath = "/pixels/v2";
         List<Path> files = fsFactory.listFiles(tablePath);
         for (Path s : files) {
@@ -30,6 +31,8 @@ public class TestFSFactory {
 
     @Test
     public void testGetBlockLocations() throws UnknownHostException {
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        FSFactory fsFactory = new FSFactory(config);
         String tablePath = "pixels/db/default/test/Point.txt";
         List<HostAddress> files = fsFactory.getBlockLocations(new Path(tablePath), 0, Long.MAX_VALUE);
         System.out.println(files.size());
