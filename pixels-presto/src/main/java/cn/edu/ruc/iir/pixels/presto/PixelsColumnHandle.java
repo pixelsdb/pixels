@@ -99,7 +99,8 @@ public final class PixelsColumnHandle
 
         PixelsColumnHandle other = (PixelsColumnHandle) obj;
         return Objects.equals(this.connectorId, other.connectorId) &&
-                Objects.equals(this.columnName, other.columnName);
+                Objects.equals(this.columnName, other.columnName) &&
+                Objects.equals(this.ordinalPosition, other.ordinalPosition);
     }
 
     @Override
