@@ -46,7 +46,7 @@ Run the presto client, we should do the following things:
 ```
 - execute
 ```sh
-./bin/presto --server localhost:8080 --catalog pixels --schema pixels 
+./bin/presto --server localhost:8080 --catalog pixels-presto --schema pixels 
 
 select * from test;
 select count(*) from test;

@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -29,7 +30,9 @@ public class TestHdfs {
     @Test
     public void testReadBlock() {
         String filePath = "hdfs://presto00:9000/pixels/v2/point2000w-10.pxl";
-        FSFactory fsFactory = new FSFactory();
+
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        FSFactory fsFactory = new FSFactory(config);
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
             ExtendedBlock eBlock = block.getBlock();

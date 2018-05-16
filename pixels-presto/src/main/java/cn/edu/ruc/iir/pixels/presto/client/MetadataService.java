@@ -1,11 +1,13 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
+import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
@@ -21,23 +23,21 @@ import java.util.UUID;
  * @date: Create in 2018-01-21 21:54
  **/
 public class MetadataService {
-    private static MetadataService instance = null;
     private String host;
     private int port;
     private static Logger logger = Logger.get(MetadataService.class);
 
-    private MetadataService() {
-        ConfigFactory config = ConfigFactory.Instance();
-//        host = "127.0.0.1";
-        host = config.getProperty("metadata.server.host");
-        port = Integer.valueOf(config.getProperty("metadata.server.port"));
-    }
-
-    public static MetadataService Instance() {
-        if (instance == null) {
-            instance = new MetadataService();
+    @Inject
+    public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
+    {
+        String uri = config.getMetadataServerUri();
+        if (uri.startsWith("pixels://") == false || uri.contains(":") == false)
+        {
+            throw new PixelsUriExceotion("invalid pixels uri: " + uri);
         }
-        return instance;
+        String[] splits = uri.substring(9).split(":");
+        this.host = splits[0];
+        this.port = Integer.parseInt(splits[1]);
     }
 
     public List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
