@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.sql;
 
+import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.*;
 import org.junit.Test;
@@ -44,6 +45,22 @@ public class SqlParserTest {
 //            System.out.println(e.toString());
             ColumnDefinition column = (ColumnDefinition) e;
             System.out.println("column: " + column.toString());
+            System.out.println("column: " + column.getName() + " " + column.getType());
+        }
+    }
+
+    @Test
+    public void testCreateTableFromTxt() {
+        String schemaFile = "/home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql";
+        String sql = FileUtils.readFileToString(schemaFile);
+
+        CreateTable createTable = (CreateTable) parser.createStatement(sql);
+        System.out.println("table: " + createTable.getName().toString());
+
+        List<TableElement> elements = createTable.getElements();
+        for (TableElement e : elements) {
+            ColumnDefinition column = (ColumnDefinition) e;
+//            System.out.println("column: " + column.toString());
             System.out.println("column: " + column.getName() + " " + column.getType());
         }
     }

@@ -53,9 +53,9 @@ public class FileUtils {
         }
     }
 
-    public static Collection<File> listFiles(String fileName) {
+    public static Collection<File> listFiles(String fileName, boolean recursive) {
         return org.apache.commons.io.FileUtils.
-                listFiles(new File(fileName), null, false);
+                listFiles(new File(fileName), null, recursive);
     }
 
     public static void writeFile(String content, String filename)
