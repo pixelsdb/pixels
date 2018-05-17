@@ -6,10 +6,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
@@ -17,6 +14,7 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slices;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
@@ -161,6 +159,22 @@ class PixelsPageSource implements ConnectorPageSource {
                     for (int i = 0; i < this.rowBatch.size; ++i)
                     {
                         type.writeDouble(blockBuilder, dcv.vector[i]);
+                    }
+                }
+                else if (typeName.equals("varchar") || typeName.equals("string"))
+                {
+                    BytesColumnVector scv = (BytesColumnVector) cv;
+                    for (int i = 0; i < this.rowBatch.size; ++i)
+                    {
+                        type.writeSlice(blockBuilder, Slices.utf8Slice(new String(scv.vector[i])));
+                    }
+                }
+                else if(typeName.equals("boolean") )
+                {
+                    LongColumnVector bcv = (LongColumnVector) cv;
+                    for (int i = 0; i < this.rowBatch.size; ++i)
+                    {
+                        type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
                     }
                 }
                 else

@@ -22,6 +22,7 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
 
     private String token;
     private Map<String, String> map = new HashMap<String, String>();
+    private StringBuilder sb = new StringBuilder();
 
     public MetadataClientHandler(String action, String token, Map<String, String> map, String paras) {
         this.token = token;
@@ -45,8 +46,16 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
         byte[] req = new byte[buf.readableBytes()];
         buf.readBytes(req);
         String body = new String(req, "UTF-8");
+        sb.append(body);
 //        System.out.println("NOW is: " + body);
-        map.put(token, body);
+//        map.put(token, body);
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+        super.channelReadComplete(ctx);
+//        System.out.println(sb.toString());
+        map.put(token, sb.toString());
     }
 
     @Override

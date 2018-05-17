@@ -23,7 +23,7 @@ public class TestMetadataService {
     @Before
     public void init () throws PixelsUriExceotion
     {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888");
         this.instance = new MetadataService(config);
     }
 
@@ -44,7 +44,8 @@ public class TestMetadataService {
     @Test
     public void testGetColumnsBySchemaNameAndTblName() {
         String schemaName = "pixels";
-        String tableName = "test";
+//        String tableName = "test";
+        String tableName = "test30g_pixels";
         for (int i = 1; i <= 20; i++) {
             Thread t = new Thread(() -> {
                 List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);

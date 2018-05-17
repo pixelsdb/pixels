@@ -31,6 +31,7 @@ public class MetadataService {
     public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
     {
         String uri = config.getMetadataServerUri();
+        System.out.println(uri.contains(":"));
         if (uri.startsWith("pixels://") == false || uri.contains(":") == false)
         {
             throw new PixelsUriExceotion("invalid pixels uri: " + uri);

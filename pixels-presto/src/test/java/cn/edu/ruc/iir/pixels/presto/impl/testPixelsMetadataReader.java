@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
@@ -24,7 +25,7 @@ public class testPixelsMetadataReader {
     @Before
     public void init () throws PixelsUriExceotion
     {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888");
         this.pixelsMetadataReader = new PixelsMetadataReader(new MetadataService(config));
     }
 
@@ -39,6 +40,12 @@ public class testPixelsMetadataReader {
     public void testGetTableNames() {
         List<String> tablelist = pixelsMetadataReader.getTableNames("");
         System.out.println(tablelist.toString());
+    }
+
+    @Test
+    public void testGetTableColumns () {
+        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn("", "pixels", "test30g_pixels");
+        System.out.println(columnHandleList.toString());
     }
 
     @Test
