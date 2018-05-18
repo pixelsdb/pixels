@@ -18,10 +18,14 @@ public class TestReader {
 //    String tSchema = "struct<orderkey:int,orderstatus:string,totalprice:double>";
 //    String[] cols = {"orderstatus", "totalprice", "orderkey"};
     // Point test
-    String filePath = "hdfs://10.77.40.236:9000/pixels/v2/point2000w.pxl";
+//    String filePath = "hdfs://10.77.40.236:9000/pixels/v2/point2000w.pxl";
     static String tSchema = "struct<id:int,x:double,y:double>";
-    static String[] cols = new String[0];
-//    static String[] cols = {"x", "y", "id"};
+    //    static String[] cols = {"x", "y", "id"};
+    //    static String[] cols = new String[0];
+
+    // 1000 columns
+    String filePath = "hdfs://10.77.40.236:9000/pixels/test30G_pixels/201805171350200.pxl";
+    static String[] cols = {"Column_1", "Column_3", "Column_13"};
 
     private static PixelsReader pixelsReader = null;
 
@@ -53,7 +57,7 @@ public class TestReader {
             long start = System.currentTimeMillis();
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
-//                System.out.println(rowBatch.toString());
+                System.out.println(rowBatch.toString());
                 int size = rowBatch.size;
 //                System.out.println(size);
                 if (rowBatch.endOfFile) {

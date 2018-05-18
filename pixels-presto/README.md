@@ -1,4 +1,4 @@
-# Presto Configuration
+# Presto-Connector Configuration
 
 ## Note
 All the following commands are done in the master node `presto00`
@@ -10,6 +10,7 @@ Upload the following files to the catalog of `presto-server-0.192`
 - pixels-load-0.1.0-SNAPSHOT.jar
 
 ## Run ETL Tool
+- See`cn.edu.ruc.iir.pixels.load.cli.Main`
 - DDL
 
 `DDL -s schema_file -d db_name`

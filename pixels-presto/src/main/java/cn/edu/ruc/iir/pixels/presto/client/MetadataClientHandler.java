@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
     private final ByteBuf firstMSG;
 
+    private boolean isRead;
     private String token;
     private Map<String, String> map = new HashMap<String, String>();
     private StringBuilder sb = new StringBuilder();
@@ -47,15 +48,21 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
         buf.readBytes(req);
         String body = new String(req, "UTF-8");
         sb.append(body);
-//        System.out.println("NOW is: " + body);
+        System.out.println("Read is: " + body);
+        isRead = true;
 //        map.put(token, body);
     }
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        super.channelReadComplete(ctx);
-//        System.out.println(sb.toString());
+        System.out.println("ReadComplete is: " + sb.toString());
+        ctx.flush();
         map.put(token, sb.toString());
+        if(isRead){
+            ctx.close();
+        } else {
+            ctx.read();
+        }
     }
 
     @Override

@@ -46,14 +46,14 @@ public class TestMetadataService {
         String schemaName = "pixels";
 //        String tableName = "test";
         String tableName = "test30g_pixels";
-        for (int i = 1; i <= 20; i++) {
-            Thread t = new Thread(() -> {
-                List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
-                if (columns.size() != 0)
-                    System.out.println("Thread: " + columns.size());
-            });
-            t.start();
-        }
+//        for (int i = 1; i <= 20; i++) {
+//            Thread t = new Thread(() -> {
+//                List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+//                if (columns.size() != 0)
+//                    System.out.println("Thread: " + columns.size());
+//            });
+//            t.start();
+//        }
         List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
         System.out.println("Command: " + columns.size());
     }
