@@ -21,6 +21,7 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,19 +31,15 @@ import static java.util.Objects.requireNonNull;
 class PixelsPageSource implements ConnectorPageSource {
     private static Logger logger = Logger.get(PixelsPageSource.class);
     private final int MAX_BATCH_SIZE = 1024;
-//    private final int NULL_ENTRY_SIZE = 0;
     private List<PixelsColumnHandle> columns;
     private List<Type> types;
     private FSFactory fsFactory;
-//    private String path;
     private boolean closed;
     private boolean endOfFile;
     private PixelsReader pixelsReader;
     private PixelsRecordReader recordReader;
     private long sizeOfData = 0L;
     private PixelsReaderOption option;
-//    private Block[] constantBlocks;
-    private final String connectorId;
     private int numColumnToRead;
     private int batchId;
     private VectorizedRowBatch rowBatch;
@@ -50,7 +47,6 @@ class PixelsPageSource implements ConnectorPageSource {
     private long nanoEnd;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String connectorId) {
-        this.connectorId = connectorId;
         ArrayList<Type> columnTypes = new ArrayList<>();
         for (PixelsColumnHandle column : columnHandles) {
             logger.info("column type: " + column.getColumnType());
@@ -59,13 +55,10 @@ class PixelsPageSource implements ConnectorPageSource {
         this.types = columnTypes;
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
-//        this.path = split.getPath();
+        this.numColumnToRead = columnHandles.size();
 
         getPixelsReaderBySchema(split);
 
-        this.numColumnToRead = columnHandles.size();
-//        this.constantBlocks = new Block[size];
-//        this.pixelsColumnIndexes = new int[size];
         this.recordReader = this.pixelsReader.read(this.option);
     }
 
@@ -77,13 +70,17 @@ class PixelsPageSource implements ConnectorPageSource {
         }
         String colsStr = colStr.toString();
         String[] cols = new String[0];
-        if(colsStr.length() > 0){
+        if (colsStr.length() > 0){
             String col = colsStr.substring(0, colsStr.length() - 1);
             cols = col.split(",");
             logger.info("getPixelsReaderBySchema col: " + col);
         }
 
-        Map<PixelsColumnHandle, Domain> domains = split.getConstraint().getDomains().get();
+        Map<PixelsColumnHandle, Domain> domains = new HashMap<>();
+        if (split.getConstraint().getDomains().isPresent()) {
+            domains = split.getConstraint().getDomains().get();
+        }
+//        Map<PixelsColumnHandle, Domain> domains = split.getConstraint().getDomains().get();
         List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>();
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
             PixelsColumnHandle column = entry.getKey();
@@ -99,13 +96,15 @@ class PixelsPageSource implements ConnectorPageSource {
         this.option.predicate(predicate);
 
         try {
-            if(this.fsFactory.getFileSystem().isPresent()){
+            if (this.fsFactory.getFileSystem().isPresent())
+            {
                 this.pixelsReader = PixelsReaderImpl.newBuilder()
                         .setFS(this.fsFactory
                                 .getFileSystem().get())
                         .setPath(new Path(split.getPath()))
                         .build();
-            }else {
+            }
+            else {
                 logger.info("pixelsReader error: getFileSystem() null");
             }
         } catch (IOException e) {
@@ -147,28 +146,28 @@ class PixelsPageSource implements ConnectorPageSource {
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
                 BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
-                if (typeName.equals("integer"))
+                switch (typeName)
                 {
-                    LongColumnVector lcv = (LongColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeLong(blockBuilder, lcv.vector[i]);
-                    }
-                }
-                else if (typeName.equals("double"))
-                {
-                    DoubleColumnVector dcv = (DoubleColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeDouble(blockBuilder, dcv.vector[i]);
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        blockBuilder.appendNull();
-                    }
+                    case "integer":
+                        LongColumnVector lcv = (LongColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            type.writeLong(blockBuilder, lcv.vector[i]);
+                        }
+                        break;
+                    case "double":
+                        DoubleColumnVector dcv = (DoubleColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            type.writeDouble(blockBuilder, dcv.vector[i]);
+                        }
+                        break;
+                    default:
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            blockBuilder.appendNull();
+                        }
+                        break;
                 }
                 blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
 //                blocks[fieldId] = new LazyBlock(batchSize, new LazyBlockLoader<LazyBlock>() {
