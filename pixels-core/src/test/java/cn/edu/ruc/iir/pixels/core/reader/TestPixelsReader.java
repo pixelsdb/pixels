@@ -84,7 +84,9 @@ public class TestPixelsReader {
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {};
+        String[] cols = {"Column_1", "Column_2", "Column_3", "Column_4", "Column_5", "Column_6", "Column_10",
+                "Column_20", "Column_30", "Column_40", "Column_50", "Column_100", "Column_200", "Column_300",
+                "Column_400", "Column_500", "Column_600"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
