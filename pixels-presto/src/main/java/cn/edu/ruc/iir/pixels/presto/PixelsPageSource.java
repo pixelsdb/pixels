@@ -6,10 +6,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
@@ -17,6 +14,7 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slices;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
@@ -30,9 +28,8 @@ import static java.util.Objects.requireNonNull;
 
 class PixelsPageSource implements ConnectorPageSource {
     private static Logger logger = Logger.get(PixelsPageSource.class);
-    private final int MAX_BATCH_SIZE = 1024;
+    private static final int BATCH_SIZE = 10000;
     private List<PixelsColumnHandle> columns;
-    private List<Type> types;
     private FSFactory fsFactory;
     private boolean closed;
     private boolean endOfFile;
@@ -47,12 +44,6 @@ class PixelsPageSource implements ConnectorPageSource {
     private long nanoEnd;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String connectorId) {
-        ArrayList<Type> columnTypes = new ArrayList<>();
-        for (PixelsColumnHandle column : columnHandles) {
-            logger.info("column type: " + column.getColumnType());
-            columnTypes.add(column.getColumnType());
-        }
-        this.types = columnTypes;
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
@@ -63,29 +54,24 @@ class PixelsPageSource implements ConnectorPageSource {
     }
 
     private void getPixelsReaderBySchema(PixelsSplit split) {
-        StringBuilder colStr = new StringBuilder();
-        for (PixelsColumnHandle columnHandle : this.columns) {
-            String name = columnHandle.getColumnName();
-            colStr.append(name).append(",");
-        }
-        String colsStr = colStr.toString();
-        String[] cols = new String[0];
-        if (colsStr.length() > 0){
-            String col = colsStr.substring(0, colsStr.length() - 1);
-            cols = col.split(",");
-            logger.info("getPixelsReaderBySchema col: " + col);
+        String[] cols = new String[columns.size()];
+        for (int i = 0; i < columns.size(); i++) {
+            cols[i] = columns.get(i).getColumnName();
         }
 
         Map<PixelsColumnHandle, Domain> domains = new HashMap<>();
         if (split.getConstraint().getDomains().isPresent()) {
             domains = split.getConstraint().getDomains().get();
         }
-//        Map<PixelsColumnHandle, Domain> domains = split.getConstraint().getDomains().get();
-        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>();
+        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
             PixelsColumnHandle column = entry.getKey();
-            logger.info("column: " + column.getColumnName() + " " + column.getColumnType() + " " + column.getOrdinalPosition());
-            columnReferences.add(new TupleDomainPixelsPredicate.ColumnReference<>(column, column.getOrdinalPosition(), column.getColumnType()));
+            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + column.getOrdinalPosition());
+            columnReferences.add(
+                    new TupleDomainPixelsPredicate.ColumnReference<>(
+                            column,
+                            column.getOrdinalPosition(),
+                            column.getColumnType()));
         }
         PixelsPredicate predicate = new TupleDomainPixelsPredicate<>(split.getConstraint(), columnReferences);
 
@@ -130,7 +116,7 @@ class PixelsPageSource implements ConnectorPageSource {
             this.nanoStart = System.nanoTime();
         try {
             this.batchId++;
-            this.rowBatch = this.recordReader.readBatch(10000);
+            this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
@@ -141,11 +127,12 @@ class PixelsPageSource implements ConnectorPageSource {
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
             {
-                Type type = types.get(fieldId);
+                Type type = columns.get(fieldId).getColumnType();
                 String typeName = type.getDisplayName();
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
-                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
+                BlockBuilder blockBuilder = type.createBlockBuilder(
+                        new BlockBuilderStatus(), batchSize, 0);
                 switch (typeName)
                 {
                     case "integer":
@@ -162,6 +149,21 @@ class PixelsPageSource implements ConnectorPageSource {
                             type.writeDouble(blockBuilder, dcv.vector[i]);
                         }
                         break;
+                    case "varchar":
+                    case "string":
+                        BytesColumnVector scv = (BytesColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]));
+                        }
+                        break;
+                    case "boolean":
+                        LongColumnVector bcv = (LongColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                        }
+                        break;
                     default:
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
@@ -170,12 +172,6 @@ class PixelsPageSource implements ConnectorPageSource {
                         break;
                 }
                 blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
-//                blocks[fieldId] = new LazyBlock(batchSize, new LazyBlockLoader<LazyBlock>() {
-//                    @Override
-//                    public void load(LazyBlock block) {
-//                        block.setBlock(blockBuilder.build());
-//                    }
-//                });
             }
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
@@ -198,6 +194,7 @@ class PixelsPageSource implements ConnectorPageSource {
     public void close() {
         try {
             pixelsReader.close();
+            rowBatch = null;
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.info("close error: " + e.getMessage());
@@ -210,7 +207,7 @@ class PixelsPageSource implements ConnectorPageSource {
         closed = true;
     }
 
-    protected void closeWithSuppression(Throwable throwable) {
+    private void closeWithSuppression(Throwable throwable) {
         requireNonNull(throwable, "throwable is null");
         try {
             close();
@@ -247,7 +244,7 @@ class PixelsPageSource implements ConnectorPageSource {
                 return;
             }
             checkState(batchId == expectedBatchId);
-            BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), MAX_BATCH_SIZE);
+            BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), BATCH_SIZE);
             Block block = builder.build();
             lazyBlock.setBlock(block);
             loaded = true;
