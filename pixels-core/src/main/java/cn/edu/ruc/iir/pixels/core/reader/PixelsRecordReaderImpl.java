@@ -505,7 +505,7 @@ public class PixelsRecordReaderImpl
                 }
             }
         }
-        // write out read performance metrics
+//         write out read performance metrics
         if (enableMetrics) {
             String metrics = JSON.toJSONString(readPerfMetrics);
             Path metricsFilePath = Paths.get(metricsDir,
