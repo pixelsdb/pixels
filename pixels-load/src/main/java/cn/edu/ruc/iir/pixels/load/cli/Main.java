@@ -21,6 +21,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
@@ -32,10 +33,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
-import java.util.Collection;
-import java.util.List;
-import java.util.Properties;
-import java.util.Scanner;
+import java.util.*;
 
 /**
  * @version V1.0
@@ -43,9 +41,14 @@ import java.util.Scanner;
  * @ClassName: Main
  * @Description: DDL, LOAD
  * <p>
- * DDL -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/DDL.txt -d pixels
+ * DDL -s /home/tao/software/data/pixels/DDL.txt -d pixels
  * <p>
- * LOAD -p /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/data/ -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/Test.sql -f hdfs://presto00:9000/po_compare/
+ * LOAD -p /home/tao/software/data/pixels/data/ -s /home/tao/software/data/pixels/Test.sql -f hdfs://presto00:9000/po_compare/
+ * <br> 1000 columns
+ * <p>
+ * DDL -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -d pixels
+ * <p>
+ * LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/
  * @author: Tao
  * @date: Create in 2018-04-09 16:00
  **/
@@ -188,10 +191,22 @@ public class Main {
                         }
                         tSchema = prefix + suffix.substring(0, suffix.length() - 1) + ">";
 
-                        Configuration conf = new Configuration();
-                        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-                        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-                        FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+                        ConfigFactory instance = ConfigFactory.Instance();
+                        String hdfsConfigPath = instance.getProperty("hdfs.config.dir");
+                        Configuration hdfsConfig = new Configuration(false);
+                        File hdfsConfigDir = new File(hdfsConfigPath);
+                        hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+                        hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
+                        if (hdfsConfigDir.exists() && hdfsConfigDir.isDirectory()) {
+                            File[] hdfsConfigFiles = hdfsConfigDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
+                            if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2) {
+                                hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
+                                hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
+                            }
+                        } else {
+                            System.out.println("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
+                        }
+                        FileSystem fs = FileSystem.get(URI.create(filePath), hdfsConfig);
                         TypeDescription schema = TypeDescription.fromString(tSchema);
                         VectorizedRowBatch rowBatch = schema.createRowBatch();
                         ColumnVector[] columnVectors = new ColumnVector[size];
@@ -207,12 +222,14 @@ public class Main {
                             } else if (type.equals("varchar") || type.equals("string")) {
                                 BytesColumnVector z = (BytesColumnVector) rowBatch.cols[i];
                                 columnVectors[i] = z;
+                            } else if (type.equals("boolean")) {
+                                LongColumnVector c = (LongColumnVector) rowBatch.cols[i];
+                                columnVectors[i] = c;
                             }
                         }
 
-                        ConfigFactory instance = ConfigFactory.Instance();
-                        int pixelStride = Integer.parseInt(instance.getProperty("pixelStride"));
-                        int rowGroupSize = Integer.parseInt(instance.getProperty("rowGroupSize"));
+                        int pixelStride = Integer.parseInt(instance.getProperty("pixel.stride"));
+                        int rowGroupSize = Integer.parseInt(instance.getProperty("row.group.size")) * 1024 * 1024;
                         int blockSize = 256 * 1024 * 1024;
                         short blockReplication = 3;
                         boolean blockPadding = true;
@@ -234,7 +251,7 @@ public class Main {
                                         .setCompressionBlockSize(compressionBlockSize)
                                         .build();
 
-                        Collection<File> files = FileUtils.listFiles(dataPath);
+                        Collection<File> files = FileUtils.listFiles(dataPath, true);
                         BufferedReader br = null;
                         String path = "";
                         String curLine;
@@ -250,8 +267,9 @@ public class Main {
                             path = f.getPath();
                             br = new BufferedReader(new FileReader(path));
                             while ((curLine = br.readLine()) != null) {
+                                // benchmark exists True or False
+                                curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
                                 splitLine = curLine.split("\t");
-                                writeLine.append(curLine).append("\n");
                                 int row = rowBatch.size++;
                                 for (int j = 0; j < splitLine.length; j++) {
                                     columnVectors[j].add(splitLine[j]);
@@ -263,7 +281,7 @@ public class Main {
                                 }
 
                                 // at the end of each col, judge the size of the file
-                                fileS = writeLine.toString().getBytes().length;
+                                fileS += (curLine + "\n").getBytes().length;
                                 fileSize = df.format((double) fileS / blockSize);
                                 if (Double.valueOf(fileSize) >= 1) {
                                     fileNum++;
@@ -285,12 +303,11 @@ public class Main {
                                                     .setEncoding(encoding)
                                                     .setCompressionBlockSize(compressionBlockSize)
                                                     .build();
-                                    writeLine = new StringBuilder();
                                     fileS = 0;
                                 }
                             }
+                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
                         }
-
                         // only one hdfs file
                         if (fileS > 0) {
                             if (rowBatch.size != 0) {
@@ -299,7 +316,7 @@ public class Main {
                             }
                             pixelsWriter.close();
                         }
-                        System.out.println("Loading file number: " + fileNum);
+                        br.close();
                         System.out.println("Executing command " + command + " successfully");
                     }
 
@@ -314,25 +331,23 @@ public class Main {
     }
 
     private static void addColumnsByTableID(List<TableElement> elements, int size, int tableID) throws SQLException {
-        String insColumnSQL = "";
-        String prefix = "INSERT INTO COLS (COL_NAME, COL_TYPE, TBLS_TBL_ID) VALUES ";
-        StringBuilder suffix = new StringBuilder();
+        String prefix = "INSERT INTO COLS (COL_NAME, COL_TYPE, TBLS_TBL_ID) VALUES (?, ?, ?)";
         DBUtils instance = DBUtils.Instance();
-        Connection conn = instance.getConn();
+        Connection conn = instance.getConnection();
         conn.setAutoCommit(false);
-        PreparedStatement pst = instance.getPsmt();
-
+        PreparedStatement pst = conn.prepareStatement(prefix);
         for (int i = 0; i < size; i++) {
             ColumnDefinition column = (ColumnDefinition) elements.get(i);
             String name = column.getName().toString();
             String type = column.getType();
-            suffix.append("('" + name + "', '" + type + "', " + tableID + "),");
-            insColumnSQL = prefix + suffix.substring(0, suffix.length() - 1);
-            pst.addBatch(insColumnSQL);
+            pst.setString(1, name);
+            pst.setString(2, type);
+            pst.setInt(3, tableID);
+            pst.addBatch();
             pst.executeBatch();
             conn.commit();
-            suffix = new StringBuilder();
         }
-        instance.close();
+        pst.close();
+        conn.close();
     }
 }

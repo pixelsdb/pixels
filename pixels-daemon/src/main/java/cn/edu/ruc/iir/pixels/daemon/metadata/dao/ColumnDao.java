@@ -47,6 +47,7 @@ public class ColumnDao implements BaseDao<Column> {
             rs = psmt.executeQuery();
             while (rs.next()) {
                 Column column = new Column();
+                column.setColId(rs.getInt("COL_ID"));
                 column.setColName(rs.getString("COL_NAME"));
                 column.setColType(rs.getString("COL_TYPE"));
                 columnList.add(column);
