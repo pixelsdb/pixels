@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsMetricsCollectProbOutOfRange;
