@@ -14,6 +14,7 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.apache.hadoop.fs.Path;
 
@@ -28,7 +29,7 @@ import static java.util.Objects.requireNonNull;
 
 class PixelsPageSource implements ConnectorPageSource {
     private static Logger logger = Logger.get(PixelsPageSource.class);
-    private static final int BATCH_SIZE = 10000;
+    private static final int BATCH_SIZE = 1000;
     private List<PixelsColumnHandle> columns;
     private FSFactory fsFactory;
     private boolean closed;
@@ -132,7 +133,9 @@ class PixelsPageSource implements ConnectorPageSource {
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
                 BlockBuilder blockBuilder = type.createBlockBuilder(
-                        new BlockBuilderStatus(), batchSize, 0);
+                        new BlockBuilderStatus(), batchSize);
+                boolean isSlice = false;
+
                 switch (typeName)
                 {
                     case "integer":
@@ -152,10 +155,52 @@ class PixelsPageSource implements ConnectorPageSource {
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
+                        int size = 0;
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
-                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]));
+                            size += scv.vector[i].length;
                         }
+                        Slice slice = Slices.allocate(size);
+                        int positions = this.rowBatch.size;
+                        boolean[] valueIsNull = new boolean[positions];
+                        int[] offsets = new int[positions+1];
+                        int index = 0;
+                        for (int i = 0; i < positions; ++i)
+                        {
+                            if (scv.vector[i] == null)
+                            {
+                                valueIsNull[i] = true;
+                                offsets[i+1] = offsets[i];
+                            }
+                            else
+                            {
+                                valueIsNull[i] = false;
+                                offsets[i+1] = scv.vector[i].length;
+                                slice.setBytes(index, scv.vector[i]);
+                                index += scv.vector[i].length;
+                            }
+                        }
+                        isSlice = true;
+                        blocks[fieldId] = new VariableWidthBlock(positions, slice, offsets, valueIsNull);
+
+                        /*
+                        String sample = Slices.wrappedBuffer(scv.vector[0]).toByteBuffer().toString() + "******" +
+                                new String(scv.vector[0]);
+                        long start = System.nanoTime();
+                        long size = 0;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            Slice slice = Slices.wrappedBuffer(scv.vector[i]);
+                            size += scv.vector[i].length;
+                            //blockBuilder.appendNull();
+                            type.writeSlice(blockBuilder, slice);
+                        }
+                        long cost = System.nanoTime()-start;
+                        logger.error("write slice cost: " + cost);
+                        logger.error("row batch size in bytes: " + size + ", batch size: " + batchSize);
+                        logger.error("slice sample: " + sample);
+                        //logger.error("block builder class: " + blockBuilder.getClass().getName() + ", type class: " + type.getClass().getName() + ", type name: " + typeName);
+                        */
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
@@ -171,7 +216,10 @@ class PixelsPageSource implements ConnectorPageSource {
                         }
                         break;
                 }
-                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                if (!isSlice)
+                {
+                    blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                }
             }
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
