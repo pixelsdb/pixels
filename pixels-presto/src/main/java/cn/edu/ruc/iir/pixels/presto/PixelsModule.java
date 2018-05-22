@@ -69,6 +69,7 @@ public class PixelsModule
 
     public static final class TypeDeserializer
             extends FromStringDeserializer<Type> {
+        private static final long serialVersionUID = -8192232141190978355L;
         private final TypeManager typeManager;
 
         @Inject
