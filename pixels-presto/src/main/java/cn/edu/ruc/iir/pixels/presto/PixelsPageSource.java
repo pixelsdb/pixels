@@ -128,10 +128,9 @@ class PixelsPageSource implements ConnectorPageSource {
             this.batchId++;
             this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
             int batchSize = this.rowBatch.size;
-            logger.info("Num of columns to read: " + this.numColumnToRead);
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
-                logger.info("getNextPage close");
+                logger.debug("getNextPage close");
                 return null;
             }
             Block[] blocks = new Block[this.numColumnToRead];
@@ -144,35 +143,34 @@ class PixelsPageSource implements ConnectorPageSource {
                 ColumnVector cv = this.rowBatch.cols[projIndex];
                 BlockBuilder blockBuilder = type.createBlockBuilder(
                         new BlockBuilderStatus(), batchSize);
-                boolean isSlice = false;
 
-                logger.info("Type: " + typeName);
                 switch (typeName)
                 {
                     case "integer":
                         LongColumnVector lcv = (LongColumnVector) cv;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        for (int i = 0; i < batchSize; ++i)
                         {
                             type.writeLong(blockBuilder, lcv.vector[i]);
                         }
+                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
                         break;
                     case "double":
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        for (int i = 0; i < batchSize; ++i)
                         {
                             type.writeDouble(blockBuilder, dcv.vector[i]);
                         }
+                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
                         break;
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
-                        int size = scv.start[this.rowBatch.size - 1] + scv.lens[this.rowBatch.size - 1];
+                        int size = scv.start[batchSize - 1] + scv.lens[batchSize - 1];
                         Slice slice = Slices.wrappedBuffer(scv.buffer, 0, size);
-                        int positions = this.rowBatch.size;
                         boolean[] valueIsNull = scv.isNull;
                         int[] offsets = scv.start;
-                        isSlice = true;
-                        blocks[fieldId] = new VariableWidthBlock(positions, slice, offsets, valueIsNull);
+                        blocks[fieldId] = new VariableWidthBlock(batchSize, slice, offsets, valueIsNull)
+                                .getRegion(0, batchSize);
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
@@ -180,23 +178,21 @@ class PixelsPageSource implements ConnectorPageSource {
                         {
                             type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
                         }
+                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
                         break;
                     default:
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
                             blockBuilder.appendNull();
                         }
+                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
                         break;
-                }
-                if (!isSlice)
-                {
-                    blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
                 }
             }
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 endOfFile = true;
-                logger.info("End of file, batch size: " + batchSize);
+                logger.debug("End of file, batch size: " + batchSize);
             }
             return new Page(batchSize, blocks);
         } catch (IOException e) {
@@ -217,7 +213,7 @@ class PixelsPageSource implements ConnectorPageSource {
             rowBatch = null;
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
-            logger.info("close error: " + e.getMessage());
+            logger.error("close error: " + e.getMessage());
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times

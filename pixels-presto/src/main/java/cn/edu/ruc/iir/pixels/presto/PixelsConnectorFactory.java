@@ -35,7 +35,7 @@ public class PixelsConnectorFactory
     private final String name = "pixels-presto";
 
     public PixelsConnectorFactory()  {
-        logger.info("Connector " + name + " initialized.");
+        logger.debug("Connector " + name + " initialized.");
     }
 
     @Override

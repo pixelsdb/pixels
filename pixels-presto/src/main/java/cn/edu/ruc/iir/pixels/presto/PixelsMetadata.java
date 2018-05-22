@@ -59,7 +59,7 @@ public class PixelsMetadata
 
     public List<String> listSchemaNamesInternal() {
         List<String> schemaNameList = pixelsMetadataReader.getSchemaNames();
-        logger.info("PixelsMetadata listSchemaNames： " + schemaNameList.toString());
+        logger.debug("PixelsMetadata listSchemaNames： " + schemaNameList.toString());
         return schemaNameList;
     }
 
@@ -80,8 +80,8 @@ public class PixelsMetadata
 
         // create PixelsTableLayoutHandle
         PixelsTableLayoutHandle tableLayout = pixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
-        logger.info("getTableLayouts tableLayout： " + tableLayout.toString());
-        logger.info("getTableLayouts size： " + constraint.getSummary().getColumnDomains().get().size());
+        logger.debug("getTableLayouts tableLayout： " + tableLayout.toString());
+        logger.debug("getTableLayouts size： " + constraint.getSummary().getColumnDomains().get().size());
         tableLayout.setConstraint(constraint.getSummary());
         ConnectorTableLayout layout = getTableLayout(session, tableLayout);
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
@@ -128,7 +128,7 @@ public class PixelsMetadata
                 builder.add(new SchemaTableName(schemaName, tableName));
             }
         }
-        logger.info("PixelsMetadata listTables： " + builder.build().toString());
+        logger.debug("PixelsMetadata listTables： " + builder.build().toString());
         return builder.build();
     }
 
@@ -146,7 +146,7 @@ public class PixelsMetadata
         for (PixelsColumnHandle column : columnHandleList) {
             columnHandles.put(column.getColumnName(), column);
         }
-        logger.info("PixelsMetadata getColumnHandles： " + columnHandles.build().values());
+        logger.debug("PixelsMetadata getColumnHandles： " + columnHandles.build().values());
         return columnHandles.build();
     }
 
@@ -161,7 +161,7 @@ public class PixelsMetadata
                 columns.put(tableName, tableMetadata.getColumns());
             }
         }
-        logger.info("PixelsMetadata listTableColumns： " + columns.build().values());
+        logger.debug("PixelsMetadata listTableColumns： " + columns.build().values());
         return columns.build();
     }
 
@@ -175,7 +175,7 @@ public class PixelsMetadata
 
     @Override
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
-        logger.info("PixelsMetadata getColumnMetadata： " + columnHandle.toString());
+        logger.debug("PixelsMetadata getColumnMetadata： " + columnHandle.toString());
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
 
@@ -188,11 +188,11 @@ public class PixelsMetadata
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
-        logger.info("User " + session.getUser() + " " + ignoreExisting);
-        logger.info("tableMetadata " + tableMetadata.toString());
+        logger.debug("User " + session.getUser() + " " + ignoreExisting);
+        logger.debug("tableMetadata " + tableMetadata.toString());
         Map<String, Object> map = tableMetadata.getProperties();
         for (String key : map.keySet()) {
-            logger.info(key + " " + map.get(key));
+            logger.debug(key + " " + map.get(key));
         }
 
 //        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());

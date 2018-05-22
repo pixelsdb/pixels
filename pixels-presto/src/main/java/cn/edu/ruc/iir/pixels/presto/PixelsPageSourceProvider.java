@@ -12,7 +12,6 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -33,7 +32,7 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
-        logger.info("PixelsPageSourceProvider connectorId: " + connectorId.toString());
+        logger.debug("PixelsPageSourceProvider connectorId: " + connectorId.toString());
     }
 
     @Override
@@ -43,13 +42,13 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
 
-        logger.info("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.toString());
+        logger.debug("PixelsPageSourceProvider pixelsColumns: " + pixelsColumns.toString());
 
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        logger.info("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
+        logger.debug("new PixelsRecordSet: " + pixelsSplit.getSchemaName() + ", " + pixelsSplit.getTableName() + ", " + pixelsSplit.getPath());
         return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
     }
 }

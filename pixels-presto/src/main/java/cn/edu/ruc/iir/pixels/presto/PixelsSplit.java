@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 
-import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Objects;
 
@@ -62,11 +61,11 @@ public class PixelsSplit
         this.connectorId = requireNonNull(connectorId, "connector id is null");
         this.tableName = requireNonNull(tableName, "table name is null");
         this.path = requireNonNull(path, "path is null");
-        this.start = requireNonNull(start, "start is null");
-        this.len = requireNonNull(len, "len is null");
+        this.start = start;
+        this.len = len;
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.constraint = requireNonNull(constraint, "constraint is null");
-        log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
+        log.debug("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
     }
 
     @JsonProperty
