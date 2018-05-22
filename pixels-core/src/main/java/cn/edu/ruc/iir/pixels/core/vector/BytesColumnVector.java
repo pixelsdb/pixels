@@ -34,7 +34,7 @@ public class BytesColumnVector extends ColumnVector
 
     // A call to increaseBufferSpace() or ensureValPreallocated() will ensure that buffer[] points to
     // a byte[] with sufficient space for the specified size.
-    private byte[] buffer;   // optional buffer to use when actually copying in data
+    public byte[] buffer;   // optional buffer to use when actually copying in data
     private int nextFree;    // next free position in buffer
 
     // Hang onto a byte array for holding smaller byte values

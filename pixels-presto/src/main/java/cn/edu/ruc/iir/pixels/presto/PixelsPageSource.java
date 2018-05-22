@@ -6,11 +6,20 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.*;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.block.LazyBlock;
+import com.facebook.presto.spi.block.LazyBlockLoader;
+import com.facebook.presto.spi.block.VariableWidthBlock;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
@@ -92,10 +101,10 @@ class PixelsPageSource implements ConnectorPageSource {
                         .build();
             }
             else {
-                logger.info("pixelsReader error: getFileSystem() null");
+                logger.error("pixelsReader error: getFileSystem() null");
             }
         } catch (IOException e) {
-            logger.info("pixelsReader error: " + e.getMessage());
+            logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
         }
     }
@@ -119,6 +128,7 @@ class PixelsPageSource implements ConnectorPageSource {
             this.batchId++;
             this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
             int batchSize = this.rowBatch.size;
+            logger.info("Num of columns to read: " + this.numColumnToRead);
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
                 logger.info("getNextPage close");
@@ -136,6 +146,7 @@ class PixelsPageSource implements ConnectorPageSource {
                         new BlockBuilderStatus(), batchSize);
                 boolean isSlice = false;
 
+                logger.info("Type: " + typeName);
                 switch (typeName)
                 {
                     case "integer":
@@ -155,52 +166,13 @@ class PixelsPageSource implements ConnectorPageSource {
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
-                        int size = 0;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
-                        {
-                            size += scv.vector[i].length;
-                        }
-                        Slice slice = Slices.allocate(size);
+                        int size = scv.start[this.rowBatch.size - 1] + scv.lens[this.rowBatch.size - 1];
+                        Slice slice = Slices.wrappedBuffer(scv.buffer, 0, size);
                         int positions = this.rowBatch.size;
-                        boolean[] valueIsNull = new boolean[positions];
-                        int[] offsets = new int[positions+1];
-                        int index = 0;
-                        for (int i = 0; i < positions; ++i)
-                        {
-                            if (scv.vector[i] == null)
-                            {
-                                valueIsNull[i] = true;
-                                offsets[i+1] = offsets[i];
-                            }
-                            else
-                            {
-                                valueIsNull[i] = false;
-                                offsets[i+1] = scv.vector[i].length;
-                                slice.setBytes(index, scv.vector[i]);
-                                index += scv.vector[i].length;
-                            }
-                        }
+                        boolean[] valueIsNull = scv.isNull;
+                        int[] offsets = scv.start;
                         isSlice = true;
                         blocks[fieldId] = new VariableWidthBlock(positions, slice, offsets, valueIsNull);
-
-                        /*
-                        String sample = Slices.wrappedBuffer(scv.vector[0]).toByteBuffer().toString() + "******" +
-                                new String(scv.vector[0]);
-                        long start = System.nanoTime();
-                        long size = 0;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
-                        {
-                            Slice slice = Slices.wrappedBuffer(scv.vector[i]);
-                            size += scv.vector[i].length;
-                            //blockBuilder.appendNull();
-                            type.writeSlice(blockBuilder, slice);
-                        }
-                        long cost = System.nanoTime()-start;
-                        logger.error("write slice cost: " + cost);
-                        logger.error("row batch size in bytes: " + size + ", batch size: " + batchSize);
-                        logger.error("slice sample: " + sample);
-                        //logger.error("block builder class: " + blockBuilder.getClass().getName() + ", type class: " + type.getClass().getName() + ", type name: " + typeName);
-                        */
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
@@ -224,7 +196,7 @@ class PixelsPageSource implements ConnectorPageSource {
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 endOfFile = true;
-                logger.info("End of file");
+                logger.info("End of file, batch size: " + batchSize);
             }
             return new Page(batchSize, blocks);
         } catch (IOException e) {
