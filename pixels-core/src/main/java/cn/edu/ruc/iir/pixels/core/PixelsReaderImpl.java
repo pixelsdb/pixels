@@ -6,7 +6,6 @@ import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsMetricsCollectProbOutOfRange;
-import cn.edu.ruc.iir.pixels.core.exception.PixelsMetricsDirNotFoundException;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsReaderException;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
@@ -136,7 +135,7 @@ public class PixelsReaderImpl
             String metricsDir = coreConfig.getMetricsDir();
             File file = new File(metricsDir);
             if (!file.isDirectory() || !file.exists()) {
-                throw new PixelsMetricsDirNotFoundException(metricsDir);
+//                throw new PixelsMetricsDirNotFoundException(metricsDir);
             }
 
             // check metrics collect probability

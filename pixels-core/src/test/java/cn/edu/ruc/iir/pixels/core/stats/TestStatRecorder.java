@@ -141,4 +141,17 @@ public class TestStatRecorder
         assertEquals(11, recorder.getNumberOfValues());
         assertEquals(44, recorder.getSum());
     }
+
+    @Test
+    public void testStringStatsRecorderWithNull()
+    {
+        StringStatsRecorder recorder = new StringStatsRecorder();
+//        recorder.updateString("", 1);
+        recorder.updateString("this", 1);
+        System.out.println("Min: " + recorder.getMaximum());
+        System.out.println("Max: " + recorder.getMinimum());
+        recorder.updateString(new byte[0], 0, 0, 1);
+        System.out.println("Min: " + recorder.getMaximum());
+        System.out.println("Max: " + recorder.getMinimum());
+    }
 }
