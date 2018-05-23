@@ -103,4 +103,16 @@ public class TestColumnVector
         assertFalse(rowBatch.cols[6].duplicated);
         assert rowBatch.cols[6].originVecId == -1;
     }
+
+    @Test
+    public void testBytesColumnVector()
+    {
+        BytesColumnVector cv = new BytesColumnVector();
+        cv.init();
+        cv.ensureSize(1000, false);
+        for (int i = 0; i < 10000; i++)
+        {
+            cv.add("13333333333333333333333333333334");   //32 bytes
+        }
+    }
 }

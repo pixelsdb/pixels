@@ -3,7 +3,6 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
-import cn.edu.ruc.iir.pixels.core.PixelsVersion;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
@@ -17,9 +16,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.TimeZone;
-
-import static org.junit.Assert.assertEquals;
 
 /**
  * pixels
@@ -54,13 +50,13 @@ public class TestPixelsReader {
             return;
         }
 
-        assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
-        assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
-        assertEquals(schema, pixelsReader.getFileSchema());
-        assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
-        assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
-        assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
-        assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
+//        assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
+//        assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
+//        assertEquals(schema, pixelsReader.getFileSchema());
+//        assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
+//        assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
+//        assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
+//        assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
 
         System.out.println(">>Footer: " + pixelsReader.getFooter().toString());
         System.out.println(">>Postscript: " + pixelsReader.getPostScript().toString());
@@ -71,9 +67,10 @@ public class TestPixelsReader {
         try {
             for (int i = 0; i < rowGroupNum; i++) {
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
-                System.out.println(pixelsReader.getRowGroupInfo(i));
-//                System.out.println(">>Row group " + i + " footer");
-//                System.out.println(rowGroupFooter);
+                PixelsProto.ColumnChunkIndex index = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(5);
+//                System.out.println(pixelsReader.getRowGroupInfo(i));
+                System.out.println(">>Row group " + i + " footer");
+                System.out.println(index);
             }
         } catch (IOException e) {
             e.printStackTrace();

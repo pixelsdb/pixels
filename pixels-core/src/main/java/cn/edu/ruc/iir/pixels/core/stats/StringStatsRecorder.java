@@ -2,6 +2,8 @@ package cn.edu.ruc.iir.pixels.core.stats;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -47,15 +49,17 @@ public class StringStatsRecorder
     @Override
     public void updateString(String value, int repetitions)
     {
-        if (minimum == null) {
-            minimum = maximum = value;
-        }
-        else {
-            if (value.compareTo(minimum) < 0) {
-                minimum = value;
+        if (value.length() > 0) {
+            if (minimum == null) {
+                minimum = maximum = value;
             }
-            if (value.compareTo(maximum) > 0) {
-                maximum = value;
+            else {
+                if (value.compareTo(minimum) < 0) {
+                    minimum = value;
+                }
+                if (value.compareTo(maximum) > 0) {
+                    maximum = value;
+                }
             }
         }
         sum += value.length() * repetitions;
@@ -68,19 +72,7 @@ public class StringStatsRecorder
         ByteBuffer buffer = ByteBuffer.wrap(value, offset, length);
         try {
             String str = EncodingUtils.decodeString(buffer, true);
-            if (minimum == null) {
-                minimum = maximum = str;
-            }
-            else {
-                if (str.compareTo(minimum) < 0) {
-                    minimum = str;
-                }
-                if (str.compareTo(maximum) > 0) {
-                    maximum = str;
-                }
-            }
-            sum += str.length() * repetitions;
-            numberOfValues += repetitions;
+            updateString(str, repetitions);
         }
         catch (CharacterCodingException e) {
             buffer.clear();
@@ -136,15 +128,15 @@ public class StringStatsRecorder
     }
 
     @Override
-    public String getMinimum()
+    public Slice getMinimum()
     {
-        return minimum;
+        return Slices.utf8Slice(minimum);
     }
 
     @Override
-    public String getMaximum()
+    public Slice getMaximum()
     {
-        return maximum;
+        return Slices.utf8Slice(maximum);
     }
 
     /**

@@ -13,6 +13,7 @@ import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import com.alibaba.fastjson.JSON;
+import io.airlift.log.Logger;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -34,6 +35,8 @@ import java.util.Map;
 public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
+    private static final Logger logger = Logger.get(PixelsRecordReaderImpl.class.getName());
+
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
@@ -339,7 +342,7 @@ public class PixelsRecordReaderImpl
                 }
             }
             long readDiskEnd = System.currentTimeMillis();
-            System.out.println("[" + physicalFSReader.getPath().getName() + "] " + readDiskBegin + " " + readDiskEnd +
+            logger.debug("[" + physicalFSReader.getPath().getName() + "] " + readDiskBegin + " " + readDiskEnd +
                     ", disk cost: " + (readDiskEnd - readDiskBegin));
         }
         catch (IOException e) {

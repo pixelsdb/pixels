@@ -1,15 +1,17 @@
 package cn.edu.ruc.iir.pixels.core.stats;
 
+import io.airlift.slice.Slice;
+
 /**
  * pixels
  *
  * @author guodong
  */
-public interface StringColumnStats extends RangeStats<String>
+public interface StringColumnStats extends RangeStats<Slice>
 {
-    String getMinimum();
+    Slice getMinimum();
 
-    String getMaximum();
+    Slice getMaximum();
 
     /**
      * Get the total length of all strings

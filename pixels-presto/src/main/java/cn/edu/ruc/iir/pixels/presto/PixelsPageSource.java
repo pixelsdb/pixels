@@ -6,11 +6,19 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.*;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.block.LazyBlock;
+import com.facebook.presto.spi.block.LazyBlockLoader;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
@@ -91,10 +99,10 @@ class PixelsPageSource implements ConnectorPageSource {
                         .build();
             }
             else {
-                logger.info("pixelsReader error: getFileSystem() null");
+                logger.error("pixelsReader error: getFileSystem() null");
             }
         } catch (IOException e) {
-            logger.info("pixelsReader error: " + e.getMessage());
+            logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
         }
     }
@@ -120,7 +128,7 @@ class PixelsPageSource implements ConnectorPageSource {
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
-                logger.info("getNextPage close");
+                logger.debug("getNextPage close");
                 return null;
             }
             Block[] blocks = new Block[this.numColumnToRead];
@@ -131,6 +139,7 @@ class PixelsPageSource implements ConnectorPageSource {
                 String typeName = type.getDisplayName();
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
+<<<<<<< HEAD
 <<<<<<< HEAD
                 BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
                 if (typeName.equals("integer"))
@@ -167,32 +176,41 @@ class PixelsPageSource implements ConnectorPageSource {
                 }
                 else
 =======
+=======
+>>>>>>> 3d7eb7c23e39599e707588c75ea1643ee4da1b25
                 BlockBuilder blockBuilder = type.createBlockBuilder(
-                        new BlockBuilderStatus(), batchSize, 0);
+                        new BlockBuilderStatus(), batchSize);
+
                 switch (typeName)
+<<<<<<< HEAD
 >>>>>>> 35f9d21d1e32ea390c2f73a239a841d4e4ac4ca2
+=======
+>>>>>>> 3d7eb7c23e39599e707588c75ea1643ee4da1b25
                 {
                     case "integer":
                         LongColumnVector lcv = (LongColumnVector) cv;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        for (int i = 0; i < batchSize; ++i)
                         {
                             type.writeLong(blockBuilder, lcv.vector[i]);
                         }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "double":
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        for (int i = 0; i < batchSize; ++i)
                         {
                             type.writeDouble(blockBuilder, dcv.vector[i]);
                         }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
-                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]));
+                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]), scv.start[i], scv.lens[i]);
                         }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
@@ -200,20 +218,21 @@ class PixelsPageSource implements ConnectorPageSource {
                         {
                             type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
                         }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     default:
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
                             blockBuilder.appendNull();
                         }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                 }
-                blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
             }
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 endOfFile = true;
-                logger.info("End of file");
+                logger.debug("End of file, batch size: " + batchSize);
             }
             return new Page(batchSize, blocks);
         } catch (IOException e) {
@@ -234,7 +253,7 @@ class PixelsPageSource implements ConnectorPageSource {
             rowBatch = null;
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
-            logger.info("close error: " + e.getMessage());
+            logger.error("close error: " + e.getMessage());
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times

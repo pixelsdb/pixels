@@ -7,7 +7,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * @version V1.0
@@ -48,14 +47,12 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
         buf.readBytes(req);
         String body = new String(req, "UTF-8");
         sb.append(body);
-        System.out.println("Read is: " + body);
         isRead = true;
 //        map.put(token, body);
     }
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("ReadComplete is: " + sb.toString());
         ctx.flush();
         map.put(token, sb.toString());
         if(isRead){
@@ -67,7 +64,6 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println("Client Exception: ");
         cause.printStackTrace();
         ctx.close();
     }
