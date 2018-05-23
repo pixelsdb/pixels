@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
 
 class PixelsPageSource implements ConnectorPageSource {
     private static Logger logger = Logger.get(PixelsPageSource.class);
-    private static final int BATCH_SIZE = 1000;
+    private static final int BATCH_SIZE = 10000;
     private List<PixelsColumnHandle> columns;
     private FSFactory fsFactory;
     private boolean closed;
@@ -167,10 +167,13 @@ class PixelsPageSource implements ConnectorPageSource {
                         BytesColumnVector scv = (BytesColumnVector) cv;
                         int size = scv.start[batchSize - 1] + scv.lens[batchSize - 1];
                         Slice slice = Slices.wrappedBuffer(scv.buffer, 0, size);
-                        boolean[] valueIsNull = scv.isNull;
-                        int[] offsets = scv.start;
-                        blocks[fieldId] = new VariableWidthBlock(batchSize, slice, offsets, valueIsNull)
-                                .getRegion(0, batchSize);
+                        boolean[] valueIsNull = new boolean[batchSize];
+                        System.arraycopy(scv.isNull, 0, valueIsNull, 0, batchSize);
+                        int[] offsets = new int[batchSize+1];
+                        System.arraycopy(scv.start, 0, offsets, 0, batchSize);
+                        offsets[batchSize] = size;
+                        blocks[fieldId] = new VariableWidthBlock(batchSize, slice, offsets, valueIsNull);
+                                //.getRegion(0, batchSize);
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
