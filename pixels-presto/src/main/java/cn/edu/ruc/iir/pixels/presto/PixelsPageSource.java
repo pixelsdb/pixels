@@ -19,11 +19,9 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.LazyBlock;
 import com.facebook.presto.spi.block.LazyBlockLoader;
-import com.facebook.presto.spi.block.VariableWidthBlock;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.apache.hadoop.fs.Path;
 
@@ -152,7 +150,7 @@ class PixelsPageSource implements ConnectorPageSource {
                         {
                             type.writeLong(blockBuilder, lcv.vector[i]);
                         }
-                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "double":
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
@@ -160,20 +158,16 @@ class PixelsPageSource implements ConnectorPageSource {
                         {
                             type.writeDouble(blockBuilder, dcv.vector[i]);
                         }
-                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
-                        int size = scv.start[batchSize - 1] + scv.lens[batchSize - 1];
-                        Slice slice = Slices.wrappedBuffer(scv.buffer, 0, size);
-                        boolean[] valueIsNull = new boolean[batchSize];
-                        System.arraycopy(scv.isNull, 0, valueIsNull, 0, batchSize);
-                        int[] offsets = new int[batchSize+1];
-                        System.arraycopy(scv.start, 0, offsets, 0, batchSize);
-                        offsets[batchSize] = size;
-                        blocks[fieldId] = new VariableWidthBlock(batchSize, slice, offsets, valueIsNull);
-                                //.getRegion(0, batchSize);
+                        for (int i = 0; i < batchSize; ++i)
+                        {
+                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]), scv.start[i], scv.lens[i]);
+                        }
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
@@ -181,14 +175,14 @@ class PixelsPageSource implements ConnectorPageSource {
                         {
                             type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
                         }
-                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                     default:
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
                             blockBuilder.appendNull();
                         }
-                        blocks[fieldId] = blockBuilder.build().getRegion(0, batchSize);
+                        blocks[fieldId] = blockBuilder.build();
                         break;
                 }
             }

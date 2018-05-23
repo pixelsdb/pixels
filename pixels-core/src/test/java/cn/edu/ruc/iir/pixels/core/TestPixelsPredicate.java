@@ -8,6 +8,7 @@ import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.slice.Slices;
 import org.junit.Test;
 
 import java.util.List;
@@ -66,7 +67,7 @@ public class TestPixelsPredicate
     @Test
     public void testVarcharPredicate()
     {
-        Domain testingColumnDomain = Domain.singleValue(VARCHAR, TEST_VARCHAR);
+        Domain testingColumnDomain = Domain.singleValue(VARCHAR, Slices.utf8Slice(TEST_VARCHAR));
         TupleDomain.ColumnDomain<String> colb = new TupleDomain.ColumnDomain<>(COLUMN_B_NAME, testingColumnDomain);
 
         TupleDomain<String> effectivePredicate = TupleDomain.fromColumnDomains(Optional.of(ImmutableList.of(colb)));
@@ -82,11 +83,12 @@ public class TestPixelsPredicate
         TypeDescription typeDescription = TypeDescription.createVarchar();
         StatsRecorder statsRecorder = StatsRecorder.create(typeDescription);
         statsRecorder.updateString(TEST_VARCHAR, 1);
+        statsRecorder.updateString("", 1);
         Map<Integer, ColumnStats> matchingStatsMap = ImmutableMap.of(0, statsRecorder, 1, statsRecorder);
 
         statsRecorder = StatsRecorder.create(typeDescription);
         statsRecorder.updateString("a", 1);
-        Map<Integer, ColumnStats> unMatchingStatsMap = ImmutableMap.of(0, statsRecorder);
+        Map<Integer, ColumnStats> unMatchingStatsMap = ImmutableMap.of(1, statsRecorder);
 
         assertTrue(predicate.matches(1L, matchingStatsMap));
         assertTrue(emptyPredicate.matches(1L, matchingStatsMap));

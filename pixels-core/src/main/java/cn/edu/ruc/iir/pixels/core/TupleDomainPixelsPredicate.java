@@ -11,8 +11,10 @@ import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
+import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.TimestampType;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
@@ -169,6 +171,9 @@ public class TupleDomainPixelsPredicate<C>
     private <T extends Comparable<T>> Domain createDomain(Type type, boolean hasNullValue,
                                                           RangeStats<T> rangeStats)
     {
+        if (type instanceof VarcharType || type instanceof CharType) {
+            return createDomain(type, hasNullValue, rangeStats, value -> value);
+        }
         return createDomain(type, hasNullValue, rangeStats, value -> value);
     }
 
