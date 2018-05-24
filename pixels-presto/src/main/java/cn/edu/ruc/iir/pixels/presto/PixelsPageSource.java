@@ -19,6 +19,7 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.LazyBlock;
 import com.facebook.presto.spi.block.LazyBlockLoader;
+import com.facebook.presto.spi.block.VariableWidthBlock;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
@@ -163,11 +164,26 @@ class PixelsPageSource implements ConnectorPageSource {
                     case "varchar":
                     case "string":
                         BytesColumnVector scv = (BytesColumnVector) cv;
+                        int vectorContentLen = 0;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeSlice(blockBuilder, Slices.wrappedBuffer(scv.vector[i]), scv.start[i], scv.lens[i]);
+                            vectorContentLen += scv.lens[i];
                         }
-                        blocks[fieldId] = blockBuilder.build();
+                        byte[] vectorContent = new byte[vectorContentLen];
+                        int[] vectorOffsets = new int[batchSize+1];
+                        int curVectorOffset = 0;
+                        for (int i = 0; i < batchSize; ++i)
+                        {
+                            int elementLen = scv.lens[i];
+                            System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
+                            vectorOffsets[i] = curVectorOffset;
+                            curVectorOffset += elementLen;
+                        }
+                        vectorOffsets[batchSize] = vectorContentLen;
+                        blocks[fieldId] = new VariableWidthBlock(batchSize,
+                                Slices.wrappedBuffer(vectorContent, 0, vectorContentLen),
+                                vectorOffsets,
+                                scv.isNull);
                         break;
                     case "boolean":
                         LongColumnVector bcv = (LongColumnVector) cv;
