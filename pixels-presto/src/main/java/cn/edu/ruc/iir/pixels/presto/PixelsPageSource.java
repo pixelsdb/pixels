@@ -139,53 +139,10 @@ class PixelsPageSource implements ConnectorPageSource {
                 String typeName = type.getDisplayName();
                 int projIndex = this.rowBatch.projectedColumns[fieldId];
                 ColumnVector cv = this.rowBatch.cols[projIndex];
-<<<<<<< HEAD
-<<<<<<< HEAD
-                BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), batchSize, 0);
-                if (typeName.equals("integer"))
-                {
-                    LongColumnVector lcv = (LongColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeLong(blockBuilder, lcv.vector[i]);
-                    }
-                }
-                else if (typeName.equals("double"))
-                {
-                    DoubleColumnVector dcv = (DoubleColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeDouble(blockBuilder, dcv.vector[i]);
-                    }
-                }
-                else if (typeName.equals("varchar") || typeName.equals("string"))
-                {
-                    BytesColumnVector scv = (BytesColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeSlice(blockBuilder, Slices.utf8Slice(new String(scv.vector[i])));
-                    }
-                }
-                else if(typeName.equals("boolean") )
-                {
-                    LongColumnVector bcv = (LongColumnVector) cv;
-                    for (int i = 0; i < this.rowBatch.size; ++i)
-                    {
-                        type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
-                    }
-                }
-                else
-=======
-=======
->>>>>>> 3d7eb7c23e39599e707588c75ea1643ee4da1b25
                 BlockBuilder blockBuilder = type.createBlockBuilder(
                         new BlockBuilderStatus(), batchSize);
 
                 switch (typeName)
-<<<<<<< HEAD
->>>>>>> 35f9d21d1e32ea390c2f73a239a841d4e4ac4ca2
-=======
->>>>>>> 3d7eb7c23e39599e707588c75ea1643ee4da1b25
                 {
                     case "integer":
                         LongColumnVector lcv = (LongColumnVector) cv;
