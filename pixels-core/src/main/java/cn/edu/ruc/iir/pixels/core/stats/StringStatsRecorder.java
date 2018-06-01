@@ -49,17 +49,15 @@ public class StringStatsRecorder
     @Override
     public void updateString(String value, int repetitions)
     {
-        if (value.length() > 0) {
-            if (minimum == null) {
-                minimum = maximum = value;
+        if (minimum == null) {
+            minimum = maximum = value;
+        }
+        else {
+            if (value.compareTo(minimum) < 0) {
+                minimum = value;
             }
-            else {
-                if (value.compareTo(minimum) < 0) {
-                    minimum = value;
-                }
-                if (value.compareTo(maximum) > 0) {
-                    maximum = value;
-                }
+            if (value.compareTo(maximum) > 0) {
+                maximum = value;
             }
         }
         sum += value.length() * repetitions;
