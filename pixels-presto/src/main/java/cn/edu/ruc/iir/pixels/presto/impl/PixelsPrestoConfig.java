@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.presto.PixelsConnectorFactory;
 import io.airlift.configuration.Config;
 import io.airlift.log.Logger;
 
@@ -18,7 +17,7 @@ import java.io.IOException;
  **/
 public class PixelsPrestoConfig
 {
-    private Logger logger = Logger.get(PixelsConnectorFactory.class);
+    private Logger logger = Logger.get(PixelsPrestoConfig.class);
     private ConfigFactory configFactory = null;
 
     private String pixelsHome = null;
