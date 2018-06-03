@@ -25,7 +25,7 @@ public class TestReader {
 
     // 1000 columns
     String filePath = "hdfs://10.77.40.236:9000/pixels/test30G_pixels/201805171350200.pxl";
-    static String[] cols = {"Column_1", "Column_3", "Column_13"};
+    static String[] cols = {"Column_1", "Column_3", "Column_6", "Column_13"};
 
     private static PixelsReader pixelsReader = null;
 
