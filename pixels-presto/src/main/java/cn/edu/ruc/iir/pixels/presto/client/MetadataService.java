@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
@@ -30,15 +31,9 @@ public class MetadataService {
     @Inject
     public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
     {
-        String uri = config.getMetadataServerUri();
-        System.out.println(uri.contains(":"));
-        if (uri.startsWith("pixels://") == false || uri.contains(":") == false)
-        {
-            throw new PixelsUriExceotion("invalid pixels uri: " + uri);
-        }
-        String[] splits = uri.substring(9).split(":");
-        this.host = splits[0];
-        this.port = Integer.parseInt(splits[1]);
+        ConfigFactory configFactory = config.getFactory();
+        this.host = configFactory.getProperty("metadata.server.host");
+        this.port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
     }
 
     public List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {

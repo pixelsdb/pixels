@@ -20,7 +20,7 @@ public class TestFSFactory {
 
     @Test
     public void testListFiles() {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         FSFactory fsFactory = new FSFactory(config);
         String tablePath = "/pixels/v2";
         List<Path> files = fsFactory.listFiles(tablePath);
@@ -31,7 +31,7 @@ public class TestFSFactory {
 
     @Test
     public void testGetBlockLocations() throws UnknownHostException {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         FSFactory fsFactory = new FSFactory(config);
         String tablePath = "pixels/db/default/test/Point.txt";
         List<HostAddress> files = fsFactory.getBlockLocations(new Path(tablePath), 0, Long.MAX_VALUE);

@@ -27,7 +27,7 @@ LOAD -p /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resourc
 ## Run Metadata Server
 Run the server, we need to use the `Root` command
 ```sh
-java -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
+java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
 ```
 
 ## Run Presto

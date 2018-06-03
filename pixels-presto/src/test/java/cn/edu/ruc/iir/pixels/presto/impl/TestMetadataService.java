@@ -12,7 +12,7 @@ public class TestMetadataService
     @Test
     public void testGetColumnsBySchemaNameAndTblName () throws PixelsUriExceotion
     {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("presto00:18888");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         List<Column> columns = new MetadataService(config).getColumnsBySchemaNameAndTblName("pixels", "test");
         for (Column column : columns)
         {
