@@ -11,6 +11,8 @@ import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.BaseDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
+import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -20,6 +22,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -28,6 +31,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -48,7 +52,12 @@ import java.util.*;
  * <p>
  * DDL -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -d pixels
  * <p>
- * LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/
+ * LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/
+ * <p>
+ * DDL -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -d pixels
+ * <p>
+ * LOAD -p hdfs://10.77.40.236:9000/pixels/test500G_text/ -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -f hdfs://presto00:9000/pixels/test500G_pixels/
+ * <br> 105 columns
  * @author: Tao
  * @date: Create in 2018-04-09 16:00
  **/
@@ -231,7 +240,7 @@ public class Main {
                         int pixelStride = Integer.parseInt(instance.getProperty("pixel.stride"));
                         int rowGroupSize = Integer.parseInt(instance.getProperty("row.group.size")) * 1024 * 1024;
                         int blockSize = 256 * 1024 * 1024;
-                        short blockReplication = 3;
+                        short blockReplication = 2;
                         boolean blockPadding = true;
                         boolean encoding = true;
                         int compressionBlockSize = 1;
@@ -251,72 +260,150 @@ public class Main {
                                         .setCompressionBlockSize(compressionBlockSize)
                                         .build();
 
-                        Collection<File> files = FileUtils.listFiles(dataPath, true);
-                        BufferedReader br = null;
-                        String path = "";
-                        String curLine;
-                        String splitLine[];
-                        StringBuilder writeLine = new StringBuilder();
-                        String fileSize;
-                        // set "", start next line to write
-                        DecimalFormat df = new DecimalFormat("#.000");
-                        int fileS = 0;
-                        int fileNum = 1;
-                        for (File f : files) {
-                            System.out.println("Loading： " + f.getPath());
-                            path = f.getPath();
-                            br = new BufferedReader(new FileReader(path));
-                            while ((curLine = br.readLine()) != null) {
-                                // benchmark exists True or False
-                                curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
-                                splitLine = curLine.split("\t");
-                                int row = rowBatch.size++;
-                                for (int j = 0; j < splitLine.length; j++) {
-                                    columnVectors[j].add(splitLine[j]);
-                                }
+                        if (dataPath.contains("hdfs://")) {
+                            PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888")
+                                    .setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+//                            String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test500G_orc/";
+                            FSFactory fsFactory = new FSFactory(config);
+                            List<Path> hdfsList = fsFactory.listFiles(dataPath);
+                            BufferedReader br = null;
+                            FSDataInputStream fsr = null;
+                            String curLine;
+                            String splitLine[];
+                            String fileSize;
+                            // set "", start next line to write
+                            DecimalFormat df = new DecimalFormat("#.000");
+                            int fileS = 0;
+                            int fileNum = 1;
+                            for (Path path : hdfsList) {
+                                System.out.println("Loading： " + path);
+                                fsr = fsFactory.getFileSystem().get().open(path);
+                                br = new BufferedReader(new InputStreamReader(fsr));
+                                while ((curLine = br.readLine()) != null) {
+                                    // benchmark exists True or False
+                                    curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
+                                    splitLine = curLine.split("\t");
+                                    int row = rowBatch.size++;
+                                    for (int j = 0; j < splitLine.length; j++) {
+                                        // exists "NULL" to fix
+                                        if (splitLine[j].equalsIgnoreCase("\\N")) {
+                                            columnVectors[j].add("0");
+                                        } else {
+                                            columnVectors[j].add(splitLine[j]);
+                                        }
+                                    }
 
-                                if (rowBatch.size == rowBatch.getMaxSize()) {
+                                    if (rowBatch.size == rowBatch.getMaxSize()) {
+                                        pixelsWriter.addRowBatch(rowBatch);
+                                        rowBatch.reset();
+                                    }
+
+                                    // at the end of each col, judge the size of the file
+                                    fileS += (curLine + "\n").getBytes().length;
+                                    fileSize = df.format((double) fileS / blockSize);
+                                    if (Double.valueOf(fileSize) >= 1) {
+                                        fileNum++;
+                                        pixelsWriter.addRowBatch(rowBatch);
+                                        rowBatch.reset();
+                                        pixelsWriter.close();
+
+                                        filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
+                                        pixelsWriter =
+                                                PixelsWriterImpl.newBuilder()
+                                                        .setSchema(schema)
+                                                        .setPixelStride(pixelStride)
+                                                        .setRowGroupSize(rowGroupSize)
+                                                        .setFS(fs)
+                                                        .setFilePath(new Path(filePath))
+                                                        .setBlockSize(blockSize)
+                                                        .setReplication(blockReplication)
+                                                        .setBlockPadding(blockPadding)
+                                                        .setEncoding(encoding)
+                                                        .setCompressionBlockSize(compressionBlockSize)
+                                                        .build();
+                                        fileS = 0;
+                                    }
+                                }
+                                System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
+                            }
+                            // only one hdfs file
+                            if (fileS > 0) {
+                                if (rowBatch.size != 0) {
                                     pixelsWriter.addRowBatch(rowBatch);
                                     rowBatch.reset();
                                 }
+                                pixelsWriter.close();
+                            }
+                            br.close();
+                        } else {
 
-                                // at the end of each col, judge the size of the file
-                                fileS += (curLine + "\n").getBytes().length;
-                                fileSize = df.format((double) fileS / blockSize);
-                                if (Double.valueOf(fileSize) >= 1) {
-                                    fileNum++;
+                            Collection<File> files = FileUtils.listFiles(dataPath, true);
+                            BufferedReader br = null;
+                            String path = "";
+                            String curLine;
+                            String splitLine[];
+                            StringBuilder writeLine = new StringBuilder();
+                            String fileSize;
+                            // set "", start next line to write
+                            DecimalFormat df = new DecimalFormat("#.000");
+                            int fileS = 0;
+                            int fileNum = 1;
+                            for (File f : files) {
+                                System.out.println("Loading： " + f.getPath());
+                                path = f.getPath();
+                                br = new BufferedReader(new FileReader(path));
+                                while ((curLine = br.readLine()) != null) {
+                                    // benchmark exists True or False
+                                    curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
+                                    splitLine = curLine.split("\t");
+                                    int row = rowBatch.size++;
+                                    for (int j = 0; j < splitLine.length; j++) {
+                                        columnVectors[j].add(splitLine[j]);
+                                    }
+
+                                    if (rowBatch.size == rowBatch.getMaxSize()) {
+                                        pixelsWriter.addRowBatch(rowBatch);
+                                        rowBatch.reset();
+                                    }
+
+                                    // at the end of each col, judge the size of the file
+                                    fileS += (curLine + "\n").getBytes().length;
+                                    fileSize = df.format((double) fileS / blockSize);
+                                    if (Double.valueOf(fileSize) >= 1) {
+                                        fileNum++;
+                                        pixelsWriter.addRowBatch(rowBatch);
+                                        rowBatch.reset();
+                                        pixelsWriter.close();
+
+                                        filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
+                                        pixelsWriter =
+                                                PixelsWriterImpl.newBuilder()
+                                                        .setSchema(schema)
+                                                        .setPixelStride(pixelStride)
+                                                        .setRowGroupSize(rowGroupSize)
+                                                        .setFS(fs)
+                                                        .setFilePath(new Path(filePath))
+                                                        .setBlockSize(blockSize)
+                                                        .setReplication(blockReplication)
+                                                        .setBlockPadding(blockPadding)
+                                                        .setEncoding(encoding)
+                                                        .setCompressionBlockSize(compressionBlockSize)
+                                                        .build();
+                                        fileS = 0;
+                                    }
+                                }
+                                System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
+                            }
+                            // only one hdfs file
+                            if (fileS > 0) {
+                                if (rowBatch.size != 0) {
                                     pixelsWriter.addRowBatch(rowBatch);
                                     rowBatch.reset();
-                                    pixelsWriter.close();
-
-                                    filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-                                    pixelsWriter =
-                                            PixelsWriterImpl.newBuilder()
-                                                    .setSchema(schema)
-                                                    .setPixelStride(pixelStride)
-                                                    .setRowGroupSize(rowGroupSize)
-                                                    .setFS(fs)
-                                                    .setFilePath(new Path(filePath))
-                                                    .setBlockSize(blockSize)
-                                                    .setReplication(blockReplication)
-                                                    .setBlockPadding(blockPadding)
-                                                    .setEncoding(encoding)
-                                                    .setCompressionBlockSize(compressionBlockSize)
-                                                    .build();
-                                    fileS = 0;
                                 }
+                                pixelsWriter.close();
                             }
-                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
+                            br.close();
                         }
-                        // only one hdfs file
-                        if (fileS > 0) {
-                            if (rowBatch.size != 0) {
-                                pixelsWriter.addRowBatch(rowBatch);
-                                rowBatch.reset();
-                            }
-                            pixelsWriter.close();
-                        }
-                        br.close();
                         System.out.println("Executing command " + command + " successfully");
                     }
 

@@ -42,6 +42,7 @@ public class testPixelsMetadataReader {
         System.out.println(tablelist.toString());
     }
 
+
     @Test
     public void testGetTableColumns () {
         List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn("", "pixels", "test30g_pixels");

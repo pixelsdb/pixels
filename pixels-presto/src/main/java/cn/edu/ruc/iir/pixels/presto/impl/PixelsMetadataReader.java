@@ -18,9 +18,11 @@ import io.airlift.log.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 /**
@@ -76,14 +78,18 @@ public class PixelsMetadataReader {
             Type columnType = null;
             String name = c.getColName();
             String type = c.getColType().toLowerCase();
-            if (type.equals("int") || type.equals("bigint")) {
+            if (type.equals("int")) {
                 columnType = INTEGER;
+            } else if (type.equals("bigint")) {
+                columnType = BIGINT;
             } else if (type.equals("double")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
             } else if (type.equals("boolean")) {
                 columnType = BOOLEAN;
+            } else if (type.equals("timestamp")) {
+                columnType = TIMESTAMP;
             }
             ColumnMetadata columnMetadata = new ColumnMetadata(name, columnType);
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
@@ -103,14 +109,18 @@ public class PixelsMetadataReader {
             Type columnType = null;
             String name = c.getColName();
             String type = c.getColType().toLowerCase();
-            if (type.equals("int") || type.equals("bigint")) {
+            if (type.equals("int")) {
                 columnType = INTEGER;
+            } else if (type.equals("bigint")) {
+                columnType = BIGINT;
             } else if (type.equals("double")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
             } else if (type.equals("boolean")) {
                 columnType = BOOLEAN;
+            } else if (type.equals("timestamp")) {
+                columnType = TIMESTAMP;
             } else {
                 System.out.println("columnType is not defined.");
             }
