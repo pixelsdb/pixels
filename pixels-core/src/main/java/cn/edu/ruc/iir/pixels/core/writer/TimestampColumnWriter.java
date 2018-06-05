@@ -41,7 +41,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
             curPartLength = pixelStride - curPixelEleCount;
             System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
-            newPixel();
+            newPixel(new boolean[0]);
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
@@ -63,7 +63,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel(boolean[] isNull) throws IOException
     {
         for (int i = 0; i < curPixelEleCount; i++)
         {

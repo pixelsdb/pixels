@@ -85,6 +85,13 @@ public class RunLenIntEncoder
         return encode(values, 0, values.length);
     }
 
+    @Override
+    public void close() throws IOException
+    {
+        gapVsPatchList = null;
+        outputStream.close();
+    }
+
     private void determineEncoding()
     {
         // compute zigzag values for DIRECT encoding if we decide to

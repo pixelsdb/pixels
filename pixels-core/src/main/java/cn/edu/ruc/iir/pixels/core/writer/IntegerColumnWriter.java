@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -20,6 +21,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                         // current column type is long or int
+    private final boolean[] isNull = new boolean[pixelStride];
 
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -43,6 +45,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             curPartLength = pixelStride - curPixelEleCount;
             // fill in current pixel value vector with current partition
             System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             newPixel();
             curPartOffset += curPartLength;
@@ -105,6 +108,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             outputStream.write(curVecPartitionBuffer.array());
         }
+        outputStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
 
         // update position of current pixel
         curPixelPosition = outputStream.size();

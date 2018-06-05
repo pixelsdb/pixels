@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
@@ -37,6 +38,7 @@ public class StringColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
     private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
     private final StringRedBlackTree dictionary = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
+    private final boolean[] isNull = new boolean[pixelStride];
     private boolean futureUseDictionaryEncoding;
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
@@ -140,6 +142,9 @@ public class StringColumnWriter extends BaseColumnWriter
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
         }
         // else ignore outputStream
+
+        // write out isNull
+        outputStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
 
         // merge and reset
         curPixelPosition = outputStream.size();

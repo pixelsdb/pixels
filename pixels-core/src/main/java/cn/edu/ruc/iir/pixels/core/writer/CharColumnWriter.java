@@ -36,7 +36,7 @@ public class CharColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateString(String.valueOf(vc), 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleCount >= pixelStride) {
-                newPixel();
+                newPixel(new boolean[0]);
             }
         }
         // append buffer of this batch to rowBatchBufferList
@@ -47,6 +47,6 @@ public class CharColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel(boolean[] isNull) throws IOException
     {}
 }

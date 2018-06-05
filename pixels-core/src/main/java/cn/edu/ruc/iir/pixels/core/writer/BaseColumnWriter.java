@@ -32,6 +32,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     Encoder encoder;
 
     final ByteArrayOutputStream outputStream;  // column chunk content
+    final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
     public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
@@ -47,6 +48,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
         // todo a good estimation of chunk size is needed as the initial size of output stream
         this.outputStream = new ByteArrayOutputStream(pixelStride);
+        this.isNullStream = new ByteArrayOutputStream(pixelStride);
     }
 
     /**
@@ -107,6 +109,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
         if (curPixelEleCount > 0) {
             newPixel();
         }
+        // flush out isNullStream
+        isNullStream.writeTo(outputStream);
     }
 
     void newPixel() throws IOException
@@ -133,5 +137,14 @@ public abstract class BaseColumnWriter implements ColumnWriter
         pixelStatRecorder.reset();
         columnChunkStatRecorder.reset();
         outputStream.reset();
+        isNullStream.reset();
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        outputStream.close();
+        isNullStream.close();
+        encoder.close();
     }
 }

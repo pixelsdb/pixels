@@ -43,7 +43,7 @@ public class VarcharColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateString(new String(v, 0, itemLength, Charset.forName("UTF-8")), 1);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleCount >= pixelStride) {
-                newPixel();
+                newPixel(new boolean[0]);
             }
         }
         // append buffer of this batch to rowBatchBufferList
@@ -52,8 +52,4 @@ public class VarcharColumnWriter extends BaseColumnWriter
 //        colChunkSize += buffer.limit();
         return buffer.limit();
     }
-
-    @Override
-    public void newPixel() throws IOException
-    {}
 }

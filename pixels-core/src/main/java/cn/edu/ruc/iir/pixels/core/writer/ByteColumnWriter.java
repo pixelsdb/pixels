@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenByteEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -16,6 +17,7 @@ import java.io.IOException;
 public class ByteColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
+    private final boolean[] isNull = new boolean[pixelStride];
 
     public ByteColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -40,6 +42,7 @@ public class ByteColumnWriter extends BaseColumnWriter
         while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
             System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             newPixel();
             curPartOffset += curPartLength;
@@ -80,6 +83,8 @@ public class ByteColumnWriter extends BaseColumnWriter
         else {
             outputStream.write(curPixelVector, 0, curPixelEleCount);
         }
+
+        outputStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
 
         curPixelPosition = outputStream.size();
 
