@@ -68,6 +68,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
+    @Override
     public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelEleCount; i++)
