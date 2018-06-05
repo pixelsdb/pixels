@@ -109,6 +109,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
         if (curPixelEleCount > 0) {
             newPixel();
         }
+        // record isNull offset in the column chunk
+        columnChunkIndex.setIsNullOffset(outputStream.size());
         // flush out isNullStream
         isNullStream.writeTo(outputStream);
     }

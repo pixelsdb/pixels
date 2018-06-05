@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
@@ -15,6 +16,7 @@ import java.io.IOException;
 public class FloatColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
+    private final boolean[] isNull = new boolean[pixelStride];
 
     public FloatColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -27,7 +29,6 @@ public class FloatColumnWriter extends BaseColumnWriter
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         double[] values = columnVector.vector;
-        boolean[] isNull = new boolean[pixelStride];
         int isNullIndex = 0;
         for (int i = 0; i < length; i++)
         {
@@ -38,10 +39,18 @@ public class FloatColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateFloat(value);
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleCount >= pixelStride) {
-                newPixel(isNull);
+                newPixel();
                 isNullIndex = 0;
             }
         }
         return outputStream.size();
+    }
+
+    @Override
+    public void newPixel() throws IOException
+    {
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
+
+        super.newPixel();
     }
 }

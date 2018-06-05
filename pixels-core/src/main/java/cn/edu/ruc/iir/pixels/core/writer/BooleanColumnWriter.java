@@ -74,7 +74,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
         }
 
         outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelEleCount));
-        outputStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
 
         curPixelPosition = outputStream.size();
         curPixelEleCount = 0;

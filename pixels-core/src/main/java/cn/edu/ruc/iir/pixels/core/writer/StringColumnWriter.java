@@ -70,6 +70,7 @@ public class StringColumnWriter extends BaseColumnWriter
                     curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
+                System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
                 curPixelEleCount += curPartLength;
                 newPixel();
                 curPartOffset += curPartLength;
@@ -81,6 +82,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
             }
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
@@ -92,6 +94,7 @@ public class StringColumnWriter extends BaseColumnWriter
                     curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
+                System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
                 curPixelEleCount += nextPartLength;
             }
         }
@@ -104,6 +107,7 @@ public class StringColumnWriter extends BaseColumnWriter
                     lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
+                System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
                 curPixelEleCount += curPartLength;
                 newPixel();
                 curPartOffset += curPartLength;
@@ -116,6 +120,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
             }
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
@@ -128,6 +133,7 @@ public class StringColumnWriter extends BaseColumnWriter
                     lensArray.add(vLens[curPartOffset + i]);
                     pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
                 }
+                System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
                 curPixelEleCount += nextPartLength;
             }
         }
@@ -144,7 +150,7 @@ public class StringColumnWriter extends BaseColumnWriter
         // else ignore outputStream
 
         // write out isNull
-        outputStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
 
         // merge and reset
         curPixelPosition = outputStream.size();
@@ -186,6 +192,14 @@ public class StringColumnWriter extends BaseColumnWriter
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        lensArray.clear();
+        dictionary.clear();
+        super.close();
     }
 
     private void flushLens() throws IOException

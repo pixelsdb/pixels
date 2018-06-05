@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
@@ -20,6 +21,7 @@ import java.nio.ByteBuffer;
 public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final LongColumnVector curPixelTimeVector;
+    private final boolean[] isNull = new boolean[pixelStride];
 
     public TimestampColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -40,8 +42,9 @@ public class TimestampColumnWriter extends BaseColumnWriter
         while ((curPixelEleCount + nextPartLength) >= pixelStride) {
             curPartLength = pixelStride - curPixelEleCount;
             System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, curPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += curPartLength;
-            newPixel(new boolean[0]);
+            newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
@@ -49,6 +52,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
         curPartLength = nextPartLength;
 
         System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, curPartLength);
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         curPartOffset += curPartLength;
@@ -56,6 +60,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
 
         if (nextPartLength > 0) {
             System.arraycopy(times, curPartOffset, curPixelTimeVector.vector, curPixelEleCount, nextPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += nextPartLength;
         }
 
@@ -63,7 +68,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel(boolean[] isNull) throws IOException
+    public void newPixel() throws IOException
     {
         for (int i = 0; i < curPixelEleCount; i++)
         {
@@ -87,6 +92,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
             }
             outputStream.write(curVecPartitionBuffer.array());
         }
+
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
 
         curPixelPosition = outputStream.size();
 

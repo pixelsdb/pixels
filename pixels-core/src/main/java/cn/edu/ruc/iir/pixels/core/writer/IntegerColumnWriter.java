@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
-    private final boolean isLong;                         // current column type is long or int
+    private final boolean isLong;                                       // current column type is long or int
     private final boolean[] isNull = new boolean[pixelStride];
 
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
@@ -56,6 +56,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
 
         // fill in current pixel value vector with current partition
         System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         curPartOffset += curPartLength;
@@ -64,11 +65,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
         // update current pixel vector
         // actually this should never be reached!!!
         if (nextPartLength > 0) {
-            System.arraycopy(values,
-                    curPartOffset,
-                    curPixelVector,
-                    curPixelEleCount,
-                    nextPartLength);
+            System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, nextPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += nextPartLength;
         }
 
@@ -108,7 +106,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             outputStream.write(curVecPartitionBuffer.array());
         }
-        outputStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
+
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, isNull.length));
 
         // update position of current pixel
         curPixelPosition = outputStream.size();

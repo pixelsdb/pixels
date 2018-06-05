@@ -52,17 +52,15 @@ public class ByteColumnWriter extends BaseColumnWriter
         curPartLength = nextPartLength;
 
         System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
 
         curPartOffset += curPartLength;
         nextPartLength = size - curPartOffset;
 
         if (nextPartLength > 0) {
-            System.arraycopy(bvalues,
-                    curPartOffset,
-                    curPixelVector,
-                    curPixelEleCount,
-                    nextPartLength);
+            System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, nextPartLength);
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += nextPartLength;
         }
 
@@ -84,7 +82,7 @@ public class ByteColumnWriter extends BaseColumnWriter
             outputStream.write(curPixelVector, 0, curPixelEleCount);
         }
 
-        outputStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
+        isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
 
         curPixelPosition = outputStream.size();
 
