@@ -39,8 +39,8 @@ public class BooleanColumnWriter extends BaseColumnWriter
                 long v = values[i + curPartOffset];
                 curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
             }
-            curPixelEleCount += curPartLength;
             System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
+            curPixelEleCount += curPartLength;
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
@@ -51,6 +51,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
             long v = values[i + curPartOffset];
             curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
         }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
         curPixelEleCount += curPartLength;
         curPartOffset += curPartLength;
         nextPartLength = size - curPartOffset;
@@ -60,6 +61,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
                 long v = values[i + curPartOffset];
                 curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
             }
+            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
             curPixelEleCount += nextPartLength;
         }
 

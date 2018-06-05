@@ -139,4 +139,11 @@ public class IntegerColumnWriter extends BaseColumnWriter
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
+
+    @Override
+    public void close() throws IOException
+    {
+        encoder.close();
+        super.close();
+    }
 }

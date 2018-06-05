@@ -199,6 +199,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         lensArray.clear();
         dictionary.clear();
+        encoder.close();
         super.close();
     }
 

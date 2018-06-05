@@ -147,6 +147,5 @@ public abstract class BaseColumnWriter implements ColumnWriter
     {
         outputStream.close();
         isNullStream.close();
-        encoder.close();
     }
 }
