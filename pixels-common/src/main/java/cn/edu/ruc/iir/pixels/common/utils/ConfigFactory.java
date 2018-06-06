@@ -10,6 +10,10 @@ public class ConfigFactory
 {
     private static ConfigFactory instance = null;
 
+    /**
+     * Injected classes in pixels-presto should not use this method to get ConfigFactory Instance.
+     * @return
+     */
     public static ConfigFactory Instance ()
     {
         if (instance == null)
@@ -19,6 +23,7 @@ public class ConfigFactory
         return instance;
     }
 
+    // Properties is thread safe, so we do not put synchronization on it.
     private Properties prop = null;
 
     private ConfigFactory()
@@ -52,6 +57,31 @@ public class ConfigFactory
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void loadProperties(String propFilePath) throws IOException
+    {
+        FileInputStream in = null;
+        try
+        {
+            in = new FileInputStream(propFilePath);
+            this.prop.load(in);
+        } catch (IOException e)
+        {
+            throw e;
+        } finally
+        {
+            if (in != null)
+            {
+                try
+                {
+                    in.close();
+                } catch (IOException e)
+                {
+                    throw e;
+                }
+            }
         }
     }
 

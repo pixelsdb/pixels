@@ -1,11 +1,11 @@
 package cn.edu.ruc.iir.pixels.core.compactor;
 
-public class ColumnChunkInfo
+public class ColumnletInfo
 {
     private int columnId = -1;
     private int rowGroupId = -1;
 
-    public ColumnChunkInfo(int rowGroupId, int columnId)
+    public ColumnletInfo(int rowGroupId, int columnId)
     {
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;

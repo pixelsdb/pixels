@@ -261,8 +261,7 @@ public class Main {
                                         .build();
 
                         if (dataPath.contains("hdfs://")) {
-                            PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888")
-                                    .setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+                            PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
 //                            String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test500G_orc/";
                             FSFactory fsFactory = new FSFactory(config);
                             List<Path> hdfsList = fsFactory.listFiles(dataPath);

@@ -34,7 +34,7 @@ public class TestHdfs {
     public void testReadBlock() {
         String filePath = "hdfs://presto00:9000/pixels/v2/point2000w-10.pxl";
 
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         FSFactory fsFactory = new FSFactory(config);
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
@@ -58,8 +58,7 @@ public class TestHdfs {
 
     @Test
     public void testDistribute() {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888")
-                .setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test30G_pixels/";
         FSFactory fsFactory = new FSFactory(config);
         List<Path> hdfsList = fsFactory.listFiles(hdfsDir);

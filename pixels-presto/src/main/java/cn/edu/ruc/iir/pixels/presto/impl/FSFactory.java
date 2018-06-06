@@ -13,6 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
@@ -36,7 +37,8 @@ public final class FSFactory
     public FSFactory(PixelsPrestoConfig config)
     {
         Configuration hdfsConfig = new Configuration(false);
-        File hdfsConfigDir = new File(config.getHdfsConfigDir());
+        ConfigFactory configFactory = config.getFactory();
+        File hdfsConfigDir = new File(configFactory.getProperty("hdfs.config.dir"));
         hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
         try

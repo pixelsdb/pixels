@@ -25,7 +25,7 @@ public class testPixelsMetadataReader {
     @Before
     public void init () throws PixelsUriExceotion
     {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         this.pixelsMetadataReader = new PixelsMetadataReader(new MetadataService(config));
     }
 

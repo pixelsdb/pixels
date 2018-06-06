@@ -30,7 +30,7 @@ import static java.util.Objects.requireNonNull;
 public class PixelsConnectorFactory
         implements ConnectorFactory {
 
-    Logger logger = Logger.get(PixelsConnectorFactory.class);
+    private Logger logger = Logger.get(PixelsConnectorFactory.class);
 
     private final String name = "pixels-presto";
 
