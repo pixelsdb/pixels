@@ -39,9 +39,9 @@ public class IntegerColumnWriter extends BaseColumnWriter
 
         // do the calculation to partition the vector into current pixel and next one
         // doing this pre-calculation to eliminate branch prediction inside the for loop
-        while ((curPixelEleIndex + nextPartLength) >= pixelStride)
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
         {
-            curPartLength = pixelStride - curPixelEleIndex;
+            curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartLong(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;

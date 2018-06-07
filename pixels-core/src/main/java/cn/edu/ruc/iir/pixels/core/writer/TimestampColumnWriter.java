@@ -35,8 +35,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleIndex + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleIndex;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;

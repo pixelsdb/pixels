@@ -28,8 +28,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleIndex + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleIndex;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartBinary(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;

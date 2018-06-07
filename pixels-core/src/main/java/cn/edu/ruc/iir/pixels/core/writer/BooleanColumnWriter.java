@@ -31,9 +31,9 @@ public class BooleanColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleIndex + nextPartLength) >= pixelStride)
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
         {
-            curPartLength = pixelStride - curPixelEleIndex;
+            curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurBoolean(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;

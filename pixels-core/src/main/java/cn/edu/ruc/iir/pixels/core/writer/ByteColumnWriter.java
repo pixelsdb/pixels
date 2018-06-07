@@ -37,8 +37,8 @@ public class ByteColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleIndex + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleIndex;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;

@@ -63,9 +63,9 @@ public class StringColumnWriter extends BaseColumnWriter
 
         if (currentUseDictionaryEncoding)
         {
-            while ((curPixelEleIndex + nextPartLength) >= pixelStride)
+            while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
-                curPartLength = pixelStride - curPixelEleIndex;
+                curPartLength = pixelStride - curPixelIsNullIndex;
                 writeCurPartWithDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
                 newPixel();
                 curPartOffset += curPartLength;
@@ -77,9 +77,9 @@ public class StringColumnWriter extends BaseColumnWriter
         }
         else {
             // directly add to outputStream if not using dictionary encoding
-            while ((curPixelEleIndex + nextPartLength) >= pixelStride)
+            while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
-                curPartLength = pixelStride - curPixelEleIndex;
+                curPartLength = pixelStride - curPixelIsNullIndex;
                 writeCurPartWithoutDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
                 newPixel();
                 curPartOffset += curPartLength;
