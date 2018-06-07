@@ -3,7 +3,6 @@ package cn.edu.ruc.iir.pixels.core.writer;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenByteEncoder;
-import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -17,7 +16,6 @@ import java.io.IOException;
 public class ByteColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
-    private final boolean[] isNull = new boolean[pixelStride];
 
     public ByteColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -39,62 +37,53 @@ public class ByteColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleCount;
-            System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
-            curPixelEleCount += curPartLength;
+        while ((curPixelEleIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelEleIndex;
+            writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-
-        System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
-        curPixelEleCount += curPartLength;
-
-        curPartOffset += curPartLength;
-        nextPartLength = size - curPartOffset;
-
-        if (nextPartLength > 0) {
-            System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, nextPartLength);
-            System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelEleCount, curPartLength);
-            curPixelEleCount += nextPartLength;
-        }
+        writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
 
         return outputStream.size();
+    }
+
+    private void writeCurPartByte(LongColumnVector columnVector, byte[] bvalues, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++) {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                curPixelVector[curPixelEleIndex] = bvalues[i + curPartOffset];
+                curPixelEleIndex++;
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleCount; i++)
+        for (int i = 0; i < curPixelEleIndex; i++)
         {
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
         }
         else {
-            outputStream.write(curPixelVector, 0, curPixelEleCount);
+            outputStream.write(curPixelVector, 0, curPixelEleIndex);
         }
 
-        isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelEleCount));
-
-        curPixelPosition = outputStream.size();
-
-        curPixelEleCount = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(lastPixelPosition);
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        lastPixelPosition = curPixelPosition;
-        pixelStatRecorder.reset();
+        super.newPixel();
     }
 
     @Override

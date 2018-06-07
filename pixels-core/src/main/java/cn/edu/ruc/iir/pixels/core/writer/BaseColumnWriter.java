@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.Encoder;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.ByteArrayOutputStream;
@@ -18,6 +19,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 {
     final int pixelStride;                     // indicate num of elements in a pixel
     final boolean isEncoding;                  // indicate if encoding enabled during writing
+    final boolean[] isNull;
     final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
 
@@ -27,9 +29,11 @@ public abstract class BaseColumnWriter implements ColumnWriter
     int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
     int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
 
-    int curPixelEleCount = 0;                  // count of elements in previous vector
+    int curPixelEleIndex = 0;                  // index of elements in previous vector
+    int curPixelIsNullIndex = 0;               // index of isNull in previous vector
 
     Encoder encoder;
+    boolean hasNull = false;
 
     final ByteArrayOutputStream outputStream;  // column chunk content
     final ByteArrayOutputStream isNullStream;  // column chunk isNull
@@ -38,6 +42,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     {
         this.pixelStride = pixelStride;
         this.isEncoding = isEncoding;
+        this.isNull = new boolean[pixelStride];
 
         this.columnChunkIndex =
                 PixelsProto.ColumnChunkIndex.newBuilder();
@@ -106,7 +111,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     @Override
     public void flush() throws IOException
     {
-        if (curPixelEleCount > 0) {
+        if (curPixelEleIndex > 0) {
             newPixel();
         }
         // record isNull offset in the column chunk
@@ -117,16 +122,31 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     void newPixel() throws IOException
     {
+        // isNull
+        if (hasNull)
+        {
+            isNullStream.write(BitUtils.bitWiseCompact(isNull, curPixelIsNullIndex));
+            pixelStatRecorder.setHasNull();
+        }
+        // update position of current pixel
         curPixelPosition = outputStream.size();
-        curPixelEleCount = 0;
+        // set current pixel element count to 0 for the next batch pixel writing
+        curPixelEleIndex = 0;
+        curPixelIsNullIndex = 0;
+        // update column chunk stat
         columnChunkStatRecorder.merge(pixelStatRecorder);
+        // add current pixel stat and position info to columnChunkIndex
         PixelsProto.PixelStatistic.Builder pixelStat =
                 PixelsProto.PixelStatistic.newBuilder();
         pixelStat.setStatistic(pixelStatRecorder.serialize());
         columnChunkIndex.addPixelPositions(lastPixelPosition);
         columnChunkIndex.addPixelStatistics(pixelStat.build());
+        // update lastPixelPosition to current one
         lastPixelPosition = curPixelPosition;
+        // reset current pixel stat recorder
         pixelStatRecorder.reset();
+        // reset hasNull
+        hasNull = false;
     }
 
     @Override
