@@ -15,6 +15,7 @@ package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -27,6 +28,8 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.*;
 
 public final class FSFactory
 {
@@ -59,6 +62,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_CONFIG_ERROR, e);
         }
     }
 
@@ -87,6 +91,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
         }
 
         return files;
@@ -108,6 +113,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
         }
         for (BlockLocation location : locations)
         {
@@ -117,6 +123,7 @@ public final class FSFactory
             } catch (IOException e)
             {
                 logger.error(e);
+                throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
             }
         }
         return new ArrayList<>(addresses);
@@ -150,6 +157,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
         }
         return allBlocks;
     }

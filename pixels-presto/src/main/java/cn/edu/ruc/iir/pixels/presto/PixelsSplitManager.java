@@ -87,7 +87,6 @@ public class PixelsSplitManager
         List<Path> files = new ArrayList<>();
         for (Layout l : catalogList) {
             files.addAll(fsFactory.listFiles(l.getLayInitPath()));
-//            log.info("Path: " + l.getLayInitPath());
         }
 
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,

@@ -14,6 +14,7 @@ import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
@@ -32,6 +33,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_BAD_DATA;
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_READER_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_WRITER_CLOSE_ERROR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -105,6 +109,7 @@ class PixelsPageSource implements ConnectorPageSource {
         } catch (IOException e) {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
+            throw new PrestoException(PIXELS_READER_ERROR, e);
         }
     }
 
@@ -129,7 +134,6 @@ class PixelsPageSource implements ConnectorPageSource {
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
-                logger.debug("getNextPage close");
                 return null;
             }
             Block[] blocks = new Block[this.numColumnToRead];
@@ -205,13 +209,12 @@ class PixelsPageSource implements ConnectorPageSource {
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 endOfFile = true;
-                logger.debug("End of file, batch size: " + batchSize);
             }
             return new Page(batchSize, blocks);
         } catch (IOException e) {
             closeWithSuppression(e);
+            throw new PrestoException(PIXELS_BAD_DATA, e);
         }
-        return null;
     }
 
     @Override
@@ -227,6 +230,7 @@ class PixelsPageSource implements ConnectorPageSource {
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.error("close error: " + e.getMessage());
+            throw new PrestoException(PIXELS_WRITER_CLOSE_ERROR, e);
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times

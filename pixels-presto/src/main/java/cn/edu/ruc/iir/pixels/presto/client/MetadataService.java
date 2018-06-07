@@ -8,12 +8,15 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
+import com.facebook.presto.spi.PrestoException;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_CLIENT_SERIVCE_ERROR;
 
 /**
  * @version V1.0
@@ -45,6 +48,7 @@ public class MetadataService {
                 client.connect(port, host, tableName + "&" + schemaName);
             } catch (Exception e) {
                 e.printStackTrace();
+                throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
             }
             while (true) {
                 String res = client.getMap().get(token);
@@ -56,6 +60,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return columns;
     }
@@ -79,6 +84,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return layouts;
     }
@@ -102,6 +108,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return tables;
     }
@@ -125,6 +132,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return schemas;
     }

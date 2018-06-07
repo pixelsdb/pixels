@@ -59,7 +59,6 @@ public class PixelsMetadata
 
     public List<String> listSchemaNamesInternal() {
         List<String> schemaNameList = pixelsMetadataReader.getSchemaNames();
-        logger.debug("PixelsMetadata listSchemaNames： " + schemaNameList.toString());
         return schemaNameList;
     }
 
@@ -80,8 +79,6 @@ public class PixelsMetadata
 
         // create PixelsTableLayoutHandle
         PixelsTableLayoutHandle tableLayout = pixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
-        logger.debug("getTableLayouts tableLayout： " + tableLayout.toString());
-        logger.debug("getTableLayouts size： " + constraint.getSummary().getColumnDomains().get().size());
         tableLayout.setConstraint(constraint.getSummary());
         ConnectorTableLayout layout = getTableLayout(session, tableLayout);
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
@@ -128,7 +125,6 @@ public class PixelsMetadata
                 builder.add(new SchemaTableName(schemaName, tableName));
             }
         }
-        logger.debug("PixelsMetadata listTables： " + builder.build().toString());
         return builder.build();
     }
 
@@ -146,7 +142,6 @@ public class PixelsMetadata
         for (PixelsColumnHandle column : columnHandleList) {
             columnHandles.put(column.getColumnName(), column);
         }
-        logger.debug("PixelsMetadata getColumnHandles： " + columnHandles.build().values());
         return columnHandles.build();
     }
 
@@ -161,7 +156,6 @@ public class PixelsMetadata
                 columns.put(tableName, tableMetadata.getColumns());
             }
         }
-        logger.debug("PixelsMetadata listTableColumns： " + columns.build().values());
         return columns.build();
     }
 
@@ -175,7 +169,6 @@ public class PixelsMetadata
 
     @Override
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
-        logger.debug("PixelsMetadata getColumnMetadata： " + columnHandle.toString());
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
 

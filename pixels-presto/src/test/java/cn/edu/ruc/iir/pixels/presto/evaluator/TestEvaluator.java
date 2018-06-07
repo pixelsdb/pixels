@@ -28,12 +28,12 @@ public class TestEvaluator {
     public void testPrestoEvaluator() {
         String testEvalFuc = "orc"; // pixels, orc
         String testEvalCsv = testEvalFuc + "_duration.csv";
-        String tableName = "test30g_" + testEvalFuc;
+        String tableName = "test500g_" + testEvalFuc;
 
-        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/lite_1000c_workload.txt";
-        String logDir = "/home/tao/software/data/pixels/test30G_pixels/1000/";
-//        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/105/lite_105c_workload.txt";
-//        String logDir = "/home/tao/software/data/pixels/test30G_pixels/105/";
+//        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/lite_1000c_workload.txt";
+//        String logDir = "/home/tao/software/data/pixels/test30G_pixels/1000/";
+        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/105/lite_105c_workload.txt";
+        String logDir = "/home/tao/software/data/pixels/test30G_pixels/105/";
 
         ConfigFactory instance = ConfigFactory.Instance();
         Properties properties = new Properties();
