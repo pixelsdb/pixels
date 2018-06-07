@@ -2,6 +2,8 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 
@@ -11,13 +13,54 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class BooleanColumnWriter extends IntegerColumnWriter
+public class BooleanColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
     public BooleanColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
+    }
+
+    @Override
+    public int write(ColumnVector vector, int size) throws IOException
+    {
+        LongColumnVector columnVector = (LongColumnVector) vector;
+        long[] values = columnVector.vector;
+        int curPartLength;
+        int curPartOffset = 0;
+        int nextPartLength = size;
+
+        while ((curPixelEleIndex + nextPartLength) >= pixelStride)
+        {
+            curPartLength = pixelStride - curPixelEleIndex;
+            writeCurBoolean(columnVector, values, curPartLength, curPartOffset);
+            newPixel();
+            curPartOffset += curPartLength;
+            nextPartLength = size - curPartOffset;
+        }
+
+        curPartLength = nextPartLength;
+        writeCurBoolean(columnVector, values, curPartLength, curPartOffset);
+
+        return outputStream.size();
+    }
+
+    private void writeCurBoolean(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++)
+        {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                curPixelVector[curPixelEleIndex++] = values[i + curPartOffset];
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override

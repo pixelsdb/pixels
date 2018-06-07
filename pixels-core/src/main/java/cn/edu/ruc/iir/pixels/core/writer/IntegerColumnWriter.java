@@ -34,8 +34,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
         int curPartLength;           // size of the partition which belongs to current pixel
-        int curPartOffset = 0;           // starting offset of the partition which belongs to current pixel
-        int nextPartLength = size;       // size of the partition which belongs to next pixel
+        int curPartOffset = 0;       // starting offset of the partition which belongs to current pixel
+        int nextPartLength = size;   // size of the partition which belongs to next pixel
 
         // do the calculation to partition the vector into current pixel and next one
         // doing this pre-calculation to eliminate branch prediction inside the for loop
