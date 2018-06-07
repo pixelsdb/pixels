@@ -1,7 +1,12 @@
 package cn.edu.ruc.iir.pixels.presto.evaluator;
 
+import com.facebook.presto.spi.PrestoException;
+
 import java.sql.*;
 import java.util.Properties;
+
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_THREAD_ERROR;
 
 /**
  * @version V1.0
@@ -22,6 +27,7 @@ public class PrestoEvaluator {
         } catch (InterruptedException e)
         {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_THREAD_ERROR, e);
         }
         try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcProperties)) {
             Statement statement = connection.createStatement();
@@ -34,6 +40,7 @@ public class PrestoEvaluator {
         } catch (SQLException e) {
             e.printStackTrace();
             System.out.println("SQL: " + sql);
+            throw new PrestoException(PIXELS_SQL_EXECUTE_ERROR, e);
         }
         return end - start;
     }
