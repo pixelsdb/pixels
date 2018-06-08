@@ -5,7 +5,6 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
-import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.spi.PrestoException;
@@ -16,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_CLIENT_SERIVCE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_SERIVCE_ERROR;
 
 /**
  * @version V1.0
@@ -32,7 +31,7 @@ public class MetadataService {
     private static Logger logger = Logger.get(MetadataService.class);
 
     @Inject
-    public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
+    public MetadataService(PixelsPrestoConfig config)
     {
         ConfigFactory configFactory = config.getFactory();
         this.host = configFactory.getProperty("metadata.server.host");

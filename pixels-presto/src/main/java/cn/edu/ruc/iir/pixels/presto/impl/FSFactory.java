@@ -14,6 +14,7 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.presto.exception.ConfigurationException;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.*;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
 
 public final class FSFactory
 {
@@ -57,6 +58,7 @@ public final class FSFactory
             } else
             {
                 logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
+                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, new ConfigurationException());
             }
             fileSystem = FileSystem.get(hdfsConfig);
         } catch (IOException e)
@@ -147,7 +149,8 @@ public final class FSFactory
             in = this.fileSystem.open(path);
         } catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
         }
         HdfsDataInputStream hdis = (HdfsDataInputStream) in;
         List<LocatedBlock> allBlocks = null;
@@ -156,7 +159,7 @@ public final class FSFactory
             allBlocks = hdis.getAllBlocks();
         } catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error(e);
             throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
         }
         return allBlocks;

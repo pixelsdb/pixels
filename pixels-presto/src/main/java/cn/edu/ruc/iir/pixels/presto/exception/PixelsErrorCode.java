@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto;
+package cn.edu.ruc.iir.pixels.presto.exception;
 
 import com.facebook.presto.spi.ErrorCode;
 import com.facebook.presto.spi.ErrorCodeSupplier;
@@ -53,6 +53,7 @@ public enum PixelsErrorCode
     PIXELS_CLIENT_ERROR(41, EXTERNAL),
     PIXELS_THREAD_ERROR(42, EXTERNAL),
     PIXELS_CLIENT_SERIVCE_ERROR(43, EXTERNAL),
+    PIXELS_CONNECTOR_ERROR(44, EXTERNAL),
     /**/;
 
     private final ErrorCode errorCode;

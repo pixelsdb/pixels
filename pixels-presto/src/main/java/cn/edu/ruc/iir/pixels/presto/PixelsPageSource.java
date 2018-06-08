@@ -33,9 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_BAD_DATA;
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_READER_ERROR;
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_WRITER_CLOSE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -250,6 +248,7 @@ class PixelsPageSource implements ConnectorPageSource {
             if (throwable != e) {
                 throwable.addSuppressed(e);
             }
+            throw new PrestoException(PIXELS_CLIENT_ERROR, e);
         }
     }
 

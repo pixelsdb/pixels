@@ -9,7 +9,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.util.HashMap;
 import java.util.Map;
 
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_CLIENT_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
 
 /**
  * @version V1.0
