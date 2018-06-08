@@ -56,10 +56,10 @@ public abstract class ColumnReader
      * @param vector vector to read into
      * @throws java.io.IOException
      * */
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
                               int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        read(input, encoding, 0, size, pixelStride, vector);
+        read(input, encoding, 0, isNullOffset, size, pixelStride, vector);
     }
 
     /**
@@ -72,7 +72,7 @@ public abstract class ColumnReader
      * @param vector vector to read into
      * @throws java.io.IOException
      * */
-    public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
                               int offset, int size, int pixelStride, ColumnVector vector) throws IOException;
 
     public ColumnReader(TypeDescription type)

@@ -3,7 +3,9 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
@@ -23,6 +25,7 @@ public class TimestampColumnReader
     private ByteBuf inputBuffer = null;
     private ByteBufInputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
+    private byte[] isNull;
 
     TimestampColumnReader(TypeDescription type)
     {
@@ -39,31 +42,54 @@ public class TimestampColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
                      int offset, int size, int pixelStride, ColumnVector vector) throws IOException
     {
-        if (offset == 0) {
-            if (inputStream != null) {
+        TimestampColumnVector columnVector = (TimestampColumnVector) vector;
+        if (offset == 0)
+        {
+            if (inputStream != null)
+            {
                 inputStream.close();
             }
-            if (inputBuffer != null) {
+            if (inputBuffer != null)
+            {
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            byte[] isNullBytes = new byte[input.length - isNullOffset];
+            inputBuffer.getBytes(isNullOffset, isNullBytes);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, false);
         }
 
-        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH)) {
-            for (int i = 0; decoder.hasNext() && i < size; i++) {
-                Timestamp timestamp = new Timestamp(decoder.next());
-                vector.add(timestamp);
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
+        {
+            for (int i = 0; i < size; i++)
+            {
+                if (isNull[i] == 1)
+                {
+                    columnVector.isNull[i + offset] = true;
+                }
+                else
+                {
+                    columnVector.set(i + offset, new Timestamp(decoder.next()));
+                }
             }
         }
-        else {
-            for (int i = 0; i < size; i++) {
-                Timestamp timestamp = new Timestamp(inputStream.readLong());
-                vector.add(timestamp);
+        else
+        {
+            for (int i = 0; i < size; i++)
+            {
+                if (isNull[i] == 1)
+                {
+                    columnVector.isNull[i + offset] = true;
+                }
+                else
+                {
+                    columnVector.set(i + offset, new Timestamp(inputStream.readLong()));
+                }
             }
         }
     }

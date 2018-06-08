@@ -61,4 +61,33 @@ public class BitUtils
 
         return bitWiseOutput.toByteArray();
     }
+
+    public static byte[] bitWiseDeCompact(byte[] input)
+    {
+        byte[] result = new byte[input.length * 8];
+
+        int bitsToRead = 1;
+        int bitsLeft = 8;
+        int current = 0;
+        byte mask = 0x01;
+
+        int index = 0;
+        for (byte b : input) {
+            while (bitsLeft > 0) {
+                bitsLeft -= bitsToRead;
+                current = mask & (b >> bitsLeft);
+                result[index] = (byte) current;
+                index++;
+            }
+            bitsLeft = 8;
+        }
+        return result;
+    }
+
+    public static byte[] bitWiseDeCompact(byte[] input, int offset, int size)
+    {
+        byte[] result = new byte[size];
+
+        return result;
+    }
 }

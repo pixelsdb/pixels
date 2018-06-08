@@ -67,9 +67,9 @@ public class TestPixelsReader {
         try {
             for (int i = 0; i < rowGroupNum; i++) {
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
+                System.out.println(">>Row group " + i + " footer");
                 PixelsProto.ColumnChunkIndex index = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(5);
 //                System.out.println(pixelsReader.getRowGroupInfo(i));
-                System.out.println(">>Row group " + i + " footer");
                 System.out.println(index);
             }
         } catch (IOException e) {

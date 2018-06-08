@@ -66,7 +66,7 @@ public class TestPixelsWriter {
             Timestamp timestamp = new Timestamp(curT);
             for (int i = 0; i < TestParams.rowNum; i++) {
                 int row = rowBatch.size++;
-                if (random.nextInt(10) > 8)
+                if (i % 100 == 0)
                 {
                     a.isNull[row] = true;
                     b.isNull[row] = true;

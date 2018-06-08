@@ -2,7 +2,11 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 /**
  * pixels
@@ -13,6 +17,7 @@ public class BooleanColumnReader
         extends ColumnReader
 {
     private byte[] bits;
+    private byte[] isNull;
 
     BooleanColumnReader(TypeDescription type)
     {
@@ -28,36 +33,32 @@ public class BooleanColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
                      int offset, int size, int pixelStride, ColumnVector vector)
     {
-        if (offset == 0) {
-            bits = bitWiseDeCompact(input);
+        LongColumnVector columnVector = (LongColumnVector) vector;
+        if (offset == 0)
+        {
+            byte[] isNullBytes = new byte[input.length - isNullOffset];
+            ByteBuf inputBuf = Unpooled.wrappedBuffer(input);
+            inputBuf.getBytes(isNullOffset, isNullBytes);
+            inputBuf.release();
+
+            // read isNull
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            // read content
+            bits = BitUtils.bitWiseDeCompact(input);
         }
-        for (int i = 0; i < size; i++) {
-            vector.add(bits[i + offset] == 1);
-        }
-    }
-
-    private byte[] bitWiseDeCompact(byte[] input)
-    {
-        byte[] result = new byte[input.length * 8];
-
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current = 0;
-        byte mask = 0x01;
-
-        int index = 0;
-        for (byte b : input) {
-            while (bitsLeft > 0) {
-                bitsLeft -= bitsToRead;
-                current = mask & (b >> bitsLeft);
-                result[index] = (byte) current;
-                index++;
+        for (int i = 0; i < size; i++)
+        {
+            if (isNull[i] == 1)
+            {
+                columnVector.isNull[i + offset] = true;
             }
-            bitsLeft = 8;
+            else
+            {
+                columnVector.vector[i] = bits[i + offset] == 1 ? 1 : 0;
+            }
         }
-        return result;
     }
 }

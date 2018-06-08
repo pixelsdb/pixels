@@ -26,7 +26,7 @@ public class BinaryColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
                      int offset, int size, int pixelStride, ColumnVector vector)
     {
     }
