@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Random;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.assertArrayEquals;
 
 /**
@@ -96,5 +97,17 @@ public class TestEncoding
             res[i] = bytesRes[i] == 1;
         }
         assertArrayEquals(exp, res);
+
+        int offset = 20;
+        int size = 9;
+        byte[] result = BitUtils.bitWiseDeCompact(input, offset, size);
+        for (int i = 0; i < 6; i++)
+        {
+            assertEquals(0, result[i]);
+        }
+        for (int i = 6; i < size; i++)
+        {
+            assertEquals(1, result[i]);
+        }
     }
 }

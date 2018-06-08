@@ -72,8 +72,10 @@ public class BitUtils
         byte mask = 0x01;
 
         int index = 0;
-        for (byte b : input) {
-            while (bitsLeft > 0) {
+        for (byte b : input)
+        {
+            while (bitsLeft > 0)
+            {
                 bitsLeft -= bitsToRead;
                 current = mask & (b >> bitsLeft);
                 result[index] = (byte) current;
@@ -87,6 +89,35 @@ public class BitUtils
     public static byte[] bitWiseDeCompact(byte[] input, int offset, int size)
     {
         byte[] result = new byte[size];
+        int skipBytes = offset / 8;
+        int skipBits = offset % 8;
+        double res = Math.ceil((double)size / 8.0d);
+        int readBytes = (int) res;
+
+        int bitsToRead = 1;
+        int bitsLeft = 8;
+        int current = 0;
+        byte mask = 0x01;
+
+        int index = 0;
+        for (int i = skipBytes; i < skipBytes + readBytes; i++)
+        {
+            while (bitsLeft > 0 && index < size)
+            {
+                bitsLeft -= bitsToRead;
+                if (skipBits > 0)
+                {
+                    skipBits--;
+                }
+                else
+                {
+                    current = mask & (input[i] >> bitsLeft);
+                    result[index] = (byte) current;
+                    index++;
+                }
+            }
+            bitsLeft = 8;
+        }
 
         return result;
     }
