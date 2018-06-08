@@ -5,8 +5,8 @@ import com.facebook.presto.spi.PrestoException;
 import java.sql.*;
 import java.util.Properties;
 
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR;
-import static cn.edu.ruc.iir.pixels.presto.PixelsErrorCode.PIXELS_THREAD_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_THREAD_ERROR;
 
 /**
  * @version V1.0
