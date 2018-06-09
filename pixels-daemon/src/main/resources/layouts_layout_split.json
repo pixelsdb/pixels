@@ -3,15 +3,15 @@
   "splitPatterns":
   [
     {
-      "accessedColumns":"Column_311,Column_314,Column_315,Column_332,Column_361,Column_438,Column_316,Column_397,Column_396,Column_11,Column_375,Column_392,Column_530,Column_368",
+      "accessedColumns":"311,314,315,332,361,438,316,397,396,11,375,392,530,368",
       "numRowGroupInSplit":1
     },
     {
-      "accessedColumns":"Column_364,Column_315,Column_438,Column_397,Column_396,Column_11,Column_368",
+      "accessedColumns":"364,315,438,397,396,11,368",
       "numRowGroupInSplit":2
     },
     {
-      "accessedColumns":"Column_311,Column_680,Column_332,Column_361,Column_438,Column_362,Column_316,Column_397,Column_11",
+      "accessedColumns":"311,680,332,361,438,362,316,397,11",
       "numRowGroupInSplit":2
     }
   ]
