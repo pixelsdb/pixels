@@ -47,8 +47,10 @@ public class StringColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
-                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, int pixelStride, ColumnVector vector,
+                     PixelsProto.ColumnChunkIndex chunkIndex)
+            throws IOException
     {
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         if (offset == 0)
@@ -58,6 +60,7 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
@@ -71,7 +74,7 @@ public class StringColumnReader
             {
                 if (isNull[i] == 1)
                 {
-                    columnVector.isNull[i + offset] = true;
+                    columnVector.isNull[i] = true;
                 }
                 else
                 {
@@ -87,7 +90,7 @@ public class StringColumnReader
                     }
                     byte[] tmpBytes = new byte[tmpLen];
                     originsBuf.getBytes(starts[originId], tmpBytes);
-                    columnVector.setVal(i + offset, tmpBytes);
+                    columnVector.setVal(i, tmpBytes);
                 }
             }
         }
@@ -99,14 +102,14 @@ public class StringColumnReader
             {
                 if (isNull[i] == 1)
                 {
-                    columnVector.isNull[i + offset] = true;
+                    columnVector.isNull[i] = true;
                 }
                 else
                 {
                     int len = (int) lensDecoder.next();
                     byte[] tmpBytes = new byte[len];
                     contentBuf.readBytes(tmpBytes);
-                    columnVector.setVal(i + offset, tmpBytes);
+                    columnVector.setVal(i, tmpBytes);
                 }
             }
         }

@@ -68,9 +68,12 @@ public class TestPixelsReader {
             for (int i = 0; i < rowGroupNum; i++) {
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
                 System.out.println(">>Row group " + i + " footer");
-                PixelsProto.ColumnChunkIndex index = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(5);
-//                System.out.println(pixelsReader.getRowGroupInfo(i));
-                System.out.println(index);
+                System.out.println(pixelsReader.getRowGroupInfo(i));
+                for (int j = 0; j < 6; j++)
+                {
+                    PixelsProto.ColumnChunkIndex index = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(5);
+                    System.out.println(index);
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -81,16 +84,15 @@ public class TestPixelsReader {
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"Column_1", "Column_2", "Column_3", "Column_4", "Column_5", "Column_6", "Column_10",
-                "Column_20", "Column_30", "Column_40", "Column_50", "Column_100", "Column_200", "Column_300",
-                "Column_400", "Column_500", "Column_600"};
+//        String[] cols = {"a", "b", "c", "d", "e", "z"};
+        String[] cols = {"a"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch;
-        int batchSize = 10000;
+        int batchSize = 1000;
         long num = 0;
         try {
             long start = System.currentTimeMillis();

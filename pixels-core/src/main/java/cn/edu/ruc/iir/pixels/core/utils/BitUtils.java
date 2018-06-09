@@ -68,7 +68,7 @@ public class BitUtils
 
         int bitsToRead = 1;
         int bitsLeft = 8;
-        int current = 0;
+        int current;
         byte mask = 0x01;
 
         int index = 0;
@@ -96,7 +96,7 @@ public class BitUtils
 
         int bitsToRead = 1;
         int bitsLeft = 8;
-        int current = 0;
+        int current;
         byte mask = 0x01;
 
         int index = 0;

@@ -36,8 +36,9 @@ public class FloatColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
-                     int offset, int size, int pixelStride, ColumnVector vector)
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, int pixelStride, ColumnVector vector,
+                     PixelsProto.ColumnChunkIndex chunkIndex)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
@@ -46,6 +47,7 @@ public class FloatColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
@@ -54,13 +56,13 @@ public class FloatColumnReader
         {
             if (isNull[i] == 1)
             {
-                columnVector.isNull[i + offset] = true;
+                columnVector.isNull[i] = true;
             }
             else
             {
                 byte[] inputBytes = new byte[4];
                 inputBuffer.readBytes(inputBytes);
-                columnVector.vector[i + offset] = encodingUtils.readFloat(inputBytes);
+                columnVector.vector[i] = encodingUtils.readFloat(inputBytes);
             }
         }
     }

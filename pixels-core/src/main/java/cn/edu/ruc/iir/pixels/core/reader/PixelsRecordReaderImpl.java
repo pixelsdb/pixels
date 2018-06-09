@@ -404,17 +404,20 @@ public class PixelsRecordReaderImpl
             // read vectors
             for (int i = 0; i < resultColumns.length; i++) {
                 if (!columnVectors[i].duplicated) {
-                    PixelsProto.ColumnEncoding encoding =
-                            rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
-                                    .getColumnChunkEncodings(resultColumns[i]);
+                    PixelsProto.RowGroupFooter rowGroupFooter =
+                            rowGroupFooters[targetRGs[curRGIdx]];
+                    PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                            .getColumnChunkEncodings(resultColumns[i]);
                     int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
                     byte[] input = chunkBuffers[index];
                     if (curChunkIdx != -1 && curChunkIdx != index) {
                         chunkBuffers[curChunkIdx] = null;
                     }
                     curChunkIdx = index;
+                    PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                            .getColumnChunkIndexEntries(resultColumns[i]);
                     readers[i].read(input, encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), columnVectors[i]);
+                            postScript.getPixelStride(), columnVectors[i], chunkIndex);
                 }
             }
 

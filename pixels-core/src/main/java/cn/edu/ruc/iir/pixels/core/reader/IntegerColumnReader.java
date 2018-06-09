@@ -24,6 +24,10 @@ public class IntegerColumnReader
     private ByteBuf inputBuffer;
     private ByteBufInputStream inputStream;
     private byte[] isNull;
+    private boolean hasNull = true;
+    private int elementIndex = 0;
+    private int isNullIndex = 0;
+    private int numOfPixelsWithoutNull = 0;
 
     IntegerColumnReader(TypeDescription type)
     {
@@ -39,8 +43,10 @@ public class IntegerColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
-                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, int pixelStride, ColumnVector vector,
+                     PixelsProto.ColumnChunkIndex chunkIndex)
+            throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         // if read from start, init the stream and decoder
@@ -55,25 +61,35 @@ public class IntegerColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, true);
+            hasNull = true;
+            elementIndex = 0;
+            isNullIndex = 0;
+            numOfPixelsWithoutNull = 0;
         }
         // if run length encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
         {
             for (int i = 0; i < size; i++)
             {
-                if (isNull[i] == 1)
+                if (elementIndex % pixelStride == 0)
                 {
-                    columnVector.isNull[i + offset] = true;
+                    nextPixel(pixelStride, chunkIndex);
+                }
+                if (hasNull && isNull[isNullIndex++] == 1)
+                {
+                    columnVector.isNull[i] = true;
                 }
                 else
                 {
-                    columnVector.vector[i + offset] = decoder.next();
+                    columnVector.vector[i] = decoder.next();
                 }
+                elementIndex++;
             }
         }
         // if not encoded
@@ -86,30 +102,55 @@ public class IntegerColumnReader
             {
                 for (int i = 0; i < size; i++)
                 {
-                    if (isNull[i] == 1)
+                    if (elementIndex % pixelStride == 0)
                     {
-                        columnVector.isNull[i + offset] = true;
+                        nextPixel(pixelStride, chunkIndex);
+                    }
+                    if (hasNull && isNull[isNullIndex++] == 1)
+                    {
+                        columnVector.isNull[i] = true;
                     }
                     else
                     {
-                        columnVector.vector[i + offset] = inputStream.readLong();
+                        columnVector.vector[i] = inputStream.readLong();
                     }
+                    elementIndex++;
                 }
             }
             // if int
             else {
                 for (int i = 0; i < size; i++)
                 {
-                    if (isNull[i] == 1)
+                    if (elementIndex % pixelStride == 0)
                     {
-                        columnVector.isNull[i + offset] = true;
+                        nextPixel(pixelStride, chunkIndex);
+                    }
+                    if (hasNull && isNull[isNullIndex++] == 1)
+                    {
+                        columnVector.isNull[i] = true;
                     }
                     else
                     {
-                        columnVector.vector[i + offset] = inputStream.readInt();
+                        columnVector.vector[i] = inputStream.readInt();
                     }
+                    elementIndex++;
                 }
             }
+        }
+    }
+
+    private void nextPixel(int pixelStride, PixelsProto.ColumnChunkIndex chunkIndex)
+    {
+        int pixelId = elementIndex / pixelStride;
+        hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+        if (hasNull)
+        {
+            isNullIndex = (pixelId - numOfPixelsWithoutNull)
+                    * (int) Math.ceil((double) pixelStride / 8.0d) * 8;
+        }
+        else
+        {
+            numOfPixelsWithoutNull++;
         }
     }
 }

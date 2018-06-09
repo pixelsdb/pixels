@@ -49,4 +49,18 @@ public class TestByteBuf
         System.out.println(s.getBytes().length);
         System.out.println(sChars.length * Character.BYTES);
     }
+
+    @Test
+    public void test()
+    {
+        int sum = 0;
+        for (int i = 0; i < 19000; i++)
+        {
+            if (i % 100 != 0)
+            {
+                sum += i;
+            }
+        }
+        System.out.println(sum);
+    }
 }

@@ -33,12 +33,14 @@ public class BooleanColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
-                     int offset, int size, int pixelStride, ColumnVector vector)
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, int pixelStride, ColumnVector vector,
+                     PixelsProto.ColumnChunkIndex chunkIndex)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
+            int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             ByteBuf inputBuf = Unpooled.wrappedBuffer(input);
             inputBuf.getBytes(isNullOffset, isNullBytes);
@@ -53,11 +55,11 @@ public class BooleanColumnReader
         {
             if (isNull[i] == 1)
             {
-                columnVector.isNull[i + offset] = true;
+                columnVector.isNull[i] = true;
             }
             else
             {
-                columnVector.vector[i] = bits[i + offset] == 1 ? 1 : 0;
+                columnVector.vector[i] = bits[i] == 1 ? 1 : 0;
             }
         }
     }

@@ -42,8 +42,10 @@ public class TimestampColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding, int isNullOffset,
-                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
+    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+                     int offset, int size, int pixelStride, ColumnVector vector,
+                     PixelsProto.ColumnChunkIndex chunkIndex)
+            throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         if (offset == 0)
@@ -57,6 +59,7 @@ public class TimestampColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
@@ -70,11 +73,11 @@ public class TimestampColumnReader
             {
                 if (isNull[i] == 1)
                 {
-                    columnVector.isNull[i + offset] = true;
+                    columnVector.isNull[i] = true;
                 }
                 else
                 {
-                    columnVector.set(i + offset, new Timestamp(decoder.next()));
+                    columnVector.set(i, new Timestamp(decoder.next()));
                 }
             }
         }
@@ -84,11 +87,11 @@ public class TimestampColumnReader
             {
                 if (isNull[i] == 1)
                 {
-                    columnVector.isNull[i + offset] = true;
+                    columnVector.isNull[i] = true;
                 }
                 else
                 {
-                    columnVector.set(i + offset, new Timestamp(inputStream.readLong()));
+                    columnVector.set(i, new Timestamp(inputStream.readLong()));
                 }
             }
         }

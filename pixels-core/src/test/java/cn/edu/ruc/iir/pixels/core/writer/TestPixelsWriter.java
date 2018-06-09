@@ -19,7 +19,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.util.Random;
 
 /**
  * pixels
@@ -33,8 +32,6 @@ public class TestPixelsWriter {
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-
-        Random random = new Random();
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try {

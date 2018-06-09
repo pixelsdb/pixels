@@ -69,9 +69,9 @@ public class RunLenIntEncoder
 
     public byte[] encode(long[] values, long offset, long length) throws IOException
     {
-        for (long v : values)
+        for (int i = 0; i < length; i++)
         {
-            this.write(v);
+            this.write(values[i]);
         }
         flush();
         byte[] result = outputStream.toByteArray();
