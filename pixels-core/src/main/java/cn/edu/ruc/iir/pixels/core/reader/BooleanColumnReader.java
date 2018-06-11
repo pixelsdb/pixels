@@ -47,13 +47,21 @@ public class BooleanColumnReader
             inputBuf.release();
 
             // read isNull
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
+            hasNull = true;
+            elementIndex = 0;
+            isNullIndex = 0;
+            numOfPixelsWithoutNull = 0;
             // read content
             bits = BitUtils.bitWiseDeCompact(input);
         }
         for (int i = 0; i < size; i++)
         {
-            if (isNull[i] == 1)
+            if (elementIndex % pixelStride == 0)
+            {
+                nextPixel(pixelStride, chunkIndex);
+            }
+            if (hasNull && isNull[isNullIndex++] == 1)
             {
                 columnVector.isNull[i] = true;
             }
@@ -61,6 +69,7 @@ public class BooleanColumnReader
             {
                 columnVector.vector[i] = bits[i] == 1 ? 1 : 0;
             }
+            elementIndex++;
         }
     }
 }

@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -92,29 +93,49 @@ public class TestPixelsReader {
 
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch;
-        int batchSize = 1000;
-        long num = 0;
+        int batchSize = 2330;
+        long elementSize = 0;
         try {
-            long start = System.currentTimeMillis();
-            System.out.println("Reader begin " + start);
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
+                LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
                 if (rowBatch.endOfFile) {
-//                    System.out.println("End of file");
-                    num += rowBatch.size;
+                    for (int i = 0; i < rowBatch.size; i++)
+                    {
+                        if (elementSize % 100 == 0)
+                        {
+                            assert acv.isNull[i];
+                        }
+                        else
+                        {
+                            assert acv.vector[i] == elementSize;
+                        }
+                        elementSize++;
+                    }
                     break;
                 }
-//                System.out.println(">>Getting next batch. Current size : " + rowBatch.size);
-//                System.out.println(rowBatch.toString());
-                num += rowBatch.size;
+                for (int i = 0; i < rowBatch.size; i++)
+                {
+                    if (elementSize % 100 == 0)
+                    {
+                        assert acv.isNull[i];
+                    }
+                    else
+                    {
+                        assert acv.vector[i] == elementSize;
+                    }
+                    elementSize++;
+                }
             }
-            long end = System.currentTimeMillis();
-            System.out.println("Reader end " + end + ", cost: " + (end - start));
-            System.out.println("Num " + num);
+            System.out.println("Num " + elementSize);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+    @Test
+    public void testPerformance()
+    {}
 
     @After
     public void cleanUp() {

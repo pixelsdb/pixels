@@ -24,10 +24,6 @@ public class IntegerColumnReader
     private ByteBuf inputBuffer;
     private ByteBufInputStream inputStream;
     private byte[] isNull;
-    private boolean hasNull = true;
-    private int elementIndex = 0;
-    private int isNullIndex = 0;
-    private int numOfPixelsWithoutNull = 0;
 
     IntegerColumnReader(TypeDescription type)
     {
@@ -136,21 +132,6 @@ public class IntegerColumnReader
                     elementIndex++;
                 }
             }
-        }
-    }
-
-    private void nextPixel(int pixelStride, PixelsProto.ColumnChunkIndex chunkIndex)
-    {
-        int pixelId = elementIndex / pixelStride;
-        hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-        if (hasNull)
-        {
-            isNullIndex = (pixelId - numOfPixelsWithoutNull)
-                    * (int) Math.ceil((double) pixelStride / 8.0d) * 8;
-        }
-        else
-        {
-            numOfPixelsWithoutNull++;
         }
     }
 }

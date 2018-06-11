@@ -52,10 +52,18 @@ public class DoubleColumnReader
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            hasNull = true;
+            elementIndex = 0;
+            isNullIndex = 0;
+            numOfPixelsWithoutNull = 0;
         }
         for (int i = 0; i < size; i++)
         {
-            if (isNull[i] == 1)
+            if (elementIndex % pixelStride == 0)
+            {
+                nextPixel(pixelStride, chunkIndex);
+            }
+            if (hasNull && isNull[isNullIndex++] == 1)
             {
                 columnVector.isNull[i] = true;
             }
@@ -65,6 +73,7 @@ public class DoubleColumnReader
                 inputBuffer.readBytes(inputBytes);
                 columnVector.vector[i] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
             }
+            elementIndex++;
         }
     }
 }

@@ -75,11 +75,17 @@ public class TestPixelsWriter {
                 else
                 {
                     a.vector[row] = i;
+                    a.isNull[row] = false;
                     b.vector[row] = i * 3.1415f;
+                    b.isNull[row] = false;
                     c.vector[row] = i * 3.14159d;
+                    c.isNull[row] = false;
                     d.set(row, timestamp);
+                    d.isNull[row] = false;
                     e.vector[row] = i > 25000 ? 1 : 0;
+                    e.isNull[row] = false;
                     z.setVal(row, String.valueOf(i).getBytes());
+                    z.isNull[row] = false;
                 }
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     pixelsWriter.addRowBatch(rowBatch);

@@ -65,6 +65,10 @@ public class StringColumnReader
             inputBuffer.getBytes(isNullOffset, isNullBytes);
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
             readContent(input, encoding);
+            hasNull = true;
+            isNullIndex = 0;
+            elementIndex = 0;
+            numOfPixelsWithoutNull = 0;
         }
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
@@ -72,7 +76,11 @@ public class StringColumnReader
             // read original bytes
             for (int i = 0; i < size; i++)
             {
-                if (isNull[i] == 1)
+                if (elementIndex % pixelStride == 0)
+                {
+                    nextPixel(pixelStride, chunkIndex);
+                }
+                if (hasNull && isNull[i] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -92,6 +100,7 @@ public class StringColumnReader
                     originsBuf.getBytes(starts[originId], tmpBytes);
                     columnVector.setVal(i, tmpBytes);
                 }
+                elementIndex++;
             }
         }
         // if un-encoded
@@ -100,7 +109,11 @@ public class StringColumnReader
             // read values
             for (int i = 0; i < size; i++)
             {
-                if (isNull[i] == 1)
+                if (elementIndex % pixelStride == 0)
+                {
+                    nextPixel(pixelStride, chunkIndex);
+                }
+                if (hasNull && isNull[i] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -111,6 +124,7 @@ public class StringColumnReader
                     contentBuf.readBytes(tmpBytes);
                     columnVector.setVal(i, tmpBytes);
                 }
+                elementIndex++;
             }
         }
     }

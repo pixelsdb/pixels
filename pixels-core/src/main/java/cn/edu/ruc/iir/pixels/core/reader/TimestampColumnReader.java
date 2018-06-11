@@ -65,13 +65,21 @@ public class TimestampColumnReader
             isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, false);
+            hasNull = true;
+            isNullIndex = 0;
+            elementIndex = 0;
+            numOfPixelsWithoutNull = 0;
         }
 
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
         {
             for (int i = 0; i < size; i++)
             {
-                if (isNull[i] == 1)
+                if (elementIndex % pixelStride == 0)
+                {
+                    nextPixel(pixelStride, chunkIndex);
+                }
+                if (hasNull && isNull[i] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -79,13 +87,18 @@ public class TimestampColumnReader
                 {
                     columnVector.set(i, new Timestamp(decoder.next()));
                 }
+                elementIndex++;
             }
         }
         else
         {
             for (int i = 0; i < size; i++)
             {
-                if (isNull[i] == 1)
+                if (elementIndex % pixelStride == 0)
+                {
+                    nextPixel(pixelStride, chunkIndex);
+                }
+                if (hasNull && isNull[i] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -93,6 +106,7 @@ public class TimestampColumnReader
                 {
                     columnVector.set(i, new Timestamp(inputStream.readLong()));
                 }
+                elementIndex++;
             }
         }
     }
