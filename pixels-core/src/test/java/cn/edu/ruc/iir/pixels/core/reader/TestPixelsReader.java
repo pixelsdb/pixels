@@ -5,7 +5,10 @@ import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -17,6 +20,9 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
+
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 /**
  * pixels
@@ -85,8 +91,8 @@ public class TestPixelsReader {
     public void testContent()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-//        String[] cols = {"a", "b", "c", "d", "e", "z"};
-        String[] cols = {"a"};
+        String[] cols = {"a", "b", "c", "d", "e", "z"};
+//        String[] cols = {"a"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
@@ -99,16 +105,31 @@ public class TestPixelsReader {
             while (true) {
                 rowBatch = recordReader.readBatch(batchSize);
                 LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
+                DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
+                DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
+                TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
+                LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
+                BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
                 if (rowBatch.endOfFile) {
                     for (int i = 0; i < rowBatch.size; i++)
                     {
                         if (elementSize % 100 == 0)
                         {
-                            assert acv.isNull[i];
+                            assertTrue(acv.isNull[i]);
+                            assertTrue(bcv.isNull[i]);
+                            assertTrue(ccv.isNull[i]);
+                            assertTrue(dcv.isNull[i]);
+                            assertTrue(ecv.isNull[i]);
+                            assertTrue(zcv.isNull[i]);
                         }
                         else
                         {
-                            assert acv.vector[i] == elementSize;
+                            assertEquals(acv.vector[i], elementSize);
+                            assertEquals(bcv.vector[i], elementSize * 3.1415f, 0.0001d);
+                            assertEquals(ccv.vector[i], elementSize * 3.14159d, 0.0001f);
+                            assertEquals(ecv.vector[i], (elementSize > 25000 ? 1L : 0L));
+                            assertEquals(new String(zcv.vector[i], zcv.start[i], zcv.lens[i]),
+                                    String.valueOf(elementSize));
                         }
                         elementSize++;
                     }

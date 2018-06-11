@@ -63,7 +63,7 @@ public class StringColumnReader
             int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             readContent(input, encoding);
             hasNull = true;
             isNullIndex = 0;
@@ -80,7 +80,7 @@ public class StringColumnReader
                 {
                     nextPixel(pixelStride, chunkIndex);
                 }
-                if (hasNull && isNull[i] == 1)
+                if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -113,7 +113,7 @@ public class StringColumnReader
                 {
                     nextPixel(pixelStride, chunkIndex);
                 }
-                if (hasNull && isNull[i] == 1)
+                if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }

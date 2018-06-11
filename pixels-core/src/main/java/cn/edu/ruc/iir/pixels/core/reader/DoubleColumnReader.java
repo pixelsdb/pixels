@@ -51,7 +51,7 @@ public class DoubleColumnReader
             int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             hasNull = true;
             elementIndex = 0;
             isNullIndex = 0;

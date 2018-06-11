@@ -62,7 +62,7 @@ public class TimestampColumnReader
             int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, false);
             hasNull = true;
@@ -79,7 +79,7 @@ public class TimestampColumnReader
                 {
                     nextPixel(pixelStride, chunkIndex);
                 }
-                if (hasNull && isNull[i] == 1)
+                if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }
@@ -98,7 +98,7 @@ public class TimestampColumnReader
                 {
                     nextPixel(pixelStride, chunkIndex);
                 }
-                if (hasNull && isNull[i] == 1)
+                if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
                 }

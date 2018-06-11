@@ -50,7 +50,7 @@ public class FloatColumnReader
             int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes, offset, size);
+            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             numOfPixelsWithoutNull = 0;
             hasNull = true;
             elementIndex = 0;
