@@ -416,7 +416,7 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
                     readers[i].read(input, encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), columnVectors[i], chunkIndex);
+                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 
