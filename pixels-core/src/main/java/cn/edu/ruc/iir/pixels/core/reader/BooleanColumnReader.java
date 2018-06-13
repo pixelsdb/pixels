@@ -18,6 +18,7 @@ public class BooleanColumnReader
 {
     private byte[] bits;
     private byte[] isNull;
+    private int bitsIndex = 0;
 
     BooleanColumnReader(TypeDescription type)
     {
@@ -40,26 +41,28 @@ public class BooleanColumnReader
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
+            // read isNull
             int isNullOffset = (int) chunkIndex.getIsNullOffset();
             byte[] isNullBytes = new byte[input.length - isNullOffset];
             ByteBuf inputBuf = Unpooled.wrappedBuffer(input);
             inputBuf.getBytes(isNullOffset, isNullBytes);
             inputBuf.release();
-
-            // read isNull
             isNull = BitUtils.bitWiseDeCompact(isNullBytes);
+            // read content
+            bits = BitUtils.bitWiseDeCompact(input);
+            // re-init
             hasNull = true;
             elementIndex = 0;
             isNullIndex = 0;
             numOfPixelsWithoutNull = 0;
-            // read content
-            bits = BitUtils.bitWiseDeCompact(input);
+            bitsIndex = 0;
         }
         for (int i = 0; i < size; i++)
         {
             if (elementIndex % pixelStride == 0)
             {
                 nextPixel(pixelStride, chunkIndex);
+                bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
             }
             if (hasNull && isNull[isNullIndex++] == 1)
             {
@@ -67,7 +70,7 @@ public class BooleanColumnReader
             }
             else
             {
-                columnVector.vector[i] = bits[i] == 1 ? 1 : 0;
+                columnVector.vector[i] = bits[bitsIndex++];
             }
             elementIndex++;
         }

@@ -110,4 +110,16 @@ public class TestEncoding
             assertEquals(1, result[i]);
         }
     }
+
+    @Test
+    public void test()
+    {
+        long input[] = {0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 1, 1};
+        byte[] mid = BitUtils.bitWiseCompact(input, 32);
+        byte[] result = BitUtils.bitWiseDeCompact(mid);
+        System.out.println(result);
+    }
 }

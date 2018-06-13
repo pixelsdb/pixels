@@ -16,7 +16,6 @@ import com.alibaba.fastjson.JSON;
 import io.airlift.log.Logger;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -518,15 +517,15 @@ public class PixelsRecordReaderImpl
                     String.valueOf(System.nanoTime()) +
                     physicalFSReader.getPath().getName() +
                     ".json");
-            try {
-                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
-                raf.seek(0L);
-                raf.writeChars(metrics);
-                raf.close();
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
+//                raf.seek(0L);
+//                raf.writeChars(metrics);
+//                raf.close();
+//            }
+//            catch (IOException e) {
+//                e.printStackTrace();
+//            }
         }
         // reset read performance metrics
         readPerfMetrics.clear();
