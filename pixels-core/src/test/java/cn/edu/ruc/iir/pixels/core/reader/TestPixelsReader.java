@@ -32,6 +32,7 @@ import static org.junit.Assert.assertEquals;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestPixelsReader
 {
+    private static final boolean DEBUG = true;
     private long elementSize = 0;
 
     private void testMetadata() {
@@ -44,38 +45,6 @@ public class TestPixelsReader
 //        assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
     }
 
-    private void testContent(String fileName, int batchSize, int rowNum)
-    {
-        PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "c", "d", "e", "z"};
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.includeCols(cols);
-
-        VectorizedRowBatch rowBatch;
-        elementSize = 0;
-        try (PixelsReader pixelsReader = getReader(fileName);
-        PixelsRecordReader recordReader = pixelsReader.read(option)) {
-            while (true) {
-                rowBatch = recordReader.readBatch(batchSize);
-                LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
-                DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
-                DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
-                TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
-                LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
-                BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
-                if (rowBatch.endOfFile) {
-                    assertCorrect(rowBatch, acv, bcv, ccv, dcv, ecv, zcv);
-                    break;
-                }
-
-            }
-            assertEquals(rowNum, elementSize);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     @Test
     public void test0Small()
     {
@@ -86,7 +55,7 @@ public class TestPixelsReader
         {
             int batchSize = random.nextInt(rowNum);
             System.out.println("row batch size: " + batchSize);
-            testContent(fileName, batchSize, rowNum);
+            testContent(fileName, batchSize, rowNum, 1528785092538L);
         }
     }
 
@@ -100,21 +69,53 @@ public class TestPixelsReader
         {
             int batchSize = random.nextInt(rowNum);
             System.out.println("row batch size: " + batchSize);
-            testContent(fileName, batchSize, rowNum);
+            testContent(fileName, batchSize, rowNum, 1528901945696L);
         }
     }
 
     @Test
     public void test2Large()
     {
-        String fileName = "test-mid.pxl";
+        String fileName = "test-large.pxl";
         int rowNum = 20_000_000;
         Random random = new Random();
         for (int i = 0; i < 10; i++)
         {
             int batchSize = random.nextInt(rowNum);
             System.out.println("row batch size: " + batchSize);
-            testContent(fileName, batchSize, rowNum);
+            testContent(fileName, batchSize, rowNum, 1528902023606L);
+        }
+    }
+
+    private void testContent(String fileName, int batchSize, int rowNum, long time)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"a", "b", "c", "d", "e", "z"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+
+        VectorizedRowBatch rowBatch;
+        elementSize = 0;
+        try (PixelsReader pixelsReader = getReader(fileName);
+             PixelsRecordReader recordReader = pixelsReader.read(option)) {
+            while (true) {
+                rowBatch = recordReader.readBatch(batchSize);
+                LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
+                DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
+                DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
+                TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
+                LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
+                BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
+                if (rowBatch.endOfFile) {
+                    assertCorrect(rowBatch, acv, bcv, ccv, dcv, ecv, zcv, time);
+                    break;
+                }
+                assertCorrect(rowBatch, acv, bcv, ccv, dcv, ecv, zcv, time);
+            }
+            assertEquals(rowNum, elementSize);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -124,28 +125,97 @@ public class TestPixelsReader
                                DoubleColumnVector ccv,
                                TimestampColumnVector dcv,
                                LongColumnVector ecv,
-                               BytesColumnVector zcv)
+                               BytesColumnVector zcv,
+                               long time)
     {
         for (int i = 0; i < rowBatch.size; i++)
         {
             if (elementSize % 100 == 0)
             {
-                assertTrue(acv.isNull[i]);
-                assertTrue(bcv.isNull[i]);
-                assertTrue(ccv.isNull[i]);
-                assertTrue(dcv.isNull[i]);
-                assertTrue(ecv.isNull[i]);
-                assertTrue(zcv.isNull[i]);
+                if (DEBUG)
+                {
+                    if (!acv.isNull[i])
+                    {
+                        System.out.println("[a] size: " + elementSize + ", non null");
+                    }
+                    if (!bcv.isNull[i])
+                    {
+                        System.out.println("[b] size: " + elementSize + ", non null");
+                    }
+                    if (!ccv.isNull[i])
+                    {
+                        System.out.println("[c] size: " + elementSize + ", non null");
+                    }
+                    if (!dcv.isNull[i])
+                    {
+                        System.out.println("[d] size: " + elementSize + ", non null");
+                    }
+                    if (!ecv.isNull[i])
+                    {
+                        System.out.println("[e] size: " + elementSize + ", non null");
+                    }
+                    if (!zcv.isNull[i])
+                    {
+                        System.out.println("[z] size: " + elementSize + ", non null");
+                    }
+                }
+                else
+                {
+                    assertTrue(acv.isNull[i]);
+                    assertTrue(bcv.isNull[i]);
+                    assertTrue(ccv.isNull[i]);
+                    assertTrue(dcv.isNull[i]);
+                    assertTrue(ecv.isNull[i]);
+                    assertTrue(zcv.isNull[i]);
+                }
             }
             else
             {
-                assertEquals(elementSize, acv.vector[i]);
-                assertEquals( elementSize * 3.1415f, bcv.vector[i], 0.0001d);
-                assertEquals( elementSize * 3.14159d, ccv.vector[i], 0.0001f);
-                assertEquals(dcv.time[i], 1528785092538L);
-                assertEquals((elementSize > 25 ? 1 : 0), ecv.vector[i]);
-                assertEquals(String.valueOf(elementSize),
-                        new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                if (DEBUG)
+                {
+                    if (elementSize != acv.vector[i])
+                    {
+                        System.out.println("[a] size: " + elementSize
+                                + ", expected: " + elementSize + ", actual: " + acv.vector[i]);
+                    }
+                    if (Float.compare(elementSize * 3.1415f, (float) bcv.vector[i]) != 0)
+                    {
+                        System.out.println("[b] size: " + elementSize
+                                + ", expected: " + elementSize * 3.1415f + ", actual: " + (float) bcv.vector[i]);
+                    }
+                    if (Math.abs(elementSize * 3.14159d - ccv.vector[i]) > 0.000001)
+                    {
+                        System.out.println("[c] size: " + elementSize
+                                + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
+                    }
+                    if (dcv.time[i] != time)
+                    {
+                        System.out.println("[d] size: " + elementSize
+                                + ", expected: " + time + ", actual: " + dcv.time[i]);
+                    }
+                    int expectedBool = elementSize > 25 ? 1 : 0;
+                    if (expectedBool != ecv.vector[i])
+                    {
+                        System.out.println("[e] size: " + elementSize
+                                + ", expected: " + expectedBool + ", actual: " + ecv.vector[i]);
+                    }
+                    String actualStr = new String(zcv.vector[i], zcv.start[i], zcv.lens[i]);
+                    if (!String.valueOf(elementSize).equals(actualStr))
+                    {
+                        System.out.println("[z] size: " + elementSize
+                                + ", expected: " + String.valueOf(elementSize) + ", actual: " + actualStr);
+                    }
+                }
+                else
+                {
+                    assertEquals(elementSize, acv.vector[i]);
+                    assertEquals(elementSize * 3.1415f, bcv.vector[i], 0.000001d);
+                    assertEquals(elementSize * 3.14159d, ccv.vector[i], 0.000001f);
+                    assertEquals(dcv.time[i], 1528901945696L);
+                    assertEquals((elementSize > 25 ? 1 : 0), ecv.vector[i]);
+                    assertEquals(String.valueOf(elementSize),
+                            new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                }
             }
             elementSize++;
         }
@@ -155,7 +225,7 @@ public class TestPixelsReader
     {
         PixelsReader pixelsReader = null;
         String filePath = Objects.requireNonNull(
-                Class.class.getClassLoader().getResource("files/" + fileName)).getPath();
+                this.getClass().getClassLoader().getResource("files/" + fileName)).getPath();
         Path path = new Path(filePath);
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
