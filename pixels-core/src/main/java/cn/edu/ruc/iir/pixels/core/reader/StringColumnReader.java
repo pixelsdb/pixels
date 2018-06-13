@@ -83,6 +83,7 @@ public class StringColumnReader
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
+                    columnVector.add(new byte[0]);
                 }
                 else
                 {
@@ -98,7 +99,8 @@ public class StringColumnReader
                     }
                     byte[] tmpBytes = new byte[tmpLen];
                     originsBuf.getBytes(starts[originId], tmpBytes);
-                    columnVector.setVal(i, tmpBytes);
+//                    columnVector.setVal(i, tmpBytes);
+                    columnVector.add(tmpBytes);
                 }
                 elementIndex++;
             }
@@ -116,13 +118,15 @@ public class StringColumnReader
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
+                    columnVector.add(new byte[0]);
                 }
                 else
                 {
                     int len = (int) lensDecoder.next();
                     byte[] tmpBytes = new byte[len];
                     contentBuf.readBytes(tmpBytes);
-                    columnVector.setVal(i, tmpBytes);
+//                    columnVector.setVal(i, tmpBytes);
+                    columnVector.add(tmpBytes);
                 }
                 elementIndex++;
             }

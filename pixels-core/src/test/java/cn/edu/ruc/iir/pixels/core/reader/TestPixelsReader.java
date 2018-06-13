@@ -81,7 +81,7 @@ public class TestPixelsReader
         Random random = new Random();
         for (int i = 0; i < 10; i++)
         {
-            int batchSize = random.nextInt(rowNum);
+            int batchSize = random.nextInt(200_000);
             System.out.println("row batch size: " + batchSize);
             testContent(fileName, batchSize, rowNum, 1528902023606L);
         }

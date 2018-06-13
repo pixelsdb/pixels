@@ -65,12 +65,14 @@ public class FloatColumnReader
             if (hasNull && isNull[isNullIndex++] == 1)
             {
                 columnVector.isNull[i] = true;
+                columnVector.add(0.0f);
             }
             else
             {
                 byte[] inputBytes = new byte[4];
                 inputBuffer.readBytes(inputBytes);
-                columnVector.vector[i] = encodingUtils.readFloat(inputBytes);
+//                columnVector.vector[i] = encodingUtils.readFloat(inputBytes);
+                columnVector.add(encodingUtils.readFloat(inputBytes));
             }
             elementIndex++;
         }

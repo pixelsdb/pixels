@@ -67,10 +67,12 @@ public class BooleanColumnReader
             if (hasNull && isNull[isNullIndex++] == 1)
             {
                 columnVector.isNull[i] = true;
+                columnVector.add(0);
             }
             else
             {
-                columnVector.vector[i] = bits[bitsIndex++];
+//                columnVector.vector[i] = bits[bitsIndex++];
+                columnVector.add(bits[bitsIndex++]);
             }
             elementIndex++;
         }

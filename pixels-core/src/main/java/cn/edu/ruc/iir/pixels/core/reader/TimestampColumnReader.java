@@ -82,10 +82,12 @@ public class TimestampColumnReader
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
+                    columnVector.add(new Timestamp(0));
                 }
                 else
                 {
-                    columnVector.set(i, new Timestamp(decoder.next()));
+//                    columnVector.set(i, new Timestamp(decoder.next()));
+                    columnVector.add(new Timestamp(decoder.next()));
                 }
                 elementIndex++;
             }
@@ -101,10 +103,12 @@ public class TimestampColumnReader
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
+                    columnVector.add(new Timestamp(0));
                 }
                 else
                 {
-                    columnVector.set(i, new Timestamp(inputStream.readLong()));
+//                    columnVector.set(i, new Timestamp(inputStream.readLong()));
+                    columnVector.add(new Timestamp(inputStream.readLong()));
                 }
                 elementIndex++;
             }

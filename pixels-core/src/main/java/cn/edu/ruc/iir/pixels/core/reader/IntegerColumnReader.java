@@ -80,10 +80,11 @@ public class IntegerColumnReader
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
                     columnVector.isNull[i] = true;
+                    columnVector.add(0);
                 }
                 else
                 {
-                    columnVector.vector[i] = decoder.next();
+                    columnVector.add(decoder.next());
                 }
                 elementIndex++;
             }

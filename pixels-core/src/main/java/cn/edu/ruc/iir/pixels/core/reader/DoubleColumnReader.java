@@ -66,12 +66,14 @@ public class DoubleColumnReader
             if (hasNull && isNull[isNullIndex++] == 1)
             {
                 columnVector.isNull[i] = true;
+                columnVector.add(0.0d);
             }
             else
             {
                 byte[] inputBytes = new byte[8];
                 inputBuffer.readBytes(inputBytes);
-                columnVector.vector[i] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
+//                columnVector.vector[i] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
+                columnVector.add(Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes)));
             }
             elementIndex++;
         }
