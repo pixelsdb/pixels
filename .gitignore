@@ -3,6 +3,7 @@ build
 target
 .classpath*
 .settings
+*.pxl
 *~
 *.iml
 .DS_Store
