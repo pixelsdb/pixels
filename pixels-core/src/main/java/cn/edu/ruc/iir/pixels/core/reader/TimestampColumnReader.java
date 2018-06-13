@@ -43,8 +43,8 @@ public class TimestampColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
@@ -81,13 +81,11 @@ public class TimestampColumnReader
                 }
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
-                    columnVector.isNull[i] = true;
-                    columnVector.add(new Timestamp(0));
+                    columnVector.isNull[i + vectorIndex] = true;
                 }
                 else
                 {
-//                    columnVector.set(i, new Timestamp(decoder.next()));
-                    columnVector.add(new Timestamp(decoder.next()));
+                    columnVector.set(i + vectorIndex, new Timestamp(decoder.next()));
                 }
                 elementIndex++;
             }
@@ -102,13 +100,11 @@ public class TimestampColumnReader
                 }
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
-                    columnVector.isNull[i] = true;
-                    columnVector.add(new Timestamp(0));
+                    columnVector.isNull[i + vectorIndex] = true;
                 }
                 else
                 {
-//                    columnVector.set(i, new Timestamp(inputStream.readLong()));
-                    columnVector.add(new Timestamp(inputStream.readLong()));
+                    columnVector.set(i + vectorIndex, new Timestamp(inputStream.readLong()));
                 }
                 elementIndex++;
             }

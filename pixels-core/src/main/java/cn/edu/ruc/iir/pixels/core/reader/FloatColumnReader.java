@@ -37,8 +37,8 @@ public class FloatColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
@@ -64,15 +64,13 @@ public class FloatColumnReader
             }
             if (hasNull && isNull[isNullIndex++] == 1)
             {
-                columnVector.isNull[i] = true;
-                columnVector.add(0.0f);
+                columnVector.isNull[i + vectorIndex] = true;
             }
             else
             {
                 byte[] inputBytes = new byte[4];
                 inputBuffer.readBytes(inputBytes);
-//                columnVector.vector[i] = encodingUtils.readFloat(inputBytes);
-                columnVector.add(encodingUtils.readFloat(inputBytes));
+                columnVector.vector[i + vectorIndex] = encodingUtils.readFloat(inputBytes);
             }
             elementIndex++;
         }

@@ -48,8 +48,8 @@ public class StringColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
         BytesColumnVector columnVector = (BytesColumnVector) vector;
@@ -82,8 +82,7 @@ public class StringColumnReader
                 }
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
-                    columnVector.isNull[i] = true;
-                    columnVector.add(new byte[0]);
+                    columnVector.isNull[i + vectorIndex] = true;
                 }
                 else
                 {
@@ -99,8 +98,7 @@ public class StringColumnReader
                     }
                     byte[] tmpBytes = new byte[tmpLen];
                     originsBuf.getBytes(starts[originId], tmpBytes);
-//                    columnVector.setVal(i, tmpBytes);
-                    columnVector.add(tmpBytes);
+                    columnVector.setVal(i + vectorIndex, tmpBytes);
                 }
                 elementIndex++;
             }
@@ -117,16 +115,14 @@ public class StringColumnReader
                 }
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
-                    columnVector.isNull[i] = true;
-                    columnVector.add(new byte[0]);
+                    columnVector.isNull[i + vectorIndex] = true;
                 }
                 else
                 {
                     int len = (int) lensDecoder.next();
                     byte[] tmpBytes = new byte[len];
                     contentBuf.readBytes(tmpBytes);
-//                    columnVector.setVal(i, tmpBytes);
-                    columnVector.add(tmpBytes);
+                    columnVector.setVal(i + vectorIndex, tmpBytes);
                 }
                 elementIndex++;
             }

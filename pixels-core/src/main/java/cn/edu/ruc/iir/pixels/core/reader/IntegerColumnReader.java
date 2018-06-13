@@ -40,8 +40,8 @@ public class IntegerColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
@@ -79,12 +79,11 @@ public class IntegerColumnReader
                 }
                 if (hasNull && isNull[isNullIndex++] == 1)
                 {
-                    columnVector.isNull[i] = true;
-                    columnVector.add(0);
+                    columnVector.isNull[i + vectorIndex] = true;
                 }
                 else
                 {
-                    columnVector.add(decoder.next());
+                    columnVector.vector[i + vectorIndex] = decoder.next();
                 }
                 elementIndex++;
             }
@@ -105,11 +104,11 @@ public class IntegerColumnReader
                     }
                     if (hasNull && isNull[isNullIndex++] == 1)
                     {
-                        columnVector.isNull[i] = true;
+                        columnVector.isNull[i + vectorIndex] = true;
                     }
                     else
                     {
-                        columnVector.vector[i] = inputStream.readLong();
+                        columnVector.vector[i + vectorIndex] = inputStream.readLong();
                     }
                     elementIndex++;
                 }
@@ -124,11 +123,11 @@ public class IntegerColumnReader
                     }
                     if (hasNull && isNull[isNullIndex++] == 1)
                     {
-                        columnVector.isNull[i] = true;
+                        columnVector.isNull[i + vectorIndex] = true;
                     }
                     else
                     {
-                        columnVector.vector[i] = inputStream.readInt();
+                        columnVector.vector[i + vectorIndex] = inputStream.readInt();
                     }
                     elementIndex++;
                 }

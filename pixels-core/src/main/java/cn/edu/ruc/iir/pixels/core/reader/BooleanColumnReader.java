@@ -35,8 +35,8 @@ public class BooleanColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
@@ -66,13 +66,11 @@ public class BooleanColumnReader
             }
             if (hasNull && isNull[isNullIndex++] == 1)
             {
-                columnVector.isNull[i] = true;
-                columnVector.add(0);
+                columnVector.isNull[i + vectorIndex] = true;
             }
             else
             {
-//                columnVector.vector[i] = bits[bitsIndex++];
-                columnVector.add(bits[bitsIndex++]);
+                columnVector.vector[i + vectorIndex] = bits[bitsIndex++];
             }
             elementIndex++;
         }

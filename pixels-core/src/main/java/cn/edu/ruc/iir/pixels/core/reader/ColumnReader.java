@@ -63,7 +63,7 @@ public abstract class ColumnReader
      * @throws java.io.IOException
      * */
     public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                              int offset, int size, int pixelStride,
+                              int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException;
 

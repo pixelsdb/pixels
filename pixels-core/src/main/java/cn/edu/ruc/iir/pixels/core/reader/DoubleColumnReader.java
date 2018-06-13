@@ -37,8 +37,8 @@ public class DoubleColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector,
-                     PixelsProto.ColumnChunkIndex chunkIndex)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
@@ -65,15 +65,13 @@ public class DoubleColumnReader
             }
             if (hasNull && isNull[isNullIndex++] == 1)
             {
-                columnVector.isNull[i] = true;
-                columnVector.add(0.0d);
+                columnVector.isNull[i + vectorIndex] = true;
             }
             else
             {
                 byte[] inputBytes = new byte[8];
                 inputBuffer.readBytes(inputBytes);
-//                columnVector.vector[i] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
-                columnVector.add(Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes)));
+                columnVector.vector[i + vectorIndex] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
             }
             elementIndex++;
         }

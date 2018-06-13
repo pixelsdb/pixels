@@ -87,34 +87,9 @@ public abstract class ColumnVector
         throw new UnsupportedOperationException("Adding boolean is not supported");
     }
 
-    public void add(boolean[] values)
-    {
-        throw new UnsupportedOperationException("Adding booleans is not supported");
-    }
-
     public void add(byte[] value)
     {
         throw new UnsupportedOperationException("Adding bytes is not supported");
-    }
-
-    public void add(byte[][] values)
-    {
-        throw new UnsupportedOperationException("Adding binary is not supported");
-    }
-
-    public void add(char value)
-    {
-        throw new UnsupportedOperationException("Adding char is not supported");
-    }
-
-    public void add(char[] values)
-    {
-        throw new UnsupportedOperationException("Adding chars is not supported");
-    }
-
-    public void add(char[][] values)
-    {
-        throw new UnsupportedOperationException("Adding varchars is not supported");
     }
 
     public void add(double value)
@@ -122,19 +97,9 @@ public abstract class ColumnVector
         throw new UnsupportedOperationException("Adding double is not supported");
     }
 
-    public void add(double[] values)
-    {
-        throw new UnsupportedOperationException("Adding doubles is not supported");
-    }
-
     public void add(float value)
     {
         throw new UnsupportedOperationException("Adding float is not supported");
-    }
-
-    public void add(float[] values)
-    {
-        throw new UnsupportedOperationException("Adding floats is not supported");
     }
 
     public void add(long value)
@@ -142,29 +107,14 @@ public abstract class ColumnVector
         throw new UnsupportedOperationException("Adding long is not supported");
     }
 
-    public void add(long[] values)
-    {
-        throw new UnsupportedOperationException("Adding longs is not supported");
-    }
-
     public void add(String value)
     {
         throw new UnsupportedOperationException("Adding string is not supported");
     }
 
-    public void add(String[] values)
-    {
-        throw new UnsupportedOperationException("Adding strings is not supported");
-    }
-
     public void add(Timestamp value)
     {
         throw new UnsupportedOperationException("Adding timestamp is not supported");
-    }
-
-    public void add(Timestamp[] values)
-    {
-        throw new UnsupportedOperationException("Adding timestamps is not supported");
     }
 
     public int getLength()
