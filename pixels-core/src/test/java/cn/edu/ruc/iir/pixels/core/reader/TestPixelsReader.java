@@ -103,6 +103,20 @@ public class TestPixelsReader
         }
     }
 
+    @Test
+    public void test4Mid()
+    {
+        String fileName = "test-mid.pxl";
+        int rowNum = 2_000_000;
+        Random random = new Random();
+        for (int i = 0; i < 10; i++)
+        {
+            int batchSize = random.nextInt(rowNum);
+            System.out.println("row batch size: " + batchSize);
+            testContent(fileName, batchSize, rowNum, 1529130997320L, false);
+        }
+    }
+
     private void testContent(String fileName, int batchSize, int rowNum, long time, boolean hasNull)
     {
         PixelsReaderOption option = new PixelsReaderOption();
