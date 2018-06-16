@@ -53,14 +53,23 @@ public class TestByteBuf
     @Test
     public void test()
     {
-        int sum = 0;
-        for (int i = 0; i < 19000; i++)
-        {
-            if (i % 100 != 0)
-            {
-                sum += i;
-            }
-        }
-        System.out.println(sum);
+        byte[][] matrix = new byte[10][10];
+        byte[] row = matrix[0];
+        System.out.println(row[0]);
+        matrix[0] = null;
+        System.out.println(row[0]);
+    }
+
+    @Test
+    public void testReference()
+    {
+        String a = "aaa";
+        String b = a;
+        System.out.println(a);
+        System.out.println(b);
+        a = null;
+        System.out.println(a);
+        System.out.println(b);
     }
 }
+

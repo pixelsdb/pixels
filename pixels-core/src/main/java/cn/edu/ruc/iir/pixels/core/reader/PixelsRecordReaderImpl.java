@@ -408,14 +408,13 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
                     int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
-                    byte[] input = chunkBuffers[index];
                     if (curChunkIdx != -1 && curChunkIdx != index) {
                         chunkBuffers[curChunkIdx] = null;
                     }
                     curChunkIdx = index;
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    readers[i].read(input, encoding, curRowInRG, curBatchSize,
+                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }

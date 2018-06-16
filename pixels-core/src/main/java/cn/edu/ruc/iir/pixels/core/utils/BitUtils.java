@@ -62,6 +62,11 @@ public class BitUtils
         return bitWiseOutput.toByteArray();
     }
 
+    /**
+     * Bit de-compaction
+     * @param input input byte array
+     * @return result bits
+     * */
     public static byte[] bitWiseDeCompact(byte[] input)
     {
         byte[] result = new byte[input.length * 8];
@@ -86,13 +91,16 @@ public class BitUtils
         return result;
     }
 
-    public static byte[] bitWiseDeCompact(byte[] input, int offset, int size)
+    /**
+     * Bit de-compaction
+     * @param input input byte array
+     * @param offset starting offset of the input
+     * @param length byte length of the input
+     * @return result bits
+     * */
+    public static byte[] bitWiseDeCompact(byte[] input, int offset, int length)
     {
-        byte[] result = new byte[size];
-        int skipBytes = offset / 8;
-        int skipBits = offset % 8;
-        double res = Math.ceil((double)size / 8.0d);
-        int readBytes = (int) res;
+        byte[] result = new byte[length * 8];
 
         int bitsToRead = 1;
         int bitsLeft = 8;
@@ -100,25 +108,17 @@ public class BitUtils
         byte mask = 0x01;
 
         int index = 0;
-        for (int i = skipBytes; i < skipBytes + readBytes; i++)
+        for (int i = offset; i < offset + length; i++)
         {
-            while (bitsLeft > 0 && index < size)
+            while (bitsLeft > 0)
             {
                 bitsLeft -= bitsToRead;
-                if (skipBits > 0)
-                {
-                    skipBits--;
-                }
-                else
-                {
-                    current = mask & (input[i] >> bitsLeft);
-                    result[index] = (byte) current;
-                    index++;
-                }
+                current = mask & (input[i] >> bitsLeft);
+                result[index] = (byte) current;
+                index++;
             }
             bitsLeft = 8;
         }
-
         return result;
     }
 }
