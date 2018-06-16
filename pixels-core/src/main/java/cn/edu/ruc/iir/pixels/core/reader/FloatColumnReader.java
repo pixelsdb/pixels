@@ -50,10 +50,9 @@ public class FloatColumnReader
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
+            isNullBitIndex = 8;
         }
         for (int i = 0; i < size; i++)
         {

@@ -64,10 +64,9 @@ public class StringColumnReader
             inputBuffer = Unpooled.wrappedBuffer(input);
             readContent(input, encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
+            isNullBitIndex = 8;
         }
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
