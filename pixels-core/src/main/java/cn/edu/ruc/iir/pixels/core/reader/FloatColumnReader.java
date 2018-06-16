@@ -20,6 +20,8 @@ public class FloatColumnReader
     private final EncodingUtils encodingUtils;
     private ByteBuf inputBuffer = null;
     private byte[] isNull;
+    private int isNullOffset = 0;
+    private int isNullBitIndex = 0;
 
     FloatColumnReader(TypeDescription type)
     {
@@ -47,22 +49,30 @@ public class FloatColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
-            int isNullOffset = (int) chunkIndex.getIsNullOffset();
-            byte[] isNullBytes = new byte[input.length - isNullOffset];
-            inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
-            numOfPixelsWithoutNull = 0;
+            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             hasNull = true;
             elementIndex = 0;
-            isNullIndex = 0;
+            isNullBitIndex = 0;
         }
         for (int i = 0; i < size; i++)
         {
             if (elementIndex % pixelStride == 0)
             {
-                nextPixel(pixelStride, chunkIndex);
+                int pixelId = elementIndex / pixelStride;
+                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                if (hasNull && isNullBitIndex > 0)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
             }
-            if (hasNull && isNull[isNullIndex++] == 1)
+            if (hasNull && isNullBitIndex >= 8)
+            {
+                isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                isNullBitIndex = 0;
+            }
+            if (hasNull && isNull[isNullBitIndex] == 1)
             {
                 columnVector.isNull[i + vectorIndex] = true;
             }
@@ -71,6 +81,10 @@ public class FloatColumnReader
                 byte[] inputBytes = new byte[4];
                 inputBuffer.readBytes(inputBytes);
                 columnVector.vector[i + vectorIndex] = encodingUtils.readFloat(inputBytes);
+            }
+            if (hasNull)
+            {
+                isNullBitIndex++;
             }
             elementIndex++;
         }

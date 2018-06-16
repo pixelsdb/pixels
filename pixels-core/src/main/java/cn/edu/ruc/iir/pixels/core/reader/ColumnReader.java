@@ -17,8 +17,6 @@ public abstract class ColumnReader
     private final TypeDescription type;
 
     int elementIndex = 0;
-    int isNullIndex = 0;
-    int numOfPixelsWithoutNull = 0;
     boolean hasNull = true;
 
     public static ColumnReader newColumnReader(TypeDescription type)
@@ -75,20 +73,5 @@ public abstract class ColumnReader
     public TypeDescription getType()
     {
         return type;
-    }
-
-    void nextPixel(int pixelStride, PixelsProto.ColumnChunkIndex chunkIndex)
-    {
-        int pixelId = elementIndex / pixelStride;
-        hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
-        if (hasNull)
-        {
-            isNullIndex = (pixelId - numOfPixelsWithoutNull)
-                    * (int) Math.ceil((double) pixelStride / 8.0d) * 8;
-        }
-        else
-        {
-            numOfPixelsWithoutNull++;
-        }
     }
 }

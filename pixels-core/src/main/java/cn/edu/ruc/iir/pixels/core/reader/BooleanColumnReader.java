@@ -5,8 +5,6 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 /**
  * pixels
@@ -18,7 +16,10 @@ public class BooleanColumnReader
 {
     private byte[] bits;
     private byte[] isNull;
+    private byte[] input;
     private int bitsIndex = 0;
+    private int isNullOffset = 0;
+    private int isNullBitIndex = 0;
 
     BooleanColumnReader(TypeDescription type)
     {
@@ -41,36 +42,47 @@ public class BooleanColumnReader
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
-            // read isNull
-            int isNullOffset = (int) chunkIndex.getIsNullOffset();
-            byte[] isNullBytes = new byte[input.length - isNullOffset];
-            ByteBuf inputBuf = Unpooled.wrappedBuffer(input);
-            inputBuf.getBytes(isNullOffset, isNullBytes);
-            inputBuf.release();
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             // read content
             bits = BitUtils.bitWiseDeCompact(input);
+            // read isNull
+            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
+            this.input = input;
             // re-init
             hasNull = true;
             elementIndex = 0;
-            isNullIndex = 0;
-            numOfPixelsWithoutNull = 0;
+            isNullBitIndex = 0;
             bitsIndex = 0;
         }
         for (int i = 0; i < size; i++)
         {
             if (elementIndex % pixelStride == 0)
             {
-                nextPixel(pixelStride, chunkIndex);
+                int pixelId = elementIndex / pixelStride;
+                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                if (hasNull && isNullBitIndex > 0)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
                 bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
             }
-            if (hasNull && isNull[isNullIndex++] == 1)
+            if (hasNull && isNullBitIndex >= 8)
+            {
+                isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                isNullBitIndex = 0;
+            }
+            if (hasNull && isNull[isNullBitIndex] == 1)
             {
                 columnVector.isNull[i + vectorIndex] = true;
             }
             else
             {
                 columnVector.vector[i + vectorIndex] = bits[bitsIndex++];
+            }
+            if (hasNull)
+            {
+                isNullBitIndex++;
             }
             elementIndex++;
         }

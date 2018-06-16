@@ -31,6 +31,8 @@ public class StringColumnReader
     private RunLenIntDecoder lensDecoder = null;
     private RunLenIntDecoder contentDecoder = null;
     private byte[] isNull;
+    private int isNullOffset = 0;
+    private int isNullBitIndex = 0;
 
     StringColumnReader(TypeDescription type)
     {
@@ -60,15 +62,12 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
-            int isNullOffset = (int) chunkIndex.getIsNullOffset();
-            byte[] isNullBytes = new byte[input.length - isNullOffset];
-            inputBuffer.getBytes(isNullOffset, isNullBytes);
-            isNull = BitUtils.bitWiseDeCompact(isNullBytes);
             readContent(input, encoding);
+            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             hasNull = true;
-            isNullIndex = 0;
             elementIndex = 0;
-            numOfPixelsWithoutNull = 0;
+            isNullBitIndex = 0;
         }
         // if dictionary encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
@@ -78,9 +77,20 @@ public class StringColumnReader
             {
                 if (elementIndex % pixelStride == 0)
                 {
-                    nextPixel(pixelStride, chunkIndex);
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull && isNullBitIndex > 0)
+                    {
+                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        isNullBitIndex = 0;
+                    }
                 }
-                if (hasNull && isNull[isNullIndex++] == 1)
+                if (hasNull && isNullBitIndex >= 8)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
+                if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
                 }
@@ -100,6 +110,10 @@ public class StringColumnReader
                     originsBuf.getBytes(starts[originId], tmpBytes);
                     columnVector.setVal(i + vectorIndex, tmpBytes);
                 }
+                if (hasNull)
+                {
+                    isNullBitIndex++;
+                }
                 elementIndex++;
             }
         }
@@ -111,9 +125,20 @@ public class StringColumnReader
             {
                 if (elementIndex % pixelStride == 0)
                 {
-                    nextPixel(pixelStride, chunkIndex);
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull && isNullBitIndex > 0)
+                    {
+                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        isNullBitIndex = 0;
+                    }
                 }
-                if (hasNull && isNull[isNullIndex++] == 1)
+                if (hasNull && isNullBitIndex >= 8)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
+                if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
                 }
@@ -123,6 +148,10 @@ public class StringColumnReader
                     byte[] tmpBytes = new byte[len];
                     contentBuf.readBytes(tmpBytes);
                     columnVector.setVal(i + vectorIndex, tmpBytes);
+                }
+                if (hasNull)
+                {
+                    isNullBitIndex++;
                 }
                 elementIndex++;
             }
