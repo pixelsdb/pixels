@@ -40,6 +40,8 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
+    private final int RGStart;
+    private int RGLen;
     private final boolean enableMetrics;
     private final boolean enableCache;
     private final String metricsDir;
@@ -78,6 +80,8 @@ public class PixelsRecordReaderImpl
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
+        this.RGStart = option.getRGStart();
+        this.RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;
         this.enableCache = enableCache;
         this.metricsDir = metricsDir;
@@ -89,18 +93,29 @@ public class PixelsRecordReaderImpl
     {
         // get file schema
         List<PixelsProto.Type> fileColTypes = footer.getTypesList();
-        if (fileColTypes == null || fileColTypes.isEmpty()) {
+        if (fileColTypes == null || fileColTypes.isEmpty())
+        {
             checkValid = false;
             return;
         }
         fileSchema = TypeDescription.createSchema(fileColTypes);
-        if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
+        if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty())
+        {
+            checkValid = false;
+            return;
+        }
+
+        // check RGStart and RGLen are within the range of actual number of row groups
+        int rgNum = footer.getRowGroupInfosCount();
+        if (RGStart >= rgNum || RGLen > rgNum)
+        {
             checkValid = false;
             return;
         }
 
         // check predicate schemas
-        if (option.getPredicate().isPresent()) {
+        if (option.getPredicate().isPresent())
+        {
             // todo check if predicate matches file schema
         }
 
@@ -108,7 +123,8 @@ public class PixelsRecordReaderImpl
         int includedColumnsNum = 0;
         String[] cols = option.getIncludedCols();
         // if size of cols is 0, create an empty row batch
-        if (cols.length == 0) {
+        if (cols.length == 0)
+        {
             TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
             this.resultRowBatch = resultSchema.createRowBatch(0);
             resultRowBatch.selectedInUse = false;
@@ -118,9 +134,12 @@ public class PixelsRecordReaderImpl
         }
         List<Integer> userColsList = new ArrayList<>();
         this.includedColumns = new boolean[fileColTypes.size()];
-        for (String col : cols) {
-            for (int j = 0; j < fileColTypes.size(); j++) {
-                if (col.equalsIgnoreCase(fileColTypes.get(j).getName())) {
+        for (String col : cols)
+        {
+            for (int j = 0; j < fileColTypes.size(); j++)
+            {
+                if (col.equalsIgnoreCase(fileColTypes.get(j).getName()))
+                {
                     userColsList.add(j);
                     includedColumns[j] = true;
                     includedColumnsNum++;
@@ -130,14 +149,16 @@ public class PixelsRecordReaderImpl
         }
 
         // check included columns
-        if (includedColumnsNum != cols.length && !option.isTolerantSchemaEvolution()) {
+        if (includedColumnsNum != cols.length && !option.isTolerantSchemaEvolution())
+        {
             checkValid = false;
             return;
         }
 
         // create result columns storing result column ids by user specified order
         this.resultColumns = new int[includedColumnsNum];
-        for (int i = 0; i < userColsList.size(); i++) {
+        for (int i = 0; i < userColsList.size(); i++)
+        {
             this.resultColumns[i] = userColsList.get(i);
         }
 
@@ -145,8 +166,10 @@ public class PixelsRecordReaderImpl
         int targetColumnsNum = new HashSet<>(userColsList).size();
         targetColumns = new int[targetColumnsNum];
         int targetColIdx = 0;
-        for (int i = 0; i < includedColumns.length; i++) {
-            if (includedColumns[i]) {
+        for (int i = 0; i < includedColumns.length; i++)
+        {
+            if (includedColumns[i])
+            {
                 targetColumns[targetColIdx] = i;
                 targetColIdx++;
             }
@@ -155,14 +178,16 @@ public class PixelsRecordReaderImpl
         // create column readers
         List<TypeDescription> columnSchemas = fileSchema.getChildren();
         readers = new ColumnReader[resultColumns.length];
-        for (int i = 0; i < resultColumns.length; i++) {
+        for (int i = 0; i < resultColumns.length; i++)
+        {
             int index = resultColumns[i];
             readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
         }
 
         // create result vectorized row batch
         List<PixelsProto.Type> resultTypes = new ArrayList<>();
-        for (int resultColumn : resultColumns) {
+        for (int resultColumn : resultColumns)
+        {
             resultTypes.add(fileColTypes.get(resultColumn));
         }
         TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
@@ -177,7 +202,8 @@ public class PixelsRecordReaderImpl
 
     private boolean read()
     {
-        if (!checkValid) {
+        if (!checkValid)
+        {
             return false;
         }
 
@@ -185,50 +211,64 @@ public class PixelsRecordReaderImpl
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
                 = footer.getRowGroupStatsList();
-        boolean[] includedRGs = new boolean[rowGroupStatistics.size()];
-        if (includedRGs.length == 0) {
+        if (RGLen == -1)
+        {
+            RGLen = rowGroupStatistics.size() - RGStart;
+        }
+        boolean[] includedRGs = new boolean[RGLen];
+        if (includedRGs.length == 0)
+        {
             return false;
         }
 
         Map<Integer, ColumnStats> columnStatsMap = new HashMap<>();
         // read row group statistics and find target row groups
-        if (option.getPredicate().isPresent()) {
+        if (option.getPredicate().isPresent())
+        {
             List<TypeDescription> columnSchemas = fileSchema.getChildren();
             PixelsPredicate predicate = option.getPredicate().get();
 
             // first, get file level column statistic, if not matches, skip this file
             List<PixelsProto.ColumnStatistic> fileColumnStatistics = footer.getColumnStatsList();
-            for (int idx : targetColumns) {
+            for (int idx : targetColumns)
+            {
                 columnStatsMap.put(idx,
                         StatsRecorder.create(columnSchemas.get(idx), fileColumnStatistics.get(idx)));
             }
-            if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap)) {
+            if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap))
+            {
                 return false;
             }
             columnStatsMap.clear();
 
             // second, get row group statistics, if not matches, skip the row group
-            for (int i = 0; i < includedRGs.length; i++) {
-                PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(i);
+            for (int i = 0; i < RGLen; i++)
+            {
+                PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(i + RGStart);
                 List<PixelsProto.ColumnStatistic> rgColumnStatistics =
                         rowGroupStatistic.getColumnChunkStatsList();
-                for (int idx : targetColumns) {
+                for (int idx : targetColumns)
+                {
                     columnStatsMap.put(idx,
                             StatsRecorder.create(columnSchemas.get(idx), rgColumnStatistics.get(idx)));
                 }
                 includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
             }
         }
-        else {
-            for (int i = 0; i < rowGroupStatistics.size(); i++) {
+        else
+        {
+            for (int i = 0; i < RGLen; i++)
+            {
                 includedRGs[i] = true;
             }
         }
         targetRGs = new int[includedRGs.length];
         int targetRGIdx = 0;
-        for (int i = 0; i < includedRGs.length; i++) {
-            if (includedRGs[i]) {
-                targetRGs[targetRGIdx] = i;
+        for (int i = 0; i < RGLen; i++)
+        {
+            if (includedRGs[i])
+            {
+                targetRGs[targetRGIdx] = i + RGStart;
                 targetRGIdx++;
             }
         }
@@ -236,24 +276,26 @@ public class PixelsRecordReaderImpl
 
         // read row group footers
         rowGroupFooters =
-                new PixelsProto.RowGroupFooter[includedRGs.length];
-        for (int i = 0; i < includedRGs.length; i++) {
-            if (includedRGs[i]) {
-                PixelsProto.RowGroupInformation rowGroupInformation =
-                        footer.getRowGroupInfos(i);
-                long footerOffset = rowGroupInformation.getFooterOffset();
-                long footerLength = rowGroupInformation.getFooterLength();
-                byte[] footerBuffer = new byte[(int) footerLength];
-                try {
-                    physicalFSReader.seek(footerOffset);
-                    physicalFSReader.readFully(footerBuffer);
-                    rowGroupFooters[i] =
-                            PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    return false;
-                }
+                new PixelsProto.RowGroupFooter[targetRGNum];
+        for (int i = 0; i < includedRGs.length; i++)
+        {
+            int rgId = targetRGs[i];
+            PixelsProto.RowGroupInformation rowGroupInformation =
+                    footer.getRowGroupInfos(rgId);
+            long footerOffset = rowGroupInformation.getFooterOffset();
+            long footerLength = rowGroupInformation.getFooterLength();
+            byte[] footerBuffer = new byte[(int) footerLength];
+            try
+            {
+                physicalFSReader.seek(footerOffset);
+                physicalFSReader.readFully(footerBuffer);
+                rowGroupFooters[i] =
+                        PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+                return false;
             }
         }
 
@@ -262,18 +304,18 @@ public class PixelsRecordReaderImpl
         if (enableCache) {
         }
         List<ChunkId> chunks = new ArrayList<>();
-        for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++) {
-            if (includedRGs[rgIdx]) {
-                PixelsProto.RowGroupIndex rowGroupIndex =
-                        rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-                for (int colIdx : targetColumns) {
-                    PixelsProto.ColumnChunkIndex chunkIndex =
-                            rowGroupIndex.getColumnChunkIndexEntries(colIdx);
-                    ChunkId chunk = new ChunkId(rgIdx, colIdx,
-                            chunkIndex.getChunkOffset(),
-                            chunkIndex.getChunkLength());
-                    chunks.add(chunk);
-                }
+        for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++)
+        {
+            PixelsProto.RowGroupIndex rowGroupIndex =
+                    rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+            for (int colIdx : targetColumns)
+            {
+                PixelsProto.ColumnChunkIndex chunkIndex =
+                        rowGroupIndex.getColumnChunkIndexEntries(colIdx);
+                ChunkId chunk = new ChunkId(rgIdx, colIdx,
+                        chunkIndex.getChunkOffset(),
+                        chunkIndex.getChunkLength());
+                chunks.add(chunk);
             }
         }
 
@@ -283,8 +325,10 @@ public class PixelsRecordReaderImpl
         // get chunk blocks
         List<ChunkSeq> chunkSeqs = new ArrayList<>();
         ChunkSeq chunkSeq = new ChunkSeq();
-        for (ChunkId chunk : chunks) {
-            if (!chunkSeq.addChunk(chunk)) {
+        for (ChunkId chunk : chunks)
+        {
+            if (!chunkSeq.addChunk(chunk))
+            {
                 chunkSeqs.add(chunkSeq);
                 chunkSeq = new ChunkSeq();
                 chunkSeq.addChunk(chunk);
@@ -294,11 +338,14 @@ public class PixelsRecordReaderImpl
 
         // read chunk blocks into buffers
         this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
-        try {
+        try
+        {
             long offsetBeforeSeek = 0;
             long readDiskBegin = System.currentTimeMillis();
-            for (ChunkSeq seq : chunkSeqs) {
-                if (seq.getLength() == 0) {
+            for (ChunkSeq seq : chunkSeqs)
+            {
+                if (seq.getLength() == 0)
+                {
                     continue;
                 }
                 int offset = (int) seq.getOffset();
@@ -324,13 +371,15 @@ public class PixelsRecordReaderImpl
                     readCost.setMs(readEnd - readStart);
                     readPerfMetrics.addSeqRead(readCost);
                 }
-                else {
+                else
+                {
                     physicalFSReader.seek(offset);
                     physicalFSReader.readFully(chunkBlockBuffer);
                 }
                 List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
-                for (ChunkId chunkId : chunkIds) {
+                for (ChunkId chunkId : chunkIds)
+                {
                     int chunkLength = (int) chunkId.getLength();
                     int rgId = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
@@ -344,7 +393,8 @@ public class PixelsRecordReaderImpl
             logger.debug("[" + physicalFSReader.getPath().getName() + "] " + readDiskBegin + " " + readDiskEnd +
                     ", disk cost: " + (readDiskEnd - readDiskBegin));
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
             return false;
         }
@@ -363,7 +413,8 @@ public class PixelsRecordReaderImpl
     public VectorizedRowBatch readBatch(int batchSize) throws IOException
     {
         // project nothing, must be count(*)
-        if (resultRowBatch.projectionSize == 0) {
+        if (resultRowBatch.projectionSize == 0)
+        {
             resultRowBatch.size = postScript.getNumberOfRows();
             resultRowBatch.endOfFile = true;
             return resultRowBatch;
@@ -371,13 +422,16 @@ public class PixelsRecordReaderImpl
 
         resultRowBatch.reset();
 
-        if (!checkValid) {
+        if (!checkValid)
+        {
             resultRowBatch.endOfFile = true;
             return resultRowBatch;
         }
 
-        if (!everRead) {
-            if (!read()) {
+        if (!everRead)
+        {
+            if (!read())
+            {
                 resultRowBatch.endOfFile = true;
                 return resultRowBatch;
             }
@@ -388,26 +442,31 @@ public class PixelsRecordReaderImpl
 
         int rgRowCount = 0;
         int curBatchSize = 0;
-        if (curRGIdx < targetRGNum) {
+        if (curRGIdx < targetRGNum)
+        {
             rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
         }
 
         ColumnVector[] columnVectors = resultRowBatch.cols;
-        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount) {
+        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
+        {
             // update current batch size
             curBatchSize = rgRowCount - curRowInRG;
-            if (curBatchSize + resultRowBatch.size >= batchSize) {
+            if (curBatchSize + resultRowBatch.size >= batchSize)
+            {
                 curBatchSize = batchSize - resultRowBatch.size;
             }
 
             // read vectors
-            for (int i = 0; i < resultColumns.length; i++) {
-                if (!columnVectors[i].duplicated) {
+            for (int i = 0; i < resultColumns.length; i++)
+            {
+                if (!columnVectors[i].duplicated)
+                {
                     PixelsProto.RowGroupFooter rowGroupFooter =
-                            rowGroupFooters[targetRGs[curRGIdx]];
+                            rowGroupFooters[curRGIdx];
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
-                    int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
+                    int index = curRGIdx * includedColumns.length + resultColumns[i];
                     if (curChunkIdx != -1 && curChunkIdx != index) {
                         chunkBuffers[curChunkIdx] = null;
                     }
@@ -424,14 +483,17 @@ public class PixelsRecordReaderImpl
             rowIndex += curBatchSize;
             resultRowBatch.size += curBatchSize;
             // update row group index if current row index exceeds max row count in the row group
-            if (curRowInRG >= rgRowCount) {
+            if (curRowInRG >= rgRowCount)
+            {
                 curRGIdx++;
                 // if not end of file, update row count
-                if (curRGIdx < targetRGNum) {
+                if (curRGIdx < targetRGNum)
+                {
                     rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
                 }
                 // if end of file, set result vectorized row batch endOfFile
-                else {
+                else
+                {
                     resultRowBatch.endOfFile = true;
                     break;
                 }
@@ -439,8 +501,10 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        for (ColumnVector cv : columnVectors) {
-            if (cv.duplicated) {
+        for (ColumnVector cv : columnVectors)
+        {
+            if (cv.duplicated)
+            {
                 cv.copyFrom(columnVectors[cv.originVecId]);
             }
         }
@@ -462,7 +526,8 @@ public class PixelsRecordReaderImpl
     @Override
     public long getRowNumber()
     {
-        if (!checkValid) {
+        if (!checkValid)
+        {
             return -1L;
         }
         return rowIndex;
@@ -502,15 +567,16 @@ public class PixelsRecordReaderImpl
     {
         completedBytes = 0;
         // release chunk buffer
-        if (targetRGs != null) {
-            for (int targetRG : targetRGs) {
-                for (int targetColumn : targetColumns) {
-                    chunkBuffers[targetRG * includedColumns.length + targetColumn] = null;
-                }
+        if (chunkBuffers != null)
+        {
+            for (int i = 0; i < chunkBuffers.length; i++)
+            {
+                chunkBuffers[i] = null;
             }
         }
-//         write out read performance metrics
-        if (enableMetrics) {
+        // write out read performance metrics
+        if (enableMetrics)
+        {
             String metrics = JSON.toJSONString(readPerfMetrics);
             Path metricsFilePath = Paths.get(metricsDir,
                     String.valueOf(System.nanoTime()) +
