@@ -15,8 +15,8 @@ public class PixelsReaderOption
     private PixelsPredicate predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
-    private long offset = 0;
-    private long length = Long.MAX_VALUE;
+    private int rgStart = 0;
+    private int rgLen = -1;     // -1 means reading to the end of the file
 
     public PixelsReaderOption()
     {}
@@ -54,20 +54,20 @@ public class PixelsReaderOption
         return skipCorruptRecords;
     }
 
-    public void range(long offset, long length)
+    public void rgRange(int rgStart, int rgLen)
     {
-        this.offset = offset;
-        this.length = length;
+        this.rgStart = rgStart;
+        this.rgLen = rgLen;
     }
 
-    public long getOffset()
+    public int getRGStart()
     {
-        return offset;
+        return this.rgStart;
     }
 
-    public long getLength()
+    public int getRGLen()
     {
-        return length;
+        return this.rgLen;
     }
 
     public void tolerantSchemaEvolution(boolean tolerantSchemaEvolution)

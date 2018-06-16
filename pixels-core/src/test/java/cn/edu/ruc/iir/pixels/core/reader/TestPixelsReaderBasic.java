@@ -25,13 +25,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 /**
- * pixels reader test
- * this test is to guarantee correctness of the pixels reader
+ * pixels reader basic test
+ * this test is to guarantee basic correctness of the pixels reader
  *
  * @author guodong
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-public class TestPixelsReader
+public class TestPixelsReaderBasic
 {
     private static final boolean DEBUG = true;
     private long elementSize = 0;
@@ -258,9 +258,9 @@ public class TestPixelsReader
                 else
                 {
                     assertEquals(elementSize, acv.vector[i]);
-                    assertEquals(elementSize * 3.1415f, bcv.vector[i], 0.000001d);
-                    assertEquals(elementSize * 3.14159d, ccv.vector[i], 0.000001f);
-                    assertEquals(dcv.time[i], 1528901945696L);
+                    assertEquals(elementSize * 3.1415f, bcv.vector[i], 0.000001f);
+                    assertEquals(elementSize * 3.14159d, ccv.vector[i], 0.000001d);
+                    assertEquals(time, dcv.time[i]);
                     assertEquals((elementSize > 25 ? 1 : 0), ecv.vector[i]);
                     assertEquals(String.valueOf(elementSize),
                             new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));

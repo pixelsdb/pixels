@@ -49,8 +49,8 @@ public class PixelsReaderImpl
     private final Random random;
 
     private PixelsReaderImpl(TypeDescription fileSchema,
-                            PhysicalFSReader physicalFSReader,
-                            PixelsProto.FileTail fileTail,
+                             PhysicalFSReader physicalFSReader,
+                             PixelsProto.FileTail fileTail,
                              String metricsDir,
                              float metricsCollectProb,
                              boolean enableCache)
