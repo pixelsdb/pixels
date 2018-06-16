@@ -37,61 +37,53 @@ public class ByteColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleCount;
-            System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-            curPixelEleCount += curPartLength;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelIsNullIndex;
+            writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-
-        System.arraycopy(bvalues, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-        curPixelEleCount += curPartLength;
-
-        curPartOffset += curPartLength;
-        nextPartLength = size - curPartOffset;
-
-        if (nextPartLength > 0) {
-            System.arraycopy(bvalues,
-                    curPartOffset,
-                    curPixelVector,
-                    curPixelEleCount,
-                    nextPartLength);
-            curPixelEleCount += nextPartLength;
-        }
+        writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
 
         return outputStream.size();
+    }
+
+    private void writeCurPartByte(LongColumnVector columnVector, byte[] bvalues, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++) {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                curPixelVector[curPixelEleIndex] = bvalues[i + curPartOffset];
+                curPixelEleIndex++;
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleCount; i++)
+        for (int i = 0; i < curPixelEleIndex; i++)
         {
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
         }
         else {
-            outputStream.write(curPixelVector, 0, curPixelEleCount);
+            outputStream.write(curPixelVector, 0, curPixelEleIndex);
         }
 
-        curPixelPosition = outputStream.size();
-
-        curPixelEleCount = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(lastPixelPosition);
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        lastPixelPosition = curPixelPosition;
-        pixelStatRecorder.reset();
+        super.newPixel();
     }
 
     @Override
@@ -103,5 +95,12 @@ public class ByteColumnWriter extends BaseColumnWriter
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        encoder.close();
+        super.close();
     }
 }

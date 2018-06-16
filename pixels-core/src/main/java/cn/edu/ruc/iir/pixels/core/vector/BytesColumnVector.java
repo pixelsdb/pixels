@@ -1,7 +1,5 @@
 package cn.edu.ruc.iir.pixels.core.vector;
 
-import com.google.common.primitives.Chars;
-
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -150,45 +148,9 @@ public class BytesColumnVector extends ColumnVector
     }
 
     @Override
-    public void add(byte[][] values)
-    {
-        for (byte[] v : values) {
-            add(v);
-        }
-    }
-
-    @Override
-    public void add(char value)
-    {
-        add(Chars.toByteArray(value));
-    }
-
-    @Override
-    public void add(char[] values)
-    {
-        add(new String(values).getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Override
-    public void add(char[][] values)
-    {
-        for (char[] v : values) {
-            add(v);
-        }
-    }
-
-    @Override
     public void add(String value)
     {
         add(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    @Override
-    public void add(String[] values)
-    {
-        for (String v : values) {
-            add(v);
-        }
     }
 
     /**

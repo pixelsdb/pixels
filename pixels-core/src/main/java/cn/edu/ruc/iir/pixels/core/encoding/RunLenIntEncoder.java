@@ -69,9 +69,9 @@ public class RunLenIntEncoder
 
     public byte[] encode(long[] values, long offset, long length) throws IOException
     {
-        for (long v : values)
+        for (int i = 0; i < length; i++)
         {
-            this.write(v);
+            this.write(values[i]);
         }
         flush();
         byte[] result = outputStream.toByteArray();
@@ -83,6 +83,13 @@ public class RunLenIntEncoder
     public byte[] encode(long[] values) throws IOException
     {
         return encode(values, 0, values.length);
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        gapVsPatchList = null;
+        outputStream.close();
     }
 
     private void determineEncoding()

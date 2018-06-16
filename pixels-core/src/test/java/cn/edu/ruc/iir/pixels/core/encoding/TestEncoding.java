@@ -1,13 +1,14 @@
 package cn.edu.ruc.iir.pixels.core.encoding;
 
 import cn.edu.ruc.iir.pixels.core.TestParams;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Random;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.junit.Assert.assertArrayEquals;
 
 /**
@@ -88,63 +89,37 @@ public class TestEncoding
             cur[i] = i > 25 ? 1 : 0;
             exp[i] = i > 25;
         }
-        byte[] input = bitWiseCompact(cur);
+        byte[] input = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
 
         boolean[] res = new boolean[TestParams.rowNum];
-        byte[] bytesRes = bitWiseDeCompact(input, TestParams.rowNum);
+        byte[] bytesRes = BitUtils.bitWiseDeCompact(input);
         for (int i = 0; i < TestParams.rowNum; i++) {
             res[i] = bytesRes[i] == 1;
         }
         assertArrayEquals(exp, res);
-    }
 
-    private byte[] bitWiseCompact(long[] values)
-    {
-        ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
-        int bitsToWrite = 1;
-        int bitsLeft = 8;
-        byte current = 0;
-
-        for (long v : values)
+        int offset = 20;
+        int size = 9;
+        byte[] result = BitUtils.bitWiseDeCompact(input, offset, size);
+        for (int i = 0; i < 6; i++)
         {
-            bitsLeft -= bitsToWrite;
-            current |= v << bitsLeft;
-            if (bitsLeft == 0) {
-                bitWiseOutput.write(current);
-                current = 0;
-                bitsLeft = 8;
-            }
+            assertEquals(0, result[i]);
         }
-
-        if (bitsLeft != 8) {
-            bitWiseOutput.write(current);
+        for (int i = 6; i < size; i++)
+        {
+            assertEquals(1, result[i]);
         }
-
-        return bitWiseOutput.toByteArray();
     }
 
-    private byte[] bitWiseDeCompact(byte[] input, int size)
+    @Test
+    public void test()
     {
-        byte[] result = new byte[size];
-
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current;
-        byte mask = 0x01;
-
-        int index = 0;
-        for (byte b : input) {
-            while (bitsLeft > 0) {
-                if (index >= size) {
-                    return result;
-                }
-                bitsLeft -= bitsToRead;
-                current = mask & (b >> bitsLeft);
-                result[index] = (byte) current;
-                index++;
-            }
-            bitsLeft = 8;
-        }
-        return result;
+        long input[] = {0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 1, 1, 1, 1, 1};
+        byte[] mid = BitUtils.bitWiseCompact(input, 32);
+        byte[] result = BitUtils.bitWiseDeCompact(mid);
+        System.out.println(result);
     }
 }

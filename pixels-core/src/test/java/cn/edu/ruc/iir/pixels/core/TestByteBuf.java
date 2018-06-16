@@ -49,4 +49,27 @@ public class TestByteBuf
         System.out.println(s.getBytes().length);
         System.out.println(sChars.length * Character.BYTES);
     }
+
+    @Test
+    public void test()
+    {
+        byte[][] matrix = new byte[10][10];
+        byte[] row = matrix[0];
+        System.out.println(row[0]);
+        matrix[0] = null;
+        System.out.println(row[0]);
+    }
+
+    @Test
+    public void testReference()
+    {
+        String a = "aaa";
+        String b = a;
+        System.out.println(a);
+        System.out.println(b);
+        a = null;
+        System.out.println(a);
+        System.out.println(b);
+    }
 }
+

@@ -1,11 +1,10 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
@@ -32,82 +31,48 @@ public class BooleanColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleCount;
-            for (int i = 0; i < curPartLength; i++) {
-                long v = values[i + curPartOffset];
-                curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
-            }
-            curPixelEleCount += curPartLength;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
+            curPartLength = pixelStride - curPixelIsNullIndex;
+            writeCurBoolean(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-        for (int i = 0; i < curPartLength; i++) {
-            long v = values[i + curPartOffset];
-            curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
-        }
-        curPixelEleCount += curPartLength;
-        curPartOffset += curPartLength;
-        nextPartLength = size - curPartOffset;
-
-        if (nextPartLength > 0) {
-            for (int i = 0; i < curPartLength; i++) {
-                long v = values[i + curPartOffset];
-                curPixelVector[i + curPixelEleCount] = (v == 0 ? 0 : 1);
-            }
-            curPixelEleCount += nextPartLength;
-        }
+        writeCurBoolean(columnVector, values, curPartLength, curPartOffset);
 
         return outputStream.size();
+    }
+
+    private void writeCurBoolean(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++)
+        {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                curPixelVector[curPixelEleIndex++] = values[i + curPartOffset];
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleCount; i++)
+        for (int i = 0; i < curPixelEleIndex; i++)
         {
             pixelStatRecorder.updateBoolean(curPixelVector[i] != 0, 1);
         }
 
-        outputStream.write(bitWiseCompact(curPixelVector, curPixelEleCount));
+        outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelEleIndex));
 
-        curPixelPosition = outputStream.size();
-        curPixelEleCount = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(lastPixelPosition);
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        lastPixelPosition = curPixelPosition;
-        pixelStatRecorder.reset();
-    }
-
-    private byte[] bitWiseCompact(long[] values, int length)
-    {
-        ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
-        int bitsToWrite = 1;
-        int bitsLeft = 8;
-        byte current = 0;
-
-        for (int i = 0; i < length; i++) {
-            long v = values[i];
-            bitsLeft -= bitsToWrite;
-            current |= v << bitsLeft;
-            if (bitsLeft == 0) {
-                bitWiseOutput.write(current);
-                current = 0;
-                bitsLeft = 8;
-            }
-        }
-
-        if (bitsLeft != 8) {
-            bitWiseOutput.write(current);
-        }
-
-        return bitWiseOutput.toByteArray();
+        super.newPixel();
     }
 }

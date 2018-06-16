@@ -183,8 +183,9 @@ message ColumnChunkIndex {
 //    optional ColumnStatistic columnStatistic = 1;
     optional uint64 chunkOffset = 1;
     optional uint64 chunkLength = 2;
-    repeated uint64 pixelPositions = 3 [packed=true];
-    repeated PixelStatistic pixelStatistics = 4;
+    optional uint64 isNullOffset = 3;
+    repeated uint64 pixelPositions = 4 [packed=true];
+    repeated PixelStatistic pixelStatistics = 5;
 }
 
 message RowGroupIndex {

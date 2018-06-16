@@ -16,7 +16,6 @@ import com.alibaba.fastjson.JSON;
 import io.airlift.log.Logger;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -404,17 +403,19 @@ public class PixelsRecordReaderImpl
             // read vectors
             for (int i = 0; i < resultColumns.length; i++) {
                 if (!columnVectors[i].duplicated) {
-                    PixelsProto.ColumnEncoding encoding =
-                            rowGroupFooters[targetRGs[curRGIdx]].getRowGroupEncoding()
-                                    .getColumnChunkEncodings(resultColumns[i]);
+                    PixelsProto.RowGroupFooter rowGroupFooter =
+                            rowGroupFooters[targetRGs[curRGIdx]];
+                    PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                            .getColumnChunkEncodings(resultColumns[i]);
                     int index = targetRGs[curRGIdx] * includedColumns.length + resultColumns[i];
-                    byte[] input = chunkBuffers[index];
                     if (curChunkIdx != -1 && curChunkIdx != index) {
                         chunkBuffers[curChunkIdx] = null;
                     }
                     curChunkIdx = index;
-                    readers[i].read(input, encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), columnVectors[i]);
+                    PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                            .getColumnChunkIndexEntries(resultColumns[i]);
+                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 
@@ -515,15 +516,15 @@ public class PixelsRecordReaderImpl
                     String.valueOf(System.nanoTime()) +
                     physicalFSReader.getPath().getName() +
                     ".json");
-            try {
-                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
-                raf.seek(0L);
-                raf.writeChars(metrics);
-                raf.close();
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
+//                raf.seek(0L);
+//                raf.writeChars(metrics);
+//                raf.close();
+//            }
+//            catch (IOException e) {
+//                e.printStackTrace();
+//            }
         }
         // reset read performance metrics
         readPerfMetrics.clear();

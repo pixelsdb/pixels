@@ -29,12 +29,21 @@ public class FloatColumnWriter extends BaseColumnWriter
         double[] values = columnVector.vector;
         for (int i = 0; i < length; i++)
         {
-            curPixelEleCount++;
-            float value = (float) values[i];
-            encodingUtils.writeFloat(outputStream, value);
-            pixelStatRecorder.updateFloat(value);
+            isNull[curPixelIsNullIndex++] = columnVector.isNull[i];
+            curPixelEleIndex++;
+            if (columnVector.isNull[i])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                float value = (float) values[i];
+                encodingUtils.writeFloat(outputStream, value);
+                pixelStatRecorder.updateFloat(value);
+            }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
-            if (curPixelEleCount >= pixelStride) {
+            if (curPixelEleIndex >= pixelStride)
+            {
                 newPixel();
             }
         }

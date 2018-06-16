@@ -28,41 +28,38 @@ public class BinaryColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleCount;
-            for (int i = 0; i < curPartLength; i++) {
-                byte[] bytes = values[curPartOffset + i];
-                outputStream.write(bytes.length);
-                outputStream.write(bytes);
-                pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
-            }
-            curPixelEleCount += curPartLength;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+            curPartLength = pixelStride - curPixelIsNullIndex;
+            writeCurPartBinary(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-        for (int i = 0; i < curPartLength; i++) {
-            byte[] bytes = values[curPartOffset + i];
-            outputStream.write(bytes.length);
-            outputStream.write(bytes);
-            pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
-        }
-        curPixelEleCount += curPartLength;
-        curPartOffset += curPartLength;
-        nextPartLength = size - curPartOffset;
+        writeCurPartBinary(columnVector, values, curPartLength, curPartOffset);
 
-        if (nextPartLength > 0) {
-            curPartLength = nextPartLength;
-            for (int i = 0; i < curPartLength; i++) {
+        return outputStream.size();
+    }
+
+    private void writeCurPartBinary(BytesColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
+            throws IOException
+    {
+        for (int i = 0; i < curPartLength; i++) {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
                 byte[] bytes = values[curPartOffset + i];
                 outputStream.write(bytes.length);
                 outputStream.write(bytes);
                 pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
+                curPixelEleIndex++;
             }
-            curPixelEleCount += nextPartLength;
         }
-        return outputStream.size();
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 }

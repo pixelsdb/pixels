@@ -2,8 +2,10 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
@@ -17,6 +19,9 @@ public class FloatColumnReader
 {
     private final EncodingUtils encodingUtils;
     private ByteBuf inputBuffer = null;
+    private byte[] isNull;
+    private int isNullOffset = 0;
+    private int isNullBitIndex = 0;
 
     FloatColumnReader(TypeDescription type)
     {
@@ -34,18 +39,54 @@ public class FloatColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector)
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
-        if (offset == 0) {
+        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        if (offset == 0)
+        {
             if (inputBuffer != null) {
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
+            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
+            hasNull = true;
+            elementIndex = 0;
+            isNullBitIndex = 0;
         }
-        for (int i = 0; i < size; i++) {
-            byte[] inputBytes = new byte[4];
-            inputBuffer.readBytes(inputBytes);
-            vector.add(encodingUtils.readFloat(inputBytes));
+        for (int i = 0; i < size; i++)
+        {
+            if (elementIndex % pixelStride == 0)
+            {
+                int pixelId = elementIndex / pixelStride;
+                hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                if (hasNull && isNullBitIndex > 0)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
+            }
+            if (hasNull && isNullBitIndex >= 8)
+            {
+                isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                isNullBitIndex = 0;
+            }
+            if (hasNull && isNull[isNullBitIndex] == 1)
+            {
+                columnVector.isNull[i + vectorIndex] = true;
+            }
+            else
+            {
+                byte[] inputBytes = new byte[4];
+                inputBuffer.readBytes(inputBytes);
+                columnVector.vector[i + vectorIndex] = encodingUtils.readFloat(inputBytes);
+            }
+            if (hasNull)
+            {
+                isNullBitIndex++;
+            }
+            elementIndex++;
         }
     }
 }

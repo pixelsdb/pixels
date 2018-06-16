@@ -61,75 +61,73 @@ public class StringColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        if (currentUseDictionaryEncoding) {
-            while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-                curPartLength = pixelStride - curPixelEleCount;
-                for (int i = 0; i < curPartLength; i++) {
-                    curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                    pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-                }
-                curPixelEleCount += curPartLength;
+        if (currentUseDictionaryEncoding)
+        {
+            while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+            {
+                curPartLength = pixelStride - curPixelIsNullIndex;
+                writeCurPartWithDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
                 newPixel();
                 curPartOffset += curPartLength;
                 nextPartLength = size - curPartOffset;
             }
 
             curPartLength = nextPartLength;
-            for (int i = 0; i < curPartLength; i++) {
-                curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-            }
-            curPixelEleCount += curPartLength;
-            curPartOffset += curPartLength;
-            nextPartLength = size - curPartOffset;
-
-            // this should never be reached.
-            if (nextPartLength > 0) {
-                curPartLength = nextPartLength;
-                for (int i = 0; i < curPartLength; i++) {
-                    curPixelVector[curPixelEleCount + i] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                    pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-                }
-                curPixelEleCount += nextPartLength;
-            }
+            writeCurPartWithDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
         }
         else {
             // directly add to outputStream if not using dictionary encoding
-            while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-                curPartLength = pixelStride - curPixelEleCount;
-                for (int i = 0; i < curPartLength; i++) {
-                    outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                    lensArray.add(vLens[curPartOffset + i]);
-                    pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-                }
-                curPixelEleCount += curPartLength;
+            while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+            {
+                curPartLength = pixelStride - curPixelIsNullIndex;
+                writeCurPartWithoutDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
                 newPixel();
                 curPartOffset += curPartLength;
                 nextPartLength = size - curPartOffset;
             }
 
             curPartLength = nextPartLength;
-            for (int i = 0; i < curPartLength; i++) {
+            writeCurPartWithoutDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
+        }
+        return outputStream.size();
+    }
+
+    private void writeCurPartWithoutDict(BytesColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++)
+        {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-            }
-            curPixelEleCount += curPartLength;
-            curPartOffset += curPartLength;
-            nextPartLength = size - curPartOffset;
-
-            // this should never be reached.
-            if (nextPartLength > 0) {
-                curPartLength = nextPartLength;
-                for (int i = 0; i < curPartLength; i++) {
-                    outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                    lensArray.add(vLens[curPartOffset + i]);
-                    pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-                }
-                curPixelEleCount += nextPartLength;
+                curPixelEleIndex++;
             }
         }
-        return outputStream.size();
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
+    }
+
+    private void writeCurPartWithDict(BytesColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++)
+        {
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+            }
+            else
+            {
+                curPixelVector[curPixelEleIndex++] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override
@@ -137,21 +135,11 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         if (currentUseDictionaryEncoding) {
             // for dictionary encoding. run length encode again.
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
         }
         // else ignore outputStream
 
-        // merge and reset
-        curPixelPosition = outputStream.size();
-        curPixelEleCount = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(lastPixelPosition);
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        lastPixelPosition = curPixelPosition;
-        pixelStatRecorder.reset();
+        super.newPixel();
     }
 
     @Override
@@ -181,6 +169,15 @@ public class StringColumnWriter extends BaseColumnWriter
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        lensArray.clear();
+        dictionary.clear();
+        encoder.close();
+        super.close();
     }
 
     private void flushLens() throws IOException

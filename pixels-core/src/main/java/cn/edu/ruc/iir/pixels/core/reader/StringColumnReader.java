@@ -3,7 +3,9 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
+import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -28,6 +30,9 @@ public class StringColumnReader
     private ByteBuf contentBuf = null;
     private RunLenIntDecoder lensDecoder = null;
     private RunLenIntDecoder contentDecoder = null;
+    private byte[] isNull;
+    private int isNullOffset = 0;
+    private int isNullBitIndex = 0;
 
     StringColumnReader(TypeDescription type)
     {
@@ -45,40 +50,110 @@ public class StringColumnReader
      */
     @Override
     public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, ColumnVector vector) throws IOException
+                     int offset, int size, int pixelStride, final int vectorIndex,
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
+            throws IOException
     {
-        if (offset == 0) {
-            if (inputBuffer != null) {
+        BytesColumnVector columnVector = (BytesColumnVector) vector;
+        if (offset == 0)
+        {
+            if (inputBuffer != null)
+            {
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
             readContent(input, encoding);
+            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
+            hasNull = true;
+            elementIndex = 0;
+            isNullBitIndex = 0;
         }
         // if dictionary encoded
-        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
+        {
             // read original bytes
-            for (int i = 0; i < size; i++) {
-                int originId = orders[(int) contentDecoder.next()];
-                int tmpLen;
-                if (originId < starts.length - 1) {
-                    tmpLen = starts[originId + 1] - starts[originId];
+            for (int i = 0; i < size; i++)
+            {
+                if (elementIndex % pixelStride == 0)
+                {
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull && isNullBitIndex > 0)
+                    {
+                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        isNullBitIndex = 0;
+                    }
                 }
-                else {
-                    tmpLen = startsOffset - originsOffset - starts[originId];
+                if (hasNull && isNullBitIndex >= 8)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
                 }
-                byte[] tmpBytes = new byte[tmpLen];
-                originsBuf.getBytes(starts[originId], tmpBytes);
-                vector.add(tmpBytes);
+                if (hasNull && isNull[isNullBitIndex] == 1)
+                {
+                    columnVector.isNull[i + vectorIndex] = true;
+                }
+                else
+                {
+                    int originId = orders[(int) contentDecoder.next()];
+                    int tmpLen;
+                    if (originId < starts.length - 1)
+                    {
+                        tmpLen = starts[originId + 1] - starts[originId];
+                    }
+                    else
+                    {
+                        tmpLen = startsOffset - originsOffset - starts[originId];
+                    }
+                    byte[] tmpBytes = new byte[tmpLen];
+                    originsBuf.getBytes(starts[originId], tmpBytes);
+                    columnVector.setVal(i + vectorIndex, tmpBytes);
+                }
+                if (hasNull)
+                {
+                    isNullBitIndex++;
+                }
+                elementIndex++;
             }
         }
         // if un-encoded
-        else {
+        else
+        {
             // read values
-            for (int i = 0; i < size; i++) {
-                int len = (int) lensDecoder.next();
-                byte[] tmpBytes = new byte[len];
-                contentBuf.readBytes(tmpBytes);
-                vector.add(tmpBytes);
+            for (int i = 0; i < size; i++)
+            {
+                if (elementIndex % pixelStride == 0)
+                {
+                    int pixelId = elementIndex / pixelStride;
+                    hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                    if (hasNull && isNullBitIndex > 0)
+                    {
+                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        isNullBitIndex = 0;
+                    }
+                }
+                if (hasNull && isNullBitIndex >= 8)
+                {
+                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNullBitIndex = 0;
+                }
+                if (hasNull && isNull[isNullBitIndex] == 1)
+                {
+                    columnVector.isNull[i + vectorIndex] = true;
+                }
+                else
+                {
+                    int len = (int) lensDecoder.next();
+                    byte[] tmpBytes = new byte[len];
+                    contentBuf.readBytes(tmpBytes);
+                    columnVector.setVal(i + vectorIndex, tmpBytes);
+                }
+                if (hasNull)
+                {
+                    isNullBitIndex++;
+                }
+                elementIndex++;
             }
         }
     }

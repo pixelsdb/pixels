@@ -317,6 +317,10 @@ public class PixelsWriterImpl
             }
             writeFileTail();
             physicalWriter.close();
+            for (ColumnWriter cw : columnWriters)
+            {
+                cw.close();
+            }
         } catch (IOException e)
         {
             LOGGER.error(e.getMessage());

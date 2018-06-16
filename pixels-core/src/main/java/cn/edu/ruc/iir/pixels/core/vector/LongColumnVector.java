@@ -52,29 +52,12 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
-    public void add(boolean[] values)
-    {
-        for (boolean v : values)
-        {
-            add(v ? 1 : 0);
-        }
-    }
-
-    @Override
     public void add(long v)
     {
         if (writeIndex >= getLength()) {
             ensureSize(writeIndex * 2, true);
         }
         vector[writeIndex++] = v;
-    }
-
-    @Override
-    public void add(long[] values)
-    {
-        for (long v : values) {
-            add(v);
-        }
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
