@@ -64,10 +64,9 @@ public class TimestampColumnReader
             inputStream = new ByteBufInputStream(inputBuffer);
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
+            isNullBitIndex = 8;
         }
 
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))

@@ -63,11 +63,10 @@ public class IntegerColumnReader
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             // re-init
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
+            isNullBitIndex = 8;
         }
         // if run length encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))

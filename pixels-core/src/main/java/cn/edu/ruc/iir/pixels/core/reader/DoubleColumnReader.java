@@ -52,11 +52,10 @@ public class DoubleColumnReader
             inputBuffer = Unpooled.wrappedBuffer(input);
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             // re-init
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
+            isNullBitIndex = 8;
         }
         for (int i = 0; i < size; i++)
         {

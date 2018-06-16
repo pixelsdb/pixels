@@ -46,13 +46,12 @@ public class BooleanColumnReader
             bits = BitUtils.bitWiseDeCompact(input);
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            isNull = BitUtils.bitWiseDeCompact(input, isNullOffset++, 1);
             this.input = input;
             // re-init
+            bitsIndex = 0;
             hasNull = true;
             elementIndex = 0;
-            isNullBitIndex = 0;
-            bitsIndex = 0;
+            isNullBitIndex = 8;
         }
         for (int i = 0; i < size; i++)
         {
