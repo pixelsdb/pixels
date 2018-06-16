@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
+import com.facebook.presto.spi.PrestoException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -7,6 +8,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
 
 /**
  * @version V1.0
@@ -66,5 +69,6 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter {
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         cause.printStackTrace();
         ctx.close();
+        throw new PrestoException(PIXELS_CLIENT_ERROR, cause);
     }
 }

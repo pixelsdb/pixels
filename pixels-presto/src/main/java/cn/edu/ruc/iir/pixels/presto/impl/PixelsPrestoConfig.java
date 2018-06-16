@@ -1,8 +1,14 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import com.facebook.presto.spi.PrestoException;
 import io.airlift.configuration.Config;
+import io.airlift.log.Logger;
 
 import javax.validation.constraints.NotNull;
+import java.io.IOException;
+
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CONFIG_ERROR;
 
 /**
  * @version V1.0
@@ -14,33 +20,67 @@ import javax.validation.constraints.NotNull;
  **/
 public class PixelsPrestoConfig
 {
-    private String hdfsConfigDir = null;
-    private String metadataServerUri = null;
+    private Logger logger = Logger.get(PixelsPrestoConfig.class);
+    private ConfigFactory configFactory = null;
 
-    @Config("hdfs.config.dir")
-    public PixelsPrestoConfig setHdfsConfigDir (String hdfsConfigDir)
-    {
-        this.hdfsConfigDir = hdfsConfigDir;
-        return this;
-    }
+    private String pixelsHome = null;
 
-    @Config("metadata.server.uri")
-    public PixelsPrestoConfig setMetadataServerUri (String metadataServerUri)
+    @Config("pixels.home")
+    public PixelsPrestoConfig setPixelsHome (String pixelsHome)
     {
-        this.metadataServerUri = metadataServerUri;
+        this.pixelsHome = pixelsHome;
+
+        // reload configuration
+        if (this.configFactory == null)
+        {
+            if (pixelsHome == null || pixelsHome.isEmpty())
+            {
+                String defaultPixelsHome = ConfigFactory.Instance().getProperty("pixels.home");
+                if (defaultPixelsHome == null)
+                {
+                    logger.info("use pixels.properties inside jar.");
+                } else
+                {
+                    logger.info("use pixels.properties under default pixels.home: " + defaultPixelsHome);
+                }
+            } else
+            {
+                if (!(pixelsHome.endsWith("/") || pixelsHome.endsWith("\\")))
+                {
+                    pixelsHome += "/";
+                }
+                try
+                {
+                    ConfigFactory.Instance().loadProperties(pixelsHome + "pixels.properties");
+                    ConfigFactory.Instance().addProperty("pixels.home", pixelsHome);
+                    logger.info("use pixels.properties under connector specified pixels.home: " + pixelsHome);
+
+                } catch (IOException e)
+                {
+                    logger.error(e,"can not load pixels.properties under: " + pixelsHome +
+                            ", configuration reloading is skipped.");
+                    throw new PrestoException(PIXELS_CONFIG_ERROR, e);
+                }
+            }
+
+            configFactory = ConfigFactory.Instance();
+        }
         return this;
     }
 
     @NotNull
-    public String getHdfsConfigDir ()
+    public String getPixelsHome ()
     {
-        return this.hdfsConfigDir;
+        return this.pixelsHome;
     }
 
+    /**
+     * Injected class should get ConfigFactory instance by this method instead of ConfigFactory.Instance().
+     * @return
+     */
     @NotNull
-    public String getMetadataServerUri ()
+    public ConfigFactory getFactory ()
     {
-        return this.metadataServerUri;
+        return configFactory;
     }
-
 }

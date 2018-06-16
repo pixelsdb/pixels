@@ -2,12 +2,15 @@ package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @version V1.0
@@ -31,7 +34,7 @@ public class TestHdfs {
     public void testReadBlock() {
         String filePath = "hdfs://presto00:9000/pixels/v2/point2000w-10.pxl";
 
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setHdfsConfigDir("/home/presto/opt/hadoop-2.7.3/etc/hadoop/");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         FSFactory fsFactory = new FSFactory(config);
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
@@ -52,5 +55,37 @@ public class TestHdfs {
             }
         }
     }
+
+    @Test
+    public void testDistribute() {
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
+        String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test30G_pixels/";
+        FSFactory fsFactory = new FSFactory(config);
+        List<Path> hdfsList = fsFactory.listFiles(hdfsDir);
+        Map<String, Integer> hostMap = new HashMap<>();
+        for(Path hdfsPath : hdfsList){
+            String filePath = hdfsPath.toString();
+            List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
+            for (LocatedBlock block : allBlocks) {
+                DatanodeInfo[] locations =
+                        block.getLocations();
+                for (DatanodeInfo info : locations) {
+                    String hostname = info.getHostName();
+                    if(hostMap.get(hostname) == null){
+                        hostMap.put(hostname, 1);
+                    }else {
+                        int count = hostMap.get(hostname);
+                        count++;
+                        hostMap.put(hostname, count);
+                    }
+                    System.out.println(hostMap.keySet().toString());
+                    System.out.println(hostMap.values());
+                }
+            }
+
+        }
+
+    }
+
 
 }

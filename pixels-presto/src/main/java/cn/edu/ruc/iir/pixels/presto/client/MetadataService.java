@@ -1,18 +1,21 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
-import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
+import com.facebook.presto.spi.PrestoException;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_SERIVCE_ERROR;
 
 /**
  * @version V1.0
@@ -28,17 +31,11 @@ public class MetadataService {
     private static Logger logger = Logger.get(MetadataService.class);
 
     @Inject
-    public MetadataService(PixelsPrestoConfig config) throws PixelsUriExceotion
+    public MetadataService(PixelsPrestoConfig config)
     {
-        String uri = config.getMetadataServerUri();
-        System.out.println(uri.contains(":"));
-        if (uri.startsWith("pixels://") == false || uri.contains(":") == false)
-        {
-            throw new PixelsUriExceotion("invalid pixels uri: " + uri);
-        }
-        String[] splits = uri.substring(9).split(":");
-        this.host = splits[0];
-        this.port = Integer.parseInt(splits[1]);
+        ConfigFactory configFactory = config.getFactory();
+        this.host = configFactory.getProperty("metadata.server.host");
+        this.port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
     }
 
     public List<Column> getColumnsBySchemaNameAndTblName(String schemaName, String tableName) {
@@ -50,6 +47,7 @@ public class MetadataService {
                 client.connect(port, host, tableName + "&" + schemaName);
             } catch (Exception e) {
                 e.printStackTrace();
+                throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
             }
             while (true) {
                 String res = client.getMap().get(token);
@@ -61,6 +59,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return columns;
     }
@@ -84,6 +83,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return layouts;
     }
@@ -107,6 +107,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return tables;
     }
@@ -130,6 +131,7 @@ public class MetadataService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
         }
         return schemas;
     }

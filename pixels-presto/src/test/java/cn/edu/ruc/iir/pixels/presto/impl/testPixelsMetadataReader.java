@@ -3,7 +3,6 @@ package cn.edu.ruc.iir.pixels.presto.impl;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
-import cn.edu.ruc.iir.pixels.presto.exception.PixelsUriExceotion;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,9 +22,9 @@ public class testPixelsMetadataReader {
     private final Logger log = Logger.getLogger(testPixelsMetadataReader.class.getName());
 
     @Before
-    public void init () throws PixelsUriExceotion
+    public void init ()
     {
-        PixelsPrestoConfig config = new PixelsPrestoConfig().setMetadataServerUri("pixels://presto00:18888");
+        PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         this.pixelsMetadataReader = new PixelsMetadataReader(new MetadataService(config));
     }
 
@@ -41,6 +40,7 @@ public class testPixelsMetadataReader {
         List<String> tablelist = pixelsMetadataReader.getTableNames("");
         System.out.println(tablelist.toString());
     }
+
 
     @Test
     public void testGetTableColumns () {

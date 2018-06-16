@@ -13,7 +13,10 @@
  */
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.presto.exception.ConfigurationException;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -27,6 +30,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
+
 public final class FSFactory
 {
     private FileSystem fileSystem;
@@ -36,7 +41,8 @@ public final class FSFactory
     public FSFactory(PixelsPrestoConfig config)
     {
         Configuration hdfsConfig = new Configuration(false);
-        File hdfsConfigDir = new File(config.getHdfsConfigDir());
+        ConfigFactory configFactory = config.getFactory();
+        File hdfsConfigDir = new File(configFactory.getProperty("hdfs.config.dir"));
         hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
         try
@@ -52,11 +58,13 @@ public final class FSFactory
             } else
             {
                 logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
+                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, new ConfigurationException());
             }
             fileSystem = FileSystem.get(hdfsConfig);
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_CONFIG_ERROR, e);
         }
     }
 
@@ -85,6 +93,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
         }
 
         return files;
@@ -106,6 +115,7 @@ public final class FSFactory
         } catch (IOException e)
         {
             logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
         }
         for (BlockLocation location : locations)
         {
@@ -115,6 +125,7 @@ public final class FSFactory
             } catch (IOException e)
             {
                 logger.error(e);
+                throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
             }
         }
         return new ArrayList<>(addresses);
@@ -138,7 +149,8 @@ public final class FSFactory
             in = this.fileSystem.open(path);
         } catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
         }
         HdfsDataInputStream hdis = (HdfsDataInputStream) in;
         List<LocatedBlock> allBlocks = null;
@@ -147,7 +159,8 @@ public final class FSFactory
             allBlocks = hdis.getAllBlocks();
         } catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error(e);
+            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
         }
         return allBlocks;
     }

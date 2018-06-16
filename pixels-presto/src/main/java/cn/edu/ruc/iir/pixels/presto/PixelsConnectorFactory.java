@@ -14,10 +14,10 @@
 package cn.edu.ruc.iir.pixels.presto;
 
 import com.facebook.presto.spi.ConnectorHandleResolver;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorContext;
 import com.facebook.presto.spi.connector.ConnectorFactory;
-import com.google.common.base.Throwables;
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
@@ -25,12 +25,13 @@ import io.airlift.log.Logger;
 
 import java.util.Map;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CONNECTOR_ERROR;
 import static java.util.Objects.requireNonNull;
 
 public class PixelsConnectorFactory
         implements ConnectorFactory {
 
-    Logger logger = Logger.get(PixelsConnectorFactory.class);
+    private Logger logger = Logger.get(PixelsConnectorFactory.class);
 
     private final String name = "pixels-presto";
 
@@ -65,7 +66,7 @@ public class PixelsConnectorFactory
 
             return injector.getInstance(PixelsConnector.class);
         } catch (Exception e) {
-            throw Throwables.propagate(e);
+            throw new PrestoException(PIXELS_CONNECTOR_ERROR, e);
         }
     }
 }

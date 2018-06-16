@@ -8,8 +8,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +37,7 @@ public class MetadataClient {
 
     public void connect(int port, String host, String paras) throws Exception {
         //配置客户端NIO 线程组
-        EventLoopGroup group = new NioEventLoopGroup();
+        EventLoopGroup group = new NioEventLoopGroup(1);
 
         Bootstrap client = new Bootstrap();
 
