@@ -13,7 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.Layout;
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.*;
@@ -83,10 +83,11 @@ public class PixelsSplitManager
 //            log.info("domain: " + domain.isSingleValue());
 //        }
 //        log.info("indexedColumns: " + indexedColumns.toString());
-        List<Layout> catalogList = metadataService.getLayoutsByTblName(tableHandle.getTableName());
+        List<Layout> catalogList = metadataService.getLayouts(tableHandle.getSchemaName(),
+                tableHandle.getTableName());
         List<Path> files = new ArrayList<>();
         for (Layout l : catalogList) {
-            files.addAll(fsFactory.listFiles(l.getLayInitPath()));
+            files.addAll(fsFactory.listFiles(l.getOrderPath()));
         }
 
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,

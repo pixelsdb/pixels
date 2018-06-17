@@ -17,7 +17,7 @@ public class TestRedirect {
 
     @Test
     public void testRedirect() {
-        String splitInfo = FileUtils.readFileToString("/home/tao/software/station/bitbucket/pixels/pixels-daemon/src/main/resources/layouts_layout_split.json");
+        String splitInfo = FileUtils.readFileToString("/home/tao/software/station/bitbucket/pixels/pixels-daemon/src/main/resources/layout_splits.json");
         System.out.println(splitInfo);
         Split split = JSON.parseObject(splitInfo, Split.class);
         List<SplitPattern> splitPatterns = split.getSplitPatterns();

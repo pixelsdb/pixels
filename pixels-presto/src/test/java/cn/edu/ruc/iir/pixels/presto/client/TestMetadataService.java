@@ -1,7 +1,8 @@
 package cn.edu.ruc.iir.pixels.presto.client;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.Schema;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,13 +28,15 @@ public class TestMetadataService {
     }
 
     @Test
-    public void testGetSchemaNames() {
+    public void testGetSchemaNames() throws InterruptedException
+    {
         for (int i = 1; i <= 5; i++) {
             Thread t = new Thread(() -> {
                 List<Schema> schemas = instance.getSchemas();
                 System.out.println("Thread: " + schemas.size());
             });
             t.start();
+            t.join();
         }
 
         List<Schema> schemas = instance.getSchemas();
@@ -41,19 +44,18 @@ public class TestMetadataService {
     }
 
     @Test
-    public void testGetColumnsBySchemaNameAndTblName() {
-        String schemaName = "pixels";
-//        String tableName = "test";
-        String tableName = "test30g_pixels";
-//        for (int i = 1; i <= 20; i++) {
-//            Thread t = new Thread(() -> {
-//                List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
-//                if (columns.size() != 0)
-//                    System.out.println("Thread: " + columns.size());
-//            });
-//            t.start();
-//        }
-        List<Column> columns = instance.getColumnsBySchemaNameAndTblName(schemaName, tableName);
-        System.out.println("Command: " + columns.size());
+    public void testGetColumnsBySchemaNameAndTblName ()
+    {
+        List<Column> columns = instance.getColumns("pixels", "test");
+        for (Column column : columns)
+        {
+            System.out.println(column.getName() + ", " + column.getType());
+        }
+    }
+
+    @Test
+    public void testGetTableLayouts () {
+        List<Layout> layouts = instance.getLayouts("pixels", "test30g_pixels");
+        System.out.println(layouts.get(0).getSplits());
     }
 }

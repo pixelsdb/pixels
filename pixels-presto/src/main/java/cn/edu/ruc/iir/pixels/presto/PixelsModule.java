@@ -15,8 +15,8 @@ package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.fasterxml.jackson.databind.DeserializationContext;
