@@ -184,16 +184,16 @@ public class EncodingUtils
         output.write(writeBuffer, 0, 8);
     }
 
-    public long readLongLE(byte[] inputBytes)
+    public long readLongLE(byte[] inputBytes, int offset)
     {
-        return (((inputBytes[0] & 0xff))
-                + ((inputBytes[1] & 0xff) << 8)
-                + ((inputBytes[2] & 0xff) << 16)
-                + ((long) (inputBytes[3] & 0xff) << 24)
-                + ((long) (inputBytes[4] & 0xff) << 32)
-                + ((long) (inputBytes[5] & 0xff) << 40)
-                + ((long) (inputBytes[6] & 0xff) << 48)
-                + ((long) (inputBytes[7] & 0xff) << 56));
+        return (((inputBytes[offset] & 0xff))
+                + ((inputBytes[1 + offset] & 0xff) << 8)
+                + ((inputBytes[2 + offset] & 0xff) << 16)
+                + ((long) (inputBytes[3 + offset] & 0xff) << 24)
+                + ((long) (inputBytes[4 + offset] & 0xff) << 32)
+                + ((long) (inputBytes[5 + offset] & 0xff) << 40)
+                + ((long) (inputBytes[6 + offset] & 0xff) << 48)
+                + ((long) (inputBytes[7 + offset] & 0xff) << 56));
     }
 
     public void writeFloat(OutputStream output, float value) throws IOException
@@ -206,12 +206,12 @@ public class EncodingUtils
         output.write(writeBuffer, 0, 4);
     }
 
-    public float readFloat(byte[] inputBytes)
+    public float readFloat(byte[] inputBytes, int offset)
     {
-        int value = (((inputBytes[0] & 0xff))
-                + ((inputBytes[1] & 0xff) << 8)
-                + ((inputBytes[2] & 0xff) << 16)
-                + ((inputBytes[3] & 0xff) << 24)
+        int value = (((inputBytes[offset] & 0xff))
+                + ((inputBytes[1 + offset] & 0xff) << 8)
+                + ((inputBytes[2 + offset] & 0xff) << 16)
+                + ((inputBytes[3 + offset] & 0xff) << 24)
         );
         return Float.intBitsToFloat(value);
     }

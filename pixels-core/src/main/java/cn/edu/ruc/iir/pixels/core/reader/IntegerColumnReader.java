@@ -6,11 +6,11 @@ import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.Unpooled;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -21,8 +21,8 @@ public class IntegerColumnReader
         extends ColumnReader
 {
     private RunLenIntDecoder decoder;
-    private ByteBuf inputBuffer;
-    private ByteBufInputStream inputStream;
+    private ByteBuffer inputBuffer;
+    private InputStream inputStream;
     private byte[] isNull;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
@@ -54,12 +54,8 @@ public class IntegerColumnReader
             {
                 inputStream.close();
             }
-            if (inputBuffer != null)
-            {
-                inputBuffer.release();
-            }
-            inputBuffer = Unpooled.wrappedBuffer(input);
-            inputStream = new ByteBufInputStream(inputBuffer);
+            inputBuffer = ByteBuffer.wrap(input);
+            inputStream = new ByteArrayInputStream(input);
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
@@ -109,7 +105,7 @@ public class IntegerColumnReader
         // if not encoded
         else
         {
-            byte firstByte = inputStream.readByte();
+            byte firstByte = inputBuffer.get();
             boolean isLong = firstByte == (byte) 1;
             // if long
             if (isLong)
@@ -137,7 +133,7 @@ public class IntegerColumnReader
                     }
                     else
                     {
-                        columnVector.vector[i + vectorIndex] = inputStream.readLong();
+                        columnVector.vector[i + vectorIndex] = inputBuffer.getLong();
                     }
                     if (hasNull)
                     {
@@ -171,7 +167,7 @@ public class IntegerColumnReader
                     }
                     else
                     {
-                        columnVector.vector[i + vectorIndex] = inputStream.readInt();
+                        columnVector.vector[i + vectorIndex] = inputBuffer.getInt();
                     }
                     if (hasNull)
                     {

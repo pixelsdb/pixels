@@ -6,11 +6,11 @@ import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.Unpooled;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.sql.Timestamp;
 
 /**
@@ -22,8 +22,8 @@ import java.sql.Timestamp;
 public class TimestampColumnReader
         extends ColumnReader
 {
-    private ByteBuf inputBuffer = null;
-    private ByteBufInputStream inputStream = null;
+    private ByteBuffer inputBuffer = null;
+    private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
     private byte[] isNull;
     private int isNullOffset = 0;
@@ -56,12 +56,8 @@ public class TimestampColumnReader
             {
                 inputStream.close();
             }
-            if (inputBuffer != null)
-            {
-                inputBuffer.release();
-            }
-            inputBuffer = Unpooled.wrappedBuffer(input);
-            inputStream = new ByteBufInputStream(inputBuffer);
+            inputBuffer = ByteBuffer.wrap(input);
+            inputStream = new ByteArrayInputStream(input);
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
@@ -128,7 +124,7 @@ public class TimestampColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Timestamp(inputStream.readLong()));
+                    columnVector.set(i + vectorIndex, new Timestamp(inputBuffer.getLong()));
                 }
                 if (hasNull)
                 {

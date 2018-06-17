@@ -151,7 +151,14 @@ class PixelsPageSource implements ConnectorPageSource {
                         LongColumnVector lcv = (LongColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeLong(blockBuilder, lcv.vector[i]);
+                            if (lcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeLong(blockBuilder, lcv.vector[i]);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
@@ -159,7 +166,14 @@ class PixelsPageSource implements ConnectorPageSource {
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeDouble(blockBuilder, dcv.vector[i]);
+                            if (dcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeDouble(blockBuilder, dcv.vector[i]);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
@@ -191,7 +205,14 @@ class PixelsPageSource implements ConnectorPageSource {
                         LongColumnVector bcv = (LongColumnVector) cv;
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
-                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                            if (bcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
