@@ -6,8 +6,6 @@ import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 
 /**
  * pixels
@@ -18,10 +16,11 @@ public class DoubleColumnReader
         extends ColumnReader
 {
     private final EncodingUtils encodingUtils;
-    private ByteBuf inputBuffer;
+    private byte[] input;
     private byte[] isNull;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
+    private int inputIndex = 0;
 
     DoubleColumnReader(TypeDescription type)
     {
@@ -45,11 +44,8 @@ public class DoubleColumnReader
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
         {
-            if (inputBuffer != null)
-            {
-                inputBuffer.release();
-            }
-            inputBuffer = Unpooled.wrappedBuffer(input);
+            this.input = input;
+            inputIndex = 0;
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             // re-init
@@ -65,13 +61,13 @@ public class DoubleColumnReader
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)
@@ -80,9 +76,8 @@ public class DoubleColumnReader
             }
             else
             {
-                byte[] inputBytes = new byte[8];
-                inputBuffer.readBytes(inputBytes);
-                columnVector.vector[i + vectorIndex] = Double.longBitsToDouble(encodingUtils.readLongLE(inputBytes));
+                columnVector.vector[i + vectorIndex] = Double.longBitsToDouble(encodingUtils.readLongLE(this.input, inputIndex));
+                inputIndex += 8;
             }
             if (hasNull)
             {
