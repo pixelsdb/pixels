@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
+import cn.edu.ruc.iir.pixels.common.metadata.Table;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
@@ -8,9 +9,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.BaseDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.*;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -127,18 +126,24 @@ public class Main {
                         String sql = FileUtils.readFileToString(schemaFile);
                         CreateTable createTable = (CreateTable) parser.createStatement(sql);
                         String tableName = createTable.getName().toString();
-                        String insTableSQL = "INSERT INTO TBLS" +
-                                "(TBL_NAME, TBL_TYPE, DBS_DB_ID) " +
-                                "SELECT '" + tableName + "' as TBL_NAME, '' as TBL_TYPE, " +
-                                "DB_ID as DBS_DB_ID from DBS where DB_NAME = '" + dbName + "'";
-                        BaseDao baseDao = new ColumnDao();
-                        boolean flag = baseDao.update(insTableSQL, null);
+
+                        // TODO: youxian, please check if this is correct:
+                        Table table = new Table();
+                        SchemaDao schemaDao = new SchemaDao();
+                        table.setId(-1);
+                        table.setName(tableName);
+                        table.setType("");
+                        table.setSchema(schemaDao.getByName(dbName));
+                        TableDao tableDao = new TableDao();
+                        boolean flag = tableDao.save(table);
+                        // ODOT-------------------------------------------
 
                         // COLS
                         if (flag) {
                             // TBLS
-                            TableDao tableDao = new TableDao();
-                            int tableID = tableDao.getDbIdbyDbName(tableName);
+                            // TODO: youxian, please check if this is correct:
+                            int tableID = tableDao.getByName(tableName).get(0).getId();
+                            // ODOT-------------------------------------------
                             List<TableElement> elements = createTable.getElements();
                             int size = elements.size();
                             addColumnsByTableID(elements, size, tableID);

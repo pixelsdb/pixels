@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.Table;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
@@ -46,16 +46,16 @@ public class PixelsMetadataReader {
         List<String> schemaList = new ArrayList<String>();
         List<Schema> schemas = metadataService.getSchemas();
         for (Schema s : schemas) {
-            schemaList.add(s.getSchName());
+            schemaList.add(s.getName());
         }
         return schemaList;
     }
 
     public List<String> getTableNames(String schemaName) {
         List<String> tablelist = new ArrayList<String>();
-        List<Table> tables = metadataService.getTablesBySchemaName(schemaName);
+        List<Table> tables = metadataService.getTables(schemaName);
         for (Table t : tables) {
-            tablelist.add(t.getTblName());
+            tablelist.add(t.getName());
         }
         return tablelist;
     }
@@ -72,12 +72,12 @@ public class PixelsMetadataReader {
 
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
         List<ColumnMetadata> columnsMetadata = new ArrayList<ColumnMetadata>();
-        List<Column> columnsList = metadataService.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+        List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
             Type columnType = null;
-            String name = c.getColName();
-            String type = c.getColType().toLowerCase();
+            String name = c.getName();
+            String type = c.getType().toLowerCase();
             if (type.equals("int")) {
                 columnType = INTEGER;
             } else if (type.equals("bigint")) {
@@ -103,12 +103,12 @@ public class PixelsMetadataReader {
 
     public List<PixelsColumnHandle> getTableColumn(String connectorId, String schemaName, String tableName) {
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
-        List<Column> columnsList = metadataService.getColumnsBySchemaNameAndTblName(schemaName, tableName);
+        List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
             Type columnType = null;
-            String name = c.getColName();
-            String type = c.getColType().toLowerCase();
+            String name = c.getName();
+            String type = c.getType().toLowerCase();
             if (type.equals("int")) {
                 columnType = INTEGER;
             } else if (type.equals("bigint")) {

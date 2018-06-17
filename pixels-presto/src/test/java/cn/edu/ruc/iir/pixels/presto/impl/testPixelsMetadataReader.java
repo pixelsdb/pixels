@@ -37,10 +37,9 @@ public class testPixelsMetadataReader {
 
     @Test
     public void testGetTableNames() {
-        List<String> tablelist = pixelsMetadataReader.getTableNames("");
+        List<String> tablelist = pixelsMetadataReader.getTableNames("pixels");
         System.out.println(tablelist.toString());
     }
-
 
     @Test
     public void testGetTableColumns () {
