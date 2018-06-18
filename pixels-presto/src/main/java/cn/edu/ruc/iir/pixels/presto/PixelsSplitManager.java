@@ -14,7 +14,7 @@
 package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;

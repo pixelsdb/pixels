@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.common.metadata.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import com.alibaba.fastjson.JSON;
 import org.junit.Test;
 

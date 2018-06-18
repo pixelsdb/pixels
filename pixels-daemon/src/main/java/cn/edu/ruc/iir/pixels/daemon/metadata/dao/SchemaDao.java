@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import cn.edu.ruc.iir.pixels.common.metadata.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import org.apache.commons.logging.Log;
 
 import java.sql.Connection;

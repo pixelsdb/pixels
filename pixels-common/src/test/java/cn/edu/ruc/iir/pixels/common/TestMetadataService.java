@@ -1,10 +1,10 @@
 package cn.edu.ruc.iir.pixels.common;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
-import cn.edu.ruc.iir.pixels.common.metadata.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import org.junit.Before;
 import org.junit.Test;
 
