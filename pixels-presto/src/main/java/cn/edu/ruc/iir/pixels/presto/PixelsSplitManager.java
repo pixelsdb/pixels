@@ -13,14 +13,14 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -40,18 +41,17 @@ import static java.util.Objects.requireNonNull;
  **/
 public class PixelsSplitManager
         implements ConnectorSplitManager {
-    private final Logger log = Logger.get(PixelsSplitManager.class);
     private final String connectorId;
     //    private final PixelsMetadataReader pixelsMetadataReader;
     private final FSFactory fsFactory;
-    private final MetadataService metadataService;
+    private final PixelsMetadataReader metadataReader;
 
     @Inject
-    public PixelsSplitManager(PixelsConnectorId connectorId, MetadataService metadataService, FSFactory fsFactory) {
+    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataReader metadataReader, FSFactory fsFactory) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
 //        this.pixelsMetadataReader = requireNonNull(PixelsMetadataReader.Instance(), "pixelsMetadataReader is null");
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
-        this.metadataService = requireNonNull(metadataService, "metadataService is null");
+        this.metadataReader = requireNonNull(metadataReader, "metadataReader is null");
     }
 
     @Override
@@ -83,10 +83,18 @@ public class PixelsSplitManager
 //            log.info("domain: " + domain.isSingleValue());
 //        }
 //        log.info("indexedColumns: " + indexedColumns.toString());
-        List<Layout> catalogList = metadataService.getLayoutsByTblName(tableHandle.getTableName());
+        List<Layout> layouts;
+        try
+        {
+            layouts = metadataReader.getDataLayouts(tableHandle.getSchemaName(),
+                    tableHandle.getTableName());
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
         List<Path> files = new ArrayList<>();
-        for (Layout l : catalogList) {
-            files.addAll(fsFactory.listFiles(l.getLayInitPath()));
+        for (Layout l : layouts) {
+            files.addAll(fsFactory.listFiles(l.getOrderPath()));
         }
 
         files.forEach(file -> splits.add(new PixelsSplit(connectorId,
@@ -97,7 +105,6 @@ public class PixelsSplitManager
 
         Collections.shuffle(splits);
 
-//        log.info("files forEach: " + files.size());
         return new FixedSplitSource(splits);
     }
 }

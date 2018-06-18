@@ -1,11 +1,15 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.*;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.*;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
 import com.alibaba.fastjson.JSON;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -17,60 +21,67 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.util.List;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.daemon.metadata.server
- * @ClassName: MetadataServerHandler
- * @Description:
- * @author: taoyouxian
- * @date: Create in 2018-01-26 15:11
- **/
-public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
+ * Created by hank on 18-6-17.
+ */
+public class MetadataServerHandler extends ChannelInboundHandlerAdapter
+{
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-//        System.out.println("Server -> read");
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
+    {
         ByteBuf buf = (ByteBuf) msg;
         byte[] req = new byte[buf.readableBytes()];
         buf.readBytes(req);
         String body = new String(req, "UTF-8").trim();
-        String curResponse = null;
-        String sql = null;
-        String split[] = body.split("==");
-        String action = split[0];
-        String params[] = new String[]{};
-//        System.out.println("Body: " + body);
-//        System.out.println("Action: " + action);
-//        System.out.println();
-        if (split.length > 1)
-            params = split[1].split("&");
-        if (action.equals("getSchemas")) {
-            BaseDao baseDao = new SchemaDao();
-            sql = "select * from DBS";
-            List<Schema> schemaList = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(schemaList);
-        } else if (action.equals("getTables")) {
-            BaseDao baseDao = new TableDao();
-            sql = "select * from TBLS " + (params.length > 0 ? "where DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ? )" : "");
-            List<Table> tableList = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(tableList);
-        } else if (action.equals("getLayouts")) {
-            BaseDao baseDao = new LayoutDao();
-            sql = "select * from LAYOUTS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? ) " : "");
-            List<Layout> layoutList = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(layoutList);
-        } else if (action.equals("getColumns")) {
-            BaseDao baseDao = new ColumnDao();
-            sql = "select * from COLS " + (params.length > 0 ? "where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = ? and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = ?)) " : "");
-//            sql = "select * from COLS where TBLS_TBL_ID in (select TBL_ID from TBLS where TBL_NAME = '" + params[0] + "' and DBS_DB_ID in (select DB_ID from DBS where DB_NAME = '" + params[1] + "'))";
-            List<Column> columnList = baseDao.loadAll(sql, params);
-            curResponse = JSON.toJSONString(columnList);
-        } else {
-            curResponse = "action default";
+        ReqParams params = ReqParams.parse(body);
+
+        String res;
+
+        SchemaDao schemaDao = new SchemaDao();
+        TableDao tableDao = new TableDao();
+        LayoutDao layoutDao = new LayoutDao();
+        ColumnDao columnDao = new ColumnDao();
+
+        switch (params.getAction())
+        {
+            case "getSchemas":
+            {
+                List<Schema> schemaList = schemaDao.getAll();
+                res = JSON.toJSONString(schemaList);
+                break;
+            }
+            case "getTables":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                List<Table> tableList = tableDao.getBySchema(schema);
+                res = JSON.toJSONString(tableList);
+                break;
+            }
+            case "getLayouts":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
+                List<Layout> layoutList = layoutDao.getReadableByTable(table);
+                res = JSON.toJSONString(layoutList);
+                break;
+            }
+            case "getColumns":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
+                List<Column> columnList = columnDao.getByTable(table);
+                res = JSON.toJSONString(columnList);
+                break;
+            }
+            default:
+            {
+                res = "action default";
+                break;
+            }
         }
 
         //response
-        ByteBuf resp = Unpooled.copiedBuffer(curResponse.getBytes());
         //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
-        ChannelFuture future = ctx.writeAndFlush(resp);
+        ChannelFuture future = ctx.writeAndFlush(Unpooled.copiedBuffer(res.getBytes()));
         // Thread close
         future.addListener(
                 (ChannelFutureListener) channelFuture -> ctx.close()
@@ -78,19 +89,17 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-//        System.out.println("Server -> read complete");
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception
+    {
         //将发送缓冲区中数据全部写入SocketChannel
         ctx.flush();
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println("Server Exception: ");
-        cause.printStackTrace();
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable e)
+    {
+        LogFactory.Instance().getLog().error("error caught in metadata server.", e);
         //释放资源
         ctx.close();
-        DBUtils db = DBUtils.Instance();
-        db.closeConn();
     }
 }

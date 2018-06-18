@@ -9,15 +9,16 @@ import java.io.*;
 import java.net.URI;
 import java.util.Collection;
 
-public class FileUtils {
-    static private FileUtils instance = null;
+public class FileUtil
+{
+    static private FileUtil instance = null;
 
-    private FileUtils() {
+    private FileUtil() {
     }
 
-    public static FileUtils Instance() {
+    public static FileUtil Instance() {
         if (instance == null) {
-            instance = new FileUtils();
+            instance = new FileUtil();
         }
         return instance;
     }

@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto.client;
+package cn.edu.ruc.iir.pixels.common.metadata;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -13,43 +13,45 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto.client
- * @ClassName: MetadataClient
- * @Description: 时间服务器 客户端
- * @author: taoyouxian
- * @date: Create in 2018-01-26 15:13
- **/
-public class MetadataClient {
+ * Created by hank on 18-6-17.
+ */
+public class MetadataClient
+{
 
-    private String action;
-    private String token;
-    private Map<String, String> map = new HashMap<String, String>();
+    private final ReqParams params;
+    private final String token;
+    private final Map<String, String> response = new HashMap<String, String>();
 
-    public MetadataClient(String action, String token) {
-        this.action = action;
+    public MetadataClient(ReqParams params, String token)
+    {
+        this.params = params;
         this.token = token;
     }
 
-    public Map<String, String> getMap() {
-        return map;
+    public Map<String, String> getResponse()
+    {
+        return response;
     }
 
-    public void connect(int port, String host, String paras) throws Exception {
-        //配置客户端NIO 线程组
+    public void connect(int port, String host) throws Exception
+    {
+        //配置客户端NIO线程组
         EventLoopGroup group = new NioEventLoopGroup(1);
 
         Bootstrap client = new Bootstrap();
 
-        try {
+        try
+        {
             client.group(group)
                     .channel(NioSocketChannel.class)
                     .option(ChannelOption.TCP_NODELAY, true)
-                    .handler(new ChannelInitializer<SocketChannel>() {
+                    .handler(new ChannelInitializer<SocketChannel>()
+                    {
                         @Override
-                        protected void initChannel(SocketChannel ch) throws Exception {
+                        protected void initChannel(SocketChannel ch) throws Exception
+                        {
                             ch.pipeline().addLast(
-                                    new MetadataClientHandler(action, token, map, paras));
+                                    new MetadataClientHandler(params, token, response));
                         }
                     });
 
@@ -58,8 +60,9 @@ public class MetadataClient {
 
             //等待客户端连接端口关闭
             future.channel().closeFuture().sync();
-        } finally {
-            //优雅关闭 线程组
+        } finally
+        {
+            //优雅关闭线程组
             group.shutdownGracefully();
         }
     }

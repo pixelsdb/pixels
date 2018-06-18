@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto.client;
+package cn.edu.ruc.iir.pixels.common.metadata;
 
 /**
  * @version V1.0
