@@ -1,18 +1,11 @@
-package cn.edu.ruc.iir.pixels.presto.client;
+package cn.edu.ruc.iir.pixels.common.metadata;
 
-import cn.edu.ruc.iir.pixels.common.metadata.*;
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import com.alibaba.fastjson.JSON;
-import com.facebook.presto.spi.PrestoException;
-import com.google.inject.Inject;
-import io.airlift.log.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_SERIVCE_ERROR;
 
 /**
  * Created by hank on 18-6-17.
@@ -21,17 +14,14 @@ public class MetadataService
 {
     private String host;
     private int port;
-    private static Logger logger = Logger.get(MetadataService.class);
 
-    @Inject
-    public MetadataService(PixelsPrestoConfig config)
+    public MetadataService(String host, int port)
     {
-        ConfigFactory configFactory = config.getFactory();
-        this.host = configFactory.getProperty("metadata.server.host");
-        this.port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
+        this.host = host;
+        this.port = port;
     }
 
-    public List<Column> getColumns(String schemaName, String tableName)
+    public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
     {
         List<Column> columns;
         String token = UUID.randomUUID().toString();
@@ -53,13 +43,12 @@ public class MetadataService
             }
         } catch (Exception e)
         {
-            logger.error(e, "can not get columns from metadata");
-            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
+            throw new MetadataException("can not get columns from metadata", e);
         }
         return columns != null ? columns : new ArrayList<>();
     }
 
-    public List<Layout> getLayouts(String schemaName, String tableName)
+    public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
         List<Layout> layouts;
         String token = UUID.randomUUID().toString();
@@ -81,13 +70,12 @@ public class MetadataService
             }
         } catch (Exception e)
         {
-            logger.error(e, "can not get layouts from metadata");
-            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
+            throw new MetadataException("can not get layouts from metadata", e);
         }
         return layouts != null ? layouts : new ArrayList<>();
     }
 
-    public List<Table> getTables(String schemaName)
+    public List<Table> getTables(String schemaName) throws MetadataException
     {
         List<Table> tables;
         String token = UUID.randomUUID().toString();
@@ -108,13 +96,12 @@ public class MetadataService
             }
         } catch (Exception e)
         {
-            logger.error(e, "can not get tables from metadata");
-            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
+            throw new MetadataException("can not get tables from metadata", e);
         }
         return tables != null ? tables : new ArrayList<>();
     }
 
-    public List<Schema> getSchemas()
+    public List<Schema> getSchemas() throws MetadataException
     {
         List<Schema> schemas;
         String token = UUID.randomUUID().toString();
@@ -134,8 +121,7 @@ public class MetadataService
             }
         } catch (Exception e)
         {
-            logger.error(e, "can not get schemas from metadata");
-            throw new PrestoException(PIXELS_CLIENT_SERIVCE_ERROR, e);
+            throw new MetadataException("can not get schemas from metadata", e);
         }
         return schemas != null ? schemas : new ArrayList<>();
     }

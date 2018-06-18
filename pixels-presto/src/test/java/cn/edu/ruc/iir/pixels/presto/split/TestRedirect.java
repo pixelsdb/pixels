@@ -1,10 +1,10 @@
 package cn.edu.ruc.iir.pixels.presto.split;
 
 import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.Split;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.SplitPattern;
 import cn.edu.ruc.iir.pixels.presto.split.cmd.CmdBuildIndex;
 import cn.edu.ruc.iir.pixels.presto.split.cmd.CmdRedirect;
+import cn.edu.ruc.iir.pixels.presto.split.domain.Split;
+import cn.edu.ruc.iir.pixels.presto.split.domain.SplitPattern;
 import cn.edu.ruc.iir.rainbow.common.cmd.Command;
 import cn.edu.ruc.iir.rainbow.common.cmd.Receiver;
 import com.alibaba.fastjson.JSON;

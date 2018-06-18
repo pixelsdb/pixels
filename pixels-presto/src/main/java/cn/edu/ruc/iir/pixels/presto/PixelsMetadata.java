@@ -13,12 +13,12 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -39,33 +40,44 @@ import static java.util.stream.Collectors.toList;
  * @date: Create in 2018-01-19 14:16
  **/
 public class PixelsMetadata
-        implements ConnectorMetadata {
+        implements ConnectorMetadata
+{
     private final String connectorId;
 
     private final PixelsMetadataReader pixelsMetadataReader;
 
-    private final Logger logger = Logger.get(PixelsMetadata.class);
-
     @Inject
-    public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader) {
+    public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader)
+    {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
     }
 
     @Override
-    public List<String> listSchemaNames(ConnectorSession session) {
+    public List<String> listSchemaNames(ConnectorSession session)
+    {
         return listSchemaNamesInternal();
     }
 
-    public List<String> listSchemaNamesInternal() {
-        List<String> schemaNameList = pixelsMetadataReader.getSchemaNames();
+    private List<String> listSchemaNamesInternal()
+    {
+        List<String> schemaNameList = null;
+        try
+        {
+            schemaNameList = pixelsMetadataReader.getSchemaNames();
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
         return schemaNameList;
     }
 
     @Override
-    public PixelsTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName) {
+    public PixelsTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
+    {
         requireNonNull(tableName, "tableName is null");
-        if (!listSchemaNames(session).contains(tableName.getSchemaName())) {
+        if (!listSchemaNames(session).contains(tableName.getSchemaName()))
+        {
             return null;
         }
         PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
@@ -73,7 +85,8 @@ public class PixelsMetadata
     }
 
     @Override
-    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns) {
+    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
+    {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
         SchemaTableName tableName = tableHandle.toSchemaTableName();
 
@@ -85,99 +98,132 @@ public class PixelsMetadata
     }
 
     @Override
-    public ConnectorTableLayout getTableLayout(ConnectorSession session, ConnectorTableLayoutHandle handle) {
+    public ConnectorTableLayout getTableLayout(ConnectorSession session, ConnectorTableLayoutHandle handle)
+    {
         return new ConnectorTableLayout(handle);
     }
 
     @Override
-    public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table) {
+    public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table)
+    {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
         checkArgument(tableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
-        return getTableMetadata(tableHandle.getSchemaName(), tableHandle.getTableName());
+        return getTableMetadataInternal(tableHandle.getSchemaName(), tableHandle.getTableName());
     }
 
-    public ConnectorTableMetadata getTableMetadata(String schemaName, String tableName) {
-        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, schemaName, tableName);
+    private ConnectorTableMetadata getTableMetadataInternal(String schemaName, String tableName)
+    {
+        List<PixelsColumnHandle> columnHandleList;
+        try
+        {
+            columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, schemaName, tableName);
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
         List<ColumnMetadata> columns = columnHandleList.stream().map(PixelsColumnHandle::getColumnMetadata)
                 .collect(toList());
         return new ConnectorTableMetadata(new SchemaTableName(schemaName, tableName), columns);
     }
 
-    public ConnectorTableMetadata getTableMetadata(SchemaTableName tableName) {
-        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, tableName.getSchemaName(), tableName.getTableName());
-        List<ColumnMetadata> columns = columnHandleList.stream().map(PixelsColumnHandle::getColumnMetadata)
-                .collect(toList());
-        return new ConnectorTableMetadata(tableName, columns);
+    private ConnectorTableMetadata getTableMetadataInternal(SchemaTableName schemaTableName)
+    {
+        return getTableMetadataInternal(schemaTableName.getSchemaName(), schemaTableName.getTableName());
     }
 
     @Override
-    public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull) {
-        List<String> schemaNames;
-        if (schemaNameOrNull != null) {
-            schemaNames = ImmutableList.of(schemaNameOrNull);
-        } else {
-            schemaNames = pixelsMetadataReader.getSchemaNames();
-        }
-
-        ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
-        for (String schemaName : schemaNames) {
-            for (String tableName : pixelsMetadataReader.getTableNames(schemaName)) {
-                builder.add(new SchemaTableName(schemaName, tableName));
+    public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
+    {
+        try
+        {
+            List<String> schemaNames;
+            if (schemaNameOrNull != null)
+            {
+                schemaNames = ImmutableList.of(schemaNameOrNull);
+            } else
+            {
+                schemaNames = pixelsMetadataReader.getSchemaNames();
             }
+
+            ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
+            for (String schemaName : schemaNames)
+            {
+                for (String tableName : pixelsMetadataReader.getTableNames(schemaName))
+                {
+                    builder.add(new SchemaTableName(schemaName, tableName));
+                }
+            }
+            return builder.build();
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
         }
-        return builder.build();
     }
 
     @Override
-    public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle) {
+    public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
         PixelsTableHandle pixelsTableHandle = (PixelsTableHandle) tableHandle;
         checkArgument(pixelsTableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
 
-        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
-        if (columnHandleList == null) {
+        List<PixelsColumnHandle> columnHandleList = null;
+        try
+        {
+            columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
+        if (columnHandleList == null)
+        {
             throw new TableNotFoundException(pixelsTableHandle.toSchemaTableName());
         }
 
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
-        for (PixelsColumnHandle column : columnHandleList) {
+        for (PixelsColumnHandle column : columnHandleList)
+        {
             columnHandles.put(column.getColumnName(), column);
         }
         return columnHandles.build();
     }
 
     @Override
-    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix) {
+    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
+    {
         requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
-        for (SchemaTableName tableName : listTables(session, prefix)) {
-            ConnectorTableMetadata tableMetadata = getTableMetadata(tableName);
+        for (SchemaTableName tableName : listTablesInternal(session, prefix))
+        {
+            ConnectorTableMetadata tableMetadata = getTableMetadataInternal(tableName);
             // table can disappear during listing operation
-            if (tableMetadata != null) {
+            if (tableMetadata != null)
+            {
                 columns.put(tableName, tableMetadata.getColumns());
             }
         }
         return columns.build();
     }
 
-
-    private List<SchemaTableName> listTables(ConnectorSession session, SchemaTablePrefix prefix) {
-        if (prefix.getSchemaName() == null) {
+    private List<SchemaTableName> listTablesInternal(ConnectorSession session, SchemaTablePrefix prefix)
+    {
+        if (prefix.getSchemaName() == null)
+        {
             return listTables(session, prefix.getSchemaName());
         }
         return ImmutableList.of(new SchemaTableName(prefix.getSchemaName(), prefix.getTableName()));
     }
 
     @Override
-    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle) {
+    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
+    {
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
 
     @Override
-    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
-        createPixelsTable(session, tableMetadata, ignoreExisting);
-    }
-
-    private void createPixelsTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
+    {
+        throw new PrestoException(PIXELS_METASTORE_ERROR, new MetadataException("create table is not supported."));
+        /*
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
@@ -186,47 +232,7 @@ public class PixelsMetadata
         Map<String, Object> map = tableMetadata.getProperties();
         for (String key : map.keySet()) {
             logger.debug(key + " " + map.get(key));
-        }
-
-//        List<String> partitionedBy = getPartitionedBy(tableMetadata.getProperties());
-//        Optional<HiveBucketProperty> bucketProperty = getBucketProperty(tableMetadata.getProperties());
-//        if (bucketProperty.isPresent() && !bucketWritingEnabled) {
-//            throw new PrestoException(NOT_SUPPORTED, "Writing to bucketed Hive table has been temporarily disabled");
-//        }
-//        List<HiveColumnHandle> columnHandles = getColumnHandles(tableMetadata, ImmutableSet.copyOf(partitionedBy), typeTranslator);
-//        HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(tableMetadata.getProperties());
-//        Map<String, String> tableProperties = getTableProperties(tableMetadata);
-//
-//        hiveStorageFormat.validateColumns(columnHandles);
-//
-//        Path targetPath;
-//        boolean external;
-//        String externalLocation = getExternalLocation(tableMetadata.getProperties());
-//        if (externalLocation != null) {
-//            external = true;
-//            targetPath = getExternalPath(new HdfsContext(session, schemaName, tableName), externalLocation);
-//        }
-//        else {
-//            external = false;
-//            LocationHandle locationHandle = locationService.forNewTable(metastore, session, schemaName, tableName);
-//            targetPath = locationService.targetPathRoot(locationHandle);
-//        }
-//
-//        Table table = buildTableObject(
-//                session.getQueryId(),
-//                schemaName,
-//                tableName,
-//                session.getUser(),
-//                columnHandles,
-//                hiveStorageFormat,
-//                partitionedBy,
-//                bucketProperty,
-//                tableProperties,
-//                targetPath,
-//                external,
-//                prestoVersion);
-//        PrincipalPrivileges principalPrivileges = buildInitialPrivilegeSet(table.getOwner());
-//        metastore.createTable(session, table, principalPrivileges, Optional.empty(), ignoreExisting);
+        }*/
     }
 
 }

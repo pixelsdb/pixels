@@ -1,6 +1,5 @@
-package cn.edu.ruc.iir.pixels.presto.client;
+package cn.edu.ruc.iir.pixels.common.metadata;
 
-import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;

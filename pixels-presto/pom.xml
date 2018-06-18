@@ -25,20 +25,16 @@
             <artifactId>pixels-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
-            <artifactId>pixels-daemon</artifactId>
+            <artifactId>pixels-common</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-jdbc</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
         </dependency>
 
         <dependency>
@@ -50,6 +46,11 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>bootstrap</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
         </dependency>
 
         <dependency>
