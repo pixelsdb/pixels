@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.sql;
 
-import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.*;
 import org.junit.Test;
@@ -52,7 +52,7 @@ public class SqlParserTest {
     @Test
     public void testCreateTableFromTxt() {
         String schemaFile = "/home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql";
-        String sql = FileUtils.readFileToString(schemaFile);
+        String sql = FileUtil.readFileToString(schemaFile);
 
         CreateTable createTable = (CreateTable) parser.createStatement(sql);
         System.out.println("table: " + createTable.getName().toString());

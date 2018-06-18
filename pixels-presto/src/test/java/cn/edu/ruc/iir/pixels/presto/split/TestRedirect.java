@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.split;
 
-import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.Split;
 import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.SplitPattern;
 import cn.edu.ruc.iir.pixels.presto.split.cmd.CmdBuildIndex;
@@ -17,7 +17,7 @@ public class TestRedirect {
 
     @Test
     public void testRedirect() {
-        String splitInfo = FileUtils.readFileToString("/home/tao/software/station/bitbucket/pixels/pixels-daemon/src/main/resources/layout_splits.json");
+        String splitInfo = FileUtil.readFileToString("/home/tao/software/station/bitbucket/pixels/pixels-daemon/src/main/resources/layout_splits.json");
         System.out.println(splitInfo);
         Split split = JSON.parseObject(splitInfo, Split.class);
         List<SplitPattern> splitPatterns = split.getSplitPatterns();

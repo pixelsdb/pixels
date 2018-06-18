@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtil2;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.common.metadata.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.Table;
@@ -15,7 +15,7 @@ public class ColumnDao implements Dao<Column>
 {
     public ColumnDao() {}
 
-    private static final DBUtil2 db = DBUtil2.Instance();
+    private static final DBUtil db = DBUtil.Instance();
     private static final Log log = LogFactory.Instance().getLog();
     private static final TableDao tableModel = new TableDao();
 

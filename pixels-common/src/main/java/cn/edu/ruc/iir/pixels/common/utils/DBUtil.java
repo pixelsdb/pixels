@@ -6,11 +6,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-public class DBUtil2
+public class DBUtil
 {
-    private static DBUtil2 INSTANCE = new DBUtil2();
+    private static DBUtil INSTANCE = new DBUtil();
 
-    public static DBUtil2 Instance ()
+    public static DBUtil Instance ()
     {
         return INSTANCE;
     }
@@ -22,7 +22,7 @@ public class DBUtil2
     private String user;
     private String pass;
 
-    private DBUtil2()
+    private DBUtil()
     {
         try {
             ConfigFactory config = ConfigFactory.Instance();
