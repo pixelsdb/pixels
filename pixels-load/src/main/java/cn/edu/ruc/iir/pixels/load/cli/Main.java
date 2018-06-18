@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
-import cn.edu.ruc.iir.pixels.common.metadata.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.*;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;

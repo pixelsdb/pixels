@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.metadata.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import org.junit.Test;
 
 import java.util.List;

@@ -1,6 +1,10 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.common.metadata.*;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;

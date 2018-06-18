@@ -28,15 +28,31 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>log</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.prometheus</groupId>
             <artifactId>simpleclient_pushgateway</artifactId>
+            <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- testing -->
         <dependency>
             <groupId>org.junit.platform</groupId>
