@@ -1,15 +1,13 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
 import cn.edu.ruc.iir.pixels.common.metadata.Table;
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
-import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
-import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.*;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.*;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -123,7 +121,7 @@ public class Main {
                         String dbName = namespace1.getString("db_name");
                         String schemaFile = namespace1.getString("schema_file");
 
-                        String sql = FileUtils.readFileToString(schemaFile);
+                        String sql = FileUtil.readFileToString(schemaFile);
                         CreateTable createTable = (CreateTable) parser.createStatement(sql);
                         String tableName = createTable.getName().toString();
 
@@ -182,7 +180,7 @@ public class Main {
                             hdfsFile += "/";
                         String filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
 
-                        String sql = FileUtils.readFileToString(schemaFile);
+                        String sql = FileUtil.readFileToString(schemaFile);
                         CreateTable createTable = (CreateTable) parser.createStatement(sql);
                         List<TableElement> elements = createTable.getElements();
 
@@ -341,7 +339,7 @@ public class Main {
                             br.close();
                         } else {
 
-                            Collection<File> files = FileUtils.listFiles(dataPath, true);
+                            Collection<File> files = FileUtil.listFiles(dataPath, true);
                             BufferedReader br = null;
                             String path = "";
                             String curLine;
@@ -423,7 +421,7 @@ public class Main {
 
     private static void addColumnsByTableID(List<TableElement> elements, int size, int tableID) throws SQLException {
         String prefix = "INSERT INTO COLS (COL_NAME, COL_TYPE, TBLS_TBL_ID) VALUES (?, ?, ?)";
-        DBUtils instance = DBUtils.Instance();
+        DBUtil instance = DBUtil.Instance();
         Connection conn = instance.getConnection();
         conn.setAutoCommit(false);
         PreparedStatement pst = conn.prepareStatement(prefix);

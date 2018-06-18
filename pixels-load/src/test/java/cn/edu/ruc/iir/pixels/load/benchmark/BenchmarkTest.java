@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.benchmark;
 
-import cn.edu.ruc.iir.pixels.common.utils.FileUtils;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -25,7 +25,7 @@ public class BenchmarkTest {
     public void testGenerateData() {
         int fileNum = 3;
 
-        String sql = FileUtils.readFileToString(schemaFile);
+        String sql = FileUtil.readFileToString(schemaFile);
         CreateTable createTable = (CreateTable) parser.createStatement(sql);
         BufferedWriter bw = null;
         List<TableElement> elements = createTable.getElements();

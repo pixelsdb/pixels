@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.common.metadata.*;
-import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
@@ -98,7 +97,5 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
         LogFactory.Instance().getLog().error("error caught in metadata server.", e);
         //释放资源
         ctx.close();
-        DBUtils db = DBUtils.Instance();
-        db.closeConn();
     }
 }

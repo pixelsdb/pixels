@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtil2;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
 import cn.edu.ruc.iir.pixels.common.metadata.Layout;
@@ -15,7 +15,7 @@ public class LayoutDao implements Dao<Layout>
 {
     public LayoutDao() {}
 
-    private static final DBUtil2 db = DBUtil2.Instance();
+    private static final DBUtil db = DBUtil.Instance();
     private static final Log log = LogFactory.Instance().getLog();
     private static final TableDao tableModel = new TableDao();
 

@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtil2;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.common.metadata.Schema;
 import org.apache.commons.logging.Log;
@@ -16,7 +16,7 @@ public class SchemaDao implements Dao<Schema>
 {
     public SchemaDao() {}
 
-    private static final DBUtil2 db = DBUtil2.Instance();
+    private static final DBUtil db = DBUtil.Instance();
     private static final Log log = LogFactory.Instance().getLog();
 
     @Override
