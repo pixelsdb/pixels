@@ -283,13 +283,16 @@ public class Main {
                                 br = new BufferedReader(new InputStreamReader(fsr));
                                 while ((curLine = br.readLine()) != null) {
                                     // benchmark exists True or False
-                                    curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
+                                    curLine = curLine.replace("False", "0")
+                                            .replace("false", "0")
+                                            .replace("True", "1")
+                                            .replace("true", "1");
                                     splitLine = curLine.split("\t");
                                     int row = rowBatch.size++;
                                     for (int j = 0; j < splitLine.length; j++) {
                                         // exists "NULL" to fix
                                         if (splitLine[j].equalsIgnoreCase("\\N")) {
-                                            columnVectors[j].add("0");
+                                            columnVectors[j].isNull[row] = true;
                                         } else {
                                             columnVectors[j].add(splitLine[j]);
                                         }
@@ -356,11 +359,21 @@ public class Main {
                                 br = new BufferedReader(new FileReader(path));
                                 while ((curLine = br.readLine()) != null) {
                                     // benchmark exists True or False
-                                    curLine = curLine.replace("False", "0").replace("false", "0").replace("True", "1").replace("true", "1");
+                                    curLine = curLine.replace("False", "0")
+                                            .replace("false", "0")
+                                            .replace("True", "1")
+                                            .replace("true", "1");
                                     splitLine = curLine.split("\t");
                                     int row = rowBatch.size++;
                                     for (int j = 0; j < splitLine.length; j++) {
-                                        columnVectors[j].add(splitLine[j]);
+                                        if (splitLine[j].equals("\\N"))
+                                        {
+                                            columnVectors[j].isNull[row] = true;
+                                        }
+                                        else
+                                        {
+                                            columnVectors[j].add(splitLine[j]);
+                                        }
                                     }
 
                                     if (rowBatch.size == rowBatch.getMaxSize()) {
