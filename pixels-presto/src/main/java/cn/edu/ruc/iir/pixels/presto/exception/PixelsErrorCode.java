@@ -54,6 +54,7 @@ public enum PixelsErrorCode
     PIXELS_THREAD_ERROR(42, EXTERNAL),
     PIXELS_CLIENT_SERIVCE_ERROR(43, EXTERNAL),
     PIXELS_CONNECTOR_ERROR(44, EXTERNAL),
+    PIXELS_INVERTED_INDEX_ERROR(45, EXTERNAL),
     /**/;
 
     private final ErrorCode errorCode;

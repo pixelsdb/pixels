@@ -74,8 +74,8 @@ public class PixelsMetadataReader {
         PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, path);
 
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();
-        PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
-
+        PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle);
+        tableLayout.setConstraint(constraint);
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
         List<ColumnMetadata> columnsMetadata = new ArrayList<ColumnMetadata>();
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
@@ -142,10 +142,4 @@ public class PixelsMetadataReader {
         return metadataService.getLayouts(schemaName, tableName);
     }
 
-    public PixelsTableLayoutHandle getTableLayout(String connectorId, String schemaName, String tableName) {
-        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, "no meaning path");
-        TupleDomain<ColumnHandle> constraint = TupleDomain.all();
-        PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle, constraint);
-        return tableLayout;
-    }
 }

@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.presto.split.cmd;
 
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.presto.split.domain.AccessPattern;
 import cn.edu.ruc.iir.pixels.presto.split.domain.ColumnSet;
+import cn.edu.ruc.iir.pixels.presto.split.index.IndexEntry;
 import cn.edu.ruc.iir.pixels.presto.split.index.IndexFactory;
 import cn.edu.ruc.iir.pixels.presto.split.index.Inverted;
 import cn.edu.ruc.iir.rainbow.common.cmd.Command;
@@ -21,12 +21,16 @@ public class CmdRedirect implements Command {
     @Override
     public void execute(Properties params) {
         String[] columns = params.getProperty("column.set").split(",");
+        String schemaName = params.getProperty("schema.name");
+        String tableName = params.getProperty("table.name");
+
         ColumnSet columnSet = new ColumnSet();
         for (String column : columns) {
             columnSet.addColumn(column);
         }
-        Inverted index = (Inverted) IndexFactory.Instance().getIndex(
-                ConfigFactory.Instance().getProperty("inverted.index.name"));
+
+        IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
+        Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
         AccessPattern bestPattern = index.search(columnSet);
 
         Properties results = new Properties(params);
