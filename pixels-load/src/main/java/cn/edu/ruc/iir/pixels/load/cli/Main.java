@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.*;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
@@ -125,13 +126,13 @@ public class Main {
                         CreateTable createTable = (CreateTable) parser.createStatement(sql);
                         String tableName = createTable.getName().toString();
 
-                        // TODO: youxian, please check if this is correct:
                         Table table = new Table();
                         SchemaDao schemaDao = new SchemaDao();
+                        Schema schema = schemaDao.getByName(dbName);
                         table.setId(-1);
                         table.setName(tableName);
                         table.setType("");
-                        table.setSchema(schemaDao.getByName(dbName));
+                        table.setSchema(schema);
                         TableDao tableDao = new TableDao();
                         boolean flag = tableDao.save(table);
                         // ODOT-------------------------------------------
@@ -139,7 +140,6 @@ public class Main {
                         // COLS
                         if (flag) {
                             // TBLS
-                            // TODO: youxian, please check if this is correct:
                             int tableID = tableDao.getByName(tableName).get(0).getId();
                             // ODOT-------------------------------------------
                             List<TableElement> elements = createTable.getElements();
@@ -432,24 +432,28 @@ public class Main {
         }
     }
 
-    private static void addColumnsByTableID(List<TableElement> elements, int size, int tableID) throws SQLException {
+    private static void addColumnsByTableID(List<TableElement> elements, int size, int tableID)  {
         String prefix = "INSERT INTO COLS (COL_NAME, COL_TYPE, TBLS_TBL_ID) VALUES (?, ?, ?)";
         DBUtil instance = DBUtil.Instance();
         Connection conn = instance.getConnection();
-        conn.setAutoCommit(false);
-        PreparedStatement pst = conn.prepareStatement(prefix);
-        for (int i = 0; i < size; i++) {
-            ColumnDefinition column = (ColumnDefinition) elements.get(i);
-            String name = column.getName().toString();
-            String type = column.getType();
-            pst.setString(1, name);
-            pst.setString(2, type);
-            pst.setInt(3, tableID);
-            pst.addBatch();
-            pst.executeBatch();
-            conn.commit();
+        try {
+            conn.setAutoCommit(false);
+            PreparedStatement pst = conn.prepareStatement(prefix);
+            for (int i = 0; i < size; i++) {
+                ColumnDefinition column = (ColumnDefinition) elements.get(i);
+                String name = column.getName().toString();
+                String type = column.getType();
+                pst.setString(1, name);
+                pst.setString(2, type);
+                pst.setInt(3, tableID);
+                pst.addBatch();
+                pst.executeBatch();
+                conn.commit();
+            }
+            pst.close();
+            conn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
-        pst.close();
-        conn.close();
     }
 }
