@@ -1,13 +1,16 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
-import cn.edu.ruc.iir.pixels.common.metadata.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.Table;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
-import cn.edu.ruc.iir.pixels.presto.client.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -26,23 +29,23 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto.impl
- * @ClassName: PixelsMetadataReader
- * @Description: Read metadata
- * @author: tao
- * @date: Create in 2018-01-20 11:15
- **/
+ * Created by hank on 18-6-18.
+ */
 public class PixelsMetadataReader {
     private static final Logger log = Logger.get(PixelsMetadataReader.class);
-    private MetadataService metadataService = null;
+    private final MetadataService metadataService;
 
     @Inject
-    public PixelsMetadataReader(MetadataService metadataService) {
-        this.metadataService = metadataService;
+    public PixelsMetadataReader(PixelsPrestoConfig config)
+    {
+        ConfigFactory configFactory = config.getFactory();
+        String host = configFactory.getProperty("metadata.server.host");
+        int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
+        this.metadataService = new MetadataService(host, port);
     }
 
-    public List<String> getSchemaNames() {
+    public List<String> getSchemaNames() throws MetadataException
+    {
         List<String> schemaList = new ArrayList<String>();
         List<Schema> schemas = metadataService.getSchemas();
         for (Schema s : schemas) {
@@ -51,7 +54,8 @@ public class PixelsMetadataReader {
         return schemaList;
     }
 
-    public List<String> getTableNames(String schemaName) {
+    public List<String> getTableNames(String schemaName) throws MetadataException
+    {
         List<String> tablelist = new ArrayList<String>();
         List<Table> tables = metadataService.getTables(schemaName);
         for (Table t : tables) {
@@ -60,11 +64,13 @@ public class PixelsMetadataReader {
         return tablelist;
     }
 
-    public PixelsTable getTable(String connectorId, String schemaName, String tableName) {
+    public PixelsTable getTable(String connectorId, String schemaName, String tableName) throws MetadataException
+    {
         return getTable(connectorId, schemaName, tableName, "");
     }
 
-    public PixelsTable getTable(String connectorId, String schemaName, String tableName, String path) {
+    public PixelsTable getTable(String connectorId, String schemaName, String tableName, String path) throws MetadataException
+    {
         PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, schemaName, tableName, path);
 
         TupleDomain<ColumnHandle> constraint = TupleDomain.all();
@@ -80,7 +86,7 @@ public class PixelsMetadataReader {
             String type = c.getType().toLowerCase();
             if (type.equals("int")) {
                 columnType = INTEGER;
-            } else if (type.equals("bigint")) {
+            } else if (type.equals("bigint") || type.equals("long")) {
                 columnType = BIGINT;
             } else if (type.equals("double")) {
                 columnType = DOUBLE;
@@ -101,7 +107,8 @@ public class PixelsMetadataReader {
         return table;
     }
 
-    public List<PixelsColumnHandle> getTableColumn(String connectorId, String schemaName, String tableName) {
+    public List<PixelsColumnHandle> getTableColumn(String connectorId, String schemaName, String tableName) throws MetadataException
+    {
         List<PixelsColumnHandle> columns = new ArrayList<PixelsColumnHandle>();
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
@@ -128,6 +135,11 @@ public class PixelsMetadataReader {
             columns.add(pixelsColumnHandle);
         }
         return columns;
+    }
+
+    public List<Layout> getDataLayouts (String schemaName, String tableName) throws MetadataException
+    {
+        return metadataService.getLayouts(schemaName, tableName);
     }
 
     public PixelsTableLayoutHandle getTableLayout(String connectorId, String schemaName, String tableName) {

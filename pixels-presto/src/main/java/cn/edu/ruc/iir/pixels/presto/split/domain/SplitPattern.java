@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.daemon.metadata.domain.split;
+package cn.edu.ruc.iir.pixels.presto.split.domain;
 
 import java.util.List;
 

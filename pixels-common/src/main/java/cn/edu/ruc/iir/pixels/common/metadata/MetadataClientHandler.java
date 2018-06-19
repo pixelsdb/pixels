@@ -1,7 +1,6 @@
-package cn.edu.ruc.iir.pixels.presto.client;
+package cn.edu.ruc.iir.pixels.common.metadata;
 
-import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
-import com.facebook.presto.spi.PrestoException;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -9,16 +8,15 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 import java.util.Map;
 
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
 
 /**
  * Created by hank on 18-6-17.
  */
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter
 {
-    private final ByteBuf firstMSG;
+    private final ByteBuf request;
 
-    private boolean isRead;
+    private boolean complete;
     private final String token;
     private final Map<String, String> response;
     private StringBuilder builder = new StringBuilder();
@@ -28,14 +26,14 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
         this.token = token;
         this.response = response;
         byte[] req = params.toString().getBytes();
-        firstMSG = Unpooled.buffer(req.length);
-        firstMSG.writeBytes(req);
+        request = Unpooled.buffer(req.length);
+        request.writeBytes(req);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception
     {
-        ctx.writeAndFlush(firstMSG);
+        ctx.writeAndFlush(request);
     }
 
     @Override
@@ -44,7 +42,7 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
         ByteBuf buf = (ByteBuf) msg;
         if (buf.readableBytes() <= 0)
         {
-            isRead = true;
+            complete = true;
             return;
         }
         byte[] req = new byte[buf.readableBytes()];
@@ -58,7 +56,7 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     {
         ctx.flush();
         response.put(token, builder.toString());
-        if (isRead)
+        if (complete)
         {
             ctx.close();
         } else
@@ -68,10 +66,10 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws MetadataException
     {
         cause.printStackTrace();
         ctx.close();
-        throw new PrestoException(PIXELS_CLIENT_ERROR, cause);
+        throw new MetadataException("exception caught in MetadataClientHandler", cause);
     }
 }

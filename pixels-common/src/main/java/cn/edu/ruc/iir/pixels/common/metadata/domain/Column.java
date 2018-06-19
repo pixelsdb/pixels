@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.common.metadata;
+package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
 public class Column
 {

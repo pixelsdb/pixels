@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.presto.split.builder;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.Split;
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.split.SplitPattern;
 import cn.edu.ruc.iir.pixels.presto.split.domain.AccessPattern;
 import cn.edu.ruc.iir.pixels.presto.split.domain.ColumnSet;
+import cn.edu.ruc.iir.pixels.presto.split.domain.Split;
+import cn.edu.ruc.iir.pixels.presto.split.domain.SplitPattern;
 
 import java.io.IOException;
 import java.util.ArrayList;
