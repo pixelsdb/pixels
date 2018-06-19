@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.domain.split;
 
+import java.util.List;
+
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.daemon.metadata.domain.split
@@ -9,22 +11,22 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.domain.split;
  * @date: Create in 2018-02-25 10:06
  **/
 public class SplitPattern {
-    private String accessedColumns;
+    private List<String> accessedColumns;
     private int numRowGroupInSplit;
 
     public SplitPattern() {
     }
 
-    public SplitPattern(String accessedColumns, int numRowGroupInSplit) {
+    public SplitPattern(List<String> accessedColumns, int numRowGroupInSplit) {
         this.accessedColumns = accessedColumns;
         this.numRowGroupInSplit = numRowGroupInSplit;
     }
 
-    public String getAccessedColumns() {
+    public List<String> getAccessedColumns() {
         return accessedColumns;
     }
 
-    public void setAccessedColumns(String accessedColumns) {
+    public void setAccessedColumns(List<String> accessedColumns) {
         this.accessedColumns = accessedColumns;
     }
 

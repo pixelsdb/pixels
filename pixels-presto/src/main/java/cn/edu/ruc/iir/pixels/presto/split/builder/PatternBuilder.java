@@ -22,13 +22,12 @@ public class PatternBuilder {
         List<SplitPattern> splitPatterns = splitInfo.getSplitPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
-        String accessedColumns;
+        List<String> accessedColumns;
         for (SplitPattern splitPattern : splitPatterns) {
             accessedColumns = splitPattern.getAccessedColumns();
 
-            String[] columns = accessedColumns.split(",");
             AccessPattern pattern = new AccessPattern();
-            for (String column : columns) {
+            for (String column : accessedColumns) {
                 pattern.addColumn(column);
             }
             // set split size of each pattern

@@ -169,7 +169,8 @@ public class TableDao implements Dao<Table>
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
             pst.setInt(3, table.getSchema().getId());
-            return pst.execute();
+            int flag = pst.executeUpdate();
+            return flag > 0;
         } catch (SQLException e)
         {
             log.error("insert in TableDao", e);
