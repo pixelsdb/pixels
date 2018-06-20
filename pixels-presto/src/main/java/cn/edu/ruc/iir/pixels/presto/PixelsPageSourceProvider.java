@@ -39,7 +39,6 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
-
         return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
     }
 }

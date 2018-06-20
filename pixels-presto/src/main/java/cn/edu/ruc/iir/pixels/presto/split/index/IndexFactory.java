@@ -13,17 +13,18 @@ public class IndexFactory {
         return instance;
     }
 
-    private Map<String, Index> indexCache = null;
+    private Map<IndexEntry, Index> indexCache = null;
 
     private IndexFactory() {
         this.indexCache = new HashMap<>();
     }
 
-    public void cacheIndex(String name, Index inverted) {
+    public void cacheIndex(IndexEntry name, Index inverted) {
         this.indexCache.put(name, inverted);
     }
 
-    public Index getIndex(String name) {
+    public Index getIndex(IndexEntry name) {
         return this.indexCache.get(name);
     }
+
 }

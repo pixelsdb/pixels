@@ -56,6 +56,7 @@ public class PixelsModule
         binder.bind(PixelsSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(PixelsPageSourceProvider.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(PixelsPrestoConfig.class);
+        configBinder(binder).bindConfig(PixelsPrestoConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
         jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PixelsTable.class));

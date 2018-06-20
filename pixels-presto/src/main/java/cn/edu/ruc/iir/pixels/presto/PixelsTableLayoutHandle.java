@@ -20,6 +20,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -28,14 +30,12 @@ public class PixelsTableLayoutHandle
     private final PixelsTableHandle table;
 
     private TupleDomain<ColumnHandle> constraint;
+    private Set<ColumnHandle> desiredColumns;
 
     @JsonCreator
-    public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table,
-                                   @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint)
-
+    public PixelsTableLayoutHandle(@JsonProperty("table") PixelsTableHandle table)
     {
         this.table = requireNonNull(table, "table is null");
-        this.constraint = requireNonNull(constraint, "constraint is null");
     }
 
     @JsonProperty
@@ -46,6 +46,15 @@ public class PixelsTableLayoutHandle
     public void setConstraint(TupleDomain<ColumnHandle> constraint)
     {
         this.constraint = constraint;
+    }
+
+    @JsonProperty
+    public Set<ColumnHandle> getDesiredColumns() {
+        return desiredColumns;
+    }
+
+    public void setDesiredColumns(Set<ColumnHandle> desiredColumns) {
+        this.desiredColumns = desiredColumns;
     }
 
     @JsonProperty

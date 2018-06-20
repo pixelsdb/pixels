@@ -19,6 +19,7 @@ import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -42,6 +43,7 @@ import static java.util.stream.Collectors.toList;
 public class PixelsMetadata
         implements ConnectorMetadata
 {
+    private static Logger logger = Logger.get(PixelsMetadata.class);
     private final String connectorId;
 
     private final PixelsMetadataReader pixelsMetadataReader;
@@ -88,11 +90,10 @@ public class PixelsMetadata
     public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
     {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
-        SchemaTableName tableName = tableHandle.toSchemaTableName();
-
-        // create PixelsTableLayoutHandle
-        PixelsTableLayoutHandle tableLayout = pixelsMetadataReader.getTableLayout(connectorId, tableName.getSchemaName(), tableName.getTableName());
+        PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle);
         tableLayout.setConstraint(constraint.getSummary());
+        if(desiredColumns.isPresent())
+            tableLayout.setDesiredColumns(desiredColumns.get());
         ConnectorTableLayout layout = getTableLayout(session, tableLayout);
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }

@@ -11,6 +11,8 @@ public class Inverted implements Index {
      * key: column name;
      * value: bit map
      */
+    private int version;
+
     private Map<String, BitSet> bitMapIndex = null;
 
     private List<AccessPattern> queryAccessPatterns = null;
@@ -74,5 +76,13 @@ public class Inverted implements Index {
         }
 
         return bestPattern;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public void setVersion(int version) {
+        this.version = version;
     }
 }
