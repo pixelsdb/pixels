@@ -7,7 +7,12 @@ public class TestString
     @Test
     public void test ()
     {
-        byte[] bytes = "hello world".getBytes();
-        System.out.println(new String(bytes));
+        StringBuilder sb = new StringBuilder("<");
+        for (int i = 0; i < 5; i++)
+        {
+            sb.append(":,");
+        }
+        sb.replace(sb.length() - 1, sb.length(), ">");
+        System.out.println(sb.toString());
     }
 }
