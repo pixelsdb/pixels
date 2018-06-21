@@ -112,6 +112,10 @@ public class PixelsRecordReaderImpl
             checkValid = false;
             return;
         }
+        if (RGStart + RGLen > rgNum)
+        {
+            RGLen = rgNum - RGStart;
+        }
 
         // check predicate schemas
         if (option.getPredicate().isPresent())

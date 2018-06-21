@@ -60,10 +60,6 @@ import java.util.*;
  * @date: Create in 2018-04-09 16:00
  **/
 public class Main {
-    public static final long KB = 1024L;
-    public static final long MB = 1048576L;
-    public static final long GB = 1073741824L;
-    public static final long TB = 1099511627776L;
 
     public static void main(String args[]) {
         try {
@@ -100,7 +96,6 @@ public class Main {
                 String command = inputStr.trim().split("\\s+")[0].toUpperCase();
 
                 try {
-                    Properties params = new Properties();
                     SqlParser parser = new SqlParser();
 
                     if (command.equals("DDL")) {
@@ -117,7 +112,6 @@ public class Main {
                             parser1.handleError(e);
                             continue;
                         }
-                        params.setProperty("schema.file", namespace1.getString("schema_file"));
 
                         String dbName = namespace1.getString("db_name");
                         String schemaFile = namespace1.getString("schema_file");
@@ -168,9 +162,6 @@ public class Main {
                             parser1.handleError(e);
                             continue;
                         }
-                        params.setProperty("data.path", namespace1.getString("data_path"));
-                        params.setProperty("schema.file", namespace1.getString("schema_file"));
-                        params.setProperty("hdfs.file.path", namespace1.getString("hdfs_file_path"));
 
                         String dataPath = namespace1.getString("data_path");
                         String hdfsFile = namespace1.getString("hdfs_file_path");
