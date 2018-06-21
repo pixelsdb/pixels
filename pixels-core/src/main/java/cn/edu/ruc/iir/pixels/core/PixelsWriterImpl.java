@@ -283,7 +283,7 @@ public class PixelsWriterImpl
      * Repeating is not supported currently in ColumnVector
      * */
     @Override
-    public void addRowBatch(VectorizedRowBatch rowBatch) throws IOException
+    public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
         if (isNewRowGroup) {
             this.isNewRowGroup = false;
@@ -301,7 +301,9 @@ public class PixelsWriterImpl
         if (curRowGroupDataLength >= rowGroupSize) {
             writeRowGroup();
             curRowGroupDataLength = 0;
+            return false;
         }
+        return true;
     }
 
     /**
