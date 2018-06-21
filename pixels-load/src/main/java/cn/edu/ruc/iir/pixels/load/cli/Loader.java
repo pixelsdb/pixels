@@ -1,16 +1,27 @@
 package cn.edu.ruc.iir.pixels.load.cli;
 
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import cn.edu.ruc.iir.pixels.common.utils.*;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
+import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.vector.*;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
+import com.alibaba.fastjson.JSON;
+import com.facebook.presto.sql.parser.ParsingOptions;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -20,28 +31,23 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.text.DecimalFormat;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Scanner;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.cli
- * @ClassName: Main
- * @Description: DDL, LOAD
  * <p>
  * DDL -s /home/tao/software/data/pixels/DDL.txt -d pixels
  * <p>
@@ -59,374 +65,352 @@ import java.util.*;
  * @author: Tao
  * @date: Create in 2018-04-09 16:00
  **/
-public class Main {
-
+public class Loader
+{
     public static void main(String args[]) {
+        Loader loader = new Loader();
+
         try {
             Scanner scanner = new Scanner(System.in);
             String inputStr;
 
-            while (true) {
+            while (true)
+            {
                 System.out.print("pixels> ");
                 inputStr = scanner.nextLine().trim();
 
-                if (inputStr.isEmpty() || inputStr.equals(";")) {
+                if (inputStr.isEmpty() || inputStr.equals(";"))
+                {
                     continue;
                 }
 
-                if (inputStr.endsWith(";")) {
+                if (inputStr.endsWith(";"))
+                {
                     inputStr = inputStr.substring(0, inputStr.length() - 1);
                 }
 
                 if (inputStr.equalsIgnoreCase("exit") || inputStr.equalsIgnoreCase("quit") ||
-                        inputStr.equalsIgnoreCase("-q")) {
+                        inputStr.equalsIgnoreCase("-q"))
+                {
                     System.out.println("Bye.");
                     break;
                 }
 
-                if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h")) {
+                if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h"))
+                {
                     System.out.println("Supported commands:\n" +
                             "DDL\n" +
                             "LOAD\n");
                     System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
-//                    System.out.println("Examples on using these commands: ");
                     continue;
                 }
 
                 String command = inputStr.trim().split("\\s+")[0].toUpperCase();
 
-                try {
-                    SqlParser parser = new SqlParser();
-
-                    if (command.equals("DDL")) {
-                        ArgumentParser parser1 = ArgumentParsers.newArgumentParser("DDL")
-                                .defaultHelp(true);
-                        parser1.addArgument("-s", "--schema_file").required(true)
-                                .help("specify the path of schema file");
-                        parser1.addArgument("-d", "--db_name").required(true)
-                                .help("specify the name of database");
-                        Namespace namespace1;
-                        try {
-                            namespace1 = parser1.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                        } catch (ArgumentParserException e) {
-                            parser1.handleError(e);
-                            continue;
-                        }
-
-                        String dbName = namespace1.getString("db_name");
-                        String schemaFile = namespace1.getString("schema_file");
-
-                        String sql = FileUtil.readFileToString(schemaFile);
-                        CreateTable createTable = (CreateTable) parser.createStatement(sql);
-                        String tableName = createTable.getName().toString();
-
-                        Table table = new Table();
-                        SchemaDao schemaDao = new SchemaDao();
-                        Schema schema = schemaDao.getByName(dbName);
-                        table.setId(-1);
-                        table.setName(tableName);
-                        table.setType("");
-                        table.setSchema(schema);
-                        TableDao tableDao = new TableDao();
-                        boolean flag = tableDao.save(table);
-                        // ODOT-------------------------------------------
-
-                        // COLS
-                        if (flag) {
-                            // TBLS
-                            int tableID = tableDao.getByName(tableName).get(0).getId();
-                            // ODOT-------------------------------------------
-                            List<TableElement> elements = createTable.getElements();
-                            int size = elements.size();
-                            addColumnsByTableID(elements, size, tableID);
-
-                            System.out.println("Executing command " + command + " successfully");
-                        } else {
-                            System.out.println("Executing command " + command + " unsuccessfully when adding table info");
-                        }
+                if (command.equals("DDL"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("DDL")
+                            .defaultHelp(true);
+                    argumentParser.addArgument("-s", "--schema_file").required(true)
+                            .help("specify the path of schema file");
+                    argumentParser.addArgument("-d", "--db_name").required(true)
+                            .help("specify the name of database");
+                    Namespace namespace;
+                    try
+                    {
+                        namespace = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    }
+                    catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
                     }
 
-                    if (command.equals("LOAD")) {
-                        ArgumentParser parser1 = ArgumentParsers.newArgumentParser("LOAD")
-                                .defaultHelp(true);
-                        parser1.addArgument("-s", "--schema_file").required(true)
-                                .help("specify the path of schema file");
-                        parser1.addArgument("-p", "--data_path").required(true)
-                                .help("specify the path of data");
-                        parser1.addArgument("-f", "--hdfs_file_path").required(true)
-                                .help("specify the path of files on HDFS");
-                        Namespace namespace1;
-                        try {
-                            namespace1 = parser1.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
-                        } catch (ArgumentParserException e) {
-                            parser1.handleError(e);
-                            continue;
-                        }
-
-                        String dataPath = namespace1.getString("data_path");
-                        String hdfsFile = namespace1.getString("hdfs_file_path");
-                        String schemaFile = namespace1.getString("schema_file");
-
-                        if (!hdfsFile.endsWith("/"))
-                            hdfsFile += "/";
-                        String filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-
-                        String sql = FileUtil.readFileToString(schemaFile);
-                        CreateTable createTable = (CreateTable) parser.createStatement(sql);
-                        List<TableElement> elements = createTable.getElements();
-
-                        // struct<id:int,x:double,y:double,z:string>
-                        String tSchema = "";
-                        String prefix = "struct<";
-                        StringBuilder suffix = new StringBuilder();
-
-                        int size = elements.size();
-                        String[] columnTypes = new String[size];
-                        for (int i = 0; i < size; i++) {
-                            ColumnDefinition column = (ColumnDefinition) elements.get(i);
-                            String name = column.getName().toString();
-                            String type = column.getType();
-                            if (type.equalsIgnoreCase("varchar")) {
-                                type = "string";
-                            }
-                            suffix.append(name + ":" + type + ",");
-                            columnTypes[i] = type;
-                        }
-                        tSchema = prefix + suffix.substring(0, suffix.length() - 1) + ">";
-
-                        ConfigFactory instance = ConfigFactory.Instance();
-                        String hdfsConfigPath = instance.getProperty("hdfs.config.dir");
-                        Configuration hdfsConfig = new Configuration(false);
-                        File hdfsConfigDir = new File(hdfsConfigPath);
-                        hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-                        hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
-                        if (hdfsConfigDir.exists() && hdfsConfigDir.isDirectory()) {
-                            File[] hdfsConfigFiles = hdfsConfigDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
-                            if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2) {
-                                hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
-                                hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
-                            }
-                        } else {
-                            System.out.println("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
-                        }
-                        FileSystem fs = FileSystem.get(URI.create(filePath), hdfsConfig);
-                        TypeDescription schema = TypeDescription.fromString(tSchema);
-                        VectorizedRowBatch rowBatch = schema.createRowBatch();
-                        ColumnVector[] columnVectors = new ColumnVector[size];
-
-                        for (int i = 0; i < size; i++) {
-                            String type = columnTypes[i];
-                            if (type.equals("int") || type.equals("bigint")) {
-                                LongColumnVector a = (LongColumnVector) rowBatch.cols[i];
-                                columnVectors[i] = a;
-                            } else if (type.equals("double")) {
-                                DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[i];
-                                columnVectors[i] = b;
-                            } else if (type.equals("varchar") || type.equals("string")) {
-                                BytesColumnVector z = (BytesColumnVector) rowBatch.cols[i];
-                                columnVectors[i] = z;
-                            } else if (type.equals("boolean")) {
-                                LongColumnVector c = (LongColumnVector) rowBatch.cols[i];
-                                columnVectors[i] = c;
-                            }
-                        }
-
-                        int pixelStride = Integer.parseInt(instance.getProperty("pixel.stride"));
-                        int rowGroupSize = Integer.parseInt(instance.getProperty("row.group.size")) * 1024 * 1024;
-                        int blockSize = 256 * 1024 * 1024;
-                        short blockReplication = 2;
-                        boolean blockPadding = true;
-                        boolean encoding = true;
-                        int compressionBlockSize = 1;
-
-                        PixelsWriter pixelsWriter =
-                                PixelsWriterImpl.newBuilder()
-                                        .setSchema(schema)
-
-                                        .setPixelStride(pixelStride)
-                                        .setRowGroupSize(rowGroupSize)
-                                        .setFS(fs)
-                                        .setFilePath(new Path(filePath))
-                                        .setBlockSize(blockSize)
-                                        .setReplication(blockReplication)
-                                        .setBlockPadding(blockPadding)
-                                        .setEncoding(encoding)
-                                        .setCompressionBlockSize(compressionBlockSize)
-                                        .build();
-
-                        if (dataPath.contains("hdfs://")) {
-                            PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-//                            String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test500G_orc/";
-                            FSFactory fsFactory = new FSFactory(config);
-                            List<Path> hdfsList = fsFactory.listFiles(dataPath);
-                            BufferedReader br = null;
-                            FSDataInputStream fsr = null;
-                            String curLine;
-                            String splitLine[];
-                            String fileSize;
-                            // set "", start next line to write
-                            DecimalFormat df = new DecimalFormat("#.000");
-                            int fileS = 0;
-                            int fileNum = 1;
-                            for (Path path : hdfsList) {
-                                System.out.println("Loading： " + path);
-                                fsr = fsFactory.getFileSystem().get().open(path);
-                                br = new BufferedReader(new InputStreamReader(fsr));
-                                while ((curLine = br.readLine()) != null) {
-                                    // benchmark exists True or False
-                                    curLine = curLine.replace("False", "0")
-                                            .replace("false", "0")
-                                            .replace("True", "1")
-                                            .replace("true", "1");
-                                    splitLine = curLine.split("\t");
-                                    int row = rowBatch.size++;
-                                    for (int j = 0; j < splitLine.length; j++) {
-                                        // exists "NULL" to fix
-                                        if (splitLine[j].equalsIgnoreCase("\\N")) {
-                                            columnVectors[j].isNull[row] = true;
-                                        } else {
-                                            columnVectors[j].add(splitLine[j]);
-                                        }
-                                    }
-
-                                    if (rowBatch.size == rowBatch.getMaxSize()) {
-                                        boolean newFile = pixelsWriter.addRowBatch(rowBatch);
-                                        rowBatch.reset();
-                                        if (newFile)
-                                        {
-                                            pixelsWriter.close();
-                                            fileNum++;
-                                            filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-                                            pixelsWriter =
-                                                    PixelsWriterImpl.newBuilder()
-                                                            .setSchema(schema)
-                                                            .setPixelStride(pixelStride)
-                                                            .setRowGroupSize(rowGroupSize)
-                                                            .setFS(fs)
-                                                            .setFilePath(new Path(filePath))
-                                                            .setBlockSize(blockSize)
-                                                            .setReplication(blockReplication)
-                                                            .setBlockPadding(blockPadding)
-                                                            .setEncoding(encoding)
-                                                            .setCompressionBlockSize(compressionBlockSize)
-                                                            .build();
-                                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
-                                        }
-                                    }
-                                }
-                            }
-                            if (rowBatch.size != 0) {
-                                pixelsWriter.addRowBatch(rowBatch);
-                                rowBatch.reset();
-                            }
-                            pixelsWriter.close();
-                            br.close();
-                        }
-                        else
-                        {
-                            Collection<File> files = FileUtil.listFiles(dataPath, true);
-                            BufferedReader br = null;
-                            String path = "";
-                            String curLine;
-                            String splitLine[];
-                            StringBuilder writeLine = new StringBuilder();
-                            String fileSize;
-                            // set "", start next line to write
-                            DecimalFormat df = new DecimalFormat("#.000");
-                            int fileS = 0;
-                            int fileNum = 1;
-                            for (File f : files) {
-                                System.out.println("Loading： " + f.getPath());
-                                path = f.getPath();
-                                br = new BufferedReader(new FileReader(path));
-                                while ((curLine = br.readLine()) != null) {
-                                    // benchmark exists True or False
-                                    curLine = curLine.replace("False", "0")
-                                            .replace("false", "0")
-                                            .replace("True", "1")
-                                            .replace("true", "1");
-                                    splitLine = curLine.split("\t");
-                                    int row = rowBatch.size++;
-                                    for (int j = 0; j < splitLine.length; j++) {
-                                        if (splitLine[j].equals("\\N"))
-                                        {
-                                            columnVectors[j].isNull[row] = true;
-                                        }
-                                        else
-                                        {
-                                            columnVectors[j].add(splitLine[j]);
-                                        }
-                                    }
-
-                                    if (rowBatch.size == rowBatch.getMaxSize()) {
-                                        boolean newFile = pixelsWriter.addRowBatch(rowBatch);
-                                        rowBatch.reset();
-                                        if (newFile)
-                                        {
-                                            pixelsWriter.close();
-                                            fileNum++;
-                                            filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-                                            pixelsWriter =
-                                                    PixelsWriterImpl.newBuilder()
-                                                            .setSchema(schema)
-                                                            .setPixelStride(pixelStride)
-                                                            .setRowGroupSize(rowGroupSize)
-                                                            .setFS(fs)
-                                                            .setFilePath(new Path(filePath))
-                                                            .setBlockSize(blockSize)
-                                                            .setReplication(blockReplication)
-                                                            .setBlockPadding(blockPadding)
-                                                            .setEncoding(encoding)
-                                                            .setCompressionBlockSize(compressionBlockSize)
-                                                            .build();
-                                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
-                                        }
-                                    }
-                                }
-                            }
-                            // only one hdfs file
-                            if (rowBatch.size != 0) {
-                                pixelsWriter.addRowBatch(rowBatch);
-                                rowBatch.reset();
-                            }
-                            pixelsWriter.close();
-                            br.close();
-                        }
+                    SqlParser parser = new SqlParser();
+                    String dbName = namespace.getString("db_name");
+                    String schemaPath = namespace.getString("schema_file");
+                    if (loader.executeDDL(parser, dbName, schemaPath))
+                    {
                         System.out.println("Executing command " + command + " successfully");
                     }
+                    else
+                    {
+                        System.out.println("Executing command " + command + " unsuccessfully when adding table info");
+                    }
+                }
 
-                } catch (IllegalArgumentException e) {
-                    System.out.println("Executing command " + command + " unsuccessfully");
-                    System.out.println(e.getMessage());
+                if (command.equals("LOAD"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("LOAD")
+                            .defaultHelp(true);
+                    argumentParser.addArgument("-d", "--db_name").required(true)
+                            .help("specify the name of database");
+                    argumentParser.addArgument("-t", "--table_name").required(true)
+                            .help("Specify the name of table");
+                    argumentParser.addArgument("-o", "--original_data_path").required(true)
+                            .help("specify the path of original data");
+                    argumentParser.addArgument("-l", "--loading_data_path").required(true)
+                            .help("specify the path into which data are loaded");
+                    Namespace namespace;
+                    try
+                    {
+                        namespace = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                    }
+                    catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    String dbName = namespace.getString("db_name");
+                    String tableName = namespace.getString("table_name");
+                    String originalDataPath = namespace.getString("original_data_path");
+
+                    if (loader.executeLoad(originalDataPath, dbName, tableName))
+                    {
+                        System.out.println("Executing command " + command + " successfully");
+                    }
+                    else
+                    {
+                        System.out.println("Executing command " + command + " unsuccessfully when loading data");
+                    }
                 }
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static void addColumnsByTableID(List<TableElement> elements, int size, int tableID)  {
+    private boolean executeDDL(SqlParser parser, String dbName, String schemaPath)
+            throws SQLException
+    {
+        String sql = FileUtil.readFileToString(schemaPath);
+        if (sql == null)
+        {
+            return false;
+        }
+        CreateTable createTable = (CreateTable) parser.createStatement(sql, new ParsingOptions());
+        String tableName = createTable.getName().toString();
+
+        Table table = new Table();
+        SchemaDao schemaDao = new SchemaDao();
+        Schema schema = schemaDao.getByName(dbName);
+        table.setId(-1);
+        table.setName(tableName);
+        table.setType("");
+        table.setSchema(schema);
+        TableDao tableDao = new TableDao();
+        boolean flag = tableDao.save(table);
+        // ODOT-------------------------------------------
+
+        // COLS
+        if (flag) {
+            // TBLS
+            int tableID = tableDao.getByName(tableName).get(0).getId();
+            // ODOT-------------------------------------------
+            List<TableElement> elements = createTable.getElements();
+            int size = elements.size();
+            addColumnsByTableID(elements, size, tableID);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private boolean executeLoad(String originalDataPath, String dbName, String tableName)
+            throws IOException, MetadataException
+    {
+        // init metadata service
+        ConfigFactory configFactory = ConfigFactory.Instance();
+        String metaHost = configFactory.getProperty("metadata.server.host");
+        int metaPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
+        MetadataService metadataService = new MetadataService(metaHost, metaPort);
+        // get columns of the specified table
+        List<Column> columns = metadataService.getColumns(dbName, tableName);
+        int colSize = columns.size();
+        // record original column names and types
+        String[] originalColNames = new String[colSize];
+        String[] originalColTypes = new String[colSize];
+        for (int i = 0; i < colSize; i++)
+        {
+            originalColNames[i] = columns.get(i).getName();
+            originalColTypes[i] = columns.get(i).getType();
+        }
+        // get the latest layout for writing
+        List<Layout> layouts = metadataService.getLayouts(dbName, tableName);
+        Layout writingLayout = null;
+        int writingLayoutVersion = -1;
+        for (Layout layout : layouts)
+        {
+            if (layout.getPermission() > 0)
+            {
+                if (layout.getVersion() > writingLayoutVersion)
+                {
+                    writingLayout = layout;
+                    writingLayoutVersion = layout.getVersion();
+                }
+            }
+        }
+        // no layouts for writing currently
+        if (writingLayout == null)
+        {
+            return false;
+        }
+        // get the column order of the latest writing layout
+        Order order = JSON.parseObject(writingLayout.getOrder(), Order.class);
+        List<String> layoutColumnOrder = order.getColumnOrder();
+        // get path of loading
+        String loadingDataPath = writingLayout.getOrderPath();
+        if (!loadingDataPath.endsWith("/"))
+        {
+            loadingDataPath += "/";
+        }
+        // check size consistency
+        if (layoutColumnOrder.size() != colSize)
+        {
+            return false;
+        }
+        // map the column order of the latest writing layout to the original column order
+        int[] orderMapping = new int[colSize];
+        for (int i = 0; i < colSize; i++)
+        {
+            int index = Arrays.binarySearch(originalColNames, layoutColumnOrder.get(i));
+            if (index < 0)
+            {
+                return false;
+            }
+            orderMapping[i] = index;
+        }
+        // construct pixels schema based on the column order of the latest writing layout
+        StringBuilder pixelsSchemaBuilder = new StringBuilder("struct<");
+        for (int i = 0; i < colSize; i++)
+        {
+            String name = layoutColumnOrder.get(i);
+            String type = originalColTypes[orderMapping[i]];
+            pixelsSchemaBuilder.append(name).append(":").append(type)
+                    .append(",");
+        }
+        pixelsSchemaBuilder.replace(pixelsSchemaBuilder.length() - 1, pixelsSchemaBuilder.length(), ">");
+        TypeDescription pixelsSchema = TypeDescription.fromString(pixelsSchemaBuilder.toString());
+
+        return loadData(originalDataPath, loadingDataPath, pixelsSchema, orderMapping, configFactory);
+    }
+
+    private boolean loadData(String originalDataPath, String loadingDataPath, TypeDescription schema, int[] orderMapping,
+                             ConfigFactory configFactory)
+            throws IOException
+    {
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", LocalFileSystem.class.getName());
+        FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+        VectorizedRowBatch rowBatch = schema.createRowBatch();
+        ColumnVector[] columnVectors = rowBatch.cols;
+        int pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        int rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size")) * 1024 * 1024;
+        int blockSize = Integer.parseInt(configFactory.getProperty("block.size")) * 1024 * 1024;
+        short replication = Short.parseShort(configFactory.getProperty("block.replication"));
+        String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+        PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
+                .setSchema(schema)
+                .setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize)
+                .setFS(fs)
+                .setFilePath(new Path(loadingFilePath))
+                .setBlockSize(blockSize)
+                .setReplication(replication)
+                .setBlockPadding(true)
+                .setEncoding(true)
+                .setCompressionBlockSize(1)
+                .build();
+
+        // read original data
+        FSFactory fsFactory = new FSFactory(new PixelsPrestoConfig());
+        List<Path> originalFilePaths = fsFactory.listFiles(originalDataPath);
+        BufferedReader reader = null;
+        String line;
+        for (Path originalFilePath : originalFilePaths)
+        {
+            reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
+            while ((line = reader.readLine()) != null)
+            {
+                line = line.replace("false", "0")
+                        .replace("False", "0")
+                        .replace("true", "1")
+                        .replace("True", "1");
+                String[] colsInLine = line.split("\t");
+                for (int i = 0; i < columnVectors.length; i++)
+                {
+                    int valueIdx = orderMapping[i];
+                    int rowId = rowBatch.size++;
+                    if (colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                    {
+                        columnVectors[i].isNull[rowId] = true;
+                    }
+                    else
+                    {
+                        columnVectors[i].add(colsInLine[valueIdx]);
+                    }
+                }
+
+                if (rowBatch.size >= rowBatch.getMaxSize())
+                {
+                    if (pixelsWriter.addRowBatch(rowBatch))
+                    {
+                        pixelsWriter.close();
+                        loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+                        pixelsWriter = PixelsWriterImpl.newBuilder()
+                                .setSchema(schema)
+                                .setPixelStride(pixelStride)
+                                .setRowGroupSize(rowGroupSize)
+                                .setFS(fs)
+                                .setFilePath(new Path(loadingFilePath))
+                                .setBlockSize(blockSize)
+                                .setReplication(replication)
+                                .setBlockPadding(true)
+                                .setEncoding(true)
+                                .setCompressionBlockSize(1)
+                                .build();
+                    }
+                    rowBatch.reset();
+                }
+            }
+        }
+        if (rowBatch.size != 0)
+        {
+            pixelsWriter.addRowBatch(rowBatch);
+            rowBatch.reset();
+        }
+        pixelsWriter.close();
+        if (reader != null)
+        {
+            reader.close();
+        }
+
+        return true;
+    }
+
+    private void addColumnsByTableID(List<TableElement> elements, int size, int tableID)
+            throws SQLException
+    {
         String prefix = "INSERT INTO COLS (COL_NAME, COL_TYPE, TBLS_TBL_ID) VALUES (?, ?, ?)";
         DBUtil instance = DBUtil.Instance();
         Connection conn = instance.getConnection();
-        try {
-            conn.setAutoCommit(false);
-            PreparedStatement pst = conn.prepareStatement(prefix);
-            for (int i = 0; i < size; i++) {
-                ColumnDefinition column = (ColumnDefinition) elements.get(i);
-                String name = column.getName().toString();
-                String type = column.getType();
-                pst.setString(1, name);
-                pst.setString(2, type);
-                pst.setInt(3, tableID);
-                pst.addBatch();
-                pst.executeBatch();
-                conn.commit();
-            }
-            pst.close();
-            conn.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        conn.setAutoCommit(false);
+        PreparedStatement pst = conn.prepareStatement(prefix);
+        for (int i = 0; i < size; i++) {
+            ColumnDefinition column = (ColumnDefinition) elements.get(i);
+            String name = column.getName().toString();
+            String type = column.getType();
+            pst.setString(1, name);
+            pst.setString(2, type);
+            pst.setInt(3, tableID);
+            pst.addBatch();
+            pst.executeBatch();
+            conn.commit();
         }
+        pst.close();
+        conn.close();
     }
 }

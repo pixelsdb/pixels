@@ -95,7 +95,7 @@
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>cn.edu.ruc.iir.pixels.load.cli.Main</mainClass>
+                                    <mainClass>cn.edu.ruc.iir.pixels.load.cli.Loader</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
