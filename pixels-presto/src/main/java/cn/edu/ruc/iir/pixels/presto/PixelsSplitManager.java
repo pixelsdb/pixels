@@ -136,9 +136,10 @@ public class PixelsSplitManager
                             file.toString(), 0, -1,
                             fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
             // add splits in compactionPath
-            int curFileRGIdx = 0;
+            int curFileRGIdx;
             for (Path file : fsFactory.listFiles(layout.getCompactPath()))
             {
+                curFileRGIdx = 0;
                 while (curFileRGIdx < rowGroupNum)
                 {
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
