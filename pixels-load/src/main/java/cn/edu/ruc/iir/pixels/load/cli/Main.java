@@ -299,49 +299,40 @@ public class Main {
                                     }
 
                                     if (rowBatch.size == rowBatch.getMaxSize()) {
-                                        pixelsWriter.addRowBatch(rowBatch);
+                                        boolean newFile = pixelsWriter.addRowBatch(rowBatch);
                                         rowBatch.reset();
-                                    }
-
-                                    // at the end of each col, judge the size of the file
-                                    fileS += (curLine + "\n").getBytes().length;
-                                    fileSize = df.format((double) fileS / blockSize);
-                                    if (Double.valueOf(fileSize) >= 1) {
-                                        fileNum++;
-                                        pixelsWriter.addRowBatch(rowBatch);
-                                        rowBatch.reset();
-                                        pixelsWriter.close();
-
-                                        filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-                                        pixelsWriter =
-                                                PixelsWriterImpl.newBuilder()
-                                                        .setSchema(schema)
-                                                        .setPixelStride(pixelStride)
-                                                        .setRowGroupSize(rowGroupSize)
-                                                        .setFS(fs)
-                                                        .setFilePath(new Path(filePath))
-                                                        .setBlockSize(blockSize)
-                                                        .setReplication(blockReplication)
-                                                        .setBlockPadding(blockPadding)
-                                                        .setEncoding(encoding)
-                                                        .setCompressionBlockSize(compressionBlockSize)
-                                                        .build();
-                                        fileS = 0;
+                                        if (newFile)
+                                        {
+                                            pixelsWriter.close();
+                                            fileNum++;
+                                            filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
+                                            pixelsWriter =
+                                                    PixelsWriterImpl.newBuilder()
+                                                            .setSchema(schema)
+                                                            .setPixelStride(pixelStride)
+                                                            .setRowGroupSize(rowGroupSize)
+                                                            .setFS(fs)
+                                                            .setFilePath(new Path(filePath))
+                                                            .setBlockSize(blockSize)
+                                                            .setReplication(blockReplication)
+                                                            .setBlockPadding(blockPadding)
+                                                            .setEncoding(encoding)
+                                                            .setCompressionBlockSize(compressionBlockSize)
+                                                            .build();
+                                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
+                                        }
                                     }
                                 }
-                                System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
                             }
-                            // only one hdfs file
-                            if (fileS > 0) {
-                                if (rowBatch.size != 0) {
-                                    pixelsWriter.addRowBatch(rowBatch);
-                                    rowBatch.reset();
-                                }
-                                pixelsWriter.close();
+                            if (rowBatch.size != 0) {
+                                pixelsWriter.addRowBatch(rowBatch);
+                                rowBatch.reset();
                             }
+                            pixelsWriter.close();
                             br.close();
-                        } else {
-
+                        }
+                        else
+                        {
                             Collection<File> files = FileUtil.listFiles(dataPath, true);
                             BufferedReader br = null;
                             String path = "";
@@ -377,46 +368,37 @@ public class Main {
                                     }
 
                                     if (rowBatch.size == rowBatch.getMaxSize()) {
-                                        pixelsWriter.addRowBatch(rowBatch);
+                                        boolean newFile = pixelsWriter.addRowBatch(rowBatch);
                                         rowBatch.reset();
-                                    }
-
-                                    // at the end of each col, judge the size of the file
-                                    fileS += (curLine + "\n").getBytes().length;
-                                    fileSize = df.format((double) fileS / blockSize);
-                                    if (Double.valueOf(fileSize) >= 1) {
-                                        fileNum++;
-                                        pixelsWriter.addRowBatch(rowBatch);
-                                        rowBatch.reset();
-                                        pixelsWriter.close();
-
-                                        filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
-                                        pixelsWriter =
-                                                PixelsWriterImpl.newBuilder()
-                                                        .setSchema(schema)
-                                                        .setPixelStride(pixelStride)
-                                                        .setRowGroupSize(rowGroupSize)
-                                                        .setFS(fs)
-                                                        .setFilePath(new Path(filePath))
-                                                        .setBlockSize(blockSize)
-                                                        .setReplication(blockReplication)
-                                                        .setBlockPadding(blockPadding)
-                                                        .setEncoding(encoding)
-                                                        .setCompressionBlockSize(compressionBlockSize)
-                                                        .build();
-                                        fileS = 0;
+                                        if (newFile)
+                                        {
+                                            pixelsWriter.close();
+                                            fileNum++;
+                                            filePath = hdfsFile + DateUtil.getCurTime() + ".pxl";
+                                            pixelsWriter =
+                                                    PixelsWriterImpl.newBuilder()
+                                                            .setSchema(schema)
+                                                            .setPixelStride(pixelStride)
+                                                            .setRowGroupSize(rowGroupSize)
+                                                            .setFS(fs)
+                                                            .setFilePath(new Path(filePath))
+                                                            .setBlockSize(blockSize)
+                                                            .setReplication(blockReplication)
+                                                            .setBlockPadding(blockPadding)
+                                                            .setEncoding(encoding)
+                                                            .setCompressionBlockSize(compressionBlockSize)
+                                                            .build();
+                                            System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
+                                        }
                                     }
                                 }
-                                System.out.println("Loading file number: " + fileNum + ", time: " + DateUtil.formatTime(new Date()));
                             }
                             // only one hdfs file
-                            if (fileS > 0) {
-                                if (rowBatch.size != 0) {
-                                    pixelsWriter.addRowBatch(rowBatch);
-                                    rowBatch.reset();
-                                }
-                                pixelsWriter.close();
+                            if (rowBatch.size != 0) {
+                                pixelsWriter.addRowBatch(rowBatch);
+                                rowBatch.reset();
                             }
+                            pixelsWriter.close();
                             br.close();
                         }
                         System.out.println("Executing command " + command + " successfully");
