@@ -61,7 +61,7 @@ import java.util.Scanner;
  * <p>
  * DDL -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -d pixels
  * <p>
- * LOAD -o hdfs://10.77.40.236:9000/pixels/test500G_text/ -d pixels -t testnull_pixels
+ * LOAD -o hdfs://10.77.40.236:9000/pixels/test500G_text/ -d pixels -t testnull_pixels -n 300000
  * <br> 105 columns
  * @author: Tao
  * @date: Create in 2018-04-09 16:00
@@ -150,6 +150,8 @@ public class Loader
                             .help("Specify the name of table");
                     argumentParser.addArgument("-o", "--original_data_path").required(true)
                             .help("specify the path of original data");
+                    argumentParser.addArgument("-n", "--row_num").required(true)
+                            .help("Specify the max number of rows to write in a file");
                     Namespace namespace;
                     try
                     {
@@ -164,8 +166,9 @@ public class Loader
                     String dbName = namespace.getString("db_name");
                     String tableName = namespace.getString("table_name");
                     String originalDataPath = namespace.getString("original_data_path");
+                    int rowNum = Integer.parseInt(namespace.getString("row_num"));
 
-                    if (loader.executeLoad(originalDataPath, dbName, tableName))
+                    if (loader.executeLoad(originalDataPath, dbName, tableName, rowNum))
                     {
                         System.out.println("Executing command " + command + " successfully");
                     }
@@ -217,7 +220,7 @@ public class Loader
         }
     }
 
-    private boolean executeLoad(String originalDataPath, String dbName, String tableName)
+    private boolean executeLoad(String originalDataPath, String dbName, String tableName, int maxRowNum)
             throws IOException, MetadataException
     {
         // init metadata service
@@ -297,11 +300,11 @@ public class Loader
         pixelsSchemaBuilder.replace(pixelsSchemaBuilder.length() - 1, pixelsSchemaBuilder.length(), ">");
         TypeDescription pixelsSchema = TypeDescription.fromString(pixelsSchemaBuilder.toString());
 
-        return loadData(originalDataPath, loadingDataPath, pixelsSchema, orderMapping, configFactory);
+        return loadData(originalDataPath, loadingDataPath, pixelsSchema, orderMapping, configFactory, maxRowNum);
     }
 
     private boolean loadData(String originalDataPath, String loadingDataPath, TypeDescription schema, int[] orderMapping,
-                             ConfigFactory configFactory)
+                             ConfigFactory configFactory, int maxRowNum)
             throws IOException
     {
         Configuration conf = new Configuration();
@@ -340,6 +343,7 @@ public class Loader
                 .setEncoding(true)
                 .setCompressionBlockSize(1)
                 .build();
+        int rowCounter = 0;
         for (Path originalFilePath : originalFilePaths)
         {
             reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
@@ -350,6 +354,7 @@ public class Loader
                 line = StringUtil.replaceAll(line, "true", "1");
                 line = StringUtil.replaceAll(line, "True", "1");
                 int rowId = rowBatch.size++;
+                rowCounter++;
                 String[] colsInLine = line.split("\t");
                 for (int i = 0; i < columnVectors.length; i++)
                 {
@@ -366,7 +371,9 @@ public class Loader
 
                 if (rowBatch.size >= rowBatch.getMaxSize())
                 {
-                    if (!pixelsWriter.addRowBatch(rowBatch))
+                    pixelsWriter.addRowBatch(rowBatch);
+                    rowBatch.reset();
+                    if (rowCounter >= maxRowNum)
                     {
                         pixelsWriter.close();
                         loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
@@ -382,8 +389,8 @@ public class Loader
                                 .setEncoding(true)
                                 .setCompressionBlockSize(1)
                                 .build();
+                        rowCounter = 0;
                     }
-                    rowBatch.reset();
                 }
             }
         }
