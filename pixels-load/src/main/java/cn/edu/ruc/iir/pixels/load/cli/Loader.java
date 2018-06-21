@@ -11,6 +11,7 @@ import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
+import cn.edu.ruc.iir.pixels.common.utils.StringUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
@@ -18,8 +19,6 @@ import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.sql.parser.ParsingOptions;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -31,6 +30,7 @@ import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -43,6 +43,7 @@ import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
@@ -60,7 +61,7 @@ import java.util.Scanner;
  * <p>
  * DDL -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -d pixels
  * <p>
- * LOAD -p hdfs://10.77.40.236:9000/pixels/test500G_text/ -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -f hdfs://presto00:9000/pixels/test500G_pixels/
+ * LOAD -o hdfs://10.77.40.236:9000/pixels/test500G_text/ -d pixels -t testnull_pixels
  * <br> 105 columns
  * @author: Tao
  * @date: Create in 2018-04-09 16:00
@@ -149,8 +150,6 @@ public class Loader
                             .help("Specify the name of table");
                     argumentParser.addArgument("-o", "--original_data_path").required(true)
                             .help("specify the path of original data");
-                    argumentParser.addArgument("-l", "--loading_data_path").required(true)
-                            .help("specify the path into which data are loaded");
                     Namespace namespace;
                     try
                     {
@@ -273,14 +272,18 @@ public class Loader
         }
         // map the column order of the latest writing layout to the original column order
         int[] orderMapping = new int[colSize];
+        List<String> originalColNameList = Arrays.asList(originalColNames);
         for (int i = 0; i < colSize; i++)
         {
-            int index = Arrays.binarySearch(originalColNames, layoutColumnOrder.get(i));
-            if (index < 0)
+            int index=  originalColNameList.indexOf(layoutColumnOrder.get(i));
+            if (index >= 0)
+            {
+                orderMapping[i] = index;
+            }
+            else
             {
                 return false;
             }
-            orderMapping[i] = index;
         }
         // construct pixels schema based on the column order of the latest writing layout
         StringBuilder pixelsSchemaBuilder = new StringBuilder("struct<");
@@ -311,6 +314,19 @@ public class Loader
         int rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size")) * 1024 * 1024;
         int blockSize = Integer.parseInt(configFactory.getProperty("block.size")) * 1024 * 1024;
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
+
+        // read original data
+        FileStatus[] fileStatuses = fs.listStatus(new Path(originalDataPath));
+        List<Path> originalFilePaths = new ArrayList<>();
+        for (FileStatus fileStatus : fileStatuses)
+        {
+            if (fileStatus.isFile())
+            {
+                originalFilePaths.add(fileStatus.getPath());
+            }
+        }
+        BufferedReader reader = null;
+        String line;
         String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
         PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
                 .setSchema(schema)
@@ -324,26 +340,20 @@ public class Loader
                 .setEncoding(true)
                 .setCompressionBlockSize(1)
                 .build();
-
-        // read original data
-        FSFactory fsFactory = new FSFactory(new PixelsPrestoConfig());
-        List<Path> originalFilePaths = fsFactory.listFiles(originalDataPath);
-        BufferedReader reader = null;
-        String line;
         for (Path originalFilePath : originalFilePaths)
         {
             reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
             while ((line = reader.readLine()) != null)
             {
-                line = line.replace("false", "0")
-                        .replace("False", "0")
-                        .replace("true", "1")
-                        .replace("True", "1");
+                line = StringUtil.replaceAll(line, "false", "0");
+                line = StringUtil.replaceAll(line, "False", "0");
+                line = StringUtil.replaceAll(line, "true", "1");
+                line = StringUtil.replaceAll(line, "True", "1");
+                int rowId = rowBatch.size++;
                 String[] colsInLine = line.split("\t");
                 for (int i = 0; i < columnVectors.length; i++)
                 {
                     int valueIdx = orderMapping[i];
-                    int rowId = rowBatch.size++;
                     if (colsInLine[valueIdx].equalsIgnoreCase("\\N"))
                     {
                         columnVectors[i].isNull[rowId] = true;
@@ -356,7 +366,7 @@ public class Loader
 
                 if (rowBatch.size >= rowBatch.getMaxSize())
                 {
-                    if (pixelsWriter.addRowBatch(rowBatch))
+                    if (!pixelsWriter.addRowBatch(rowBatch))
                     {
                         pixelsWriter.close();
                         loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
