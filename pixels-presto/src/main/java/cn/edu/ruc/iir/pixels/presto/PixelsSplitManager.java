@@ -26,7 +26,12 @@ import cn.edu.ruc.iir.pixels.presto.split.index.IndexEntry;
 import cn.edu.ruc.iir.pixels.presto.split.index.IndexFactory;
 import cn.edu.ruc.iir.pixels.presto.split.index.Inverted;
 import com.alibaba.fastjson.JSON;
-import com.facebook.presto.spi.*;
+import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.ConnectorSplitSource;
+import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+import com.facebook.presto.spi.FixedSplitSource;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -68,8 +73,10 @@ public class PixelsSplitManager
     }
 
     @Override
-    public ConnectorSplitSource getSplits(ConnectorTransactionHandle handle, ConnectorSession session, ConnectorTableLayoutHandle layout, SplitSchedulingStrategy splitSchedulingStrategy) {
-        PixelsTableLayoutHandle layoutHandle = (PixelsTableLayoutHandle) layout;
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle handle, ConnectorSession session, ConnectorTableLayoutHandle tableLayout,
+                                          SplitSchedulingStrategy splitSchedulingStrategy)
+    {
+        PixelsTableLayoutHandle layoutHandle = (PixelsTableLayoutHandle) tableLayout;
         PixelsTableHandle tableHandle = layoutHandle.getTable();
 
         TupleDomain<PixelsColumnHandle> constraint = layoutHandle.getConstraint()
@@ -83,65 +90,77 @@ public class PixelsSplitManager
         try {
             layouts = metadataReader.getDataLayouts(tableHandle.getSchemaName(),
                     tableHandle.getTableName());
-        } catch (MetadataException e) {
+        }
+        catch (MetadataException e) {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
         }
 
-        Layout curLayout = layouts.get(0);
-        int version = curLayout.getVersion();
-
-        // index is exist
-        IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
-        Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
-        if (index == null) {
-            log.info("action null");
-            index = getInverted(curLayout, indexEntry);
-        } else {
-            log.info("action not null");
-            int indexVersion = index.getVersion();
-            // todo update
-            if (indexVersion < version) {
-                log.info("action not null update");
-                index = getInverted(curLayout, indexEntry);
+        List<ConnectorSplit> pixelsSplits = new ArrayList<>();
+        for (Layout layout : layouts)
+        {
+            // get index
+            int version = layout.getVersion();
+            IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
+            Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
+            Order order = JSON.parseObject(layout.getOrder(), Order.class);
+            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            if (index == null)
+            {
+                log.debug("action null");
+                index = getInverted(order, splits, indexEntry);
+            }
+            else
+            {
+                log.debug("action not null");
+                int indexVersion = index.getVersion();
+                // todo update
+                if (indexVersion < version) {
+                    log.debug("action not null update");
+                    index = getInverted(order, splits, indexEntry);
+                }
+            }
+            // get split size
+            ColumnSet columnSet = new ColumnSet();
+            for (PixelsColumnHandle column : desiredColumns) {
+                log.debug(column.getColumnName());
+                columnSet.addColumn(column.getColumnName());
+            }
+            AccessPattern bestPattern = index.search(columnSet);
+            log.debug("bestPattern: " + bestPattern.toString());
+            int splitSize = bestPattern.getSplitSize();
+            int rowGroupNum = splits.getNumRowGroupInBlock();
+            // add splits in orderPath
+            fsFactory.listFiles(layout.getOrderPath()).forEach(file -> pixelsSplits.add(
+                    new PixelsSplit(connectorId,
+                            tableHandle.getSchemaName(), tableHandle.getTableName(),
+                            file.toString(), 0, -1,
+                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
+            // add splits in compactionPath
+            int curFileRGIdx = 0;
+            for (Path file : fsFactory.listFiles(layout.getCompactPath()))
+            {
+                while (curFileRGIdx < rowGroupNum)
+                {
+                    PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                            tableHandle.getSchemaName(), tableHandle.getTableName(),
+                            file.toString(), curFileRGIdx, splitSize,
+                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint);
+                    pixelsSplits.add(pixelsSplit);
+                    curFileRGIdx += splitSize;
+                }
             }
         }
-        //todo get split size
-        ColumnSet columnSet = new ColumnSet();
-        for (PixelsColumnHandle column : desiredColumns) {
-            log.info(column.getColumnName());
-            columnSet.addColumn(column.getColumnName());
-        }
 
-        AccessPattern bestPattern = index.search(columnSet);
-        log.info("bestPattern: " + bestPattern.toString());
-        int splitSize = bestPattern.getSplitSize();
+        Collections.shuffle(pixelsSplits);
 
-        List<Path> files = new ArrayList<>();
-        for (Layout l : layouts) {
-            files.addAll(fsFactory.listFiles(l.getOrderPath()));
-        }
-
-        List<ConnectorSplit> splits = new ArrayList<>();
-        files.forEach(file -> splits.add(new PixelsSplit(connectorId,
-                tableHandle.getSchemaName(),
-                tableHandle.getTableName(),
-                file.toString(), 0, -1,
-                fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
-
-        Collections.shuffle(splits);
-
-        return new FixedSplitSource(splits);
+        return new FixedSplitSource(pixelsSplits);
     }
 
-    private Inverted getInverted(Layout curLayout, IndexEntry indexEntry) {
-        String columnInfo = curLayout.getOrder();
-        String splitInfo = curLayout.getSplits();
-        Splits split = JSON.parseObject(splitInfo, Splits.class);
-        Order order = JSON.parseObject(columnInfo, Order.class);
+    private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
         List<String> columnOrder = order.getColumnOrder();
         Inverted index;
         try {
-            index = new Inverted(columnOrder, PatternBuilder.build(columnOrder, split));
+            index = new Inverted(columnOrder, PatternBuilder.build(columnOrder, splits));
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
             log.info("getInverted error: " + e.getMessage());
