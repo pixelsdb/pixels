@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
@@ -17,6 +18,7 @@ import org.junit.runners.MethodSorters;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 
@@ -36,8 +38,25 @@ public class TestPixelsReaderBasic
     private static final boolean DEBUG = true;
     private long elementSize = 0;
 
-    private void testMetadata()
+    @Test
+    public void testMetadata()
     {
+        String fileName = "hdfs://presto00:9000//pixels/test500G_pixels/201806011652540.pxl";
+        PixelsReader reader;
+        Path path = new Path(fileName);
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+        try {
+            FileSystem fs = FileSystem.get(URI.create(fileName), conf);
+            reader = PixelsReaderImpl.newBuilder()
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
+            List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getRowGroupInfos();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 //        assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
 //        assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
 //        assertEquals(schema, pixelsReader.getFileSchema());

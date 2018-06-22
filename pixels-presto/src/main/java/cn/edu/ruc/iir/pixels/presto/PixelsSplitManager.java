@@ -87,11 +87,13 @@ public class PixelsSplitManager
         String schemaName = tableHandle.getSchemaName();
         String tableName = tableHandle.getTableName();
         List<Layout> layouts;
-        try {
+        try
+        {
             layouts = metadataReader.getDataLayouts(tableHandle.getSchemaName(),
                     tableHandle.getTableName());
         }
-        catch (MetadataException e) {
+        catch (MetadataException e)
+        {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
         }
 
