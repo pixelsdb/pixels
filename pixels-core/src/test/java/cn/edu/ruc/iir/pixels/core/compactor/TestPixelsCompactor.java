@@ -4,7 +4,6 @@ import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
@@ -14,7 +13,6 @@ import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import com.alibaba.fastjson.JSON;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -42,12 +40,12 @@ public class TestPixelsCompactor
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
 
             CompactLayout layout = new CompactLayout(3, 2);
-            layout.addColumnlet(0, 1);
-            layout.addColumnlet(1, 1);
-            layout.addColumnlet(0, 0);
-            layout.addColumnlet(1, 0);
-            layout.addColumnlet(2, 1);
-            layout.addColumnlet(2, 0);
+            layout.append(0, 1);
+            layout.append(1, 1);
+            layout.append(0, 0);
+            layout.append(1, 0);
+            layout.append(2, 1);
+            layout.append(2, 0);
 
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
@@ -72,34 +70,20 @@ public class TestPixelsCompactor
     @Test
     public void testRealCompact () throws MetadataException, IOException
     {
+        // get compact layout
         MetadataService metadataService = new MetadataService("presto00", 18888);
         List<Layout> layouts = metadataService.getLayouts("pixels", "testnull_pixels");
-        System.out.println(layouts.size());
+        System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = layouts.get(0);
-        String orderJson = layout.getOrder();
-        String compactJson = layout.getCompact();
-        Order order = JSON.parseObject(orderJson, Order.class);
-        Compact compact = JSON.parseObject(compactJson, Compact.class);
+        Compact compact = layout.getCompactObject();
+        CompactLayout compactLayout = CompactLayout.fromCompact(compact);
 
-        String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
-        Path path = new Path(filePath);
+        // get input file paths
+        String filePath = "hdfs://presto00:9000/";
         Configuration conf = new Configuration();
         FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-        /*
-        PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                .setFS(fs)
-                .setPath(path)
-                .build();
-        List<String> fieldNames = pixelsReader.getFileSchema().getFieldNames();
-        Map<String, Integer> nameToIdxMap = new HashMap<>();
-        for (int i = 0; i < fieldNames.size(); ++i)
-        {
-            nameToIdxMap.put(fieldNames.get(i), i);
-        }
-
-        //TypeDescription schema = pixelsReader.getFileSchema();
-*/
-        FileStatus[] statuses = fs.listStatus(new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order"));
+        FileStatus[] statuses = fs.listStatus(
+                new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order"));
         List<Path> sourcePaths = new ArrayList<>();
         for (int i = 16; i < 32; ++i)
         {
@@ -107,21 +91,9 @@ public class TestPixelsCompactor
             sourcePaths.add(statuses[i].getPath());
         }
 
-        CompactLayout compactLayout = new CompactLayout(
-                compact.getNumRowGroupInBlock(), compact.getNumColumn());
-        for (String columnletStr : compact.getColumnletOrder())
-        {
-            String[] splits = columnletStr.split(":");
-            //int rowGroupId = Integer.parseInt(splits[0]);
-            //int orderId = Integer.parseInt(splits[1]);
-            //int columnId = nameToIdxMap.get(order.getColumnOrder().get(orderId));
-            int rowGroupId = Integer.parseInt(splits[0]);
-            int columnId = Integer.parseInt(splits[1]);
-            compactLayout.addColumnlet(rowGroupId, columnId);
-        }
-
         long start = System.currentTimeMillis();
 
+        // compact
         PixelsCompactor pixelsCompactor =
                 PixelsCompactor.newBuilder()
                         .setSourcePaths(sourcePaths)
@@ -132,7 +104,6 @@ public class TestPixelsCompactor
                         .setReplication((short) 1)
                         .setBlockPadding(false)
                         .build();
-
         pixelsCompactor.compact();
         pixelsCompactor.close();
 
