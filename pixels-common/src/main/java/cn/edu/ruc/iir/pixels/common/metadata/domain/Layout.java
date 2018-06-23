@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.JSON;
+
 public class Layout
 {
     private int id;
@@ -68,6 +70,11 @@ public class Layout
         return order;
     }
 
+    public Order getOrderObject()
+    {
+        return JSON.parseObject(this.order, Order.class);
+    }
+
     public void setOrder(String order)
     {
         this.order = order;
@@ -88,6 +95,11 @@ public class Layout
         return compact;
     }
 
+    public Compact getCompactObject()
+    {
+        return JSON.parseObject(this.compact, Compact.class);
+    }
+
     public void setCompact(String compact)
     {
         this.compact = compact;
@@ -106,6 +118,11 @@ public class Layout
     public String getSplits()
     {
         return splits;
+    }
+
+    public Splits getSplitsObject()
+    {
+        return JSON.parseObject(this.splits, Splits.class);
     }
 
     public void setSplits(String split)
