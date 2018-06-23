@@ -4,6 +4,7 @@ import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
@@ -79,35 +80,44 @@ public class TestPixelsCompactor
         CompactLayout compactLayout = CompactLayout.fromCompact(compact);
 
         // get input file paths
-        String filePath = "hdfs://presto00:9000/";
         Configuration conf = new Configuration();
-        FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+        FileSystem fs = FileSystem.get(URI.create("hdfs://presto00:9000/"), conf);
         FileStatus[] statuses = fs.listStatus(
                 new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order"));
-        List<Path> sourcePaths = new ArrayList<>();
-        for (int i = 16; i < 32; ++i)
-        {
-            System.out.println(statuses[i].getPath().toString());
-            sourcePaths.add(statuses[i].getPath());
-        }
-
-        long start = System.currentTimeMillis();
 
         // compact
-        PixelsCompactor pixelsCompactor =
-                PixelsCompactor.newBuilder()
-                        .setSourcePaths(sourcePaths)
-                        .setCompactLayout(compactLayout)
-                        .setFS(fs)
-                        .setFilePath(new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_compact/compact.2.pxl"))
-                        .setBlockSize(2l*1024*1024*1024)
-                        .setReplication((short) 1)
-                        .setBlockPadding(false)
-                        .build();
-        pixelsCompactor.compact();
-        pixelsCompactor.close();
+        int NO = 0;
+        for (int i = 0; i < statuses.length; i+=16)
+        {
+            List<Path> sourcePaths = new ArrayList<>();
+            for (int j = 0; j < 16; ++j)
+            {
+                //System.out.println(statuses[i+j].getPath().toString());
+                sourcePaths.add(statuses[i+j].getPath());
+            }
+            long start = System.currentTimeMillis();
 
-        System.out.println(System.currentTimeMillis() - start);
+            String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_compact/" +
+                    NO + "_" +
+                    DateUtil.getCurTime() +
+                    ".compact.pxl";
+            PixelsCompactor pixelsCompactor =
+                    PixelsCompactor.newBuilder()
+                            .setSourcePaths(sourcePaths)
+                            .setCompactLayout(compactLayout)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(2l*1024*1024*1024)
+                            .setReplication((short) 1)
+                            .setBlockPadding(false)
+                            .build();
+            pixelsCompactor.compact();
+            pixelsCompactor.close();
+
+            NO++;
+
+            System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
+        }
     }
 
     @Test
