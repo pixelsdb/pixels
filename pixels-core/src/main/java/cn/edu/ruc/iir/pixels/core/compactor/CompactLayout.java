@@ -11,7 +11,7 @@ public class CompactLayout
     private int columnNumber = 0;
     private List<ColumnletIndex> indices = null;
 
-    public CompactLayout(int rowGroupNumber, int columnNumber)
+    protected CompactLayout(int rowGroupNumber, int columnNumber)
     {
         this.rowGroupNumber = rowGroupNumber;
         this.columnNumber = columnNumber;
@@ -31,7 +31,7 @@ public class CompactLayout
         return layout;
     }
 
-    public void append (int rowGroupId, int columnId)
+    protected void append (int rowGroupId, int columnId)
     {
         this.indices.add(new ColumnletIndex(rowGroupId, columnId));
     }

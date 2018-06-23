@@ -318,9 +318,9 @@ public class PixelsCompactor
     {
         for (int i = 0; i < this.compactLayout.size(); ++i)
         {
-            ColumnletIndex info = this.compactLayout.get(i);
-            int rowGroupId = info.getRowGroupId();
-            int columnId = info.getColumnId();
+            ColumnletIndex index = this.compactLayout.get(i);
+            int rowGroupId = index.getRowGroupId();
+            int columnId = index.getColumnId();
             PixelsProto.ColumnChunkIndex.Builder columnChunkIndexBuilder =
                     this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
                             .getColumnChunkIndexEntriesBuilder(columnId);
