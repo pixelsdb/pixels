@@ -87,7 +87,7 @@ public class TestPixelsCompactor
 
         // compact
         int NO = 0;
-        for (int i = 0; i < statuses.length; i+=16)
+        for (int i = 0; i + 16 < statuses.length; i+=16)
         {
             List<Path> sourcePaths = new ArrayList<>();
             for (int j = 0; j < 16; ++j)
@@ -95,6 +95,7 @@ public class TestPixelsCompactor
                 //System.out.println(statuses[i+j].getPath().toString());
                 sourcePaths.add(statuses[i+j].getPath());
             }
+
             long start = System.currentTimeMillis();
 
             String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_compact/" +

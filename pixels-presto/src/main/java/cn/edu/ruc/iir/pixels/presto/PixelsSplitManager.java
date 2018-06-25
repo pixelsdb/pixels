@@ -132,11 +132,14 @@ public class PixelsSplitManager
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
             // add splits in orderPath
-            fsFactory.listFiles(layout.getOrderPath()).forEach(file -> pixelsSplits.add(
-                    new PixelsSplit(connectorId,
-                            tableHandle.getSchemaName(), tableHandle.getTableName(),
-                            file.toString(), 0, -1,
-                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
+            for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+            {
+                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                        tableHandle.getSchemaName(), tableHandle.getTableName(),
+                        file.toString(), 0, -1,
+                        fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint);
+                pixelsSplits.add(pixelsSplit);
+            }
             // add splits in compactionPath
             int curFileRGIdx;
             for (Path file : fsFactory.listFiles(layout.getCompactPath()))
