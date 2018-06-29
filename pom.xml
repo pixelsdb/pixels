@@ -304,7 +304,6 @@
                 <groupId>org.apache.orc</groupId>
                 <artifactId>orc-core</artifactId>
                 <version>1.4.3</version>
-                <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>net.sourceforge.argparse4j</groupId>
