@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto.split.index;
+package cn.edu.ruc.iir.pixels.presto.split;
 
 
 import cn.edu.ruc.iir.pixels.presto.split.domain.AccessPattern;
