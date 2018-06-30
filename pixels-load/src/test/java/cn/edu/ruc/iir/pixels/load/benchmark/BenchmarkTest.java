@@ -1,6 +1,16 @@
 package cn.edu.ruc.iir.pixels.load.benchmark;
 
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.Dao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -106,7 +116,7 @@ public class BenchmarkTest {
             String[] cols;
             while ((line = schemaReader.readLine()) != null) {
                 cols = line.split("\t");
-                if(cols[1].equalsIgnoreCase("long"))
+                if (cols[1].equalsIgnoreCase("long"))
                     cols[1] = "bigint";
                 ddl_sql.append(cols[0] + " " + cols[1] + ",\n");
             }
@@ -119,13 +129,13 @@ public class BenchmarkTest {
     }
 
     /**
-    * @ClassName: BenchmarkTest
-    * @Title: testInsertSchema
-    * @Description: 105Columns -> load.sql
-    * @param:
-    * @author: tao
-    * @date: 下午10:26 18-5-27
-    */
+     * @ClassName: BenchmarkTest
+     * @Title: testInsertSchema
+     * @Description: 105Columns -> load.sql
+     * @param:
+     * @author: tao
+     * @date: 下午10:26 18-5-27
+     */
     @Test
     public void testInsertSchema() {
         String schemaFilePath = "/home/tao/software/data/pixels/test30G_pixels/105/105_schema.txt";
@@ -139,7 +149,7 @@ public class BenchmarkTest {
             String[] cols;
             while ((line = schemaReader.readLine()) != null) {
                 cols = line.split("\t");
-                if(cols[1].equalsIgnoreCase("long"))
+                if (cols[1].equalsIgnoreCase("long"))
                     cols[1] = "bigint";
                 load_sql.append(cols[0] + ",\n");
             }
@@ -150,4 +160,63 @@ public class BenchmarkTest {
             e.printStackTrace();
         }
     }
+
+    /**
+     * @ClassName: BenchmarkTest
+     * @Title: testGetSchemaByOrder
+     * @Description: 105Columns -> orc_ddl_order.sql
+     * @param:
+     * @author: tao
+     * @date: 下午2:26 18-6-30
+     */
+    @Test
+    public void testGetSchemaByOrder() {
+        Table table = new Table();
+        table.setId(50);
+        ColumnDao columnDao = new ColumnDao();
+        List<Column> columnList = columnDao.getByTable(table);
+        System.out.println(columnList.size());
+        Dao layoutDao = new LayoutDao();
+        Layout layout = (Layout) layoutDao.getById(9);
+        System.out.println(layout.getOrder());
+        Order columnOrder = JSON.parseObject(layout.getOrder(), Order.class);
+        System.out.println(columnOrder.getColumnOrder().size());
+        String ddlFilePath = "/home/tao/software/data/pixels/test30G_pixels/105/orc_ddl_order.sql";
+        try (BufferedWriter ddlWriter = new BufferedWriter(new FileWriter(ddlFilePath))) {
+            StringBuilder ddl_sql = new StringBuilder();
+            String prefix = "CREATE EXTERNAL TABLE testnull_orc\n(\n";
+            String suffix = "\n)\nSTORED AS ORC\n" +
+                    "LOCATION '/pixels/pixels/testnull_orc/v_0_order'\n" +
+                    "TBLPROPERTIES (\"orc.compress\"=\"NONE\")";
+            for (String column : columnOrder.getColumnOrder()) {
+                String type = findTypeByColumn(column, columnList);
+                ddl_sql.append(column + " " + type + ",\n");
+            }
+            String schema = prefix + ddl_sql.substring(0, ddl_sql.length() - 2) + suffix;
+            ddlWriter.write(schema);
+            ddlWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String findTypeByColumn(String column, List<Column> columns) {
+        String type = null;
+        for (Column col : columns) {
+            if (col.getName().equalsIgnoreCase(column)) {
+                type = col.getType();
+                break;
+            }
+        }
+        if (type == null) {
+            try {
+                throw new Exception("Type not find.");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return type;
+    }
+
+
 }
