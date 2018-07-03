@@ -115,7 +115,6 @@ public class PixelsSplitManager
             {
                 log.debug("action not null");
                 int indexVersion = index.getVersion();
-                // todo update
                 if (indexVersion < version) {
                     log.debug("action not null update");
                     index = getInverted(order, splits, indexEntry);

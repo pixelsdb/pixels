@@ -2,12 +2,18 @@ package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,10 +88,17 @@ public class TestHdfs {
                     System.out.println(hostMap.values());
                 }
             }
-
         }
-
     }
 
-
+    @Test
+    public void testListFiles() throws IOException
+    {
+        Configuration configuration = new Configuration();
+        configuration.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        configuration.set("fs.file.impl", LocalFileSystem.class.getName());
+        FileSystem fs = FileSystem.get(configuration);
+        FileStatus[] statuses = fs.listStatus(new Path("hdfs://presto00:9000/"));
+        System.out.println(statuses.length);
+    }
 }
