@@ -109,7 +109,6 @@ public class PixelsSplitManager
             {
                 log.debug("action not null");
                 int indexVersion = index.getVersion();
-                // todo update
                 if (indexVersion < version) {
                     log.debug("action not null update");
                     index = getInverted(order, splits, indexEntry);
@@ -130,8 +129,8 @@ public class PixelsSplitManager
             {
                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                         tableHandle.getSchemaName(), tableHandle.getTableName(),
-                        file.toString(), 0, -1,
-                        fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint);
+                        file.toString(), 0, 1,
+                        fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                 pixelsSplits.add(pixelsSplit);
             }
             // add splits in compactionPath
@@ -144,7 +143,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             file.toString(), curFileRGIdx, splitSize,
-                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint);
+                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                     pixelsSplits.add(pixelsSplit);
                     curFileRGIdx += splitSize;
                 }
