@@ -33,7 +33,7 @@ public class TestPixelsPerformance
                     .setPath(path)
                     .build();
             PixelsReaderOption option = new PixelsReaderOption();
-            String[] cols = {"a", "b", "c", "d", "e", "z"};
+            String[] cols = {"City", "IsMSIdUser"};
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
             option.includeCols(cols);
