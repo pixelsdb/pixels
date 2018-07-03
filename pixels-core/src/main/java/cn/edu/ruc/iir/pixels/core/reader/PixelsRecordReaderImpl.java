@@ -281,7 +281,7 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
-        for (int i = 0; i < includedRGs.length; i++)
+        for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
             PixelsProto.RowGroupInformation rowGroupInformation =

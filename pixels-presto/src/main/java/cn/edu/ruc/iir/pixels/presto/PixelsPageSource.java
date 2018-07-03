@@ -29,7 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_BAD_DATA;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_READER_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_WRITER_CLOSE_ERROR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -73,11 +76,13 @@ class PixelsPageSource implements ConnectorPageSource {
         List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
             PixelsColumnHandle column = entry.getKey();
-            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + column.getOrdinalPosition());
+            String columnName = column.getColumnName();
+            int columnOrdinal = split.getOrder().indexOf(columnName);
+            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,
-                            column.getOrdinalPosition(),
+                            columnOrdinal,
                             column.getColumnType()));
         }
         PixelsPredicate predicate = new TupleDomainPixelsPredicate<>(split.getConstraint(), columnReferences);

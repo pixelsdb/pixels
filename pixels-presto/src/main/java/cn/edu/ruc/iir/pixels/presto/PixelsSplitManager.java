@@ -19,19 +19,13 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
-import cn.edu.ruc.iir.pixels.presto.split.builder.PatternBuilder;
+import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
+import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
+import cn.edu.ruc.iir.pixels.presto.split.Inverted;
 import cn.edu.ruc.iir.pixels.presto.split.domain.AccessPattern;
 import cn.edu.ruc.iir.pixels.presto.split.domain.ColumnSet;
-import cn.edu.ruc.iir.pixels.presto.split.index.IndexEntry;
-import cn.edu.ruc.iir.pixels.presto.split.index.IndexFactory;
-import cn.edu.ruc.iir.pixels.presto.split.index.Inverted;
 import com.alibaba.fastjson.JSON;
-import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.ConnectorSplit;
-import com.facebook.presto.spi.ConnectorSplitSource;
-import com.facebook.presto.spi.ConnectorTableLayoutHandle;
-import com.facebook.presto.spi.FixedSplitSource;
-import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -115,7 +109,6 @@ public class PixelsSplitManager
             {
                 log.debug("action not null");
                 int indexVersion = index.getVersion();
-                // todo update
                 if (indexVersion < version) {
                     log.debug("action not null update");
                     index = getInverted(order, splits, indexEntry);
@@ -132,11 +125,14 @@ public class PixelsSplitManager
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
             // add splits in orderPath
-            fsFactory.listFiles(layout.getOrderPath()).forEach(file -> pixelsSplits.add(
-                    new PixelsSplit(connectorId,
-                            tableHandle.getSchemaName(), tableHandle.getTableName(),
-                            file.toString(), 0, -1,
-                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint)));
+            for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+            {
+                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                        tableHandle.getSchemaName(), tableHandle.getTableName(),
+                        file.toString(), 0, 1,
+                        fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                pixelsSplits.add(pixelsSplit);
+            }
             // add splits in compactionPath
             int curFileRGIdx;
             for (Path file : fsFactory.listFiles(layout.getCompactPath()))
@@ -147,7 +143,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             file.toString(), curFileRGIdx, splitSize,
-                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), constraint);
+                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                     pixelsSplits.add(pixelsSplit);
                     curFileRGIdx += splitSize;
                 }
@@ -163,7 +159,7 @@ public class PixelsSplitManager
         List<String> columnOrder = order.getColumnOrder();
         Inverted index;
         try {
-            index = new Inverted(columnOrder, PatternBuilder.build(columnOrder, splits));
+            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits));
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
             log.info("getInverted error: " + e.getMessage());
