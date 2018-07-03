@@ -1,8 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto.split;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public class ColumnSet
@@ -33,9 +31,9 @@ public class ColumnSet
         return this.columns.size();
     }
 
-    public List<String> toArrayList()
+    public Set<String> getColumns()
     {
-        return new ArrayList<>(this.columns);
+        return this.columns;
     }
 
     @Override
@@ -54,6 +52,18 @@ public class ColumnSet
         if (o instanceof ColumnSet)
         {
             ColumnSet set = (ColumnSet) o;
+            if (this.columns == null || set.columns == null)
+            {
+                if (this.columns == set.columns)
+                {
+                    return true;
+                }
+                return false;
+            }
+            if (this.columns.size() != set.columns.size())
+            {
+                return false;
+            }
             for (String column : set.columns)
             {
                 if (!this.columns.contains(column))
@@ -81,15 +91,5 @@ public class ColumnSet
             builder.append(column).append(',');
         }
         return builder.substring(0, builder.length() - 1);
-    }
-
-    public static ColumnSet buildColumnSet(List<String> columnOrder)
-    {
-        ColumnSet columnSet = new ColumnSet();
-        for (String column : columnOrder)
-        {
-            columnSet.addColumn(column);
-        }
-        return columnSet;
     }
 }

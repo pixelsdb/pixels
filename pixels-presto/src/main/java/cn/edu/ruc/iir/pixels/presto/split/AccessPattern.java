@@ -10,22 +10,27 @@ import java.util.*;
 public class AccessPattern
 {
     // it seems that this.pattern can be a Set.
-    private List<String> pattern = new ArrayList<>();
+    private ColumnSet columnSet = null;
     private int splitSize;
+
+    public AccessPattern()
+    {
+        this.columnSet = new ColumnSet();
+    }
 
     public void addColumn(String column)
     {
-        this.pattern.add(column);
+        this.columnSet.addColumn(column);
     }
 
     public int size()
     {
-        return this.pattern.size();
+        return this.columnSet.size();
     }
 
     public ColumnSet getColumnSet()
     {
-        return new ColumnSet(new HashSet<>(this.pattern));
+        return this.columnSet;
     }
 
     public void setSplitSize(int splitSize)
@@ -40,14 +45,14 @@ public class AccessPattern
 
     public boolean contaiansColumn(String column)
     {
-        return this.pattern.contains(column);
+        return this.columnSet.contains(column);
     }
 
     @Override
     public String toString()
     {
         StringBuilder builder = new StringBuilder();
-        for (String column : this.pattern)
+        for (String column : this.columnSet.getColumns())
         {
             builder.append(",").append(column);
         }

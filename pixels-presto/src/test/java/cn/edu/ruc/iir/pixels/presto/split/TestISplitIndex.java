@@ -27,8 +27,30 @@ public class TestISplitIndex
         BufferedReader workloadReader = new BufferedReader(
                 new FileReader("/home/hank/dev/idea-projects/pixels/pixels-presto/target/classes/105_workload.text")
         );
-        //Index index = new Inverted();
-        //IndexFactory.Instance().cacheIndex(entry, null);
-        System.out.println(this.getClass().getResource("/").getPath());
+        List<AccessPattern> accessPatterns = new ArrayList<>();
+        int i = 0;
+        while ((line = workloadReader.readLine()) != null)
+        {
+            String[] columns = line.split("\t")[2].split(",");
+            AccessPattern accessPattern = new AccessPattern();
+            for (String column : columns)
+            {
+                accessPattern.addColumn(column);
+            }
+            accessPattern.setSplitSize(i++);
+            accessPatterns.add(accessPattern);
+        }
+        workloadReader.close();
+        Index index = new Inverted(columnOrder, accessPatterns);
+        IndexFactory.Instance().cacheIndex(entry, index);
+        index = IndexFactory.Instance().getIndex(new IndexEntry("test", "t1"));
+        ColumnSet columnSet = new ColumnSet();
+        String[] columns = {"QueryDate_","Market","IsBotVNext","IsNormalQuery","Vertical","AppInfoServerName","AppInfoClientName","QueryDate_","TrafficCount"};
+        for (String column : columns)
+        {
+            columnSet.addColumn(column);
+        }
+        System.out.println(index.search(columnSet).toString());
+
     }
 }

@@ -21,10 +21,9 @@ public class Inverted implements Index
     {
         this.columnOrder = new ArrayList<>(columnOrder);
         this.queryAccessPatterns = new ArrayList<>(patterns);
-        ColumnSet fullColumnSet = ColumnSet.buildColumnSet(this.columnOrder);
-        this.bitMapIndex = new HashMap<>(fullColumnSet.size());
+        this.bitMapIndex = new HashMap<>(this.columnOrder.size());
 
-        for (String column : fullColumnSet.toArrayList())
+        for (String column : this.columnOrder)
         {
             BitSet bitMap = new BitSet(this.queryAccessPatterns.size());
             for (int i = 0; i < this.queryAccessPatterns.size(); ++i)
@@ -41,11 +40,10 @@ public class Inverted implements Index
     @Override
     public AccessPattern search(ColumnSet columnSet)
     {
-        List<String> columns = columnSet.toArrayList();
         List<BitSet> bitMaps = new ArrayList<>();
         BitSet and = new BitSet(this.queryAccessPatterns.size());
         and.set(0, this.queryAccessPatterns.size(), true);
-        for (String column : columns)
+        for (String column : columnSet.getColumns())
         {
             BitSet bitMap = this.bitMapIndex.get(column);
             bitMaps.add(bitMap);
@@ -57,13 +55,13 @@ public class Inverted implements Index
         {
             // no exact access pattern found.
             // look for the minimum difference in size
-            int columnSize = columnSet.size();
+            int numColumns = columnSet.size();
             int minPatternSize = Integer.MAX_VALUE;
             int temp = 0;
 
             for (int i = 0; i < this.queryAccessPatterns.size(); ++i)
             {
-                temp = Math.abs(this.queryAccessPatterns.get(i).size() - columnSize);
+                temp = Math.abs(this.queryAccessPatterns.get(i).size() - numColumns);
                 if (temp < minPatternSize)
                 {
                     bestPattern = this.queryAccessPatterns.get(i);
