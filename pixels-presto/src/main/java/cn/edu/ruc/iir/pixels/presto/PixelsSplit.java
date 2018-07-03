@@ -45,6 +45,7 @@ public class PixelsSplit
     private final long start;
     private final long len;
     private final List<HostAddress> addresses;
+    private final List<String> order;
     private final TupleDomain<PixelsColumnHandle> constraint;
 
     @JsonCreator
@@ -56,6 +57,7 @@ public class PixelsSplit
             @JsonProperty("start") long start,
             @JsonProperty("len") long len,
             @JsonProperty("addresses") List<HostAddress> addresses,
+            @JsonProperty("order") List<String> order,
             @JsonProperty("constraint") TupleDomain<PixelsColumnHandle> constraint) {
         this.schemaName = requireNonNull(schemaName, "schema name is null");
         this.connectorId = requireNonNull(connectorId, "connector id is null");
@@ -64,6 +66,7 @@ public class PixelsSplit
         this.start = start;
         this.len = len;
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
+        this.order = requireNonNull(order, "order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         log.debug("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
     }
@@ -116,6 +119,12 @@ public class PixelsSplit
     @Override
     public List<HostAddress> getAddresses() {
         return addresses;
+    }
+
+    @JsonProperty
+    public List<String> getOrder()
+    {
+        return order;
     }
 
     @Override
