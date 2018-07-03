@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto.split.domain;
+package cn.edu.ruc.iir.pixels.presto.split;
 
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.SplitPattern;
@@ -7,50 +7,53 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import java.io.IOException;
 import java.util.*;
 
-public class AccessPattern {
+public class AccessPattern
+{
     // it seems that this.pattern can be a Set.
-    private List<String> pattern = null;
+    private ColumnSet columnSet = null;
     private int splitSize;
 
-    public AccessPattern() {
-        this.pattern = new ArrayList<>();
+    public AccessPattern()
+    {
+        this.columnSet = new ColumnSet();
     }
 
-    public AccessPattern(List<String> pattern) {
-        this();
-        for (String column : this.pattern) {
-            this.addColumn(column);
-        }
+    public void addColumn(String column)
+    {
+        this.columnSet.addColumn(column);
     }
 
-    public void addColumn(String column) {
-        this.pattern.add(column);
+    public int size()
+    {
+        return this.columnSet.size();
     }
 
-    public int size() {
-        return this.pattern.size();
+    public ColumnSet getColumnSet()
+    {
+        return this.columnSet;
     }
 
-    public ColumnSet getColumnSet() {
-        return new ColumnSet(new HashSet<>(this.pattern));
-    }
-
-    public void setSplitSize(int splitSize) {
+    public void setSplitSize(int splitSize)
+    {
         this.splitSize = splitSize;
     }
 
-    public int getSplitSize() {
+    public int getSplitSize()
+    {
         return splitSize;
     }
 
-    public boolean contaiansColumn(String column) {
-        return this.pattern.contains(column);
+    public boolean contaiansColumn(String column)
+    {
+        return this.columnSet.contains(column);
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder builder = new StringBuilder();
-        for (String column : this.pattern) {
+        for (String column : this.columnSet.getColumns())
+        {
             builder.append(",").append(column);
         }
         return "splitSize: " + splitSize + "\npattern: " + builder.substring(1);
@@ -64,11 +67,13 @@ public class AccessPattern {
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (SplitPattern splitPattern : splitPatterns) {
+        for (SplitPattern splitPattern : splitPatterns)
+        {
             accessedColumns = splitPattern.getAccessedColumns();
 
             AccessPattern pattern = new AccessPattern();
-            for (int column : accessedColumns) {
+            for (int column : accessedColumns)
+            {
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
@@ -76,12 +81,12 @@ public class AccessPattern {
 
             ColumnSet columnSet = pattern.getColumnSet();
 
-            if (!existingColumnSets.contains(columnSet)) {
+            if (!existingColumnSets.contains(columnSet))
+            {
                 patterns.add(pattern);
                 existingColumnSets.add(columnSet);
             }
         }
         return patterns;
-
     }
 }
