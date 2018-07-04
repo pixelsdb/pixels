@@ -93,5 +93,14 @@ public class TestByteBuf
         System.out.println(a);
         System.out.println(b);
     }
+
+    @Test
+    public void testStringNullPointerException()
+    {
+        byte[] content = new byte[10];
+        content[0] = 1;
+        String v = new String(content, 0, 0);
+        System.out.println(v);
+    }
 }
 

@@ -26,14 +26,14 @@ public class TestEvaluator {
      */
     @Test
     public void testPrestoEvaluator() {
-        String testEvalFuc = "orc"; // pixels, orc
+        String testEvalFuc = "pixels"; // pixels, orc
         String testEvalCsv = testEvalFuc + "_duration.csv";
-        String tableName = "test500g_" + testEvalFuc;
+        String tableName = "testnull_" + testEvalFuc;
 
 //        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/lite_1000c_workload.txt";
 //        String logDir = "/home/tao/software/data/pixels/test30G_pixels/1000/";
-        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/105/lite_105c_workload.txt";
-        String logDir = "/home/tao/software/data/pixels/test30G_pixels/105/";
+        String workloadFilePath = "/Users/Jelly/Developer/pixels/pixels-presto/src/main/resources/105_workload.text";
+        String logDir = "/Users/Jelly/Developer/pixels/pixels-presto/src/test/";
 
         ConfigFactory instance = ConfigFactory.Instance();
         Properties properties = new Properties();
