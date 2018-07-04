@@ -193,12 +193,15 @@ class PixelsPageSource implements ConnectorPageSource {
                         byte[] vectorContent = new byte[vectorContentLen];
                         int[] vectorOffsets = new int[batchSize+1];
                         int curVectorOffset = 0;
+                        int index = 0;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            int elementLen = scv.lens[i];
-                            System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
-                            vectorOffsets[i] = curVectorOffset;
-                            curVectorOffset += elementLen;
+                            int isNullValue = scv.isNull[i] ? 0 : 1;
+                            int elementLen = scv.lens[index];
+                            System.arraycopy(scv.vector[index], scv.start[index], vectorContent, curVectorOffset, elementLen);
+                            vectorOffsets[index] = curVectorOffset;
+                            curVectorOffset += isNullValue * elementLen;
+                            index += isNullValue;
                         }
                         vectorOffsets[batchSize] = vectorContentLen;
                         blocks[fieldId] = new VariableWidthBlock(batchSize,
