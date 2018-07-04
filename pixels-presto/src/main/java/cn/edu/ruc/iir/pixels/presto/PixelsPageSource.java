@@ -195,10 +195,13 @@ class PixelsPageSource implements ConnectorPageSource {
                         int curVectorOffset = 0;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            int elementLen = scv.lens[i];
-                            System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
-                            vectorOffsets[i] = curVectorOffset;
-                            curVectorOffset += elementLen;
+                            if (!scv.isNull[i])
+                            {
+                                int elementLen = scv.lens[i];
+                                System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
+                                vectorOffsets[i] = curVectorOffset;
+                                curVectorOffset += elementLen;
+                            }
                         }
                         vectorOffsets[batchSize] = vectorContentLen;
                         blocks[fieldId] = new VariableWidthBlock(batchSize,
