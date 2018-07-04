@@ -74,6 +74,7 @@ public class BooleanColumnReader
             if (hasNull && isNull[isNullBitIndex] == 1)
             {
                 columnVector.isNull[i + vectorIndex] = true;
+                columnVector.noNulls = false;
             }
             else
             {

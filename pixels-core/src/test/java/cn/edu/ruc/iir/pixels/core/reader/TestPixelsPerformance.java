@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -28,33 +29,41 @@ public class TestPixelsPerformance
         {
             Path path = new Path(filePath);
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            PixelsReader reader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(path)
-                    .build();
-            PixelsReaderOption option = new PixelsReaderOption();
-            String[] cols = {"City", "IsMSIdUser"};
-            option.skipCorruptRecords(true);
-            option.tolerantSchemaEvolution(true);
-            option.includeCols(cols);
-            PixelsRecordReader recordReader = reader.read(option);
-            int batchSize = 10000;
-            VectorizedRowBatch rowBatch;
-            int num = 0;
-            long start = System.currentTimeMillis();
-            while (true)
+            FileStatus[] fileStatuses = fs.listStatus(path);
+            PixelsReader reader;
+            for (FileStatus fileStatus : fileStatuses)
             {
-                rowBatch = recordReader.readBatch(batchSize);
-                if (rowBatch.endOfFile)
+                reader = PixelsReaderImpl.newBuilder()
+                        .setFS(fs)
+                        .setPath(fileStatus.getPath())
+                        .build();
+                PixelsReaderOption option = new PixelsReaderOption();
+                String[] cols = {"RawQuery"};
+                option.skipCorruptRecords(true);
+                option.tolerantSchemaEvolution(true);
+                option.includeCols(cols);
+                PixelsRecordReader recordReader = reader.read(option);
+                int batchSize = 10000;
+                VectorizedRowBatch rowBatch;
+                int len = 0;
+                int num = 0;
+                long start = System.currentTimeMillis();
+                while (true)
                 {
+                    rowBatch = recordReader.readBatch(batchSize);
+                    String result = rowBatch.toString();
+                    len += result.length();
+                    if (rowBatch.endOfFile)
+                    {
+                        num += rowBatch.size;
+                        break;
+                    }
                     num += rowBatch.size;
-                    break;
                 }
-                num += rowBatch.size;
+                long end = System.currentTimeMillis();
+                reader.close();
+                System.out.println("Path: " + fileStatus.getPath() + ", cost: " + (end - start) + ", len: " + len);
             }
-            long end = System.currentTimeMillis();
-            reader.close();
-            System.out.println("Num: " + num + ", cost: " + (end - start));
         }
         catch (IOException e)
         {

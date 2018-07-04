@@ -92,6 +92,7 @@ public class StringColumnReader
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
+                    columnVector.noNulls = false;
                 }
                 else
                 {
@@ -140,6 +141,7 @@ public class StringColumnReader
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
+                    columnVector.noNulls = false;
                 }
                 else
                 {

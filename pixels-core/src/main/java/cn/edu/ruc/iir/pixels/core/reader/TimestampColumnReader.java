@@ -87,6 +87,7 @@ public class TimestampColumnReader
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
+                    columnVector.noNulls = false;
                 }
                 else
                 {
@@ -121,6 +122,7 @@ public class TimestampColumnReader
                 if (hasNull && isNull[isNullBitIndex] == 1)
                 {
                     columnVector.isNull[i + vectorIndex] = true;
+                    columnVector.noNulls = false;
                 }
                 else
                 {
