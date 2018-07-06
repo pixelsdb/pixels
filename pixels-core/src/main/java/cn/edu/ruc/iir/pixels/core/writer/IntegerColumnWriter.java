@@ -58,13 +58,15 @@ public class IntegerColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPartLength; i++)
         {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
-                curPixelVector[curPixelEleIndex++] = values[i + curPartOffset];
+                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -75,7 +77,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
     void newPixel() throws IOException
     {
         // update stats
-        for (int i = 0; i < curPixelEleIndex; i++)
+        for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
@@ -83,25 +85,25 @@ public class IntegerColumnWriter extends BaseColumnWriter
         // write out current pixel vector
         if (isEncoding)
         {
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         else
         {
             ByteBuffer curVecPartitionBuffer;
             if (isLong)
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleIndex * Long.BYTES + 1);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES + 1);
                 curVecPartitionBuffer.put((byte) 1);
-                for (int i = 0; i < curPixelEleIndex; i++)
+                for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
                 }
             }
             else
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleIndex * Integer.BYTES + 1);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + 1);
                 curVecPartitionBuffer.put((byte) 0);
-                for (int i = 0; i < curPixelEleIndex; i++)
+                for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);
                 }

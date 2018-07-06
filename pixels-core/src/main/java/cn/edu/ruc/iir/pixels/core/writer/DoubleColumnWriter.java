@@ -34,6 +34,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
             if (vector.isNull[i])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {

@@ -50,13 +50,15 @@ public class BooleanColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPartLength; i++)
         {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
-                curPixelVector[curPixelEleIndex++] = values[i + curPartOffset];
+                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -66,12 +68,12 @@ public class BooleanColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleIndex; i++)
+        for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateBoolean(curPixelVector[i] != 0, 1);
         }
 
-        outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelEleIndex));
+        outputStream.write(BitUtils.bitWiseCompact(curPixelVector, curPixelVectorIndex));
 
         super.newPixel();
     }

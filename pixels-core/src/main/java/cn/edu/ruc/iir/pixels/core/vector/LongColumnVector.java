@@ -41,8 +41,12 @@ public class LongColumnVector extends ColumnVector
     @Override
     public void add(String value)
     {
-        Long v = Long.parseLong(value);
-        add(v);
+        switch (value.toLowerCase())
+        {
+            case "true": add(1); break;
+            case "false": add(0); break;
+            default: add(Long.parseLong(value)); break;
+        }
     }
 
     @Override

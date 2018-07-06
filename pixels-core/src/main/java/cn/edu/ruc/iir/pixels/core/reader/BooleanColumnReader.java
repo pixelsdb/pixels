@@ -59,12 +59,13 @@ public class BooleanColumnReader
             {
                 int pixelId = elementIndex / pixelStride;
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                // skip padding bits
+                bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
                 if (hasNull && isNullBitIndex > 0)
                 {
                     isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
-                bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
             }
             if (hasNull && isNullBitIndex >= 8)
             {

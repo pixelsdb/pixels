@@ -13,32 +13,30 @@ import java.util.Properties;
  * @Description: Test PrestoEvaluator
  * @author: tao
  * @date: Create in 2018-05-24 14:21
+ * java -jar pixels-evaluator.jar /home/presto/opt/pixels/105_workload.text /home/presto/opt/pixels/ /home/presto/opt/presto-server/sbin/drop-caches.sh
  **/
 public class TestEvaluator {
 
-    /**
-     * @ClassName: TestEvaluator
-     * @Title: testPrestoEvaluator
-     * @Description:
-     * @param: workloadFilePath = "/home/tao/software/station/Workplace/data_template/workload.txt"
-     * @author: tao
-     * @date: 上午9:29 18-5-28
-     */
-    @Test
-    public void testPrestoEvaluator() {
+    // args: workload_file_path log_dir command
+    public static void main(String[] args)
+    {
+        String workloadFilePath = args[0];
+        String logDir = args[1];
+        String command = args[2];
+
+        TestEvaluator testEvaluator = new TestEvaluator();
+        testEvaluator.testPrestoEvaluator(workloadFilePath, logDir, command);
+    }
+
+    private void testPrestoEvaluator(String workloadFilePath, String logDir, String command)
+    {
         String testEvalFuc = "pixels"; // pixels, orc
         String testEvalCsv = testEvalFuc + "_duration.csv";
         String tableName = "testnull_" + testEvalFuc;
 
-//        String workloadFilePath = "/home/tao/software/data/pixels/test30G_pixels/lite_1000c_workload.txt";
-//        String logDir = "/home/tao/software/data/pixels/test30G_pixels/1000/";
-        String workloadFilePath = "/Users/Jelly/Developer/pixels/pixels-presto/src/main/resources/105_workload.text";
-        String logDir = "/Users/Jelly/Developer/pixels/pixels-presto/src/test/";
-
         ConfigFactory instance = ConfigFactory.Instance();
         Properties properties = new Properties();
 //        String user = instance.getProperty("presto.user");
-        String user = testEvalFuc;
         String password = instance.getProperty("presto.password");
         String ssl = instance.getProperty("presto.ssl");
         String jdbc = instance.getProperty("presto.pixels.jdbc.url");
@@ -63,7 +61,7 @@ public class TestEvaluator {
             String[] lines;
             while ((line = workloadReader.readLine()) != null) {
                 lines = line.split("\t");
-                properties.setProperty("user", user + "_" + lines[0]);
+                properties.setProperty("user", testEvalFuc + "_" + lines[0]);
 //                columns = lines[2];
                 orderByColumn = getOrderByCol(lines[2]);
                 long cost = PrestoEvaluator.execute(jdbc, properties, tableName, lines[2], orderByColumn);
@@ -73,21 +71,17 @@ public class TestEvaluator {
                     timeWriter.flush();
                     System.out.println(i);
                 }
+                ProcessBuilder processBuilder = new ProcessBuilder(command);
+                Process process = processBuilder.start();
+                process.waitFor();
+                Thread.sleep(1000);
             }
             timeWriter.flush();
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * @ClassName: TestEvaluator
-     * @Title: getOrderByCol
-     * @Description:
-     * @param:
-     * @author: tao
-     * @date: 上午9:58 18-5-28
-     */
     public String getOrderByCol(String columns) {
         String[] cols = columns.split(",");
         int index = 0;

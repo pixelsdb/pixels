@@ -46,9 +46,11 @@ public class BinaryColumnWriter extends BaseColumnWriter
             throws IOException
     {
         for (int i = 0; i < curPartLength; i++) {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
@@ -56,7 +58,6 @@ public class BinaryColumnWriter extends BaseColumnWriter
                 outputStream.write(bytes.length);
                 outputStream.write(bytes);
                 pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
-                curPixelEleIndex++;
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
