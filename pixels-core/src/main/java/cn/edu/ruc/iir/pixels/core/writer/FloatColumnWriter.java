@@ -34,6 +34,7 @@ public class FloatColumnWriter extends BaseColumnWriter
             if (columnVector.isNull[i])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {

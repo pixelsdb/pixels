@@ -54,14 +54,15 @@ public class ByteColumnWriter extends BaseColumnWriter
     private void writeCurPartByte(LongColumnVector columnVector, byte[] bvalues, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++) {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
-                curPixelVector[curPixelEleIndex] = bvalues[i + curPartOffset];
-                curPixelEleIndex++;
+                curPixelVector[curPixelVectorIndex++] = bvalues[i + curPartOffset];
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -71,16 +72,16 @@ public class ByteColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleIndex; i++)
+        for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
         if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         else {
-            outputStream.write(curPixelVector, 0, curPixelEleIndex);
+            outputStream.write(curPixelVector, 0, curPixelVectorIndex);
         }
 
         super.newPixel();

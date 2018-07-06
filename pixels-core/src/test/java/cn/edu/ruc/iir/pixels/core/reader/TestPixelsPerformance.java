@@ -24,6 +24,7 @@ public class TestPixelsPerformance
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", LocalFileSystem.class.getName());
+        Path currentPath = new Path(filePath);
 
         try
         {
@@ -33,12 +34,14 @@ public class TestPixelsPerformance
             PixelsReader reader;
             for (FileStatus fileStatus : fileStatuses)
             {
+                currentPath = fileStatus.getPath();
                 reader = PixelsReaderImpl.newBuilder()
                         .setFS(fs)
-                        .setPath(fileStatus.getPath())
+                        .setPath(currentPath)
                         .build();
                 PixelsReaderOption option = new PixelsReaderOption();
-                String[] cols = {"RawQuery"};
+                String[] cols = {"UserIsStable", "UserIsCrossMarket"};
+//                String[] cols = {"IsBotVNext"};
                 option.skipCorruptRecords(true);
                 option.tolerantSchemaEvolution(true);
                 option.includeCols(cols);
@@ -67,6 +70,7 @@ public class TestPixelsPerformance
         }
         catch (IOException e)
         {
+            System.out.println("Err path: " + currentPath.toString());
             e.printStackTrace();
         }
     }

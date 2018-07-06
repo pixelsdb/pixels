@@ -96,16 +96,17 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPartLength; i++)
         {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
-                curPixelEleIndex++;
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -116,13 +117,15 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPartLength; i++)
         {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
-                curPixelVector[curPixelEleIndex++] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                curPixelVector[curPixelVectorIndex++] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
             }
         }
@@ -135,7 +138,7 @@ public class StringColumnWriter extends BaseColumnWriter
     {
         if (currentUseDictionaryEncoding) {
             // for dictionary encoding. run length encode again.
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleIndex));
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
         // else ignore outputStream
 

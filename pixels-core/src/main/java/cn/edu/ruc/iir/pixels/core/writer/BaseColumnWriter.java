@@ -30,6 +30,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
 
     int curPixelEleIndex = 0;                  // index of elements in previous vector
+    int curPixelVectorIndex = 0;               // index of the element to write in the current vector
     int curPixelIsNullIndex = 0;               // index of isNull in previous vector
 
     Encoder encoder;
@@ -132,6 +133,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
         curPixelPosition = outputStream.size();
         // set current pixel element count to 0 for the next batch pixel writing
         curPixelEleIndex = 0;
+        curPixelVectorIndex = 0;
         curPixelIsNullIndex = 0;
         // update column chunk stat
         columnChunkStatRecorder.merge(pixelStatRecorder);

@@ -53,13 +53,15 @@ public class TimestampColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPartLength; i++)
         {
+            curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
+                pixelStatRecorder.increment();
             }
             else
             {
-                curPixelVector[curPixelEleIndex++] = values[i + curPartOffset];
+                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -69,20 +71,20 @@ public class TimestampColumnWriter extends BaseColumnWriter
     @Override
     public void newPixel() throws IOException
     {
-        for (int i = 0; i < curPixelEleIndex; i++)
+        for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateTimestamp(curPixelVector[i]);
         }
 
         if (isEncoding) {
-            long[] values = new long[curPixelEleIndex];
-            System.arraycopy(curPixelVector, 0, values, 0, curPixelEleIndex);
+            long[] values = new long[curPixelVectorIndex];
+            System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
         }
         else {
             ByteBuffer curVecPartitionBuffer =
-                    ByteBuffer.allocate(curPixelEleIndex * Long.BYTES);
-            for (int i = 0; i < curPixelEleIndex; i++)
+                    ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+            for (int i = 0; i < curPixelVectorIndex; i++)
             {
                 curVecPartitionBuffer.putLong(curPixelVector[i]);
             }
