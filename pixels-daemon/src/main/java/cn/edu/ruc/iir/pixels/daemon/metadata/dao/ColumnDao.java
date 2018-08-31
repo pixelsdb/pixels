@@ -104,4 +104,40 @@ public class ColumnDao implements Dao<Column>
 
         return false;
     }
+
+    public int insertBatch (List<Column> columns)
+    {
+        StringBuilder sql = new StringBuilder("INSERT INTO COLS (COL_NAME,COL_TYPE,COL_SIZE,TBLS_TBL_ID)" +
+                "VALUES ");
+        for (Column column : columns)
+        {
+            sql.append("('").append(column.getName()).append("','").append(column.getType())
+                    .append("',").append(column.getSize()).append(",").append(column.getTable().getId()).append("),");
+        }
+        sql.deleteCharAt(sql.length()-1);
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            return st.executeUpdate(sql.toString());
+        } catch (SQLException e)
+        {
+            log.error("insertBatch in ColumnDao", e);
+        }
+        return 0;
+    }
+
+    public boolean deleteByTable (Table table)
+    {
+        Connection conn = db.getConnection();
+        String sql = "DELETE FROM COLS WHERE TBLS_TBL_ID=?";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setInt(1, table.getId());
+            return pst.execute();
+        } catch (SQLException e)
+        {
+            log.error("delete in ColumnDao", e);
+        }
+        return false;
+    }
 }

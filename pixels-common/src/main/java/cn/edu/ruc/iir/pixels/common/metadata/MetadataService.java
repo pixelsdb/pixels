@@ -129,4 +129,64 @@ public class MetadataService
         }
         return schemas != null ? schemas : new ArrayList<>();
     }
+
+    public boolean createSchema (String schemaName) throws MetadataException
+    {
+        return createOrDropSchema(schemaName, true);
+    }
+
+    public boolean dropSchema (String schemaName) throws MetadataException
+    {
+        return createOrDropSchema(schemaName, false);
+    }
+
+    private boolean createOrDropSchema (String schemaName, boolean create) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        String token = UUID.randomUUID().toString();
+        ReqParams params;
+        if (create)
+        {
+            params = new ReqParams(Action.createSchema.toString());
+        }
+        else
+        {
+            params = new ReqParams(Action.dropSchema.toString());
+        }
+        params.setParam("schemaName", schemaName);
+        MetadataClient client = new MetadataClient(params, token);
+        try
+        {
+            client.connect(port, host);
+            while (true)
+            {
+                String res = client.getResponse().get(token);
+                if (res != null && res.equals("success"))
+                {
+                    return true;
+                }
+                else if (res != null && !res.equals("success"))
+                {
+                    break;
+                }
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("can not create schema in metadata", e);
+        }
+
+        return false;
+    }
+
+    public boolean createTable (String schemaName, String tableName, List<Column> columns)
+    {
+        //TODO: to be implemented...
+        return false;
+    }
+
+    public boolean dropTable (String schemaName, String tableName)
+    {
+        //TODO: to be implemented...
+        return false;
+    }
 }
