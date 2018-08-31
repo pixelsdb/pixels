@@ -34,7 +34,6 @@ public class TableDao implements Dao<Table>
                 table.setSchema(schemaModel.getById(rs.getInt("DBS_DB_ID")));
                 return table;
             }
-
         } catch (SQLException e)
         {
             log.error("getById in TableDao", e);
@@ -195,6 +194,30 @@ public class TableDao implements Dao<Table>
         } catch (SQLException e)
         {
             log.error("insert in TableDao", e);
+        }
+        return false;
+    }
+
+    /**
+     * We use cascade delete and cascade update in the metadata database.
+     * If you delete a table by this method, all the layouts and columns of the table
+     * will be deleted.
+     * @param name
+     * @param schema
+     * @return
+     */
+    public boolean deleteByNameAndSchema (String name, Schema schema)
+    {
+        Connection conn = db.getConnection();
+        String sql = "DELETE FROM TBLS WHERE TBL_NAME=? AND DBS_DB_ID=?";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setString(1, name);
+            pst.setInt(2, schema.getId());
+            return pst.execute();
+        } catch (SQLException e)
+        {
+            log.error("delete in TableDao", e);
         }
         return false;
     }

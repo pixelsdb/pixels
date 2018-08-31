@@ -72,6 +72,42 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                 res = JSON.toJSONString(columnList);
                 break;
             }
+            case "createSchema":
+            {
+                Schema schema = new Schema();
+                schema.setName(params.getParam("schemaName"));
+                schema.setDesc("This schema is created by pixels-daemon");
+                schemaDao.save(schema);
+                res = "success";
+                break;
+            }
+            case "dropSchema":
+            {
+                schemaDao.deleteByName(params.getParam("schemaName"));
+                res = "success";
+                break;
+            }
+            case "createTable":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                Table table = new Table();
+                table.setName(params.getParam("tableName"));
+                table.setSchema(schema);
+                table.setType("user");
+                tableDao.save(table);
+                String columnsJson = params.getParam("columns");
+                List<Column> columns = JSON.parseArray(columnsJson, Column.class);
+                columnDao.insertBatch(columns);
+                res = "success";
+                break;
+            }
+            case "dropTable":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemName"));
+                tableDao.deleteByNameAndSchema(params.getParam("tableName"), schema);
+                res = "success";
+                break;
+            }
             default:
             {
                 res = "action default";
