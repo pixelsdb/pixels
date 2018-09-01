@@ -208,7 +208,7 @@ public class LayoutDao implements Dao<Layout>
         return false;
     }
 
-    private boolean insert (Layout layout)
+    public boolean insert (Layout layout)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO LAYOUTS(" +
@@ -240,7 +240,7 @@ public class LayoutDao implements Dao<Layout>
         return false;
     }
 
-    private boolean update (Layout layout)
+    public boolean update (Layout layout)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE LAYOUTS\n" +

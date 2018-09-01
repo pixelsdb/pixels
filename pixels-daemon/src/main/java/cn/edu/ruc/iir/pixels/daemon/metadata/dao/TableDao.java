@@ -138,12 +138,19 @@ public class TableDao implements Dao<Table>
         }
     }
 
+    /**
+     * If the table with the same id or with the same db_id and table name exists,
+     * this method returns false.
+     * @param table
+     * @return
+     */
     public boolean exists (Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId());
+            ResultSet rs = st.executeQuery("SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId() +
+            " OR (DBS_DB_ID=" + table.getSchema().getId() + " AND TBL_NAME='" + table.getName() + "')");
             if (rs.next())
             {
                 return true;
@@ -156,7 +163,7 @@ public class TableDao implements Dao<Table>
         return false;
     }
 
-    private boolean insert (Table table)
+    public boolean insert (Table table)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO TBLS(" +
@@ -177,7 +184,7 @@ public class TableDao implements Dao<Table>
         return false;
     }
 
-    private boolean update (Table table)
+    public boolean update (Table table)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE TBLS\n" +

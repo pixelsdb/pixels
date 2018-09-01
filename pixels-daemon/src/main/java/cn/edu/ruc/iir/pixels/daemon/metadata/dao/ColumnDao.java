@@ -105,14 +105,14 @@ public class ColumnDao implements Dao<Column>
         return false;
     }
 
-    public int insertBatch (List<Column> columns)
+    public int insertBatch (Table table, List<Column> columns)
     {
         StringBuilder sql = new StringBuilder("INSERT INTO COLS (COL_NAME,COL_TYPE,COL_SIZE,TBLS_TBL_ID)" +
                 "VALUES ");
         for (Column column : columns)
         {
             sql.append("('").append(column.getName()).append("','").append(column.getType())
-                    .append("',").append(column.getSize()).append(",").append(column.getTable().getId()).append("),");
+                    .append("',").append(column.getSize()).append(",").append(table.getId()).append("),");
         }
         sql.deleteCharAt(sql.length()-1);
         Connection conn = db.getConnection();
