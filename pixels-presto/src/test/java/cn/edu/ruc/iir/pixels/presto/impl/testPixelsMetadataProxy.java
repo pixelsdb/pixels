@@ -12,26 +12,27 @@ import java.util.List;
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.presto.impl
- * @ClassName: testPixelsMetadataReader
+ * @ClassName: testPixelsMetadataProxy
  * @Description:
  * @author: tao
  * @date: Create in 2018-01-27 11:15
  **/
-public class testPixelsMetadataReader {
-    private PixelsMetadataReader pixelsMetadataReader = null;
-    private final Logger log = Logger.getLogger(testPixelsMetadataReader.class.getName());
+public class testPixelsMetadataProxy
+{
+    private PixelsMetadataProxy pixelsMetadataProxy = null;
+    private final Logger log = Logger.getLogger(testPixelsMetadataProxy.class.getName());
 
     @Before
     public void init ()
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        this.pixelsMetadataReader = new PixelsMetadataReader(config);
+        this.pixelsMetadataProxy = new PixelsMetadataProxy(config);
     }
 
     @Test
     public void testGetSchemaNames() throws MetadataException
     {
-        List<String> schemaList = pixelsMetadataReader.getSchemaNames();
+        List<String> schemaList = pixelsMetadataProxy.getSchemaNames();
         System.out.println(schemaList.toString());
         log.info("Size: " + schemaList.size());
     }
@@ -39,14 +40,14 @@ public class testPixelsMetadataReader {
     @Test
     public void testGetTableNames() throws MetadataException
     {
-        List<String> tablelist = pixelsMetadataReader.getTableNames("pixels");
+        List<String> tablelist = pixelsMetadataProxy.getTableNames("pixels");
         System.out.println(tablelist.toString());
     }
 
     @Test
     public void testGetTableColumns () throws MetadataException
     {
-        List<PixelsColumnHandle> columnHandleList = pixelsMetadataReader.getTableColumn("", "pixels", "test30g_pixels");
+        List<PixelsColumnHandle> columnHandleList = pixelsMetadataProxy.getTableColumn("", "pixels", "test30g_pixels");
         System.out.println(columnHandleList.toString());
     }
 
@@ -58,7 +59,7 @@ public class testPixelsMetadataReader {
     @Test
     public void getTable() throws MetadataException
     {
-        PixelsTable table = pixelsMetadataReader.getTable("pixels", "default", "test");
+        PixelsTable table = pixelsMetadataProxy.getTable("pixels", "default", "test");
         System.out.println(table.getTableHandle().toString());
         System.out.println(table.getTableLayout().toString());
         System.out.println(table.getColumns().toString());

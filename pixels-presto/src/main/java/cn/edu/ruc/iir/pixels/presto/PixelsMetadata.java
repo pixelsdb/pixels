@@ -14,7 +14,8 @@
 package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.google.common.collect.ImmutableList;
@@ -22,12 +23,10 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 
 import javax.inject.Inject;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -46,13 +45,13 @@ public class PixelsMetadata
     private static Logger logger = Logger.get(PixelsMetadata.class);
     private final String connectorId;
 
-    private final PixelsMetadataReader pixelsMetadataReader;
+    private final PixelsMetadataProxy pixelsMetadataProxy;
 
     @Inject
-    public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataReader pixelsMetadataReader)
+    public PixelsMetadata(PixelsConnectorId connectorId, PixelsMetadataProxy pixelsMetadataProxy)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.pixelsMetadataReader = requireNonNull(pixelsMetadataReader, "pixelsMetadataReader is null");
+        this.pixelsMetadataProxy = requireNonNull(pixelsMetadataProxy, "pixelsMetadataProxy is null");
     }
 
     @Override
@@ -66,7 +65,7 @@ public class PixelsMetadata
         List<String> schemaNameList = null;
         try
         {
-            schemaNameList = pixelsMetadataReader.getSchemaNames();
+            schemaNameList = pixelsMetadataProxy.getSchemaNames();
         } catch (MetadataException e)
         {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
@@ -117,7 +116,7 @@ public class PixelsMetadata
         List<PixelsColumnHandle> columnHandleList;
         try
         {
-            columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, schemaName, tableName);
+            columnHandleList = pixelsMetadataProxy.getTableColumn(connectorId, schemaName, tableName);
         } catch (MetadataException e)
         {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
@@ -143,13 +142,13 @@ public class PixelsMetadata
                 schemaNames = ImmutableList.of(schemaNameOrNull);
             } else
             {
-                schemaNames = pixelsMetadataReader.getSchemaNames();
+                schemaNames = pixelsMetadataProxy.getSchemaNames();
             }
 
             ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
             for (String schemaName : schemaNames)
             {
-                for (String tableName : pixelsMetadataReader.getTableNames(schemaName))
+                for (String tableName : pixelsMetadataProxy.getTableNames(schemaName))
                 {
                     builder.add(new SchemaTableName(schemaName, tableName));
                 }
@@ -170,7 +169,7 @@ public class PixelsMetadata
         List<PixelsColumnHandle> columnHandleList = null;
         try
         {
-            columnHandleList = pixelsMetadataReader.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
+            columnHandleList = pixelsMetadataProxy.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
         } catch (MetadataException e)
         {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
@@ -223,17 +222,86 @@ public class PixelsMetadata
     @Override
     public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
     {
-        throw new PrestoException(PIXELS_METASTORE_ERROR, new MetadataException("create table is not supported."));
-        /*
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
-        logger.debug("User " + session.getUser() + " " + ignoreExisting);
-        logger.debug("tableMetadata " + tableMetadata.toString());
-        Map<String, Object> map = tableMetadata.getProperties();
-        for (String key : map.keySet()) {
-            logger.debug(key + " " + map.get(key));
-        }*/
+        List<Column> columns = new ArrayList<>();
+        for (ColumnMetadata columnMetadata : tableMetadata.getColumns())
+        {
+            Column column = new Column();
+            column.setName(columnMetadata.getName());
+            // columnMetadata.getType().getDisplayName(); is the same as
+            // columnMetadata.getType().getTypeSignature().toString();
+            column.setType(columnMetadata.getType().getDisplayName());
+            // column size is set to 0 when the table is just created.
+            column.setSize(0);
+            columns.add(column);
+        }
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, columns);
+            if (res == false && ignoreExisting == false)
+            {
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "table " + schemaTableName.toString() +
+                " exists");
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
     }
 
+    @Override
+    public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        PixelsTableHandle pixelsTableHandle = (PixelsTableHandle) tableHandle;
+        String schemaName = pixelsTableHandle.getSchemaName();
+        String tableName = pixelsTableHandle.getTableName();
+
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.dropTable(schemaName, tableName);
+            if (res == false)
+            {
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "failed to drop table " + schemaName +
+                        "." + tableName);
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties)
+    {
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.createSchema(schemaName);
+            if (res == false)
+            {
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "schema " + schemaName +
+                        " exists");
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.dropSchema(schemaName);
+            if (res == false)
+            {
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "failed to drop schema " + schemaName);
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
+        }
+    }
 }

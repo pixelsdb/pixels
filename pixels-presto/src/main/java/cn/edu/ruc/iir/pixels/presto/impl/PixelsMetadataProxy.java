@@ -31,12 +31,13 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 /**
  * Created by hank on 18-6-18.
  */
-public class PixelsMetadataReader {
-    private static final Logger log = Logger.get(PixelsMetadataReader.class);
+public class PixelsMetadataProxy
+{
+    private static final Logger log = Logger.get(PixelsMetadataProxy.class);
     private final MetadataService metadataService;
 
     @Inject
-    public PixelsMetadataReader(PixelsPrestoConfig config)
+    public PixelsMetadataProxy(PixelsPrestoConfig config)
     {
         ConfigFactory configFactory = config.getFactory();
         String host = configFactory.getProperty("metadata.server.host");
@@ -142,4 +143,23 @@ public class PixelsMetadataReader {
         return metadataService.getLayouts(schemaName, tableName);
     }
 
+    public boolean createSchema (String schemaName) throws MetadataException
+    {
+        return metadataService.createSchema(schemaName);
+    }
+
+    public boolean dropSchema (String schemaName) throws MetadataException
+    {
+        return metadataService.dropSchema(schemaName);
+    }
+
+    public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
+    {
+        return metadataService.createTable(schemaName, tableName, columns);
+    }
+
+    public boolean dropTable (String schemaName, String tableName) throws MetadataException
+    {
+        return metadataService.dropTable(schemaName, tableName);
+    }
 }

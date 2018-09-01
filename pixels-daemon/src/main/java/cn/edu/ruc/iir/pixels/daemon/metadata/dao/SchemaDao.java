@@ -106,7 +106,8 @@ public class SchemaDao implements Dao<Schema>
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT 1 FROM DBS WHERE DB_ID=" + schema.getId());
+            ResultSet rs = st.executeQuery("SELECT 1 FROM DBS WHERE DB_ID=" + schema.getId() +
+            " OR DB_NAME='" + schema.getName() + "'");
             if (rs.next())
             {
                 return true;
@@ -119,7 +120,7 @@ public class SchemaDao implements Dao<Schema>
         return false;
     }
 
-    private boolean insert (Schema schema)
+    public boolean insert (Schema schema)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO DBS(" +
@@ -137,7 +138,7 @@ public class SchemaDao implements Dao<Schema>
         return false;
     }
 
-    private boolean update (Schema schema)
+    public boolean update (Schema schema)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE DBS\n" +

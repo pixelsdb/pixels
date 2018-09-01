@@ -77,8 +77,15 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                 Schema schema = new Schema();
                 schema.setName(params.getParam("schemaName"));
                 schema.setDesc("This schema is created by pixels-daemon");
-                schemaDao.save(schema);
-                res = "success";
+                if (schemaDao.exists(schema))
+                {
+                    res = "exists";
+                }
+                else
+                {
+                    schemaDao.insert(schema);
+                    res = "success";
+                }
                 break;
             }
             case "dropSchema":
@@ -94,11 +101,18 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                 table.setName(params.getParam("tableName"));
                 table.setSchema(schema);
                 table.setType("user");
-                tableDao.save(table);
-                String columnsJson = params.getParam("columns");
-                List<Column> columns = JSON.parseArray(columnsJson, Column.class);
-                columnDao.insertBatch(columns);
-                res = "success";
+                if (tableDao.exists(table))
+                {
+                    res = "exists";
+                }
+                else
+                {
+                    tableDao.insert(table);
+                    String columnsJson = params.getParam("columns");
+                    List<Column> columns = JSON.parseArray(columnsJson, Column.class);
+                    columnDao.insertBatch(table, columns);
+                    res = "success";
+                }
                 break;
             }
             case "dropTable":
