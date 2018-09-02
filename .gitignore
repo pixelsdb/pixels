@@ -20,3 +20,4 @@ package-info.java
 *.log
 *.txt
 test30G_pixels/
+*.csv
