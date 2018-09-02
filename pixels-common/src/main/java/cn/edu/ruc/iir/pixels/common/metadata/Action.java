@@ -16,5 +16,6 @@ public enum Action {
     createSchema,
     createTable,
     dropSchema,
-    dropTable
+    dropTable,
+    existTable
 }

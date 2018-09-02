@@ -110,11 +110,24 @@ public class DaemonMain
                         {
                             continue;
                         }
-                        if (splits[1].contains(jarName) &&
-                                (splits[2].contains("-Drole=main") || splits[2].contains("-Drole=guard")))
+                        if (splits[1].contains(jarName))
                         {
+                            String roleName = null;
+                            // get the role name of the target daemon (to be killing).
+                            for (int i = 2; i < splits.length; ++i)
+                            {
+                                if ((splits[i].contains("-Drole=main") || splits[i].contains("-Drole=guard")))
+                                {
+                                    roleName = splits[i].split("=")[1];
+                                    break;
+                                }
+                            }
+                            if (roleName == null)
+                            {
+                                continue;
+                            }
                             int pid = Integer.parseInt(splits[0]);
-                            System.out.println("killing " + splits[2].split("=")[1] + ", pid (" + pid + ")");
+                            System.out.println("killing " + roleName + ", pid (" + pid + ")");
                             // TODO: this is not a gentle manner to terminate the daemon, we should notify the killing daemon to close database connection.
                             Runtime.getRuntime().exec("kill -9 " + pid);
                         }

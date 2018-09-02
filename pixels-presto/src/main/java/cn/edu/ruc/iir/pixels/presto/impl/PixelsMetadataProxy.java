@@ -162,4 +162,9 @@ public class PixelsMetadataProxy
     {
         return metadataService.dropTable(schemaName, tableName);
     }
+
+    public boolean existTable (String schemaName, String tableName) throws MetadataException
+    {
+        return metadataService.existTable(schemaName, tableName);
+    }
 }
