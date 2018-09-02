@@ -169,11 +169,11 @@ public class SchemaDao implements Dao<Schema>
     public boolean deleteByName (String name)
     {
         Connection conn = db.getConnection();
-        String sql = "DELETE FROM DBS DB_NAME=?";
+        String sql = "DELETE FROM DBS WHERE DB_NAME=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, name);
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("deleteByName in SchemaDao", e);

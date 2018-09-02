@@ -90,8 +90,14 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             }
             case "dropSchema":
             {
-                schemaDao.deleteByName(params.getParam("schemaName"));
-                res = "success";
+                if (schemaDao.deleteByName(params.getParam("schemaName")))
+                {
+                    res = "success";
+                }
+                else
+                {
+                    res = "no-such";
+                }
                 break;
             }
             case "createTable":
@@ -110,21 +116,52 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                     tableDao.insert(table);
                     String columnsJson = params.getParam("columns");
                     List<Column> columns = JSON.parseArray(columnsJson, Column.class);
-                    columnDao.insertBatch(table, columns);
-                    res = "success";
+                    table = tableDao.getByNameAndSchema(table.getName(), schema);
+                    if (columns.size() == columnDao.insertBatch(table, columns))
+                    {
+                        res = "success";
+                    }
+                    else
+                    {
+                        tableDao.deleteByNameAndSchema(table.getName(), schema);
+                        res = "failed";
+                    }
                 }
                 break;
             }
             case "dropTable":
             {
-                Schema schema = schemaDao.getByName(params.getParam("schemName"));
-                tableDao.deleteByNameAndSchema(params.getParam("tableName"), schema);
-                res = "success";
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                if (tableDao.deleteByNameAndSchema(params.getParam("tableName"), schema))
+                {
+                    res = "success";
+                }
+                else
+                {
+                    res = "no-such";
+                }
+                break;
+            }
+            case "existTable":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                Table table = new Table();
+                table.setId(-1);
+                table.setName(params.getParam("tableName"));
+                table.setSchema(schema);
+                if (tableDao.exists(table))
+                {
+                    res = "true";
+                }
+                else
+                {
+                    res = "false";
+                }
                 break;
             }
             default:
             {
-                res = "action default";
+                res = "default";
                 break;
             }
         }

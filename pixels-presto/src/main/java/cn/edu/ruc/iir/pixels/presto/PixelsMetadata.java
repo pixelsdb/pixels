@@ -18,9 +18,11 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
+import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -77,12 +79,18 @@ public class PixelsMetadata
     public PixelsTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
         requireNonNull(tableName, "tableName is null");
-        if (!listSchemaNames(session).contains(tableName.getSchemaName()))
+        try
         {
-            return null;
+            if (this.pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
+            {
+                PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
+                return tableHandle;
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PIXELS_METASTORE_ERROR, e);
         }
-        PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
-        return tableHandle;
+        return null;
     }
 
     @Override
@@ -239,6 +247,7 @@ public class PixelsMetadata
         }
         try
         {
+            logger.debug("create table: column number=" + columns.size());
             boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, columns);
             if (res == false && ignoreExisting == false)
             {
@@ -249,6 +258,32 @@ public class PixelsMetadata
         {
             throw new PrestoException(PIXELS_METASTORE_ERROR, e);
         }
+    }
+
+    /**
+     * Begin the atomic creation of a table with data.
+     *
+     * @param session
+     * @param tableMetadata
+     * @param layout
+     */
+    @Override
+    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    {
+        throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "create table with data is currently not supported.");
+    }
+
+    /**
+     * Finish a table creation with data after the data is written.
+     *
+     * @param session
+     * @param tableHandle
+     * @param fragments
+     */
+    @Override
+    public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments)
+    {
+        throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "create table with data is currently not supported.");
     }
 
     @Override
@@ -263,7 +298,7 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.dropTable(schemaName, tableName);
             if (res == false)
             {
-                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "failed to drop table " + schemaName +
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "no such table " + schemaName +
                         "." + tableName);
             }
         } catch (MetadataException e)
@@ -297,7 +332,7 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.dropSchema(schemaName);
             if (res == false)
             {
-                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "failed to drop schema " + schemaName);
+                throw  new PrestoException(PIXELS_SQL_EXECUTE_ERROR, "no such schema " + schemaName);
             }
         } catch (MetadataException e)
         {

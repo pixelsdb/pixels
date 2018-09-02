@@ -149,8 +149,13 @@ public class TableDao implements Dao<Table>
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId() +
-            " OR (DBS_DB_ID=" + table.getSchema().getId() + " AND TBL_NAME='" + table.getName() + "')");
+            String sql = "SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId();
+            if (table.getSchema() != null)
+            {
+                sql += " OR (DBS_DB_ID=" + table.getSchema().getId() +
+                        " AND TBL_NAME='" + table.getName() + "')";
+            }
+            ResultSet rs = st.executeQuery(sql);
             if (rs.next())
             {
                 return true;
@@ -215,13 +220,14 @@ public class TableDao implements Dao<Table>
      */
     public boolean deleteByNameAndSchema (String name, Schema schema)
     {
+        assert name !=null && schema != null;
         Connection conn = db.getConnection();
         String sql = "DELETE FROM TBLS WHERE TBL_NAME=? AND DBS_DB_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, name);
             pst.setInt(2, schema.getId());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("delete in TableDao", e);
