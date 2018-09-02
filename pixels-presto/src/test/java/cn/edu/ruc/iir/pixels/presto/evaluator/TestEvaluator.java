@@ -1,10 +1,13 @@
 package cn.edu.ruc.iir.pixels.presto.evaluator;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import org.junit.Test;
 
 import java.io.*;
+import java.util.Date;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 /**
  * @version V1.0
@@ -112,6 +115,96 @@ public class TestEvaluator {
                 "InfoServerName,AppInfoClientName,QueryDate_,DistinctQueryCountVerticalWithinVisi\n" +
                 "t";
         getOrderByCol(columns);
+    }
+
+
+    @Test
+    public void testGetQuery() {
+        String resDir = "/home/tao/software/station/bitbucket/pixels/pixels-presto/src/main/resources/";
+        String queryFilePath = resDir + "105_query.text";
+        String queryFile = resDir + "105_query_update.text";
+
+        try (BufferedReader queryReader = new BufferedReader(new FileReader(queryFilePath));
+             BufferedWriter queryWriter = new BufferedWriter(new FileWriter(queryFile))) {
+            String line;
+            int i = 0;
+            StringBuffer sb = new StringBuffer();
+            while ((line = queryReader.readLine()) != null) {
+                line = line.replace("\t", " ");
+                line = line.trim();
+                if (line.length() > 0 && isInteger(line)) {
+                    sb.append(i + "\t" + line + "\t");
+                } else if (line.startsWith("--")) {
+                    continue;
+                } else if (line.length() == 0) {
+                    sb.append("\n");
+                    queryWriter.write(sb.toString());
+                    queryWriter.flush();
+                    sb = new StringBuffer();
+                    i++;
+                } else {
+                    sb.append(line + " ");
+                }
+            }
+            queryWriter.flush();
+
+            String testEvalFuc = "pixels";
+            String tableNmae = "testnull_pixels";
+            doPrestoEvaluator(queryFile, tableNmae, testEvalFuc, resDir);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isInteger(String str) {
+        Pattern pattern = Pattern.compile("^[-\\+]?[\\d]*$");
+        return pattern.matcher(str).matches();
+    }
+
+    public void doPrestoEvaluator(String workloadFilePath, String tableName, String testEvalFuc, String logDir) {
+        String testEvalCsv = "_" + testEvalFuc + "_duration.csv";
+
+        ConfigFactory instance = ConfigFactory.Instance();
+        Properties properties = new Properties();
+        String user = testEvalFuc;
+        String password = instance.getProperty("presto.password");
+        String ssl = instance.getProperty("presto.ssl");
+        String jdbc = instance.getProperty("presto.pixels.jdbc.url");
+        if (testEvalFuc.equalsIgnoreCase("orc")) {
+            jdbc = instance.getProperty("presto.orc.jdbc.url");
+        }
+
+        if (!password.equalsIgnoreCase("null")) {
+            properties.setProperty("password", password);
+        }
+        properties.setProperty("SSL", ssl);
+
+        String time = DateUtil.formatTime(new Date());
+
+        try (BufferedReader workloadReader = new BufferedReader(new FileReader(workloadFilePath));
+             BufferedWriter timeWriter = new BufferedWriter(new FileWriter(logDir + time + testEvalCsv))) {
+            timeWriter.write("query id,id,duration(ms)\n");
+            timeWriter.flush();
+            String line;
+            int i = 0;
+            String[] lines;
+            String id = "";
+            while ((line = workloadReader.readLine()) != null) {
+                lines = line.split("\t");
+                properties.setProperty("user", user + "_" + lines[0]);
+                id = line.split("\t")[1];
+                long cost = PrestoEvaluator.executeSQL(jdbc, properties, lines[2], id);
+                timeWriter.write(id + "," + i + "," + cost + "\n");
+                i++;
+                if (i % 10 == 0) {
+                    timeWriter.flush();
+                    System.out.println(i);
+                }
+            }
+            timeWriter.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

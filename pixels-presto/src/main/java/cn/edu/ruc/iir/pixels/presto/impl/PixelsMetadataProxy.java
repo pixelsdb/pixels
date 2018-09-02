@@ -89,7 +89,7 @@ public class PixelsMetadataProxy
                 columnType = INTEGER;
             } else if (type.equals("bigint") || type.equals("long")) {
                 columnType = BIGINT;
-            } else if (type.equals("double")) {
+            } else if (type.equals("double")|| type.equals("float")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
@@ -121,7 +121,7 @@ public class PixelsMetadataProxy
                 columnType = INTEGER;
             } else if (type.equals("bigint")) {
                 columnType = BIGINT;
-            } else if (type.equals("double")) {
+            } else if (type.equals("double")|| type.equals("float")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
