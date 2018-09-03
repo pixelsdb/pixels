@@ -57,12 +57,12 @@ public class PixelsMetadataProxy
 
     public List<String> getTableNames(String schemaName) throws MetadataException
     {
-        List<String> tablelist = new ArrayList<String>();
+        List<String> tableList = new ArrayList<String>();
         List<Table> tables = metadataService.getTables(schemaName);
         for (Table t : tables) {
-            tablelist.add(t.getName());
+            tableList.add(t.getName());
         }
-        return tablelist;
+        return tableList;
     }
 
     public PixelsTable getTable(String connectorId, String schemaName, String tableName) throws MetadataException
@@ -117,9 +117,9 @@ public class PixelsMetadataProxy
             Type columnType = null;
             String name = c.getName();
             String type = c.getType().toLowerCase();
-            if (type.equals("int")) {
+            if (type.equals("integer") || type.equals("int")) {
                 columnType = INTEGER;
-            } else if (type.equals("bigint")) {
+            } else if (type.equals("bigint") || type.equals("long")) {
                 columnType = BIGINT;
             } else if (type.equals("double")|| type.equals("float")) {
                 columnType = DOUBLE;
@@ -130,7 +130,7 @@ public class PixelsMetadataProxy
             } else if (type.equals("timestamp")) {
                 columnType = TIMESTAMP;
             } else {
-                System.out.println("columnType is not defined.");
+                log.error("columnType is not defined.");
             }
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
             columns.add(pixelsColumnHandle);

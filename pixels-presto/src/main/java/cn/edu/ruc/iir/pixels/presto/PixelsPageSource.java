@@ -149,6 +149,9 @@ class PixelsPageSource implements ConnectorPageSource {
                 switch (typeName)
                 {
                     case "integer":
+                    case "bigint":
+                    case "long":
+                    case "int":
                         LongColumnVector lcv = (LongColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
