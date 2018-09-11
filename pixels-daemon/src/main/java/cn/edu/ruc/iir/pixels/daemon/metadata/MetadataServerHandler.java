@@ -17,23 +17,72 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 
 import java.util.List;
 
 /**
- * Created by hank on 18-6-17.
+ * instance of this class should not be reused.
  */
 public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 {
+    private boolean complete = false;
+    private StringBuilder builder = new StringBuilder();
+
+    @SuppressWarnings("Duplicates")
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
     {
         ByteBuf buf = (ByteBuf) msg;
-        byte[] req = new byte[buf.readableBytes()];
-        buf.readBytes(req);
-        String body = new String(req, "UTF-8").trim();
-        ReqParams params = ReqParams.parse(body);
+        try
+        {
+            byte[] req = new byte[buf.readableBytes()];
+            buf.readBytes(req);
+            String body = new String(req, "UTF-8");
+            builder.append(body);
+        }
+        finally
+        {
+            ReferenceCountUtil.release(msg);
+        }
 
+
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception
+    {
+        //将发送缓冲区中数据全部写入SocketChannel
+        ctx.flush();
+        if (this.complete == false)
+        {
+            ReqParams params = ReqParams.parse(builder.toString());
+
+            // log the received params.
+            LogFactory.Instance().getLog().info(builder.toString());
+
+            String res = this.executeRequest(params);
+            //response
+            //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
+            ChannelFuture future = ctx.writeAndFlush(Unpooled.copiedBuffer(res.getBytes()));
+            // Thread close
+            future.addListener(
+                    (ChannelFutureListener) channelFuture -> ctx.close()
+            );
+        }
+        this.complete = true;
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable e)
+    {
+        LogFactory.Instance().getLog().error("error caught in metadata server.", e);
+        //释放资源
+        ctx.close();
+    }
+
+    private String executeRequest (ReqParams params)
+    {
         String res;
 
         SchemaDao schemaDao = new SchemaDao();
@@ -166,27 +215,6 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             }
         }
 
-        //response
-        //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
-        ChannelFuture future = ctx.writeAndFlush(Unpooled.copiedBuffer(res.getBytes()));
-        // Thread close
-        future.addListener(
-                (ChannelFutureListener) channelFuture -> ctx.close()
-        );
-    }
-
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception
-    {
-        //将发送缓冲区中数据全部写入SocketChannel
-        ctx.flush();
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable e)
-    {
-        LogFactory.Instance().getLog().error("error caught in metadata server.", e);
-        //释放资源
-        ctx.close();
+        return res;
     }
 }
