@@ -20,7 +20,8 @@ public class MetadataClient
 
     private final ReqParams params;
     private final String token;
-    private final Map<String, String> response = new HashMap<String, String>();
+    // getResponse and setResponse are synchronized to ensure atomic read/write.
+    private final Map<String, String> response = new HashMap<>();
 
     public MetadataClient(ReqParams params, String token)
     {
@@ -28,9 +29,14 @@ public class MetadataClient
         this.token = token;
     }
 
-    public Map<String, String> getResponse()
+    public synchronized Map<String, String> getResponse()
     {
         return response;
+    }
+
+    public synchronized void setResponse (String token, String res)
+    {
+        this.response.put(token, res);
     }
 
     public void connect(int port, String host) throws Exception
@@ -51,7 +57,7 @@ public class MetadataClient
                         protected void initChannel(SocketChannel ch) throws Exception
                         {
                             ch.pipeline().addLast(
-                                    new MetadataClientHandler(params, token, response));
+                                    new MetadataClientHandler(params, token, MetadataClient.this));
                         }
                     });
 
