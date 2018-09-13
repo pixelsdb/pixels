@@ -3,7 +3,6 @@ package cn.edu.ruc.iir.pixels.presto.evaluator;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
@@ -29,7 +28,7 @@ public class PrestoEvaluator {
             resultSet.next();
             end = System.currentTimeMillis();
             statement.close();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             System.out.println("SQL: " + sql);
         }

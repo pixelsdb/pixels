@@ -11,6 +11,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
+ * */
 public class DaemonMain
 {
     public static void main(String[] args)
