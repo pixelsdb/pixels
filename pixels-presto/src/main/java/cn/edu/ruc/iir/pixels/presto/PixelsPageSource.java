@@ -6,14 +6,11 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
@@ -32,6 +29,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_BAD_DATA;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_READER_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_WRITER_CLOSE_ERROR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -75,11 +76,13 @@ class PixelsPageSource implements ConnectorPageSource {
         List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
             PixelsColumnHandle column = entry.getKey();
-            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + column.getOrdinalPosition());
+            String columnName = column.getColumnName();
+            int columnOrdinal = split.getOrder().indexOf(columnName);
+            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,
-                            column.getOrdinalPosition(),
+                            columnOrdinal,
                             column.getColumnType()));
         }
         PixelsPredicate predicate = new TupleDomainPixelsPredicate<>(split.getConstraint(), columnReferences);
@@ -105,6 +108,7 @@ class PixelsPageSource implements ConnectorPageSource {
         } catch (IOException e) {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
+            throw new PrestoException(PIXELS_READER_ERROR, e);
         }
     }
 
@@ -129,7 +133,6 @@ class PixelsPageSource implements ConnectorPageSource {
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId >1) ) {
                 close();
-                logger.debug("getNextPage close");
                 return null;
             }
             Block[] blocks = new Block[this.numColumnToRead];
@@ -146,18 +149,36 @@ class PixelsPageSource implements ConnectorPageSource {
                 switch (typeName)
                 {
                     case "integer":
+                    case "bigint":
+                    case "long":
+                    case "int":
                         LongColumnVector lcv = (LongColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeLong(blockBuilder, lcv.vector[i]);
+                            if (lcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeLong(blockBuilder, lcv.vector[i]);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
                     case "double":
+                    case "float":
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
-                            type.writeDouble(blockBuilder, dcv.vector[i]);
+                            if (dcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeDouble(blockBuilder, dcv.vector[i]);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
@@ -175,7 +196,10 @@ class PixelsPageSource implements ConnectorPageSource {
                         for (int i = 0; i < batchSize; ++i)
                         {
                             int elementLen = scv.lens[i];
-                            System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
+                            if (!scv.isNull[i])
+                            {
+                                System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
+                            }
                             vectorOffsets[i] = curVectorOffset;
                             curVectorOffset += elementLen;
                         }
@@ -189,7 +213,29 @@ class PixelsPageSource implements ConnectorPageSource {
                         LongColumnVector bcv = (LongColumnVector) cv;
                         for (int i = 0; i < this.rowBatch.size; ++i)
                         {
-                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                            if (bcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                            }
+                        }
+                        blocks[fieldId] = blockBuilder.build();
+                        break;
+                    case "timestamp":
+                        TimestampColumnVector tcv = (TimestampColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            if (tcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeLong(blockBuilder, tcv.time[i]);
+                            }
                         }
                         blocks[fieldId] = blockBuilder.build();
                         break;
@@ -205,13 +251,12 @@ class PixelsPageSource implements ConnectorPageSource {
             sizeOfData += batchSize;
             if (this.rowBatch.endOfFile) {
                 endOfFile = true;
-                logger.debug("End of file, batch size: " + batchSize);
             }
             return new Page(batchSize, blocks);
         } catch (IOException e) {
             closeWithSuppression(e);
+            throw new PrestoException(PIXELS_BAD_DATA, e);
         }
-        return null;
     }
 
     @Override
@@ -227,6 +272,7 @@ class PixelsPageSource implements ConnectorPageSource {
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.error("close error: " + e.getMessage());
+            throw new PrestoException(PIXELS_WRITER_CLOSE_ERROR, e);
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times
@@ -246,6 +292,7 @@ class PixelsPageSource implements ConnectorPageSource {
             if (throwable != e) {
                 throwable.addSuppressed(e);
             }
+            throw new PrestoException(PIXELS_CLIENT_ERROR, e);
         }
     }
 

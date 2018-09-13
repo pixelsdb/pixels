@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import io.netty.bootstrap.ServerBootstrap;
@@ -18,7 +18,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
  * @date: Create in 2018-01-26 15:09
  **/
 public class MetadataServer implements Server {
-    DBUtils db = DBUtils.Instance();
     private boolean running = false;
     private int port;
     private EventLoopGroup boss = null;
@@ -54,14 +53,9 @@ public class MetadataServer implements Server {
                     .channel(NioServerSocketChannel.class)
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
-                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(2048))
-                    .childHandler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel ch) throws Exception {
-                            ch.pipeline().addLast(
-                                    new MetadataServerHandler());
-                        }
-                    });
+                    //TODO: currently, the message received by server can not be longer than this fixed buffer size.
+                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024*128))
+                    .childHandler(new ChildChannelInitializer());
 
             //绑定端口, 同步等待成功
             //System.out.println("port: " + port);
@@ -77,7 +71,7 @@ public class MetadataServer implements Server {
             this.running = false;
             boss.shutdownGracefully();
             worker.shutdownGracefully();
-            db.closeConn();
+            DBUtil.Instance().close();
         }
     }
 }

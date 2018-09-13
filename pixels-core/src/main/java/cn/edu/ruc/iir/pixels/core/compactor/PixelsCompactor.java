@@ -1,17 +1,18 @@
 package cn.edu.ruc.iir.pixels.core.compactor;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSWriter;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalWriterUtil;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.PixelsVersion;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsFileMagicInvalidException;
+import cn.edu.ruc.iir.pixels.core.exception.PixelsFileVersionInvalidException;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import com.google.common.collect.ImmutableList;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -70,23 +71,23 @@ public class PixelsCompactor
             List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList,
             List<Path> rowGroupPaths)
     {
-        this.schema = requireNonNull(schema);
-        this.compactLayout = requireNonNull(compactLayout);
-        checkArgument(pixelStride > 0);
+        this.schema = requireNonNull(schema, "schema is null");
+        this.compactLayout = requireNonNull(compactLayout, "compactLayout is null");
+        checkArgument(pixelStride > 0, "pixel stripe is not positive");
         this.pixelStride = pixelStride;
         this.compressionKind = requireNonNull(compressionKind);
-        checkArgument(compressionBlockSize > 0);
+        checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = requireNonNull(timeZone);
-        checkArgument(fileContentLength > 0);
+        checkArgument(fileContentLength > 0, "file content length is not positive");
         this.fileContentLength = fileContentLength;
-        checkArgument(fileRowNum > 0);
+        checkArgument(fileRowNum > 0, "file row number is not positive");
         this.fileRowNum = fileRowNum;
 
-        this.fs = requireNonNull(fs);
-        this.fsWriter = requireNonNull(fsWriter);
+        this.fs = requireNonNull(fs, "fs is null");
+        this.fsWriter = requireNonNull(fsWriter, "fsWriter is null");
 
-        this.fileColStatRecorders = fileColStatRecorders;
+        this.fileColStatRecorders = requireNonNull(fileColStatRecorders, "file column stat reader is null");
 
         checkArgument(!requireNonNull(rowGroupFooterBuilderList).isEmpty());
         checkArgument(!requireNonNull(rowGroupStatBuilderList).isEmpty());
@@ -124,9 +125,15 @@ public class PixelsCompactor
         private Builder()
         {}
 
+        /**
+         * set schema is optional, if schema is not set, the schema read from the first source file will be used as this.schema.
+         * and this.schema will be used as the schema of the compacted file.
+         * @param schema
+         * @return
+         */
         public PixelsCompactor.Builder setSchema(TypeDescription schema)
         {
-            this.schema = requireNonNull(schema);
+            this.schema = schema;
 
             return this;
         }
@@ -190,18 +197,10 @@ public class PixelsCompactor
         public PixelsCompactor build() throws IOException
         {
             // check arguments
-            if (schema == null || sourcePaths == null || compactLayout == null || builderTimeZone == null
+            if (sourcePaths == null || compactLayout == null || builderTimeZone == null
                     || builderFS == null || builderFilePath == null)
             {
                 throw new IllegalArgumentException("Missing argument to build PixelsCompactor");
-            }
-
-            List<TypeDescription> childrenSchema = schema.getChildren();
-            checkArgument(!requireNonNull(childrenSchema).isEmpty());
-            fileColStatRecorders = new StatsRecorder[childrenSchema.size()];
-            for (int i = 0; i < childrenSchema.size(); ++i)
-            {
-                this.fileColStatRecorders[i] = StatsRecorder.create(childrenSchema.get(i)); // to be updated when compacting
             }
 
             // read each source file footer
@@ -213,30 +212,51 @@ public class PixelsCompactor
                 {
                     throw new IOException("Read file failed.");
                 }
-                long fileLength = fsReader.getFileLength();
-                fsReader.seek(fileLength - 8);
-                long pos = fsReader.readLong();
-                fsReader.seek(pos - 4);
-                int tailLength = fsReader.readInt();
-                long tailOffset = fileLength - 8 - 4 - tailLength;
-                fsReader.seek(tailOffset);
-                byte[] tailBuffer = new byte[tailLength];
-                fsReader.readFully(tailBuffer);
 
-                PixelsProto.FileTail fileTail =
-                        PixelsProto.FileTail.parseFrom(tailBuffer);
+                // get FileTail
+                long fileLen = fsReader.getFileLength();
+                fsReader.seek(fileLen - Long.BYTES);
+                long fileTailOffset = fsReader.readLong();
+                int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+                fsReader.seek(fileTailOffset);
+                byte[] fileTailBuffer = new byte[fileTailLength];
+                fsReader.readFully(fileTailBuffer);
+                PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
 
                 if (fileTail == null) {
                     throw new IOException("read file tail failed.");
+                }
+
+                // check file MAGIC and file version
+                PixelsProto.PostScript postScript = fileTail.getPostscript();
+                int fileVersion = postScript.getVersion();
+                String fileMagic = postScript.getMagic();
+                if (!PixelsVersion.matchVersion(fileVersion)) {
+                    throw new PixelsFileVersionInvalidException(fileVersion);
+                }
+                if (!fileMagic.contentEquals(Constants.MAGIC)) {
+                    throw new PixelsFileMagicInvalidException(fileMagic);
                 }
 
                 if (i == 0) {
                     compressionKind = fileTail.getPostscript().getCompression();
                     compressionBlockSize = fileTail.getPostscript().getCompressionBlockSize();
                     pixelStride = fileTail.getPostscript().getPixelStride();
+
+                    if (schema == null)
+                    {
+                        schema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
+                    }
+
+                    List<TypeDescription> childrenSchema = schema.getChildren();
+                    checkArgument(!requireNonNull(childrenSchema).isEmpty());
+                    fileColStatRecorders = new StatsRecorder[childrenSchema.size()];
+                    for (int j = 0; j < childrenSchema.size(); ++j)
+                    {
+                        this.fileColStatRecorders[j] = StatsRecorder.create(childrenSchema.get(j)); // to be updated when compacting
+                    }
                 }
 
-                PixelsProto.PostScript postScript = fileTail.getPostscript();
                 fileContentLength += postScript.getContentLength(); // init fileContentLength
                 fileRowNum += postScript.getNumberOfRows(); // init fileRowNum
 
@@ -291,15 +311,16 @@ public class PixelsCompactor
     {
         this.writeColumnChunks();
         this.writeRowGroupFooters();
+        writeFileTail();
     }
 
     private void writeColumnChunks()
     {
         for (int i = 0; i < this.compactLayout.size(); ++i)
         {
-            ColumnletInfo info = this.compactLayout.get(i);
-            int rowGroupId = info.getRowGroupId();
-            int columnId = info.getColumnId();
+            ColumnletIndex index = this.compactLayout.get(i);
+            int rowGroupId = index.getRowGroupId();
+            int columnId = index.getColumnId();
             PixelsProto.ColumnChunkIndex.Builder columnChunkIndexBuilder =
                     this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
                             .getColumnChunkIndexEntriesBuilder(columnId);
@@ -313,11 +334,7 @@ public class PixelsCompactor
                 }
                 fsReader.seek(columnChunkOffset);
                 byte[] chunkBuffer = new byte[(int) columnChunkLength];
-                int readLength = 0;
-                while (readLength < columnChunkLength)
-                {
-                    readLength += fsReader.read(chunkBuffer);
-                }
+                fsReader.readFully(chunkBuffer);
                 fsWriter.prepare((int) columnChunkLength);
                 long offset = this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
                 columnChunkIndexBuilder.setChunkOffset(offset);
@@ -361,24 +378,7 @@ public class PixelsCompactor
         }
     }
 
-    /**
-     * Close PixelsCompactor, indicating the end of file
-     * */
-    public void close()
-    {
-        try
-        {
-            writeFileTail();
-            fsWriter.close();
-        } catch (IOException e)
-        {
-            LOGGER.error(e.getMessage());
-            System.out.println("Error writing file tail out.");
-            e.printStackTrace();
-        }
-    }
-
-    private void writeFileTail() throws IOException
+    private void writeFileTail()
     {
         PixelsProto.Footer footer = writeFooter();
         PixelsProto.PostScript postScript = writePostScript();
@@ -390,14 +390,23 @@ public class PixelsCompactor
                         .setFooterLength(footer.getSerializedSize())
                         .setPostscriptLength(postScript.getSerializedSize())
                         .build();
-        int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
-        fsWriter.prepare(fileTailLen);
-        long tailOffset = fsWriter.append(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
-        ByteBuf tailOffsetBuf = Unpooled.buffer(Long.BYTES);
-        tailOffsetBuf.writeLong(tailOffset);
-        fsWriter.append(tailOffsetBuf.array(), 0, Long.BYTES);
-        tailOffsetBuf.release();
-        fsWriter.flush();
+
+        try
+        {
+            // write and flush FileTail plus FileTail physical offset at the end of the file
+            int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
+            fsWriter.prepare(fileTailLen);
+            long tailOffset = fsWriter.append(fileTail.toByteArray(), 0, fileTail.getSerializedSize());
+            ByteBuffer tailOffsetBuffer = ByteBuffer.allocate(Long.BYTES);
+            tailOffsetBuffer.putLong(tailOffset);
+            fsWriter.append(tailOffsetBuffer);
+            fsWriter.flush();
+        } catch (IOException e)
+        {
+            LOGGER.error(e.getMessage());
+            System.out.println("Error writing file tail out.");
+            e.printStackTrace();
+        }
     }
 
     private PixelsProto.Footer writeFooter()
@@ -433,5 +442,21 @@ public class PixelsCompactor
                 .setWriterTimezone(timeZone.getDisplayName())
                 .setMagic(Constants.MAGIC)
                 .build();
+    }
+
+    /**
+     * Close PixelsCompactor, indicating the end of file
+     * */
+    public void close()
+    {
+        try
+        {
+            fsWriter.close();
+        } catch (IOException e)
+        {
+            LOGGER.error(e.getMessage());
+            System.out.println("Error writing file tail out.");
+            e.printStackTrace();
+        }
     }
 }

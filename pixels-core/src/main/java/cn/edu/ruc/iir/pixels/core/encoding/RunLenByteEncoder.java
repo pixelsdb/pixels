@@ -53,6 +53,12 @@ public class RunLenByteEncoder
         return result;
     }
 
+    @Override
+    public void close() throws IOException
+    {
+        output.close();
+    }
+
     private void writeValues()
     {
         if (numLiterals != 0) {

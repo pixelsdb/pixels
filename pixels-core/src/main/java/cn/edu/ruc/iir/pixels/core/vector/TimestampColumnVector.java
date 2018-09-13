@@ -276,14 +276,6 @@ public class TimestampColumnVector extends ColumnVector
         set(writeIndex++, value);
     }
 
-    @Override
-    public void add(Timestamp[] values)
-    {
-        for (Timestamp v : values) {
-            add(v);
-        }
-    }
-
     /**
      * Set a row from a timestamp.
      * We assume the entry has already been isRepeated adjusted.

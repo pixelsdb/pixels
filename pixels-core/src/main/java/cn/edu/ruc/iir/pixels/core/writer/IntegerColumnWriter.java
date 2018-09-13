@@ -19,7 +19,7 @@ import java.nio.ByteBuffer;
 public class IntegerColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
-    private final boolean isLong;                         // current column type is long or int
+    private final boolean isLong;                                       // current column type is long or int
 
     public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -34,71 +34,76 @@ public class IntegerColumnWriter extends BaseColumnWriter
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
         int curPartLength;           // size of the partition which belongs to current pixel
-        int curPartOffset = 0;           // starting offset of the partition which belongs to current pixel
-        int nextPartLength = size;       // size of the partition which belongs to next pixel
+        int curPartOffset = 0;       // starting offset of the partition which belongs to current pixel
+        int nextPartLength = size;   // size of the partition which belongs to next pixel
 
         // do the calculation to partition the vector into current pixel and next one
         // doing this pre-calculation to eliminate branch prediction inside the for loop
-        while ((curPixelEleCount + nextPartLength) >= pixelStride) {
-            curPartLength = pixelStride - curPixelEleCount;
-            // fill in current pixel value vector with current partition
-            System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-            curPixelEleCount += curPartLength;
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
+            curPartLength = pixelStride - curPixelIsNullIndex;
+            writeCurPartLong(columnVector, values, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-
-        // fill in current pixel value vector with current partition
-        System.arraycopy(values, curPartOffset, curPixelVector, curPixelEleCount, curPartLength);
-        curPixelEleCount += curPartLength;
-
-        curPartOffset += curPartLength;
-        nextPartLength = size - curPartOffset;
-
-        // update current pixel vector
-        // actually this should never be reached!!!
-        if (nextPartLength > 0) {
-            System.arraycopy(values,
-                    curPartOffset,
-                    curPixelVector,
-                    curPixelEleCount,
-                    nextPartLength);
-            curPixelEleCount += nextPartLength;
-        }
+        writeCurPartLong(columnVector, values, curPartLength, curPartOffset);
 
         return outputStream.size();
+    }
+
+    private void writeCurPartLong(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    {
+        for (int i = 0; i < curPartLength; i++)
+        {
+            curPixelEleIndex++;
+            if (columnVector.isNull[i + curPartOffset])
+            {
+                hasNull = true;
+                pixelStatRecorder.increment();
+            }
+            else
+            {
+                curPixelVector[curPixelVectorIndex++] = values[i + curPartOffset];
+            }
+        }
+        System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
+        curPixelIsNullIndex += curPartLength;
     }
 
     @Override
     void newPixel() throws IOException
     {
         // update stats
-        for (int i = 0; i < curPixelEleCount; i++)
+        for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
         // write out current pixel vector
-        if (isEncoding) {
-            outputStream.write(encoder.encode(curPixelVector, 0, curPixelEleCount));
+        if (isEncoding)
+        {
+            outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
-        else {
+        else
+        {
             ByteBuffer curVecPartitionBuffer;
-            if (isLong) {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Long.BYTES + 1);
+            if (isLong)
+            {
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES + 1);
                 curVecPartitionBuffer.put((byte) 1);
-                for (int i = 0; i < curPixelEleCount; i++)
+                for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
                 }
             }
-            else {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelEleCount * Integer.BYTES + 1);
+            else
+            {
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + 1);
                 curVecPartitionBuffer.put((byte) 0);
-                for (int i = 0; i < curPixelEleCount; i++)
+                for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);
                 }
@@ -106,34 +111,25 @@ public class IntegerColumnWriter extends BaseColumnWriter
             outputStream.write(curVecPartitionBuffer.array());
         }
 
-        // update position of current pixel
-        curPixelPosition = outputStream.size();
-
-        // reset and clean up. inline to remove function call newPixel().
-        // 1. set current pixel element count to 0 for the next batch pixel writing
-        // 2. update column chunk stat
-        // 3. add current pixel stat and position info to columnChunkIndex
-        // 4. update lastPixelPosition to current one
-        // 5. reset current pixel stat recorder
-        curPixelEleCount = 0;
-        columnChunkStatRecorder.merge(pixelStatRecorder);
-        PixelsProto.PixelStatistic.Builder pixelStat =
-                PixelsProto.PixelStatistic.newBuilder();
-        pixelStat.setStatistic(pixelStatRecorder.serialize());
-        columnChunkIndex.addPixelPositions(lastPixelPosition);
-        columnChunkIndex.addPixelStatistics(pixelStat.build());
-        lastPixelPosition = curPixelPosition;
-        pixelStatRecorder.reset();
+        super.newPixel();
     }
 
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding) {
+        if (isEncoding)
+        {
             return PixelsProto.ColumnEncoding.newBuilder()
                     .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        encoder.close();
+        super.close();
     }
 }

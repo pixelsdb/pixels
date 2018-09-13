@@ -13,6 +13,7 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
@@ -24,6 +25,7 @@ import io.airlift.log.Logger;
 import javax.inject.Inject;
 
 import static cn.edu.ruc.iir.pixels.presto.PixelsTransactionHandle.INSTANCE;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CONNECTOR_ERROR;
 import static java.util.Objects.requireNonNull;
 
 public class PixelsConnector
@@ -73,6 +75,7 @@ public class PixelsConnector
             lifeCycleManager.stop();
         } catch (Exception e) {
             log.error(e, "Error shutting down connector");
+            throw new PrestoException(PIXELS_CONNECTOR_ERROR, e);
         }
     }
 }

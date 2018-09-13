@@ -13,5 +13,9 @@ import java.io.IOException;
 public abstract class PixelsWriter
         implements Closeable
 {
-    public abstract void addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
+    /**
+     * add row batch into the file
+     * @return if the file adds a new row group, return false. Else, return true.
+     * */
+    public abstract boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
 }

@@ -16,6 +16,9 @@ public abstract class ColumnReader
 {
     private final TypeDescription type;
 
+    int elementIndex = 0;
+    boolean hasNull = true;
+
     public static ColumnReader newColumnReader(TypeDescription type)
     {
         switch (type.getCategory())
@@ -49,21 +52,6 @@ public abstract class ColumnReader
 
     /**
      * Read values from input buffer.
-     * All values are gonna be put into the specified vector.
-     * @param input input buffer
-     * @param encoding encoding type
-     * @param size number of values to read
-     * @param vector vector to read into
-     * @throws java.io.IOException
-     * */
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                              int size, int pixelStride, ColumnVector vector) throws IOException
-    {
-        read(input, encoding, 0, size, pixelStride, vector);
-    }
-
-    /**
-     * Read values from input buffer.
      * Values after specified offset are gonna be put into the specified vector.
      * @param input input buffer
      * @param encoding encoding type
@@ -73,7 +61,9 @@ public abstract class ColumnReader
      * @throws java.io.IOException
      * */
     public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
-                              int offset, int size, int pixelStride, ColumnVector vector) throws IOException;
+                              int offset, int size, int pixelStride, final int vectorIndex,
+                              ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
+            throws IOException;
 
     public ColumnReader(TypeDescription type)
     {

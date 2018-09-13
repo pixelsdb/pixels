@@ -30,4 +30,6 @@ public interface ColumnWriter
     void reset();
 
     void flush() throws IOException;
+
+    void close() throws IOException;
 }

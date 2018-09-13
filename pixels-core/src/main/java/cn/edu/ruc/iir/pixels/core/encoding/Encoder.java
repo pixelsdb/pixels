@@ -70,4 +70,7 @@ public abstract class Encoder
     {
         throw new PixelsEncodingException("Encoding double values is not supported");
     }
+
+    public void close() throws IOException
+    {}
 }

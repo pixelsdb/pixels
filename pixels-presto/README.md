@@ -10,7 +10,7 @@ Upload the following files to the catalog of `presto-server-0.192`
 - pixels-load-0.1.0-SNAPSHOT.jar
 
 ## Run ETL Tool
-- See`cn.edu.ruc.iir.pixels.load.cli.Main`
+- See`cn.edu.ruc.iir.pixels.load.cli.Loader`
 - DDL
 
 `DDL -s schema_file -d db_name`
@@ -29,7 +29,10 @@ Run the server, we need to use the `Root` command
 ```sh
 java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
 ```
-
+```IDEA
+VM option: -Dio.netty.leakDetection.level=advanced -Drole=main 
+Program arguements: metadata
+```
 ## Run Presto
 Run the presto client, we should do the following things:
 - stop the clusters

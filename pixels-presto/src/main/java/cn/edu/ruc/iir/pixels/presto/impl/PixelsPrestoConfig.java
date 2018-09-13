@@ -1,11 +1,14 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import com.facebook.presto.spi.PrestoException;
 import io.airlift.configuration.Config;
 import io.airlift.log.Logger;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
+
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CONFIG_ERROR;
 
 /**
  * @version V1.0
@@ -54,8 +57,9 @@ public class PixelsPrestoConfig
 
                 } catch (IOException e)
                 {
-                    logger.error("can not load pixels.properties under: " + pixelsHome +
-                            ", configuration reloading is skipped.", e);
+                    logger.error(e,"can not load pixels.properties under: " + pixelsHome +
+                            ", configuration reloading is skipped.");
+                    throw new PrestoException(PIXELS_CONFIG_ERROR, e);
                 }
             }
 

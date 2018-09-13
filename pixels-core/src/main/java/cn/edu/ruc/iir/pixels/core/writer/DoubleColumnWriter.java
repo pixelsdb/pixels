@@ -29,12 +29,22 @@ public class DoubleColumnWriter extends BaseColumnWriter
         double[] values = columnVector.vector;
         for (int i = 0; i < length; i++)
         {
-            curPixelEleCount++;
-            double value = values[i];
-            encodingUtils.writeLongLE(outputStream, Double.doubleToLongBits(value));
-            pixelStatRecorder.updateDouble(value);
+            isNull[curPixelIsNullIndex++] = vector.isNull[i];
+            curPixelEleIndex++;
+            if (vector.isNull[i])
+            {
+                hasNull = true;
+                pixelStatRecorder.increment();
+            }
+            else
+            {
+                double value = values[i];
+                encodingUtils.writeLongLE(outputStream, Double.doubleToLongBits(value));
+                pixelStatRecorder.updateDouble(value);
+            }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
-            if (curPixelEleCount >= pixelStride) {
+            if (curPixelEleIndex >= pixelStride)
+            {
                 newPixel();
             }
         }

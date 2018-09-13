@@ -1,116 +1,275 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.daemon.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
+import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import org.apache.commons.logging.Log;
 
-import java.io.Serializable;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.daemon.metadata.dao
- * @ClassName: LayoutDao
- * @Description: LayoutsDao
- * @author: tao
- * @date: Create in 2018-01-26 10:36
- **/
-public class LayoutDao implements BaseDao<Layout> {
+public class LayoutDao implements Dao<Layout>
+{
+    public LayoutDao() {}
+
+    private static final DBUtil db = DBUtil.Instance();
+    private static final Log log = LogFactory.Instance().getLog();
+    private static final TableDao tableModel = new TableDao();
 
     @Override
-    public Layout get(Serializable id) {
-        return null;
-    }
-
-    @Override
-    public List<Layout> find(String sql) {
-        return null;
-    }
-
-    @Override
-    public List<Layout> loadAll(String sql, String[] params) {
+    public Layout getById(int id)
+    {
         Connection conn = db.getConnection();
-        PreparedStatement psmt = null;
-        ResultSet rs = null;
-        List<Layout> layoutList = new ArrayList<Layout>();
-        try {
-            psmt = conn.prepareStatement(sql);
-            if (params != null && params.length > 0) {
-                for (int i = 0; i < params.length; i++) {
-                    try {
-                        psmt.setString(i + 1, params[i]);
-                    } catch (SQLException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            rs = psmt.executeQuery();
-            while (rs.next()) {
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE LAYOUT_ID=" + id);
+            if (rs.next())
+            {
                 Layout layout = new Layout();
-                layout.setLayInitPath(rs.getString("LAYOUT_INIT_PATH"));
-                layout.setLaySplit(rs.getString("LAYOUT_SPLIT"));
-                layoutList.add(layout);
+                layout.setId(id);
+                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
+                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
+                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
+                layout.setOrder(rs.getString("LAYOUT_ORDER"));
+                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
+                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
+                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
+                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
+                layout.setTable(tableModel.getById(rs.getInt("TBLS_TBL_ID")));
+                return layout;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (rs != null)
-                    rs.close();
-                if (psmt != null)
-                    psmt.close();
-                if (conn != null)
-                    conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        } catch (SQLException e)
+        {
+            log.error("getById in LayoutDao", e);
         }
-        return layoutList;
+
+        return null;
     }
 
     @Override
-    public boolean update(String sql, String[] params) {
+    public List<Layout> getAll()
+    {
+        throw new UnsupportedOperationException("getAll is not supported.");
+    }
+
+    public Layout getWritableByTable(Table table)
+    {
         Connection conn = db.getConnection();
-        PreparedStatement psmt = null;
-        int result = 0;
-        try {
-            psmt = conn.prepareStatement(sql);
-            if (params != null && params.length > 0) {
-                for (int i = 0; i < params.length; i++) {
-                    psmt.setString(i + 1, params[i]);
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
+            " AND LAYOUT_PERMISSION>0");
+            if (rs.next())
+            {
+                Layout layout = new Layout();
+                layout.setId(rs.getInt("LAYOUT_ID"));
+                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
+                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
+                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
+                layout.setOrder(rs.getString("LAYOUT_ORDER"));
+                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
+                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
+                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
+                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
+                layout.setTable(tableModel.getById(rs.getInt("TBLS_TBL_ID")));
+                if (rs.next())
+                {
+                    throw new ColumnOrderException("multiple writable layouts founded for table: " +
+                            table.getSchema().getName() + "." + table.getName());
+                }
+                return layout;
+            }
+        } catch (Exception e)
+        {
+            log.error("getById in LayoutDao", e);
+        }
+
+        return null;
+    }
+
+    public Layout getLatestByTable(Table table)
+    {
+        List<Layout> layouts = this.getByTable(table);
+
+        Layout res = null;
+        if (layouts != null)
+        {
+            int maxId = -1;
+            for (Layout layout : layouts)
+            {
+                if (layout.getId() > maxId)
+                {
+                    maxId = layout.getId();
+                    res = layout;
                 }
             }
-            result = psmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (psmt != null)
-                    psmt.close();
-                if (conn != null)
-                    conn.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
         }
-        return result == 1;
+
+        return res;
     }
 
-    @Override
-    public List<Layout> find(Layout o) {
+    @SuppressWarnings("Duplicates")
+    public List<Layout> getByTable (Table table)
+    {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId());
+            List<Layout> layouts = new ArrayList<>();
+            while (rs.next())
+            {
+                Layout layout = new Layout();
+                layout.setId(rs.getInt("LAYOUT_ID"));
+                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
+                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
+                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
+                layout.setOrder(rs.getString("LAYOUT_ORDER"));
+                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
+                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
+                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
+                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
+                layout.setTable(table);
+                table.addLayout(layout);
+                layouts.add(layout);
+            }
+            return layouts;
+        } catch (SQLException e)
+        {
+            log.error("getById in LayoutDao", e);
+        }
+
         return null;
     }
 
-    @Override
-    public List<Layout> loadAll(Layout o) {
+    @SuppressWarnings("Duplicates")
+    public List<Layout> getReadableByTable (Table table)
+    {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
+                    " AND LAYOUT_PERMISSION>=0");
+            List<Layout> layouts = new ArrayList<>();
+            while (rs.next())
+            {
+                Layout layout = new Layout();
+                layout.setId(rs.getInt("LAYOUT_ID"));
+                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
+                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
+                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
+                layout.setOrder(rs.getString("LAYOUT_ORDER"));
+                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
+                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
+                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
+                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
+                layout.setTable(table);
+                table.addLayout(layout);
+                layouts.add(layout);
+            }
+            return layouts;
+        } catch (SQLException e)
+        {
+            log.error("getById in LayoutDao", e);
+        }
+
         return null;
     }
 
-    @Override
-    public boolean update(Layout o, String[] params) {
+    public boolean save (Layout layout)
+    {
+        if (exists(layout))
+        {
+            return update(layout);
+        }
+        else
+        {
+            return insert(layout);
+        }
+    }
+
+    public boolean exists (Layout layout)
+    {
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT 1 FROM LAYOUTS WHERE LAYOUT_ID=" + layout.getId());
+            if (rs.next())
+            {
+                return true;
+            }
+        } catch (SQLException e)
+        {
+            log.error("exists in LayoutDao", e);
+        }
+
+        return false;
+    }
+
+    public boolean insert (Layout layout)
+    {
+        Connection conn = db.getConnection();
+        String sql = "INSERT INTO LAYOUTS(" +
+                "`LAYOUT_VERSION`," +
+                "`LAYOUT_CREATE_AT`," +
+                "`LAYOUT_PERMISSION`," +
+                "`LAYOUT_ORDER`," +
+                "`LAYOUT_ORDER_PATH`," +
+                "`LAYOUT_COMPACT`," +
+                "`LAYOUT_COMPACT_PATH`," +
+                "`LAYOUT_SPLITS`," +
+                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?)";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setInt(1, layout.getVersion());
+            pst.setLong(2, layout.getCreateAt());
+            pst.setInt(3, layout.getPermission());
+            pst.setString(4, layout.getOrder());
+            pst.setString(5, layout.getOrderPath());
+            pst.setString(6, layout.getCompact());
+            pst.setString(7, layout.getCompactPath());
+            pst.setString(8, layout.getSplits());
+            pst.setInt(9, layout.getTable().getId());
+            return pst.execute();
+        } catch (SQLException e)
+        {
+            log.error("insert in LayoutDao", e);
+        }
+        return false;
+    }
+
+    public boolean update (Layout layout)
+    {
+        Connection conn = db.getConnection();
+        String sql = "UPDATE LAYOUTS\n" +
+                "SET\n" +
+                "`LAYOUT_VERSION` = ?," +
+                "`LAYOUT_CREATE_AT` = ?," +
+                "`LAYOUT_PERMISSION` = ?," +
+                "`LAYOUT_ORDER` = ?," +
+                "`LAYOUT_ORDER_PATH` = ?," +
+                "`LAYOUT_COMPACT` = ?," +
+                "`LAYOUT_COMPACT_PATH` = ?," +
+                "`LAYOUT_SPLITS` = ?\n" +
+                "WHERE `LAYOUT_ID` = ?";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setInt(1, layout.getVersion());
+            pst.setLong(2, layout.getCreateAt());
+            pst.setInt(3, layout.getPermission());
+            pst.setString(4, layout.getOrder());
+            pst.setString(5, layout.getOrderPath());
+            pst.setString(6, layout.getCompact());
+            pst.setString(7, layout.getCompactPath());
+            pst.setString(8, layout.getSplits());
+            pst.setInt(9, layout.getId());
+            return pst.execute();
+        } catch (SQLException e)
+        {
+            log.error("insert in LayoutDao", e);
+        }
         return false;
     }
 }

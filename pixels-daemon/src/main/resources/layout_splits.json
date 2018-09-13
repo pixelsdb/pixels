@@ -1,0 +1,18 @@
+{
+  "numRowGroupInBlock":4,
+  "splitPatterns":
+  [
+    {
+      "accessedColumns":[311,314,315,332,361,438,316,397,396,11,375,392,530,368],
+      "numRowGroupInSplit":1
+    },
+    {
+      "accessedColumns":[364,315,438,397,396,11,368],
+      "numRowGroupInSplit":2
+    },
+    {
+      "accessedColumns":[311,680,332,361,438,362,316,397,11],
+      "numRowGroupInSplit":2
+    }
+  ]
+}

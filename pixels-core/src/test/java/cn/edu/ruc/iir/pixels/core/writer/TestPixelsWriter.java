@@ -19,7 +19,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.util.Random;
 
 /**
  * pixels
@@ -27,15 +26,13 @@ import java.util.Random;
  * @author guodong
  */
 public class TestPixelsWriter {
+
     @Test
-    public void testWriter() {
+    public void testWriterWithNull() {
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-
-        Random randomKey = new Random();
-        Random randomSf = new Random(System.currentTimeMillis() * randomKey.nextInt());
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try {
@@ -65,18 +62,39 @@ public class TestPixelsWriter {
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
             for (int i = 0; i < TestParams.rowNum; i++) {
-                int key = randomKey.nextInt(50000);
-                float sf = randomSf.nextFloat();
-                double sd = randomSf.nextDouble();
                 int row = rowBatch.size++;
-                a.vector[row] = i;
-                b.vector[row] = i * 3.1415f;
-                c.vector[row] = i * 3.14159d;
-                d.set(row, timestamp);
-                e.vector[row] = i > 25000 ? 1 : 0;
-                z.setVal(row, String.valueOf(i).getBytes());
+                if (i % 100 == 0)
+                {
+                    a.isNull[row] = true;
+                    a.vector[row] = 0;
+                    b.isNull[row] = true;
+                    b.vector[row] = 0;
+                    c.isNull[row] = true;
+                    c.vector[row] = 0;
+                    d.isNull[row] = true;
+                    d.time[row] = 0;
+                    d.nanos[row] = 0;
+                    e.isNull[row] = true;
+                    e.vector[row] = 0;
+                    z.isNull[row] = true;
+                    z.vector[row] = new byte[0];
+                }
+                else
+                {
+                    a.vector[row] = i;
+                    a.isNull[row] = false;
+                    b.vector[row] = i * 3.1415f;
+                    b.isNull[row] = false;
+                    c.vector[row] = i * 3.14159d;
+                    c.isNull[row] = false;
+                    d.set(row, timestamp);
+                    d.isNull[row] = false;
+                    e.vector[row] = i > 25 ? 1 : 0;
+                    e.isNull[row] = false;
+                    z.setVal(row, String.valueOf(i).getBytes());
+                    z.isNull[row] = false;
+                }
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
@@ -93,21 +111,24 @@ public class TestPixelsWriter {
     }
 
     @Test
-    public void testWriter2() {
-        String filePath = "hdfs://10.77.40.236:9000/pixels/v1/point10001_9.pxl";
-        int rowNum = 10001;
+    public void testWriterWithoutNull()
+    {
+        String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
+        // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try {
-            String schemaStr = "struct<id:int,x:double,y:double>";
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            TypeDescription schema = TypeDescription.fromString(schemaStr);
+            TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
-            DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // double
+            DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
+            TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
+            LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
+            BytesColumnVector z = (BytesColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -125,12 +146,20 @@ public class TestPixelsWriter {
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 1; i <= rowNum; i++) {
+            for (int i = 0; i < TestParams.rowNum; i++) {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
-                b.vector[row] = i * 2d;
-                c.vector[row] = i * 3d;
+                a.isNull[row] = false;
+                b.vector[row] = i * 3.1415f;
+                b.isNull[row] = false;
+                c.vector[row] = i * 3.14159d;
+                c.isNull[row] = false;
+                d.set(row, timestamp);
+                d.isNull[row] = false;
+                e.vector[row] = i > 25000 ? 1 : 0;
+                e.isNull[row] = false;
+                z.setVal(row, String.valueOf(i).getBytes());
+                z.isNull[row] = false;
                 if (rowBatch.size == rowBatch.getMaxSize()) {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();

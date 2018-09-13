@@ -3,6 +3,7 @@ build
 target
 .classpath*
 .settings
+*.pxl
 *~
 *.iml
 .DS_Store
@@ -19,3 +20,4 @@ package-info.java
 *.log
 *.txt
 test30G_pixels/
+*.csv
