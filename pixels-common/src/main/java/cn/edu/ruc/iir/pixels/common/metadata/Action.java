@@ -12,5 +12,10 @@ public enum Action {
     getSchemas,
     getTables,
     getLayouts,
-    getColumns
+    getColumns,
+    createSchema,
+    createTable,
+    dropSchema,
+    dropTable,
+    existTable
 }

@@ -10,7 +10,7 @@ WHERE
     AppInfoServerName IN ('www.bing.com') AND
     AppInfoClientName IN ('Browser') AND
     Market IN ('zh-CN') AND
-    QueryDate_ >= '2015-03-01' AND QueryDate_ <= '2015-03-01' AND
+    QueryDate_ >= '2010-03-01' AND QueryDate_ <= '2018-03-01' AND
     IsHomepageView = true
 GROUP BY
     QueryDate_,RequestTimeUTCMinute
@@ -35,7 +35,7 @@ WHERE
     Vertical IN ('web') AND
     AppInfoServerName IN ('www.bing.com') AND
     AppInfoClientName IN ('Browser') AND
-    QueryDate_ >= '2015-03-01' AND QueryDate_ <= '2015-03-07'
+    QueryDate_ >= '2010-03-01' AND QueryDate_ <= '2018-03-07'
 GROUP BY
     RawQuery
 ORDER BY

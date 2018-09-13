@@ -6,11 +6,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
-import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
@@ -153,6 +149,9 @@ class PixelsPageSource implements ConnectorPageSource {
                 switch (typeName)
                 {
                     case "integer":
+                    case "bigint":
+                    case "long":
+                    case "int":
                         LongColumnVector lcv = (LongColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
@@ -168,6 +167,7 @@ class PixelsPageSource implements ConnectorPageSource {
                         blocks[fieldId] = blockBuilder.build();
                         break;
                     case "double":
+                    case "float":
                         DoubleColumnVector dcv = (DoubleColumnVector) cv;
                         for (int i = 0; i < batchSize; ++i)
                         {
@@ -220,6 +220,21 @@ class PixelsPageSource implements ConnectorPageSource {
                             else
                             {
                                 type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+                            }
+                        }
+                        blocks[fieldId] = blockBuilder.build();
+                        break;
+                    case "timestamp":
+                        TimestampColumnVector tcv = (TimestampColumnVector) cv;
+                        for (int i = 0; i < this.rowBatch.size; ++i)
+                        {
+                            if (tcv.isNull[i])
+                            {
+                                blockBuilder.appendNull();
+                            }
+                            else
+                            {
+                                type.writeLong(blockBuilder, tcv.time[i]);
                             }
                         }
                         blocks[fieldId] = blockBuilder.build();

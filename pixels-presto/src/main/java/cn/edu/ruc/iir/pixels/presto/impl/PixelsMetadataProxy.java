@@ -31,12 +31,13 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 /**
  * Created by hank on 18-6-18.
  */
-public class PixelsMetadataReader {
-    private static final Logger log = Logger.get(PixelsMetadataReader.class);
+public class PixelsMetadataProxy
+{
+    private static final Logger log = Logger.get(PixelsMetadataProxy.class);
     private final MetadataService metadataService;
 
     @Inject
-    public PixelsMetadataReader(PixelsPrestoConfig config)
+    public PixelsMetadataProxy(PixelsPrestoConfig config)
     {
         ConfigFactory configFactory = config.getFactory();
         String host = configFactory.getProperty("metadata.server.host");
@@ -56,12 +57,12 @@ public class PixelsMetadataReader {
 
     public List<String> getTableNames(String schemaName) throws MetadataException
     {
-        List<String> tablelist = new ArrayList<String>();
+        List<String> tableList = new ArrayList<String>();
         List<Table> tables = metadataService.getTables(schemaName);
         for (Table t : tables) {
-            tablelist.add(t.getName());
+            tableList.add(t.getName());
         }
-        return tablelist;
+        return tableList;
     }
 
     public PixelsTable getTable(String connectorId, String schemaName, String tableName) throws MetadataException
@@ -88,7 +89,7 @@ public class PixelsMetadataReader {
                 columnType = INTEGER;
             } else if (type.equals("bigint") || type.equals("long")) {
                 columnType = BIGINT;
-            } else if (type.equals("double")) {
+            } else if (type.equals("double")|| type.equals("float")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
@@ -116,11 +117,11 @@ public class PixelsMetadataReader {
             Type columnType = null;
             String name = c.getName();
             String type = c.getType().toLowerCase();
-            if (type.equals("int")) {
+            if (type.equals("integer") || type.equals("int")) {
                 columnType = INTEGER;
-            } else if (type.equals("bigint")) {
+            } else if (type.equals("bigint") || type.equals("long")) {
                 columnType = BIGINT;
-            } else if (type.equals("double")) {
+            } else if (type.equals("double")|| type.equals("float")) {
                 columnType = DOUBLE;
             } else if (type.equals("varchar") || type.equals("string")) {
                 columnType = VARCHAR;
@@ -129,7 +130,7 @@ public class PixelsMetadataReader {
             } else if (type.equals("timestamp")) {
                 columnType = TIMESTAMP;
             } else {
-                System.out.println("columnType is not defined.");
+                log.error("columnType is not defined.");
             }
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
             columns.add(pixelsColumnHandle);
@@ -142,4 +143,28 @@ public class PixelsMetadataReader {
         return metadataService.getLayouts(schemaName, tableName);
     }
 
+    public boolean createSchema (String schemaName) throws MetadataException
+    {
+        return metadataService.createSchema(schemaName);
+    }
+
+    public boolean dropSchema (String schemaName) throws MetadataException
+    {
+        return metadataService.dropSchema(schemaName);
+    }
+
+    public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
+    {
+        return metadataService.createTable(schemaName, tableName, columns);
+    }
+
+    public boolean dropTable (String schemaName, String tableName) throws MetadataException
+    {
+        return metadataService.dropTable(schemaName, tableName);
+    }
+
+    public boolean existTable (String schemaName, String tableName) throws MetadataException
+    {
+        return metadataService.existTable(schemaName, tableName);
+    }
 }

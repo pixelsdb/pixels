@@ -18,7 +18,7 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
-import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataReader;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
 import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
 import cn.edu.ruc.iir.pixels.presto.split.Inverted;
@@ -57,13 +57,13 @@ public class PixelsSplitManager
     private final Logger log = Logger.get(PixelsSplitManager.class);
     private final String connectorId;
     private final FSFactory fsFactory;
-    private final PixelsMetadataReader metadataReader;
+    private final PixelsMetadataProxy metadataProxy;
 
     @Inject
-    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataReader metadataReader, FSFactory fsFactory) {
+    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, FSFactory fsFactory) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
-        this.metadataReader = requireNonNull(metadataReader, "metadataReader is null");
+        this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
     }
 
     @Override
@@ -83,7 +83,7 @@ public class PixelsSplitManager
         List<Layout> layouts;
         try
         {
-            layouts = metadataReader.getDataLayouts(tableHandle.getSchemaName(),
+            layouts = metadataProxy.getDataLayouts(tableHandle.getSchemaName(),
                     tableHandle.getTableName());
         }
         catch (MetadataException e)

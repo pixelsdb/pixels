@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
@@ -79,8 +80,15 @@ public class DaemonMain
                     } catch (Exception e)
                     {
                         LogFactory.Instance().getLog().error("error in the main loop of daemon.", e);
+                        if (args[0].equalsIgnoreCase("metadata"))
+                        {
+                            // close the metadata database connection.
+                            DBUtil.Instance().close();
+                        }
                     }
                 }
+
+
             } else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
                     (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
             {
@@ -105,11 +113,25 @@ public class DaemonMain
                         {
                             continue;
                         }
-                        if (splits[1].contains(jarName) &&
-                                (splits[2].contains("-Drole=main") || splits[2].contains("-Drole=guard")))
+                        if (splits[1].contains(jarName))
                         {
+                            String roleName = null;
+                            // get the role name of the target daemon (to be killing).
+                            for (int i = 2; i < splits.length; ++i)
+                            {
+                                if ((splits[i].contains("-Drole=main") || splits[i].contains("-Drole=guard")))
+                                {
+                                    roleName = splits[i].split("=")[1];
+                                    break;
+                                }
+                            }
+                            if (roleName == null)
+                            {
+                                continue;
+                            }
                             int pid = Integer.parseInt(splits[0]);
-                            System.out.println("killing " + splits[2].split("=")[1] + ", pid (" + pid + ")");
+                            System.out.println("killing " + roleName + ", pid (" + pid + ")");
+                            // TODO: this is not a gentle manner to terminate the daemon, we should notify the killing daemon to close database connection.
                             Runtime.getRuntime().exec("kill -9 " + pid);
                         }
                     }

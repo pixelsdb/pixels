@@ -59,7 +59,8 @@ public class MetadataServer implements Server {
                     .channel(NioServerSocketChannel.class)
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
-                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(2048))
+                    //TODO: currently, the message received by server can not be longer than this fixed buffer size.
+                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024*128))
                     .childHandler(new ChildChannelInitializer());
 
             //绑定端口, 同步等待成功

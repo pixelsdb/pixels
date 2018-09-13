@@ -129,4 +129,80 @@ public class MetadataService
         }
         return schemas != null ? schemas : new ArrayList<>();
     }
+
+    public boolean createSchema (String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.createSchema.toString());
+        params.setParam("schemaName", schemaName);
+        return submitCheckRequest(params, token).equals("success");
+    }
+
+    public boolean dropSchema (String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.dropSchema.toString());
+        params.setParam("schemaName", schemaName);
+        return submitCheckRequest(params, token).equals("success");
+    }
+
+    public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+        assert columns != null && !columns.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.createTable.toString());
+        params.setParam("schemaName", schemaName);
+        params.setParam("tableName", tableName);
+        params.setParam("columns", JSON.toJSONString(columns));
+        return submitCheckRequest(params, token).equals("success");
+    }
+
+    public boolean dropTable (String schemaName, String tableName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.dropTable.toString());
+        params.setParam("schemaName", schemaName);
+        params.setParam("tableName", tableName);
+        return submitCheckRequest(params, token).equals("success");
+    }
+
+    public boolean existTable (String schemaName, String tableName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+        assert tableName != null && !tableName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.existTable.toString());
+        params.setParam("schemaName", schemaName);
+        params.setParam("tableName", tableName);
+        return submitCheckRequest(params, token).equals("true");
+    }
+
+    private String submitCheckRequest (ReqParams params, String token) throws MetadataException
+    {
+        MetadataClient client = new MetadataClient(params, token);
+        try
+        {
+            client.connect(port, host);
+            while (true)
+            {
+                String res = client.getResponse().get(token);
+                if (res != null)
+                {
+                    return res;
+                }
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("can not create schema in metadata", e);
+        }
+    }
 }

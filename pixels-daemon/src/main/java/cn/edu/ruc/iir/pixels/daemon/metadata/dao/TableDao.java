@@ -34,7 +34,6 @@ public class TableDao implements Dao<Table>
                 table.setSchema(schemaModel.getById(rs.getInt("DBS_DB_ID")));
                 return table;
             }
-
         } catch (SQLException e)
         {
             log.error("getById in TableDao", e);
@@ -139,12 +138,24 @@ public class TableDao implements Dao<Table>
         }
     }
 
+    /**
+     * If the table with the same id or with the same db_id and table name exists,
+     * this method returns false.
+     * @param table
+     * @return
+     */
     public boolean exists (Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId());
+            String sql = "SELECT 1 FROM TBLS WHERE TBL_ID=" + table.getId();
+            if (table.getSchema() != null)
+            {
+                sql += " OR (DBS_DB_ID=" + table.getSchema().getId() +
+                        " AND TBL_NAME='" + table.getName() + "')";
+            }
+            ResultSet rs = st.executeQuery(sql);
             if (rs.next())
             {
                 return true;
@@ -157,7 +168,7 @@ public class TableDao implements Dao<Table>
         return false;
     }
 
-    private boolean insert (Table table)
+    public boolean insert (Table table)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO TBLS(" +
@@ -178,7 +189,7 @@ public class TableDao implements Dao<Table>
         return false;
     }
 
-    private boolean update (Table table)
+    public boolean update (Table table)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE TBLS\n" +
@@ -195,6 +206,31 @@ public class TableDao implements Dao<Table>
         } catch (SQLException e)
         {
             log.error("insert in TableDao", e);
+        }
+        return false;
+    }
+
+    /**
+     * We use cascade delete and cascade update in the metadata database.
+     * If you delete a table by this method, all the layouts and columns of the table
+     * will be deleted.
+     * @param name
+     * @param schema
+     * @return
+     */
+    public boolean deleteByNameAndSchema (String name, Schema schema)
+    {
+        assert name !=null && schema != null;
+        Connection conn = db.getConnection();
+        String sql = "DELETE FROM TBLS WHERE TBL_NAME=? AND DBS_DB_ID=?";
+        try (PreparedStatement pst = conn.prepareStatement(sql))
+        {
+            pst.setString(1, name);
+            pst.setInt(2, schema.getId());
+            return pst.executeUpdate() == 1;
+        } catch (SQLException e)
+        {
+            log.error("delete in TableDao", e);
         }
         return false;
     }
