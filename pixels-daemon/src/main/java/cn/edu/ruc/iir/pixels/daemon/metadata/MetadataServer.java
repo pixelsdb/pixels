@@ -4,11 +4,9 @@ import cn.edu.ruc.iir.pixels.common.utils.DBUtils;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.FixedRecvByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
@@ -26,20 +24,17 @@ public class MetadataServer implements Server {
     private EventLoopGroup boss = null;
     private EventLoopGroup worker = null;
 
-    public MetadataServer(int port)
-    {
+    public MetadataServer(int port) {
         this.port = port;
     }
 
     @Override
-    public boolean isRunning()
-    {
+    public boolean isRunning() {
         return this.running;
     }
 
     @Override
-    public void shutdown()
-    {
+    public void shutdown() {
         // close the netty server here.
         this.running = false;
         boss.shutdownGracefully();
@@ -47,8 +42,7 @@ public class MetadataServer implements Server {
     }
 
     @Override
-    public void run()
-    {
+    public void run() {
         //配置服务端NIO 线程组
         this.boss = new NioEventLoopGroup();
         this.worker = new NioEventLoopGroup();
@@ -61,7 +55,13 @@ public class MetadataServer implements Server {
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
                     .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(2048))
-                    .childHandler(new ChildChannelInitializer());
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel ch) throws Exception {
+                            ch.pipeline().addLast(
+                                    new MetadataServerHandler());
+                        }
+                    });
 
             //绑定端口, 同步等待成功
             //System.out.println("port: " + port);
@@ -70,8 +70,7 @@ public class MetadataServer implements Server {
 
             //等待服务端监听端口关闭
             future.channel().closeFuture().sync();
-        } catch (InterruptedException e)
-        {
+        } catch (InterruptedException e) {
             LogFactory.Instance().getLog().error("error while binding port in metadata server.", e);
         } finally {
             //优雅关闭 线程组
