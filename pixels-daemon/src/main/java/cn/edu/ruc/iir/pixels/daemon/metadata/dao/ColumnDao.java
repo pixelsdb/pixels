@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
@@ -57,7 +58,7 @@ public class ColumnDao implements Dao<Column>
         try (Statement st = conn.createStatement())
         {
             ResultSet rs = st.executeQuery("SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
-            " ORDER BY COL_ID");
+                    " ORDER BY COL_ID");
             List<Column> columns = new ArrayList<>();
             while (rs.next())
             {
@@ -71,6 +72,32 @@ public class ColumnDao implements Dao<Column>
                 columns.add(column);
             }
             return columns;
+
+        } catch (SQLException e)
+        {
+            log.error("getByTable in ColumnDao", e);
+        }
+
+        return null;
+    }
+
+    public Order getOrderByTable(Table table)
+    {
+        Order columnOrder = new Order();
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement())
+        {
+            ResultSet rs = st.executeQuery("SELECT COL_NAME FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
+                    " ORDER BY COL_ID");
+            List<String> column = new ArrayList<>();
+            String colName = null;
+            while (rs.next())
+            {
+                colName = rs.getString("COL_NAME");
+                column.add(colName);
+            }
+            columnOrder.setColumnOrder(column);
+            return columnOrder;
 
         } catch (SQLException e)
         {
