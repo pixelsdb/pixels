@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * <p>
-
+*
  * <p>
  * LOAD -p /home/tao/software/data/pixels/data/ -s /home/tao/software/data/pixels/Test.sql -f hdfs://presto00:9000/po_compare/
  * <br> 1000 columns
@@ -32,13 +32,15 @@ public abstract class Loader
     private final String dbName;
     private final String tableName;
     private final int maxRowNum;
+    private final String regex;
 
-    Loader(String originalDataPath, String dbName, String tableName, int maxRowNum)
+    Loader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
     {
         this.originalDataPath = originalDataPath;
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
+        this.regex = regex;
     }
 
     boolean load() throws IOException, MetadataException
@@ -114,14 +116,21 @@ public abstract class Loader
         {
             String name = layoutColumnOrder.get(i);
             String type = originalColTypes[orderMapping[i]];
+            if (type.equals("integer")) {
+                type = "int";
+            } else if (type.equals("long")) {
+                type = "bigint";
+            } else if (type.equals("varchar")) {
+                type = "string";
+            }
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }
         schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
-        return executeLoad(originalDataPath, loadingDataPath, schemaBuilder.toString(), orderMapping, configFactory, maxRowNum);
+        return executeLoad(originalDataPath, loadingDataPath, schemaBuilder.toString(), orderMapping, configFactory, maxRowNum, regex);
     }
 
     protected abstract boolean executeLoad(String originalDataPath, String loadingDataPath, String schema,
-                                           int[] orderMapping, ConfigFactory configFactory, int maxRowNum)
+                                           int[] orderMapping, ConfigFactory configFactory, int maxRowNum, String regex)
             throws IOException;
 }

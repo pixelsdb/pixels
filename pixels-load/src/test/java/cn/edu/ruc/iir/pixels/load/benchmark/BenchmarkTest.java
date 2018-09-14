@@ -9,8 +9,6 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.Dao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
 import com.facebook.presto.sql.tree.CreateTable;
@@ -218,5 +216,39 @@ public class BenchmarkTest {
         return type;
     }
 
+    /**
+     * @ClassName: BenchmarkTest
+     * @Title: testInsertLayout
+     * @Description: Add layout by given table name
+     * @param:
+     * @author: tao
+     * @date: 下午3:19 18-9-12
+     */
+    @Test
+    public void testInsertLayout() {
+        String tableName = "test_105";
+        String oldPath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
+        ColumnDao columnDao = new ColumnDao();
+        Table table = new Table();
+        table.setId(6);
+
+        Order columnOrder = columnDao.getOrderByTable(table);
+        String order = JSON.toJSONString(columnOrder);
+
+        LayoutDao layoutDao = new LayoutDao();
+        Layout layout = new Layout();
+        layout.setOrderPath(oldPath);
+        layout.setOrder(order);
+        // must
+        layout.setTable(table);
+        // Column cannot be null
+        layout.setCompact("no");
+        layout.setCompactPath("no");
+        layout.setSplits("no");
+
+        layoutDao.save(layout);
+        System.out.println(layout.getOrder());
+
+    }
 
 }
