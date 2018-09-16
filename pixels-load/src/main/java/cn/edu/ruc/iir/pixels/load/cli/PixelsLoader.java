@@ -49,7 +49,7 @@ public class PixelsLoader
         ColumnVector[] columnVectors = rowBatch.cols;
         int pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         int rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size")) * 1024 * 1024;
-        int blockSize = Integer.parseInt(configFactory.getProperty("block.size")) * 1024 * 1024;
+        long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
         // read original data

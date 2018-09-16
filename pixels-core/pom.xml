@@ -115,7 +115,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>pixels</finalName>
+                            <finalName>pixels-core</finalName>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>allinone</shadedClassifierName>
                             <filters>
