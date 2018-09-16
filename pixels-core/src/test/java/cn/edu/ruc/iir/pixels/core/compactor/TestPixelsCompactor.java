@@ -26,6 +26,7 @@ import java.util.List;
 
 public class TestPixelsCompactor
 {
+    @SuppressWarnings("Duplicates")
     @Test
     public void testBasicCompact () throws MetadataException, IOException
     {
@@ -34,8 +35,8 @@ public class TestPixelsCompactor
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         // get compact layout
-        MetadataService metadataService = new MetadataService("presto00", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "testnull_pixels");
+        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = layouts.get(0);
         Compact compact = layout.getCompactObject();
@@ -51,9 +52,9 @@ public class TestPixelsCompactor
         }
 
         // get input file paths
-        FileSystem fs = FileSystem.get(URI.create("hdfs://presto00:9000/"), conf);
+        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir01:9000/"), conf);
         FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order"));
+                new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order"));
 
         // compact
         int NO = 0;
@@ -67,7 +68,7 @@ public class TestPixelsCompactor
             }
             long start = System.currentTimeMillis();
 
-            String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_compact/" +
+            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
@@ -78,7 +79,7 @@ public class TestPixelsCompactor
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
                             .setBlockSize(2L *1024*1024*1024)
-                            .setReplication((short) 1)
+                            .setReplication((short) 2)
                             .setBlockPadding(false)
                             .build();
             pixelsCompactor.compact();
@@ -90,29 +91,39 @@ public class TestPixelsCompactor
         }
     }
 
+    @SuppressWarnings("Duplicates")
     @Test
     public void testRealCompact () throws MetadataException, IOException
     {
         // get compact layout
-        MetadataService metadataService = new MetadataService("presto00", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "testnull_pixels");
+        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
-        Layout layout = layouts.get(0);
+        Layout layout = null;
+        int layoutId = 1;
+        for (Layout layout1 : layouts)
+        {
+            if (layout1.getId() == layoutId)
+            {
+                layout = layout1;
+                break;
+            }
+        }
         Compact compact = layout.getCompactObject();
         CompactLayout compactLayout = CompactLayout.fromCompact(compact);
 
         // get input file paths
         Configuration conf = new Configuration();
-        FileSystem fs = FileSystem.get(URI.create("hdfs://presto00:9000/"), conf);
+        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir01:9000/"), conf);
         FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order"));
+                new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_order"));
 
         // compact
         int NO = 0;
-        for (int i = 0; i + 16 < statuses.length; i+=16)
+        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.length; i+=compact.getNumRowGroupInBlock())
         {
             List<Path> sourcePaths = new ArrayList<>();
-            for (int j = 0; j < 16; ++j)
+            for (int j = 0; j < compact.getNumRowGroupInBlock(); ++j)
             {
                 //System.out.println(statuses[i+j].getPath().toString());
                 sourcePaths.add(statuses[i+j].getPath());
@@ -120,7 +131,7 @@ public class TestPixelsCompactor
 
             long start = System.currentTimeMillis();
 
-            String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_compact/" +
+            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
@@ -131,7 +142,7 @@ public class TestPixelsCompactor
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
                             .setBlockSize(2L *1024*1024*1024)
-                            .setReplication((short) 1)
+                            .setReplication((short) 2)
                             .setBlockPadding(false)
                             .build();
             pixelsCompactor.compact();
