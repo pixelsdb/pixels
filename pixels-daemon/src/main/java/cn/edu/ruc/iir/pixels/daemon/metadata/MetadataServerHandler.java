@@ -26,26 +26,25 @@ import java.util.List;
  */
 public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 {
-    private boolean complete = false;
-    private StringBuilder builder = new StringBuilder();
 
-    @SuppressWarnings("Duplicates")
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
     {
-        ByteBuf buf = (ByteBuf) msg;
-        try
-        {
-            byte[] req = new byte[buf.readableBytes()];
-            buf.readBytes(req);
-            String body = new String(req, "UTF-8");
-            builder.append(body);
-        }
-        finally
-        {
-            ReferenceCountUtil.release(msg);
-        }
+//        if (msg instanceof ReqParams) {
+            ReqParams params = (ReqParams) msg;
+            // log the received params.
+            LogFactory.Instance().getLog().info(params.toString());
 
+            ResParams response = this.executeRequest(params);
+            //response
+            //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
+            ChannelFuture future = ctx.writeAndFlush(response);
+            // Thread close
+            future.addListener(
+                    (ChannelFutureListener) channelFuture -> ctx.close()
+            );
+
+//        }
 
     }
 
@@ -54,23 +53,6 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
     {
         //将发送缓冲区中数据全部写入SocketChannel
         ctx.flush();
-        if (this.complete == false)
-        {
-            ReqParams params = ReqParams.parse(builder.toString());
-
-            // log the received params.
-            LogFactory.Instance().getLog().info(builder.toString());
-
-            String res = this.executeRequest(params);
-            //response
-            //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
-            ChannelFuture future = ctx.writeAndFlush(Unpooled.copiedBuffer(res.getBytes()));
-            // Thread close
-            future.addListener(
-                    (ChannelFutureListener) channelFuture -> ctx.close()
-            );
-        }
-        this.complete = true;
     }
 
     @Override
@@ -81,9 +63,11 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
         ctx.close();
     }
 
-    private String executeRequest (ReqParams params)
+    private ResParams executeRequest (ReqParams params)
     {
-        String res;
+        String res = null;
+
+        ResParams response = new ResParams(params.getAction());
 
         SchemaDao schemaDao = new SchemaDao();
         TableDao tableDao = new TableDao();
@@ -215,6 +199,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             }
         }
 
-        return res;
+        response.setResult(res);
+        return response;
     }
 }

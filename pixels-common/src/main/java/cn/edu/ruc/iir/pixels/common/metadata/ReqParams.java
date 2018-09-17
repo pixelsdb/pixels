@@ -1,9 +1,10 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReqParams
+public class ReqParams implements Serializable
 {
     private String action;
     private Map<String, String> params = new HashMap<>();

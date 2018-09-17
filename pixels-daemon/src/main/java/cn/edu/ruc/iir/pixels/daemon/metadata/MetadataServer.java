@@ -8,6 +8,9 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.serialization.ClassResolvers;
+import io.netty.handler.codec.serialization.ObjectDecoder;
+import io.netty.handler.codec.serialization.ObjectEncoder;
 
 /**
  * @version V1.0
@@ -54,8 +57,18 @@ public class MetadataServer implements Server {
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
                     //TODO: currently, the message received by server can not be longer than this fixed buffer size.
-                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024*128))
-                    .childHandler(new ChildChannelInitializer());
+//                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024*128))
+                    .childHandler(new ChannelInitializer<SocketChannel>()
+                    {
+                        @Override
+                        protected void initChannel(SocketChannel channel) throws Exception
+                        {
+                            channel.pipeline().addLast(
+                                    new ObjectEncoder(),
+                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(null)),
+                                    new MetadataServerHandler());
+                        }
+                    });
 
             //绑定端口, 同步等待成功
             //System.out.println("port: " + port);
