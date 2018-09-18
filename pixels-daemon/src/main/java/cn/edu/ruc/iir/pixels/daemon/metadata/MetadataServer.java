@@ -65,7 +65,8 @@ public class MetadataServer implements Server {
                         {
                             channel.pipeline().addLast(
                                     new ObjectEncoder(),
-                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(null)),
+                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
+                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
                                     new MetadataServerHandler());
                         }
                     });

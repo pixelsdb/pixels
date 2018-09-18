@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
-import cn.edu.ruc.iir.pixels.common.metadata.Response;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;

@@ -58,10 +58,11 @@ public class MetadataClient
                     {
                         @Override
                         protected void initChannel(SocketChannel channel) throws Exception {
-                            channel.pipeline().addLast(new ObjectEncoder());
-                            channel.pipeline().addLast(new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())));
-                            channel.pipeline().addLast(new MetadataClientHandler(params, token, MetadataClient.this));
-
+                            channel.pipeline().addLast(
+                                    new ObjectEncoder(),
+                                    // 禁止缓存类加载器
+                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())),
+                                    new MetadataClientHandler(params, token, MetadataClient.this));
                         }
                     });
 
