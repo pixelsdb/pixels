@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
+import cn.edu.ruc.iir.pixels.common.serialize.KryoDecoder;
+import cn.edu.ruc.iir.pixels.common.serialize.KryoEncoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -58,11 +60,14 @@ public class MetadataClient
                     {
                         @Override
                         protected void initChannel(SocketChannel channel) throws Exception {
-                            channel.pipeline().addLast(
-                                    new ObjectEncoder(),
-                                    // 禁止缓存类加载器
-                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())),
-                                    new MetadataClientHandler(params, token, MetadataClient.this));
+//                            channel.pipeline().addLast(
+//                                    new ObjectEncoder(),
+//                                    // 禁止缓存类加载器
+//                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())),
+//                                    new MetadataClientHandler(params, token, MetadataClient.this));
+                            channel.pipeline().addLast("decoder", new KryoDecoder());
+                            channel.pipeline().addLast("encoder", new KryoEncoder());
+                            channel.pipeline().addLast(new MetadataClientHandler(params, token, MetadataClient.this));
                         }
                     });
 

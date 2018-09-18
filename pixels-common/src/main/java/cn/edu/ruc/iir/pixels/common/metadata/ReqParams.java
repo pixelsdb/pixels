@@ -10,6 +10,9 @@ public class ReqParams implements Serializable
     private String action;
     private Map<String, String> params = new HashMap<>();
 
+    public ReqParams() {
+    }
+
     public ReqParams (String action)
     {
         this.action = action;

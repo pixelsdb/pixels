@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
+import cn.edu.ruc.iir.pixels.common.serialize.KryoDecoder;
+import cn.edu.ruc.iir.pixels.common.serialize.KryoEncoder;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
@@ -63,11 +65,14 @@ public class MetadataServer implements Server {
                         @Override
                         protected void initChannel(SocketChannel channel) throws Exception
                         {
-                            channel.pipeline().addLast(
-                                    new ObjectEncoder(),
-                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
-                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
-                                    new MetadataServerHandler());
+//                            channel.pipeline().addLast(
+//                                    new ObjectEncoder(),
+//                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
+//                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
+//                                    new MetadataServerHandler());
+                            channel.pipeline().addLast("decoder", new KryoDecoder());
+                            channel.pipeline().addLast("encoder", new KryoEncoder());
+                            channel.pipeline().addLast(new MetadataServerHandler());
                         }
                     });
 
