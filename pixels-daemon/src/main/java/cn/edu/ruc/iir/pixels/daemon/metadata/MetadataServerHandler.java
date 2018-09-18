@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.metadata.*;
+import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
+import cn.edu.ruc.iir.pixels.common.metadata.Response;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
@@ -11,13 +12,10 @@ import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
 import com.alibaba.fastjson.JSON;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.ReferenceCountUtil;
 
 import java.util.List;
 
@@ -33,9 +31,10 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 //        if (msg instanceof ReqParams) {
             ReqParams params = (ReqParams) msg;
             // log the received params.
-            LogFactory.Instance().getLog().info(params.toString());
+            LogFactory.Instance().getLog().info("request: " + params.toString());
 
-            ResParams response = this.executeRequest(params);
+            Object response = this.executeRequest(params);
+
             //response
             //异步发送应答消息给客户端: 这里并没有把消息直接写入SocketChannel,而是放入发送缓冲数组中
             ChannelFuture future = ctx.writeAndFlush(response);
@@ -63,11 +62,11 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
         ctx.close();
     }
 
-    private ResParams executeRequest (ReqParams params)
+    private Object executeRequest (ReqParams params)
     {
         String res = null;
 
-        ResParams response = new ResParams(params.getAction());
+        Object response = new Object();
 
         SchemaDao schemaDao = new SchemaDao();
         TableDao tableDao = new TableDao();
@@ -79,14 +78,14 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             case "getSchemas":
             {
                 List<Schema> schemaList = schemaDao.getAll();
-                res = JSON.toJSONString(schemaList);
+                response = schemaList;
                 break;
             }
             case "getTables":
             {
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
                 List<Table> tableList = tableDao.getBySchema(schema);
-                res = JSON.toJSONString(tableList);
+                response = tableList;
                 break;
             }
             case "getLayouts":
@@ -94,7 +93,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
                 Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
                 List<Layout> layoutList = layoutDao.getReadableByTable(table);
-                res = JSON.toJSONString(layoutList);
+                response = layoutList;
                 break;
             }
             case "getColumns":
@@ -102,7 +101,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
                 Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
                 List<Column> columnList = columnDao.getByTable(table);
-                res = JSON.toJSONString(columnList);
+                response = columnList;
                 break;
             }
             case "createSchema":
@@ -199,7 +198,8 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             }
         }
 
-        response.setResult(res);
+        if(null != res)
+            response = res;
         return response;
     }
 }

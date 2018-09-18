@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -14,9 +13,7 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Created by hank on 18-6-17.
@@ -27,7 +24,7 @@ public class MetadataClient
     private final ReqParams params;
     private final String token;
     // getResponse and setResponse are synchronized to ensure atomic read/write.
-    private final Map<String, ResParams> response = new HashMap<>();
+    private final Map<String, Object> response = new HashMap<>();
 
     public MetadataClient(ReqParams params, String token)
     {
@@ -35,12 +32,12 @@ public class MetadataClient
         this.token = token;
     }
 
-    public synchronized Map<String, ResParams> getResponse()
+    public synchronized Map<String, Object> getResponse()
     {
         return response;
     }
 
-    public synchronized void setResponse (String token, ResParams res)
+    public synchronized void setResponse (String token, Object res)
     {
         this.response.put(token, res);
     }
@@ -62,7 +59,7 @@ public class MetadataClient
                         @Override
                         protected void initChannel(SocketChannel channel) throws Exception {
                             channel.pipeline().addLast(new ObjectEncoder());
-                            channel.pipeline().addLast(new ObjectDecoder(100 * 1024 * 1024, ClassResolvers.cacheDisabled(null)));
+                            channel.pipeline().addLast(new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())));
                             channel.pipeline().addLast(new MetadataClientHandler(params, token, MetadataClient.this));
 
                         }

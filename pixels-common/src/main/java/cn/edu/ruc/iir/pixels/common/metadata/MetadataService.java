@@ -1,10 +1,7 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import com.alibaba.fastjson.JSON;
 
 import java.util.ArrayList;
@@ -38,10 +35,10 @@ public class MetadataService
             client.connect(port, host);
             while (true)
             {
-                ResParams res = client.getResponse().get(token);
+                Object res = client.getResponse().get(token);
                 if (res != null)
                 {
-                    columns = JSON.parseArray(res.getResult(), Column.class);
+                    columns = (List<Column>) res;
                     break;
                 }
             }
@@ -65,10 +62,10 @@ public class MetadataService
             client.connect(port, host);
             while (true)
             {
-                ResParams res = client.getResponse().get(token);
+                Object res = client.getResponse().get(token);
                 if (res != null)
                 {
-                    layouts = JSON.parseArray(res.getResult(), Layout.class);
+                    layouts = (List<Layout>) res;
                     break;
                 }
             }
@@ -91,10 +88,10 @@ public class MetadataService
             client.connect(port, host);
             while (true)
             {
-                ResParams res = client.getResponse().get(token);
+                Object res = client.getResponse().get(token);
                 if (res != null)
                 {
-                    tables = JSON.parseArray(res.getResult(), Table.class);
+                    tables = (List<Table>) res;
                     break;
                 }
             }
@@ -116,10 +113,10 @@ public class MetadataService
             client.connect(port, host);
             while (true)
             {
-                ResParams res = client.getResponse().get(token);
+                Object res = client.getResponse().get(token);
                 if (res != null)
                 {
-                    schemas = JSON.parseArray(res.getResult(), Schema.class);
+                    schemas = (List<Schema>) res;
                     break;
                 }
             }
@@ -194,10 +191,10 @@ public class MetadataService
             client.connect(port, host);
             while (true)
             {
-                ResParams res = client.getResponse().get(token);
+                Object res = client.getResponse().get(token);
                 if (res != null)
                 {
-                    return res.getResult();
+                    return String.valueOf(res);
                 }
             }
         } catch (Exception e)

@@ -2,8 +2,6 @@ package cn.edu.ruc.iir.pixels.common.metadata;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
@@ -34,14 +32,23 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
     {
-        if (msg instanceof ResParams) {
-            ResParams resParams = (ResParams) msg;
-            this.client.setResponse(token, resParams);
-        } else {
-            // log the received params.
-            LogFactory.Instance().getLog().info("Bad response, " + msg.toString());
-            ctx.close();
+        try
+        {
+            LogFactory.Instance().getLog().info("client response: " + msg.toString());
+            if (msg instanceof Object) {
+                this.client.setResponse(token, msg);
+            } else {
+                // log the received params.
+                LogFactory.Instance().getLog().info("Bad response, " + msg.toString());
+                ctx.close();
+            }
         }
+        finally
+        {
+            ReferenceCountUtil.release(msg);
+        }
+
+
     }
 
     @Override

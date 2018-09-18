@@ -42,7 +42,7 @@ Run the presto client, we should do the following things:
 
 - move the `plugins` to each node
 ```sh
-./bin/mv-plugins.sh
+./sbin/mv-plugins.sh
 ```
 - start the clusters
 ```sh

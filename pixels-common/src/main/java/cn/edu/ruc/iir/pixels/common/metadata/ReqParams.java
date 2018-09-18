@@ -6,6 +6,7 @@ import java.util.Map;
 
 public class ReqParams implements Serializable
 {
+    private static final long serialVersionUID = 5207638282398302573L;
     private String action;
     private Map<String, String> params = new HashMap<>();
 
@@ -29,6 +30,18 @@ public class ReqParams implements Serializable
             }
         }
         return res;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    public Map<String, String> getParams() {
+        return params;
+    }
+
+    public void setParams(Map<String, String> params) {
+        this.params = params;
     }
 
     public String getAction ()

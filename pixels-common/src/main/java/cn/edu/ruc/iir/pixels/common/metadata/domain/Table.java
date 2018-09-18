@@ -3,24 +3,14 @@ package cn.edu.ruc.iir.pixels.common.metadata.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Table
+public class Table extends Base
 {
-    private int id;
+    private static final long serialVersionUID = -5992595471962291836L;
     private String name;
     private String type;
     private Schema schema;
     private List<Column> columns = new ArrayList<>();
     private List<Layout> layouts = new ArrayList<>();
-
-    public int getId()
-    {
-        return id;
-    }
-
-    public void setId(int id)
-    {
-        this.id = id;
-    }
 
     public String getName()
     {
@@ -82,19 +72,4 @@ public class Table
         this.layouts.add(layout);
     }
 
-    @Override
-    public int hashCode()
-    {
-        return this.id;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if (o instanceof Table)
-        {
-            return this.id == ((Table) o).id;
-        }
-        return false;
-    }
 }
