@@ -18,8 +18,7 @@ public class KryoDecoder extends ByteToMessageDecoder {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-        Object obj = KryoSerializer.deserialize(in);
-        out.add(obj);
+        KryoSerializer.deserialize(in, ctx, out);
     }
 
 }

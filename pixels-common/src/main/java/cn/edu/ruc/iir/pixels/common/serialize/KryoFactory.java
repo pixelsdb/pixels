@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.common.serialize;
 
 import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Base;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.serializers.DefaultSerializers;
 import de.javakaffee.kryoserializers.*;
@@ -39,6 +40,7 @@ public abstract class KryoFactory {
         Kryo kryo = new Kryo();
         kryo.setRegistrationRequired(false);
         kryo.register(ReqParams.class);
+        kryo.register(Base.class);
         kryo.register(Arrays.asList("").getClass(), new ArraysAsListSerializer());
         kryo.register(GregorianCalendar.class, new GregorianCalendarSerializer());
         kryo.register(InvocationHandler.class, new JdkProxySerializer());

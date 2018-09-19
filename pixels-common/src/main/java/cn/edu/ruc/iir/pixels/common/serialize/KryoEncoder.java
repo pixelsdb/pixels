@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.common.serialize;
 
-import cn.edu.ruc.iir.pixels.common.metadata.ReqParams;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
@@ -15,6 +14,7 @@ import io.netty.handler.codec.MessageToByteEncoder;
  **/
 public class KryoEncoder extends MessageToByteEncoder<Object> {
 
+    // Object may not be replaced by 'ReqParams', because the response is object
     @Override
     protected void encode(ChannelHandlerContext ctx, Object message, ByteBuf out) throws Exception {
         KryoSerializer.serialize(message, out);
