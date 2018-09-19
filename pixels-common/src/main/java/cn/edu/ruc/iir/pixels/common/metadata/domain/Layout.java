@@ -2,9 +2,9 @@ package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
 import com.alibaba.fastjson.JSON;
 
-public class Layout
+public class Layout extends Base
 {
-    private int id;
+    private static final long serialVersionUID = -8188182830085955370L;
     private int version;
     private long createAt;
     private int permission;
@@ -14,16 +14,6 @@ public class Layout
     private String compactPath;
     private String splits;
     private Table table;
-
-    public int getId()
-    {
-        return id;
-    }
-
-    public void setId(int id)
-    {
-        this.id = id;
-    }
 
     public int getVersion()
     {
@@ -140,19 +130,4 @@ public class Layout
         this.table = table;
     }
 
-    @Override
-    public int hashCode()
-    {
-        return this.id;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if (o instanceof Layout)
-        {
-            return this.id == ((Layout) o).id;
-        }
-        return false;
-    }
 }

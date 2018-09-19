@@ -2,8 +2,6 @@ package cn.edu.ruc.iir.pixels.common.metadata;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
@@ -14,43 +12,42 @@ import io.netty.util.ReferenceCountUtil;
  */
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter
 {
-    private boolean complete = false;
-    private final ByteBuf request;
+    private ReqParams params;
     private final String token;
     private final MetadataClient client;
-    private StringBuilder builder = new StringBuilder();
 
     public MetadataClientHandler(ReqParams params, String token, MetadataClient client)
     {
+        this.params = params;
         this.token = token;
         this.client = client;
-        byte[] req = params.toString().getBytes();
-        request = Unpooled.buffer(req.length);
-        request.writeBytes(req);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception
     {
-        ctx.writeAndFlush(request);
+        ctx.writeAndFlush(params);
     }
 
-    @SuppressWarnings("Duplicates")
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
     {
-        ByteBuf buf = (ByteBuf) msg;
         try
         {
-            byte[] req = new byte[buf.readableBytes()];
-            buf.readBytes(req);
-            String body = new String(req, "UTF-8");
-            builder.append(body);
+            LogFactory.Instance().getLog().info("client response: " + msg.toString());
+            if (msg instanceof Object) {
+                this.client.setResponse(token, msg);
+            } else {
+                // log the received params.
+                LogFactory.Instance().getLog().info("Bad response, " + msg.toString());
+                ctx.close();
+            }
         }
         finally
         {
             ReferenceCountUtil.release(msg);
         }
+
 
     }
 
@@ -58,11 +55,6 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception
     {
         ctx.flush();
-        if (this.complete == false)
-        {
-            this.client.setResponse(token, builder.toString());
-        }
-        this.complete = true;
     }
 
     @Override

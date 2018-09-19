@@ -1,9 +1,6 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import org.junit.Test;
 
 import java.util.List;
@@ -22,10 +19,12 @@ public class TestDaos
     public void testTable ()
     {
         TableDao tableDao = new TableDao();
-        List<Table> tables = tableDao.getByName("test");
+        List<Table> tables = tableDao.getByName("test_105");
         for (Table table : tables)
         {
             System.out.println(table.getId() + ", " + table.getSchema().getName());
+            Base base = table;
+            System.out.println(base.toString());
         }
     }
 

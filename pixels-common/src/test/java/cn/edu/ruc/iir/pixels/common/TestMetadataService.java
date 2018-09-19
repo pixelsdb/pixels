@@ -5,9 +5,11 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,7 +26,7 @@ public class TestMetadataService {
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("presto00", 18888);
+        this.instance = new MetadataService("localhost", 18888);
     }
 
     @Test
@@ -51,9 +53,21 @@ public class TestMetadataService {
     }
 
     @Test
+    public void testGetTableNames () throws MetadataException
+    {
+        String schemaName = "pixels";
+        List<String> tableList = new ArrayList<String>();
+        List<Table> tables = instance.getTables(schemaName);
+        for (Table t : tables) {
+            tableList.add(t.getName());
+        }
+        System.out.println("Show tables, " + tableList.toString());
+    }
+
+    @Test
     public void testGetColumnsBySchemaNameAndTblName () throws MetadataException
     {
-        List<Column> columns = instance.getColumns("pixels", "test");
+        List<Column> columns = instance.getColumns("pixels", "test_105");
         for (Column column : columns)
         {
             System.out.println(column.getName() + ", " + column.getType());
@@ -63,7 +77,7 @@ public class TestMetadataService {
     @Test
     public void testGetTableLayouts () throws MetadataException
     {
-        List<Layout> layouts = instance.getLayouts("pixels", "test30g_pixels");
+        List<Layout> layouts = instance.getLayouts("pixels", "test_105");
         System.out.println(layouts.get(0).getSplits());
     }
 }
