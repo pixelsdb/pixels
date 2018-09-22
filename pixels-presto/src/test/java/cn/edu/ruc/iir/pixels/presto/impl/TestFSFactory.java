@@ -22,7 +22,7 @@ public class TestFSFactory {
     public void testListFiles() {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         FSFactory fsFactory = new FSFactory(config);
-        String tablePath = "/pixels/v2";
+        String tablePath = "/pixels/pixels/test_105/v_0_compact";
         List<Path> files = fsFactory.listFiles(tablePath);
         for (Path s : files) {
             System.out.println(s.getName());

@@ -63,7 +63,7 @@ public class Main
             long start = System.currentTimeMillis();
 
 
-            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_test/v_" + layout.getVersion() + "_compact/" +
+            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
