@@ -26,7 +26,7 @@ public class TestMetadataService {
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("localhost", 18888);
+        this.instance = new MetadataService("dbiir01", 18888);
     }
 
     @Test
