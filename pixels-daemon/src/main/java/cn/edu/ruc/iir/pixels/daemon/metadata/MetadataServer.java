@@ -50,7 +50,7 @@ public class MetadataServer implements Server {
         //配置服务端NIO 线程组
         this.boss = new NioEventLoopGroup();
         this.worker = new NioEventLoopGroup();
-
+        DBUtil.Instance().getConnection();
         ServerBootstrap server = new ServerBootstrap();
 
         try {
@@ -65,14 +65,14 @@ public class MetadataServer implements Server {
                         @Override
                         protected void initChannel(SocketChannel channel) throws Exception
                         {
-//                            channel.pipeline().addLast(
-//                                    new ObjectEncoder(),
-//                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
-//                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
-//                                    new MetadataServerHandler());
-                            channel.pipeline().addLast("decoder", new KryoDecoder());
-                            channel.pipeline().addLast("encoder", new KryoEncoder());
-                            channel.pipeline().addLast(new MetadataServerHandler());
+                            channel.pipeline().addLast(
+                                    new ObjectEncoder(),
+                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
+                                    new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
+                                    new MetadataServerHandler());
+//                            channel.pipeline().addLast("decoder", new KryoDecoder());
+//                            channel.pipeline().addLast("encoder", new KryoEncoder());
+//                            channel.pipeline().addLast(new MetadataServerHandler());
                         }
                     });
 
