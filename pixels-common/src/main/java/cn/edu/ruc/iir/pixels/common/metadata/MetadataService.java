@@ -199,7 +199,7 @@ public class MetadataService
             }
         } catch (Exception e)
         {
-            throw new MetadataException("can not create schema in metadata", e);
+            throw new MetadataException("failed to execute check request on metadata", e);
         }
     }
 }
