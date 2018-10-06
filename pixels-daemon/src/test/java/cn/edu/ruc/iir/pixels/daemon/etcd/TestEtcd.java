@@ -43,11 +43,14 @@ public class TestEtcd {
     @Test
     public void testGetEtcdKey() {
         String address = "10.77.40.236";
-        EtcdUtil.ClientInit(null);
+        EtcdUtil.ClientInit(address);
         String key = "etcd";
-        EtcdUtil.putEtcdKey(key, "hello");
+        EtcdUtil.putEtcdKey(key, "hello world");
         KeyValue keyValue = EtcdUtil.getEtcdKey(key);
-        System.out.println(keyValue.getValue());
+        if (keyValue != null)
+            System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
+        else
+            System.out.println("keyValue is：" + keyValue);
     }
 
 }
