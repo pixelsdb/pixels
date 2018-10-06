@@ -53,6 +53,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
+        <dep.rainbow.version>0.1.0-SNAPSHOT</dep.rainbow.version>
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
@@ -72,6 +73,7 @@
         <dep.json.version>1.2.31</dep.json.version>
         <dep.netty.version>4.1.12.Final</dep.netty.version>
         <dep.google.inject.version>4.0</dep.google.inject.version>
+        <dep.google.jrs305.version>3.0.0</dep.google.jrs305.version>
         <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
         <dep.junit.jupiter.version>5.0.0-M6</dep.junit.jupiter.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
@@ -81,6 +83,38 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-daemon</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-cache</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-presto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>rainbow-common</artifactId>
+                <version>${dep.rainbow.version}</version>
+                <optional>true</optional>
+            </dependency>
 
             <dependency>
                 <groupId>com.esotericsoftware</groupId>
@@ -110,12 +144,6 @@
                 <groupId>org.apache.zookeeper</groupId>
                 <artifactId>zookeeper</artifactId>
                 <version>${dep.zookeeper.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
-                <artifactId>pixels-core</artifactId>
-                <version>${project.version}</version>
             </dependency>
 
             <dependency>
@@ -150,6 +178,12 @@
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
                 <version>${dep.protobuf.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.code.findbugs</groupId>
+                <artifactId>jsr305</artifactId>
+                <version>${dep.google.jrs305.version}</version>
             </dependency>
 
             <dependency>
@@ -388,7 +422,7 @@
                 <plugin>
                     <groupId>com.github.os72</groupId>
                     <artifactId>protoc-jar-maven-plugin</artifactId>
-                    <version>3.0.0.1</version>
+                    <version>3.3.0.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>

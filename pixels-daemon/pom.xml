@@ -99,6 +99,7 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
+            <!-- 3.3.0 must be used here -->
             <version>3.3.0</version>
             <optional>true</optional>
         </dependency>
