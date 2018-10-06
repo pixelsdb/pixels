@@ -21,7 +21,6 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -40,7 +39,6 @@
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
-            <version>3.0.0</version>
             <optional>true</optional>
         </dependency>
 
