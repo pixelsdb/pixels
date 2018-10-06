@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * @version V1.0
@@ -67,7 +68,9 @@ public class EtcdUtil {
     public static KeyValue getEtcdKey(String key) {
         KeyValue keyValue = null;
         try {
-            keyValue = client.getKVClient().get(ByteSequence.fromString(key)).get().getKvs().get(0);
+            List<KeyValue> keyValues = client.getKVClient().get(ByteSequence.fromString(key)).get().getKvs();
+            if (keyValues.size() > 0)
+                keyValue = keyValues.get(0);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -98,7 +101,12 @@ public class EtcdUtil {
      * @param value etcdKey's value
      */
     public static void putEtcdKey(String key, String value) {
-        client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromString(value));
+        CompletableFuture<PutResponse> future = client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromString(value));
+        try {
+            future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
