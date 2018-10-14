@@ -24,29 +24,35 @@ public class TestEtcd {
     @Test
     public void testEtcd() throws ExecutionException, InterruptedException {
         // create client
-        Client client = Client.builder().endpoints("http://localhost:2379").build();
+        Client client = Client.builder().endpoints("http://presto04:2379").build();
         KV kvClient = client.getKVClient();
 
         ByteSequence key = ByteSequence.fromString("test_key");
         ByteSequence value = ByteSequence.fromString("test_value");
 
+        long start = System.currentTimeMillis();
         // put the key-value
         kvClient.put(key, value).get();
 
+
         // get the CompletableFuture
         CompletableFuture<GetResponse> getFuture = kvClient.get(key);
-
+        long end = System.currentTimeMillis();
+        System.out.println(end - start);
         // get the value from CompletableFuture
         GetResponse response = getFuture.get();
     }
 
     @Test
     public void testGetEtcdKey() {
-        String address = "10.77.40.236";
+        String address = "10.77.40.238";
         EtcdUtil.ClientInit(address);
         String key = "etcd";
-        EtcdUtil.putEtcdKey(key, "hello world");
+        long start = System.currentTimeMillis();
+        //EtcdUtil.putEtcdKey(key, "hello world");
         KeyValue keyValue = EtcdUtil.getEtcdKey(key);
+        long end = System.currentTimeMillis();
+        System.out.println((end-start));
         if (keyValue != null)
             System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
         else
