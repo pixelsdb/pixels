@@ -70,6 +70,7 @@
             <optional>true</optional>
         </dependency>
 
+
         <dependency>
             <groupId>com.coreos</groupId>
             <artifactId>jetcd-core</artifactId>
@@ -85,14 +86,6 @@
                     <artifactId>netty-handler-proxy</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <!-- 3.3.0 must be used here -->
-            <version>3.3.0</version>
-            <optional>true</optional>
         </dependency>
     </dependencies>
 
