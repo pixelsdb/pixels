@@ -1,7 +1,9 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.Iterables;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
@@ -19,9 +21,10 @@ import java.util.List;
 public class TestFSFactory {
 
     @Test
-    public void testListFiles() {
+    public void testListFiles() throws FSException
+    {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        FSFactory fsFactory = new FSFactory(config);
+        FSFactory fsFactory = config.getFsFactory();
         String tablePath = "/pixels/pixels/test_105/v_0_compact";
         List<Path> files = fsFactory.listFiles(tablePath);
         for (Path s : files) {
@@ -30,9 +33,10 @@ public class TestFSFactory {
     }
 
     @Test
-    public void testGetBlockLocations() throws UnknownHostException {
+    public void testGetBlockLocations() throws UnknownHostException, FSException
+    {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        FSFactory fsFactory = new FSFactory(config);
+        FSFactory fsFactory = config.getFsFactory();
         String tablePath = "pixels/db/default/test/Point.txt";
         List<HostAddress> files = fsFactory.getBlockLocations(new Path(tablePath), 0, Long.MAX_VALUE);
         System.out.println(files.size());
