@@ -30,14 +30,14 @@ import java.util.List;
 public class PixelsLoader
         extends Loader
 {
-    PixelsLoader(String originalDataPath, String dbName, String tableName, int maxRowNum)
+    PixelsLoader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
     {
-        super(originalDataPath, dbName, tableName, maxRowNum);
+        super(originalDataPath, dbName, tableName, maxRowNum, regex);
     }
 
     @Override
     protected boolean executeLoad(String originalDataPath, String loadingDataPath, String schemaStr,
-                                  int[] orderMapping, ConfigFactory configFactory, int maxRowNum)
+                                  int[] orderMapping, ConfigFactory configFactory, int maxRowNum, String regex)
             throws IOException
     {
         Configuration conf = new Configuration();
@@ -49,7 +49,7 @@ public class PixelsLoader
         ColumnVector[] columnVectors = rowBatch.cols;
         int pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         int rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size")) * 1024 * 1024;
-        int blockSize = Integer.parseInt(configFactory.getProperty("block.size")) * 1024 * 1024;
+        long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
         // read original data
@@ -89,7 +89,10 @@ public class PixelsLoader
                 line = StringUtil.replaceAll(line, "True", "1");
                 int rowId = rowBatch.size++;
                 rowCounter++;
-                String[] colsInLine = line.split("\t");
+                if(regex.equals("\\s")){
+                    regex = " ";
+                }
+                String[] colsInLine = line.split(regex);
                 for (int i = 0; i < columnVectors.length; i++)
                 {
                     int valueIdx = orderMapping[i];

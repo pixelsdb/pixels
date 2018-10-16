@@ -30,6 +30,11 @@ import java.util.Scanner;
  *
  * LOAD -f pixels -o hdfs://10.77.40.236:9000/pixels/test500G_text/ -d pixels -t testnull_pixels -n 300000
  * LOAD -f orc -o hdfs://10.77.40.236:9000/pixels/test500G_text/ -d pixels -t testnull_orc -n 300000
+ *
+ * <p>
+ * LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t
+ * </p>
+ *
  */
 public class LoaderCli
 {
@@ -119,6 +124,8 @@ public class LoaderCli
                             .help("specify the path of original data");
                     argumentParser.addArgument("-n", "--row_num").required(true)
                             .help("Specify the max number of rows to write in a file");
+                    argumentParser.addArgument("-r", "--row_regex").required(true)
+                            .help("Specify the split regex of each row in a file");
                     Namespace namespace;
                     try
                     {
@@ -135,14 +142,15 @@ public class LoaderCli
                     String tableName = namespace.getString("table_name");
                     String originalDataPath = namespace.getString("original_data_path");
                     int rowNum = Integer.parseInt(namespace.getString("row_num"));
+                    String regex = namespace.getString("row_regex");
 
                     if (format.equalsIgnoreCase("orc"))
                     {
-                        loader = new ORCLoader(originalDataPath, dbName, tableName, rowNum);
+                        loader = new ORCLoader(originalDataPath, dbName, tableName, rowNum, regex);
                     }
                     if (format.equalsIgnoreCase("pixels"))
                     {
-                        loader = new PixelsLoader(originalDataPath, dbName, tableName, rowNum);
+                        loader = new PixelsLoader(originalDataPath, dbName, tableName, rowNum, regex);
                     }
 
                     if (loader != null)
@@ -156,6 +164,11 @@ public class LoaderCli
                             System.out.println("Executing command " + command + " unsuccessfully when loading data");
                         }
                     }
+                }
+
+                if (!command.equals("LOAD") && !command.equals("LOAD"))
+                {
+                    System.out.println("Command error");
                 }
             }
         }

@@ -34,9 +34,9 @@ import java.util.List;
 public class ORCLoader
         extends Loader
 {
-    ORCLoader(String originalDataPath, String dbName, String tableName, int maxRowNum)
+    ORCLoader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
     {
-        super(originalDataPath, dbName, tableName, maxRowNum);
+        super(originalDataPath, dbName, tableName, maxRowNum, regex);
     }
 
     private enum VECTOR_CLAZZ
@@ -46,7 +46,7 @@ public class ORCLoader
 
     @Override
     protected boolean executeLoad(String originalDataPath, String loadingDataPath, String schemaStr,
-                                  int[] orderMapping, ConfigFactory configFactory, int maxRowNum)
+                                  int[] orderMapping, ConfigFactory configFactory, int maxRowNum, String regex)
             throws IOException
     {
         Configuration conf = new Configuration();
@@ -95,7 +95,10 @@ public class ORCLoader
                 line = StringUtil.replaceAll(line, "True", "1");
                 int rowId = rowBatch.size++;
                 rowCounter++;
-                String[] colsInLine = line.split("\t");
+                if(regex.equals("\\s")){
+                    regex = " ";
+                }
+                String[] colsInLine = line.split(regex);
                 for (int i = 0; i < columnVectors.length; i++)
                 {
                     int valueIdx = orderMapping[i];

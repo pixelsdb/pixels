@@ -1,22 +1,12 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
-public class Column
+public class Column extends Base
 {
-    private int id;
+    private static final long serialVersionUID = -7648468928635345167L;
     private String name;
     private String type;
     private double size;
     private Table table;
-
-    public int getId()
-    {
-        return id;
-    }
-
-    public void setId(int id)
-    {
-        this.id = id;
-    }
 
     public String getName()
     {
@@ -58,19 +48,4 @@ public class Column
         this.table = table;
     }
 
-    @Override
-    public int hashCode()
-    {
-        return this.id;
-    }
-
-    @Override
-    public boolean equals(Object o)
-    {
-        if (o instanceof Column)
-        {
-            return this.id == ((Column) o).id;
-        }
-        return false;
-    }
 }

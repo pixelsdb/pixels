@@ -65,13 +65,14 @@ public class TestHdfs {
     @Test
     public void testDistribute() {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        String hdfsDir = "hdfs://10.77.40.236:9000/pixels/test30G_pixels/";
+        String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
         FSFactory fsFactory = new FSFactory(config);
         List<Path> hdfsList = fsFactory.listFiles(hdfsDir);
         Map<String, Integer> hostMap = new HashMap<>();
         for(Path hdfsPath : hdfsList){
             String filePath = hdfsPath.toString();
             List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
+            System.out.println(hdfsPath);
             for (LocatedBlock block : allBlocks) {
                 DatanodeInfo[] locations =
                         block.getLocations();

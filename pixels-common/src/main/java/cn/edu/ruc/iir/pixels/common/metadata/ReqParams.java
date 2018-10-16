@@ -1,12 +1,17 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReqParams
+public class ReqParams implements Serializable
 {
+    private static final long serialVersionUID = 5207638282398302573L;
     private String action;
     private Map<String, String> params = new HashMap<>();
+
+    public ReqParams() {
+    }
 
     public ReqParams (String action)
     {
@@ -28,6 +33,18 @@ public class ReqParams
             }
         }
         return res;
+    }
+
+    public void setAction(String action) {
+        this.action = action;
+    }
+
+    public Map<String, String> getParams() {
+        return params;
+    }
+
+    public void setParams(Map<String, String> params) {
+        this.params = params;
     }
 
     public String getAction ()
