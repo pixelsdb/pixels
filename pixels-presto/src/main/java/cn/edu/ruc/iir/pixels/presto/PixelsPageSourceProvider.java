@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
@@ -25,9 +26,9 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
     private final FSFactory fsFactory;
 
     @Inject
-    public PixelsPageSourceProvider(PixelsConnectorId connectorId, FSFactory fsFactory) {
+    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
+        this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
     }
 
     @Override

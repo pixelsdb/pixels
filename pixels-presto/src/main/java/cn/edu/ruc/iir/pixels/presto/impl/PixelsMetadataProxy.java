@@ -39,7 +39,7 @@ public class PixelsMetadataProxy
     @Inject
     public PixelsMetadataProxy(PixelsPrestoConfig config)
     {
-        ConfigFactory configFactory = config.getFactory();
+        ConfigFactory configFactory = config.getConfigFactory();
         String host = configFactory.getProperty("metadata.server.host");
         int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         this.metadataService = new MetadataService(host, port);

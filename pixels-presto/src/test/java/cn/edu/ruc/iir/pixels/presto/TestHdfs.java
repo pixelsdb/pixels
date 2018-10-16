@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -37,11 +38,12 @@ public class TestHdfs {
      * @date: 下午2:45 18-2-23
      */
     @Test
-    public void testReadBlock() {
+    public void testReadBlock() throws FSException
+    {
         String filePath = "hdfs://presto00:9000/pixels/v2/point2000w-10.pxl";
 
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        FSFactory fsFactory = new FSFactory(config);
+        FSFactory fsFactory = config.getFsFactory();
         List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
         for (LocatedBlock block : allBlocks) {
             ExtendedBlock eBlock = block.getBlock();
@@ -63,10 +65,11 @@ public class TestHdfs {
     }
 
     @Test
-    public void testDistribute() {
+    public void testDistribute() throws FSException
+    {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
-        FSFactory fsFactory = new FSFactory(config);
+        FSFactory fsFactory = config.getFsFactory();
         List<Path> hdfsList = fsFactory.listFiles(hdfsDir);
         Map<String, Integer> hostMap = new HashMap<>();
         for(Path hdfsPath : hdfsList){
