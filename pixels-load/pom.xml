@@ -15,13 +15,11 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-daemon</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -32,7 +30,6 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-presto</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
 
@@ -40,7 +37,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <version>2.7.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>asm</groupId>
@@ -52,7 +48,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <version>2.7.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>asm</groupId>
@@ -98,6 +93,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>

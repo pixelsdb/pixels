@@ -17,21 +17,18 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>rainbow-common</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -93,14 +90,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!--
-                <dependency>
-                    <groupId>com.facebook.presto</groupId>
-                    <artifactId>presto-jdbc</artifactId>
-                    <optional>true</optional>
-                    <scope>provided</scope>
-                </dependency>
-        -->
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>

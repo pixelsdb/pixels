@@ -11,15 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.presto.impl;
+package cn.edu.ruc.iir.pixels.common.physical;
 
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.presto.exception.ConfigurationException;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
-import com.google.inject.Inject;
-import io.airlift.log.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -30,26 +26,36 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
-
 public final class FSFactory
 {
-    private FileSystem fileSystem;
-    private final Logger logger = Logger.get(FSFactory.class.getName());
+    private static Map<String, FSFactory> instances = new HashMap<>();
 
-    @Inject
-    public FSFactory(PixelsPrestoConfig config)
+    public static FSFactory Instance (String hdfsConfigDir) throws FSException
+    {
+        if (instances.containsKey(hdfsConfigDir))
+        {
+            return instances.get(hdfsConfigDir);
+        }
+
+        FSFactory instance = new FSFactory(hdfsConfigDir);
+        instances.put(hdfsConfigDir, instance);
+
+        return instance;
+    }
+
+    private FileSystem fileSystem;
+
+    private FSFactory(String hdfsConfigDir) throws FSException
     {
         Configuration hdfsConfig = new Configuration(false);
-        ConfigFactory configFactory = config.getFactory();
-        File hdfsConfigDir = new File(configFactory.getProperty("hdfs.config.dir"));
+        File configDir = new File(hdfsConfigDir);
         hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
         try
         {
-            if (hdfsConfigDir.exists() && hdfsConfigDir.isDirectory())
+            if (configDir.exists() && configDir.isDirectory())
             {
-                File[] hdfsConfigFiles = hdfsConfigDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
+                File[] hdfsConfigFiles = configDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
                 if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2)
                 {
                     hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
@@ -57,14 +63,12 @@ public final class FSFactory
                 }
             } else
             {
-                logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
-                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, new ConfigurationException());
+                throw new FSException("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
             }
-            fileSystem = FileSystem.get(hdfsConfig);
+            this.fileSystem = FileSystem.get(hdfsConfig);
         } catch (IOException e)
         {
-            logger.error(e);
-            throw new PrestoException(PIXELS_CONFIG_ERROR, e);
+            throw new FSException("I/O error occurs when reading HDFS config files.", e);
         }
     }
 
@@ -73,7 +77,7 @@ public final class FSFactory
         return Optional.of(this.fileSystem);
     }
 
-    public List<Path> listFiles(Path dirPath)
+    public List<Path> listFiles(Path dirPath) throws FSException
     {
         List<Path> files = new ArrayList<>();
         FileStatus[] fileStatuses = null;
@@ -92,20 +96,26 @@ public final class FSFactory
             }
         } catch (IOException e)
         {
-            logger.error(e);
-            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+            throw new FSException("error occurs when listing files.", e);
         }
 
         return files;
     }
 
-    public List<Path> listFiles(String dirPath)
+    public List<Path> listFiles(String dirPath) throws FSException
     {
         return listFiles(new Path(dirPath));
     }
 
-    // assume that a file contains only a block
-    public List<HostAddress> getBlockLocations(Path file, long start, long len)
+    /**
+     * we assume that a file contains only one block.
+     * @param file
+     * @param start
+     * @param len
+     * @return
+     * @throws FSException
+     */
+    public List<HostAddress> getBlockLocations(Path file, long start, long len) throws FSException
     {
 //        KeyValue keyValue = EtcdUtil.getEtcdKey(file.toString());
 //        if (keyValue != null)
@@ -134,8 +144,7 @@ public final class FSFactory
             locations = this.fileSystem.getFileBlockLocations(file, start, len);
         } catch (IOException e)
         {
-            logger.error(e);
-            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
+            throw new FSException("I/O error occurs when getting block locations", e);
         }
         for (BlockLocation location : locations)
         {
@@ -144,8 +153,7 @@ public final class FSFactory
                 addresses.addAll(toHostAddress(location.getHosts()));
             } catch (IOException e)
             {
-                logger.error(e);
-                throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
+                throw new FSException("I/O error occurs when get hosts from block locations.", e);
             }
         }
         return new ArrayList<>(addresses);
@@ -162,7 +170,7 @@ public final class FSFactory
         return builder.build();
     }
 
-    public List<LocatedBlock> listLocatedBlocks(Path path)
+    public List<LocatedBlock> listLocatedBlocks(Path path) throws FSException
     {
         FSDataInputStream in = null;
         try
@@ -170,8 +178,7 @@ public final class FSFactory
             in = this.fileSystem.open(path);
         } catch (IOException e)
         {
-            logger.error(e);
-            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+            throw new FSException("I/O error occurs when opening file.", e);
         }
         HdfsDataInputStream hdis = (HdfsDataInputStream) in;
         List<LocatedBlock> allBlocks = null;
@@ -180,13 +187,12 @@ public final class FSFactory
             allBlocks = hdis.getAllBlocks();
         } catch (IOException e)
         {
-            logger.error(e);
-            throw new PrestoException(PIXELS_HDFS_BLOCK_ERROR, e);
+            throw new FSException("I/O error occurs when getting blocks.", e);
         }
         return allBlocks;
     }
 
-    public List<LocatedBlock> listLocatedBlocks(String path)
+    public List<LocatedBlock> listLocatedBlocks(String path) throws FSException
     {
         return listLocatedBlocks(new Path(path));
     }

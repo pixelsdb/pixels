@@ -13,12 +13,14 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
 import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
 import cn.edu.ruc.iir.pixels.presto.split.Inverted;
@@ -39,6 +41,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_HDFS_FILE_ERROR;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
 import static java.util.Objects.requireNonNull;
@@ -60,9 +63,9 @@ public class PixelsSplitManager
     private final PixelsMetadataProxy metadataProxy;
 
     @Inject
-    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, FSFactory fsFactory) {
+    public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.fsFactory = requireNonNull(fsFactory, "fsFactory is null");
+        this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
     }
 
@@ -126,28 +129,40 @@ public class PixelsSplitManager
             int rowGroupNum = splits.getNumRowGroupInBlock();
             // add splits in orderPath
             boolean isCached = false;
-            for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+            try
             {
-                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                        tableHandle.getSchemaName(), tableHandle.getTableName(),
-                        file.toString(), 0, 1,
-                        isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
-                pixelsSplits.add(pixelsSplit);
-            }
-            // add splits in compactionPath
-            int curFileRGIdx;
-            for (Path file : fsFactory.listFiles(layout.getCompactPath()))
-            {
-                curFileRGIdx = 0;
-                while (curFileRGIdx < rowGroupNum)
+                for (Path file : fsFactory.listFiles(layout.getOrderPath()))
                 {
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
-                            file.toString(), curFileRGIdx, splitSize,
+                            file.toString(), 0, 1,
                             isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                     pixelsSplits.add(pixelsSplit);
-                    curFileRGIdx += splitSize;
                 }
+            } catch (FSException e)
+            {
+                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+            }
+            // add splits in compactionPath
+            int curFileRGIdx;
+            try
+            {
+                for (Path file : fsFactory.listFiles(layout.getCompactPath()))
+                {
+                    curFileRGIdx = 0;
+                    while (curFileRGIdx < rowGroupNum)
+                    {
+                        PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                file.toString(), curFileRGIdx, splitSize,
+                                isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                        pixelsSplits.add(pixelsSplit);
+                        curFileRGIdx += splitSize;
+                    }
+                }
+            } catch (FSException e)
+            {
+                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
             }
         }
 

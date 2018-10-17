@@ -15,14 +15,12 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-cache</artifactId>
-            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
 
@@ -85,38 +83,10 @@
 
     <build>
         <plugins>
-            <!--<plugin>-->
-                <!--<groupId>com.github.os72</groupId>-->
-                <!--<artifactId>protoc-jar-maven-plugin</artifactId>-->
-                <!--<version>3.3.0.1</version>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<phase>generate-sources</phase>-->
-                        <!--<goals>-->
-                            <!--<goal>run</goal>-->
-                        <!--</goals>-->
-                        <!--<configuration>-->
-                            <!--<protocArtifact>com.google.protobuf:protoc:2.5.0</protocArtifact>-->
-                            <!--<protocVersion>2.5.0</protocVersion>-->
-                            <!--<addSources>none</addSources>-->
-                            <!--<includeDirectories>-->
-                                <!--<include>../proto</include>-->
-                            <!--</includeDirectories>-->
-                            <!--<inputDirectories>-->
-                                <!--<include>../proto</include>-->
-                            <!--</inputDirectories>-->
-                            <!--<outputTargets>-->
-                                <!--<outputTarget>-->
-                                    <!--<type>java</type>-->
-                                <!--</outputTarget>-->
-                            <!--</outputTargets>-->
-                        <!--</configuration>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-            <!--</plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>

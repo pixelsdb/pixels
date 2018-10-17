@@ -53,67 +53,79 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
+        <dep.rainbow.version>0.1.0-SNAPSHOT</dep.rainbow.version>
+        <dep.hadoop.version>2.7.3</dep.hadoop.version>
+        <dep.hive.version>2.2.1</dep.hive.version>
+        <dep.orc.version>1.4.3</dep.orc.version>
+        <dep.presto.version>0.192</dep.presto.version>
+        <dep.zookeeper.version>3.4.6</dep.zookeeper.version>
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
+        <dep.mysql.version>5.1.38</dep.mysql.version>
+        <dep.netty.version>4.1.12.Final</dep.netty.version>
+        <dep.fastjson.version>1.2.31</dep.fastjson.version>
+        <dep.guava.version>21.0</dep.guava.version>
+        <dep.protobuf.version>3.3.1</dep.protobuf.version>
+        <dep.kryo.version>4.0.2</dep.kryo.version>
+        <dep.kryo-serializers.version>0.42</dep.kryo-serializers.version>
+        <dep.jackson.version>2.8.1</dep.jackson.version>
+        <dep.google.inject.version>4.0</dep.google.inject.version>
+        <dep.google.jrs305.version>3.0.0</dep.google.jrs305.version>
+        <dep.javax.inject.version>1</dep.javax.inject.version>
+        <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
+        <dep.prometheus.client.version>0.2.0</dep.prometheus.client.version>
+        <dep.argparse4j.version>0.7.0</dep.argparse4j.version>
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
         <dep.log4j.version>2.1</dep.log4j.version>
-        <dep.hadoop.version>2.7.3</dep.hadoop.version>
-        <dep.presto.version>0.192</dep.presto.version>
-        <dep.guava.version>21.0</dep.guava.version>
-        <dep.protobuf.version>2.5.0</dep.protobuf.version>
-        <dep.jackson.version>2.8.1</dep.jackson.version>
         <dep.junit.version>4.12</dep.junit.version>
-        <dep.java.inject.version>1</dep.java.inject.version>
-        <dep.mysql.version>5.1.38</dep.mysql.version>
-        <dep.json.version>1.2.31</dep.json.version>
-        <dep.netty.version>4.1.12.Final</dep.netty.version>
-        <dep.google.inject.version>4.0</dep.google.inject.version>
-        <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
-        <dep.junit.jupiter.version>5.0.0-M6</dep.junit.jupiter.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
-        <dep.prometheus.client.version>0.2.0</dep.prometheus.client.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-
+            <!-- pixels -->
             <dependency>
-                <groupId>com.esotericsoftware</groupId>
-                <artifactId>kryo</artifactId>
-                <version>4.0.2</version>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-common</artifactId>
+                <version>${project.version}</version>
             </dependency>
-
             <dependency>
-                <groupId>de.javakaffee</groupId>
-                <artifactId>kryo-serializers</artifactId>
-                <version>0.42</version>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-daemon</artifactId>
+                <version>${project.version}</version>
             </dependency>
-
-            <dependency>
-                <groupId>com.alibaba</groupId>
-                <artifactId>fastjson</artifactId>
-                <version>${dep.json.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>mysql</groupId>
-                <artifactId>mysql-connector-java</artifactId>
-                <version>${dep.mysql.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.zookeeper</groupId>
-                <artifactId>zookeeper</artifactId>
-                <version>3.4.6</version>
-            </dependency>
-
             <dependency>
                 <groupId>cn.edu.ruc.iir</groupId>
                 <artifactId>pixels-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-cache</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>pixels-presto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
+            <!-- rainbow -->
+            <dependency>
+                <groupId>cn.edu.ruc.iir</groupId>
+                <artifactId>rainbow-common</artifactId>
+                <version>${dep.rainbow.version}</version>
+            </dependency>
+
+            <!-- zookeeper -->
+            <dependency>
+                <groupId>org.apache.zookeeper</groupId>
+                <artifactId>zookeeper</artifactId>
+                <version>${dep.zookeeper.version}</version>
+            </dependency>
+
+            <!-- prometheus -->
             <dependency>
                 <groupId>io.prometheus</groupId>
                 <artifactId>simpleclient</artifactId>
@@ -125,59 +137,38 @@
                 <version>${dep.prometheus.client.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>commons-logging</groupId>
-                <artifactId>commons-logging</artifactId>
-                <version>${dep.commons-logging.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.hive</groupId>
-                <artifactId>hive-storage-api</artifactId>
-                <version>2.2.1</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-core</artifactId>
-                <version>${dep.log4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-api</artifactId>
-                <version>${dep.log4j.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.google.protobuf</groupId>
-                <artifactId>protobuf-java</artifactId>
-                <version>${dep.protobuf.version}</version>
-            </dependency>
-
+            <!-- presto -->
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-spi</artifactId>
                 <version>${dep.presto.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-jdbc</artifactId>
                 <version>${dep.presto.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-parser</artifactId>
                 <version>${dep.presto.version}</version>
             </dependency>
 
+            <!-- hive -->
             <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${dep.guava.version}</version>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-storage-api</artifactId>
+                <version>${dep.hive.version}</version>
             </dependency>
 
+            <!-- orc -->
+            <dependency>
+                <groupId>org.apache.orc</groupId>
+                <artifactId>orc-core</artifactId>
+                <version>${dep.orc.version}</version>
+            </dependency>
+
+            <!-- hdfs -->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
@@ -209,6 +200,7 @@
                 <version>${dep.hadoop.version}</version>
             </dependency>
 
+            <!-- airlift -->
             <dependency>
                 <groupId>io.airlift</groupId>
                 <artifactId>concurrent</artifactId>
@@ -245,24 +237,75 @@
                 <version>${dep.airlift.units.version}</version>
             </dependency>
 
+            <!-- mysql -->
             <dependency>
-                <groupId>com.google.inject</groupId>
-                <artifactId>guice</artifactId>
-                <version>${dep.google.inject.version}</version>
+                <groupId>mysql</groupId>
+                <artifactId>mysql-connector-java</artifactId>
+                <version>${dep.mysql.version}</version>
             </dependency>
 
+            <!-- validation -->
             <dependency>
                 <groupId>javax.validation</groupId>
                 <artifactId>validation-api</artifactId>
                 <version>${dep.javax.validation.version}</version>
             </dependency>
 
+            <!-- guava -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${dep.guava.version}</version>
+            </dependency>
+
+            <!-- protobuf -->
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${dep.protobuf.version}</version>
+            </dependency>
+
+            <!-- findbugs -->
+            <dependency>
+                <groupId>com.google.code.findbugs</groupId>
+                <artifactId>jsr305</artifactId>
+                <version>${dep.google.jrs305.version}</version>
+            </dependency>
+
+            <!-- guice -->
+            <dependency>
+                <groupId>com.google.inject</groupId>
+                <artifactId>guice</artifactId>
+                <version>${dep.google.inject.version}</version>
+            </dependency>
+
+            <!-- javax.inject -->
             <dependency>
                 <groupId>javax.inject</groupId>
                 <artifactId>javax.inject</artifactId>
-                <version>${dep.java.inject.version}</version>
+                <version>${dep.javax.inject.version}</version>
             </dependency>
 
+            <!-- kryo -->
+            <dependency>
+                <groupId>com.esotericsoftware</groupId>
+                <artifactId>kryo</artifactId>
+                <version>${dep.kryo.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.javakaffee</groupId>
+                <artifactId>kryo-serializers</artifactId>
+                <version>${dep.kryo-serializers.version}</version>
+            </dependency>
+
+            <!-- fastjson -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>fastjson</artifactId>
+                <version>${dep.fastjson.version}</version>
+            </dependency>
+
+            <!-- jackson -->
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
@@ -273,38 +316,36 @@
                 <artifactId>jackson-databind</artifactId>
                 <version>${dep.jackson.version}</version>
             </dependency>
+
+            <!-- netty -->
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
                 <version>${dep.netty.version}</version>
             </dependency>
+
             <!-- logging -->
             <dependency>
                 <groupId>commons-logging</groupId>
                 <artifactId>commons-logging</artifactId>
-                <version>1.2</version>
+                <version>${dep.commons-logging.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-core</artifactId>
-                <version>2.1</version>
+                <version>${dep.log4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>
-                <version>2.1</version>
+                <version>${dep.log4j.version}</version>
             </dependency>
 
+            <!-- testing -->
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>${dep.junit.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-engine</artifactId>
-                <version>${dep.junit.jupiter.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -319,15 +360,12 @@
                 <version>${dep.junit.platform.version}</version>
                 <scope>test</scope>
             </dependency>
-            <dependency>
-                <groupId>org.apache.orc</groupId>
-                <artifactId>orc-core</artifactId>
-                <version>1.4.3</version>
-            </dependency>
+
+            <!-- argparse4j -->
             <dependency>
                 <groupId>net.sourceforge.argparse4j</groupId>
                 <artifactId>argparse4j</artifactId>
-                <version>0.7.0</version>
+                <version>${dep.argparse4j.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -397,7 +435,7 @@
                 <plugin>
                     <groupId>com.github.os72</groupId>
                     <artifactId>protoc-jar-maven-plugin</artifactId>
-                    <version>3.0.0.1</version>
+                    <version>3.3.0.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>

@@ -95,13 +95,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>3.3.0</version>
-            <optional>true</optional>
-        </dependency>
     </dependencies>
 
     <build>
@@ -115,7 +108,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <!--<version>2.4.3</version>-->
+                <version>3.2.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
