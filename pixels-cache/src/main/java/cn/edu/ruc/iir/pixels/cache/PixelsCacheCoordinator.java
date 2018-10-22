@@ -10,7 +10,6 @@ public class PixelsCacheCoordinator extends Thread
 {
     private PixelsCacheCoordinator ()
     {
-
     }
 
     @Override
@@ -18,6 +17,4 @@ public class PixelsCacheCoordinator extends Thread
     {
         super.run();
     }
-
-
 }

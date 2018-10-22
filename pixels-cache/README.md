@@ -39,4 +39,4 @@ There are some tasks to be done to resolve this issue:
 3. Once a caching node(CacheManager) finds a new `cache_version`, it begins to update itself according to the new file caching locations, and sets itself as `busy` in the ETCD.
 4. When a query comes, Presto Coordinator checks ETCD for file caching locations, and checks caching node status, thus find available caches for its source splits.
 5. Each Presto DataNode executes query splits with caching information (whether cached or not), and calls `PixelsCacheReader` to read caching data locally, whose implementation is encapsulated in the `PixelsReader`.
-6. `CacheCoordinator` constantly sends heartbeats to check status of caching nodes, and sync them through ETCD.
+6. `CacheCoordinator` constantly sends heartbeats to check running status of caching nodes, and sync their status through ETCD.
