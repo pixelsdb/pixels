@@ -18,4 +18,6 @@ public final class Constants
     public static int MAX_SHORT_REPEAT_LENGTH = 10;
     public static float DICT_KEY_SIZE_THRESHOLD = 0.1F;
     public static int INIT_DICT_SIZE = 4096;
+
+    public static String CACHE_VERSION_LITERAL = "cache_version";
 }

@@ -137,6 +137,13 @@
                 <version>${dep.prometheus.client.version}</version>
             </dependency>
 
+            <!-- jetcd -->
+            <dependency>
+                <groupId>com.coreos</groupId>
+                <artifactId>jetcd-core</artifactId>
+                <version>0.0.1</version>
+            </dependency>
+
             <!-- presto -->
             <dependency>
                 <groupId>com.facebook.presto</groupId>

@@ -28,10 +28,11 @@ There are some tasks to be done to resolve this issue:
 5) implement CacheCoordinator in pixels-daemon, CacheCoordinator coordinates the cache distribution for the whole cluster.
 
 ## Data Model in ETCD
-1. caching node -> status
-2. file -> caching location (each version maintains a separate set of file caching locations)
-3. layout_version -> layout_id
-4. cache_version -> version_id
+
+1. node_${id} -> status: recording status of each caching node(CacheManager).
+2. location_%{version}_%{node_id} -> files: recording the array of files cached on the specified node under the specified caching version.
+3. layout_%{version} -> layout: recording layout of the specified version.
+4. cache_version -> version: caching version, incremented each time caches are updated.
 
 ## Caching Flow
 1. When `Layout Optimizer` generates a new layout, it writes the new layout (with a new `layout_id`) into ETCD.

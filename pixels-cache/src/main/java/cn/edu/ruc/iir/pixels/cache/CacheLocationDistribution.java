@@ -1,0 +1,38 @@
+package cn.edu.ruc.iir.pixels.cache;
+
+import com.facebook.presto.spi.HostAddress;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * pixels
+ *
+ * @author guodong
+ */
+public class CacheLocationDistribution
+{
+    private final Map<String, Set<String>> locationDistributionMap;
+
+    public CacheLocationDistribution(HostAddress[] locations)
+    {
+        this.locationDistributionMap = new HashMap<>(locations.length);
+        for (HostAddress location : locations) {
+            locationDistributionMap.put(location.toString(), new HashSet<>());
+        }
+    }
+
+    public void addCacheLocation(String location, String file)
+    {
+        if (locationDistributionMap.get(location) != null) {
+            locationDistributionMap.get(location).add(file);
+        }
+    }
+
+    public Set<String> getCacheDistributionByLocation(String location)
+    {
+        return locationDistributionMap.get(location);
+    }
+}
