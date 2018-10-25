@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import com.facebook.presto.spi.PrestoException;
 import io.airlift.configuration.Config;
@@ -22,6 +24,7 @@ public class PixelsPrestoConfig
 {
     private Logger logger = Logger.get(PixelsPrestoConfig.class);
     private ConfigFactory configFactory = null;
+    private FSFactory fsFactory = null;
 
     private String pixelsHome = null;
 
@@ -63,7 +66,15 @@ public class PixelsPrestoConfig
                 }
             }
 
-            configFactory = ConfigFactory.Instance();
+            this.configFactory = ConfigFactory.Instance();
+            try
+            {
+                this.fsFactory = FSFactory.Instance(this.configFactory.getProperty("hdfs.config.dir"));
+            } catch (FSException e)
+            {
+                throw new PrestoException(PIXELS_CONFIG_ERROR, e);
+            }
+
         }
         return this;
     }
@@ -79,8 +90,18 @@ public class PixelsPrestoConfig
      * @return
      */
     @NotNull
-    public ConfigFactory getFactory ()
+    public ConfigFactory getConfigFactory()
     {
-        return configFactory;
+        return this.configFactory;
+    }
+
+    /**
+     * Injected class should get FSFactory instance by this method instead of FSFactory.Instance(...).
+     * @return
+     */
+    @NotNull
+    public FSFactory getFsFactory()
+    {
+        return this.fsFactory;
     }
 }

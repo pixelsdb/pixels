@@ -7,7 +7,7 @@ import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;

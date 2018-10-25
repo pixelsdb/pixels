@@ -13,7 +13,6 @@
  */
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.presto.impl.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.type.Type;
@@ -51,11 +50,9 @@ public class PixelsModule
         binder.bind(PixelsConnector.class).in(Scopes.SINGLETON);
         binder.bind(PixelsConnectorId.class).toInstance(new PixelsConnectorId(connectorId));
         binder.bind(PixelsMetadata.class).in(Scopes.SINGLETON);
-        binder.bind(FSFactory.class).in(Scopes.SINGLETON);
         binder.bind(PixelsMetadataProxy.class).in(Scopes.SINGLETON);
         binder.bind(PixelsSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(PixelsPageSourceProvider.class).in(Scopes.SINGLETON);
-        configBinder(binder).bindConfig(PixelsPrestoConfig.class);
         configBinder(binder).bindConfig(PixelsPrestoConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
