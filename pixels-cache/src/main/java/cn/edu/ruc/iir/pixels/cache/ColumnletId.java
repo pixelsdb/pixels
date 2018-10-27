@@ -17,13 +17,14 @@ public class ColumnletId
 {
     private static final int SIZE = Long.BYTES + 2 * Short.BYTES;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
-    public long blockId;
-    public short rowGroupId;
-    public short columnId;
-    public int missingCount = 0;
-    public boolean cached = false;
-    public long cacheOffset;
-    public int cacheLength;
+
+    long blockId;
+    short rowGroupId;
+    short columnId;
+    int missingCount = 0;
+    boolean cached = false;
+    long cacheOffset;
+    int cacheLength;
 
     public ColumnletId(long blockId, short rowGroupId, short columnId)
     {

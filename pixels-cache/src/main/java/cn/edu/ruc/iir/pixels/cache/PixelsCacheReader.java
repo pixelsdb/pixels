@@ -12,13 +12,14 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
-public class PixelsCacheReader implements AutoCloseable
+public class PixelsCacheReader
+        implements AutoCloseable
 {
     private final static int KEY_HEADER_SIZE = 2;
+    private final static long CHILDREN_OFFSET_MASK = 0x00FFFFFFFFFFFFFFL;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final MappedBusWriter mqWriter;
-    private final long childrenOffsetMask = 0x00FFFFFFFFFFFFFFL;
     private int version = 1;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
@@ -120,6 +121,11 @@ public class PixelsCacheReader implements AutoCloseable
     public static PixelsCacheReader.Builder newBuilder()
     {
         return new PixelsCacheReader.Builder();
+    }
+
+    public int getVersion()
+    {
+        return 0;
     }
 
     /**
@@ -230,7 +236,7 @@ public class PixelsCacheReader implements AutoCloseable
                 // if found matching child, set this child as current node, and increment bytesMatched
                 if (childLead == key[bytesMatched]) {
                     nodeOffset = indexFile.getLong(nodeOffset + 2 + i * 8);
-                    nodeOffset = nodeOffset & childrenOffsetMask;
+                    nodeOffset = nodeOffset & CHILDREN_OFFSET_MASK;
                     bytesMatched++;
                     matched = true;
                     break;
