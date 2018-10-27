@@ -125,6 +125,7 @@ public class PixelsCacheReader
 
     public int getVersion()
     {
+        // todo get cache version in index file
         return 0;
     }
 

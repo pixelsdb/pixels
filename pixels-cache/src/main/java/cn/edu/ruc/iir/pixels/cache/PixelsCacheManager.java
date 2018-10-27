@@ -2,9 +2,14 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import com.coreos.jetcd.Lease;
 import com.coreos.jetcd.Watch;
+import com.coreos.jetcd.data.ByteSequence;
+import com.coreos.jetcd.options.WatchOption;
+import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +34,8 @@ public class PixelsCacheManager
     private final PixelsCacheReader cacheReader;
     private final PixelsCacheWriter cacheWriter;
     private final EtcdUtil etcdUtil;
-    private final ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService scheduledExecutor;
+    private final ExecutorService watcherListenerExecutor;
 
     private static CacheManagerStatus cacheManagerStatus = CacheManagerStatus.INITIALIZING;
 
@@ -38,7 +44,8 @@ public class PixelsCacheManager
         this.cacheReader = cacheReader;
         this.cacheWriter = cacheWriter;
         this.etcdUtil = EtcdUtil.Instance();
-        this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.watcherListenerExecutor = Executors.newSingleThreadExecutor();
         initialize();
     }
 
@@ -62,6 +69,7 @@ public class PixelsCacheManager
                 int currentVersion = Integer.parseInt(etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL)
                                                               .getValue().toStringUtf8());
                 if (currentVersion > existingVersion) {
+                    cacheManagerStatus = CacheManagerStatus.UPDATING;
                     cacheWriter.updateAll();
                 }
             }
@@ -69,16 +77,67 @@ public class PixelsCacheManager
         else {
             cacheWriter.updateAll();
         }
+        // update local caching status
         cacheManagerStatus = CacheManagerStatus.READABLE;
-        etcdUtil.putKeyValue("node_", "" + cacheManagerStatus.statusId);
-        scheduledExecutorService.scheduleAtFixedRate(new CacheManagerStatusRegister(30), 1, 10, TimeUnit.SECONDS);
-        Watch.Watcher cacheVersionWatcher = etcdUtil.getCustomWatcherForKey(Constants.CACHE_VERSION_LITERAL);
+        Lease leaseClient = etcdUtil.getClient().getLeaseClient();
+        // get a lease from etcd with a specified ttl
+        // add this caching node into etcd with a granted lease
         try {
-            WatchResponse watchResponse = cacheVersionWatcher.listen();
-            String latestCacheVersion = watchResponse.getEvents().get(0).getKeyValue().getValue().toStringUtf8();
+            long leaseId = leaseClient.grant(60).get(30, TimeUnit.SECONDS).getID();
+            etcdUtil.putKeyValueWithLeaseId("node_", "" + cacheManagerStatus.statusId, leaseId);
         }
-        catch (InterruptedException e) {
+        catch (Exception e) {
             e.printStackTrace();
+            // todo deal with exception
+        }
+        // start a scheduled thread to update node status periodically
+        scheduledExecutor.scheduleAtFixedRate(new CacheManagerStatusRegister("", 30), 1, 10, TimeUnit.SECONDS);
+        // start the watcher listener
+        watcherListenerExecutor.submit(new CacheWatcherListener(this));
+    }
+
+    private void notifyEvent(WatchEvent event)
+    {
+        if (event.getEventType() == WatchEvent.EventType.PUT) {
+            // update
+        }
+        else if (event.getEventType() == WatchEvent.EventType.DELETE) {
+            // deal with error, cache coordinator may be corrupted.
+        }
+        else {
+        }
+    }
+
+    private static class CacheWatcherListener
+        implements Runnable
+    {
+        private final EtcdUtil etcdUtil;
+        private final Watch watch;
+        private final Watch.Watcher watcher;
+        private final PixelsCacheManager cacheManager;
+
+        public CacheWatcherListener(PixelsCacheManager cacheManager)
+        {
+            this.cacheManager = cacheManager;
+            this.etcdUtil = EtcdUtil.Instance();
+            this.watch = etcdUtil.getClient().getWatchClient();
+            this.watcher = watch.watch(ByteSequence.fromString(Constants.CACHE_VERSION_LITERAL), WatchOption.DEFAULT);
+        }
+
+        @Override
+        public void run()
+        {
+            while (true) {
+                try {
+                    WatchResponse watchResponse = watcher.listen();
+                    for (WatchEvent event : watchResponse.getEvents()) {
+                        cacheManager.notifyEvent(event);
+                    }
+                }
+                catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -86,18 +145,35 @@ public class PixelsCacheManager
             implements Runnable
     {
         private final EtcdUtil etcdUtil;
-        private final long expiration;
+        private final Lease leaseClient;
+        private final String id;
+        private final long leaseId;
 
-        public CacheManagerStatusRegister(long expiration)
+        public CacheManagerStatusRegister(String id, long leaseId)
         {
             this.etcdUtil = EtcdUtil.Instance();
-            this.expiration = expiration;
+            this.leaseClient = etcdUtil.getClient().getLeaseClient();
+            this.id = id;
+            this.leaseId = leaseId;
+
         }
 
         @Override
         public void run()
         {
-            etcdUtil.putKeyValueWithExpireTime("node_", "" + cacheManagerStatus.statusId, expiration);
+            try {
+                etcdUtil.putKeyValueWithLeaseId("node_" + id, "" + cacheManagerStatus.statusId, leaseId);
+                leaseClient.keepAliveOnce(leaseId);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void stop()
+        {
+            leaseClient.revoke(leaseId);
+            leaseClient.close();
         }
     }
 }
