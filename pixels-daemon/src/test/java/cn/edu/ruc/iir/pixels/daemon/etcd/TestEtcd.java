@@ -52,11 +52,36 @@ public class TestEtcd {
         //EtcdUtil.putEtcdKey(key, "hello world");
         KeyValue keyValue = EtcdUtil.getEtcdKey(key);
         long end = System.currentTimeMillis();
-        System.out.println((end-start));
+        System.out.println((end - start));
         if (keyValue != null)
             System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
         else
             System.out.println("keyValue is：" + keyValue);
+    }
+
+    @Test
+    public void testLock() {
+        cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance().Instance();
+        Client client = etcdUtil.getClient();
+        EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(client, "/read-write-lock");
+
+        System.out.println(readWriteLock.toString());
+
+        //读锁
+        final EtcdMutex readLock = readWriteLock.readLock();
+        //写锁
+        final EtcdMutex writeLock = readWriteLock.writeLock();
+
+//        readLock.acquire();
+        System.out.println(Thread.currentThread() + "获取到读锁");
+    }
+
+    @Test
+    public void testKV()
+    {
+        cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance();
+        KV client = etcdUtil.getClient().getKVClient();
+//        client.get()
     }
 
 }
