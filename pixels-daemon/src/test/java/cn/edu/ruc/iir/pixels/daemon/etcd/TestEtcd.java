@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon.etcd;
 
 import cn.edu.ruc.iir.pixels.common.lock.EtcdMutex;
 import cn.edu.ruc.iir.pixels.common.lock.EtcdReadWriteLock;
-import cn.edu.ruc.iir.pixels.daemon.etcd.util.EtcdUtil;
+import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import com.coreos.jetcd.Client;
 import com.coreos.jetcd.KV;
 import com.coreos.jetcd.data.ByteSequence;
@@ -48,12 +48,11 @@ public class TestEtcd {
 
     @Test
     public void testGetEtcdKey() {
-        String address = "10.77.40.238";
-        EtcdUtil.ClientInit(address);
+        EtcdUtil etcdUtil = EtcdUtil.Instance();
         String key = "etcd";
         long start = System.currentTimeMillis();
         //EtcdUtil.putEtcdKey(key, "hello world");
-        KeyValue keyValue = EtcdUtil.getEtcdKey(key);
+        KeyValue keyValue = etcdUtil.getKeyValue(key);
         long end = System.currentTimeMillis();
         System.out.println((end - start));
         if (keyValue != null)
