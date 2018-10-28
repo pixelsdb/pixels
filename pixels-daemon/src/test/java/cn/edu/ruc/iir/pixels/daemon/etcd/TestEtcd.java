@@ -10,7 +10,6 @@ import com.coreos.jetcd.data.KeyValue;
 import com.coreos.jetcd.kv.GetResponse;
 import org.junit.Test;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -63,10 +62,9 @@ public class TestEtcd {
 
     @Test
     public void testLock() throws Exception {
-        cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance().Instance();
+        EtcdUtil etcdUtil = EtcdUtil.Instance();
         Client client = etcdUtil.getClient();
         String basePath = "/read-write-lock";
-        List<KeyValue> children = etcdUtil.getKeyValuesByPrefix(basePath);
 
         etcdUtil.deleteByPrefix(basePath);
 
