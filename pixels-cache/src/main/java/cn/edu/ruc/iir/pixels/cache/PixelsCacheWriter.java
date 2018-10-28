@@ -1,10 +1,14 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusReader;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import com.alibaba.fastjson.JSON;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -23,94 +27,143 @@ public class PixelsCacheWriter
     private final MappedBusReader mqReader;
     private final List<ColumnletId> columnletIds;
     private final PixelsRadix radix;
+    private final String schema;
+    private final String table;
+    private final MetadataService metadataService;
+    private final EtcdUtil etcdUtil;
     private long currentIndexOffset;
 
     public PixelsCacheWriter(MemoryMappedFile cacheFile,
                              MemoryMappedFile indexFile,
                              MappedBusReader mqReader,
-                             PixelsRadix radix)
+                             PixelsRadix radix,
+                             String schema,
+                             String table,
+                             String metaHost,
+                             int metaPort)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
         this.mqReader = mqReader;
         this.columnletIds = new LinkedList<>();
         this.radix = radix;
+        this.schema = schema;
+        this.table = table;
+        this.metadataService = new MetadataService(metaHost, metaPort);
+        this.etcdUtil = EtcdUtil.Instance();
     }
 
-    public void update()
-    {}
-
-    public void updateAll()
-    {}
-
-    public void run()
+    public void updateAll(int version)
     {
+        try {
+            // get the matched layout
+            List<Layout> layouts = metadataService.getLayouts(schema, table);
+            Layout chosenLayout = null;
+            for (Layout layout : layouts)
+            {
+                if (layout.getVersion() == version) {
+                    chosenLayout = layout;
+                    break;
+                }
+            }
+            if (chosenLayout == null) {
+                // no matching layout
+                return;
+            }
+            // get the caching file list
+            String fileStr = etcdUtil.getKeyValue("location_" + version + "_node_id").getValue().toStringUtf8();
+            String[] files = fileStr.split(";"); // todo split is inefficient
+            internalUpdate(version, chosenLayout, files);
+        }
+        catch (MetadataException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void internalUpdate(int version, Layout layout, String[] files)
+    {
+        // get the new caching layout
+        String compactStr = layout.getCompact();
+        Compact compact = (Compact) JSON.parse(compactStr);
+        int cacheBorder = compact.getCacheBorder();
+        List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
-        indexFile.putShortVolatile(0, (short) 1);
+        PixelsCacheUtil.setIndexRW(indexFile, (short) 1);
         // wait until readerCount is 0
         long start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start < 3000) {
-            if (indexFile.getShortVolatile(2) == 0) {
+            if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
                 break;
             }
         }
-        indexFile.putShortVolatile(2, (short) 0);
-        // collect cache missing messages from mq, and sort caches by their missing counts
-        try {
-            mqReader.open();
-            while (mqReader.next()) {
-                ColumnletId columnletId = new ColumnletId();
-                mqReader.readMessage(columnletId);
-                int index = columnletIds.indexOf(columnletId);
-                if (index >= 0) {
-                    ColumnletId target = columnletIds.get(index);
-                    target.missingCount++;
-                }
-                else {
-                    columnletIds.add(columnletId);
-                }
-            }
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-        // read all columnlets in cache, and sort by their access counts
-        traverseRadix(columnletIds);
-        columnletIds.sort(Comparator.comparingInt(o -> o.missingCount));
-        // decide which columnlets to evict and which ones to insert
-        evict(columnletIds);
-        // get offsets of all remaining cached columnlets, sort by their offsets
-        List<ColumnletId> remainingCaches = new LinkedList<>();
-        for (ColumnletId columnletId : columnletIds) {
-            if (columnletId.cached) {
-                remainingCaches.add(columnletId);
-            }
-        }
-        remainingCaches.sort(Comparator.comparingLong(o -> o.cacheOffset));
-        // write all remaining cached columnlets by order, reset their counts
-        compact(remainingCaches);
+        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
+        // update cache content
+
+        // update cache version
+        PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
         flushIndex();
         // set rwFlag as readable
-        indexFile.putShortVolatile(0, READABLE);
+        PixelsCacheUtil.setIndexRW(indexFile, READABLE);
+    }
+
+    private void run()
+    {
+        // collect cache missing messages from mq, and sort caches by their missing counts
+//        try {
+//            mqReader.open();
+//            while (mqReader.next()) {
+//                ColumnletId columnletId = new ColumnletId();
+//                mqReader.readMessage(columnletId);
+//                int index = columnletIds.indexOf(columnletId);
+//                if (index >= 0) {
+//                    ColumnletId target = columnletIds.get(index);
+//                    target.missingCount++;
+//                }
+//                else {
+//                    columnletIds.add(columnletId);
+//                }
+//            }
+//        }
+//        catch (IOException e) {
+//            e.printStackTrace();
+//        }
+        // read all columnlets in cache, and sort by their access counts
+//        traverseRadix(columnletIds);
+//        columnletIds.sort(Comparator.comparingInt(o -> o.missingCount));
+        // decide which columnlets to evict and which ones to insert
+//        evict(columnletIds);
+        // get offsets of all remaining cached columnlets, sort by their offsets
+//        List<ColumnletId> remainingCaches = new LinkedList<>();
+//        for (ColumnletId columnletId : columnletIds) {
+//            if (columnletId.cached) {
+//                remainingCaches.add(columnletId);
+//            }
+//        }
+//        remainingCaches.sort(Comparator.comparingLong(o -> o.cacheOffset));
+        // write all remaining cached columnlets by order, reset their counts
+//        compact(remainingCaches);
+        // flush index
+//        flushIndex();
+
         // todo read missing columnlets and append them into cache file, and change radix accordingly.
 
         // set rwFlag as write
-        indexFile.putShortVolatile(0, WRITE);
+//        indexFile.putShortVolatile(0, WRITE);
         // wait until readerCount is 0
-        start = System.currentTimeMillis();
-        while (System.currentTimeMillis() - start < 3000) {
-            if (indexFile.getShortVolatile(2) == 0) {
-                break;
-            }
-        }
-        indexFile.putShortVolatile(2, (short) 0);
+//        start = System.currentTimeMillis();
+//        while (System.currentTimeMillis() - start < 3000) {
+//            if (indexFile.getShortVolatile(2) == 0) {
+//                break;
+//            }
+//        }
+//        indexFile.putShortVolatile(2, (short) 0);
         // flush index
-        flushIndex();
+//        flushIndex();
         // increase version
-        indexFile.getAndAddLong(4, 1);
+//        indexFile.getAndAddLong(4, 1);
         // set raFlag as readable
-        indexFile.putShortVolatile(0, READABLE);
+//        indexFile.putShortVolatile(0, READABLE);
     }
 
     /**

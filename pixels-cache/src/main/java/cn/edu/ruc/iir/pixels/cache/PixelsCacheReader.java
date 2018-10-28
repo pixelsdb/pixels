@@ -20,7 +20,6 @@ public class PixelsCacheReader
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final MappedBusWriter mqWriter;
-    private int version = 1;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
     {
@@ -125,8 +124,7 @@ public class PixelsCacheReader
 
     public int getVersion()
     {
-        // todo get cache version in index file
-        return 0;
+        return PixelsCacheUtil.getIndexVersion(indexFile);
     }
 
     /**
@@ -142,19 +140,19 @@ public class PixelsCacheReader
     {
         byte[] content = new byte[0];
         // check rw flag
-        short rwFlag = indexFile.getShortVolatile(0);
+        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
         if (rwFlag != 0) {
             return content;
         }
 
         // check if reader count reaches its max value (short max value)
-        int readerCount = indexFile.getShortVolatile(2);
+        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
         if (readerCount >= Short.MAX_VALUE) {
             return content;
         }
         // update reader count
         readerCount = readerCount + 1;
-        indexFile.putShortVolatile(2, (short) readerCount);
+        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) readerCount);
 
         // search index file for columnlet id
         ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);

@@ -14,6 +14,36 @@ public class PixelsCacheUtil
     public static final int INDEX_SIZE_OFFSET = 128;
     public static final int INDEX_FIELD_OFFSET = 192;
 
+    public static void setIndexVersion(MemoryMappedFile indexFile, int version)
+    {
+        indexFile.putIntVolatile(4, version);
+    }
+
+    public static int getIndexVersion(MemoryMappedFile indexFile)
+    {
+        return indexFile.getIntVolatile(4);
+    }
+
+    public static void setIndexReaderCount(MemoryMappedFile indexFile, short readerCount)
+    {
+        indexFile.putShortVolatile(2, readerCount);
+    }
+
+    public static short getIndexReaderCount(MemoryMappedFile indexFile)
+    {
+        return indexFile.getShortVolatile(2);
+    }
+
+    public static void setIndexRW(MemoryMappedFile indexFile, short rwFlag)
+    {
+        indexFile.putShortVolatile(0, rwFlag);
+    }
+
+    public static short getIndexRW(MemoryMappedFile indexFile)
+    {
+        return indexFile.getShortVolatile(0);
+    }
+
     public static int setHeaderRW(int header, boolean write)
     {
         if (write) {

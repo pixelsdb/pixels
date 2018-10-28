@@ -53,8 +53,24 @@ public class PixelsCacheCoordinator
 
     /**
      * Update file caching locations
+     * 1. for all files, decide which files to cache
+     * 2. for each file, decide which node to cache it
      * */
-    private void update(String[] paths, HostAddress[] nodes)
+    private void update()
+            throws FSException
+    {
+        // select: decide which files to cache
+        String[] paths = select();
+        // allocate: decide which node to cache each file
+        allocate(paths, new HostAddress[0]);
+    }
+
+    private String[] select()
+    {
+        return new String[0];
+    }
+
+    private void allocate(String[] paths, HostAddress[] nodes)
             throws FSException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes);

@@ -64,18 +64,18 @@ public class PixelsCacheManager
     private void initialize()
     {
         int existingVersion = cacheReader.getVersion();
+        int currentVersion = Integer.parseInt(etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL)
+                                                      .getValue().toStringUtf8());
         if (existingVersion >= 0) {
             if (etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL) != null) {
-                int currentVersion = Integer.parseInt(etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL)
-                                                              .getValue().toStringUtf8());
                 if (currentVersion > existingVersion) {
                     cacheManagerStatus = CacheManagerStatus.UPDATING;
-                    cacheWriter.updateAll();
+                    cacheWriter.updateAll(currentVersion);
                 }
             }
         }
         else {
-            cacheWriter.updateAll();
+            cacheWriter.updateAll(currentVersion);
         }
         // update local caching status
         cacheManagerStatus = CacheManagerStatus.READABLE;
@@ -84,7 +84,7 @@ public class PixelsCacheManager
         // add this caching node into etcd with a granted lease
         try {
             long leaseId = leaseClient.grant(60).get(30, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId("node_", "" + cacheManagerStatus.statusId, leaseId);
+            etcdUtil.putKeyValueWithLeaseId("node_", "" + cacheManagerStatus.statusId, leaseId); // todo node_id
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -100,6 +100,8 @@ public class PixelsCacheManager
     {
         if (event.getEventType() == WatchEvent.EventType.PUT) {
             // update
+            int version = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
+            cacheWriter.updateAll(version);
         }
         else if (event.getEventType() == WatchEvent.EventType.DELETE) {
             // deal with error, cache coordinator may be corrupted.
@@ -108,6 +110,9 @@ public class PixelsCacheManager
         }
     }
 
+    /**
+     * Listener to watch changes of the cache version.
+     * */
     private static class CacheWatcherListener
         implements Runnable
     {
@@ -141,6 +146,9 @@ public class PixelsCacheManager
         }
     }
 
+    /**
+     * Scheduled register to update caching node status and keep its registration alive.
+     * */
     private static class CacheManagerStatusRegister
             implements Runnable
     {
@@ -162,7 +170,7 @@ public class PixelsCacheManager
         public void run()
         {
             try {
-                etcdUtil.putKeyValueWithLeaseId("node_" + id, "" + cacheManagerStatus.statusId, leaseId);
+                etcdUtil.putKeyValue("node_" + id, "" + cacheManagerStatus.statusId);
                 leaseClient.keepAliveOnce(leaseId);
             }
             catch (Exception e) {
