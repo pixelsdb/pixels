@@ -15,10 +15,7 @@ import com.google.common.collect.Maps;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 /**
  * @version V1.0
@@ -82,7 +79,7 @@ public class EtcdLock {
                 int preIndex = 0;
                 for (int index = 0; index < kvList.size(); index++) {
                     if (kvList.get(index).getModRevision() == revisionOfMyself) {
-//                        System.out.println("revisionOfMyself: " + revisionOfMyself);
+                        System.out.println("revisionOfMyself: " + revisionOfMyself);
                         preIndex = index - 1;
                     }
                 }
@@ -133,13 +130,6 @@ public class EtcdLock {
             System.out.println("[error]: unlock failed：" + e);
         }
 
-//        Thread currentThread = Thread.currentThread();
-//        Watch.Watcher watch = threadData.get(currentThread);
-//        if (watch != null) {
-//            System.out.println("unlock watch: " + watch.hashCode());
-//            watch.close();
-//        }
-
     }
 
 
@@ -158,13 +148,14 @@ public class EtcdLock {
             Long leaseId = null;
             try {
                 leaseId = leaseClient.grant(15).get(10, TimeUnit.SECONDS).getID();
+                System.out.println("leaseId: " + leaseId);
             } catch (InterruptedException | ExecutionException | TimeoutException e1) {
                 System.out.println("[error]: create lease failed:" + e1);
                 return;
             }
 
-//            ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-//            service.scheduleAtFixedRate(new EtcdLock.KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
+            ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+            service.scheduleAtFixedRate(new EtcdLock.KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
 
             // 1. try to lock
             String realLoclName = lock(lockName, client, leaseId);
@@ -178,7 +169,7 @@ public class EtcdLock {
                 System.out.println("[error]:" + e2);
             }
             // 3. unlock
-//            service.shutdown();
+            service.shutdown();
             unLock(realLoclName, client);
         }
     }

@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.etcd;
 
+import cn.edu.ruc.iir.pixels.common.lock.EtcdMutex;
+import cn.edu.ruc.iir.pixels.common.lock.EtcdReadWriteLock;
 import cn.edu.ruc.iir.pixels.daemon.etcd.util.EtcdUtil;
 import com.coreos.jetcd.Client;
 import com.coreos.jetcd.KV;
@@ -8,6 +10,7 @@ import com.coreos.jetcd.data.KeyValue;
 import com.coreos.jetcd.kv.GetResponse;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -60,28 +63,124 @@ public class TestEtcd {
     }
 
     @Test
-    public void testLock() {
+    public void testLock() throws Exception {
         cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance().Instance();
         Client client = etcdUtil.getClient();
-        EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(client, "/read-write-lock");
+        String basePath = "/read-write-lock";
+        List<KeyValue> children = etcdUtil.getKeyValuesByPrefix(basePath);
 
-        System.out.println(readWriteLock.toString());
+        etcdUtil.deleteByPrefix(basePath);
+
+        EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(client, basePath);
 
         //读锁
         final EtcdMutex readLock = readWriteLock.readLock();
         //写锁
         final EtcdMutex writeLock = readWriteLock.writeLock();
 
-//        readLock.acquire();
-        System.out.println(Thread.currentThread() + "获取到读锁");
-    }
+        final EtcdMutex readLock1 = readWriteLock.readLock();
 
-    @Test
-    public void testKV()
-    {
-        cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance();
-        KV client = etcdUtil.getClient().getKVClient();
-//        client.get()
+        final EtcdMutex readLock2 = readWriteLock.readLock();
+
+        final EtcdMutex writeLock1 = readWriteLock.writeLock();
+
+        try {
+            readLock.acquire();
+            System.out.println(Thread.currentThread() + "获取到读锁-0");
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        //在读锁没释放之前不能读取写锁。
+                        writeLock.acquire();
+                        System.out.println(Thread.currentThread() + "获取到写锁-0");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            writeLock.release();
+                            System.out.println(Thread.currentThread() + "writeLock 释放写锁-0");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        readLock1.acquire();
+                        System.out.println(Thread.currentThread() + "readLock1 获取到读锁-1");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(4000);
+                            readLock1.release();
+                            System.out.println(Thread.currentThread() + "readLock1 释放读锁-1");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        readLock2.acquire();
+                        System.out.println(Thread.currentThread() + "readLock2 获取到读锁-2");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            Thread.sleep(2000);
+                            readLock2.release();
+                            System.out.println(Thread.currentThread() + "readLock2 释放读锁-2");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        //在读锁没释放之前不能读取写锁。
+                        writeLock1.acquire();
+                        System.out.println(Thread.currentThread() + "writeLock1 获取到写锁-1");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        try {
+                            writeLock1.release();
+                            System.out.println(Thread.currentThread() + "writeLock1 释放写锁-1");
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+
+            //停顿3000毫秒不释放锁，这时其它线程可以获取读锁，却不能获取写锁。
+            Thread.sleep(1000);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            //停顿3000毫秒不释放锁，这时其它线程可以获取读锁，却不能获取写锁。
+            Thread.sleep(8000);
+            System.out.println(Thread.currentThread() + "readLock 释放读锁-0");
+            readLock.release();
+        }
+
+        Thread.sleep(30000);
+        System.out.println("End");
     }
 
 }
