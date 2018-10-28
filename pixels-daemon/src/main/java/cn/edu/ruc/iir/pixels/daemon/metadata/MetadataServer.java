@@ -14,6 +14,8 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 
+import java.sql.Connection;
+
 /**
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.daemon.metadata.server
@@ -50,7 +52,9 @@ public class MetadataServer implements Server {
         //配置服务端NIO 线程组
         this.boss = new NioEventLoopGroup();
         this.worker = new NioEventLoopGroup();
-        DBUtil.Instance().getConnection();
+        Connection conn = DBUtil.Instance().getConnection();
+        if(conn != null)
+            System.out.println("mysql connected.");
         ServerBootstrap server = new ServerBootstrap();
 
         try {

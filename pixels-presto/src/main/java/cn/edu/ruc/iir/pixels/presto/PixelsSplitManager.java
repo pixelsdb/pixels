@@ -128,6 +128,7 @@ public class PixelsSplitManager
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
             // add splits in orderPath
+            boolean isCached = false;
             try
             {
                 for (Path file : fsFactory.listFiles(layout.getOrderPath()))
@@ -135,7 +136,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             file.toString(), 0, 1,
-                            fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                            isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
             } catch (FSException e)
@@ -154,7 +155,7 @@ public class PixelsSplitManager
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                 file.toString(), curFileRGIdx, splitSize,
-                                fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                                isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }

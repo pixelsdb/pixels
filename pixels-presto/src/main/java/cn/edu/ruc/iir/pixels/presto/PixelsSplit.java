@@ -44,6 +44,7 @@ public class PixelsSplit
     private final String path;
     private final long start;
     private final long len;
+    private final boolean isCached;
     private final List<HostAddress> addresses;
     private final List<String> order;
     private final TupleDomain<PixelsColumnHandle> constraint;
@@ -56,6 +57,7 @@ public class PixelsSplit
             @JsonProperty("path") String path,
             @JsonProperty("start") long start,
             @JsonProperty("len") long len,
+            @JsonProperty("len") boolean isCached,
             @JsonProperty("addresses") List<HostAddress> addresses,
             @JsonProperty("order") List<String> order,
             @JsonProperty("constraint") TupleDomain<PixelsColumnHandle> constraint) {
@@ -65,10 +67,16 @@ public class PixelsSplit
         this.path = requireNonNull(path, "path is null");
         this.start = start;
         this.len = len;
+        this.isCached = isCached;
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.order = requireNonNull(order, "order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         log.debug("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
+    }
+
+    @JsonProperty
+    public boolean isCached() {
+        return isCached;
     }
 
     @JsonProperty
