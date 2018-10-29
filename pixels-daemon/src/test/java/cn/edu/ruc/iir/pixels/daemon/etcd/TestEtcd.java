@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon.etcd;
 
 import cn.edu.ruc.iir.pixels.common.lock.EtcdMutex;
 import cn.edu.ruc.iir.pixels.common.lock.EtcdReadWriteLock;
-import cn.edu.ruc.iir.pixels.daemon.etcd.util.EtcdUtil;
+import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import com.coreos.jetcd.Client;
 import com.coreos.jetcd.KV;
 import com.coreos.jetcd.data.ByteSequence;
@@ -10,7 +10,6 @@ import com.coreos.jetcd.data.KeyValue;
 import com.coreos.jetcd.kv.GetResponse;
 import org.junit.Test;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -48,12 +47,11 @@ public class TestEtcd {
 
     @Test
     public void testGetEtcdKey() {
-        String address = "10.77.40.238";
-        EtcdUtil.ClientInit(address);
+        EtcdUtil etcdUtil = EtcdUtil.Instance();
         String key = "etcd";
         long start = System.currentTimeMillis();
         //EtcdUtil.putEtcdKey(key, "hello world");
-        KeyValue keyValue = EtcdUtil.getEtcdKey(key);
+        KeyValue keyValue = etcdUtil.getKeyValue(key);
         long end = System.currentTimeMillis();
         System.out.println((end - start));
         if (keyValue != null)
@@ -64,10 +62,9 @@ public class TestEtcd {
 
     @Test
     public void testLock() throws Exception {
-        cn.edu.ruc.iir.pixels.common.utils.EtcdUtil etcdUtil = cn.edu.ruc.iir.pixels.common.utils.EtcdUtil.Instance().Instance();
+        EtcdUtil etcdUtil = EtcdUtil.Instance();
         Client client = etcdUtil.getClient();
         String basePath = "/read-write-lock";
-        List<KeyValue> children = etcdUtil.getKeyValuesByPrefix(basePath);
 
         etcdUtil.deleteByPrefix(basePath);
 
