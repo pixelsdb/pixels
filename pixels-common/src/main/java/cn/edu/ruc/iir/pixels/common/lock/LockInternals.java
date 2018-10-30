@@ -118,7 +118,7 @@ public class LockInternals {
                     int preIndex = 0;
                     // true: all 'READ', false: exist 'WRIT'
                     boolean isRead = true;
-                    for (int index = children.size() - 1; index > 0; index--) {
+                    for (int index = children.size() - 1; index >= 0; index--) {
                         KeyValue kv = children.get(index);
                         long revision = kv.getCreateRevision();
                         // no or exist 'WRIT'

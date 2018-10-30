@@ -14,8 +14,14 @@ java -jar rainbow-benchmark-0.1.0-SNAPSHOT-full.jar --data_size=30720 --thread_n
 
 `/text` is the directory in HDFS
 
+## How to use pixels-load
+different `LOAD` command, the same `DDL` command
+- single thread
+`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.cli.LoaderCli'
+- multiple thread
+`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.pc.Main'
 
-## Pixels loader command line tool
+## Pixels consumer command line tool
 1> Start `pixels-metadata` thread
 ```
 java -jar -Dio.netty.leakDetection.level=advanced -Drole=main pixels-damon-0.1.0-SNAPSHOT-full.jar metadata
@@ -29,11 +35,21 @@ java -jar pixels-load-0.1.0-SNAPSHOT-full.jar
 ```
 DDL -s {schema_file} -d {db_name}
 ```
-- LOAD Command
+- LOAD Command *single thread*
 ```
 LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex}
 
 pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t
+```
+- LOAD Command *multiple thread*
+```
+LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex} -c {consumer_thread_num} -p {producer}
+
+pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4 -p false
+pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4
+
+{producer} is optional, default false.
+
 ```
 
 ## Presto Command
