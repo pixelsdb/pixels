@@ -20,4 +20,5 @@ public final class Constants
     public static int INIT_DICT_SIZE = 4096;
 
     public static String CACHE_VERSION_LITERAL = "cache_version";
+    public static int MAX_BLOCK_ID_LEN = 20480;
 }

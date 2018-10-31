@@ -1,8 +1,10 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusMessage;
+import org.apache.commons.compress.utils.CharsetNames;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -18,7 +20,7 @@ public class ColumnletId
     private static final int SIZE = Long.BYTES + 2 * Short.BYTES;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
 
-    long blockId;
+    String blockId;
     short rowGroupId;
     short columnId;
     int missingCount = 0;
@@ -26,7 +28,7 @@ public class ColumnletId
     long cacheOffset;
     int cacheLength;
 
-    public ColumnletId(long blockId, short rowGroupId, short columnId)
+    public ColumnletId(String blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
@@ -39,7 +41,8 @@ public class ColumnletId
     public byte[] getBytes()
     {
         keyBuffer.clear();
-        keyBuffer.putLong(blockId);
+        keyBuffer.putInt(blockId.length());
+        keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
         return keyBuffer.array();
@@ -54,9 +57,9 @@ public class ColumnletId
     @Override
     public void write(MemoryMappedFile mem, long pos)
     {
-        mem.putLong(0, blockId);
-        mem.putShort(8, rowGroupId);
-        mem.putShort(12, columnId);
+//        mem.putLong(0, blockId);
+//        mem.putShort(8, rowGroupId);
+//        mem.putShort(12, columnId);
     }
 
     /**

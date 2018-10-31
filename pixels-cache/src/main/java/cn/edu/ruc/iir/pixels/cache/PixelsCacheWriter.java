@@ -6,8 +6,12 @@ import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import com.alibaba.fastjson.JSON;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
@@ -26,6 +30,7 @@ public class PixelsCacheWriter
     private final MemoryMappedFile indexFile;
     private final MappedBusReader mqReader;
     private final List<ColumnletId> columnletIds;
+    private final FileSystem fs;
     private final PixelsRadix radix;
     private final String schema;
     private final String table;
@@ -36,6 +41,7 @@ public class PixelsCacheWriter
     public PixelsCacheWriter(MemoryMappedFile cacheFile,
                              MemoryMappedFile indexFile,
                              MappedBusReader mqReader,
+                             FileSystem fs,
                              PixelsRadix radix,
                              String schema,
                              String table,
@@ -46,6 +52,7 @@ public class PixelsCacheWriter
         this.indexFile = indexFile;
         this.mqReader = mqReader;
         this.columnletIds = new LinkedList<>();
+        this.fs = fs;
         this.radix = radix;
         this.schema = schema;
         this.table = table;
@@ -75,12 +82,13 @@ public class PixelsCacheWriter
             String[] files = fileStr.split(";"); // todo split is inefficient
             internalUpdate(version, chosenLayout, files);
         }
-        catch (MetadataException e) {
+        catch (MetadataException | IOException e) {
             e.printStackTrace();
         }
     }
 
     private void internalUpdate(int version, Layout layout, String[] files)
+            throws IOException
     {
         // get the new caching layout
         String compactStr = layout.getCompact();
@@ -98,7 +106,37 @@ public class PixelsCacheWriter
         }
         PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
         // update cache content
-
+        radix.removeAll();
+        long cacheOffset = 0L;
+        for (String file : files)
+        {
+            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            int[] physicalLens = new int[cacheColumnletOrders.size()];
+            long[] physicalOffsets = new long[cacheColumnletOrders.size()];
+            // update radix
+            for (int i = 0; i < cacheColumnletOrders.size(); i++)
+            {
+                String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
+                short rowGroupId = Short.parseShort(columnletIdStr[0]);
+                short columnId = Short.parseShort(columnletIdStr[1]);
+                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+                PixelsProto.ColumnChunkIndex chunkIndex =
+                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+                physicalLens[i] = (int) chunkIndex.getChunkLength();
+                physicalOffsets[i] = chunkIndex.getChunkOffset();
+                radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
+                          new PixelsCacheIdx(cacheOffset, physicalLens[i]));
+                cacheOffset += physicalLens[i];
+            }
+            // update cache content
+            cacheOffset = 0L;
+            for (int i = 0; i < cacheColumnletOrders.size(); i++)
+            {
+                byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
+                cacheFile.putBytes(cacheOffset, columnlet);
+                cacheOffset += physicalLens[i];
+            }
+        }
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index

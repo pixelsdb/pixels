@@ -276,6 +276,9 @@ public class PixelsRadix
         }
     }
 
+    public void removeAll()
+    {}
+
     private SearchResult searchInternal(byte[] key)
     {
         RadixNode currentNode = nodes.get(0);

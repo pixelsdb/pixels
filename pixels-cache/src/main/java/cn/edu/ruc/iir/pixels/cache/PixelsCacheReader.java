@@ -136,7 +136,7 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(long blockId, short rowGroupId, short columnId) throws EOFException
+    public byte[] get(String blockId, short rowGroupId, short columnId) throws EOFException
     {
         byte[] content = new byte[0];
         // check rw flag
