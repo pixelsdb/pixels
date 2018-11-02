@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.cache.mq.MappedBusReader;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
@@ -13,7 +12,6 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -28,8 +26,6 @@ public class PixelsCacheWriter
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final MappedBusReader mqReader;
-    private final List<ColumnletId> columnletIds;
     private final FileSystem fs;
     private final PixelsRadix radix;
     private final String schema;
@@ -40,7 +36,6 @@ public class PixelsCacheWriter
 
     public PixelsCacheWriter(MemoryMappedFile cacheFile,
                              MemoryMappedFile indexFile,
-                             MappedBusReader mqReader,
                              FileSystem fs,
                              PixelsRadix radix,
                              String schema,
@@ -50,8 +45,6 @@ public class PixelsCacheWriter
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.mqReader = mqReader;
-        this.columnletIds = new LinkedList<>();
         this.fs = fs;
         this.radix = radix;
         this.schema = schema;
@@ -143,65 +136,6 @@ public class PixelsCacheWriter
         flushIndex();
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
-    }
-
-    private void run()
-    {
-        // collect cache missing messages from mq, and sort caches by their missing counts
-//        try {
-//            mqReader.open();
-//            while (mqReader.next()) {
-//                ColumnletId columnletId = new ColumnletId();
-//                mqReader.readMessage(columnletId);
-//                int index = columnletIds.indexOf(columnletId);
-//                if (index >= 0) {
-//                    ColumnletId target = columnletIds.get(index);
-//                    target.missingCount++;
-//                }
-//                else {
-//                    columnletIds.add(columnletId);
-//                }
-//            }
-//        }
-//        catch (IOException e) {
-//            e.printStackTrace();
-//        }
-        // read all columnlets in cache, and sort by their access counts
-//        traverseRadix(columnletIds);
-//        columnletIds.sort(Comparator.comparingInt(o -> o.missingCount));
-        // decide which columnlets to evict and which ones to insert
-//        evict(columnletIds);
-        // get offsets of all remaining cached columnlets, sort by their offsets
-//        List<ColumnletId> remainingCaches = new LinkedList<>();
-//        for (ColumnletId columnletId : columnletIds) {
-//            if (columnletId.cached) {
-//                remainingCaches.add(columnletId);
-//            }
-//        }
-//        remainingCaches.sort(Comparator.comparingLong(o -> o.cacheOffset));
-        // write all remaining cached columnlets by order, reset their counts
-//        compact(remainingCaches);
-        // flush index
-//        flushIndex();
-
-        // todo read missing columnlets and append them into cache file, and change radix accordingly.
-
-        // set rwFlag as write
-//        indexFile.putShortVolatile(0, WRITE);
-        // wait until readerCount is 0
-//        start = System.currentTimeMillis();
-//        while (System.currentTimeMillis() - start < 3000) {
-//            if (indexFile.getShortVolatile(2) == 0) {
-//                break;
-//            }
-//        }
-//        indexFile.putShortVolatile(2, (short) 0);
-        // flush index
-//        flushIndex();
-        // increase version
-//        indexFile.getAndAddLong(4, 1);
-        // set raFlag as readable
-//        indexFile.putShortVolatile(0, READABLE);
     }
 
     /**

@@ -16,20 +16,45 @@ import java.io.IOException;
 public class PixelsPhysicalReader
 {
     private final PhysicalReader physicalReader;
+    private final PixelsProto.FileTail fileTail;
 
     public PixelsPhysicalReader(FileSystem fs, Path path)
     {
         this.physicalReader = PhysicalReaderUtil.newPhysicalFSReader(fs, path);
+        this.fileTail = readFileTail();
     }
 
-    public PixelsProto.FileTail readFileTail()
+    private PixelsProto.FileTail readFileTail()
     {
+        if (physicalReader != null) {
+            try {
+                long fileLen = physicalReader.getFileLength();
+                physicalReader.seek(fileLen - Long.BYTES);
+                long fileTailOffset = physicalReader.readLong();
+                int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+                physicalReader.seek(fileTailOffset);
+                byte[] fileTailBuffer = new byte[fileTailLength];
+                physicalReader.readFully(fileTailBuffer);
+                return PixelsProto.FileTail.parseFrom(fileTailBuffer);
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         return null;
     }
 
     public PixelsProto.RowGroupFooter readRowGroupFooter(int rowGroupId)
+            throws IOException
     {
-        return null;
+        PixelsProto.RowGroupInformation rgInfo = fileTail.getFooter().getRowGroupInfos(rowGroupId);
+        long rgFooterOffset = rgInfo.getFooterOffset();
+        int rgFooterLength = rgInfo.getFooterLength();
+        byte[] rgFooterBytes = new byte[rgFooterLength];
+        physicalReader.seek(rgFooterOffset);
+        physicalReader.readFully(rgFooterBytes);
+
+        return PixelsProto.RowGroupFooter.parseFrom(rgFooterBytes);
     }
 
     public byte[] read(long offset, int length)

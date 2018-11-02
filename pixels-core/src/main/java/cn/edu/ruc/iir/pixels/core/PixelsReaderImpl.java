@@ -157,8 +157,8 @@ public class PixelsReaderImpl
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException
     {
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
-        long footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
-        byte[] footer = new byte[(int) footerLength];
+        int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
+        byte[] footer = new byte[footerLength];
         physicalFSReader.seek(footerOffset);
         physicalFSReader.readFully(footer);
         return PixelsProto.RowGroupFooter.parseFrom(footer);
