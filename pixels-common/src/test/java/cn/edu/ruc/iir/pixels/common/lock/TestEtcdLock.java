@@ -1,7 +1,5 @@
-package cn.edu.ruc.iir.pixels.daemon.etcd;
+package cn.edu.ruc.iir.pixels.common.lock;
 
-import cn.edu.ruc.iir.pixels.common.lock.EtcdMutex;
-import cn.edu.ruc.iir.pixels.common.lock.EtcdReadWriteLock;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import com.coreos.jetcd.Client;
 import org.junit.Test;

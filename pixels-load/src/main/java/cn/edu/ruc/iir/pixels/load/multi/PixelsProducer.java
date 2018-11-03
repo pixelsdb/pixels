@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.pc;
+package cn.edu.ruc.iir.pixels.load.multi;
 
 import org.apache.hadoop.fs.Path;
 
@@ -7,56 +7,69 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.pc
+ * @Package: cn.edu.ruc.iir.pixels.load.multi
  * @ClassName: PixelsProducer
  * @Description: souce -> BlockingQueue
  * @author: tao
  * @date: Create in 2018-10-30 12:57
  **/
-public class PixelsProducer {
+public class PixelsProducer
+{
     private static PixelsProducer instance = new PixelsProducer();
 
-    public PixelsProducer() {
+    public PixelsProducer()
+    {
     }
 
-    public static PixelsProducer getInstance() {
+    public static PixelsProducer getInstance()
+    {
         return instance;
     }
 
-    public void startProducer(BlockingQueue<Path> queue) {
+    public void startProducer(BlockingQueue<Path> queue)
+    {
     }
 
-    class Producer extends Thread {
+    class Producer extends Thread
+    {
 
         private volatile boolean isRunning = true;
         private BlockingQueue<Path> queue;
         Path data = null;
 
-        public Producer(BlockingQueue<Path> queue) {
+        public Producer(BlockingQueue<Path> queue)
+        {
             this.queue = queue;
         }
 
         @Override
-        public void run() {
+        public void run()
+        {
             System.out.println("start producer thread！");
-            try {
-                while (isRunning) {
+            try
+            {
+                while (isRunning)
+                {
                     System.out.println("begin to generate data...");
 
                     System.out.println("add：" + data + "into queue...");
-                    if (!queue.offer(data, 2, TimeUnit.SECONDS)) {
+                    if (!queue.offer(data, 2, TimeUnit.SECONDS))
+                    {
                         System.out.println("add error：" + data);
                     }
                 }
-            } catch (InterruptedException e) {
+            } catch (InterruptedException e)
+            {
                 e.printStackTrace();
                 Thread.currentThread().interrupt();
-            } finally {
+            } finally
+            {
                 System.out.println("Exit producer thread！");
             }
         }
 
-        public void stopProducer() {
+        public void stopProducer()
+        {
             isRunning = false;
         }
     }

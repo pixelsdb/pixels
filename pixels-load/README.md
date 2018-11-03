@@ -17,9 +17,9 @@ java -jar rainbow-benchmark-0.1.0-SNAPSHOT-full.jar --data_size=30720 --thread_n
 ## How to use pixels-load
 different `LOAD` command, the same `DDL` command
 - single thread
-`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.cli.LoaderCli'
+`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.single.Main'
 - multiple thread
-`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.pc.Main'
+`pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.multi.Main'
 
 ## Pixels consumer command line tool
 1> Start `pixels-metadata` thread
