@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.pc;
+package cn.edu.ruc.iir.pixels.load.multi;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
@@ -12,8 +12,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-public class Config {
-    private String originalDataPath;
+public class Config
+{
     private String dbName;
     private String tableName;
     private int maxRowNum;
@@ -25,35 +25,42 @@ public class Config {
     private String schema;
     private int[] orderMapping;
 
-    protected Config() {
+    protected Config()
+    {
     }
 
-    public String getPixelsPath() {
+    public String getPixelsPath()
+    {
         return pixelsPath;
     }
 
-    public String getSchema() {
+    public String getSchema()
+    {
         return schema;
     }
 
-    public int[] getOrderMapping() {
+    public int[] getOrderMapping()
+    {
         return orderMapping;
     }
 
-    public int getMaxRowNum() {
+    public int getMaxRowNum()
+    {
         return maxRowNum;
     }
 
-    public String getRegex() {
+    public String getRegex()
+    {
         return regex;
     }
 
-    public String getFormat() {
+    public String getFormat()
+    {
         return format;
     }
 
-    Config(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex, String format) {
-        this.originalDataPath = originalDataPath;
+    Config(String dbName, String tableName, int maxRowNum, String regex, String format)
+    {
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
@@ -61,7 +68,8 @@ public class Config {
         this.format = format;
     }
 
-    boolean load(ConfigFactory configFactory) throws IOException, MetadataException {
+    boolean load(ConfigFactory configFactory) throws IOException, MetadataException
+    {
         // init metadata service
         String metaHost = configFactory.getProperty("metadata.server.host");
         int metaPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
@@ -72,7 +80,8 @@ public class Config {
         // record original column names and types
         String[] originalColNames = new String[colSize];
         String[] originalColTypes = new String[colSize];
-        for (int i = 0; i < colSize; i++) {
+        for (int i = 0; i < colSize; i++)
+        {
             originalColNames[i] = columns.get(i).getName();
             originalColTypes[i] = columns.get(i).getType();
         }
@@ -80,16 +89,20 @@ public class Config {
         List<Layout> layouts = metadataService.getLayouts(dbName, tableName);
         Layout writingLayout = null;
         int writingLayoutVersion = -1;
-        for (Layout layout : layouts) {
-            if (layout.getPermission() > 0) {
-                if (layout.getVersion() > writingLayoutVersion) {
+        for (Layout layout : layouts)
+        {
+            if (layout.getPermission() > 0)
+            {
+                if (layout.getVersion() > writingLayoutVersion)
+                {
                     writingLayout = layout;
                     writingLayoutVersion = layout.getVersion();
                 }
             }
         }
         // no layouts for writing currently
-        if (writingLayout == null) {
+        if (writingLayout == null)
+        {
             return false;
         }
         // get the column order of the latest writing layout
@@ -97,34 +110,43 @@ public class Config {
         List<String> layoutColumnOrder = order.getColumnOrder();
         // get path of loading
         String loadingDataPath = writingLayout.getOrderPath();
-        if (!loadingDataPath.endsWith("/")) {
+        if (!loadingDataPath.endsWith("/"))
+        {
             loadingDataPath += "/";
         }
         // check size consistency
-        if (layoutColumnOrder.size() != colSize) {
+        if (layoutColumnOrder.size() != colSize)
+        {
             return false;
         }
         // map the column order of the latest writing layout to the original column order
         int[] orderMapping = new int[colSize];
         List<String> originalColNameList = Arrays.asList(originalColNames);
-        for (int i = 0; i < colSize; i++) {
+        for (int i = 0; i < colSize; i++)
+        {
             int index = originalColNameList.indexOf(layoutColumnOrder.get(i));
-            if (index >= 0) {
+            if (index >= 0)
+            {
                 orderMapping[i] = index;
-            } else {
+            } else
+            {
                 return false;
             }
         }
         // construct pixels schema based on the column order of the latest writing layout
         StringBuilder schemaBuilder = new StringBuilder("struct<");
-        for (int i = 0; i < colSize; i++) {
+        for (int i = 0; i < colSize; i++)
+        {
             String name = layoutColumnOrder.get(i);
             String type = originalColTypes[orderMapping[i]];
-            if (type.equals("integer")) {
+            if (type.equals("integer"))
+            {
                 type = "int";
-            } else if (type.equals("long")) {
+            } else if (type.equals("long"))
+            {
                 type = "bigint";
-            } else if (type.equals("varchar")) {
+            } else if (type.equals("varchar"))
+            {
                 type = "string";
             }
             schemaBuilder.append(name).append(":").append(type)

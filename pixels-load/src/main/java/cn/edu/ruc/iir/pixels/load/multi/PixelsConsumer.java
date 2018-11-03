@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.pc;
+package cn.edu.ruc.iir.pixels.load.multi;
 
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.common.utils.StringUtil;
@@ -25,34 +25,39 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.pc
+ * @Package: cn.edu.ruc.iir.pixels.load.multi
  * @ClassName: PixelsConsumer
  * @Description:
  * @author: tao
  * @date: Create in 2018-10-30 15:18
  **/
-public class PixelsConsumer extends Consumer {
+public class PixelsConsumer extends Consumer
+{
 
     private BlockingQueue<Path> queue;
     private Properties prop;
     private Config config;
 
-    public Properties getProp() {
+    public Properties getProp()
+    {
         return prop;
     }
 
-    public PixelsConsumer(BlockingQueue<Path> queue, Properties prop, Config config) {
+    public PixelsConsumer(BlockingQueue<Path> queue, Properties prop, Config config)
+    {
         this.queue = queue;
         this.prop = prop;
         this.config = config;
     }
 
     @Override
-    public void run() {
+    public void run()
+    {
         System.out.println("Start PixelsConsumer, " + Thread.currentThread().getName() + ", time: " + DateUtil.formatTime(new Date()));
 
         boolean isRunning = true;
-        try {
+        try
+        {
             String loadingDataPath = config.getPixelsPath();
             String schemaStr = config.getSchema();
             int[] orderMapping = config.getOrderMapping();
@@ -75,54 +80,61 @@ public class PixelsConsumer extends Consumer {
 
             BufferedReader reader = null;
             String line;
-            PixelsWriter pixelsWriter = null;
 
-            while (isRunning) {
+            String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+            PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setFS(fs)
+                    .setFilePath(new Path(loadingFilePath))
+                    .setBlockSize(blockSize)
+                    .setReplication(replication)
+                    .setBlockPadding(true)
+                    .setEncoding(true)
+                    .setCompressionBlockSize(1)
+                    .build();
+
+            int rowCounter = 0;
+
+            while (isRunning)
+            {
                 Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
-                if (null != originalFilePath) {
-
-                    String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
-                    pixelsWriter = PixelsWriterImpl.newBuilder()
-                            .setSchema(schema)
-                            .setPixelStride(pixelStride)
-                            .setRowGroupSize(rowGroupSize)
-                            .setFS(fs)
-                            .setFilePath(new Path(loadingFilePath))
-                            .setBlockSize(blockSize)
-                            .setReplication(replication)
-                            .setBlockPadding(true)
-                            .setEncoding(true)
-                            .setCompressionBlockSize(1)
-                            .build();
-
-                    int rowCounter = 0;
-
+                if (null != originalFilePath)
+                {
                     reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
 
-                    while ((line = reader.readLine()) != null) {
+                    while ((line = reader.readLine()) != null)
+                    {
                         line = StringUtil.replaceAll(line, "false", "0");
                         line = StringUtil.replaceAll(line, "False", "0");
                         line = StringUtil.replaceAll(line, "true", "1");
                         line = StringUtil.replaceAll(line, "True", "1");
                         int rowId = rowBatch.size++;
                         rowCounter++;
-                        if (regex.equals("\\s")) {
+                        if (regex.equals("\\s"))
+                        {
                             regex = " ";
                         }
                         String[] colsInLine = line.split(regex);
-                        for (int i = 0; i < columnVectors.length; i++) {
+                        for (int i = 0; i < columnVectors.length; i++)
+                        {
                             int valueIdx = orderMapping[i];
-                            if (colsInLine[valueIdx].equalsIgnoreCase("\\N")) {
+                            if (colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                            {
                                 columnVectors[i].isNull[rowId] = true;
-                            } else {
+                            } else
+                            {
                                 columnVectors[i].add(colsInLine[valueIdx]);
                             }
                         }
 
-                        if (rowBatch.size >= rowBatch.getMaxSize()) {
+                        if (rowBatch.size >= rowBatch.getMaxSize())
+                        {
                             pixelsWriter.addRowBatch(rowBatch);
                             rowBatch.reset();
-                            if (rowCounter >= maxRowNum) {
+                            if (rowCounter >= maxRowNum)
+                            {
                                 pixelsWriter.close();
                                 loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
                                 pixelsWriter = PixelsWriterImpl.newBuilder()
@@ -144,7 +156,8 @@ public class PixelsConsumer extends Consumer {
                     }
 
 
-                } else {
+                } else
+                {
                     // over 2s， assume all the produce line is out， consumer exit
                     isRunning = false;
                 }
@@ -152,25 +165,31 @@ public class PixelsConsumer extends Consumer {
             }
 
             // left last file to write
-            if (rowBatch.size != 0) {
+            if (rowBatch.size != 0)
+            {
                 pixelsWriter.addRowBatch(rowBatch);
                 rowBatch.reset();
             }
 
             pixelsWriter.close();
 
-            if (reader != null) {
+            if (reader != null)
+            {
                 reader.close();
             }
 
-        } catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             System.out.println("PixelsConsumer: " + e.getMessage());
             Thread.currentThread().interrupt();
-        } catch (FileNotFoundException e) {
+        } catch (FileNotFoundException e)
+        {
             e.printStackTrace();
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
-        } finally {
+        } finally
+        {
             System.out.println("Exit PixelsConsumer, " + Thread.currentThread().getName() + ", time: " + DateUtil.formatTime(new Date()));
         }
     }

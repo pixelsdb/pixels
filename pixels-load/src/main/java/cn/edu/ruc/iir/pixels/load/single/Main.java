@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.cli;
+package cn.edu.ruc.iir.pixels.load.single;
 
 import cn.edu.ruc.iir.pixels.load.util.LoaderUtil;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -23,7 +23,7 @@ import java.util.Scanner;
  * </p>
  *
  */
-public class LoaderCli
+public class Main
 {
     public static void main(String[] args)
     {

@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.cli;
+package cn.edu.ruc.iir.pixels.load.single;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
