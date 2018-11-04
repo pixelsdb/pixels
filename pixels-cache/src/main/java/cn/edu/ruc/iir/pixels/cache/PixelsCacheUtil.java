@@ -19,6 +19,18 @@ public class PixelsCacheUtil
         indexFile.putIntVolatile(4, version);
     }
 
+    public static boolean checkMagic(MemoryMappedFile file)
+    {
+        // todo read magic from files
+        return true;
+    }
+
+    public static PixelsRadix getRadix(MemoryMappedFile indexFile)
+    {
+        // todo read radix from index file
+        return new PixelsRadix();
+    }
+
     public static int getIndexVersion(MemoryMappedFile indexFile)
     {
         return indexFile.getIntVolatile(4);

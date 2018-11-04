@@ -1,7 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.cache.mq.MappedBusWriter;
-
 import java.io.EOFException;
 import java.io.IOException;
 
@@ -19,13 +17,11 @@ public class PixelsCacheReader
     private final static long CHILDREN_OFFSET_MASK = 0x00FFFFFFFFFFFFFFL;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final MappedBusWriter mqWriter;
 
-    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
+    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.mqWriter = mqWriter;
     }
 
     public static class Builder
@@ -34,10 +30,6 @@ public class PixelsCacheReader
         private long builderCacheSize;
         private String builderIndexLocation = "";
         private long builderIndexSize;
-        private String builderMQLocation = "";
-        private long builderMQFileSize;
-        private int builderMQRecordSize;
-        private boolean builderMQAppend;
 
         private Builder()
         {}
@@ -74,46 +66,12 @@ public class PixelsCacheReader
             return this;
         }
 
-        public PixelsCacheReader.Builder setMQLocation(String mqLocation)
-        {
-            checkArgument(!mqLocation.isEmpty(), "location should not be empty");
-            this.builderMQLocation = mqLocation;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQFileSize(long mqFileSize)
-        {
-            checkArgument(mqFileSize > 0, "message queue file size should be positive");
-            this.builderMQFileSize = mqFileSize;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQRecordSize(int mqRecordSize)
-        {
-            checkArgument(mqRecordSize > 0, "message queue record size should be positive");
-            this.builderMQRecordSize = mqRecordSize;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQAppend(boolean mqAppend)
-        {
-            this.builderMQAppend = mqAppend;
-
-            return this;
-        }
-
         public PixelsCacheReader build() throws Exception
         {
-            MappedBusWriter mqWriter = new MappedBusWriter(builderMQLocation, builderMQFileSize,
-                    builderMQRecordSize, builderMQAppend);
-            mqWriter.open();
             MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
 
-            return new PixelsCacheReader(cacheFile, indexFile, mqWriter);
+            return new PixelsCacheReader(cacheFile, indexFile);
         }
     }
 
@@ -171,9 +129,9 @@ public class PixelsCacheReader
             cacheFile.getBytes(offset + 4, content, 0, length);
         }
         // if not found, send cache miss message
-        else {
-            mqWriter.write(columnletId);
-        }
+//        else {
+//            mqWriter.write(columnletId);
+//        }
 
         // decrease reader count
         readerCount = indexFile.getShortVolatile(2);
@@ -259,6 +217,6 @@ public class PixelsCacheReader
 
     public void close() throws IOException
     {
-        mqWriter.close();
+//        mqWriter.close();
     }
 }

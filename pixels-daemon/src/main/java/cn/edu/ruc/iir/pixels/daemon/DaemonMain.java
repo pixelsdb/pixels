@@ -3,7 +3,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
+import cn.edu.ruc.iir.pixels.daemon.cache.CacheManager;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
 
@@ -47,7 +47,7 @@ public class DaemonMain
                 int port = Integer.valueOf(config.getProperty("metadata.server.port"));
                 MetadataServer metadataServer = new MetadataServer(port);
 
-                CacheServer cacheServer = new CacheServer();
+                CacheManager cacheServer = new CacheManager();
 
                 MetricsServer metricsServer = new MetricsServer();
 

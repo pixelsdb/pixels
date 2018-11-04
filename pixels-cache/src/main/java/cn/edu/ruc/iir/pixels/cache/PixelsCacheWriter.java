@@ -1,7 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
@@ -14,6 +12,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * pixels
  *
@@ -22,60 +22,129 @@ import java.util.List;
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;
-    private final static short WRITE = 1;
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final FileSystem fs;
     private final PixelsRadix radix;
-    private final String schema;
-    private final String table;
-    private final MetadataService metadataService;
     private final EtcdUtil etcdUtil;
     private long currentIndexOffset;
 
-    public PixelsCacheWriter(MemoryMappedFile cacheFile,
+    private PixelsCacheWriter(MemoryMappedFile cacheFile,
                              MemoryMappedFile indexFile,
                              FileSystem fs,
                              PixelsRadix radix,
-                             String schema,
-                             String table,
-                             String metaHost,
-                             int metaPort)
+                             EtcdUtil etcdUtil)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
         this.fs = fs;
         this.radix = radix;
-        this.schema = schema;
-        this.table = table;
-        this.metadataService = new MetadataService(metaHost, metaPort);
-        this.etcdUtil = EtcdUtil.Instance();
+        this.etcdUtil = etcdUtil;
     }
 
-    public void updateAll(int version)
+    public static class Builder
+    {
+        private String builderCacheLocation = "";
+        private long builderCacheSize;
+        private String builderIndexLocation = "";
+        private long builderIndexSize;
+        private FileSystem builderFS;
+        private boolean builderOverwrite = true;
+
+        private Builder()
+        {}
+
+        public PixelsCacheWriter.Builder setCacheLocation(String cacheLocation)
+        {
+            checkArgument(!cacheLocation.isEmpty(), "location should bot be empty");
+            this.builderCacheLocation = cacheLocation;
+
+            return this;
+        }
+
+        public PixelsCacheWriter.Builder setCacheSize(long cacheSize)
+        {
+            checkArgument(cacheSize > 0, "size should be positive");
+            this.builderCacheSize = cacheSize;
+
+            return this;
+        }
+
+        public PixelsCacheWriter.Builder setIndexLocation(String location)
+        {
+            checkArgument(!location.isEmpty(), "index location should not be empty");
+            this.builderIndexLocation = location;
+
+            return this;
+        }
+
+        public PixelsCacheWriter.Builder setIndexSize(long size)
+        {
+            checkArgument(size > 0, "index size should be positive");
+            this.builderIndexSize = size;
+
+            return this;
+        }
+
+        public PixelsCacheWriter.Builder setFS(FileSystem fs)
+        {
+            checkArgument(fs != null, "fs should not be null");
+            this.builderFS = fs;
+
+            return this;
+        }
+
+        public PixelsCacheWriter.Builder setOverwrite(boolean overwrite)
+        {
+            this.builderOverwrite = overwrite;
+            return this;
+        }
+
+        public PixelsCacheWriter build()
+                throws Exception
+        {
+            MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
+            MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
+            PixelsRadix radix;
+            // check if cache(index) file exists.
+            //   if overwrite is true, then create a new cache file and an index file.
+            //   else, create the radix tree from the existing cache(index) file.
+            if (builderOverwrite) {
+                radix = new PixelsRadix();
+            }
+            else if (PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile)){
+                radix = PixelsCacheUtil.getRadix(indexFile);
+            }
+            else {
+                radix = new PixelsRadix();
+            }
+            // todo check null of all parameters
+            EtcdUtil etcdUtil = EtcdUtil.Instance();
+
+            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil);
+        }
+    }
+
+    public static Builder newBuilder()
+    {
+        return new Builder();
+    }
+
+    public MemoryMappedFile getIndexFile()
+    {
+        return indexFile;
+    }
+
+    public void updateAll(int version, Layout layout)
     {
         try {
-            // get the matched layout
-            List<Layout> layouts = metadataService.getLayouts(schema, table);
-            Layout chosenLayout = null;
-            for (Layout layout : layouts)
-            {
-                if (layout.getVersion() == version) {
-                    chosenLayout = layout;
-                    break;
-                }
-            }
-            if (chosenLayout == null) {
-                // no matching layout
-                return;
-            }
             // get the caching file list
             String fileStr = etcdUtil.getKeyValue("location_" + version + "_node_id").getValue().toStringUtf8();
             String[] files = fileStr.split(";"); // todo split is inefficient
-            internalUpdate(version, chosenLayout, files);
+            internalUpdate(version, layout, files);
         }
-        catch (MetadataException | IOException e) {
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -136,31 +205,6 @@ public class PixelsCacheWriter
         flushIndex();
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
-    }
-
-    /**
-     * Evict caches from radix tree.
-     * Remove cache keys evicted or not to be inserted from cacheKeys list.
-     * */
-    private void evict(List<ColumnletId> cachedColumnlets)
-    {}
-
-    /**
-     * Compact remaining caches in the cache file.
-     * */
-    private void compact(List<ColumnletId> remainingColumnlets)
-    {
-        long currentOffset = 0;
-        for (ColumnletId columnletId : remainingColumnlets) {
-            long columnletOffset = columnletId.cacheOffset;
-            int columnletLength = columnletId.cacheLength;
-            if (columnletOffset != currentOffset) {
-                byte[] columnlet = new byte[columnletLength];
-                cacheFile.getBytes(columnletOffset, columnlet, 0, columnletLength);
-                cacheFile.putBytes(currentOffset, columnlet);
-            }
-            currentOffset += columnletLength;
-        }
     }
 
     /**
