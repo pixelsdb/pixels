@@ -10,7 +10,7 @@ Upload the following files to the catalog of `presto-server-0.192`
 - pixels-load-0.1.0-SNAPSHOT.jar
 
 ## Run ETL Tool
-- See`cn.edu.ruc.iir.pixels.load.cli.Loader`
+- See`cn.edu.ruc.iir.pixels.load.single.Loader`
 - DDL
 
 `DDL -s schema_file -d db_name`

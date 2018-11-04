@@ -1,23 +1,19 @@
-package cn.edu.ruc.iir.pixels.load.cli;
+package cn.edu.ruc.iir.pixels.load.single;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.common.utils.StringUtil;
+import cn.edu.ruc.iir.pixels.core.PixelsWriter;
+import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.orc.CompressionKind;
-import org.apache.orc.OrcFile;
-import org.apache.orc.TypeDescription;
-import org.apache.orc.Writer;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -31,17 +27,12 @@ import java.util.List;
  *
  * @author guodong
  */
-public class ORCLoader
+public class PixelsLoader
         extends Loader
 {
-    ORCLoader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
+    PixelsLoader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
     {
         super(originalDataPath, dbName, tableName, maxRowNum, regex);
-    }
-
-    private enum VECTOR_CLAZZ
-    {
-        BytesColumnVector, DoubleColumnVector, LongColumnVector
     }
 
     @Override
@@ -56,9 +47,10 @@ public class ORCLoader
         TypeDescription schema = TypeDescription.fromString(schemaStr);
         VectorizedRowBatch rowBatch = schema.createRowBatch();
         ColumnVector[] columnVectors = rowBatch.cols;
-        int strideSize = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        int pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         int rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size")) * 1024 * 1024;
-        int blockSize = Integer.parseInt(configFactory.getProperty("block.size")) * 1024 * 1024;
+        long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
+        short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
         // read original data
         FileStatus[] fileStatuses = fs.listStatus(new Path(originalDataPath));
@@ -72,17 +64,19 @@ public class ORCLoader
         }
         BufferedReader reader = null;
         String line;
-        String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".orc";
-        Writer orcWriter = OrcFile.createWriter(new Path(loadingFilePath),
-                OrcFile.writerOptions(conf)
-                        .setSchema(schema)
-                        .rowIndexStride(strideSize)
-                        .stripeSize(rowGroupSize)
-                        .blockSize(blockSize)
-                        .compress(CompressionKind.NONE)
-                        .blockPadding(true)
-                        .fileSystem(fs)
-        );
+        String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+        PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
+                .setSchema(schema)
+                .setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize)
+                .setFS(fs)
+                .setFilePath(new Path(loadingFilePath))
+                .setBlockSize(blockSize)
+                .setReplication(replication)
+                .setBlockPadding(true)
+                .setEncoding(true)
+                .setCompressionBlockSize(1)
+                .build();
         int rowCounter = 0;
         for (Path originalFilePath : originalFilePaths)
         {
@@ -108,43 +102,30 @@ public class ORCLoader
                     }
                     else
                     {
-                        String value = colsInLine[valueIdx];
-                        VECTOR_CLAZZ clazz = VECTOR_CLAZZ.valueOf(columnVectors[i].getClass().getSimpleName());
-                        switch (clazz)
-                        {
-                            case BytesColumnVector:
-                                BytesColumnVector bytesColumnVector = (BytesColumnVector) columnVectors[i];
-                                bytesColumnVector.setVal(rowId, value.getBytes());
-                                break;
-                            case DoubleColumnVector:
-                                DoubleColumnVector doubleColumnVector = (DoubleColumnVector) columnVectors[i];
-                                doubleColumnVector.vector[rowId] = Double.valueOf(value);
-                                break;
-                            case LongColumnVector:
-                                LongColumnVector longColumnVector = (LongColumnVector) columnVectors[i];
-                                longColumnVector.vector[rowId] = Long.valueOf(value);
-                                break;
-                        }
+                        columnVectors[i].add(colsInLine[valueIdx]);
                     }
                 }
 
                 if (rowBatch.size >= rowBatch.getMaxSize())
                 {
-                    orcWriter.addRowBatch(rowBatch);
+                    pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
                     if (rowCounter >= maxRowNum)
                     {
-                        orcWriter.close();
-                        loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".orc";
-                        orcWriter = OrcFile.createWriter(new Path(loadingFilePath),
-                                OrcFile.writerOptions(conf)
-                                        .setSchema(schema)
-                                        .rowIndexStride(strideSize)
-                                        .stripeSize(rowGroupSize)
-                                        .blockSize(blockSize)
-                                        .compress(CompressionKind.NONE)
-                                        .blockPadding(true)
-                                        .fileSystem(fs));
+                        pixelsWriter.close();
+                        loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+                        pixelsWriter = PixelsWriterImpl.newBuilder()
+                                .setSchema(schema)
+                                .setPixelStride(pixelStride)
+                                .setRowGroupSize(rowGroupSize)
+                                .setFS(fs)
+                                .setFilePath(new Path(loadingFilePath))
+                                .setBlockSize(blockSize)
+                                .setReplication(replication)
+                                .setBlockPadding(true)
+                                .setEncoding(true)
+                                .setCompressionBlockSize(1)
+                                .build();
                         rowCounter = 0;
                     }
                 }
@@ -152,10 +133,10 @@ public class ORCLoader
         }
         if (rowBatch.size != 0)
         {
-            orcWriter.addRowBatch(rowBatch);
+            pixelsWriter.addRowBatch(rowBatch);
             rowBatch.reset();
         }
-        orcWriter.close();
+        pixelsWriter.close();
         if (reader != null)
         {
             reader.close();

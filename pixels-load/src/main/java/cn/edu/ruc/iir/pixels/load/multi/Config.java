@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.load.cli;
+package cn.edu.ruc.iir.pixels.load.multi;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
@@ -12,41 +12,65 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * <p>
-*
- * <p>
- * LOAD -p /home/tao/software/data/pixels/data/ -s /home/tao/software/data/pixels/Test.sql -f hdfs://presto00:9000/po_compare/
- * <br> 1000 columns
- * <p>
- * DDL -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -d pixels
- * <p>
- * LOAD -p /home/tao/software/data/pixels/test30G_pixels/data/ -s /home/tao/software/data/pixels/test30G_pixels/presto_ddl.sql -f hdfs://presto00:9000/pixels/test30G_pixels/
- * <p>
- * DDL -s /home/tao/software/data/pixels/test30G_pixels/105/presto_ddl.sql -d pixels
- * <p>
- **/
-public abstract class Loader
+public class Config
 {
-    private final String originalDataPath;
-    private final String dbName;
-    private final String tableName;
-    private final int maxRowNum;
-    private final String regex;
+    private String dbName;
+    private String tableName;
+    private int maxRowNum;
+    private String regex;
 
-    Loader(String originalDataPath, String dbName, String tableName, int maxRowNum, String regex)
+    private String format;
+
+    private String pixelsPath;
+    private String schema;
+    private int[] orderMapping;
+
+    protected Config()
     {
-        this.originalDataPath = originalDataPath;
+    }
+
+    public String getPixelsPath()
+    {
+        return pixelsPath;
+    }
+
+    public String getSchema()
+    {
+        return schema;
+    }
+
+    public int[] getOrderMapping()
+    {
+        return orderMapping;
+    }
+
+    public int getMaxRowNum()
+    {
+        return maxRowNum;
+    }
+
+    public String getRegex()
+    {
+        return regex;
+    }
+
+    public String getFormat()
+    {
+        return format;
+    }
+
+    Config(String dbName, String tableName, int maxRowNum, String regex, String format)
+    {
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
         this.regex = regex;
+        this.format = format;
     }
 
-    boolean load() throws IOException, MetadataException
+    boolean load(ConfigFactory configFactory) throws IOException, MetadataException
     {
         // init metadata service
-        ConfigFactory configFactory = ConfigFactory.Instance();
         String metaHost = configFactory.getProperty("metadata.server.host");
         int metaPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         MetadataService metadataService = new MetadataService(metaHost, metaPort);
@@ -100,12 +124,11 @@ public abstract class Loader
         List<String> originalColNameList = Arrays.asList(originalColNames);
         for (int i = 0; i < colSize; i++)
         {
-            int index=  originalColNameList.indexOf(layoutColumnOrder.get(i));
+            int index = originalColNameList.indexOf(layoutColumnOrder.get(i));
             if (index >= 0)
             {
                 orderMapping[i] = index;
-            }
-            else
+            } else
             {
                 return false;
             }
@@ -116,21 +139,26 @@ public abstract class Loader
         {
             String name = layoutColumnOrder.get(i);
             String type = originalColTypes[orderMapping[i]];
-            if (type.equals("integer")) {
+            if (type.equals("integer"))
+            {
                 type = "int";
-            } else if (type.equals("long")) {
+            } else if (type.equals("long"))
+            {
                 type = "bigint";
-            } else if (type.equals("varchar")) {
+            } else if (type.equals("varchar"))
+            {
                 type = "string";
             }
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }
         schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
-        return executeLoad(originalDataPath, loadingDataPath, schemaBuilder.toString(), orderMapping, configFactory, maxRowNum, regex);
+
+        // init the params
+        this.pixelsPath = loadingDataPath;
+        this.schema = schemaBuilder.toString();
+        this.orderMapping = orderMapping;
+        return true;
     }
 
-    protected abstract boolean executeLoad(String originalDataPath, String loadingDataPath, String schema,
-                                           int[] orderMapping, ConfigFactory configFactory, int maxRowNum, String regex)
-            throws IOException;
 }
