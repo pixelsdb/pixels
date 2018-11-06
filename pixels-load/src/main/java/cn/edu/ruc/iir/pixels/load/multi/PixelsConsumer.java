@@ -78,34 +78,42 @@ public class PixelsConsumer extends Consumer
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             ColumnVector[] columnVectors = rowBatch.cols;
 
-            BufferedReader reader = null;
+            BufferedReader reader;
             String line;
 
-            String loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
-            PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
-                    .setSchema(schema)
-                    .setPixelStride(pixelStride)
-                    .setRowGroupSize(rowGroupSize)
-                    .setFS(fs)
-                    .setFilePath(new Path(loadingFilePath))
-                    .setBlockSize(blockSize)
-                    .setReplication(replication)
-                    .setBlockPadding(true)
-                    .setEncoding(true)
-                    .setCompressionBlockSize(1)
-                    .build();
-
+            boolean initPixelsFile = true;
+            String loadingFilePath;
+            PixelsWriter pixelsWriter = null;
             int rowCounter = 0;
 
             while (isRunning)
             {
                 Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
-                if (null != originalFilePath)
+                if (originalFilePath != null)
                 {
                     reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
 
                     while ((line = reader.readLine()) != null)
                     {
+                        if (initPixelsFile == true)
+                        {
+                            // we create a new pixels file if we can read a next line from the source file.
+                            loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+                            pixelsWriter = PixelsWriterImpl.newBuilder()
+                                    .setSchema(schema)
+                                    .setPixelStride(pixelStride)
+                                    .setRowGroupSize(rowGroupSize)
+                                    .setFS(fs)
+                                    .setFilePath(new Path(loadingFilePath))
+                                    .setBlockSize(blockSize)
+                                    .setReplication(replication)
+                                    .setBlockPadding(true)
+                                    .setEncoding(true)
+                                    .setCompressionBlockSize(1)
+                                    .build();
+                        }
+                        initPixelsFile = false;
+
                         line = StringUtil.replaceAll(line, "false", "0");
                         line = StringUtil.replaceAll(line, "False", "0");
                         line = StringUtil.replaceAll(line, "true", "1");
@@ -136,48 +144,31 @@ public class PixelsConsumer extends Consumer
                             if (rowCounter >= maxRowNum)
                             {
                                 pixelsWriter.close();
-                                loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
-                                pixelsWriter = PixelsWriterImpl.newBuilder()
-                                        .setSchema(schema)
-                                        .setPixelStride(pixelStride)
-                                        .setRowGroupSize(rowGroupSize)
-                                        .setFS(fs)
-                                        .setFilePath(new Path(loadingFilePath))
-                                        .setBlockSize(blockSize)
-                                        .setReplication(replication)
-                                        .setBlockPadding(true)
-                                        .setEncoding(true)
-                                        .setCompressionBlockSize(1)
-                                        .build();
                                 rowCounter = 0;
+                                initPixelsFile = true;
                             }
                         }
-
                     }
-
-
+                    reader.close();
                 } else
                 {
-                    // over 2s， assume all the produce line is out， consumer exit
+                    // no source file can be consumed within 2 seconds,
+                    // loading is considered to be finished.
                     isRunning = false;
                 }
 
             }
 
-            // left last file to write
-            if (rowBatch.size != 0)
+            if (rowCounter > 0)
             {
-                pixelsWriter.addRowBatch(rowBatch);
-                rowBatch.reset();
+                // left last file to write
+                if (rowBatch.size != 0)
+                {
+                    pixelsWriter.addRowBatch(rowBatch);
+                    rowBatch.reset();
+                }
+                pixelsWriter.close();
             }
-
-            pixelsWriter.close();
-
-            if (reader != null)
-            {
-                reader.close();
-            }
-
         } catch (InterruptedException e)
         {
             System.out.println("PixelsConsumer: " + e.getMessage());
