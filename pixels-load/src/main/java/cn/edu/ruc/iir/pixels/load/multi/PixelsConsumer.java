@@ -78,7 +78,7 @@ public class PixelsConsumer extends Consumer
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             ColumnVector[] columnVectors = rowBatch.cols;
 
-            BufferedReader reader = null;
+            BufferedReader reader;
             String line;
 
             boolean initPixelsFile = true;
@@ -89,7 +89,7 @@ public class PixelsConsumer extends Consumer
             while (isRunning)
             {
                 Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
-                if (null != originalFilePath)
+                if (originalFilePath != null)
                 {
                     reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
 
