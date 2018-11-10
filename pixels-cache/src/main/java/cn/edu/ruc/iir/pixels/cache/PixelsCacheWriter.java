@@ -136,16 +136,18 @@ public class PixelsCacheWriter
         return indexFile;
     }
 
-    public void updateAll(int version, Layout layout)
+    public boolean updateAll(int version, Layout layout)
     {
         try {
             // get the caching file list
             String fileStr = etcdUtil.getKeyValue("location_" + version + "_node_id").getValue().toStringUtf8();
             String[] files = fileStr.split(";"); // todo split is inefficient
             internalUpdate(version, layout, files);
+            return true;
         }
         catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
     }
 

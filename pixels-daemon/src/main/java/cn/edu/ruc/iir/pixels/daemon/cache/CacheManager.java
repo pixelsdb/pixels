@@ -133,7 +133,13 @@ public class CacheManager
             cacheStatus.set(2);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
             // update cache content
-            cacheWriter.updateAll(version, matchedLayouts.iterator().next());
+            if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
+                cacheStatus.set(1);
+                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+            }
+            else {
+                // todo deal with exceptions when local cache update failed
+            }
         }
     }
 
