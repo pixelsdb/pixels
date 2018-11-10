@@ -110,9 +110,10 @@ public class CacheManager
             etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(),
                                             "" + cacheStatus.get(), leaseId);
             // start a scheduled thread to update node status periodically
-            this.cacheStatusRegister = new CacheManagerStatusRegister(etcdUtil, leaseClient, Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), 30);
+            this.cacheStatusRegister = new CacheManagerStatusRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
             cacheStatus.set(1);
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
         }
         // registration failed with exceptions.
         catch (Exception e) {
@@ -130,7 +131,7 @@ public class CacheManager
         if (!matchedLayouts.isEmpty()) {
             // update cache status
             cacheStatus.set(2);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + 2);
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
             // update cache content
             cacheWriter.updateAll(version, matchedLayouts.iterator().next());
         }
@@ -152,7 +153,6 @@ public class CacheManager
                         update(version);
                     }
                     else {
-                        // todo deal with errors. something goes wrong with the cache coordinator
                         logger.error("Unknown changes watched on cache version");
                         break;
                     }
@@ -187,16 +187,12 @@ public class CacheManager
     private static class CacheManagerStatusRegister
             implements Runnable
     {
-        private final EtcdUtil etcdUtil;
         private final Lease leaseClient;
-        private final String id;
         private final long leaseId;
 
-        CacheManagerStatusRegister(EtcdUtil etcdUtil, Lease leaseClient, String id, long leaseId)
+        CacheManagerStatusRegister(Lease leaseClient, long leaseId)
         {
-            this.etcdUtil = etcdUtil;
             this.leaseClient = leaseClient;
-            this.id = id;
             this.leaseId = leaseId;
 
         }
@@ -205,7 +201,6 @@ public class CacheManager
         public void run()
         {
             try {
-                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + id, "" + cacheStatus.get());
                 leaseClient.keepAliveOnce(leaseId);
             }
             catch (Exception e) {
