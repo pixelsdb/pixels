@@ -114,6 +114,7 @@ public class CacheManager
             scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
             cacheStatus.set(1);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+            Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
         }
         // registration failed with exceptions.
         catch (Exception e) {
