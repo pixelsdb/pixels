@@ -16,6 +16,8 @@ import com.coreos.jetcd.data.KeyValue;
 import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Set;
@@ -33,7 +35,7 @@ import java.util.stream.Collectors;
 public class CacheManager
         implements Server
 {
-
+    private static Logger logger = LoggerFactory.getLogger(CacheManager.class);
     // cache status: initializing(0), ready(1), updating(2), dead(-1)
     private static AtomicInteger cacheStatus = new AtomicInteger(0);
 
@@ -104,18 +106,18 @@ public class CacheManager
         Lease leaseClient = etcdUtil.getClient().getLeaseClient();
         // get a lease from etcd with a specified ttl, add this caching node into etcd with a granted lease
         try {
-            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(30, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId("node_" + cacheConfig.getNodeId(),"" + cacheStatus.get(), leaseId);
+            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
+            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(),
+                                            "" + cacheStatus.get(), leaseId);
+            // start a scheduled thread to update node status periodically
+            this.cacheStatusRegister = new CacheManagerStatusRegister(etcdUtil, leaseClient, Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), 30);
+            scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
+            cacheStatus.set(1);
         }
         // registration failed with exceptions.
         catch (Exception e) {
             e.printStackTrace();
-            return;
         }
-        // start a scheduled thread to update node status periodically
-        this.cacheStatusRegister = new CacheManagerStatusRegister("", 30);
-        scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
-        cacheStatus.set(1);
     }
 
     private void update(int version)
@@ -128,7 +130,7 @@ public class CacheManager
         if (!matchedLayouts.isEmpty()) {
             // update cache status
             cacheStatus.set(2);
-            etcdUtil.putKeyValue("node_" + cacheConfig.getNodeId(), "" + 2);
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + 2);
             // update cache content
             cacheWriter.updateAll(version, matchedLayouts.iterator().next());
         }
@@ -151,11 +153,15 @@ public class CacheManager
                     }
                     else {
                         // todo deal with errors. something goes wrong with the cache coordinator
+                        logger.error("Unknown changes watched on cache version");
+                        break;
                     }
                 }
             }
             catch (InterruptedException | MetadataException e) {
+                logger.error(e.getMessage());
                 e.printStackTrace();
+                break;
             }
         }
     }
@@ -170,7 +176,7 @@ public class CacheManager
     public void shutdown()
     {
         cacheStatus.set(-1);
-        etcdUtil.putKeyValue("node_" + cacheConfig.getNodeId(), "" + cacheStatus.get());
+        etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
         cacheStatusRegister.stop();
         this.scheduledExecutor.shutdownNow();
     }
@@ -186,10 +192,10 @@ public class CacheManager
         private final String id;
         private final long leaseId;
 
-        CacheManagerStatusRegister(String id, long leaseId)
+        CacheManagerStatusRegister(EtcdUtil etcdUtil, Lease leaseClient, String id, long leaseId)
         {
-            this.etcdUtil = EtcdUtil.Instance();
-            this.leaseClient = etcdUtil.getClient().getLeaseClient();
+            this.etcdUtil = etcdUtil;
+            this.leaseClient = leaseClient;
             this.id = id;
             this.leaseId = leaseId;
 
@@ -199,7 +205,7 @@ public class CacheManager
         public void run()
         {
             try {
-                etcdUtil.putKeyValue("node_" + id, "" + cacheStatus.get());
+                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + id, "" + cacheStatus.get());
                 leaseClient.keepAliveOnce(leaseId);
             }
             catch (Exception e) {

@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import java.io.EOFException;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -94,7 +93,7 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(String blockId, short rowGroupId, short columnId) throws EOFException
+    public byte[] get(String blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
         // check rw flag

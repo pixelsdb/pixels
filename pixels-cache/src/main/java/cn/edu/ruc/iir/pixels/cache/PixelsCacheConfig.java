@@ -18,56 +18,56 @@ public class PixelsCacheConfig
 
     public String getIndexLocation()
     {
-        return "";
+        return configFactory.getProperty("index.location");
     }
 
     public long getIndexSize()
     {
-        return 0L;
+        return Long.parseLong(configFactory.getProperty("index.size"));
     }
 
     public String getCacheLocation()
     {
-        return "";
+        return configFactory.getProperty("cache.location");
     }
 
     public long getCacheSize()
     {
-        return 0L;
+        return Long.parseLong(configFactory.getProperty("cache.size"));
     }
 
     public String getMetaHost()
     {
-        return "";
+        return configFactory.getProperty("metadata.server.host");
     }
 
     public int getMetaPort()
     {
-        return 0;
+        return Integer.parseInt(configFactory.getProperty("metadata.server.port"));
     }
 
     public String getSchema()
     {
-        return "";
+        return configFactory.getProperty("cache.schema");
     }
 
     public String getTable()
     {
-        return "";
+        return configFactory.getProperty("cache.table");
     }
 
     public String getHDFSConfigDir()
     {
-        return "";
+        return configFactory.getProperty("hdfs.config.dir");
     }
 
     public int getNodeLeaseTTL()
     {
-        return 0;
+        return Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
     }
 
-    public String getNodeId()
+    public String getHostAddress()
     {
-        return "";
+        return configFactory.getProperty("cache.host");
     }
 }

@@ -4,7 +4,6 @@ import com.coreos.jetcd.Client;
 import com.coreos.jetcd.Watch;
 import com.coreos.jetcd.data.ByteSequence;
 import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.kv.DeleteResponse;
 import com.coreos.jetcd.kv.PutResponse;
 import com.coreos.jetcd.lease.LeaseGrantResponse;
 import com.coreos.jetcd.options.DeleteOption;

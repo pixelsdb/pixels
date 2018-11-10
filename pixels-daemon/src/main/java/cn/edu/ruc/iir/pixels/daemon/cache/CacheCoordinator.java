@@ -7,14 +7,25 @@ import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.daemon.Server;
+import com.coreos.jetcd.Lease;
+import com.coreos.jetcd.Watch;
+import com.coreos.jetcd.data.ByteSequence;
 import com.coreos.jetcd.data.KeyValue;
+import com.coreos.jetcd.options.WatchOption;
+import com.coreos.jetcd.watch.WatchEvent;
+import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
-import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -25,16 +36,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheCoordinator
         implements Server
 {
+    private static final Logger logger = LoggerFactory.getLogger(CacheCoordinator.class);
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
+    private final ScheduledExecutorService scheduledExecutor;
     private FSFactory fsFactory = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
+    private CacheCoordinatorVersionRegister cacheVersionRegister = null;
 
-    private CacheCoordinator()
+    public CacheCoordinator()
     {
         this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
+        this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         initialize();
     }
 
@@ -45,15 +60,45 @@ public class CacheCoordinator
         if (null != etcdUtil.getKeyValue("cache_version")) {
             return;
         }
-        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, "0");
-        coordinatorStatus.set(1);
+        Lease leaseClient = etcdUtil.getClient().getLeaseClient();
+        try {
+            long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
+            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_VERSION_LITERAL, "0", leaseId);
+            this.cacheVersionRegister = new CacheCoordinatorVersionRegister(leaseClient, leaseId);
+            scheduledExecutor.scheduleAtFixedRate(cacheVersionRegister, 1, 10, TimeUnit.SECONDS);
+            coordinatorStatus.set(1);
+            Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void run()
     {
+        Watch watch = etcdUtil.getClient().getWatchClient();
+        Watch.Watcher watcher = watch.watch(
+                ByteSequence.fromString(Constants.LAYOUT_VERSION_LITERAL), WatchOption.DEFAULT);
         // watch layout version change, and update cache distribution and cache version
         while (coordinatorStatus.get() > 0) {
+            try {
+                WatchResponse watchResponse = watcher.listen();
+                for (WatchEvent event : watchResponse.getEvents()) {
+                    if (event.getEventType() == WatchEvent.EventType.PUT) {
+                        // update the cache distribution
+                        int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
+                        update();
+                        // update cache version
+                        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                    }
+                }
+            }
+            catch (InterruptedException | FSException e) {
+                logger.error(e.getMessage());
+                e.printStackTrace();
+                break;
+            }
         }
     }
 
@@ -67,6 +112,9 @@ public class CacheCoordinator
     public void shutdown()
     {
         coordinatorStatus.set(-1);
+        etcdUtil.delete(Constants.CACHE_VERSION_LITERAL);
+        cacheVersionRegister.stop();
+        this.scheduledExecutor.shutdownNow();
     }
 
     /**
@@ -78,31 +126,42 @@ public class CacheCoordinator
             throws FSException
     {
         if (fsFactory == null) {
-            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
+//            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
         }
         // select: decide which files to cache
         String[] paths = select();
         // allocate: decide which node to cache each file
-        allocate(paths, new HostAddress[0]);
+        List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
+        HostAddress[] hosts = new HostAddress[nodes.size()];
+        int hostIndex = 0;
+        for (int i = 0; i < nodes.size(); i++) {
+            KeyValue node = nodes.get(i);
+            if (Integer.parseInt(node.getValue().toStringUtf8()) == 1) {
+                hosts[hostIndex++] = HostAddress.fromString(node.getKey().toStringUtf8().substring(5));
+            }
+        }
+        allocate(paths, hosts, hostIndex);
     }
 
     private String[] select()
     {
-        return new String[0];
+        return new String[]{"/pixels/test30G_pixels/201806191751450.pxl"};
     }
 
-    private void allocate(String[] paths, HostAddress[] nodes)
+    private void allocate(String[] paths, HostAddress[] nodes, int size)
             throws FSException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes);
         KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
         if (cacheVersionKV == null) {
             // todo deal with exception
+            logger.warn("Cannot get cache version.");
             return;
         }
         String cacheVersion = cacheVersionKV.getValue().toStringUtf8();
-        for (HostAddress node : nodes)
+        for (int i = 0; i < size; i++)
         {
+            HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = "location_" + cacheVersion + "_" + node;
             etcdUtil.putKeyValue(key, String.join(",", files));
@@ -122,7 +181,8 @@ public class CacheCoordinator
         for (String path : paths)
         {
             // get a set of nodes where the file is located (location_set)
-            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
+//            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
+            List<HostAddress> locations = Arrays.asList(nodes);
             if (locations.size() == 0) {
                 continue;
             }
@@ -145,5 +205,30 @@ public class CacheCoordinator
         }
 
         return locationDistribution;
+    }
+
+    private static class CacheCoordinatorVersionRegister
+            implements Runnable
+    {
+        private final Lease leaseClient;
+        private final long leaseId;
+
+        CacheCoordinatorVersionRegister(Lease leaseClient, long leaseId)
+        {
+            this.leaseClient = leaseClient;
+            this.leaseId = leaseId;
+        }
+
+        @Override
+        public void run()
+        {
+            leaseClient.keepAliveOnce(leaseId);
+        }
+
+        public void stop()
+        {
+            leaseClient.revoke(leaseId);
+            leaseClient.close();
+        }
     }
 }
