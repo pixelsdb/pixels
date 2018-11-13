@@ -112,7 +112,6 @@
                 </exclusion>
             </exclusions>
             <optional>true</optional>
-            <scope>test</scope>
         </dependency>
 
         <dependency>

@@ -16,9 +16,12 @@ import com.coreos.jetcd.data.KeyValue;
 import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -69,13 +72,20 @@ public class CacheManager
     private void initialize()
     {
         try {
+            // get fs
+            Configuration conf = new Configuration();
+            conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+            conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+            FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             this.cacheWriter =
                     PixelsCacheWriter.newBuilder()
                                      .setCacheLocation(cacheConfig.getCacheLocation())
                                      .setCacheSize(cacheConfig.getCacheSize())
                                      .setIndexLocation(cacheConfig.getIndexLocation())
                                      .setIndexSize(cacheConfig.getIndexSize())
-                                     .setOverwrite(false).build();
+                                     .setOverwrite(false)
+                                     .setFS(fs)
+                                     .build();
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
             int localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
@@ -107,13 +117,13 @@ public class CacheManager
         // get a lease from etcd with a specified ttl, add this caching node into etcd with a granted lease
         try {
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(),
+            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(),
                                             "" + cacheStatus.get(), leaseId);
             // start a scheduled thread to update node status periodically
             this.cacheStatusRegister = new CacheManagerStatusRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
             cacheStatus.set(1);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
             Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
         }
         // registration failed with exceptions.
@@ -132,11 +142,11 @@ public class CacheManager
         if (!matchedLayouts.isEmpty()) {
             // update cache status
             cacheStatus.set(2);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
             // update cache content
             if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
                 cacheStatus.set(1);
-                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
             }
             else {
                 // todo deal with exceptions when local cache update failed
@@ -183,7 +193,7 @@ public class CacheManager
     public void shutdown()
     {
         cacheStatus.set(-1);
-        etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getHostAddress(), "" + cacheStatus.get());
+        etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
         cacheStatusRegister.stop();
         this.scheduledExecutor.shutdownNow();
     }

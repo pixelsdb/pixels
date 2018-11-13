@@ -88,7 +88,7 @@ public class CacheCoordinator
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
                         // update the cache distribution
                         int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
-                        update();
+                        update(layoutVersion);
                         // update cache version
                         etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
                     }
@@ -122,7 +122,7 @@ public class CacheCoordinator
      * 1. for all files, decide which files to cache
      * 2. for each file, decide which node to cache it
      * */
-    private void update()
+    private void update(int layoutVersion)
             throws FSException
     {
         if (fsFactory == null) {
@@ -132,6 +132,9 @@ public class CacheCoordinator
         String[] paths = select();
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
+        if (nodes.isEmpty()) {
+            return;
+        }
         HostAddress[] hosts = new HostAddress[nodes.size()];
         int hostIndex = 0;
         for (int i = 0; i < nodes.size(); i++) {
@@ -140,30 +143,23 @@ public class CacheCoordinator
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey().toStringUtf8().substring(5));
             }
         }
-        allocate(paths, hosts, hostIndex);
+        allocate(paths, hosts, hostIndex, layoutVersion);
     }
 
     private String[] select()
     {
-        return new String[]{"/pixels/test30G_pixels/201806191751450.pxl"};
+        return new String[]{"hdfs://dbiir01:9000//pixels/pixels/test_105/v_2_compact/0_201809232311590.compact.pxl"};
     }
 
-    private void allocate(String[] paths, HostAddress[] nodes, int size)
+    private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
             throws FSException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes);
-        KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
-        if (cacheVersionKV == null) {
-            // todo deal with exception
-            logger.warn("Cannot get cache version.");
-            return;
-        }
-        String cacheVersion = cacheVersionKV.getValue().toStringUtf8();
         for (int i = 0; i < size; i++)
         {
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
-            String key = "location_" + cacheVersion + "_" + node;
+            String key = "location_" + layoutVersion + "_" + node;
             etcdUtil.putKeyValue(key, String.join(",", files));
         }
     }

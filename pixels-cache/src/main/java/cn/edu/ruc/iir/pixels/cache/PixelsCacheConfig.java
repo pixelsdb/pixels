@@ -66,8 +66,13 @@ public class PixelsCacheConfig
         return Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
     }
 
-    public String getHostAddress()
+    public String getCacheHost()
     {
         return configFactory.getProperty("cache.host");
+    }
+
+    public String getWarehousePath()
+    {
+        return configFactory.getProperty("pixels.warehouse.path");
     }
 }

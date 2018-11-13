@@ -4,7 +4,7 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
-import com.alibaba.fastjson.JSON;
+import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
@@ -28,19 +28,22 @@ public class PixelsCacheWriter
     private final FileSystem fs;
     private final PixelsRadix radix;
     private final EtcdUtil etcdUtil;
+    private final String host;
     private long currentIndexOffset;
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
-                             MemoryMappedFile indexFile,
-                             FileSystem fs,
-                             PixelsRadix radix,
-                             EtcdUtil etcdUtil)
+                              MemoryMappedFile indexFile,
+                              FileSystem fs,
+                              PixelsRadix radix,
+                              EtcdUtil etcdUtil,
+                              String host)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
         this.fs = fs;
         this.radix = radix;
         this.etcdUtil = etcdUtil;
+        this.host = host;
     }
 
     public static class Builder
@@ -121,8 +124,9 @@ public class PixelsCacheWriter
             }
             // todo check null of all parameters
             EtcdUtil etcdUtil = EtcdUtil.Instance();
+            PixelsCacheConfig config = new PixelsCacheConfig();
 
-            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil);
+            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, config.getCacheHost());
         }
     }
 
@@ -140,7 +144,11 @@ public class PixelsCacheWriter
     {
         try {
             // get the caching file list
-            String fileStr = etcdUtil.getKeyValue("location_" + version + "_node_id").getValue().toStringUtf8();
+            KeyValue keyValue = etcdUtil.getKeyValue("location_" + version + "_" + host);
+            if (keyValue == null) {
+                return false;
+            }
+            String fileStr =  keyValue.getValue().toStringUtf8();
             String[] files = fileStr.split(";"); // todo split is inefficient
             internalUpdate(version, layout, files);
             return true;
@@ -155,8 +163,7 @@ public class PixelsCacheWriter
             throws IOException
     {
         // get the new caching layout
-        String compactStr = layout.getCompact();
-        Compact compact = (Compact) JSON.parse(compactStr);
+        Compact compact = layout.getCompactObject();
         int cacheBorder = compact.getCacheBorder();
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
