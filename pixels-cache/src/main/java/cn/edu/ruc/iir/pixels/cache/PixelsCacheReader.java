@@ -1,7 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import java.io.IOException;
-
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -79,11 +77,6 @@ public class PixelsCacheReader
         return new PixelsCacheReader.Builder();
     }
 
-    public int getVersion()
-    {
-        return PixelsCacheUtil.getIndexVersion(indexFile);
-    }
-
     /**
      * Read specified columnlet from cache.
      * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
@@ -96,20 +89,19 @@ public class PixelsCacheReader
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
-        // check rw flag
+        // check rw flag, if not readable, return empty bytes
         short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
-        if (rwFlag != 0) {
+        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
             return content;
         }
 
-        // check if reader count reaches its max value (short max value)
+        // check if reader count reaches its max value, if so no more reads are allowed
         int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
-        if (readerCount >= Short.MAX_VALUE) {
+        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
             return content;
         }
         // update reader count
-        readerCount = readerCount + 1;
-        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) readerCount);
+        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
         ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);
@@ -127,17 +119,9 @@ public class PixelsCacheReader
             // read content
             cacheFile.getBytes(offset + 4, content, 0, length);
         }
-        // if not found, send cache miss message
-//        else {
-//            mqWriter.write(columnletId);
-//        }
 
         // decrease reader count
-        readerCount = indexFile.getShortVolatile(2);
-        if (readerCount >= 1) {
-            readerCount--;
-        }
-        indexFile.putShortVolatile(2, (short) readerCount);
+        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
 
         return content;
     }
@@ -214,8 +198,7 @@ public class PixelsCacheReader
         return null;
     }
 
-    public void close() throws IOException
+    public void close()
     {
-//        mqWriter.close();
     }
 }

@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
  */
 public class PixelsCacheUtil
 {
-    private static final int MAX_READER_COUNT = 2 ^ 31 - 1;
+    public static final int MAX_READER_COUNT = 2 ^ 31 - 1;
     public static final int INDEX_RADIX_OFFSET = 16;
 
     public enum RWFlag {

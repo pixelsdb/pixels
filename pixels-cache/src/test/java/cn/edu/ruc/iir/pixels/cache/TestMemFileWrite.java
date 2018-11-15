@@ -10,8 +10,8 @@ public class TestMemFileWrite
     @Test
     public void test () throws Exception
     {
-
-        new File("/dev/shm/test").delete();
+        String path = "/Users/Jelly/Desktop/pixels.index";
+        new File(path);
         long [] addr = new long[1024*1024*32];
         Random random = new Random(System.nanoTime());
         for (int i = 0; i < 1024*1024*32; ++i)
@@ -20,15 +20,16 @@ public class TestMemFileWrite
         }
 
         long start = System.nanoTime();
-        MemoryMappedFile mem = new MemoryMappedFile("/dev/shm/test", 1024L*1024L*256L);
+        MemoryMappedFile mem = new MemoryMappedFile(path, 1024L*1024L*10L);
         System.out.println((System.nanoTime()-start)/1000000.0);
 
         start = System.nanoTime();
-        for (int i = 0; i < 1024*1024*32; ++i)
+        byte[] bytes = {0, 0, 0, 0, 0, 0, 0, 1};
+        for (int i = 0; i < 1024*1024; ++i)
         {
             //mem.getAndAddLong(addr[i], 8);
-            //mem.putLong(addr[i]*8, i);
-            mem.getLong(addr[i]*8);
+            mem.putBytes(i * 8, bytes);
+//            System.out.println(mem.getLong(addr[i]*8));
         }
         System.out.println("ns/op: " + (System.nanoTime()-start)/1024.0/1024/32);
     }
