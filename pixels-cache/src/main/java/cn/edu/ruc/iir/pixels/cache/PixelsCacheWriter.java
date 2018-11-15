@@ -110,17 +110,15 @@ public class PixelsCacheWriter
             MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
             PixelsRadix radix;
-            // check if cache(index) file exists.
-            //   if overwrite is true, then create a new cache file and an index file.
-            //   else, create the radix tree from the existing cache(index) file.
-            if (builderOverwrite) {
-                radix = new PixelsRadix();
+            // check if cache and index exists.
+            //   if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
+            if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile)) {
+                radix = PixelsCacheUtil.getIndexRadix(indexFile);
             }
-            else if (PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile)){
-                radix = PixelsCacheUtil.getRadix(indexFile);
-            }
+            //   else, create a new radix tree, and initialize the index and cache file.
             else {
                 radix = new PixelsRadix();
+                PixelsCacheUtil.initialize(indexFile, cacheFile);
             }
             // todo check null of all parameters
             EtcdUtil etcdUtil = EtcdUtil.Instance();
@@ -299,7 +297,7 @@ public class PixelsCacheWriter
      * */
     private void flushIndex()
     {
-        currentIndexOffset = 0;
+        currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         if (radix.getRoot().getSize() != 0) {
             writeRadix(radix.getRoot());
         }
