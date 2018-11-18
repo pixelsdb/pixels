@@ -25,10 +25,6 @@ public class Config
     private String schema;
     private int[] orderMapping;
 
-    protected Config()
-    {
-    }
-
     public String getPixelsPath()
     {
         return pixelsPath;
@@ -59,7 +55,7 @@ public class Config
         return format;
     }
 
-    Config(String dbName, String tableName, int maxRowNum, String regex, String format)
+    public Config(String dbName, String tableName, int maxRowNum, String regex, String format)
     {
         this.dbName = dbName;
         this.tableName = tableName;
@@ -68,7 +64,7 @@ public class Config
         this.format = format;
     }
 
-    boolean load(ConfigFactory configFactory) throws IOException, MetadataException
+    public boolean load(ConfigFactory configFactory) throws IOException, MetadataException
     {
         // init metadata service
         String metaHost = configFactory.getProperty("metadata.server.host");
