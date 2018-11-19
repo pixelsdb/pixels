@@ -57,7 +57,7 @@ public class PixelsSplit
             @JsonProperty("path") String path,
             @JsonProperty("start") long start,
             @JsonProperty("len") long len,
-            @JsonProperty("len") boolean isCached,
+            @JsonProperty("isCached") boolean isCached,
             @JsonProperty("addresses") List<HostAddress> addresses,
             @JsonProperty("order") List<String> order,
             @JsonProperty("constraint") TupleDomain<PixelsColumnHandle> constraint) {
