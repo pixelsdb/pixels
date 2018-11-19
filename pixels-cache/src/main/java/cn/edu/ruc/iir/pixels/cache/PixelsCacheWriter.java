@@ -30,6 +30,7 @@ public class PixelsCacheWriter
     private final EtcdUtil etcdUtil;
     private final String host;
     private long currentIndexOffset;
+    private long cacheOffset = 0L;  // this is used in the write() method.
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -155,6 +156,18 @@ public class PixelsCacheWriter
             e.printStackTrace();
             return false;
         }
+    }
+
+    /**
+     * Currently, this is an interface for unit tests.
+     * This method only updates index content and cache content (without touching headers)
+     * */
+    public void write(PixelsCacheKey key, byte[] value)
+    {
+        PixelsCacheIdx cacheIdx = new PixelsCacheIdx(cacheOffset, value.length);
+        cacheFile.putBytes(cacheOffset, value);
+        cacheOffset += value.length;
+        radix.put(key, cacheIdx);
     }
 
     private void internalUpdate(int version, Layout layout, String[] files)

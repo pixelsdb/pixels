@@ -2,9 +2,8 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import org.junit.Test;
 
-import java.io.RandomAccessFile;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Random;
 
 public class TestMemFileRead
@@ -12,29 +11,23 @@ public class TestMemFileRead
     @Test
     public void test () throws Exception
     {
-        long start = System.nanoTime();
-        RandomAccessFile raf = new RandomAccessFile("/Users/Jelly/shm/test", "rw");
-        FileChannel fc = raf.getChannel();
-        MappedByteBuffer mbb = fc.map(FileChannel.MapMode.READ_WRITE, 0, 1024*1024*56);
-        System.out.println((System.nanoTime()-start)/1000000.0);
+        String path = "/Users/Jelly/Desktop/pixels.index";
 
-        start = System.nanoTime();
-        for (int i = 0; i < 1024*1024*7; ++i)
-        {
-            long a = mbb.getLong();
-        }
-        System.out.println((System.nanoTime()-start)/1024.0/1024/16);
-        MemoryMappedFile mem = new MemoryMappedFile("/Users/Jelly/shm/test", 1024L*1024L*56L);
-        System.out.println((System.nanoTime()-start)/1000000.0);
+        long [] addr = new long[1024*1024];
         Random random = new Random(System.nanoTime());
-        start = System.nanoTime();
-        for (long i = 0; i < 1024*1024*512L; ++i)
+        for (int i = 0; i < 1024*1024; ++i)
         {
-            //long pos = random.nextInt(1024*1024*16);
-            //System.out.println(pos);
-            long a = mem.getLong(i*8);
-            //System.out.println(a);
+            addr[i] = random.nextInt(1024*1024);
         }
-        System.out.println((System.nanoTime()-start)/1024.0/1024/512);
+
+        MemoryMappedFile mem = new MemoryMappedFile(path, 1024L*1024L*10L);
+        byte[] res = new byte[8];
+        mem.getBytes(0, res, 0, 8);
+        long v = ByteBuffer.wrap(res).order(ByteOrder.LITTLE_ENDIAN).getLong();
+        System.out.println(v);
+        for (int i = 0; i < 1024; ++i)
+        {
+            System.out.println(mem.getLong(addr[i] * 8));
+        }
     }
 }
