@@ -25,7 +25,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 /**
  * pixels loader command line tool
  * <p>
- * LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 10
+ * LOAD -f pixels -o hdfs://dbiir10:9000/pixels/pixels/test_105/source_small -d pixels -t test_105 -n 300000 -r \t -c 16
  * -p false [optional, default false]
  * </p>
  */

@@ -41,7 +41,7 @@ public class TestPixelsReaderBasic
     @Test
     public void testMetadata()
     {
-        String fileName = "hdfs://presto00:9000//pixels/test500G_pixels/201806011652540.pxl";
+        String fileName = "hdfs://dbiir10:9000/pixels/pixels/test_105/old3_v_order/20181109162236_1437.pxl";
         PixelsReader reader;
         Path path = new Path(fileName);
         Configuration conf = new Configuration();
@@ -53,7 +53,8 @@ public class TestPixelsReaderBasic
                     .setFS(fs)
                     .setPath(path)
                     .build();
-            List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getRowGroupInfos();
+            List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getFooter().getRowGroupInfosList();
+            System.out.println(reader.getRowGroupStats().size());
         } catch (IOException e) {
             e.printStackTrace();
         }

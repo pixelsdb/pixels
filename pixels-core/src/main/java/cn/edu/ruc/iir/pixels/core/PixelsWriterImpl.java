@@ -114,7 +114,7 @@ public class PixelsWriterImpl
     {
         private TypeDescription builderSchema;
         private int builderPixelStride;
-        private int builderRowGroupSize;  // group size in MB
+        private int builderRowGroupSize;
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
         private int builderCompressionBlockSize = 0;
         private TimeZone builderTimeZone = TimeZone.getDefault();
