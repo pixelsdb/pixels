@@ -3,15 +3,17 @@ package cn.edu.ruc.iir.pixels.daemon.metric;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfHistogram;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import com.alibaba.fastjson.JSON;
+import org.apache.log4j.Logger;
 
 import java.io.*;
 import java.util.concurrent.TimeUnit;
 
 public class MetricsServer implements Server
 {
+    private static Logger log = Logger.getLogger(MetricsServer.class);
+
     private boolean running = false;
 
     @Override
@@ -54,7 +56,7 @@ public class MetricsServer implements Server
                         histogram.addMetrics(metrics);
                     } catch (java.io.IOException e)
                     {
-                        LogFactory.Instance().getLog().error("I/O exception when reading metrics from json.", e);
+                        log.error("I/O exception when reading metrics from json.", e);
                     }
                 }
 
@@ -77,10 +79,10 @@ public class MetricsServer implements Server
                 TimeUnit.SECONDS.sleep(60);
             } catch (InterruptedException e)
             {
-                LogFactory.Instance().getLog().error("interrupted in main loop of metrics server.", e);
+                log.error("interrupted in main loop of metrics server.", e);
             } catch (IOException e)
             {
-                LogFactory.Instance().getLog().error("I/O error in main loop of metrics server.", e);
+                log.error("I/O error in main loop of metrics server.", e);
             }
         }
     }

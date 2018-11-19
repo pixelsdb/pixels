@@ -2,10 +2,10 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
+import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 
 public class DaemonMain
 {
+    private static Logger log = Logger.getLogger(DaemonMain.class);
+
     public static void main(String[] args)
     {
         String role = System.getProperty("role");
@@ -76,7 +78,7 @@ public class DaemonMain
 
                     } catch (Exception e)
                     {
-                        LogFactory.Instance().getLog().error("error in the main loop of daemon.", e);
+                        log.error("error in the main loop of daemon.", e);
                         if (args[0].equalsIgnoreCase("metadata"))
                         {
                             // close the metadata database connection.
@@ -136,7 +138,7 @@ public class DaemonMain
                     process.destroy();
                 } catch (IOException e)
                 {
-                    LogFactory.Instance().getLog().error("error when killing pixels daemons.", e);
+                    log.error("error when killing pixels daemons.", e);
                 }
             }
             else

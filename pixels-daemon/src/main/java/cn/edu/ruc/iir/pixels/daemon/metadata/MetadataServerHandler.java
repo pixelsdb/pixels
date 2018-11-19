@@ -5,7 +5,6 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
@@ -15,8 +14,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.apache.log4j.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,6 +23,7 @@ import java.util.List;
  */
 public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 {
+    private static Logger log = Logger.getLogger(MetadataServerHandler.class);
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
@@ -31,7 +31,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 //        if (msg instanceof ReqParams) {
             ReqParams params = (ReqParams) msg;
             // log the received params.
-            LogFactory.Instance().getLog().info("request: " + params.toString());
+            log.info("request: " + params.toString());
 
             Object response = this.executeRequest(params);
 
@@ -57,7 +57,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable e)
     {
-        LogFactory.Instance().getLog().error("error caught in metadata server.", e);
+        log.error("error caught in metadata server.", e);
         //释放资源
         ctx.close();
     }
@@ -239,7 +239,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 
         if(null != res)
         {
-            LogFactory.Instance().getLog().info("Server executeRequest" + res);
+            log.info("Server executeRequest" + res);
             response = res;
         }
         return response;

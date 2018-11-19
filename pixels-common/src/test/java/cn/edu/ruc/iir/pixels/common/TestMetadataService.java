@@ -1,11 +1,9 @@
 package cn.edu.ruc.iir.pixels.common;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import com.alibaba.fastjson.JSON;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -26,7 +24,7 @@ public class TestMetadataService {
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("127.0.0.1", 18888);
+        this.instance = new MetadataService("dbiir10", 18888);
     }
 
     @Test
@@ -82,6 +80,16 @@ public class TestMetadataService {
         long end = System.currentTimeMillis();
         System.out.println("Last: " + (end - start));
         System.out.println(layouts.get(0).getSplits());
+
+        for (Layout layout : layouts) {
+            // get index
+            int version = layout.getVersion();
+            Order order = JSON.parseObject(layout.getOrder(), Order.class);
+            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            System.out.println(order.toString());
+            System.out.println(splits.toString());
+        }
+
     }
 
 

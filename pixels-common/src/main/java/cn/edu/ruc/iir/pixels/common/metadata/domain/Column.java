@@ -54,7 +54,6 @@ public class Column extends Base
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
                 ", size=" + size +
-                ", table=" + table +
                 '}';
     }
 }

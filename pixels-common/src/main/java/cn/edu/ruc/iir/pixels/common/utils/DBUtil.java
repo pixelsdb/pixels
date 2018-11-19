@@ -16,7 +16,7 @@ public class DBUtil
     }
 
     private Connection connection = null;
-    private Logger log = LogFactory.Instance().getLog();
+    private static Logger log = Logger.getLogger(DBUtil.class);
 
     private String url;
     private String user;

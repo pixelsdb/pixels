@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import org.apache.log4j.Logger;
 
 import java.sql.*;
@@ -14,7 +13,7 @@ public class SchemaDao implements Dao<Schema>
     public SchemaDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final Logger log = LogFactory.Instance().getLog();
+    private static Logger log = Logger.getLogger(DBUtil.class);
 
     @Override
     public Schema getById(int id)
