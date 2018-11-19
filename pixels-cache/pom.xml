@@ -42,6 +42,11 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>RELEASE</version>
+        </dependency>
     </dependencies>
 
 

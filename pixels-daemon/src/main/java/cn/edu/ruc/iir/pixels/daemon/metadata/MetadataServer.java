@@ -54,7 +54,7 @@ public class MetadataServer implements Server {
         this.worker = new NioEventLoopGroup();
         Connection conn = DBUtil.Instance().getConnection();
         if(conn != null)
-            System.out.println("mysql connected.");
+            LogFactory.Instance().getLog().info("mysql connected.");
         ServerBootstrap server = new ServerBootstrap();
 
         try {

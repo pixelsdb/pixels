@@ -130,4 +130,17 @@ public class Layout extends Base
         this.table = table;
     }
 
+    @Override
+    public String toString() {
+        return "Layout{" +
+                "version=" + version +
+                ", createAt=" + createAt +
+                ", permission=" + permission +
+                ", order='" + order + '\'' +
+                ", orderPath='" + orderPath + '\'' +
+                ", compact='" + compact + '\'' +
+                ", compactPath='" + compactPath + '\'' +
+                ", splits='" + splits + '\'' +
+                '}';
+    }
 }

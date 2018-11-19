@@ -26,7 +26,7 @@ public class TestMetadataService {
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("dbiir01", 18888);
+        this.instance = new MetadataService("127.0.0.1", 18888);
     }
 
     @Test
@@ -79,6 +79,17 @@ public class TestMetadataService {
     {
         long start = System.currentTimeMillis();
         List<Layout> layouts = instance.getLayouts("pixels", "test_105");
+        long end = System.currentTimeMillis();
+        System.out.println("Last: " + (end - start));
+        System.out.println(layouts.get(0).getSplits());
+    }
+
+
+    @Test
+    public void testGetTableLayoutsByVersion () throws MetadataException
+    {
+        long start = System.currentTimeMillis();
+        List<Layout> layouts = instance.getLayouts("pixels", "test_105", 0);
         long end = System.currentTimeMillis();
         System.out.println("Last: " + (end - start));
         System.out.println(layouts.get(0).getSplits());

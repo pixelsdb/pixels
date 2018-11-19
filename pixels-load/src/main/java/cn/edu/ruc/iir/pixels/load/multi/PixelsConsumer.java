@@ -54,6 +54,7 @@ public class PixelsConsumer extends Consumer
     public void run()
     {
         System.out.println("Start PixelsConsumer, " + Thread.currentThread().getName() + ", time: " + DateUtil.formatTime(new Date()));
+        int count = 0;
 
         boolean isRunning = true;
         try
@@ -91,12 +92,18 @@ public class PixelsConsumer extends Consumer
                 Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
                 if (originalFilePath != null)
                 {
+                    count++;
                     reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
 
                     while ((line = reader.readLine()) != null)
                     {
                         if (initPixelsFile == true)
                         {
+                            if(line.length() == 0)
+                            {
+                                System.out.println(Thread.currentThread().getName() + "\tcontent: (" + line + ")");
+                                continue;
+                            }
                             // we create a new pixels file if we can read a next line from the source file.
                             loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
                             pixelsWriter = PixelsWriterImpl.newBuilder()
@@ -181,6 +188,7 @@ public class PixelsConsumer extends Consumer
             e.printStackTrace();
         } finally
         {
+            System.out.println(Thread.currentThread().getName() + ":" + count);
             System.out.println("Exit PixelsConsumer, " + Thread.currentThread().getName() + ", time: " + DateUtil.formatTime(new Date()));
         }
     }
