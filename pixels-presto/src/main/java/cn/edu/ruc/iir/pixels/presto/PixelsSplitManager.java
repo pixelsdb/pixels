@@ -165,6 +165,7 @@ public class PixelsSplitManager
                 throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
             }
         }
+        log.info("pixelsSplits: " + pixelsSplits.size());
         log.info("=====begin to shuffle====");
         Collections.shuffle(pixelsSplits);
 

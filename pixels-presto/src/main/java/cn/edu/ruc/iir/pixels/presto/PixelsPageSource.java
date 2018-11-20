@@ -78,7 +78,7 @@ class PixelsPageSource implements ConnectorPageSource {
             PixelsColumnHandle column = entry.getKey();
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
-            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
+            logger.info("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,
