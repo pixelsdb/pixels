@@ -24,7 +24,7 @@ public class MetadataService
 
     public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
     {
-        List<Column> columns;
+        List<Column> columns = null;
         String token = UUID.randomUUID().toString();
         ReqParams params = new ReqParams(Action.getColumns.toString());
         params.setParam("tableName", tableName);
@@ -38,6 +38,8 @@ public class MetadataService
                 Object res = client.getResponse().get(token);
                 if (res != null)
                 {
+                    if(isError(res))
+                        break;
                     columns = (List<Column>) res;
                     break;
                 }
@@ -51,7 +53,7 @@ public class MetadataService
 
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
-        List<Layout> layouts;
+        List<Layout> layouts = null;
         String token = UUID.randomUUID().toString();
         ReqParams params = new ReqParams(Action.getLayouts.toString());
         params.setParam("tableName", tableName);
@@ -65,6 +67,38 @@ public class MetadataService
                 Object res = client.getResponse().get(token);
                 if (res != null)
                 {
+                    if(isError(res))
+                        break;
+                    layouts = (List<Layout>) res;
+                    break;
+                }
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("can not get layouts from metadata", e);
+        }
+        return layouts != null ? layouts : new ArrayList<>();
+    }
+
+    public List<Layout> getLayouts(String schemaName, String tableName, int version) throws MetadataException
+    {
+        List<Layout> layouts = null;
+        String token = UUID.randomUUID().toString();
+        ReqParams params = new ReqParams(Action.getLayout.toString());
+        params.setParam("tableName", tableName);
+        params.setParam("schemaName", schemaName);
+        params.setParam("version", String.valueOf(version));
+        MetadataClient client = new MetadataClient(params, token);
+        try
+        {
+            client.connect(port, host);
+            while (true)
+            {
+                Object res = client.getResponse().get(token);
+                if (res != null)
+                {
+                    if(isError(res))
+                        break;
                     layouts = (List<Layout>) res;
                     break;
                 }
@@ -78,7 +112,7 @@ public class MetadataService
 
     public List<Table> getTables(String schemaName) throws MetadataException
     {
-        List<Table> tables;
+        List<Table> tables = null;
         String token = UUID.randomUUID().toString();
         ReqParams params = new ReqParams(Action.getTables.toString());
         params.setParam("schemaName", schemaName);
@@ -91,6 +125,8 @@ public class MetadataService
                 Object res = client.getResponse().get(token);
                 if (res != null)
                 {
+                    if(isError(res))
+                        break;
                     tables = (List<Table>) res;
                     break;
                 }
@@ -102,9 +138,13 @@ public class MetadataService
         return tables != null ? tables : new ArrayList<>();
     }
 
+    private boolean isError(Object res) {
+        return String.valueOf(res).equals("ERROR");
+    }
+
     public List<Schema> getSchemas() throws MetadataException
     {
-        List<Schema> schemas;
+        List<Schema> schemas = null;
         String token = UUID.randomUUID().toString();
         ReqParams params = new ReqParams(Action.getSchemas.toString());
         MetadataClient client = new MetadataClient(params, token);
@@ -116,6 +156,8 @@ public class MetadataService
                 Object res = client.getResponse().get(token);
                 if (res != null)
                 {
+                    if(isError(res))
+                        break;
                     schemas = (List<Schema>) res;
                     break;
                 }

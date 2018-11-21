@@ -12,6 +12,7 @@ public enum Action {
     getSchemas,
     getTables,
     getLayouts,
+    getLayout,
     getColumns,
     createSchema,
     createTable,

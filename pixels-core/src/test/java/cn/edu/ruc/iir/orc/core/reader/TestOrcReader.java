@@ -14,13 +14,15 @@ import java.io.IOException;
 
 public class TestOrcReader {
 
+    String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/2.orc";
+
     @Test
     public void testReader()
     {
         Configuration conf = new Configuration();
         Reader reader = null;
         try {
-            reader = OrcFile.createReader(new Path(TestParams.orcPath),
+            reader = OrcFile.createReader(new Path(orcPath),
                     OrcFile.readerOptions(conf));
             RecordReader rows = null;
             rows = reader.rows();
@@ -33,6 +35,17 @@ public class TestOrcReader {
             long end = System.currentTimeMillis();
             System.out.println("Size: " + num);
             System.out.println("Time: " + (end - begin));
+            System.out.println(reader.getRawDataSize());
+            System.out.println(reader.getStripes().size());
+            System.out.println(reader.getStripes().get(0).getLength());
+            System.out.println(reader.getStripes().get(0).getDataLength());
+            System.out.println(reader.getStripes().get(0).getFooterLength());
+            System.out.println(reader.getStripes().get(0).getNumberOfRows());
+
+            System.out.println(reader.getStripes().get(1).getLength());
+            System.out.println(reader.getStripes().get(1).getDataLength());
+            System.out.println(reader.getStripes().get(1).getFooterLength());
+            System.out.println(reader.getStripes().get(1).getNumberOfRows());
             rows.close();
         } catch (IOException e) {
             e.printStackTrace();

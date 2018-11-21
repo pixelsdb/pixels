@@ -45,4 +45,11 @@ public class Schema extends Base
         this.tables.add(table);
     }
 
+    @Override
+    public String toString() {
+        return "Schema{" +
+                "name='" + name + '\'' +
+                ", desc='" + desc + '\'' +
+                '}';
+    }
 }

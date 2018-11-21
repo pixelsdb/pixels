@@ -1,12 +1,12 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataClientHandler;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import org.apache.commons.logging.Log;
+import org.apache.log4j.Logger;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -14,10 +14,11 @@ import java.util.List;
 
 public class ColumnDao implements Dao<Column>
 {
+    private static Logger log = Logger.getLogger(MetadataClientHandler.class);
+
     public ColumnDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final Log log = LogFactory.Instance().getLog();
     private static final TableDao tableModel = new TableDao();
 
     @Override

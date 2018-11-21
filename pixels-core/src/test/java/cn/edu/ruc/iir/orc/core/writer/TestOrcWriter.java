@@ -16,6 +16,8 @@ import static org.apache.orc.CompressionKind.NONE;
 
 public class TestOrcWriter {
 
+    String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/11.orc";
+
     @Test
     public void testWriterAll() {
         Configuration conf = new Configuration();
@@ -23,11 +25,11 @@ public class TestOrcWriter {
         Writer writer = null;
         try
         {
-            writer = OrcFile.createWriter(new Path(TestParams.orcPath),
+            writer = OrcFile.createWriter(new Path(orcPath),
                     OrcFile.writerOptions(conf)
                             .blockSize(TestParams.blockSize)
                             .blockPadding(true)
-                            .stripeSize(TestParams.rowGroupSize)
+                            .stripeSize(64)
                             .rowIndexStride(TestParams.pixelStride)
                             .setSchema(schema)
                             .compress(NONE)
@@ -43,7 +45,7 @@ public class TestOrcWriter {
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
             System.out.println(curT + ", nanos: " + timestamp.getNanos() + ",  time: " + timestamp.getTime());
-            for (int i = 0; i < TestParams.rowNum; ++i)
+            for (int i = 0; i < 10; ++i)
             {
                 int row = batch.size++;
                 a.vector[row] = i;

@@ -3,8 +3,7 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import org.apache.commons.logging.Log;
+import org.apache.log4j.Logger;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -15,7 +14,7 @@ public class TableDao implements Dao<Table>
     public TableDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final Log log = LogFactory.Instance().getLog();
+    private static Logger log = Logger.getLogger(DBUtil.class);
     private static final SchemaDao schemaModel = new SchemaDao();
 
     @Override
@@ -50,6 +49,10 @@ public class TableDao implements Dao<Table>
 
     public Table getByNameAndSchema (String name, Schema schema)
     {
+        if(schema == null)
+        {
+            return null;
+        }
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
@@ -102,6 +105,10 @@ public class TableDao implements Dao<Table>
 
     public List<Table> getBySchema(Schema schema)
     {
+        if(schema == null)
+        {
+            return null;
+        }
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {

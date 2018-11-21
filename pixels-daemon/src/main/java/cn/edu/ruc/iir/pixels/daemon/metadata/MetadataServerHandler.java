@@ -5,7 +5,6 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
@@ -15,6 +14,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import org.apache.log4j.Logger;
 
 import java.util.List;
 
@@ -23,6 +23,7 @@ import java.util.List;
  */
 public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 {
+    private static Logger log = Logger.getLogger(MetadataServerHandler.class);
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception
@@ -30,7 +31,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
 //        if (msg instanceof ReqParams) {
             ReqParams params = (ReqParams) msg;
             // log the received params.
-            LogFactory.Instance().getLog().info("request: " + params.toString());
+            log.info("request: " + params.toString());
 
             Object response = this.executeRequest(params);
 
@@ -56,7 +57,7 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable e)
     {
-        LogFactory.Instance().getLog().error("error caught in metadata server.", e);
+        log.error("error caught in metadata server.", e);
         //释放资源
         ctx.close();
     }
@@ -83,24 +84,63 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
             case "getTables":
             {
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
-                List<Table> tableList = tableDao.getBySchema(schema);
-                response = tableList;
+                List<Table> tableList = null;
+                if(schema != null)
+                {
+                    tableList = tableDao.getBySchema(schema);
+                    response = tableList;
+                }
+                else {
+                    res = "ERROR";
+                }
                 break;
             }
             case "getLayouts":
             {
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
-                Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
-                List<Layout> layoutList = layoutDao.getReadableByTable(table);
-                response = layoutList;
+                List<Layout> layoutList = null;
+                if(schema != null) {
+                    Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
+                    if (table != null) {
+                        layoutList = layoutDao.getReadableByTable(table, null);
+                    }
+                }
+                if(layoutList != null)
+                    response = layoutList;
+                else
+                    res = "ERROR";
+                break;
+            }
+            case "getLayout":
+            {
+                Schema schema = schemaDao.getByName(params.getParam("schemaName"));
+                List<Layout> layoutList = null;
+                if(schema != null) {
+                    Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
+                    if (table != null) {
+                        layoutList = layoutDao.getReadableByTable(table, params.getParam("version"));
+                    }
+                }
+                if(layoutList != null)
+                    response = layoutList;
+                else
+                    res = "ERROR";
                 break;
             }
             case "getColumns":
             {
                 Schema schema = schemaDao.getByName(params.getParam("schemaName"));
-                Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
-                List<Column> columnList = columnDao.getByTable(table);
-                response = columnList;
+                List<Column> columnList = null;
+                if(schema != null) {
+                    Table table = tableDao.getByNameAndSchema(params.getParam("tableName"), schema);
+                    if (table != null) {
+                        columnList = columnDao.getByTable(table);
+                    }
+                }
+                if(columnList != null)
+                    response = columnList;
+                else
+                    res = "ERROR";
                 break;
             }
             case "createSchema":
@@ -198,7 +238,10 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
         }
 
         if(null != res)
+        {
+            log.info("Server executeRequest" + res);
             response = res;
+        }
         return response;
     }
 }

@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.common.utils;
 
-import org.apache.commons.logging.Log;
+import org.apache.log4j.Logger;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -16,7 +16,7 @@ public class DBUtil
     }
 
     private Connection connection = null;
-    private Log log = LogFactory.Instance().getLog();
+    private static Logger log = Logger.getLogger(DBUtil.class);
 
     private String url;
     private String user;
