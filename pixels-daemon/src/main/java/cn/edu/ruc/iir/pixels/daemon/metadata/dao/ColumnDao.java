@@ -2,19 +2,24 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataClientHandler;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
-import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import org.apache.log4j.Logger;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ColumnDao implements Dao<Column>
 {
-    private static Logger log = Logger.getLogger(MetadataClientHandler.class);
+    private static Logger log = LogManager.getLogger(MetadataClientHandler.class);
 
     public ColumnDao() {}
 

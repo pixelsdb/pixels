@@ -18,4 +18,9 @@ public final class Constants
     public static int MAX_SHORT_REPEAT_LENGTH = 10;
     public static float DICT_KEY_SIZE_THRESHOLD = 0.1F;
     public static int INIT_DICT_SIZE = 4096;
+
+    public static String LAYOUT_VERSION_LITERAL = "layout_version";
+    public static String CACHE_VERSION_LITERAL = "cache_version";
+    public static String CACHE_NODE_STATUS_LITERAL = "node_";
+    public static int MAX_BLOCK_ID_LEN = 20480;
 }

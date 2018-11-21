@@ -69,9 +69,9 @@ public class TestPixelsCompactor
             long start = System.currentTimeMillis();
 
             String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_compact/" +
-                    NO + "_" +
-                    DateUtil.getCurTime() +
-                    ".compact.pxl";
+                              NO + "_" +
+                              DateUtil.getCurTime() +
+                              ".compact.pxl";
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
                             .setSourcePaths(sourcePaths)

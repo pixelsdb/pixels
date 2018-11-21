@@ -4,7 +4,8 @@ import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 /**
@@ -12,7 +13,7 @@ import org.apache.log4j.Logger;
  */
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter
 {
-    private static Logger logger = Logger.getLogger(MetadataClientHandler.class);
+    private static Logger logger = LogManager.getLogger(MetadataClientHandler.class);
 
     private ReqParams params;
     private final String token;

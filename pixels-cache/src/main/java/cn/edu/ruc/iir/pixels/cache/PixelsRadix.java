@@ -213,7 +213,7 @@ public class PixelsRadix
 //                        }
 //                    }
                     if (childNode == null) {
-                        // todo fix exception, though this cannot happen due to logically constraints
+                        // todo fix exception, though this cannot happen due to the logical constraint
                         return false;
                     }
                     byte[] childNodeEdge = childNode.getEdge();
@@ -275,6 +275,9 @@ public class PixelsRadix
             }
         }
     }
+
+    public void removeAll()
+    {}
 
     private SearchResult searchInternal(byte[] key)
     {

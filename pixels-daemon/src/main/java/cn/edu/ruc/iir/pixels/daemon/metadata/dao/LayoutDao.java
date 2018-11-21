@@ -4,9 +4,14 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +19,7 @@ public class LayoutDao implements Dao<Layout>
 {
     public LayoutDao() {}
 
-    private static Logger log = Logger.getLogger(LayoutDao.class);
+    private static Logger log = LogManager.getLogger(LayoutDao.class);
 
     private static final DBUtil db = DBUtil.Instance();
     private static final TableDao tableModel = new TableDao();

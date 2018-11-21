@@ -1,14 +1,22 @@
 package cn.edu.ruc.iir.pixels.common.utils;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collection;
 
 public class FileUtil
 {
     static private FileUtil instance = null;
-    private static Logger log = Logger.getLogger(FileUtil.class);
+    private static Logger log = LogManager.getLogger(FileUtil.class);
 
     private FileUtil()
     {

@@ -14,17 +14,11 @@ public class TestPixelsCacheReader
     {
         try {
             PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
-                    .setCacheLocation("")
-                    .setCacheSize(11L)
-                    .setIndexLocation("")
-                    .setIndexSize(11L)
-                    .setMQLocation("")
-                    .setMQFileSize(11L)
-                    .setMQRecordSize(1)
-                    .setMQAppend(true)
+                    .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+                    .setCacheSize(1024*1024*64L)
+                    .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+                    .setIndexSize(1024*1024*64L)
                     .build();
-
-            byte[] content = cacheReader.get(1, (short) 1, (short) 1);
         }
         catch (Exception e) {
             e.printStackTrace();

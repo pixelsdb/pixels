@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -14,7 +15,7 @@ public class Daemon implements Runnable
     private FileChannel mainChannel = null;
     private FileChannel guardChannel = null;
     private String[] guardCmd = null;
-    private static Logger log = Logger.getLogger(Daemon.class);
+    private static Logger log = LogManager.getLogger(Daemon.class);
 
     public void setup (String mainFilePath, String guardFilePath, String[] guardCmd)
     {

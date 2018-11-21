@@ -13,8 +13,8 @@ import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReaderImpl;
 import cn.edu.ruc.iir.pixels.core.utils.PixelsCoreConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.File;
@@ -36,7 +36,7 @@ import static java.util.Objects.requireNonNull;
 public class PixelsReaderImpl
         implements PixelsReader
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsReaderImpl.class);
+    private static final Logger LOGGER = LogManager.getLogger(PixelsReaderImpl.class);
 
     private final TypeDescription fileSchema;
     private final PhysicalFSReader physicalFSReader;
@@ -157,8 +157,8 @@ public class PixelsReaderImpl
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException
     {
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
-        long footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
-        byte[] footer = new byte[(int) footerLength];
+        int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
+        byte[] footer = new byte[footerLength];
         physicalFSReader.seek(footerOffset);
         physicalFSReader.readFully(footer);
         return PixelsProto.RowGroupFooter.parseFrom(footer);

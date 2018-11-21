@@ -80,7 +80,7 @@ public class MetadataService
         return layouts != null ? layouts : new ArrayList<>();
     }
 
-    public List<Layout> getLayouts(String schemaName, String tableName, int version) throws MetadataException
+    public List<Layout> getLayout(String schemaName, String tableName, int version) throws MetadataException
     {
         List<Layout> layouts = null;
         String token = UUID.randomUUID().toString();
