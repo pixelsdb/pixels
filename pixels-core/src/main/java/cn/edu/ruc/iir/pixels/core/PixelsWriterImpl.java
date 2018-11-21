@@ -314,7 +314,7 @@ public class PixelsWriterImpl
     {
         try
         {
-            if (curRowGroupDataLength != 0) {
+            if (curRowGroupNumOfRows != 0) {
                 writeRowGroup();
             }
             writeFileTail();

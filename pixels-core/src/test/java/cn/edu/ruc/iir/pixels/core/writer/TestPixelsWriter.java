@@ -1,10 +1,14 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TestParams;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.exception.PixelsWriterException;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
@@ -171,6 +175,42 @@ public class TestPixelsWriter {
             }
             pixelsWriter.close();
         } catch (IOException | PixelsWriterException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testRead()
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"a", "b", "c", "d", "e", "z"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+
+        VectorizedRowBatch rowBatch;
+        PixelsReader pixelsReader;
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+
+        try {
+            FileSystem fs = FileSystem.get(URI.create(TestParams.filePath), conf);
+            Path path = new Path(TestParams.filePath);
+            pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
+            PixelsRecordReader recordReader = pixelsReader.read(option);
+            rowBatch = recordReader.readBatch(5000);
+            LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
+            DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
+            DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
+            TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
+            LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
+            BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
