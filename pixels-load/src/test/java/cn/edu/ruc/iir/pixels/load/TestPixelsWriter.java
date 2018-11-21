@@ -150,7 +150,7 @@ public class TestPixelsWriter
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
-        String[] cols = {"samplepercent"};
+        String[] cols = {"querydayname"};
         option.includeCols(cols);
         PixelsRecordReader recordReader = pixelsReader.read(option);
         rowBatch = recordReader.readBatch(5000);
