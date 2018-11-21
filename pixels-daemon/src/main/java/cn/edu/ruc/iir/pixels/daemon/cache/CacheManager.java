@@ -18,8 +18,8 @@ import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.net.URI;
 import java.util.List;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class CacheManager
         implements Server
 {
-    private static Logger logger = LoggerFactory.getLogger(CacheManager.class);
+    private static Logger logger = LogManager.getLogger(CacheManager.class);
     // cache status: initializing(0), ready(1), updating(2), dead(-1)
     private static AtomicInteger cacheStatus = new AtomicInteger(0);
 

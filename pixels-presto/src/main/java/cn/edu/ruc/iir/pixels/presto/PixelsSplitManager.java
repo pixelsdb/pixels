@@ -105,26 +105,26 @@ public class PixelsSplitManager
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (index == null)
             {
-                log.debug("action null");
+                log.info("action null");
                 index = getInverted(order, splits, indexEntry);
             }
             else
             {
-                log.debug("action not null");
+                log.info("action not null");
                 int indexVersion = index.getVersion();
                 if (indexVersion < version) {
-                    log.debug("action not null update");
+                    log.info("action not null update");
                     index = getInverted(order, splits, indexEntry);
                 }
             }
             // get split size
             ColumnSet columnSet = new ColumnSet();
             for (PixelsColumnHandle column : desiredColumns) {
-                log.debug(column.getColumnName());
+                log.info(column.getColumnName());
                 columnSet.addColumn(column.getColumnName());
             }
             AccessPattern bestPattern = index.search(columnSet);
-            log.debug("bestPattern: " + bestPattern.toString());
+            log.info("bestPattern: " + bestPattern.toString());
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
             // add splits in orderPath
@@ -165,7 +165,7 @@ public class PixelsSplitManager
                 throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
             }
         }
-
+        log.info("=====begin to shuffle====");
         Collections.shuffle(pixelsSplits);
 
         return new FixedSplitSource(pixelsSplits);

@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -14,6 +15,7 @@ public class Daemon implements Runnable
     private FileChannel mainChannel = null;
     private FileChannel guardChannel = null;
     private String[] guardCmd = null;
+    private static Logger log = LogManager.getLogger(Daemon.class);
 
     public void setup (String mainFilePath, String guardFilePath, String[] guardCmd)
     {
@@ -27,7 +29,7 @@ public class Daemon implements Runnable
                 mainLockFile.createNewFile();
             } catch (IOException e)
             {
-                LogFactory.Instance().getLog().error("create main lock file failed.", e);
+                log.error("create main lock file failed.", e);
             }
         }
         if (!guardLockFile.exists())
@@ -37,7 +39,7 @@ public class Daemon implements Runnable
                 guardLockFile.createNewFile();
             } catch (IOException e)
             {
-                LogFactory.Instance().getLog().error("create guard lock file failed.", e);
+                log.error("create guard lock file failed.", e);
             }
         }
         try
@@ -47,7 +49,7 @@ public class Daemon implements Runnable
 
         } catch (IOException e)
         {
-            LogFactory.Instance().getLog().error("I/O exception when create file channels.", e);
+            log.error("I/O exception when create file channels.", e);
         }
     }
 
@@ -61,7 +63,7 @@ public class Daemon implements Runnable
             }
         } catch (IOException e)
         {
-            LogFactory.Instance().getLog().error("close channel A error", e);
+            log.error("close channel A error", e);
         }
         try
         {
@@ -71,7 +73,7 @@ public class Daemon implements Runnable
             }
         } catch (IOException e)
         {
-            LogFactory.Instance().getLog().error("close channel B error", e);
+            log.error("close channel B error", e);
         }
     }
 
@@ -103,7 +105,7 @@ public class Daemon implements Runnable
 
         } catch (Exception e)
         {
-            LogFactory.Instance().getLog().error("exception when running.", e);
+            log.error("exception when running.", e);
         }
     }
 }

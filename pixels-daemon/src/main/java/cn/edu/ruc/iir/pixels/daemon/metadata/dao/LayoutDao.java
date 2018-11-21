@@ -1,13 +1,17 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
-import org.apache.commons.logging.Log;
+import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,8 +19,9 @@ public class LayoutDao implements Dao<Layout>
 {
     public LayoutDao() {}
 
+    private static Logger log = LogManager.getLogger(LayoutDao.class);
+
     private static final DBUtil db = DBUtil.Instance();
-    private static final Log log = LogFactory.Instance().getLog();
     private static final TableDao tableModel = new TableDao();
 
     @Override
@@ -145,13 +150,22 @@ public class LayoutDao implements Dao<Layout>
     }
 
     @SuppressWarnings("Duplicates")
-    public List<Layout> getReadableByTable (Table table)
+    public List<Layout> getReadableByTable (Table table, String version)
     {
+        if(table == null)
+        {
+            return null;
+        }
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
-                    " AND LAYOUT_PERMISSION>=0");
+            String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
+                    " AND LAYOUT_PERMISSION>=0";
+            if(version != null)
+            {
+                sql += " AND LAYOUT_VERSION=" + version;
+            }
+            ResultSet rs = st.executeQuery(sql);
             List<Layout> layouts = new ArrayList<>();
             while (rs.next())
             {

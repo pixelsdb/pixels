@@ -1,7 +1,8 @@
 package cn.edu.ruc.iir.pixels.daemon;
 
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import cn.edu.ruc.iir.pixels.daemon.exception.NoSuchServerException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 
 public class ServerContainer
 {
+    private static Logger log = LogManager.getLogger(ServerContainer.class);
+
     private Map<String, Server> serverMap = null;
 
     public ServerContainer ()
@@ -59,7 +62,7 @@ public class ServerContainer
             }
         } catch (InterruptedException e)
         {
-            LogFactory.Instance().getLog().error(
+            log.error(
                     "interrupted while checking server.", e);
         }
         return serverIsRunning;

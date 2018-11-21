@@ -1,10 +1,11 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 /**
@@ -12,6 +13,8 @@ import io.netty.util.ReferenceCountUtil;
  */
 public class MetadataClientHandler extends ChannelInboundHandlerAdapter
 {
+    private static Logger logger = LogManager.getLogger(MetadataClientHandler.class);
+
     private ReqParams params;
     private final String token;
     private final MetadataClient client;
@@ -34,12 +37,12 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     {
         try
         {
-            LogFactory.Instance().getLog().info("client response: " + msg.toString());
+            logger.info("client response: " + msg.toString());
             if (msg instanceof Object) {
                 this.client.setResponse(token, msg);
             } else {
                 // log the received params.
-                LogFactory.Instance().getLog().info("Bad response, " + msg.toString());
+                logger.info("Bad response, " + msg.toString());
                 ctx.close();
             }
         }
@@ -60,7 +63,7 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable e) throws MetadataException
     {
-        LogFactory.Instance().getLog().error("error caught in metadata client.", e);
+        logger.error("error caught in metadata client.", e);
         ctx.close();
         throw new MetadataException("exception caught in MetadataClientHandler", e);
     }

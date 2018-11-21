@@ -65,8 +65,5 @@
             <artifactId>jsr305</artifactId>
             <optional>true</optional>
         </dependency>
-
     </dependencies>
-
-
 </project>

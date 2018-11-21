@@ -15,8 +15,8 @@ import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class PixelsCompactor
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsCompactor.class);
+    private static final Logger LOGGER = LogManager.getLogger(PixelsCompactor.class);
 
     private final TypeDescription schema;
     private final CompactLayout compactLayout;

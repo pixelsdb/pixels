@@ -1,11 +1,22 @@
 package cn.edu.ruc.iir.pixels.common.utils;
 
-import java.io.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collection;
 
 public class FileUtil
 {
     static private FileUtil instance = null;
+    private static Logger log = LogManager.getLogger(FileUtil.class);
 
     private FileUtil()
     {
@@ -61,7 +72,7 @@ public class FileUtil
             printWriter.flush();
         } catch (Exception e)
         {
-            LogFactory.Instance().getLog().error("error when writing file: " + fileName, e);
+            log.error("error when writing file: " + fileName, e);
         }
     }
 
@@ -78,7 +89,7 @@ public class FileUtil
             org.apache.commons.io.FileUtils.deleteDirectory(new File(dirName));
         } catch (IOException e)
         {
-            LogFactory.Instance().getLog().error("error when deleting dir: " + dirName, e);
+            log.error("error when deleting dir: " + dirName, e);
         }
     }
 

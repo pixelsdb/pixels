@@ -48,4 +48,12 @@ public class Column extends Base
         this.table = table;
     }
 
+    @Override
+    public String toString() {
+        return "Column{" +
+                "name='" + name + '\'' +
+                ", type='" + type + '\'' +
+                ", size=" + size +
+                '}';
+    }
 }

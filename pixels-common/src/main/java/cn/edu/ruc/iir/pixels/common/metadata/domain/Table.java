@@ -72,4 +72,14 @@ public class Table extends Base
         this.layouts.add(layout);
     }
 
+    @Override
+    public String toString() {
+        return "Table{" +
+                "name='" + name + '\'' +
+                ", type='" + type + '\'' +
+                ", schema=" + schema +
+                ", columns=" + columns +
+                ", layouts=" + layouts +
+                '}';
+    }
 }

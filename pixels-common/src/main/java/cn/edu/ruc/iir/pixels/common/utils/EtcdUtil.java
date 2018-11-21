@@ -10,8 +10,8 @@ import com.coreos.jetcd.options.DeleteOption;
 import com.coreos.jetcd.options.GetOption;
 import com.coreos.jetcd.options.PutOption;
 import com.coreos.jetcd.options.WatchOption;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutionException;
  */
 public class EtcdUtil {
     private static EtcdUtil instance = new EtcdUtil();
-    private static Logger logger = LoggerFactory.getLogger(EtcdUtil.class);
+    private static Logger logger = LogManager.getLogger(EtcdUtil.class);
     private Client client = null;
     private boolean lockHeld;
 

@@ -15,8 +15,8 @@ import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheCoordinator
         implements Server
 {
-    private static final Logger logger = LoggerFactory.getLogger(CacheCoordinator.class);
+    private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
     private final ScheduledExecutorService scheduledExecutor;

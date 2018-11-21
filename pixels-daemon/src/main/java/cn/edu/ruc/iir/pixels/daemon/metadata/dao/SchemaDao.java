@@ -2,10 +2,14 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.common.utils.LogFactory;
-import org.apache.commons.logging.Log;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +18,7 @@ public class SchemaDao implements Dao<Schema>
     public SchemaDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final Log log = LogFactory.Instance().getLog();
+    private static Logger log = LogManager.getLogger(DBUtil.class);
 
     @Override
     public Schema getById(int id)
