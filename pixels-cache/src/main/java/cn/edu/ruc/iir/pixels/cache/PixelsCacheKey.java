@@ -5,6 +5,7 @@ import org.apache.commons.compress.utils.CharsetNames;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -51,7 +52,12 @@ public class PixelsCacheKey
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return keyBuffer.array();
+        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
+    }
+
+    public int getSize()
+    {
+        return keyBuffer.position();
     }
 
     @Override

@@ -45,6 +45,7 @@ public class TestPixelsCacheWriter
                     cacheWriter.write(cacheKey, value);
                 }
             }
+            cacheWriter.flush();
         }
         catch (Exception e) {
             e.printStackTrace();

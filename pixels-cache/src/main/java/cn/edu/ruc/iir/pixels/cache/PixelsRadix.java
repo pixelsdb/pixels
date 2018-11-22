@@ -124,7 +124,7 @@ public class PixelsRadix
             case MATCH_END_AT_END_EDGE:
             {
                 byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getBytes().length);
+                        searchResult.bytesMatched, cacheKey.getSize());
                 RadixNode newNode = new RadixNode();
                 newNode.setEdge(keySuffix);
                 newNode.setValue(cacheIdx);
@@ -143,7 +143,7 @@ public class PixelsRadix
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
                         0, searchResult.bytesMatchedInNodeFound);
                 byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getBytes().length);
+                        searchResult.bytesMatched, cacheKey.getSize());
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
                         searchResult.bytesMatchedInNodeFound, nodeFound.getEdge().length);
                 RadixNode parentNode = new RadixNode();

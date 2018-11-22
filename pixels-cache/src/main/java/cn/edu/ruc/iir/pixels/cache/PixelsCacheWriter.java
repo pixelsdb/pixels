@@ -170,6 +170,14 @@ public class PixelsCacheWriter
         radix.put(key, cacheIdx);
     }
 
+    /**
+     * Currently, this is an interface for unit tests.
+     * */
+    public void flush()
+    {
+        flushIndex();
+    }
+
     private void internalUpdate(int version, Layout layout, String[] files)
             throws IOException
     {
@@ -310,7 +318,9 @@ public class PixelsCacheWriter
      * */
     private void flushIndex()
     {
+        // set index content offset, skip the index header.
         currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+        // if root contains nodes, which means the tree is not empty,then write nodes.
         if (radix.getRoot().getSize() != 0) {
             writeRadix(radix.getRoot());
         }
