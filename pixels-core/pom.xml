@@ -76,6 +76,7 @@
     </dependencies>
 
     <build>
+        <finalName>pixels-core</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -89,8 +90,9 @@
                         </goals>
                         <configuration>
                             <finalName>pixels-core</finalName>
+                            <outputDirectory>${project.parent.basedir}/pixels-core/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
-                            <shadedClassifierName>allinone</shadedClassifierName>
+                            <shadedClassifierName>full</shadedClassifierName>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
