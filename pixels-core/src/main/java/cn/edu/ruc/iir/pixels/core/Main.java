@@ -24,8 +24,8 @@ public class Main
     public static void main(String[] args) throws IOException, MetadataException
     {
         // get compact layout
-        MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
+        MetadataService metadataService = new MetadataService("dbiir10", 18888);
+        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105_perf");
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = null;
         int layoutId = Integer.parseInt(args[0]);
@@ -45,9 +45,9 @@ public class Main
         // get input file paths
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir01:9000/"), conf);
+        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir10:9000/"), conf);
         FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_order"));
+                new Path("hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_" + layout.getVersion() + "_order"));
 
         // compact
         int NO = 0;
@@ -63,7 +63,7 @@ public class Main
             long start = System.currentTimeMillis();
 
 
-            String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
+            String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_" + layout.getVersion() + "_compact/" +
                     NO + "_" +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
@@ -74,7 +74,7 @@ public class Main
                             .setFS(fs)
                             .setFilePath(new Path(filePath))
                             .setBlockSize(2L *1024*1024*1024)
-                            .setReplication((short) 2)
+                            .setReplication((short) 1)
                             .setBlockPadding(false)
                             .build();
             pixelsCompactor.compact();
