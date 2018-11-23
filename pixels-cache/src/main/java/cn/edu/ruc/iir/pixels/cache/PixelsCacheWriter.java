@@ -29,6 +29,7 @@ public class PixelsCacheWriter
     private final EtcdUtil etcdUtil;
     private final String host;
     private long currentIndexOffset;
+    private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = 0L;  // this is used in the write() method.
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
@@ -279,31 +280,35 @@ public class PixelsCacheWriter
     /**
      * Flush node content to the index file based on {@code currentIndexOffset}.
      * Header(4 bytes) + [Child(8 bytes)]{n} + edge(variable size) + value(optional).
-     * Header: isKey(1 bit) + edgeSize(23 bits) + childrenSize(8 bits)
+     * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
      * Child: leader(1 byte) + child_offset(7 bytes)
      * */
     private void flushNode(RadixNode node)
     {
-        long nodeIndexOffset = currentIndexOffset;
-        nodeIndexOffset += node.getLengthInBytes();
-        node.offset = nodeIndexOffset;
+        if (node.offset == 0) {
+            node.offset = currentIndexOffset;
+        }
+        else {
+            currentIndexOffset = node.offset;
+        }
+        allocatedIndexOffset += node.getLengthInBytes();
         int header = 0;
         int edgeSize = node.getEdge().length;
-        header = header | (edgeSize << 8);
-        int isKeyMask = 0x0001 << 31;
+        header = header | (edgeSize << 9);
+        int isKeyMask = 1 << 31;
         if (node.isKey()) {
             header = header | isKeyMask;
         }
         header = header | node.getChildren().size();
         indexFile.putInt(currentIndexOffset, header);  // header
         currentIndexOffset += 4;
-        for (RadixNode n : node.getChildren().values()) {   // children
+        for (Byte key : node.getChildren().keySet()) {   // children
+            RadixNode n = node.getChild(key);
             int len = n.getLengthInBytes();
-            n.offset = nodeIndexOffset;
-            nodeIndexOffset += len;
+            n.offset = allocatedIndexOffset;
+            allocatedIndexOffset += len;
             long childId = 0L;
-            long leader = n.getEdge()[0];  // 1 byte
-            childId = childId | (leader << 56);  // leader
+            childId = childId | ((long) key << 56);  // leader
             childId = childId | n.offset;  // offset
             indexFile.putLong(currentIndexOffset, childId);
             currentIndexOffset += 8;

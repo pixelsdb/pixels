@@ -259,7 +259,12 @@ public class PixelsRadix
                         newNode.setEdge(edge);
                         newNode.setChildren(remainingChild.getChildren(), remainingChild.getSize());
                         newNode.setValue(remainingChild.getValue());
-                        searchResult.grandParentNode.addChild(newNode, true);
+                        if (searchResult.grandParentNode == null) {
+                            nodes.get(0).addChild(newNode, true);
+                        }
+                        else {
+                            searchResult.grandParentNode.addChild(newNode, true);
+                        }
                     }
                     // parent cannot be merged with remaining children
                     // then just delete the node

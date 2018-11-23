@@ -10,8 +10,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-    private final static int KEY_HEADER_SIZE = 2;
-    private final static long CHILDREN_OFFSET_MASK = 0x00FFFFFFFFFFFFFFL;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
@@ -104,8 +102,8 @@ public class PixelsCacheReader
         PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
-        ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);
-        byte[] cacheKeyBytes = columnletId.getBytes();
+        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
+        byte[] cacheKeyBytes = cacheKey.getBytes();
 
         // search cache key
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
@@ -138,8 +136,8 @@ public class PixelsCacheReader
 
         // get root
         int currentNodeHeader = indexFile.getInt(currentNodeOffset);
-        int currentNodeChildrenNum = currentNodeHeader & 0x000000FF;
-        int currentNodeEdgeSize = currentNodeHeader & 0x7FFFFF00;
+        int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
+        int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
         if (currentNodeChildrenNum == 0 && currentNodeEdgeSize == 0) {
             return null;
         }
@@ -149,10 +147,11 @@ public class PixelsCacheReader
             // search each child for the matching node
             long matchingChildOffset = 0L;
             for (int i = 0; i < currentNodeChildrenNum; i++) {
-                long child = indexFile.getLong(currentNodeOffset + 4 + (4 * i));
-                byte leader = (byte) ((child & 0xFF00000000000000L) >>> 24);
+                long child = indexFile.getLong(currentNodeOffset + 4 + (8 * i));
+                byte leader = (byte) ((child >>> 56) & 0xFF);
                 if (leader == key[bytesMatched]) {
                     matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
+                    break;
                 }
             }
             if (matchingChildOffset == 0) {
@@ -162,8 +161,8 @@ public class PixelsCacheReader
             currentNodeOffset = matchingChildOffset;
             bytesMatchedInNodeFound = 0;
             currentNodeHeader = indexFile.getInt(currentNodeOffset);
-            currentNodeChildrenNum = currentNodeHeader & 0x000000FF;
-            currentNodeEdgeSize = currentNodeHeader & 0x7FFFFF00;
+            currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
+            currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
             byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
             indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
                                currentNodeEdge, 0, currentNodeEdgeSize);
