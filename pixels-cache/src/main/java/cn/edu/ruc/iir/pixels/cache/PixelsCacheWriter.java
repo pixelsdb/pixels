@@ -9,7 +9,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -279,38 +278,42 @@ public class PixelsCacheWriter
 
     /**
      * Flush node content to the index file based on {@code currentIndexOffset}.
-     * Header(2 bytes) + [Child(1 byte)]{n} + edge(variable size) + value(optional).
+     * Header(4 bytes) + [Child(8 bytes)]{n} + edge(variable size) + value(optional).
+     * Header: isKey(1 bit) + edgeSize(23 bits) + childrenSize(8 bits)
+     * Child: leader(1 byte) + child_offset(7 bytes)
      * */
     private void flushNode(RadixNode node)
     {
-        node.offset = currentIndexOffset;
-        currentIndexOffset += node.getLengthInBytes();
-        ByteBuffer nodeBuffer = ByteBuffer.allocate(node.getLengthInBytes());
+        long nodeIndexOffset = currentIndexOffset;
+        nodeIndexOffset += node.getLengthInBytes();
+        node.offset = nodeIndexOffset;
         int header = 0;
-        int isKeyMask = 0x0001 << 15;
+        int edgeSize = node.getEdge().length;
+        header = header | (edgeSize << 8);
+        int isKeyMask = 0x0001 << 31;
         if (node.isKey()) {
             header = header | isKeyMask;
         }
-        int edgeSize = node.getEdge().length;
-        header = header | (edgeSize << 7);
         header = header | node.getChildren().size();
-        nodeBuffer.putShort((short) header);  // header
+        indexFile.putInt(currentIndexOffset, header);  // header
+        currentIndexOffset += 4;
         for (RadixNode n : node.getChildren().values()) {   // children
             int len = n.getLengthInBytes();
-            n.offset = currentIndexOffset;
-            currentIndexOffset += len;
+            n.offset = nodeIndexOffset;
+            nodeIndexOffset += len;
             long childId = 0L;
             long leader = n.getEdge()[0];  // 1 byte
-            childId = childId & (leader << 56);  // leader
+            childId = childId | (leader << 56);  // leader
             childId = childId | n.offset;  // offset
-            nodeBuffer.putLong(childId);
+            indexFile.putLong(currentIndexOffset, childId);
+            currentIndexOffset += 8;
         }
-        nodeBuffer.put(node.getEdge()); // edge
+        indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
+        currentIndexOffset += node.getEdge().length;
         if (node.isKey()) {  // value
-            nodeBuffer.put(node.getValue().getBytes());
+            indexFile.putBytes(currentIndexOffset, node.getValue().getBytes());
+            currentIndexOffset += 12;
         }
-        // flush bytes
-        indexFile.putBytes(node.offset, nodeBuffer.array());
     }
 
     /**

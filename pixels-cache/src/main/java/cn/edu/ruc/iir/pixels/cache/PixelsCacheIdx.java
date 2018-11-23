@@ -21,6 +21,13 @@ public class PixelsCacheIdx
         this.length = length;
     }
 
+    public PixelsCacheIdx(byte[] content)
+    {
+        ByteBuffer idxBuffer = ByteBuffer.wrap(content);
+        this.offset = idxBuffer.getLong();
+        this.length = idxBuffer.getInt();
+    }
+
     public long getOffset()
     {
         return offset;

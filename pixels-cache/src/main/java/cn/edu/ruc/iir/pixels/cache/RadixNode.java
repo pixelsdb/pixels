@@ -138,7 +138,7 @@ public class RadixNode
      * */
     public int getLengthInBytes()
     {
-        int len = 2 + edge.length;
+        int len = 4 + edge.length;
         len += 8 * children.size();
         if (isKey) {
             len += PixelsCacheIdx.SIZE;

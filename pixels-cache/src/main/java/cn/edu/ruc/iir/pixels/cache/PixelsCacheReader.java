@@ -114,10 +114,8 @@ public class PixelsCacheReader
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
             content = new byte[length];
-            // increment counter
-            cacheFile.getAndAddLong(offset, 1);
             // read content
-            cacheFile.getBytes(offset + 4, content, 0, length);
+            cacheFile.getBytes(offset, content, 0, length);
         }
 
         // decrease reader count
@@ -133,67 +131,60 @@ public class PixelsCacheReader
      * */
     private PixelsCacheIdx search(byte[] key)
     {
-        long nodeOffset = 0;
         final int keyLen = key.length;
+        long currentNodeOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         int bytesMatched = 0;
-        int childrenNum = 0;
-        int edgeSize = 0;
-        byte[] nodeHeader = new byte[2];
-        byte[] edge;
-        while (bytesMatched < keyLen) {
-            boolean matched = false;
-            nodeHeader = new byte[2];
-            indexFile.getBytes(nodeOffset, nodeHeader, 0, 2);
-            // get children num, if 0, return empty
-            childrenNum = nodeHeader[1] + 128;
-            edgeSize = nodeHeader[0] | 0x7F;
-            edge = new byte[edgeSize];
-            indexFile.getBytes(nodeOffset + 2 + childrenNum, edge, 0, edgeSize);
+        int bytesMatchedInNodeFound = 0;
 
-            // root node has node children, return null
-            if (edgeSize == 0 && childrenNum == 0) {
-                return null;
-            }
-            // search edge for matching
-            int edgeIndex = 0;
-            while (edgeIndex < edgeSize
-                    && bytesMatched < keyLen
-                    && key[bytesMatched] == edge[edgeIndex]) {
-                edgeIndex++;
-                bytesMatched++;
-            }
-            // if not matching current edge, then return null
-            if (edgeIndex < edgeSize) {
-                return null;
-            }
-            // if bytesMatched is equal to keyLen, then this is the node, then break
-            if (bytesMatched == keyLen) {
-                break;
-            }
-            // else search children further
-            for (int i = 0; i < childrenNum; i++) {
-                byte childLead = indexFile.getByte(nodeOffset + 2 + i * 8);
-                // if found matching child, set this child as current node, and increment bytesMatched
-                if (childLead == key[bytesMatched]) {
-                    nodeOffset = indexFile.getLong(nodeOffset + 2 + i * 8);
-                    nodeOffset = nodeOffset & CHILDREN_OFFSET_MASK;
-                    bytesMatched++;
-                    matched = true;
-                    break;
+        // get root
+        int currentNodeHeader = indexFile.getInt(currentNodeOffset);
+        int currentNodeChildrenNum = currentNodeHeader & 0x000000FF;
+        int currentNodeEdgeSize = currentNodeHeader & 0x7FFFFF00;
+        if (currentNodeChildrenNum == 0 && currentNodeEdgeSize == 0) {
+            return null;
+        }
+
+        // search
+        outer_loop: while (bytesMatched < keyLen) {
+            // search each child for the matching node
+            long matchingChildOffset = 0L;
+            for (int i = 0; i < currentNodeChildrenNum; i++) {
+                long child = indexFile.getLong(currentNodeOffset + 4 + (4 * i));
+                byte leader = (byte) ((child & 0xFF00000000000000L) >>> 24);
+                if (leader == key[bytesMatched]) {
+                    matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
                 }
             }
-            // if found no matching child, return null
-            if (!matched) {
-                return null;
+            if (matchingChildOffset == 0) {
+                break;
+            }
+
+            currentNodeOffset = matchingChildOffset;
+            bytesMatchedInNodeFound = 0;
+            currentNodeHeader = indexFile.getInt(currentNodeOffset);
+            currentNodeChildrenNum = currentNodeHeader & 0x000000FF;
+            currentNodeEdgeSize = currentNodeHeader & 0x7FFFFF00;
+            byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
+            indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
+                               currentNodeEdge, 0, currentNodeEdgeSize);
+            for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
+            {
+                if (currentNodeEdge[i] != key[bytesMatched]) {
+                    break outer_loop;
+                }
+                bytesMatched++;
+                bytesMatchedInNodeFound++;
             }
         }
-        // found matching key, check if it has value
-        if ((nodeHeader[0] >> 7 & 0x01) == 1) {
-            // if it has value, get idx and increment counter
-            long valueOffset = nodeOffset + KEY_HEADER_SIZE + childrenNum + edgeSize;
-            long offset = indexFile.getLong(valueOffset);
-            int length = indexFile.getInt(valueOffset + 8);
-            return new PixelsCacheIdx(offset, length);
+
+        // if matches, node found
+        if (bytesMatched == keyLen && bytesMatchedInNodeFound == currentNodeEdgeSize) {
+            if (((currentNodeHeader >>> 31) & 1) > 0) {
+                byte[] idx = new byte[12];
+                indexFile.getBytes(currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
+                                         idx, 0, 12);
+                return new PixelsCacheIdx(idx);
+            }
         }
         return null;
     }
