@@ -166,6 +166,7 @@ public class PixelsSplitManager
             }
         }
         log.info("pixelsSplits: " + pixelsSplits.size());
+        log.info("=====begin to shuffle====");
         Collections.shuffle(pixelsSplits);
 
         return new FixedSplitSource(pixelsSplits);

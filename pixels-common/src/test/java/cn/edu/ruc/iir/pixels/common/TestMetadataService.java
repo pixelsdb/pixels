@@ -97,11 +97,7 @@ public class TestMetadataService {
     public void testGetTableLayoutsByVersion () throws MetadataException
     {
         long start = System.currentTimeMillis();
-<<<<<<< HEAD
-        List<Layout> layouts = instance.getLayouts("pixels", "test_105", 0);
-=======
         List<Layout> layouts = instance.getLayout("pixels", "test_105", 0);
->>>>>>> 74340a5052187d718fb18bd40ded22ff8201c302
         long end = System.currentTimeMillis();
         System.out.println("Last: " + (end - start));
         System.out.println(layouts.get(0).getSplits());
