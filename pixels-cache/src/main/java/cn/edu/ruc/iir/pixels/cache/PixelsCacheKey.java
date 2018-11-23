@@ -1,6 +1,10 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
+import org.apache.commons.compress.utils.CharsetNames;
+
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -12,20 +16,20 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private static final int SIZE = Long.BYTES + 2 * Short.BYTES;
+    private static final int SIZE = Integer.BYTES + 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
-    private long blockId;
+    private String blockId;
     private short rowGroupId;
     private short columnId;
 
-    PixelsCacheKey(long blockId, short rowGroupId, short columnId)
+    PixelsCacheKey(String blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
     }
 
-    public long getBlockId()
+    public String getBlockId()
     {
         return blockId;
     }
@@ -43,7 +47,8 @@ public class PixelsCacheKey
     public byte[] getBytes()
     {
         keyBuffer.clear();
-        keyBuffer.putLong(blockId);
+        keyBuffer.putInt(blockId.length());
+        keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
         return keyBuffer.array();

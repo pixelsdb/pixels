@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalWriter;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalWriterUtil;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.CompressionKind;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupInformation;
 import cn.edu.ruc.iir.pixels.core.PixelsProto.RowGroupStatistic;
@@ -23,8 +23,8 @@ import cn.edu.ruc.iir.pixels.core.writer.TimestampColumnWriter;
 import cn.edu.ruc.iir.pixels.core.writer.VarcharColumnWriter;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
@@ -47,7 +47,7 @@ import static java.util.Objects.requireNonNull;
 public class PixelsWriterImpl
         extends PixelsWriter
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PixelsWriterImpl.class);
+    private static final Logger LOGGER = LogManager.getLogger(PixelsWriterImpl.class);
 
     private final TypeDescription schema;
     private final int pixelStride;
@@ -314,7 +314,7 @@ public class PixelsWriterImpl
     {
         try
         {
-            if (curRowGroupDataLength != 0) {
+            if (curRowGroupNumOfRows != 0) {
                 writeRowGroup();
             }
             writeFileTail();

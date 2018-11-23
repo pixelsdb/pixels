@@ -185,7 +185,7 @@ public class MemoryMappedFile
     public void putBytes(long pos, byte[] val)
     {
         for (byte v : val) {
-            unsafe.putByte(pos++, v);
+            unsafe.putByte(pos++ + addr, v);
         }
     }
     

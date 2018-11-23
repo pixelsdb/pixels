@@ -3,9 +3,13 @@ package cn.edu.ruc.iir.pixels.load;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.StringUtil;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.PixelsWriterImpl;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import cn.edu.ruc.iir.pixels.load.multi.Config;
@@ -28,10 +32,10 @@ import java.net.URI;
 public class TestPixelsWriter
 {
     @Test
-    public void test () throws IOException, MetadataException
+    public void testWrite () throws IOException, MetadataException
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
-        Config config = new Config("pixels", "test_105", 300000, "\t", "pixels");
+        Config config = new Config("pixels", "test_105", 5000, "\t", "pixels");
         config.load(configFactory);
         String loadingDataPath = config.getPixelsPath();
         String schemaStr = config.getSchema();
@@ -122,5 +126,34 @@ public class TestPixelsWriter
             }
             pixelsWriter.close();
         }
+    }
+
+    @Test
+    public void testRead()
+            throws IOException, MetadataException
+    {
+        ConfigFactory configFactory = ConfigFactory.Instance();
+        Config config = new Config("pixels", "test_105", 5000, "\t", "pixels");
+        config.load(configFactory);
+        String loadingDataPath = config.getPixelsPath();
+
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", LocalFileSystem.class.getName());
+        FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+        VectorizedRowBatch rowBatch;
+
+        PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                .setFS(fs)
+                .setPath(new Path(loadingDataPath + "test_5000_lines.pxl"))
+                .build();
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        String[] cols = {"querydayname"};
+        option.includeCols(cols);
+        PixelsRecordReader recordReader = pixelsReader.read(option);
+        rowBatch = recordReader.readBatch(5000);
+        System.out.println(rowBatch.size);
     }
 }

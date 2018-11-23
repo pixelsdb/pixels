@@ -16,12 +16,6 @@
     <dependencies>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
-            <artifactId>rainbow-common</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
             <optional>true</optional>
         </dependency>

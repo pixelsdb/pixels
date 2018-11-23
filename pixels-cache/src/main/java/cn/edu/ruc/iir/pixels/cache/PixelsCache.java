@@ -133,10 +133,6 @@ public class PixelsCache
      * */
     public void start()
     {
-        PixelsCacheManager cacheManager = new PixelsCacheManager(
-                cacheFile, indexFile, mqReader, radix);
-//        executorService.schedule(new PixelsCacheManager(cacheFile, indexFile, mqReader),
-//                scheduledSeconds, TimeUnit.SECONDS);
     }
 
 

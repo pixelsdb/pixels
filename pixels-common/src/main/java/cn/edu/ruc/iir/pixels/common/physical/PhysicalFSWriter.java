@@ -4,8 +4,8 @@ import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -18,7 +18,7 @@ import java.nio.ByteBuffer;
 public class PhysicalFSWriter
         implements PhysicalWriter
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalFSWriter.class);
+    private static final Logger LOGGER = LogManager.getLogger(PhysicalFSWriter.class);
 
     private final FileSystem fs;
     private final Path path;

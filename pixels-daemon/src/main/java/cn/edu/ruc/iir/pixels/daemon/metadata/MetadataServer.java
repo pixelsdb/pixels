@@ -1,18 +1,20 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata;
 
-import cn.edu.ruc.iir.pixels.common.serialize.KryoDecoder;
-import cn.edu.ruc.iir.pixels.common.serialize.KryoEncoder;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.daemon.Server;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.sql.Connection;
 
@@ -25,7 +27,7 @@ import java.sql.Connection;
  * @date: Create in 2018-01-26 15:09
  **/
 public class MetadataServer implements Server {
-    private static Logger log = Logger.getLogger(MetadataServer.class);
+    private static Logger log = LogManager.getLogger(MetadataServer.class);
 
     private boolean running = false;
     private int port;

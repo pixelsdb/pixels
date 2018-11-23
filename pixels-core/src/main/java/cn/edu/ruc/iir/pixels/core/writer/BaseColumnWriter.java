@@ -20,14 +20,14 @@ public abstract class BaseColumnWriter implements ColumnWriter
     final int pixelStride;                     // indicate num of elements in a pixel
     final boolean isEncoding;                  // indicate if encoding enabled during writing
     final boolean[] isNull;
-    final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
+    private final PixelsProto.ColumnChunkIndex.Builder columnChunkIndex;
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
 
     final StatsRecorder pixelStatRecorder;
-    final StatsRecorder columnChunkStatRecorder;
+    private final StatsRecorder columnChunkStatRecorder;
 
-    int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
-    int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
+    private int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
+    private int curPixelPosition = 0;                  // current offset of this pixel in the column chunk. this is a relative value inside each column chunk.
 
     int curPixelEleIndex = 0;                  // index of elements in previous vector
     int curPixelVectorIndex = 0;               // index of the element to write in the current vector
@@ -37,7 +37,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     boolean hasNull = false;
 
     final ByteArrayOutputStream outputStream;  // column chunk content
-    final ByteArrayOutputStream isNullStream;  // column chunk isNull
+    private final ByteArrayOutputStream isNullStream;  // column chunk isNull
 
     public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
@@ -66,7 +66,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
      *
      * @param vector vector
      * @param size size of vector
-     * @return size in bytes of current column chunk
+     * @return size in bytes of the current column chunk
      * */
     @Override
     public abstract int write(ColumnVector vector, int size) throws IOException;

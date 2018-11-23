@@ -77,7 +77,7 @@
         <dep.prometheus.client.version>0.2.0</dep.prometheus.client.version>
         <dep.argparse4j.version>0.7.0</dep.argparse4j.version>
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
-        <dep.log4j.version>2.1</dep.log4j.version>
+        <dep.log4j.version>2.11.1</dep.log4j.version>
         <dep.junit.version>4.12</dep.junit.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
     </properties>
@@ -135,6 +135,13 @@
                 <groupId>io.prometheus</groupId>
                 <artifactId>simpleclient_pushgateway</artifactId>
                 <version>${dep.prometheus.client.version}</version>
+            </dependency>
+
+            <!-- jetcd -->
+            <dependency>
+                <groupId>com.coreos</groupId>
+                <artifactId>jetcd-core</artifactId>
+                <version>0.0.1</version>
             </dependency>
 
             <!-- presto -->
@@ -326,11 +333,6 @@
 
             <!-- logging -->
             <dependency>
-                <groupId>commons-logging</groupId>
-                <artifactId>commons-logging</artifactId>
-                <version>${dep.commons-logging.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-core</artifactId>
                 <version>${dep.log4j.version}</version>
@@ -340,6 +342,11 @@
                 <artifactId>log4j-api</artifactId>
                 <version>${dep.log4j.version}</version>
             </dependency>
+            <!--<dependency>-->
+                <!--<groupId>org.slf4j</groupId>-->
+                <!--<artifactId>slf4j-log4j12</artifactId>-->
+                <!--<version>1.7.22</version>-->
+            <!--</dependency>-->
 
             <!-- testing -->
             <dependency>
@@ -372,11 +379,6 @@
 
     <dependencies>
         <!-- logging -->
-        <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-            <optional>true</optional>
-        </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>

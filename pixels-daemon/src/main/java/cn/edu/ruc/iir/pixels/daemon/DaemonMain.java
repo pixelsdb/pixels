@@ -2,19 +2,23 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
-import cn.edu.ruc.iir.pixels.daemon.cache.CacheServer;
+import cn.edu.ruc.iir.pixels.daemon.cache.CacheManager;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
+ * */
 public class DaemonMain
 {
-    private static Logger log = Logger.getLogger(DaemonMain.class);
+    private static Logger log = LogManager.getLogger(DaemonMain.class);
 
     public static void main(String[] args)
     {
@@ -46,7 +50,7 @@ public class DaemonMain
                 int port = Integer.valueOf(config.getProperty("metadata.server.port"));
                 MetadataServer metadataServer = new MetadataServer(port);
 
-                CacheServer cacheServer = new CacheServer();
+                CacheManager cacheServer = new CacheManager();
 
                 MetricsServer metricsServer = new MetricsServer();
 

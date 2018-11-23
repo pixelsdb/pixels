@@ -1,10 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.cache.mq.MappedBusWriter;
-
-import java.io.EOFException;
-import java.io.IOException;
-
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -12,20 +7,18 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
-public class PixelsCacheReader implements AutoCloseable
+public class PixelsCacheReader
+        implements AutoCloseable
 {
     private final static int KEY_HEADER_SIZE = 2;
+    private final static long CHILDREN_OFFSET_MASK = 0x00FFFFFFFFFFFFFFL;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final MappedBusWriter mqWriter;
-    private final long childrenOffsetMask = 0x00FFFFFFFFFFFFFFL;
-    private int version = 1;
 
-    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile, MappedBusWriter mqWriter)
+    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.mqWriter = mqWriter;
     }
 
     public static class Builder
@@ -34,10 +27,6 @@ public class PixelsCacheReader implements AutoCloseable
         private long builderCacheSize;
         private String builderIndexLocation = "";
         private long builderIndexSize;
-        private String builderMQLocation = "";
-        private long builderMQFileSize;
-        private int builderMQRecordSize;
-        private boolean builderMQAppend;
 
         private Builder()
         {}
@@ -74,46 +63,12 @@ public class PixelsCacheReader implements AutoCloseable
             return this;
         }
 
-        public PixelsCacheReader.Builder setMQLocation(String mqLocation)
-        {
-            checkArgument(!mqLocation.isEmpty(), "location should not be empty");
-            this.builderMQLocation = mqLocation;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQFileSize(long mqFileSize)
-        {
-            checkArgument(mqFileSize > 0, "message queue file size should be positive");
-            this.builderMQFileSize = mqFileSize;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQRecordSize(int mqRecordSize)
-        {
-            checkArgument(mqRecordSize > 0, "message queue record size should be positive");
-            this.builderMQRecordSize = mqRecordSize;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setMQAppend(boolean mqAppend)
-        {
-            this.builderMQAppend = mqAppend;
-
-            return this;
-        }
-
         public PixelsCacheReader build() throws Exception
         {
-            MappedBusWriter mqWriter = new MappedBusWriter(builderMQLocation, builderMQFileSize,
-                    builderMQRecordSize, builderMQAppend);
-            mqWriter.open();
             MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
 
-            return new PixelsCacheReader(cacheFile, indexFile, mqWriter);
+            return new PixelsCacheReader(cacheFile, indexFile);
         }
     }
 
@@ -131,23 +86,22 @@ public class PixelsCacheReader implements AutoCloseable
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(long blockId, short rowGroupId, short columnId) throws EOFException
+    public byte[] get(String blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
-        // check rw flag
-        short rwFlag = indexFile.getShortVolatile(0);
-        if (rwFlag != 0) {
+        // check rw flag, if not readable, return empty bytes
+        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
+        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
             return content;
         }
 
-        // check if reader count reaches its max value (short max value)
-        int readerCount = indexFile.getShortVolatile(2);
-        if (readerCount >= Short.MAX_VALUE) {
+        // check if reader count reaches its max value, if so no more reads are allowed
+        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
+        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
             return content;
         }
         // update reader count
-        readerCount = readerCount + 1;
-        indexFile.putShortVolatile(2, (short) readerCount);
+        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
         ColumnletId columnletId = new ColumnletId(blockId, rowGroupId, columnId);
@@ -165,17 +119,9 @@ public class PixelsCacheReader implements AutoCloseable
             // read content
             cacheFile.getBytes(offset + 4, content, 0, length);
         }
-        // if not found, send cache miss message
-        else {
-            mqWriter.write(columnletId);
-        }
 
         // decrease reader count
-        readerCount = indexFile.getShortVolatile(2);
-        if (readerCount >= 1) {
-            readerCount--;
-        }
-        indexFile.putShortVolatile(2, (short) readerCount);
+        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
 
         return content;
     }
@@ -230,7 +176,7 @@ public class PixelsCacheReader implements AutoCloseable
                 // if found matching child, set this child as current node, and increment bytesMatched
                 if (childLead == key[bytesMatched]) {
                     nodeOffset = indexFile.getLong(nodeOffset + 2 + i * 8);
-                    nodeOffset = nodeOffset & childrenOffsetMask;
+                    nodeOffset = nodeOffset & CHILDREN_OFFSET_MASK;
                     bytesMatched++;
                     matched = true;
                     break;
@@ -252,8 +198,7 @@ public class PixelsCacheReader implements AutoCloseable
         return null;
     }
 
-    public void close() throws IOException
+    public void close()
     {
-        mqWriter.close();
     }
 }
