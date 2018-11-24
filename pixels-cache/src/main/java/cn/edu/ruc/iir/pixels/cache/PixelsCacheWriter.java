@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
+// todo cache writer needs a cache space monitor
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;

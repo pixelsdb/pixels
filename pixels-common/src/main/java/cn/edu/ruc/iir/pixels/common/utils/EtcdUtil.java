@@ -36,9 +36,7 @@ public class EtcdUtil {
         System.out.println(host);
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 
-        if (this.client == null) {
-            this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
-        }
+        this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
     }
 
     public static EtcdUtil Instance() {

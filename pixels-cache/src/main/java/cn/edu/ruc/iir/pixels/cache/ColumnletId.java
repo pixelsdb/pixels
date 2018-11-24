@@ -41,7 +41,6 @@ public class ColumnletId
     public byte[] getBytes()
     {
         keyBuffer.clear();
-//        keyBuffer.putInt(blockId.length());
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);

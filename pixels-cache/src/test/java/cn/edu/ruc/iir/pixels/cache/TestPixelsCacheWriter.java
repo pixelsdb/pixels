@@ -15,7 +15,7 @@ import java.nio.ByteBuffer;
 public class TestPixelsCacheWriter
 {
     @Test
-    public void testCacheWriter()
+    public void testSimpleCacheWriter()
     {
         try {
             // get fs

@@ -23,7 +23,7 @@ public class PixelsCacheKey
     private short rowGroupId;
     private short columnId;
 
-    PixelsCacheKey(String blockId, short rowGroupId, short columnId)
+    public PixelsCacheKey(String blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
@@ -48,7 +48,6 @@ public class PixelsCacheKey
     public byte[] getBytes()
     {
         keyBuffer.clear();
-//        keyBuffer.putInt(blockId.length());
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
