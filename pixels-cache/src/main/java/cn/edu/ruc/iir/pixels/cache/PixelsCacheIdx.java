@@ -21,6 +21,13 @@ public class PixelsCacheIdx
         this.length = length;
     }
 
+    public PixelsCacheIdx(byte[] content)
+    {
+        ByteBuffer idxBuffer = ByteBuffer.wrap(content);
+        this.offset = idxBuffer.getLong();
+        this.length = idxBuffer.getInt();
+    }
+
     public long getOffset()
     {
         return offset;
@@ -44,8 +51,7 @@ public class PixelsCacheIdx
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append(offset).append(", ");
-        sb.append(length).append(", ");
+        sb.append(offset).append(", ").append(length);
         return sb.toString();
     }
 
