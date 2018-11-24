@@ -92,6 +92,7 @@ class PixelsPageSource implements ConnectorPageSource {
         this.option.tolerantSchemaEvolution(true);
         this.option.includeCols(cols);
         this.option.predicate(predicate);
+        this.option.rgRange(split.getStart(), split.getLen());
 
         try {
             if (this.fsFactory.getFileSystem().isPresent())
