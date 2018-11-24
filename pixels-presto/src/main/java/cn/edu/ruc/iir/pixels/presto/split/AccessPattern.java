@@ -51,12 +51,16 @@ public class AccessPattern
     @Override
     public String toString()
     {
+        if (this.columnSet.isEmpty())
+        {
+            return "splitSize: " + splitSize + ", pattern is empty";
+        }
         StringBuilder builder = new StringBuilder();
         for (String column : this.columnSet.getColumns())
         {
             builder.append(",").append(column);
         }
-        return "splitSize: " + splitSize + "\npattern: " + builder.substring(1);
+        return "splitSize: " + splitSize + ", pattern: " + builder.substring(1);
     }
 
     public static List<AccessPattern> buildPatterns(List<String> columns, Splits splitInfo)

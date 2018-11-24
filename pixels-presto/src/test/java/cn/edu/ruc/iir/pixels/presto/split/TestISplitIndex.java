@@ -50,7 +50,7 @@ public class TestISplitIndex
             accessPatterns.add(accessPattern);
         }
         workloadReader.close();
-        Index index = new Inverted(columnOrder, accessPatterns);
+        Index index = new Inverted(columnOrder, accessPatterns, 16);
         IndexFactory.Instance().cacheIndex(entry, index);
         index = IndexFactory.Instance().getIndex(new IndexEntry("test", "t1"));
         ColumnSet columnSet = new ColumnSet();
@@ -124,7 +124,7 @@ public class TestISplitIndex
         List<String> columnOrder = order.getColumnOrder();
         Inverted index;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits));
+            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
             throw new PrestoException(PIXELS_INVERTED_INDEX_ERROR, e);

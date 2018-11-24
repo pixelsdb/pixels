@@ -31,6 +31,11 @@ public class ColumnSet
         return this.columns.size();
     }
 
+    public boolean isEmpty ()
+    {
+        return this.columns.isEmpty();
+    }
+
     public Set<String> getColumns()
     {
         return this.columns;

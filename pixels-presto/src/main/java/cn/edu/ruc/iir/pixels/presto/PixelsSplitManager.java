@@ -175,7 +175,7 @@ public class PixelsSplitManager
         List<String> columnOrder = order.getColumnOrder();
         Inverted index;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits));
+            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
             log.info("getInverted error: " + e.getMessage());

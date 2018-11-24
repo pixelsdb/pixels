@@ -11,14 +11,17 @@ public class Inverted implements Index
      */
     private int version;
 
+    private final int defaultSplitSize;
+
     private Map<String, BitSet> bitMapIndex = null;
 
     private List<AccessPattern> queryAccessPatterns = null;
 
     private List<String> columnOrder = null;
 
-    public Inverted(List<String> columnOrder, List<AccessPattern> patterns)
+    public Inverted(List<String> columnOrder, List<AccessPattern> patterns, int defaultSplitSize)
     {
+        this.defaultSplitSize = defaultSplitSize;
         this.columnOrder = new ArrayList<>(columnOrder);
         this.queryAccessPatterns = new ArrayList<>(patterns);
         this.bitMapIndex = new HashMap<>(this.columnOrder.size());
@@ -40,6 +43,15 @@ public class Inverted implements Index
     @Override
     public AccessPattern search(ColumnSet columnSet)
     {
+        AccessPattern bestPattern = null;
+
+        if (columnSet.isEmpty())
+        {
+            bestPattern = new AccessPattern();
+            bestPattern.setSplitSize(this.defaultSplitSize);
+            return bestPattern;
+        }
+
         List<BitSet> bitMaps = new ArrayList<>();
         BitSet and = new BitSet(this.queryAccessPatterns.size());
         and.set(0, this.queryAccessPatterns.size(), true);
@@ -50,14 +62,17 @@ public class Inverted implements Index
             and.and(bitMap);
         }
 
-        AccessPattern bestPattern = null;
         if (and.nextSetBit(0) < 0)
         {
             // no exact access pattern found.
             // look for the minimum difference in size
+            // TODO: this is not a good strategy.
+            // Instead, the access pattern with minimum difference in actual read size
+            // should be used as the best access pattern. It requires that data size of each column
+            // be maintained in ColumnSet.
             int numColumns = columnSet.size();
             int minPatternSize = Integer.MAX_VALUE;
-            int temp = 0;
+            int temp;
 
             for (int i = 0; i < this.queryAccessPatterns.size(); ++i)
             {
