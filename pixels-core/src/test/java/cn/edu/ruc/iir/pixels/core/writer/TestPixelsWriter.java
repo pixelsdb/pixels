@@ -1,5 +1,11 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheKey;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheWriter;
+import cn.edu.ruc.iir.pixels.cache.PixelsPhysicalReader;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
@@ -15,6 +21,7 @@ import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -23,6 +30,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
+import java.util.Arrays;
 
 /**
  * pixels
@@ -213,5 +221,113 @@ public class TestPixelsWriter {
         catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void prepareCacheData()
+    {
+        try {
+            // get fs
+            Configuration conf = new Configuration();
+            conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+            conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+            PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+            FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
+            PixelsCacheWriter cacheWriter =
+                    PixelsCacheWriter.newBuilder()
+                                     .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+                                     .setCacheSize(1024*1024*128L)
+                                     .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+                                     .setIndexSize(1024*1024*128L)
+                                     .setOverwrite(true)
+                                     .setFS(fs)
+                                     .build();
+            String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_compact";
+            int[] rgs = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+            int[] cols = new int[]{0, 1, 2, 3, 4, 5, 6, 7};
+            long cacheLength = 0L;
+            FileStatus[] fileStatuses = fs.listStatus(new Path(directory));
+            long startNano = System.nanoTime();
+            // write cache
+            for (FileStatus fileStatus : fileStatuses)
+            {
+                Path file = fileStatus.getPath();
+//                PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, file);
+                for (int i = 0; i < 16; i++)
+                {
+                    for (int j = 0; j < 105; j++) {
+//                        PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(i);
+//                        PixelsProto.ColumnChunkIndex chunkIndex =
+//                                rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(j);
+//                        int chunkLen = (int) chunkIndex.getChunkLength();
+//                        long chunkOffset = chunkIndex.getChunkOffset();
+                        cacheLength += 118000;
+//                        byte[] columnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
+                        byte[] columnlet = new byte[0];
+                        PixelsCacheKey cacheKey = new PixelsCacheKey(file.getName(), (short) i, (short) j);
+                        cacheWriter.write(cacheKey, columnlet);
+                    }
+                }
+            }
+            long endNano = System.nanoTime();
+            System.out.println("Time cost: " + (endNano - startNano) + "ns");
+            System.out.println("Total length: " + cacheLength);
+            long flushStartNano = System.nanoTime();
+            // flush index
+            cacheWriter.flush();
+            long flushEndNano = System.nanoTime();
+            System.out.println("Flush time cost: " + (flushEndNano - flushStartNano) + "ns");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void validateCache()
+            throws Exception
+    {
+        // get fs
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
+        int[] rgs = new int[]{0, 1, 2, 3, 4, 5};
+        int[] cols = new int[]{8, 8, 0, 2, 4, 9};
+        // validation
+        PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
+                                                         .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+                                                         .setCacheSize(1024*1024*128L)
+                                                         .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+                                                         .setIndexSize(1024*1024*128L)
+                                                         .build();
+        Path file = new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_compact/62_2018092323481262.compact.pxl");
+//        for (FileStatus fileStatus : fs.listStatus(new Path(directory)))
+//        {
+//            Path file = fileStatus.getPath();
+            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, file);
+            for (short i = 0; i < rgs.length; i++)
+            {
+                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rgs[i]);
+                PixelsProto.ColumnChunkIndex chunkIndex =
+                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(cols[i]);
+                int chunkLen = (int) chunkIndex.getChunkLength();
+                long chunkOffset = chunkIndex.getChunkOffset();
+                byte[] expectedColumnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
+                byte[] actualColumnlet = cacheReader.get(file.getName(), (short) rgs[i], (short) cols[i]);
+                for (int j = 0; j < expectedColumnlet.length; j++)
+                {
+                    byte exp = expectedColumnlet[j];
+                    byte act = actualColumnlet[j];
+                    if (exp != act) {
+                        System.out.println(j + ", expected: " + exp + ", actual: " + act);
+                    }
+                }
+                if (!Arrays.equals(expectedColumnlet, actualColumnlet)) {
+                    System.out.println(file.getName() + "-" + rgs[i] + "-" + cols[i]);
+                }
+            }
+//        }
     }
 }

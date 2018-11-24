@@ -5,6 +5,7 @@ import org.apache.commons.compress.utils.CharsetNames;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -16,13 +17,13 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private static final int SIZE = Integer.BYTES + 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
+    private static final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
     private String blockId;
     private short rowGroupId;
     private short columnId;
 
-    PixelsCacheKey(String blockId, short rowGroupId, short columnId)
+    public PixelsCacheKey(String blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
@@ -47,11 +48,15 @@ public class PixelsCacheKey
     public byte[] getBytes()
     {
         keyBuffer.clear();
-        keyBuffer.putInt(blockId.length());
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return keyBuffer.array();
+        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
+    }
+
+    public int getSize()
+    {
+        return keyBuffer.position();
     }
 
     @Override

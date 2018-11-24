@@ -9,7 +9,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -19,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
+// todo cache writer needs a cache space monitor
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;
@@ -30,6 +30,7 @@ public class PixelsCacheWriter
     private final EtcdUtil etcdUtil;
     private final String host;
     private long currentIndexOffset;
+    private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = 0L;  // this is used in the write() method.
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
@@ -170,6 +171,14 @@ public class PixelsCacheWriter
         radix.put(key, cacheIdx);
     }
 
+    /**
+     * Currently, this is an interface for unit tests.
+     * */
+    public void flush()
+    {
+        flushIndex();
+    }
+
     private void internalUpdate(int version, Layout layout, String[] files)
             throws IOException
     {
@@ -271,38 +280,46 @@ public class PixelsCacheWriter
 
     /**
      * Flush node content to the index file based on {@code currentIndexOffset}.
-     * Header(2 bytes) + [Child(1 byte)]{n} + edge(variable size) + value(optional).
+     * Header(4 bytes) + [Child(8 bytes)]{n} + edge(variable size) + value(optional).
+     * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
+     * Child: leader(1 byte) + child_offset(7 bytes)
      * */
     private void flushNode(RadixNode node)
     {
-        node.offset = currentIndexOffset;
-        currentIndexOffset += node.getLengthInBytes();
-        ByteBuffer nodeBuffer = ByteBuffer.allocate(node.getLengthInBytes());
+        if (node.offset == 0) {
+            node.offset = currentIndexOffset;
+        }
+        else {
+            currentIndexOffset = node.offset;
+        }
+        allocatedIndexOffset += node.getLengthInBytes();
         int header = 0;
-        int isKeyMask = 0x0001 << 15;
+        int edgeSize = node.getEdge().length;
+        header = header | (edgeSize << 9);
+        int isKeyMask = 1 << 31;
         if (node.isKey()) {
             header = header | isKeyMask;
         }
-        int edgeSize = node.getEdge().length;
-        header = header | (edgeSize << 7);
         header = header | node.getChildren().size();
-        nodeBuffer.putShort((short) header);  // header
-        for (RadixNode n : node.getChildren().values()) {   // children
+        indexFile.putInt(currentIndexOffset, header);  // header
+        currentIndexOffset += 4;
+        for (Byte key : node.getChildren().keySet()) {   // children
+            RadixNode n = node.getChild(key);
             int len = n.getLengthInBytes();
-            n.offset = currentIndexOffset;
-            currentIndexOffset += len;
+            n.offset = allocatedIndexOffset;
+            allocatedIndexOffset += len;
             long childId = 0L;
-            long leader = n.getEdge()[0];  // 1 byte
-            childId = childId & (leader << 56);  // leader
+            childId = childId | ((long) key << 56);  // leader
             childId = childId | n.offset;  // offset
-            nodeBuffer.putLong(childId);
+            indexFile.putLong(currentIndexOffset, childId);
+            currentIndexOffset += 8;
         }
-        nodeBuffer.put(node.getEdge()); // edge
+        indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
+        currentIndexOffset += node.getEdge().length;
         if (node.isKey()) {  // value
-            nodeBuffer.put(node.getValue().getBytes());
+            indexFile.putBytes(currentIndexOffset, node.getValue().getBytes());
+            currentIndexOffset += 12;
         }
-        // flush bytes
-        indexFile.putBytes(node.offset, nodeBuffer.array());
     }
 
     /**
@@ -310,7 +327,9 @@ public class PixelsCacheWriter
      * */
     private void flushIndex()
     {
+        // set index content offset, skip the index header.
         currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+        // if root contains nodes, which means the tree is not empty,then write nodes.
         if (radix.getRoot().getSize() != 0) {
             writeRadix(radix.getRoot());
         }

@@ -23,12 +23,10 @@ import org.apache.logging.log4j.Logger;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * pixels cache manager.
@@ -135,10 +133,7 @@ public class CacheManager
     private void update(int version)
             throws MetadataException
     {
-        // todo meta server should provide a interface to get layouts with version filtering
-        List<Layout> layouts = metadataService.getLayouts(cacheConfig.getSchema(), cacheConfig.getTable());
-        Set<Layout> matchedLayouts = layouts.stream().filter(
-                l -> l.getVersion() == version).collect(Collectors.toSet());
+        List<Layout> matchedLayouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (!matchedLayouts.isEmpty()) {
             // update cache status
             cacheStatus.set(2);

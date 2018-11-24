@@ -1,10 +1,12 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.cache.mq.MappedBusMessage;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import org.apache.commons.compress.utils.CharsetNames;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -17,14 +19,12 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class ColumnletId
         implements MappedBusMessage
 {
-    private static final int SIZE = Long.BYTES + 2 * Short.BYTES;
+    private static final int SIZE = Long.BYTES + 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
 
-    String blockId;
-    short rowGroupId;
-    short columnId;
-    int missingCount = 0;
-    boolean cached = false;
+    private String blockId;
+    private short rowGroupId;
+    private short columnId;
     long cacheOffset;
     int cacheLength;
 
@@ -41,11 +41,10 @@ public class ColumnletId
     public byte[] getBytes()
     {
         keyBuffer.clear();
-        keyBuffer.putInt(blockId.length());
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return keyBuffer.array();
+        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
     }
 
     /**

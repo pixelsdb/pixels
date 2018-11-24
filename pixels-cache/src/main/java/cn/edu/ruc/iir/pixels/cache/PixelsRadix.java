@@ -124,7 +124,7 @@ public class PixelsRadix
             case MATCH_END_AT_END_EDGE:
             {
                 byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getBytes().length);
+                        searchResult.bytesMatched, cacheKey.getSize());
                 RadixNode newNode = new RadixNode();
                 newNode.setEdge(keySuffix);
                 newNode.setValue(cacheIdx);
@@ -143,7 +143,7 @@ public class PixelsRadix
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
                         0, searchResult.bytesMatchedInNodeFound);
                 byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getBytes().length);
+                        searchResult.bytesMatched, cacheKey.getSize());
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
                         searchResult.bytesMatchedInNodeFound, nodeFound.getEdge().length);
                 RadixNode parentNode = new RadixNode();
@@ -259,7 +259,12 @@ public class PixelsRadix
                         newNode.setEdge(edge);
                         newNode.setChildren(remainingChild.getChildren(), remainingChild.getSize());
                         newNode.setValue(remainingChild.getValue());
-                        searchResult.grandParentNode.addChild(newNode, true);
+                        if (searchResult.grandParentNode == null) {
+                            nodes.get(0).addChild(newNode, true);
+                        }
+                        else {
+                            searchResult.grandParentNode.addChild(newNode, true);
+                        }
                     }
                     // parent cannot be merged with remaining children
                     // then just delete the node
