@@ -120,15 +120,7 @@ class PixelsPageSource implements ConnectorPageSource {
 
     @Override
     public long getReadTimeNanos() {
-        this.nanoEnd = this.nanoEnd == 0L ? System.nanoTime() : this.nanoEnd;
-        logger.info(((this.nanoEnd - this.nanoStart) > 0) + "");
-        return 1000000000L;
-//        if(this.nanoStart > 0L) {
-//            return this.nanoEnd - this.nanoStart;
-//        }
-//        else{
-//            return 0L;
-//        }
+        return ((this.nanoStart > 0L) ? ((this.nanoEnd == 0L) ? System.nanoTime() : this.nanoEnd) - this.nanoStart : 0L);
     }
 
     @Override
