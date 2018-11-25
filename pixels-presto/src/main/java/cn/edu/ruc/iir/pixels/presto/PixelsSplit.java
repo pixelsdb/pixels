@@ -42,8 +42,8 @@ public class PixelsSplit
     private final String schemaName;
     private final String tableName;
     private final String path;
-    private final long start;
-    private final long len;
+    private final int start;
+    private final int len;
     private final boolean isCached;
     private final List<HostAddress> addresses;
     private final List<String> order;
@@ -55,8 +55,8 @@ public class PixelsSplit
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
             @JsonProperty("path") String path,
-            @JsonProperty("start") long start,
-            @JsonProperty("len") long len,
+            @JsonProperty("start") int start,
+            @JsonProperty("len") int len,
             @JsonProperty("isCached") boolean isCached,
             @JsonProperty("addresses") List<HostAddress> addresses,
             @JsonProperty("order") List<String> order,
@@ -109,12 +109,12 @@ public class PixelsSplit
     }
 
     @JsonProperty
-    public long getStart() {
+    public int getStart() {
         return start;
     }
 
     @JsonProperty
-    public long getLen() {
+    public int getLen() {
         return len;
     }
 
