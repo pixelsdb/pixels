@@ -50,8 +50,8 @@ class PixelsPageSource implements ConnectorPageSource {
     private int numColumnToRead;
     private int batchId;
     private VectorizedRowBatch rowBatch;
-    private long nanoStart;
-    private long nanoEnd;
+    private volatile long nanoStart = 0L;
+    private volatile long nanoEnd;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String connectorId) {
         this.fsFactory = fsFactory;
@@ -78,7 +78,7 @@ class PixelsPageSource implements ConnectorPageSource {
             PixelsColumnHandle column = entry.getKey();
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
-            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
+            logger.info("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,
@@ -113,21 +113,34 @@ class PixelsPageSource implements ConnectorPageSource {
         }
     }
 
+    @Override
     public long getCompletedBytes() {
         return recordReader.getCompletedBytes();
     }
 
+    @Override
     public long getReadTimeNanos() {
-        return ((this.nanoStart > 0L) ? ((this.nanoEnd == 0L) ? System.nanoTime() : this.nanoEnd) - this.nanoStart : 0L);
+        this.nanoEnd = this.nanoEnd == 0L ? System.nanoTime() : this.nanoEnd;
+        logger.info(((this.nanoEnd - this.nanoStart) > 0) + "");
+        return 1000000000L;
+//        if(this.nanoStart > 0L) {
+//            return this.nanoEnd - this.nanoStart;
+//        }
+//        else{
+//            return 0L;
+//        }
     }
 
+    @Override
     public boolean isFinished() {
         return this.closed;
     }
 
+    @Override
     public Page getNextPage() {
-        if (this.nanoStart == 0L)
+        if (this.nanoStart == 0L) {
             this.nanoStart = System.nanoTime();
+        }
         try {
             this.batchId++;
             this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
