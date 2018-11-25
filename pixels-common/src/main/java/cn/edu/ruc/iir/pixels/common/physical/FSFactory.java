@@ -117,26 +117,6 @@ public final class FSFactory
      */
     public List<HostAddress> getBlockLocations(Path file, long start, long len) throws FSException
     {
-//        KeyValue keyValue = EtcdUtil.getEtcdKey(file.toString());
-//        if (keyValue != null)
-//        {
-//            ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//            builder.add(HostAddress.fromString(keyValue.getValue().toStringUtf8()));
-//            return builder.build();
-//        }
-//        if(file != null)
-//        {
-//            ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//            builder.add(HostAddress.fromString("dbiir02"));
-//            builder.add(HostAddress.fromString("dbiir03"));
-//            builder.add(HostAddress.fromString("dbiir04"));
-//            builder.add(HostAddress.fromString("dbiir05"));
-//            builder.add(HostAddress.fromString("dbiir06"));
-//            builder.add(HostAddress.fromString("dbiir07"));
-//            builder.add(HostAddress.fromString("dbiir08"));
-//            builder.add(HostAddress.fromString("dbiir09"));
-//            return builder.build();
-//        }
         Set<HostAddress> addresses = new HashSet<>();
         BlockLocation[] locations = new BlockLocation[0];
         try
@@ -157,6 +137,17 @@ public final class FSFactory
             }
         }
         return new ArrayList<>(addresses);
+    }
+
+    public List<HostAddress> getBlockLocations(Path file, long start, long len, String node) throws FSException {
+        if(node == null)
+            return getBlockLocations(file, start, len);
+        else
+        {
+            ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+            builder.add(HostAddress.fromString(node));
+            return builder.build();
+        }
     }
 
     private List<HostAddress> toHostAddress(String[] hosts)
