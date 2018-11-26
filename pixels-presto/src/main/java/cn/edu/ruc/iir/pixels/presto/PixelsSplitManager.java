@@ -19,8 +19,8 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import cn.edu.ruc.iir.pixels.presto.split.*;
@@ -56,12 +56,15 @@ public class PixelsSplitManager
     private final String connectorId;
     private final FSFactory fsFactory;
     private final PixelsMetadataProxy metadataProxy;
+    private final boolean cacheEnabled;
 
     @Inject
     public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
+        String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        this.cacheEnabled = enabled != null ? Boolean.parseBoolean(enabled) : false;
     }
 
     @Override
@@ -123,10 +126,7 @@ public class PixelsSplitManager
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
-            ConfigFactory configFactory = ConfigFactory.Instance();
-            String cache = configFactory.getProperty("cache.enabled");
-            boolean cacheEnabled = cache != null ? Boolean.parseBoolean(cache) : false;
-            if(cacheEnabled)
+            if(this.cacheEnabled)
             {
                 String cacheVersion;
                 EtcdUtil etcdUtil = EtcdUtil.Instance();
@@ -151,14 +151,14 @@ public class PixelsSplitManager
                                 log.info("cache location: {file='" + file + "', node='" + node + "'");
                             }
                         }
-                        // 3. add splits in orderPath
+                        // 3. add splits in orderedPath
                         try
                         {
-                            for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
                             {
-                                String hdfsFile = file.toString();
+                                String hdfsFile = path.toString();
                                 String node = fileToNodeMap.get(hdfsFile);
-                                List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE, node);
+                                List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         hdfsFile, 0, 1,
@@ -169,18 +169,18 @@ public class PixelsSplitManager
                         {
                             throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
                         }
-                        // 4. add splits in compactionPath
+                        // 4. add splits in compactPath
                         int curFileRGIdx;
                         try
                         {
-                            for (Path file : fsFactory.listFiles(layout.getCompactPath()))
+                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
                             {
                                 curFileRGIdx = 0;
                                 while (curFileRGIdx < rowGroupNum)
                                 {
-                                    String hdfsFile = file.toString();
+                                    String hdfsFile = path.toString();
                                     String node = fileToNodeMap.get(hdfsFile);
-                                    List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE, node);
+                                    List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                                             hdfsFile, curFileRGIdx, splitSize,
@@ -196,64 +196,72 @@ public class PixelsSplitManager
                     }
                     else
                     {
-                        log.info("Get caching files error when version is " + cacheVersion);
-                        System.exit(-1);
+                        log.error("Get caching files error when version is " + cacheVersion);
+                        throw new PrestoException(PIXELS_CACHE_NODE_FILE_ERROR, new CacheException());
                     }
                 }
                 else
                 {
-                    log.info("Get caching version error. ");
-                    System.exit(-1);
+                    throw new PrestoException(PIXELS_CACHE_VERSION_ERROR, new CacheException());
                 }
             }
             else
             {
-                // add splits in orderPath
+                List<Path> orderedPaths;
+                Balancer orderedBalancer = new Balancer();
+                List<Path> compactPaths;
+                Balancer compactBalancer = new Balancer();
                 try
                 {
-                    for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+                    orderedPaths = fsFactory.listFiles(layout.getOrderPath());
+                    for (Path path : orderedPaths)
                     {
-                        PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                                tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                file.toString(), 0, 1,
-                                cacheEnabled, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
-                        pixelsSplits.add(pixelsSplit);
+                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                        orderedBalancer.put(addresses.get(0), path);
                     }
+                    orderedBalancer.balance();
+                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
+
+                    compactPaths = fsFactory.listFiles(layout.getCompactPath());
+                    for (Path path : compactPaths)
+                    {
+                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                        compactBalancer.put(addresses.get(0), path);
+                    }
+                    compactBalancer.balance();
+                    log.info("compact files balanced=" + compactBalancer.isBalanced());
                 } catch (FSException e)
                 {
                     throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
                 }
-                // add splits in compactionPath
-                int curFileRGIdx;
-                try
-                {
-                    List<Path> filePaths = fsFactory.listFiles(layout.getCompactPath());
-                    Balancer balancer = new Balancer();
 
-                    for (Path path : filePaths)
-                    {
-                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-                        balancer.put(addresses.get(0), path);
-                    }
-                    balancer.balance();
-                    for (Path path : fsFactory.listFiles(layout.getCompactPath()))
-                    {
-                        ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-                        builder.add(balancer.get(path));
-                        curFileRGIdx = 0;
-                        while (curFileRGIdx < rowGroupNum)
-                        {
-                            PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                                    tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                    path.toString(), curFileRGIdx, splitSize,
-                                    cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
-                            pixelsSplits.add(pixelsSplit);
-                            curFileRGIdx += splitSize;
-                        }
-                    }
-                } catch (FSException e)
+                // add splits in orderedPath
+                for (Path path : orderedPaths)
                 {
-                    throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                    builder.add(orderedBalancer.get(path));
+                    PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                            tableHandle.getSchemaName(), tableHandle.getTableName(),
+                            path.toString(), 0, 1,
+                            cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
+                    pixelsSplits.add(pixelsSplit);
+                }
+                // add splits in compactPath
+                int curFileRGIdx;
+                for (Path path : compactPaths)
+                {
+                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                    builder.add(compactBalancer.get(path));
+                    curFileRGIdx = 0;
+                    while (curFileRGIdx < rowGroupNum)
+                    {
+                        PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                path.toString(), curFileRGIdx, splitSize,
+                                cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
+                        pixelsSplits.add(pixelsSplit);
+                        curFileRGIdx += splitSize;
+                    }
                 }
             }
         }
