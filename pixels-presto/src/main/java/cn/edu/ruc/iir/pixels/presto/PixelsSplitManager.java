@@ -252,13 +252,15 @@ public class PixelsSplitManager
                 {
                     ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
                     builder.add(compactBalancer.get(path));
+                    log.info("balanced path:" + compactBalancer.get(path).toString());
+                    List<HostAddress> hostAddresses = builder.build();
                     curFileRGIdx = 0;
                     while (curFileRGIdx < rowGroupNum)
                     {
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                 path.toString(), curFileRGIdx, splitSize,
-                                cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
+                                cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }
