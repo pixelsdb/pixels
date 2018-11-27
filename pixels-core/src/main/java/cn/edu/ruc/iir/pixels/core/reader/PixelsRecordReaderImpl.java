@@ -133,6 +133,7 @@ public class PixelsRecordReaderImpl
             resultRowBatch.selectedInUse = false;
             resultRowBatch.selected = null;
             resultRowBatch.projectionSize = 0;
+            checkValid = true;
             return;
         }
         List<Integer> userColsList = new ArrayList<>();
@@ -415,6 +416,17 @@ public class PixelsRecordReaderImpl
     @Override
     public VectorizedRowBatch readBatch(int batchSize) throws IOException
     {
+        if (!checkValid)
+        {
+            TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
+            this.resultRowBatch = resultSchema.createRowBatch(0);
+            resultRowBatch.selectedInUse = false;
+            resultRowBatch.selected = null;
+            resultRowBatch.projectionSize = 0;
+            resultRowBatch.endOfFile = true;
+            return resultRowBatch;
+        }
+
         // project nothing, must be count(*)
         if (resultRowBatch.projectionSize == 0)
         {
@@ -424,12 +436,6 @@ public class PixelsRecordReaderImpl
         }
 
         resultRowBatch.reset();
-
-        if (!checkValid)
-        {
-            resultRowBatch.endOfFile = true;
-            return resultRowBatch;
-        }
 
         if (!everRead)
         {

@@ -64,7 +64,7 @@ public class PixelsSplitManager
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
         String enabled = config.getConfigFactory().getProperty("cache.enabled");
-        this.cacheEnabled = enabled != null ? Boolean.parseBoolean(enabled) : false;
+        this.cacheEnabled = Boolean.parseBoolean(enabled);
     }
 
     @Override
