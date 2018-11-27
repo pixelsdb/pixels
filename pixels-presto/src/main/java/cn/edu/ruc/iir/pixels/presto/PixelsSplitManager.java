@@ -19,31 +19,26 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
-import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
-import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
-import cn.edu.ruc.iir.pixels.presto.split.Inverted;
-import cn.edu.ruc.iir.pixels.presto.split.AccessPattern;
-import cn.edu.ruc.iir.pixels.presto.split.ColumnSet;
+import cn.edu.ruc.iir.pixels.presto.split.*;
 import com.alibaba.fastjson.JSON;
+import com.coreos.jetcd.data.KeyValue;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_HDFS_FILE_ERROR;
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR;
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
@@ -61,12 +56,15 @@ public class PixelsSplitManager
     private final String connectorId;
     private final FSFactory fsFactory;
     private final PixelsMetadataProxy metadataProxy;
+    private final boolean cacheEnabled;
 
     @Inject
     public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
+        String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        this.cacheEnabled = Boolean.parseBoolean(enabled);
     }
 
     @Override
@@ -127,44 +125,148 @@ public class PixelsSplitManager
             log.info("bestPattern: " + bestPattern.toString());
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
-            // add splits in orderPath
-            boolean isCached = false;
-            try
+
+            if(this.cacheEnabled)
             {
-                for (Path file : fsFactory.listFiles(layout.getOrderPath()))
+                String cacheVersion;
+                EtcdUtil etcdUtil = EtcdUtil.Instance();
+                KeyValue keyValue = etcdUtil.getKeyValue("cache_version");
+                if(keyValue != null)
                 {
+                    // 1. get version
+                    cacheVersion = keyValue.getValue().toStringUtf8();
+                    log.info("cache version: " + cacheVersion);
+                    // 2. get files of each node
+                    List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix("location_" + cacheVersion);
+                    if(nodeFiles.size() > 0)
+                    {
+                        Map<String, String> fileToNodeMap = new HashMap<>();
+                        for (KeyValue kv : nodeFiles)
+                        {
+                            String node = kv.getKey().toStringUtf8().split("_")[2];
+                            String[] files = kv.getValue().toStringUtf8().split(";");
+                            for(String file : files)
+                            {
+                                fileToNodeMap.put(file, node);
+                                log.info("cache location: {file='" + file + "', node='" + node + "'");
+                            }
+                        }
+                        // 3. add splits in orderedPath
+                        try
+                        {
+                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
+                            {
+                                String hdfsFile = path.toString();
+                                String node = fileToNodeMap.get(hdfsFile);
+                                List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
+                                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                        tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                        hdfsFile, 0, 1,
+                                        cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
+                                pixelsSplits.add(pixelsSplit);
+                            }
+                        } catch (FSException e)
+                        {
+                            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+                        }
+                        // 4. add splits in compactPath
+                        int curFileRGIdx;
+                        try
+                        {
+                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
+                            {
+                                curFileRGIdx = 0;
+                                while (curFileRGIdx < rowGroupNum)
+                                {
+                                    String hdfsFile = path.toString();
+                                    String node = fileToNodeMap.get(hdfsFile);
+                                    List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
+                                    PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                            tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                            hdfsFile, curFileRGIdx, splitSize,
+                                            cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
+                                    pixelsSplits.add(pixelsSplit);
+                                    curFileRGIdx += splitSize;
+                                }
+                            }
+                        } catch (FSException e)
+                        {
+                            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+                        }
+                    }
+                    else
+                    {
+                        log.error("Get caching files error when version is " + cacheVersion);
+                        throw new PrestoException(PIXELS_CACHE_NODE_FILE_ERROR, new CacheException());
+                    }
+                }
+                else
+                {
+                    throw new PrestoException(PIXELS_CACHE_VERSION_ERROR, new CacheException());
+                }
+            }
+            else
+            {
+                List<Path> orderedPaths;
+                Balancer orderedBalancer = new Balancer();
+                List<Path> compactPaths;
+                Balancer compactBalancer = new Balancer();
+                try
+                {
+                    orderedPaths = fsFactory.listFiles(layout.getOrderPath());
+                    for (Path path : orderedPaths)
+                    {
+                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                        orderedBalancer.put(addresses.get(0), path);
+                    }
+                    orderedBalancer.balance();
+                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
+
+                    compactPaths = fsFactory.listFiles(layout.getCompactPath());
+                    for (Path path : compactPaths)
+                    {
+                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                        compactBalancer.put(addresses.get(0), path);
+                    }
+                    compactBalancer.balance();
+                    log.info("compact files balanced=" + compactBalancer.isBalanced());
+                } catch (FSException e)
+                {
+                    throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
+                }
+
+                // add splits in orderedPath
+                for (Path path : orderedPaths)
+                {
+                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                    builder.add(orderedBalancer.get(path));
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
-                            file.toString(), 0, 1,
-                            isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                            path.toString(), 0, 1,
+                            cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
-            } catch (FSException e)
-            {
-                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
-            }
-            // add splits in compactionPath
-            int curFileRGIdx;
-            try
-            {
-                for (Path file : fsFactory.listFiles(layout.getCompactPath()))
+                // add splits in compactPath
+                int curFileRGIdx;
+                for (Path path : compactPaths)
                 {
+                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                    builder.add(compactBalancer.get(path));
                     curFileRGIdx = 0;
                     while (curFileRGIdx < rowGroupNum)
                     {
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                file.toString(), curFileRGIdx, splitSize,
-                                isCached, fsFactory.getBlockLocations(file, 0, Long.MAX_VALUE), order.getColumnOrder(), constraint);
+                                path.toString(), curFileRGIdx, splitSize,
+                                cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }
                 }
-            } catch (FSException e)
-            {
-                throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
             }
         }
+
+        log.info("pixelsSplits: " + pixelsSplits.size());
         log.info("=====begin to shuffle====");
         Collections.shuffle(pixelsSplits);
 
@@ -175,12 +277,110 @@ public class PixelsSplitManager
         List<String> columnOrder = order.getColumnOrder();
         Inverted index;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits));
+            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
             log.info("getInverted error: " + e.getMessage());
             throw new PrestoException(PIXELS_INVERTED_INDEX_ERROR, e);
         }
         return index;
+    }
+
+    public static class Balancer
+    {
+        private int totalCount = 0;
+        private Map<HostAddress, Integer> nodeCounters = new HashMap<>();
+        private Map<Path, HostAddress> pathToAddress = new HashMap<>();
+
+        public void put (HostAddress address, Path path)
+        {
+            if (this.nodeCounters.containsKey(address))
+            {
+                this.nodeCounters.put(address, this.nodeCounters.get(address)+1);
+            }
+            else
+            {
+                this.nodeCounters.put(address, 1);
+            }
+            this.pathToAddress.put(path, address);
+            this.totalCount++;
+        }
+
+        public HostAddress get (Path path)
+        {
+            return this.pathToAddress.get(path);
+        }
+
+        public void balance ()
+        {
+            int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
+            int floor = (int) Math.floor((double)this.totalCount / (double)this.nodeCounters.size());
+
+            List<HostAddress> peak = new ArrayList<>();
+            List<HostAddress> valley = new ArrayList<>();
+
+            for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
+            {
+                if (entry.getValue() > ceil)
+                {
+                    peak.add(entry.getKey());
+                }
+
+                if (entry.getValue() < floor)
+                {
+                    valley.add(entry.getKey());
+                }
+            }
+
+            boolean balanced = false;
+
+            while (balanced == false)
+            {
+                if (peak.isEmpty() || valley.isEmpty())
+                {
+                    break;
+                }
+                HostAddress peakAddress = peak.get(0);
+                HostAddress valleyAddress = valley.get(0);
+                if (this.nodeCounters.get(peakAddress) <= ceil)
+                {
+                    peak.remove(peakAddress);
+                }
+                if (this.nodeCounters.get(valleyAddress) >= floor)
+                {
+                    valley.remove(valleyAddress);
+                }
+                this.nodeCounters.put(peakAddress, this.nodeCounters.get(peakAddress)-1);
+                this.nodeCounters.put(valleyAddress, this.nodeCounters.get(valleyAddress)+1);
+
+                for (Map.Entry<Path, HostAddress> entry : this.pathToAddress.entrySet())
+                {
+                    if (entry.getValue().equals(peakAddress))
+                    {
+                        this.pathToAddress.put(entry.getKey(), valleyAddress);
+                        break;
+                    }
+                }
+
+                balanced = this.isBalanced();
+            }
+        }
+
+        public boolean isBalanced ()
+        {
+            int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
+            int floor = (int) Math.floor((double)this.totalCount / (double)this.nodeCounters.size());
+
+            boolean balanced = true;
+            for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
+            {
+                if (entry.getValue() > ceil || entry.getValue() < floor)
+                {
+                    balanced = false;
+                }
+            }
+
+            return balanced;
+        }
     }
 }
