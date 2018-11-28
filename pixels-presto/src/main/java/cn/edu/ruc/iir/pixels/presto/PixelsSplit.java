@@ -47,6 +47,7 @@ public class PixelsSplit
     private final boolean isCached;
     private final List<HostAddress> addresses;
     private final List<String> order;
+    private final List<String> cacheOrder;
     private final TupleDomain<PixelsColumnHandle> constraint;
 
     @JsonCreator
@@ -60,6 +61,7 @@ public class PixelsSplit
             @JsonProperty("isCached") boolean isCached,
             @JsonProperty("addresses") List<HostAddress> addresses,
             @JsonProperty("order") List<String> order,
+            @JsonProperty("cacheOrder") List<String> cacheOrder,
             @JsonProperty("constraint") TupleDomain<PixelsColumnHandle> constraint) {
         this.schemaName = requireNonNull(schemaName, "schema name is null");
         this.connectorId = requireNonNull(connectorId, "connector id is null");
@@ -70,6 +72,7 @@ public class PixelsSplit
         this.isCached = isCached;
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.order = requireNonNull(order, "order is null");
+        this.cacheOrder = requireNonNull(cacheOrder, "cache order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
     }
@@ -133,6 +136,12 @@ public class PixelsSplit
     public List<String> getOrder()
     {
         return order;
+    }
+
+    @JsonProperty
+    public List<String> getCacheOrder()
+    {
+        return cacheOrder;
     }
 
     @Override

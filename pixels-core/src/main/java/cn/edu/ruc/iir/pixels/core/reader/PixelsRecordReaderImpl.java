@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.metrics.BytesMsCost;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
@@ -33,8 +34,6 @@ import java.util.Map;
 public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
-//    private static final Logger logger = Logger.get(PixelsRecordReaderImpl.class.getName());
-
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
@@ -42,17 +41,19 @@ public class PixelsRecordReaderImpl
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
-    private final boolean enableCache;
     private final String metricsDir;
     private final ReadPerfMetrics readPerfMetrics;
+    private final boolean enableCache;
+    private final List<String> cacheOrder;
+    private final PixelsCacheReader cacheReader;
 
     private TypeDescription fileSchema;
     private boolean checkValid = false;
     private boolean everRead = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
-    private int[] targetRGs;             // target row groups to read after matching reader option, each element represents row group id
-    private int[] targetColumns;         // target columns to read after matching reader option, each element represents column id
+    private int[] targetRGs;             // target row groups to read after matching reader option, each element represents a row group id
+    private int[] targetColumns;         // target columns to read after matching reader option, each element represents a column id
     private int[] resultColumns;         // columns specified in option by user to read
     private VectorizedRowBatch resultRowBatch;
 
@@ -72,8 +73,10 @@ public class PixelsRecordReaderImpl
                                   PixelsProto.Footer footer,
                                   PixelsReaderOption option,
                                   boolean enableMetrics,
+                                  String metricsDir,
                                   boolean enableCache,
-                                  String metricsDir)
+                                  List<String> cacheOrder,
+                                  PixelsCacheReader cacheReader)
     {
         this.physicalFSReader = physicalFSReader;
         this.postScript = postScript;
@@ -82,9 +85,11 @@ public class PixelsRecordReaderImpl
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;
-        this.enableCache = enableCache;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
+        this.enableCache = enableCache;
+        this.cacheOrder = cacheOrder;
+        this.cacheReader = cacheReader;
         checkBeforeRead();
     }
 
@@ -306,22 +311,45 @@ public class PixelsRecordReaderImpl
         }
 
         // read chunk offset and length of each target column chunks
-        // cache
-        if (enableCache) {
+        this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
+        boolean[][] isCached = new boolean[targetRGNum][includedColumns.length];
+        for (int i = 0; i < targetRGNum; i++) {
+            if (isCached[i] == null) {
+                isCached[i] = new boolean[includedColumns.length];
+            }
+            for (int j = 0; j < includedColumns.length; j++) {
+                isCached[i][j] = false;
+            }
         }
+        // read data from local caching
         List<ChunkId> chunks = new ArrayList<>();
-        for (int rgIdx = 0; rgIdx < rowGroupFooters.length; rgIdx++)
+        if (enableCache) {
+            for (String cacheId : cacheOrder) {
+                String[] cacheIdParts = cacheId.split(":");
+                short cacheRGId = Short.parseShort(cacheIdParts[0]);
+                short cacheColId = Short.parseShort(cacheIdParts[1]);
+                int cacheRGIdx = cacheRGId - RGStart;
+                byte[] columnlet = cacheReader.get(physicalFSReader.getPath().toString(), cacheRGId, cacheColId);
+                if (columnlet != null) {
+                    chunkBuffers[cacheRGIdx * includedColumns.length + cacheColId] = columnlet;
+                    isCached[cacheRGIdx][cacheColId] = true;
+                }
+            }
+        }
+        for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
         {
             PixelsProto.RowGroupIndex rowGroupIndex =
                     rowGroupFooters[rgIdx].getRowGroupIndexEntry();
             for (int colIdx : targetColumns)
             {
-                PixelsProto.ColumnChunkIndex chunkIndex =
-                        rowGroupIndex.getColumnChunkIndexEntries(colIdx);
-                ChunkId chunk = new ChunkId(rgIdx, colIdx,
-                        chunkIndex.getChunkOffset(),
-                        chunkIndex.getChunkLength());
-                chunks.add(chunk);
+                if (false == isCached[rgIdx][colIdx]) {
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupIndex.getColumnChunkIndexEntries(colIdx);
+                    ChunkId chunk = new ChunkId(rgIdx, colIdx,
+                                                chunkIndex.getChunkOffset(),
+                                                chunkIndex.getChunkLength());
+                    chunks.add(chunk);
+                }
             }
         }
 
@@ -343,7 +371,6 @@ public class PixelsRecordReaderImpl
         chunkSeqs.add(chunkSeq);
 
         // read chunk blocks into buffers
-        this.chunkBuffers = new byte[includedRGs.length * includedColumns.length][];
         try
         {
             long offsetBeforeSeek = 0;
@@ -387,11 +414,11 @@ public class PixelsRecordReaderImpl
                 for (ChunkId chunkId : chunkIds)
                 {
                     int chunkLength = (int) chunkId.getLength();
-                    int rgId = chunkId.getRowGroupId();
+                    int rgIdx = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-                    chunkBuffers[rgId * includedColumns.length + colId] = chunkBytes;
+                    chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
             }

@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ColumnHandle;
@@ -24,11 +25,21 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
     private static Logger logger = Logger.get(PixelsPageSourceProvider.class);
     private final String connectorId;
     private final FSFactory fsFactory;
+    private final PixelsCacheReader pixelsCacheReader;
 
     @Inject
-    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config) {
+    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
+            throws Exception
+    {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
+        this.pixelsCacheReader = PixelsCacheReader
+                .newBuilder()
+                .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
+                .setCacheSize(Integer.parseInt(config.getConfigFactory().getProperty("cache.size")))
+                .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
+                .setIndexSize(Integer.parseInt(config.getConfigFactory().getProperty("index.size")))
+                .build();
     }
 
     @Override
@@ -40,6 +51,6 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
-        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, pixelsCacheReader, connectorId);
     }
 }

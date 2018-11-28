@@ -26,6 +26,12 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-cache</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- hdfs -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>

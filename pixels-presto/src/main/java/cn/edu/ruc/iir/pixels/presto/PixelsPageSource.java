@@ -1,13 +1,19 @@
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import cn.edu.ruc.iir.pixels.core.TupleDomainPixelsPredicate;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
-import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
@@ -53,17 +59,19 @@ class PixelsPageSource implements ConnectorPageSource {
     private volatile long nanoStart = 0L;
     private volatile long nanoEnd;
 
-    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory, String connectorId) {
+    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory,
+                            PixelsCacheReader pixelsCacheReader, String connectorId)
+    {
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
 
-        getPixelsReaderBySchema(split);
+        getPixelsReaderBySchema(split, pixelsCacheReader);
 
         this.recordReader = this.pixelsReader.read(this.option);
     }
 
-    private void getPixelsReaderBySchema(PixelsSplit split) {
+    private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader) {
         String[] cols = new String[columns.size()];
         for (int i = 0; i < columns.size(); i++) {
             cols[i] = columns.get(i).getColumnName();
@@ -97,10 +105,13 @@ class PixelsPageSource implements ConnectorPageSource {
         try {
             if (this.fsFactory.getFileSystem().isPresent())
             {
-                this.pixelsReader = PixelsReaderImpl.newBuilder()
-                        .setFS(this.fsFactory
-                                .getFileSystem().get())
+                this.pixelsReader = PixelsReaderImpl
+                        .newBuilder()
+                        .setFS(this.fsFactory.getFileSystem().get())
                         .setPath(new Path(split.getPath()))
+                        .setEnableCache(split.isCached())
+                        .setCacheOrder(split.getCacheOrder())
+                        .setPixelsCacheReader(pixelsCacheReader)
                         .build();
             }
             else {
