@@ -106,7 +106,9 @@ public class PixelsRecordReaderImpl
 
         // check RGStart and RGLen are within the range of actual number of row groups
         int rgNum = footer.getRowGroupInfosCount();
-        if (RGStart >= rgNum || RGLen > rgNum)
+        //if (RGStart >= rgNum || RGLen > rgNum)
+        // it seems that we do not need to check RGLen > rgNum
+        if (RGStart >= rgNum)
         {
             checkValid = false;
             return;
