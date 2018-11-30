@@ -3,6 +3,9 @@ package cn.edu.ruc.iir.pixels.daemon.cache;
 import cn.edu.ruc.iir.pixels.cache.CacheLocationDistribution;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
@@ -27,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * CacheCoordinator is responsible for the following tasks:
@@ -40,6 +44,7 @@ public class CacheCoordinator
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
     private final ScheduledExecutorService scheduledExecutor;
+    private final MetadataService metadataService;
     private FSFactory fsFactory = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
@@ -50,6 +55,7 @@ public class CacheCoordinator
         this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
         initialize();
     }
 
@@ -94,7 +100,7 @@ public class CacheCoordinator
                     }
                 }
             }
-            catch (InterruptedException | FSException e) {
+            catch (InterruptedException | FSException | MetadataException e) {
                 logger.error(e.getMessage());
                 e.printStackTrace();
                 break;
@@ -123,13 +129,14 @@ public class CacheCoordinator
      * 2. for each file, decide which node to cache it
      * */
     private void update(int layoutVersion)
-            throws FSException
+            throws FSException, MetadataException
     {
         if (fsFactory == null) {
             fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
         }
+        List<Layout> layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
-        String[] paths = select();
+        String[] paths = select(layout);
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
         if (nodes.isEmpty()) {
@@ -146,9 +153,20 @@ public class CacheCoordinator
         allocate(paths, hosts, hostIndex, layoutVersion);
     }
 
-    private String[] select()
+    private String[] select(List<Layout> layout)
+            throws FSException
     {
-        return new String[]{"hdfs://dbiir01:9000//pixels/pixels/test_105/v_2_compact/0_201809232311590.compact.pxl"};
+        if (layout.isEmpty()) {
+            return new String[0];
+        }
+        else {
+            String compactPath = layout.get(0).getCompactPath();
+            List<Path> files = fsFactory.listFiles(compactPath);
+            String[] result = new String[files.size()];
+            List<String> paths = files.stream().map(Path::toString).collect(Collectors.toList());
+            paths.toArray(result);
+            return result;
+        }
     }
 
     private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
