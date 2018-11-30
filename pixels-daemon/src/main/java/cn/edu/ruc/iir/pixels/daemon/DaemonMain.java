@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.cache.CacheCoordinator;
 import cn.edu.ruc.iir.pixels.daemon.cache.CacheManager;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
@@ -51,6 +52,7 @@ public class DaemonMain
                 MetadataServer metadataServer = new MetadataServer(port);
 
                 CacheManager cacheServer = new CacheManager();
+                CacheCoordinator cacheCoordinator = new CacheCoordinator();
 
                 MetricsServer metricsServer = new MetricsServer();
 
@@ -59,11 +61,16 @@ public class DaemonMain
                     // start metadata
                     container.addServer("metadata", metadataServer);
                 }
-                else
+                else if (args[0].equalsIgnoreCase("datanode"))
                 {
                     // start data node
-                    container.addServer("cache", cacheServer);
+                    container.addServer("cache_manager", cacheServer);
                     container.addServer("metrics", metricsServer);
+                }
+                else
+                {
+                    // start coordinator node
+                    container.addServer("cache_coordinator", cacheCoordinator);
                 }
 
                 // continue the main thread

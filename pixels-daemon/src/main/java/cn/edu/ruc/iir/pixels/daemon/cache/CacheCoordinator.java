@@ -15,10 +15,10 @@ import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
+import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +126,7 @@ public class CacheCoordinator
             throws FSException
     {
         if (fsFactory == null) {
-//            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
+            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
         }
         // select: decide which files to cache
         String[] paths = select();
@@ -177,8 +177,8 @@ public class CacheCoordinator
         for (String path : paths)
         {
             // get a set of nodes where the file is located (location_set)
-//            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
-            List<HostAddress> locations = Arrays.asList(nodes);
+            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
+//            List<HostAddress> locations = Arrays.asList(nodes);
             if (locations.size() == 0) {
                 continue;
             }

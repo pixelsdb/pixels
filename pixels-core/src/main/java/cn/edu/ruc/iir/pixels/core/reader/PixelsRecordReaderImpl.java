@@ -330,7 +330,7 @@ public class PixelsRecordReaderImpl
                 short cacheColId = Short.parseShort(cacheIdParts[1]);
                 int cacheRGIdx = cacheRGId - RGStart;
                 byte[] columnlet = cacheReader.get(physicalFSReader.getPath().toString(), cacheRGId, cacheColId);
-                if (columnlet != null) {
+                if (columnlet != null && columnlet.length > 0) {
                     chunkBuffers[cacheRGIdx * includedColumns.length + cacheColId] = columnlet;
                     isCached[cacheRGIdx][cacheColId] = true;
                 }
