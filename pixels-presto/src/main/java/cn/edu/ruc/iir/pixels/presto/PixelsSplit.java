@@ -71,7 +71,7 @@ public class PixelsSplit
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.order = requireNonNull(order, "order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
-        log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
+        // log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
     }
 
     @JsonProperty
