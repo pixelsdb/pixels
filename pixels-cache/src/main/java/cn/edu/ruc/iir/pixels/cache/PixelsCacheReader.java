@@ -1,5 +1,8 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -10,6 +13,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PixelsCacheReader
         implements AutoCloseable
 {
+    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
@@ -86,6 +91,7 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
+        logger.info("Cache read: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
         short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);

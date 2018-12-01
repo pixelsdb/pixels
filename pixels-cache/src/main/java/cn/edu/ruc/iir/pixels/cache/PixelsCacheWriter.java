@@ -18,7 +18,6 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
-// todo cache writer needs a cache space monitor
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;
@@ -199,12 +198,12 @@ public class PixelsCacheWriter
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
-        for (String file : files)
+        outer_loop: for (String file : files)
         {
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
             int[] physicalLens = new int[cacheColumnletOrders.size()];
             long[] physicalOffsets = new long[cacheColumnletOrders.size()];
-            // update radix
+            // update radix and cache content
             for (int i = 0; i < cacheColumnletOrders.size(); i++)
             {
                 String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
@@ -215,17 +214,16 @@ public class PixelsCacheWriter
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
                 physicalLens[i] = (int) chunkIndex.getChunkLength();
                 physicalOffsets[i] = chunkIndex.getChunkOffset();
-                radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
-                          new PixelsCacheIdx(cacheOffset, physicalLens[i]));
-                cacheOffset += physicalLens[i];
-            }
-            // update cache content
-            cacheOffset = 0L;
-            for (int i = 0; i < cacheColumnletOrders.size(); i++)
-            {
-                byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
-                cacheFile.putBytes(cacheOffset, columnlet);
-                cacheOffset += physicalLens[i];
+                if (cacheOffset + physicalLens[i] >= cacheFile.getSize()) {
+                    break outer_loop;
+                }
+                else {
+                    radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
+                              new PixelsCacheIdx(cacheOffset, physicalLens[i]));
+                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
+                    cacheFile.putBytes(cacheOffset, columnlet);
+                    cacheOffset += physicalLens[i];
+                }
             }
         }
         // update cache version

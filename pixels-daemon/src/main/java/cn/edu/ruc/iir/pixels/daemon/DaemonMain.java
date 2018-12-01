@@ -33,7 +33,8 @@ public class DaemonMain
             String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") + jarName;
 
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
+                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")
+                     || args[0].equalsIgnoreCase("coordinator")))
             {
                 // this is the main daemon
                 System.out.println("starting main daemon...");
@@ -51,9 +52,6 @@ public class DaemonMain
                 int port = Integer.valueOf(config.getProperty("metadata.server.port"));
                 MetadataServer metadataServer = new MetadataServer(port);
 
-                CacheManager cacheServer = new CacheManager();
-                CacheCoordinator cacheCoordinator = new CacheCoordinator();
-
                 MetricsServer metricsServer = new MetricsServer();
 
                 if (args[0].equalsIgnoreCase("metadata"))
@@ -64,12 +62,14 @@ public class DaemonMain
                 else if (args[0].equalsIgnoreCase("datanode"))
                 {
                     // start data node
+                    CacheManager cacheServer = new CacheManager();
                     container.addServer("cache_manager", cacheServer);
                     container.addServer("metrics", metricsServer);
                 }
                 else
                 {
                     // start coordinator node
+                    CacheCoordinator cacheCoordinator = new CacheCoordinator();
                     container.addServer("cache_coordinator", cacheCoordinator);
                 }
 
