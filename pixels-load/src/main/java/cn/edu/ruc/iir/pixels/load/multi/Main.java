@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.load.multi;
 
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import cn.edu.ruc.iir.pixels.presto.evaluator.PrestoEvaluator;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -38,7 +37,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_105_order.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
@@ -88,7 +87,6 @@ public class Main
 
             if (command.equals("LOAD"))
             {
-
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL LOAD")
                         .defaultHelp(true);
 
@@ -177,7 +175,6 @@ public class Main
 
             if (command.equals("QUERY"))
             {
-
                 ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels QUERY")
                         .defaultHelp(true);
 
@@ -212,7 +209,7 @@ public class Main
                     {
                         ConfigFactory instance = ConfigFactory.Instance();
                         Properties properties = new Properties();
-//        String user = instance.getProperty("presto.user");
+                        // String user = instance.getProperty("presto.user");
                         String password = instance.getProperty("presto.password");
                         String ssl = instance.getProperty("presto.ssl");
                         String jdbc = instance.getProperty("presto.pixels.jdbc.url");
