@@ -25,10 +25,10 @@ public class Main
     {
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir10", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105_perf");
+        List<Layout> layouts = metadataService.getLayouts("pixels", args[0]);
         System.out.println("existing number of layouts: " + layouts.size());
         Layout layout = null;
-        int layoutId = Integer.parseInt(args[0]);
+        int layoutId = Integer.parseInt(args[1]);
         for (Layout layout1 : layouts)
         {
             if (layout1.getId() == layoutId)
@@ -47,10 +47,9 @@ public class Main
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir10:9000/"), conf);
         FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_" + layout.getVersion() + "_order"));
+                new Path(layout.getOrderPath()));
 
         // compact
-        int NO = 0;
         for (int i = 0; i + numRowGroupInBlock < statuses.length; i+=numRowGroupInBlock)
         {
             List<Path> sourcePaths = new ArrayList<>();
@@ -63,8 +62,7 @@ public class Main
             long start = System.currentTimeMillis();
 
 
-            String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_" + layout.getVersion() + "_compact/" +
-                    NO + "_" +
+            String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/") +
                     DateUtil.getCurTime() +
                     ".compact.pxl";
             PixelsCompactor pixelsCompactor =
@@ -79,9 +77,6 @@ public class Main
                             .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
-
-
-            NO++;
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }

@@ -21,6 +21,7 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
+import cn.edu.ruc.iir.pixels.presto.exception.BalancerException;
 import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
@@ -63,10 +64,6 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: PixelsSplitManager
- * @Description:
  * @author: tao
  * @date: Create in 2018-01-20 19:16
  **/
@@ -270,7 +267,7 @@ public class PixelsSplitManager
                 {
                     ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
                     builder.add(compactBalancer.get(path));
-                    log.info("balanced path:" + compactBalancer.get(path).toString());
+                    // log.info("balanced path:" + compactBalancer.get(path).toString());
                     List<HostAddress> hostAddresses = builder.build();
                     curFileRGIdx = 0;
                     while (curFileRGIdx < rowGroupNum)
@@ -333,15 +330,16 @@ public class PixelsSplitManager
 
         public void balance ()
         {
-            int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
+            //int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
             int floor = (int) Math.floor((double)this.totalCount / (double)this.nodeCounters.size());
+            int ceil = floor + 1;
 
             List<HostAddress> peak = new ArrayList<>();
             List<HostAddress> valley = new ArrayList<>();
 
             for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
             {
-                if (entry.getValue() > ceil)
+                if (entry.getValue() >= ceil)
                 {
                     peak.add(entry.getKey());
                 }
@@ -356,19 +354,24 @@ public class PixelsSplitManager
 
             while (balanced == false)
             {
+                // we try to move elements from peaks to valleys.
                 if (peak.isEmpty() || valley.isEmpty())
                 {
                     break;
                 }
                 HostAddress peakAddress = peak.get(0);
                 HostAddress valleyAddress = valley.get(0);
-                if (this.nodeCounters.get(peakAddress) <= ceil)
+                if (this.nodeCounters.get(peakAddress) < ceil)
                 {
+                    // by this.nodeCounters.get(peakAddress) < ceil,
+                    // we try the best to empty the peaks.
                     peak.remove(peakAddress);
+                    continue;
                 }
                 if (this.nodeCounters.get(valleyAddress) >= floor)
                 {
                     valley.remove(valleyAddress);
+                    continue;
                 }
                 this.nodeCounters.put(peakAddress, this.nodeCounters.get(peakAddress)-1);
                 this.nodeCounters.put(valleyAddress, this.nodeCounters.get(valleyAddress)+1);
@@ -383,6 +386,59 @@ public class PixelsSplitManager
                 }
 
                 balanced = this.isBalanced();
+            }
+
+            if (peak.isEmpty() == false && balanced == false)
+            {
+                if (valley.isEmpty() == false)
+                {
+                    throw new PrestoException(PIXELS_SPLIT_BALANCER_ERROR,
+                            new BalancerException("vally is not empty in the final balancing stage."));
+                }
+
+                for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
+                {
+                    if (entry.getValue() <= floor)
+                    {
+                        valley.add(entry.getKey());
+                    }
+                }
+
+                while (balanced == false)
+                {
+                    // we try to move elements from peaks to valleys.
+                    if (peak.isEmpty() || valley.isEmpty())
+                    {
+                        break;
+                    }
+                    HostAddress peakAddress = peak.get(0);
+                    HostAddress valleyAddress = valley.get(0);
+                    if (this.nodeCounters.get(peakAddress) < ceil)
+                    {
+                        // by this.nodeCounters.get(peakAddress) < ceil,
+                        // we try the best to empty the peaks.
+                        peak.remove(peakAddress);
+                        continue;
+                    }
+                    if (this.nodeCounters.get(valleyAddress) > floor)
+                    {
+                        valley.remove(valleyAddress);
+                        continue;
+                    }
+                    this.nodeCounters.put(peakAddress, this.nodeCounters.get(peakAddress)-1);
+                    this.nodeCounters.put(valleyAddress, this.nodeCounters.get(valleyAddress)+1);
+
+                    for (Map.Entry<Path, HostAddress> entry : this.pathToAddress.entrySet())
+                    {
+                        if (entry.getValue().equals(peakAddress))
+                        {
+                            this.pathToAddress.put(entry.getKey(), valleyAddress);
+                            break;
+                        }
+                    }
+
+                    balanced = this.isBalanced();
+                }
             }
         }
 
