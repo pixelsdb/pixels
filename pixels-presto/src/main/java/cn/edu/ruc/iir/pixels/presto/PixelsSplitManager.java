@@ -60,6 +60,7 @@ import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CACH
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_HDFS_FILE_ERROR;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_SPLIT_BALANCER_ERROR;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 

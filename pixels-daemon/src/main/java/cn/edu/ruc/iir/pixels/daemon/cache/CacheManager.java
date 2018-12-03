@@ -152,6 +152,7 @@ public class CacheManager
     @Override
     public void run()
     {
+        logger.info("Starting cache manager");
         Watch watch = etcdUtil.getClient().getWatchClient();
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.CACHE_VERSION_LITERAL), WatchOption.DEFAULT);

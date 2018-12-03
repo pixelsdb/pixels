@@ -83,6 +83,7 @@ public class CacheCoordinator
     @Override
     public void run()
     {
+        logger.info("Starting cache coordinator");
         Watch watch = etcdUtil.getClient().getWatchClient();
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.LAYOUT_VERSION_LITERAL), WatchOption.DEFAULT);

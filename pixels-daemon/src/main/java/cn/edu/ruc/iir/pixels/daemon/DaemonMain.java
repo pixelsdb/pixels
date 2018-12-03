@@ -15,7 +15,7 @@ import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
 /**
- * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
+ * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar datanode|coordinator
  * */
 public class DaemonMain
 {
@@ -33,8 +33,7 @@ public class DaemonMain
             String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") + jarName;
 
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")
-                     || args[0].equalsIgnoreCase("coordinator")))
+                    (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the main daemon
                 System.out.println("starting main daemon...");
@@ -50,27 +49,23 @@ public class DaemonMain
 
                 ConfigFactory config = ConfigFactory.Instance();
                 int port = Integer.valueOf(config.getProperty("metadata.server.port"));
-                MetadataServer metadataServer = new MetadataServer(port);
 
-                MetricsServer metricsServer = new MetricsServer();
-
-                if (args[0].equalsIgnoreCase("metadata"))
+                if (args[0].equalsIgnoreCase("coordinator"))
                 {
                     // start metadata
+                    MetadataServer metadataServer = new MetadataServer(port);
                     container.addServer("metadata", metadataServer);
-                }
-                else if (args[0].equalsIgnoreCase("datanode"))
-                {
-                    // start data node
-                    CacheManager cacheServer = new CacheManager();
-                    container.addServer("cache_manager", cacheServer);
-                    container.addServer("metrics", metricsServer);
+                    // start cache coordinator
+                    CacheCoordinator cacheCoordinator = new CacheCoordinator();
+                    container.addServer("cache_coordinator", cacheCoordinator);
                 }
                 else
                 {
-                    // start coordinator node
-                    CacheCoordinator cacheCoordinator = new CacheCoordinator();
-                    container.addServer("cache_coordinator", cacheCoordinator);
+                    // start data node
+                    MetricsServer metricsServer = new MetricsServer();
+                    container.addServer("metrics", metricsServer);
+                    CacheManager cacheServer = new CacheManager();
+                    container.addServer("cache_manager", cacheServer);
                 }
 
                 // continue the main thread
@@ -97,10 +92,9 @@ public class DaemonMain
                         }
                     }
                 }
-
-
-            } else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
+            }
+            else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
+                    (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
@@ -108,7 +102,8 @@ public class DaemonMain
                 String[] guardCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
                 guardDaemon.setup(guardFile, mainFile, guardCmd);
                 guardDaemon.run();
-            } else if (role.equalsIgnoreCase("kill"))
+            }
+            else if (role.equalsIgnoreCase("kill"))
             {
                 System.out.println("Shutdown Daemons...");
                 try
