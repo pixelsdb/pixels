@@ -54,6 +54,7 @@ public class PixelsSplitManager
     private final FSFactory fsFactory;
     private final PixelsMetadataProxy metadataProxy;
     private final boolean cacheEnabled;
+    private final int fixedSplitSize;
 
     @Inject
     public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
@@ -61,6 +62,7 @@ public class PixelsSplitManager
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
         String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        this.fixedSplitSize = Integer.parseInt(config.getConfigFactory().getProperty("fixed.split.size"));
         this.cacheEnabled = Boolean.parseBoolean(enabled);
     }
 
@@ -95,32 +97,46 @@ public class PixelsSplitManager
             // get index
             int version = layout.getVersion();
             IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
-            Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
+
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
-            if (index == null)
+
+            // get split size
+            int splitSize;
+            if (this.fixedSplitSize > 0)
             {
-                log.info("action null");
-                index = getInverted(order, splits, indexEntry);
+                splitSize = this.fixedSplitSize;
             }
             else
             {
-                log.info("action not null");
-                int indexVersion = index.getVersion();
-                if (indexVersion < version) {
-                    log.info("action not null update");
+                ColumnSet columnSet = new ColumnSet();
+                for (PixelsColumnHandle column : desiredColumns)
+                {
+                    log.info(column.getColumnName());
+                    columnSet.addColumn(column.getColumnName());
+                }
+
+                Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
+                if (index == null)
+                {
+                    log.info("action null");
                     index = getInverted(order, splits, indexEntry);
                 }
+                else
+                {
+                    log.info("action not null");
+                    int indexVersion = index.getVersion();
+                    if (indexVersion < version) {
+                        log.info("action not null update");
+                        index = getInverted(order, splits, indexEntry);
+                    }
+                }
+
+                AccessPattern bestPattern = index.search(columnSet);
+                log.info("bestPattern: " + bestPattern.toString());
+                splitSize = bestPattern.getSplitSize();
             }
-            // get split size
-            ColumnSet columnSet = new ColumnSet();
-            for (PixelsColumnHandle column : desiredColumns) {
-                log.info(column.getColumnName());
-                columnSet.addColumn(column.getColumnName());
-            }
-            AccessPattern bestPattern = index.search(columnSet);
-            log.info("bestPattern: " + bestPattern.toString());
-            int splitSize = bestPattern.getSplitSize();
+
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
             if(this.cacheEnabled)

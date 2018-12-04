@@ -1,17 +1,21 @@
 package cn.edu.ruc.iir.pixels.load.multi;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
+import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IOUtils;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.*;
 import java.sql.*;
 import java.util.List;
 import java.util.Properties;
@@ -37,10 +41,13 @@ import java.util.concurrent.LinkedBlockingDeque;
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_105_order.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_compact_fixed.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
+ * </p>
+ * <p>
+ * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_1187/v_1_compact -d hdfs://dbiir10:9000/pixels/pixels/test_1187/v_1_compact_copy
  * </p>
  */
 public class Main
@@ -267,7 +274,78 @@ public class Main
                 }
             }
 
-            if (!command.equals("QUERY") && !command.equals("LOAD"))
+            if (command.equals("COPY"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COPY")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-p", "--postfix").required(true)
+                        .help("Specify the postfix of files to be copied");
+                argumentParser.addArgument("-s", "--source").required(true)
+                        .help("specify the source directory");
+                argumentParser.addArgument("-d", "--destination").required(true)
+                        .help("Specify the destination directory");
+
+                Namespace ns = null;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    System.out.println("Pixels COPY (link).");
+                    System.exit(0);
+                }
+
+                try
+                {
+                    String postfix = ns.getString("postfix");
+                    String source = ns.getString("source");
+                    String distination = ns.getString("destination");
+
+                    if (!distination.endsWith("/"))
+                    {
+                        distination += "/";
+                    }
+
+                    ConfigFactory configFactory = ConfigFactory.Instance();
+                    FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
+
+                    FileSystem fs = fsFactory.getFileSystem().get();
+
+                    List<Path> files =  fsFactory.listFiles(source);
+                    long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
+                    short replication = Short.parseShort(configFactory.getProperty("block.replication"));
+
+                    for (Path s : files)
+                    {
+                        String sourceName = s.getName();
+                        String destName = distination +
+                                sourceName.substring(0, sourceName.indexOf(postfix)) +
+                                "_copy_" + DateUtil.getCurTime() + postfix;
+                        Path dest = new Path(destName);
+                        FSDataInputStream inputStream = fs.open(s, Constants.HDFS_BUFFER_SIZE);
+                        FSDataOutputStream outputStream = fs.create(dest, false,
+                                Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+                        IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
+                        inputStream.close();
+                        outputStream.close();
+                    }
+                }
+                catch (FSException e)
+                {
+                    e.printStackTrace();
+                } catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+
+
+            }
+
+            if (!command.equals("QUERY") &&
+                    !command.equals("LOAD") &&
+                    !command.equals("COPY"))
             {
                 System.out.println("Command error");
             }
