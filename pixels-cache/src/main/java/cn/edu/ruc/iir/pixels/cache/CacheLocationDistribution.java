@@ -16,11 +16,11 @@ public class CacheLocationDistribution
 {
     private final Map<String, Set<String>> locationDistributionMap;
 
-    public CacheLocationDistribution(HostAddress[] locations)
+    public CacheLocationDistribution(HostAddress[] locations, int size)
     {
         this.locationDistributionMap = new HashMap<>(locations.length);
-        for (HostAddress location : locations) {
-            locationDistributionMap.put(location.toString(), new HashSet<>());
+        for (int i = 0; i < size; i++) {
+            locationDistributionMap.put(locations[i].toString(), new HashSet<>());
         }
     }
 

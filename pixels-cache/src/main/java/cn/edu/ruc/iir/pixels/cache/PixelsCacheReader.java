@@ -20,6 +20,7 @@ public class PixelsCacheReader
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
+        logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
     }

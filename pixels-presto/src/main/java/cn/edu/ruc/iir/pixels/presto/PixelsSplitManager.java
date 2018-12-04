@@ -172,9 +172,9 @@ public class PixelsSplitManager
                                 log.info("cache location: {file='" + file + "', node='" + node + "'");
                             }
                         }
-                        // 3. add splits in orderedPath
                         try
                         {
+                            // 3. add splits in orderedPath
                             for (Path path : fsFactory.listFiles(layout.getOrderPath()))
                             {
                                 String hdfsFile = path.toString();

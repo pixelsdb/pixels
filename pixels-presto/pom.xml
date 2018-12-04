@@ -36,7 +36,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <version>2.7.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>asm</groupId>
@@ -48,7 +47,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <version>2.7.3</version>
             <exclusions>
                 <exclusion>
                     <groupId>asm</groupId>
@@ -188,8 +186,6 @@
         <dependency>
             <groupId>com.coreos</groupId>
             <artifactId>jetcd-core</artifactId>
-            <version>0.0.1</version>
-            <optional>true</optional>
             <exclusions>
                 <exclusion>
                     <groupId>io.netty</groupId>

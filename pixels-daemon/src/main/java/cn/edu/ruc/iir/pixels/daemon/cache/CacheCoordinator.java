@@ -93,10 +93,12 @@ public class CacheCoordinator
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
+                        logger.info("Update cache distribution");
                         // update the cache distribution
                         int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
                         update(layoutVersion);
                         // update cache version
+                        logger.info("Update cache version to " + layoutVersion);
                         etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
                     }
                 }
@@ -140,7 +142,8 @@ public class CacheCoordinator
         String[] paths = select(layout);
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
-        if (nodes.isEmpty()) {
+        if (nodes == null || nodes.isEmpty()) {
+            logger.info("Nodes is null or empty, no updates");
             return;
         }
         HostAddress[] hosts = new HostAddress[nodes.size()];
@@ -158,6 +161,7 @@ public class CacheCoordinator
             throws FSException
     {
         if (layout.isEmpty()) {
+            logger.info("Layout is empty, return a 0-length array");
             return new String[0];
         }
         else {
@@ -173,24 +177,24 @@ public class CacheCoordinator
     private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
             throws FSException
     {
-        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes);
+        CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
         for (int i = 0; i < size; i++)
         {
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = "location_" + layoutVersion + "_" + node;
-            etcdUtil.putKeyValue(key, String.join(",", files));
+            etcdUtil.putKeyValue(key, String.join(";", files));
         }
     }
 
-    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes)
+    private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
             throws FSException
     {
-        CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes);
+        CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
         Map<String, Integer> nodesCacheStats = new HashMap<>();
-        for (HostAddress node : nodes) {
-            nodesCacheStats.put(node.toString(), 0);
+        for (int i = 0; i < size; i++) {
+            nodesCacheStats.put(nodes[i].toString(), 0);
         }
 
         for (String path : paths)

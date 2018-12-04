@@ -136,15 +136,18 @@ public class CacheManager
         List<Layout> matchedLayouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (!matchedLayouts.isEmpty()) {
             // update cache status
+            logger.info("Update cache status to 2");
             cacheStatus.set(2);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
             // update cache content
             if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
+                logger.info("Update cache content ok, change cache status back to 1");
                 cacheStatus.set(1);
                 etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
             }
             else {
                 // todo deal with exceptions when local cache update failed
+                logger.error("Cache update error");
             }
         }
     }
@@ -162,11 +165,12 @@ public class CacheManager
                 for (WatchEvent event : watchResponse.getEvents()) {
                     // update a new version
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
+                        logger.info("Cache version update detected, update local cache to a new version");
                         int version = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
                         update(version);
                     }
-                    else {
-                        logger.error("Unknown changes watched on cache version");
+                    else if (event.getEventType() == WatchEvent.EventType.DELETE){
+                        logger.warn("Cache version deletion detected, CacheCoordinator is down. Stop now.");
                         break;
                     }
                 }
