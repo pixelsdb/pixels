@@ -112,22 +112,22 @@ public class PixelsSplitManager
                 ColumnSet columnSet = new ColumnSet();
                 for (PixelsColumnHandle column : desiredColumns)
                 {
-                    log.info(column.getColumnName());
                     columnSet.addColumn(column.getColumnName());
                 }
+
+                log.info("columns to be accessed: " + columnSet.toString());
 
                 Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
                 if (index == null)
                 {
-                    log.info("action null");
+                    log.info("index not exist in factory, building index...");
                     index = getInverted(order, splits, indexEntry);
                 }
                 else
                 {
-                    log.info("action not null");
                     int indexVersion = index.getVersion();
                     if (indexVersion < version) {
-                        log.info("action not null update");
+                        log.info("index version is not up to date, updating index...");
                         index = getInverted(order, splits, indexEntry);
                     }
                 }
@@ -281,8 +281,8 @@ public class PixelsSplitManager
             }
         }
 
-        log.info("pixelsSplits: " + pixelsSplits.size());
-        log.info("=====begin to shuffle====");
+        log.info("number of total splits: " + pixelsSplits.size());
+
         Collections.shuffle(pixelsSplits);
 
         return new FixedSplitSource(pixelsSplits);

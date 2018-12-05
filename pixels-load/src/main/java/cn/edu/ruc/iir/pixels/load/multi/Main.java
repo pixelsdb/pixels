@@ -47,7 +47,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
  * </p>
  * <p>
- * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_1187/v_1_compact -d hdfs://dbiir10:9000/pixels/pixels/test_1187/v_1_compact_copy
+ * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact -d hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact_2
  * </p>
  */
 public class Main
