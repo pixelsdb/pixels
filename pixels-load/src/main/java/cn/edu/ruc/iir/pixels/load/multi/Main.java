@@ -41,7 +41,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_origin_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
@@ -220,48 +220,64 @@ public class Main
                         String password = instance.getProperty("presto.password");
                         String ssl = instance.getProperty("presto.ssl");
                         String jdbc = instance.getProperty("presto.pixels.jdbc.url");
-                        if (type.equalsIgnoreCase("orc")) {
+                        if (type.equalsIgnoreCase("orc"))
+                        {
                             jdbc = instance.getProperty("presto.orc.jdbc.url");
                         }
 
-                        if (!password.equalsIgnoreCase("null")) {
+                        if (!password.equalsIgnoreCase("null"))
+                        {
                             properties.setProperty("password", password);
                         }
                         properties.setProperty("SSL", ssl);
 
                         try (BufferedReader workloadReader = new BufferedReader(new FileReader(workload));
-                             BufferedWriter timeWriter = new BufferedWriter(new FileWriter(log))) {
+                             BufferedWriter timeWriter = new BufferedWriter(new FileWriter(log)))
+                        {
                             timeWriter.write("query id,id,duration(ms)\n");
                             timeWriter.flush();
                             String line;
                             int i = 0;
                             String defaultUser = null;
-                            while ((line = workloadReader.readLine()) != null) {
-                                if (!line.contains("SELECT")) {
-                                    defaultUser = line;
-                                    properties.setProperty("user", type + "_" + defaultUser);
-                                } else {
-                                    long cost = executeSQL(jdbc, properties, line, defaultUser);
-                                    timeWriter.write(defaultUser + "," + i + "," + cost + "\n");
-                                    i++;
+                            while ((line = workloadReader.readLine()) != null)
+                            {
+                                if (cache != null)
+                                {
                                     long start = System.currentTimeMillis();
-                                    Thread.sleep(15 * 1000);
-                                    if (i % 10 == 0) {
-                                        timeWriter.flush();
-                                        System.out.println(i);
-                                    }
-                                    System.out.println(i + "," + cost + "ms" + ",wait:" + (System.currentTimeMillis() - start) + "ms\n");
-                                }
-
-                                if(cache != null){
                                     ProcessBuilder processBuilder = new ProcessBuilder(cache);
                                     Process process = processBuilder.start();
                                     process.waitFor();
                                     Thread.sleep(1000);
+                                    System.out.println("clear cache: " + (System.currentTimeMillis() - start) + "ms\n");
+                                }
+                                else
+                                {
+                                    Thread.sleep(15 * 1000);
+                                    System.out.println("wait 15000 ms\n");
+                                }
+
+                                if (!line.contains("SELECT"))
+                                {
+                                    defaultUser = line;
+                                    properties.setProperty("user", type + "_" + defaultUser);
+                                } else
+                                {
+                                    long cost = executeSQL(jdbc, properties, line, defaultUser);
+                                    timeWriter.write(defaultUser + "," + i + "," + cost + "\n");
+
+                                    System.out.println(i + "," + cost + "ms");
+                                    i++;
+                                    if (i % 10 == 0)
+                                    {
+                                        timeWriter.flush();
+                                        System.out.println(i);
+                                    }
+
                                 }
                             }
                             timeWriter.flush();
-                        } catch (Exception e) {
+                        } catch (Exception e)
+                        {
                             e.printStackTrace();
                         }
                     } else
@@ -285,6 +301,8 @@ public class Main
                         .help("specify the source directory");
                 argumentParser.addArgument("-d", "--destination").required(true)
                         .help("Specify the destination directory");
+                argumentParser.addArgument("-n", "--number").required(true)
+                        .help("Specify the number of copies");
 
                 Namespace ns = null;
                 try
@@ -301,11 +319,12 @@ public class Main
                 {
                     String postfix = ns.getString("postfix");
                     String source = ns.getString("source");
-                    String distination = ns.getString("destination");
+                    String destination = ns.getString("destination");
+                    int n = ns.getInt("number");
 
-                    if (!distination.endsWith("/"))
+                    if (!destination.endsWith("/"))
                     {
-                        distination += "/";
+                        destination += "/";
                     }
 
                     ConfigFactory configFactory = ConfigFactory.Instance();
@@ -317,19 +336,22 @@ public class Main
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
-                    for (Path s : files)
+                    for (int i = 0; i < n; ++i)
                     {
-                        String sourceName = s.getName();
-                        String destName = distination +
-                                sourceName.substring(0, sourceName.indexOf(postfix)) +
-                                "_copy_" + DateUtil.getCurTime() + postfix;
-                        Path dest = new Path(destName);
-                        FSDataInputStream inputStream = fs.open(s, Constants.HDFS_BUFFER_SIZE);
-                        FSDataOutputStream outputStream = fs.create(dest, false,
-                                Constants.HDFS_BUFFER_SIZE, replication, blockSize);
-                        IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
-                        inputStream.close();
-                        outputStream.close();
+                        for (Path s : files)
+                        {
+                            String sourceName = s.getName();
+                            String destName = destination +
+                                    sourceName.substring(0, sourceName.indexOf(postfix)) +
+                                    "_copy_" + DateUtil.getCurTime() + postfix;
+                            Path dest = new Path(destName);
+                            FSDataInputStream inputStream = fs.open(s, Constants.HDFS_BUFFER_SIZE);
+                            FSDataOutputStream outputStream = fs.create(dest, false,
+                                    Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+                            IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
+                            inputStream.close();
+                            outputStream.close();
+                        }
                     }
                 }
                 catch (FSException e)
@@ -355,14 +377,17 @@ public class Main
 
     public static long executeSQL(String jdbcUrl, Properties jdbcProperties, String sql, String id) {
         long start = 0L, end = 0L;
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcProperties)) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcProperties))
+        {
             Statement statement = connection.createStatement();
             start = System.currentTimeMillis();
             ResultSet resultSet = statement.executeQuery(sql);
-            resultSet.next();
             end = System.currentTimeMillis();
+            while (resultSet.next()) {}
+            resultSet.close();
             statement.close();
-        } catch (SQLException e) {
+        } catch (SQLException e)
+        {
             System.out.println("SQL: " + id + "\n" + sql);
             System.out.println("Error msg: " + e.getMessage());
         }
