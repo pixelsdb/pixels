@@ -115,7 +115,7 @@ public class PixelsSplitManager
                     columnSet.addColumn(column.getColumnName());
                 }
 
-                log.info("columns to be accessed: " + columnSet.toString());
+                // log.info("columns to be accessed: " + columnSet.toString());
 
                 Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
                 if (index == null)
@@ -133,9 +133,11 @@ public class PixelsSplitManager
                 }
 
                 AccessPattern bestPattern = index.search(columnSet);
-                log.info("bestPattern: " + bestPattern.toString());
+                // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestPattern.getSplitSize();
             }
+
+            log.info("using split size: " + splitSize);
 
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
@@ -161,7 +163,7 @@ public class PixelsSplitManager
                             for(String file : files)
                             {
                                 fileToNodeMap.put(file, node);
-                                log.info("cache location: {file='" + file + "', node='" + node + "'");
+                                // log.info("cache location: {file='" + file + "', node='" + node + "'");
                             }
                         }
                         // 3. add splits in orderedPath

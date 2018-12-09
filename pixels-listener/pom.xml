@@ -31,7 +31,18 @@
             <groupId>io.airlift</groupId>
             <artifactId>log</artifactId>
             <optional>true</optional>
-            <!--<scope>provided</scope>-->
+        </dependency>
+
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

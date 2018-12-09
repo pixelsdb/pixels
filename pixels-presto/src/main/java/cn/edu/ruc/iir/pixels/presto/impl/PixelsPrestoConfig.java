@@ -41,7 +41,7 @@ public class PixelsPrestoConfig
                 String defaultPixelsHome = ConfigFactory.Instance().getProperty("pixels.home");
                 if (defaultPixelsHome == null)
                 {
-                    logger.info("use pixels.properties inside jar.");
+                    logger.info("use pixels.properties insided in jar.");
                 } else
                 {
                     logger.info("use pixels.properties under default pixels.home: " + defaultPixelsHome);

@@ -37,12 +37,12 @@ public class MetadataClientHandler extends ChannelInboundHandlerAdapter
     {
         try
         {
-            logger.info("client response: " + msg.toString());
+            //logger.info("client response: " + msg.toString());
             if (msg instanceof Object) {
                 this.client.setResponse(token, msg);
             } else {
                 // log the received params.
-                logger.info("Bad response, " + msg.toString());
+                logger.error("Bad response, " + msg.toString());
                 ctx.close();
             }
         }
