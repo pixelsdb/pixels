@@ -1,7 +1,5 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
-import cn.edu.ruc.iir.pixels.common.serialize.KryoDecoder;
-import cn.edu.ruc.iir.pixels.common.serialize.KryoEncoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -39,14 +37,14 @@ public class MetadataClient
         return response;
     }
 
-    public synchronized void setResponse (String token, Object res)
+    public synchronized void setResponse(String token, Object res)
     {
         this.response.put(token, res);
     }
 
     public void connect(int port, String host) throws Exception
     {
-        //配置客户端NIO线程组
+        // configure NIO thread group in client
         EventLoopGroup group = new NioEventLoopGroup(1);
 
         Bootstrap client = new Bootstrap();
@@ -59,10 +57,11 @@ public class MetadataClient
                     .handler(new ChannelInitializer<SocketChannel>()
                     {
                         @Override
-                        protected void initChannel(SocketChannel channel) throws Exception {
+                        protected void initChannel(SocketChannel channel) throws Exception
+                        {
                             channel.pipeline().addLast(
                                     new ObjectEncoder(),
-                                    // 禁止缓存类加载器
+                                    // disable cache
                                     new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.cacheDisabled(this.getClass().getClassLoader())),
                                     new MetadataClientHandler(params, token, MetadataClient.this));
 //                            channel.pipeline().addLast("decoder", new KryoDecoder());
@@ -71,14 +70,14 @@ public class MetadataClient
                         }
                     });
 
-            //绑定端口, 异步连接操作
+            // bind to the port asynchronously
             ChannelFuture future = client.connect(host, port).sync();
 
-            //等待客户端连接端口关闭
+            // wait for closing the port.
             future.channel().closeFuture().sync();
         } finally
         {
-            //优雅关闭线程组
+            // close the thread group
             group.shutdownGracefully();
         }
     }
