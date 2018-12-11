@@ -14,6 +14,8 @@ import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import com.alibaba.fastjson.JSON;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -34,6 +36,8 @@ import java.util.Map;
 public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
+    private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
+
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
@@ -321,16 +325,24 @@ public class PixelsRecordReaderImpl
                 isCached[i][j] = false;
             }
         }
-        // read data from local caching
         List<ChunkId> chunks = new ArrayList<>();
         if (enableCache) {
+            // read data from local caching
+            logger.info("PixelsRecordReader reads data from local caching");
+            logger.info("cacheOrder size: " + cacheOrder.size());
+            logger.info("cacheOrder: " + cacheOrder);
             for (String cacheId : cacheOrder) {
                 String[] cacheIdParts = cacheId.split(":");
                 short cacheRGId = Short.parseShort(cacheIdParts[0]);
                 short cacheColId = Short.parseShort(cacheIdParts[1]);
                 int cacheRGIdx = cacheRGId - RGStart;
+                logger.info("Try to read " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId + " from caching.");
+                long cacheAccessStart = System.nanoTime();
                 byte[] columnlet = cacheReader.get(physicalFSReader.getPath().toString(), cacheRGId, cacheColId);
+                long cacheAccessEnd = System.nanoTime();
+                logger.info("Cache access time cost: " + (cacheAccessEnd - cacheAccessStart) + "ns");
                 if (columnlet != null && columnlet.length > 0) {
+                    logger.info("Got cache for " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId);
                     chunkBuffers[cacheRGIdx * includedColumns.length + cacheColId] = columnlet;
                     isCached[cacheRGIdx][cacheColId] = true;
                 }

@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
  * 1. caching balance. It assigns each file a caching location, which are updated into etcd for global synchronization, and maintains a dynamic caching balance in the cluster.
  * 3. caching node monitor. It monitors all caching nodes(CacheManager) in the cluster, and update running status(available, busy, dead, etc.) of caching nodes.
  */
+// todo cache location compaction. Cache locations for older versions still exist after being used.
 public class CacheCoordinator
         implements Server
 {
@@ -45,10 +46,12 @@ public class CacheCoordinator
     private final PixelsCacheConfig cacheConfig;
     private final ScheduledExecutorService scheduledExecutor;
     private final MetadataService metadataService;
+    private final String hostName;
     private FSFactory fsFactory = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
-    private CacheCoordinatorVersionRegister cacheVersionRegister = null;
+    private CacheCoordinatorRegister cacheCoordinatorRegister = null;
+    private boolean initializeSuccess = false;
 
     public CacheCoordinator()
     {
@@ -56,24 +59,43 @@ public class CacheCoordinator
         this.cacheConfig = new PixelsCacheConfig();
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+        this.hostName = System.getenv("HOSTNAME");
         initialize();
     }
 
     // initialize cache_version as 0 in etcd
     private void initialize()
     {
-        // if cache has already been initialized, stop the initialization.
-        if (null != etcdUtil.getKeyValue("cache_version")) {
+        // if another cache coordinator exists, stop the initialization.
+        if (null != etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL)) {
+            logger.warn("Another coordinator exists. Exit.");
             return;
         }
-        Lease leaseClient = etcdUtil.getClient().getLeaseClient();
         try {
+            // register coordinator
+            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_VERSION_LITERAL, "0", leaseId);
-            this.cacheVersionRegister = new CacheCoordinatorVersionRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheVersionRegister, 1, 10, TimeUnit.SECONDS);
-            coordinatorStatus.set(1);
+            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_COORDINATOR_LITERAL, hostName, leaseId);
+            this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
+            scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister, 1, 10, TimeUnit.SECONDS);
             Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+            // check version consistency
+            int cache_version = 0, layout_version = 0;
+            KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+            if (null != cacheVersionKV) {
+                cache_version = Integer.parseInt(cacheVersionKV.getValue().toStringUtf8());
+            }
+            KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
+            if (null != layoutVersionKV) {
+                layout_version = Integer.parseInt(layoutVersionKV.getValue().toStringUtf8());
+            }
+            if (cache_version < layout_version) {
+                logger.info("Current cache version is left behind of current layout version. Update.");
+                update(layout_version);
+            }
+            coordinatorStatus.set(1);
+            initializeSuccess = true;
+            logger.info("CacheCoordinator on " + hostName + " has started.");
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -84,6 +106,10 @@ public class CacheCoordinator
     public void run()
     {
         logger.info("Starting cache coordinator");
+        if (false == initializeSuccess) {
+            logger.info("Initialization failed, stop now.");
+            return;
+        }
         Watch watch = etcdUtil.getClient().getWatchClient();
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.LAYOUT_VERSION_LITERAL), WatchOption.DEFAULT);
@@ -121,8 +147,8 @@ public class CacheCoordinator
     public void shutdown()
     {
         coordinatorStatus.set(-1);
-        etcdUtil.delete(Constants.CACHE_VERSION_LITERAL);
-        cacheVersionRegister.stop();
+        cacheCoordinatorRegister.stop();
+        etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
         this.scheduledExecutor.shutdownNow();
     }
 
@@ -182,7 +208,7 @@ public class CacheCoordinator
         {
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
-            String key = "location_" + layoutVersion + "_" + node;
+            String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
             etcdUtil.putKeyValue(key, String.join(";", files));
         }
     }
@@ -226,13 +252,13 @@ public class CacheCoordinator
         return locationDistribution;
     }
 
-    private static class CacheCoordinatorVersionRegister
+    private static class CacheCoordinatorRegister
             implements Runnable
     {
         private final Lease leaseClient;
         private final long leaseId;
 
-        CacheCoordinatorVersionRegister(Lease leaseClient, long leaseId)
+        CacheCoordinatorRegister(Lease leaseClient, long leaseId)
         {
             this.leaseClient = leaseClient;
             this.leaseId = leaseId;

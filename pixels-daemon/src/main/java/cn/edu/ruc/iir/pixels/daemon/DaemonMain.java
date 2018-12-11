@@ -118,7 +118,7 @@ public class DaemonMain
                         {
                             continue;
                         }
-                        if (splits[1].contains(jarName))
+                        if (splits[1].contains(jarName) || splits[1].contains(DaemonMain.class.getName()))
                         {
                             String roleName = null;
                             // get the role name of the target daemon (to be killing).

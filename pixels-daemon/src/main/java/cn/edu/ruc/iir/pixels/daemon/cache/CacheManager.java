@@ -42,16 +42,20 @@ public class CacheManager
 
     private PixelsCacheWriter cacheWriter = null;
     private MetadataService metadataService = null;
-    private CacheManagerStatusRegister cacheStatusRegister;
+    private CacheManagerRegister cacheManagerRegister;
     private final PixelsCacheConfig cacheConfig;
     private final EtcdUtil etcdUtil;
     private final ScheduledExecutorService scheduledExecutor;
+    private final String hostName;
+    private boolean initializeSuccess = false;
+    private int localCacheVersion = 0;
 
     public CacheManager()
     {
         this.cacheConfig = new PixelsCacheConfig();
         this.etcdUtil = EtcdUtil.Instance();
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.hostName = System.getenv("HOSTNAME");
         initialize();
     }
 
@@ -70,7 +74,12 @@ public class CacheManager
     private void initialize()
     {
         try {
-            // get fs
+            KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
+            if (cacheCoordinatorKV == null) {
+                logger.info("No coordinator found. Exit");
+                return;
+            }
+            // init cache writer and metadata service
             Configuration conf = new Configuration();
             conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
             conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
@@ -85,93 +94,93 @@ public class CacheManager
                                      .setFS(fs)
                                      .build();
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
-            int localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
+            localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
+            logger.info("Local cache version: " + localCacheVersion);
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
-            // if global cache version does not exist, maybe coordinator has not started normally yet.
-            if (globalCacheVersionKV == null) {
-                // cache coordinator has not started yet. exit.
-                return;
-            }
-            int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toStringUtf8());
-            // if cache file exists already. we need check local cache version with global cache version stored in etcd
-            if (localCacheVersion >= 0) {
-                // if global version is not consistent with the local one. update local cache.
-                if (globalCacheVersion != localCacheVersion) {
-                    // update local cache
+            if (null != globalCacheVersionKV) {
+                int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toStringUtf8());
+                logger.info("Current global cache version: " + globalCacheVersion);
+                // if cache file exists already. we need check local cache version with global cache version stored in etcd
+                if (localCacheVersion < globalCacheVersion) {
+                    // if global version is not consistent with the local one. update local cache.
                     update(globalCacheVersion);
                 }
             }
-            // if this is a fresh start of local cache, then update local cache to match the global one
-            else {
-                // update local cache
-                update(globalCacheVersion);
-            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
-        Lease leaseClient = etcdUtil.getClient().getLeaseClient();
-        // get a lease from etcd with a specified ttl, add this caching node into etcd with a granted lease
-        try {
+            // register datanode
+            Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(),
+            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + hostName,
                                             "" + cacheStatus.get(), leaseId);
             // start a scheduled thread to update node status periodically
-            this.cacheStatusRegister = new CacheManagerStatusRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheStatusRegister, 1, 10, TimeUnit.SECONDS);
+            this.cacheManagerRegister = new CacheManagerRegister(leaseClient, leaseId);
+            scheduledExecutor.scheduleAtFixedRate(cacheManagerRegister, 1, 10, TimeUnit.SECONDS);
             cacheStatus.set(1);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+            initializeSuccess = true;
         }
-        // registration failed with exceptions.
         catch (Exception e) {
+            logger.error(e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private void update(int version)
+    private boolean update(int version)
             throws MetadataException
     {
+        logger.info("Update cache to version " + version);
         List<Layout> matchedLayouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (!matchedLayouts.isEmpty()) {
             // update cache status
-            logger.info("Update cache status to 2");
             cacheStatus.set(2);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
+            logger.info("Update cache. Status changed to 2");
             // update cache content
             if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
-                logger.info("Update cache content ok, change cache status back to 1");
                 cacheStatus.set(1);
-                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
+                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
+                localCacheVersion = version;
+                logger.info("Update cache content ok. Status changed back to 1");
+                return true;
             }
             else {
-                // todo deal with exceptions when local cache update failed
-                logger.error("Cache update error");
+                logger.warn("Cache update to version" + version + " failed.");
             }
         }
+        else {
+            logger.warn("No matching layout found for the update version " + version);
+        }
+        return false;
     }
 
     @Override
     public void run()
     {
         logger.info("Starting cache manager");
+        if (false == initializeSuccess) {
+            logger.info("Initialization failed. Stop now.");
+            return;
+        }
         Watch watch = etcdUtil.getClient().getWatchClient();
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.CACHE_VERSION_LITERAL), WatchOption.DEFAULT);
-        while (cacheStatus.get() > 0) {
+        outer_loop: while (cacheStatus.get() > 0) {
             try {
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
                     // update a new version
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
-                        logger.info("Cache version update detected, update local cache to a new version");
                         int version = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
-                        update(version);
+                        logger.info("Cache version update detected, new global version is " + version);
+                        if (version > localCacheVersion) {
+                            logger.info("New global version is greater than the local version, update the local cache");
+                            update(version);
+                        }
                     }
                     else if (event.getEventType() == WatchEvent.EventType.DELETE){
-                        logger.warn("Cache version deletion detected, CacheCoordinator is down. Stop now.");
-                        break;
+                        logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
+                        cacheStatus.set(-1);
+                        break outer_loop;
                     }
                 }
             }
@@ -193,21 +202,21 @@ public class CacheManager
     public void shutdown()
     {
         cacheStatus.set(-1);
-        etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + cacheConfig.getCacheHost(), "" + cacheStatus.get());
-        cacheStatusRegister.stop();
+        etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
+        cacheManagerRegister.stop();
         this.scheduledExecutor.shutdownNow();
     }
 
     /**
      * Scheduled register to update caching node status and keep its registration alive.
      * */
-    private static class CacheManagerStatusRegister
+    private static class CacheManagerRegister
             implements Runnable
     {
         private final Lease leaseClient;
         private final long leaseId;
 
-        CacheManagerStatusRegister(Lease leaseClient, long leaseId)
+        CacheManagerRegister(Lease leaseClient, long leaseId)
         {
             this.leaseClient = leaseClient;
             this.leaseId = leaseId;

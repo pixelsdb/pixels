@@ -10,7 +10,6 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.inject.Inject;
-import io.airlift.log.Logger;
 
 import java.util.List;
 
@@ -22,7 +21,6 @@ import static java.util.stream.Collectors.toList;
  * Provider Class for Pixels Page Source class.
  */
 public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
-    private static Logger logger = Logger.get(PixelsPageSourceProvider.class);
     private final String connectorId;
     private final FSFactory fsFactory;
     private final PixelsCacheReader pixelsCacheReader;
@@ -33,13 +31,18 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
-        this.pixelsCacheReader = PixelsCacheReader
-                .newBuilder()
-                .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
-                .setCacheSize(Integer.parseInt(config.getConfigFactory().getProperty("cache.size")))
-                .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
-                .setIndexSize(Integer.parseInt(config.getConfigFactory().getProperty("index.size")))
-                .build();
+        if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
+            this.pixelsCacheReader = PixelsCacheReader
+                    .newBuilder()
+                    .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
+                    .setCacheSize(Integer.parseInt(config.getConfigFactory().getProperty("cache.size")))
+                    .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
+                    .setIndexSize(Integer.parseInt(config.getConfigFactory().getProperty("index.size")))
+                    .build();
+        }
+        else {
+            this.pixelsCacheReader = null;
+        }
     }
 
     @Override

@@ -2,11 +2,14 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +24,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;
+    private final static Logger logger = LogManager.getLogger(PixelsCacheWriter.class);
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
@@ -143,7 +147,7 @@ public class PixelsCacheWriter
     {
         try {
             // get the caching file list
-            KeyValue keyValue = etcdUtil.getKeyValue("location_" + version + "_" + host);
+            KeyValue keyValue = etcdUtil.getKeyValue(Constants.CACHE_LOCATION_LITERAL + version + "_" + host);
             if (keyValue == null) {
                 return false;
             }
@@ -226,6 +230,7 @@ public class PixelsCacheWriter
                 }
             }
         }
+        logger.info("Cache writer offset: " + cacheOffset);
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
