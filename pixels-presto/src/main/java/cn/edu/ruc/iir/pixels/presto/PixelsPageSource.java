@@ -66,7 +66,7 @@ class PixelsPageSource implements ConnectorPageSource {
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
 
-        logger.debug("Create page source for split: " + split.toString());
+        logger.info("Create page source for split: " + split.toString());
         getPixelsReaderBySchema(split, pixelsCacheReader);
 
         this.recordReader = this.pixelsReader.read(this.option);

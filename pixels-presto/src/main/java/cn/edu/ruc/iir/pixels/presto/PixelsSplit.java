@@ -169,7 +169,7 @@ public class PixelsSplit
 
     @Override
     public int hashCode() {
-        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, constraint);
+        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, isCached, constraint);
     }
 
     @Override

@@ -29,8 +29,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * Pixels file reader default implementation
  *
- * This writer is NOT thread safe!
- *
  * @author guodong
  */
 @NotThreadSafe
@@ -79,7 +77,7 @@ public class PixelsReaderImpl
         private Path builderPath = null;
         private List<String> builderCacheOrder = null;
         private TypeDescription builderSchema = null;
-        private boolean enableCache = false;
+        private boolean builderEnableCache = false;
         private PixelsCacheReader builderPixelsCacheReader = null;
 
         private Builder()
@@ -105,7 +103,8 @@ public class PixelsReaderImpl
 
         public Builder setEnableCache(boolean enableCache)
         {
-            this.enableCache = enableCache;
+            this.builderEnableCache = enableCache;
+            LOGGER.debug("setEnableCache as " + enableCache);
             return this;
         }
 
@@ -167,7 +166,7 @@ public class PixelsReaderImpl
 
             // create a default PixelsReader
             return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb,
-                                        enableCache, builderCacheOrder, builderPixelsCacheReader);
+                                        builderEnableCache, builderCacheOrder, builderPixelsCacheReader);
         }
     }
 
@@ -199,6 +198,7 @@ public class PixelsReaderImpl
         if (diceValue < metricsCollectProb) {
             enableMetrics = true;
         }
+        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
                 enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader);
         recordReaders.add(recordReader);

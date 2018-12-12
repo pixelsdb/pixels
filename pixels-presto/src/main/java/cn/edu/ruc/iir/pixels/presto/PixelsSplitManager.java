@@ -20,6 +20,7 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.presto.exception.BalancerException;
 import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
@@ -121,15 +122,15 @@ public class PixelsSplitManager
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (index == null)
             {
-                log.debug("action null");
+                log.info("action null");
                 index = getInverted(order, splits, indexEntry);
             }
             else
             {
-                log.debug("action not null");
+                log.info("action not null");
                 int indexVersion = index.getVersion();
                 if (indexVersion < version) {
-                    log.debug("action not null update");
+                    log.info("action not null update");
                     index = getInverted(order, splits, indexEntry);
                 }
             }
@@ -140,7 +141,7 @@ public class PixelsSplitManager
                 columnSet.addColumn(column.getColumnName());
             }
             AccessPattern bestPattern = index.search(columnSet);
-            log.debug("bestPattern: " + bestPattern.toString());
+            log.info("bestPattern: " + bestPattern.toString());
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
@@ -151,14 +152,14 @@ public class PixelsSplitManager
                 List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
                 String cacheVersion;
                 EtcdUtil etcdUtil = EtcdUtil.Instance();
-                KeyValue keyValue = etcdUtil.getKeyValue("cache_version");
+                KeyValue keyValue = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if(keyValue != null)
                 {
                     // 1. get version
                     cacheVersion = keyValue.getValue().toStringUtf8();
-                    log.debug("cache version: " + cacheVersion);
+                    log.info("cache version: " + cacheVersion);
                     // 2. get files of each node
-                    List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix("location_" + cacheVersion);
+                    List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
                     if(nodeFiles.size() > 0)
                     {
                         Map<String, String> fileToNodeMap = new HashMap<>();
@@ -169,7 +170,7 @@ public class PixelsSplitManager
                             for(String file : files)
                             {
                                 fileToNodeMap.put(file, node);
-                                log.debug("cache location: {file='" + file + "', node='" + node + "'");
+                                log.info("cache location: {file='" + file + "', node='" + node + "'");
                             }
                         }
                         try
@@ -190,7 +191,7 @@ public class PixelsSplitManager
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         path.toString(), 0, 1,
                                         false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
-                                log.debug("Split in orderPath: " + pixelsSplit.toString());
+                                log.info("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
                             // 4. add splits in compactPath
@@ -206,9 +207,9 @@ public class PixelsSplitManager
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                                                               tableHandle.getSchemaName(), tableHandle.getTableName(),
                                                                               hdfsFile, curFileRGIdx, splitSize,
-                                                                              cacheEnabled, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
+                                                                              true, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
                                     pixelsSplits.add(pixelsSplit);
-                                    log.debug("Split in compactPath" + pixelsSplit.toString());
+                                    log.info("Split in compactPath" + pixelsSplit.toString());
                                     curFileRGIdx += splitSize;
                                 }
                             }
@@ -231,6 +232,7 @@ public class PixelsSplitManager
             }
             else
             {
+                log.info("cache is not enabled");
                 List<Path> orderedPaths;
                 Balancer orderedBalancer = new Balancer();
                 List<Path> compactPaths;
@@ -244,7 +246,7 @@ public class PixelsSplitManager
                         orderedBalancer.put(addresses.get(0), path);
                     }
                     orderedBalancer.balance();
-                    log.debug("ordered files balanced=" + orderedBalancer.isBalanced());
+                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
 
                     compactPaths = fsFactory.listFiles(layout.getCompactPath());
                     for (Path path : compactPaths)
@@ -253,7 +255,7 @@ public class PixelsSplitManager
                         compactBalancer.put(addresses.get(0), path);
                     }
                     compactBalancer.balance();
-                    log.debug("compact files balanced=" + compactBalancer.isBalanced());
+                    log.info("compact files balanced=" + compactBalancer.isBalanced());
                 } catch (FSException e)
                 {
                     throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
@@ -267,7 +269,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             path.toString(), 0, 1,
-                            cacheEnabled, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                            false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
                 // add splits in compactPath
@@ -284,7 +286,7 @@ public class PixelsSplitManager
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                 path.toString(), curFileRGIdx, splitSize,
-                                cacheEnabled, hostAddresses, order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                false, hostAddresses, order.getColumnOrder(), new ArrayList<>(0), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }
@@ -293,7 +295,7 @@ public class PixelsSplitManager
         }
 
         log.info("pixelsSplits: " + pixelsSplits.size());
-        log.info("=====begin to shuffle====");
+        log.info("=====shuffle splits====");
         Collections.shuffle(pixelsSplits);
 
         return new FixedSplitSource(pixelsSplits);
