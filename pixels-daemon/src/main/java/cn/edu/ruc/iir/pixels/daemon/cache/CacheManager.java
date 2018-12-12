@@ -21,7 +21,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,7 +48,7 @@ public class CacheManager
     private final PixelsCacheConfig cacheConfig;
     private final EtcdUtil etcdUtil;
     private final ScheduledExecutorService scheduledExecutor;
-    private final String hostName;
+    private String hostName;
     private boolean initializeSuccess = false;
     private int localCacheVersion = 0;
 
@@ -56,6 +58,18 @@ public class CacheManager
         this.etcdUtil = EtcdUtil.Instance();
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.hostName = System.getenv("HOSTNAME");
+        logger.debug("HostName from system env: " + hostName);
+        if (hostName == null) {
+            try {
+                this.hostName = InetAddress.getLocalHost().getHostName();
+                logger.debug("HostName from InetAddress: " + hostName);
+            }
+            catch (UnknownHostException e) {
+                logger.debug("Hostname is null. Exit");
+                return;
+            }
+        }
+        logger.debug("HostName: " + hostName);
         initialize();
     }
 
@@ -92,14 +106,15 @@ public class CacheManager
                                      .setIndexSize(cacheConfig.getIndexSize())
                                      .setOverwrite(false)
                                      .setFS(fs)
+                                     .setHostName(hostName)
                                      .build();
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
             localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
-            logger.info("Local cache version: " + localCacheVersion);
+            logger.debug("Local cache version: " + localCacheVersion);
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
             if (null != globalCacheVersionKV) {
                 int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toStringUtf8());
-                logger.info("Current global cache version: " + globalCacheVersion);
+                logger.debug("Current global cache version: " + globalCacheVersion);
                 // if cache file exists already. we need check local cache version with global cache version stored in etcd
                 if (localCacheVersion < globalCacheVersion) {
                     // if global version is not consistent with the local one. update local cache.
@@ -134,13 +149,13 @@ public class CacheManager
             // update cache status
             cacheStatus.set(2);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
-            logger.info("Update cache. Status changed to 2");
+            logger.debug("Update cache. Status changed to 2");
             // update cache content
             if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
                 cacheStatus.set(1);
                 etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
                 localCacheVersion = version;
-                logger.info("Update cache content ok. Status changed back to 1");
+                logger.debug("Update cache content ok. Status changed back to 1");
                 return true;
             }
             else {
@@ -171,9 +186,9 @@ public class CacheManager
                     // update a new version
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
                         int version = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
-                        logger.info("Cache version update detected, new global version is " + version);
+                        logger.debug("Cache version update detected, new global version is " + version);
                         if (version > localCacheVersion) {
-                            logger.info("New global version is greater than the local version, update the local cache");
+                            logger.debug("New global version is greater than the local version, update the local cache");
                             update(version);
                         }
                     }
@@ -202,8 +217,9 @@ public class CacheManager
     public void shutdown()
     {
         cacheStatus.set(-1);
-        etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
         cacheManagerRegister.stop();
+        etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
+        logger.info("CacheManager on " + hostName + " shut down.");
         this.scheduledExecutor.shutdownNow();
     }
 

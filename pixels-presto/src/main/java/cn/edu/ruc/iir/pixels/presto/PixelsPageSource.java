@@ -66,6 +66,7 @@ class PixelsPageSource implements ConnectorPageSource {
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
 
+        logger.debug("Create page source for split: " + split.toString());
         getPixelsReaderBySchema(split, pixelsCacheReader);
 
         this.recordReader = this.pixelsReader.read(this.option);
@@ -86,7 +87,7 @@ class PixelsPageSource implements ConnectorPageSource {
             PixelsColumnHandle column = entry.getKey();
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
-            logger.info("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
+            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,

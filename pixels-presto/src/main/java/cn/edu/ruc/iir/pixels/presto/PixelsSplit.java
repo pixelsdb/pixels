@@ -163,6 +163,7 @@ public class PixelsSplit
                 Objects.equals(this.start, that.start) &&
                 Objects.equals(this.len, that.len) &&
                 Objects.equals(this.addresses, that.addresses) &&
+                Objects.equals(this.isCached, that.isCached) &&
                 Objects.equals(this.constraint, that.constraint);
     }
 
@@ -180,6 +181,7 @@ public class PixelsSplit
                 ", path='" + path + '\'' +
                 ", start=" + start +
                 ", len=" + len +
+                ", isCached=" + isCached +
                 ", addresses=" + addresses +
                 '}';
     }

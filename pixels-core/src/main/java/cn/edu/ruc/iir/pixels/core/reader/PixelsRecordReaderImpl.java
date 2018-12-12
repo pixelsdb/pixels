@@ -326,6 +326,7 @@ public class PixelsRecordReaderImpl
             }
         }
         List<ChunkId> chunks = new ArrayList<>();
+        logger.debug("enableCache is " + enableCache);
         if (enableCache) {
             // read data from local caching
             logger.info("PixelsRecordReader reads data from local caching");

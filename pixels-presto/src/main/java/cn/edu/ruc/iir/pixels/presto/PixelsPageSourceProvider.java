@@ -35,9 +35,9 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
             this.pixelsCacheReader = PixelsCacheReader
                     .newBuilder()
                     .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
-                    .setCacheSize(Integer.parseInt(config.getConfigFactory().getProperty("cache.size")))
+                    .setCacheSize(Long.parseLong(config.getConfigFactory().getProperty("cache.size")))
                     .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
-                    .setIndexSize(Integer.parseInt(config.getConfigFactory().getProperty("index.size")))
+                    .setIndexSize(Long.parseLong(config.getConfigFactory().getProperty("index.size")))
                     .build();
         }
         else {

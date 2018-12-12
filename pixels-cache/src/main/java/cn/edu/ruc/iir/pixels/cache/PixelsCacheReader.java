@@ -92,17 +92,19 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-        logger.info("Cache read: " + blockId + "-" + rowGroupId + "-" + columnId);
+        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
         short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
         if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
+            logger.debug("Index rwFlag is not set as READ. Stop.");
             return content;
         }
 
         // check if reader count reaches its max value, if so no more reads are allowed
         int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
         if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
+            logger.debug("Index reader count has exceeded the maximum value. Stop.");
             return content;
         }
         // update reader count
@@ -118,6 +120,7 @@ public class PixelsCacheReader
         if (cacheIdx != null) {
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
+            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);
@@ -197,5 +200,12 @@ public class PixelsCacheReader
 
     public void close()
     {
+        try {
+            cacheFile.unmap();
+            indexFile.unmap();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

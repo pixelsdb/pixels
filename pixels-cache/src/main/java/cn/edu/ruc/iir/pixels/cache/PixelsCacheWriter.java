@@ -59,6 +59,7 @@ public class PixelsCacheWriter
         private long builderIndexSize;
         private FileSystem builderFS;
         private boolean builderOverwrite = true;
+        private String builderHostName = null;
 
         private Builder()
         {}
@@ -109,6 +110,12 @@ public class PixelsCacheWriter
             return this;
         }
 
+        public PixelsCacheWriter.Builder setHostName(String hostName)
+        {
+            this.builderHostName = hostName;
+            return this;
+        }
+
         public PixelsCacheWriter build()
                 throws Exception
         {
@@ -125,11 +132,10 @@ public class PixelsCacheWriter
                 radix = new PixelsRadix();
                 PixelsCacheUtil.initialize(indexFile, cacheFile);
             }
-            // todo check null of all parameters
+            // todo check nulls
             EtcdUtil etcdUtil = EtcdUtil.Instance();
-            PixelsCacheConfig config = new PixelsCacheConfig();
 
-            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, config.getCacheHost());
+            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, builderHostName);
         }
     }
 
@@ -147,8 +153,10 @@ public class PixelsCacheWriter
     {
         try {
             // get the caching file list
-            KeyValue keyValue = etcdUtil.getKeyValue(Constants.CACHE_LOCATION_LITERAL + version + "_" + host);
+            String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
+            KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null) {
+                logger.debug("Found no allocated files. No updates are needed. " + key);
                 return false;
             }
             String fileStr =  keyValue.getValue().toStringUtf8();
@@ -190,15 +198,19 @@ public class PixelsCacheWriter
         int cacheBorder = compact.getCacheBorder();
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
-        PixelsCacheUtil.setIndexRW(indexFile, (short) 1);
+        logger.debug("Set index rwFlag as write");
+        PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
         // wait until readerCount is 0
         long start = System.currentTimeMillis();
-        while (System.currentTimeMillis() - start < 3000) {
+        while (System.currentTimeMillis() - start < 5000) {
+            logger.debug("Wait until all previous started reads are finished");
             if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
+                logger.debug("No more reads are going on. Break.");
                 break;
             }
         }
         PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
+        logger.debug("Set index reader count to 0");
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
@@ -219,9 +231,11 @@ public class PixelsCacheWriter
                 physicalLens[i] = (int) chunkIndex.getChunkLength();
                 physicalOffsets[i] = chunkIndex.getChunkOffset();
                 if (cacheOffset + physicalLens[i] >= cacheFile.getSize()) {
+                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + cacheOffset);
                     break outer_loop;
                 }
                 else {
+                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId);
                     radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
                               new PixelsCacheIdx(cacheOffset, physicalLens[i]));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
@@ -230,7 +244,7 @@ public class PixelsCacheWriter
                 }
             }
         }
-        logger.info("Cache writer offset: " + cacheOffset);
+        logger.debug("Cache writer ends at offset: " + cacheOffset);
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
@@ -287,6 +301,7 @@ public class PixelsCacheWriter
      * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
      * Child: leader(1 byte) + child_offset(7 bytes)
      * */
+    // todo add index file size limitation
     private void flushNode(RadixNode node)
     {
         if (node.offset == 0) {

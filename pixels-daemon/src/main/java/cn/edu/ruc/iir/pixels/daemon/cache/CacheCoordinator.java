@@ -22,6 +22,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,7 @@ public class CacheCoordinator
     private final PixelsCacheConfig cacheConfig;
     private final ScheduledExecutorService scheduledExecutor;
     private final MetadataService metadataService;
-    private final String hostName;
+    private String hostName;
     private FSFactory fsFactory = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
@@ -60,6 +62,17 @@ public class CacheCoordinator
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
         this.hostName = System.getenv("HOSTNAME");
+        logger.debug("HostName from system env: " + hostName);
+        if (hostName == null) {
+            try {
+                this.hostName = InetAddress.getLocalHost().getHostName();
+                logger.debug("HostName from InetAddress: " + hostName);
+            }
+            catch (UnknownHostException e) {
+                logger.debug("Hostname is null. Exit");
+                return;
+            }
+        }
         initialize();
     }
 
@@ -90,7 +103,7 @@ public class CacheCoordinator
                 layout_version = Integer.parseInt(layoutVersionKV.getValue().toStringUtf8());
             }
             if (cache_version < layout_version) {
-                logger.info("Current cache version is left behind of current layout version. Update.");
+                logger.debug("Current cache version is left behind of current layout version. Update.");
                 update(layout_version);
             }
             coordinatorStatus.set(1);
@@ -119,12 +132,12 @@ public class CacheCoordinator
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
-                        logger.info("Update cache distribution");
+                        logger.debug("Update cache distribution");
                         // update the cache distribution
                         int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
                         update(layoutVersion);
                         // update cache version
-                        logger.info("Update cache version to " + layoutVersion);
+                        logger.debug("Update cache version to " + layoutVersion);
                         etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
                     }
                 }
@@ -149,6 +162,7 @@ public class CacheCoordinator
         coordinatorStatus.set(-1);
         cacheCoordinatorRegister.stop();
         etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
+        logger.info("CacheCoordinator shuts down.");
         this.scheduledExecutor.shutdownNow();
     }
 
@@ -209,6 +223,7 @@ public class CacheCoordinator
             HostAddress node = nodes[i];
             Set<String> files = cacheLocationDistribution.getCacheDistributionByLocation(node.toString());
             String key = Constants.CACHE_LOCATION_LITERAL + layoutVersion + "_" + node;
+            logger.debug(files.size() + " files are allocated to " + node + " at version" + layoutVersion);
             etcdUtil.putKeyValue(key, String.join(";", files));
         }
     }
