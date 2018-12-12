@@ -37,8 +37,8 @@ import java.util.Map;
 
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_BAD_DATA;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CLIENT_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_READER_CLOSE_ERROR;
 import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_READER_ERROR;
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_WRITER_CLOSE_ERROR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -285,12 +285,14 @@ class PixelsPageSource implements ConnectorPageSource {
     @Override
     public void close() {
         try {
-            pixelsReader.close();
+            if (pixelsReader != null) {
+                pixelsReader.close();
+            }
             rowBatch = null;
             nanoEnd = System.nanoTime();
         } catch (Exception e) {
             logger.error("close error: " + e.getMessage());
-            throw new PrestoException(PIXELS_WRITER_CLOSE_ERROR, e);
+            throw new PrestoException(PIXELS_READER_CLOSE_ERROR, e);
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times

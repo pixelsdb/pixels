@@ -44,7 +44,7 @@ public class PixelsSplit
     private final String path;
     private final int start;
     private final int len;
-    private final boolean isCached;
+    private boolean isCached;
     private final List<HostAddress> addresses;
     private final List<String> order;
     private final List<String> cacheOrder;
@@ -75,6 +75,11 @@ public class PixelsSplit
         this.cacheOrder = requireNonNull(cacheOrder, "cache order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         // log.info("PixelsSplit Constructor:" + schemaName + ", " + tableName + ", " + path);
+    }
+
+    public void setCacheEnable(boolean isCached)
+    {
+        this.isCached = isCached;
     }
 
     @JsonProperty

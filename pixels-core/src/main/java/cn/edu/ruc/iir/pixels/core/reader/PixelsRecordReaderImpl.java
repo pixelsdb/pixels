@@ -337,6 +337,11 @@ public class PixelsRecordReaderImpl
                 short cacheRGId = Short.parseShort(cacheIdParts[0]);
                 short cacheColId = Short.parseShort(cacheIdParts[1]);
                 int cacheRGIdx = cacheRGId - RGStart;
+                if (cacheRGIdx < 0 || cacheRGIdx >= RGLen) {
+                    continue;
+                }
+                logger.info("RGStart: " + RGStart + ", cacheRGId: " + cacheRGId + ", cacheColId: " + cacheColId +
+                            ", cacheRGIdx: " + cacheRGIdx + ", includedColsLen: " + includedColumns.length);
                 logger.info("Try to read " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId + " from caching.");
                 long cacheAccessStart = System.nanoTime();
                 byte[] columnlet = cacheReader.get(physicalFSReader.getPath().toString(), cacheRGId, cacheColId);
@@ -344,6 +349,7 @@ public class PixelsRecordReaderImpl
                 logger.info("Cache access time cost: " + (cacheAccessEnd - cacheAccessStart) + "ns");
                 if (columnlet != null && columnlet.length > 0) {
                     logger.info("Got cache for " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId);
+                    logger.info("chunkBuffer idx: " + cacheRGIdx * includedColumns.length + cacheColId);
                     chunkBuffers[cacheRGIdx * includedColumns.length + cacheColId] = columnlet;
                     isCached[cacheRGIdx][cacheColId] = true;
                 }
