@@ -34,6 +34,8 @@
         <module>pixels-common</module>
         <module>pixels-cache</module>
         <module>pixels-load</module>
+        <module>pixels-listener</module>
+        <module>pixels-hive</module>
     </modules>
 
     <packaging>pom</packaging>
@@ -53,7 +55,6 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
-        <dep.rainbow.version>0.1.0-SNAPSHOT</dep.rainbow.version>
         <dep.hadoop.version>2.7.3</dep.hadoop.version>
         <dep.hive.version>2.2.1</dep.hive.version>
         <dep.orc.version>1.4.3</dep.orc.version>
@@ -77,6 +78,7 @@
         <dep.prometheus.client.version>0.2.0</dep.prometheus.client.version>
         <dep.argparse4j.version>0.7.0</dep.argparse4j.version>
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
+        <dep.apache-httpclient.version>4.5.3</dep.apache-httpclient.version>
         <dep.log4j.version>2.11.1</dep.log4j.version>
         <dep.junit.version>4.12</dep.junit.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
@@ -329,6 +331,13 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-all</artifactId>
                 <version>${dep.netty.version}</version>
+            </dependency>
+
+            <!-- apache-httpclient -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>${dep.apache-httpclient.version}</version>
             </dependency>
 
             <!-- logging -->
