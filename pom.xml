@@ -56,7 +56,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
         <dep.hadoop.version>2.7.3</dep.hadoop.version>
-        <dep.hive.version>2.2.1</dep.hive.version>
+        <dep.hive.version>2.7.0</dep.hive.version>
         <dep.orc.version>1.4.3</dep.orc.version>
         <dep.presto.version>0.192</dep.presto.version>
         <dep.zookeeper.version>3.4.6</dep.zookeeper.version>
@@ -208,7 +208,11 @@
                 </exclusions>
                 <version>${dep.hadoop.version}</version>
             </dependency>
-
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client</artifactId>
+                <version>${dep.hadoop.version}</version>
+            </dependency>
             <!-- airlift -->
             <dependency>
                 <groupId>io.airlift</groupId>
