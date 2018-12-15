@@ -64,7 +64,7 @@
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
         <dep.mysql.version>5.1.38</dep.mysql.version>
-        <dep.netty.version>4.1.12.Final</dep.netty.version>
+        <dep.netty.version>4.1.25.Final</dep.netty.version>
         <dep.fastjson.version>1.2.31</dep.fastjson.version>
         <dep.guava.version>21.0</dep.guava.version>
         <dep.protobuf.version>3.3.1</dep.protobuf.version>
@@ -143,7 +143,7 @@
             <dependency>
                 <groupId>com.coreos</groupId>
                 <artifactId>jetcd-core</artifactId>
-                <version>0.0.1</version>
+                <version>0.0.2</version>
             </dependency>
 
             <!-- presto -->

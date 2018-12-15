@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
@@ -28,8 +29,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * Pixels file reader default implementation
  *
- * This writer is NOT thread safe!
- *
  * @author guodong
  */
 @NotThreadSafe
@@ -46,6 +45,8 @@ public class PixelsReaderImpl
     private final String metricsDir;
     private final float metricsCollectProb;
     private final boolean enableCache;
+    private final List<String> cacheOrder;
+    private final PixelsCacheReader pixelsCacheReader;
     private final Random random;
 
     private PixelsReaderImpl(TypeDescription fileSchema,
@@ -53,7 +54,9 @@ public class PixelsReaderImpl
                              PixelsProto.FileTail fileTail,
                              String metricsDir,
                              float metricsCollectProb,
-                             boolean enableCache)
+                             boolean enableCache,
+                             List<String> cacheOrder,
+                             PixelsCacheReader pixelsCacheReader)
     {
         this.fileSchema = fileSchema;
         this.physicalFSReader = physicalFSReader;
@@ -63,6 +66,8 @@ public class PixelsReaderImpl
         this.metricsDir = metricsDir;
         this.metricsCollectProb = metricsCollectProb;
         this.enableCache = enableCache;
+        this.cacheOrder = cacheOrder;
+        this.pixelsCacheReader = pixelsCacheReader;
         this.random = new Random();
     }
 
@@ -70,8 +75,10 @@ public class PixelsReaderImpl
     {
         private FileSystem builderFS = null;
         private Path builderPath = null;
+        private List<String> builderCacheOrder = null;
         private TypeDescription builderSchema = null;
-        private boolean enableCache = false;
+        private boolean builderEnableCache = false;
+        private PixelsCacheReader builderPixelsCacheReader = null;
 
         private Builder()
         {}
@@ -88,9 +95,22 @@ public class PixelsReaderImpl
             return this;
         }
 
+        public Builder setCacheOrder(List<String> cacheOrder)
+        {
+            this.builderCacheOrder = cacheOrder;
+            return this;
+        }
+
         public Builder setEnableCache(boolean enableCache)
         {
-            this.enableCache = enableCache;
+            this.builderEnableCache = enableCache;
+            LOGGER.debug("setEnableCache as " + enableCache);
+            return this;
+        }
+
+        public Builder setPixelsCacheReader(PixelsCacheReader pixelsCacheReader)
+        {
+            this.builderPixelsCacheReader = pixelsCacheReader;
             return this;
         }
 
@@ -145,7 +165,8 @@ public class PixelsReaderImpl
             }
 
             // create a default PixelsReader
-            return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb, enableCache);
+            return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb,
+                                        builderEnableCache, builderCacheOrder, builderPixelsCacheReader);
         }
     }
 
@@ -177,8 +198,9 @@ public class PixelsReaderImpl
         if (diceValue < metricsCollectProb) {
             enableMetrics = true;
         }
+        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
-                enableMetrics, enableCache, metricsDir);
+                enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader);
         recordReaders.add(recordReader);
         return recordReader;
     }

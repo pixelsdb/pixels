@@ -1,7 +1,7 @@
-package cn.edu.ruc.iir.pixels.common.utils;
+package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import com.coreos.jetcd.data.KeyValue;
-import org.junit.Test;
 
 /**
  * Created at: 18-10-14
@@ -9,8 +9,7 @@ import org.junit.Test;
  */
 public class TestEtcdUtil
 {
-    @Test
-    public void test()
+    public static void main(String[] args)
     {
         String key = "cache_version";
         EtcdUtil etcdUtil = EtcdUtil.Instance();
@@ -23,6 +22,7 @@ public class TestEtcdUtil
             System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
         else
             System.out.println("keyValue is：" + keyValue);
+        etcdUtil.getClient().close();
     }
 
 }

@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ColumnHandle;
@@ -20,15 +21,33 @@ import static java.util.stream.Collectors.toList;
 /**
  * Provider Class for Pixels Page Source class.
  */
-public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
-    private static Logger logger = Logger.get(PixelsPageSourceProvider.class);
+public class PixelsPageSourceProvider
+        implements ConnectorPageSourceProvider
+{
+    private static final Logger logger = Logger.get(PixelsPageSourceProvider.class);
+
     private final String connectorId;
     private final FSFactory fsFactory;
+    private final PixelsCacheReader pixelsCacheReader;
 
     @Inject
-    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config) {
+    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
+            throws Exception
+    {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
+        if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
+            this.pixelsCacheReader = PixelsCacheReader
+                    .newBuilder()
+                    .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
+                    .setCacheSize(Long.parseLong(config.getConfigFactory().getProperty("cache.size")))
+                    .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
+                    .setIndexSize(Long.parseLong(config.getConfigFactory().getProperty("index.size")))
+                    .build();
+        }
+        else {
+            this.pixelsCacheReader = null;
+        }
     }
 
     @Override
@@ -37,9 +56,11 @@ public class PixelsPageSourceProvider implements ConnectorPageSourceProvider {
         List<PixelsColumnHandle> pixelsColumns = columns.stream()
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
+        logger.info("Create page source for split: " + split.toString());
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
+        logger.info("Create page source for pixels split: " + pixelsSplit.toString());
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
-        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, connectorId);
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, pixelsCacheReader, connectorId);
     }
 }

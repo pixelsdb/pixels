@@ -15,19 +15,31 @@ package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.presto.exception.BalancerException;
 import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
-import cn.edu.ruc.iir.pixels.presto.split.*;
+import cn.edu.ruc.iir.pixels.presto.split.AccessPattern;
+import cn.edu.ruc.iir.pixels.presto.split.ColumnSet;
+import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
+import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
+import cn.edu.ruc.iir.pixels.presto.split.Inverted;
 import com.alibaba.fastjson.JSON;
 import com.coreos.jetcd.data.KeyValue;
-import com.facebook.presto.spi.*;
+import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.ConnectorSplitSource;
+import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+import com.facebook.presto.spi.FixedSplitSource;
+import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -37,9 +49,19 @@ import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.*;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CACHE_NODE_FILE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_CACHE_VERSION_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_HDFS_FILE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_METASTORE_ERROR;
+import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_SPLIT_BALANCER_ERROR;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
@@ -136,23 +158,24 @@ public class PixelsSplitManager
                 // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestPattern.getSplitSize();
             }
-
             log.info("using split size: " + splitSize);
-
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
             if(this.cacheEnabled)
             {
+                Compact compact = layout.getCompactObject();
+                int cacheBorder = compact.getCacheBorder();
+                List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
                 String cacheVersion;
                 EtcdUtil etcdUtil = EtcdUtil.Instance();
-                KeyValue keyValue = etcdUtil.getKeyValue("cache_version");
+                KeyValue keyValue = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if(keyValue != null)
                 {
                     // 1. get version
                     cacheVersion = keyValue.getValue().toStringUtf8();
                     log.info("cache version: " + cacheVersion);
                     // 2. get files of each node
-                    List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix("location_" + cacheVersion);
+                    List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
                     if(nodeFiles.size() > 0)
                     {
                         Map<String, String> fileToNodeMap = new HashMap<>();
@@ -166,28 +189,29 @@ public class PixelsSplitManager
                                 // log.info("cache location: {file='" + file + "', node='" + node + "'");
                             }
                         }
-                        // 3. add splits in orderedPath
                         try
                         {
-                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
+                            // 3. add splits in orderedPath
+                            Balancer orderedBalancer = new Balancer();
+                            List<Path> orderedPaths = fsFactory.listFiles(layout.getOrderPath());
+                            for (Path path : orderedPaths) {
+                                List<HostAddress> hostAddresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                                orderedBalancer.put(hostAddresses.get(0), path);
+                            }
+                            orderedBalancer.balance();
+                            for (Path path : orderedPaths)
                             {
-                                String hdfsFile = path.toString();
-                                String node = fileToNodeMap.get(hdfsFile);
-                                List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
+                                ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                                builder.add(orderedBalancer.get(path));
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                        hdfsFile, 0, 1,
-                                        cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
+                                        path.toString(), 0, 1,
+                                        false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                log.info("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
-                        } catch (FSException e)
-                        {
-                            throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
-                        }
-                        // 4. add splits in compactPath
-                        int curFileRGIdx;
-                        try
-                        {
+                            // 4. add splits in compactPath
+                            int curFileRGIdx;
                             for (Path path : fsFactory.listFiles(layout.getCompactPath()))
                             {
                                 curFileRGIdx = 0;
@@ -197,14 +221,16 @@ public class PixelsSplitManager
                                     String node = fileToNodeMap.get(hdfsFile);
                                     List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                                            tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                            hdfsFile, curFileRGIdx, splitSize,
-                                            cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
+                                                                              tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                                                              hdfsFile, curFileRGIdx, splitSize,
+                                                                              true, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
                                     pixelsSplits.add(pixelsSplit);
+                                    log.info("Split in compactPath" + pixelsSplit.toString());
                                     curFileRGIdx += splitSize;
                                 }
                             }
-                        } catch (FSException e)
+                        }
+                        catch (FSException e)
                         {
                             throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
                         }
@@ -222,6 +248,7 @@ public class PixelsSplitManager
             }
             else
             {
+                log.info("cache is not enabled");
                 List<Path> orderedPaths;
                 Balancer orderedBalancer = new Balancer();
                 List<Path> compactPaths;
@@ -258,7 +285,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             path.toString(), 0, 1,
-                            cacheEnabled, builder.build(), order.getColumnOrder(), constraint);
+                            false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
                 // add splits in compactPath
@@ -275,7 +302,7 @@ public class PixelsSplitManager
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                 path.toString(), curFileRGIdx, splitSize,
-                                cacheEnabled, hostAddresses, order.getColumnOrder(), constraint);
+                                false, hostAddresses, order.getColumnOrder(), new ArrayList<>(0), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }
@@ -283,6 +310,7 @@ public class PixelsSplitManager
             }
         }
 
+        log.info("=====shuffle splits====");
         log.info("number of total splits: " + pixelsSplits.size());
 
         Collections.shuffle(pixelsSplits);

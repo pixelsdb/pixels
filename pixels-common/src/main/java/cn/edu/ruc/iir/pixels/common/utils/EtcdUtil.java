@@ -24,8 +24,8 @@ import java.util.concurrent.ExecutionException;
  * Author: hank
  */
 public class EtcdUtil {
-    private static EtcdUtil instance = new EtcdUtil();
     private static Logger logger = LogManager.getLogger(EtcdUtil.class);
+    private static EtcdUtil instance = new EtcdUtil();
     private Client client = null;
     private boolean lockHeld;
 
@@ -34,6 +34,7 @@ public class EtcdUtil {
         Random random = new Random(System.nanoTime());
         String host = hosts[random.nextInt(hosts.length)];
         System.out.println(host);
+        logger.info("Etcd hosts: " + host);
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 
         this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
