@@ -2,11 +2,14 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
@@ -18,10 +21,10 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author guodong
  */
-// todo cache writer needs a cache space monitor
 public class PixelsCacheWriter
 {
     private final static short READABLE = 0;
+    private final static Logger logger = LogManager.getLogger(PixelsCacheWriter.class);
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
@@ -56,6 +59,7 @@ public class PixelsCacheWriter
         private long builderIndexSize;
         private FileSystem builderFS;
         private boolean builderOverwrite = true;
+        private String builderHostName = null;
 
         private Builder()
         {}
@@ -106,6 +110,12 @@ public class PixelsCacheWriter
             return this;
         }
 
+        public PixelsCacheWriter.Builder setHostName(String hostName)
+        {
+            this.builderHostName = hostName;
+            return this;
+        }
+
         public PixelsCacheWriter build()
                 throws Exception
         {
@@ -122,11 +132,10 @@ public class PixelsCacheWriter
                 radix = new PixelsRadix();
                 PixelsCacheUtil.initialize(indexFile, cacheFile);
             }
-            // todo check null of all parameters
+            // todo check nulls
             EtcdUtil etcdUtil = EtcdUtil.Instance();
-            PixelsCacheConfig config = new PixelsCacheConfig();
 
-            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, config.getCacheHost());
+            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, builderHostName);
         }
     }
 
@@ -144,8 +153,10 @@ public class PixelsCacheWriter
     {
         try {
             // get the caching file list
-            KeyValue keyValue = etcdUtil.getKeyValue("location_" + version + "_" + host);
+            String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
+            KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null) {
+                logger.debug("Found no allocated files. No updates are needed. " + key);
                 return false;
             }
             String fileStr =  keyValue.getValue().toStringUtf8();
@@ -187,24 +198,28 @@ public class PixelsCacheWriter
         int cacheBorder = compact.getCacheBorder();
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
-        PixelsCacheUtil.setIndexRW(indexFile, (short) 1);
+        logger.debug("Set index rwFlag as write");
+        PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
         // wait until readerCount is 0
         long start = System.currentTimeMillis();
-        while (System.currentTimeMillis() - start < 3000) {
+        while (System.currentTimeMillis() - start < 5000) {
+            logger.debug("Wait until all previous started reads are finished");
             if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
+                logger.debug("No more reads are going on. Break.");
                 break;
             }
         }
         PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
+        logger.debug("Set index reader count to 0");
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
-        for (String file : files)
+        outer_loop: for (String file : files)
         {
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
             int[] physicalLens = new int[cacheColumnletOrders.size()];
             long[] physicalOffsets = new long[cacheColumnletOrders.size()];
-            // update radix
+            // update radix and cache content
             for (int i = 0; i < cacheColumnletOrders.size(); i++)
             {
                 String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
@@ -215,19 +230,21 @@ public class PixelsCacheWriter
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
                 physicalLens[i] = (int) chunkIndex.getChunkLength();
                 physicalOffsets[i] = chunkIndex.getChunkOffset();
-                radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
-                          new PixelsCacheIdx(cacheOffset, physicalLens[i]));
-                cacheOffset += physicalLens[i];
-            }
-            // update cache content
-            cacheOffset = 0L;
-            for (int i = 0; i < cacheColumnletOrders.size(); i++)
-            {
-                byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
-                cacheFile.putBytes(cacheOffset, columnlet);
-                cacheOffset += physicalLens[i];
+                if (cacheOffset + physicalLens[i] >= cacheFile.getSize()) {
+                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + cacheOffset);
+                    break outer_loop;
+                }
+                else {
+                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId);
+                    radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
+                              new PixelsCacheIdx(cacheOffset, physicalLens[i]));
+                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
+                    cacheFile.putBytes(cacheOffset, columnlet);
+                    cacheOffset += physicalLens[i];
+                }
             }
         }
+        logger.debug("Cache writer ends at offset: " + cacheOffset);
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
@@ -284,6 +301,7 @@ public class PixelsCacheWriter
      * Header: isKey(1 bit) + edgeSize(22 bits) + childrenSize(9 bits)
      * Child: leader(1 byte) + child_offset(7 bytes)
      * */
+    // todo add index file size limitation
     private void flushNode(RadixNode node)
     {
         if (node.offset == 0) {

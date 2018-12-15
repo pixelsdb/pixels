@@ -287,4 +287,9 @@ public class MemoryMappedFile
     {
         return unsafe.getAndAddLong(null, pos + addr, delta);
     }
+
+    public long getSize()
+    {
+        return size;
+    }
 }

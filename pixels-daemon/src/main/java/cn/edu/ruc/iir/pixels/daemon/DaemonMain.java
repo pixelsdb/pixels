@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.cache.CacheCoordinator;
 import cn.edu.ruc.iir.pixels.daemon.cache.CacheManager;
 import cn.edu.ruc.iir.pixels.daemon.metadata.MetadataServer;
 import cn.edu.ruc.iir.pixels.daemon.metric.MetricsServer;
@@ -14,7 +15,7 @@ import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
 /**
- * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
+ * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar datanode|coordinator
  * */
 public class DaemonMain
 {
@@ -32,7 +33,7 @@ public class DaemonMain
             String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") + jarName;
 
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
+                    (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the main daemon
                 System.out.println("starting main daemon...");
@@ -48,22 +49,23 @@ public class DaemonMain
 
                 ConfigFactory config = ConfigFactory.Instance();
                 int port = Integer.valueOf(config.getProperty("metadata.server.port"));
-                MetadataServer metadataServer = new MetadataServer(port);
 
-                CacheManager cacheServer = new CacheManager();
-
-                MetricsServer metricsServer = new MetricsServer();
-
-                if (args[0].equalsIgnoreCase("metadata"))
+                if (args[0].equalsIgnoreCase("coordinator"))
                 {
                     // start metadata
+                    MetadataServer metadataServer = new MetadataServer(port);
                     container.addServer("metadata", metadataServer);
+                    // start cache coordinator
+                    CacheCoordinator cacheCoordinator = new CacheCoordinator();
+                    container.addServer("cache_coordinator", cacheCoordinator);
                 }
                 else
                 {
                     // start data node
-                    container.addServer("cache", cacheServer);
+                    MetricsServer metricsServer = new MetricsServer();
                     container.addServer("metrics", metricsServer);
+                    CacheManager cacheServer = new CacheManager();
+                    container.addServer("cache_manager", cacheServer);
                 }
 
                 // continue the main thread
@@ -90,10 +92,9 @@ public class DaemonMain
                         }
                     }
                 }
-
-
-            } else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("metadata") || args[0].equalsIgnoreCase("datanode")))
+            }
+            else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
+                    (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
@@ -101,7 +102,8 @@ public class DaemonMain
                 String[] guardCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
                 guardDaemon.setup(guardFile, mainFile, guardCmd);
                 guardDaemon.run();
-            } else if (role.equalsIgnoreCase("kill"))
+            }
+            else if (role.equalsIgnoreCase("kill"))
             {
                 System.out.println("Shutdown Daemons...");
                 try
@@ -116,7 +118,7 @@ public class DaemonMain
                         {
                             continue;
                         }
-                        if (splits[1].contains(jarName))
+                        if (splits[1].contains(jarName) || splits[1].contains(DaemonMain.class.getName()))
                         {
                             String roleName = null;
                             // get the role name of the target daemon (to be killing).

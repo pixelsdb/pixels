@@ -32,7 +32,7 @@ public class TestDaos
     public void testLayout ()
     {
         String schemaName = "pixels";
-        String tableName = "test30g_pixels";
+        String tableName = "test_105";
 
         SchemaDao schemaDao = new SchemaDao();
         TableDao tableDao = new TableDao();

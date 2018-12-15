@@ -282,7 +282,9 @@ public class PixelsRadix
     }
 
     public void removeAll()
-    {}
+    {
+        // todo remove all
+    }
 
     private SearchResult searchInternal(byte[] key)
     {
