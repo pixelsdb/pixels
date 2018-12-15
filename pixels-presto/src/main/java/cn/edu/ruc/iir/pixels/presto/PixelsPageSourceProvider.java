@@ -60,7 +60,6 @@ public class PixelsPageSourceProvider
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         logger.info("Create page source for pixels split: " + pixelsSplit.toString());
-        pixelsSplit.setCacheEnable(true);
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
         return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, pixelsCacheReader, connectorId);
     }
