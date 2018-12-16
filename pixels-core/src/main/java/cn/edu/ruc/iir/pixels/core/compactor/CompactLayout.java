@@ -31,6 +31,19 @@ public class CompactLayout
         return layout;
     }
 
+    public static CompactLayout buildNaive (int rowGroupNumber, int columnNumber)
+    {
+        CompactLayout layout = new CompactLayout(rowGroupNumber, columnNumber);
+        for (int i = 0; i < rowGroupNumber; i++)
+        {
+            for (int j = 0; j < columnNumber; j++)
+            {
+                layout.append(i, j);
+            }
+        }
+        return layout;
+    }
+
     protected void append (int rowGroupId, int columnId)
     {
         this.indices.add(new ColumnletIndex(rowGroupId, columnId));
