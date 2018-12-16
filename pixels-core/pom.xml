@@ -92,6 +92,7 @@
         </dependency>
     </dependencies>
 
+    <!--
     <build>
         <finalName>pixels-core</finalName>
         <plugins>
@@ -132,4 +133,5 @@
             </plugin>
         </plugins>
     </build>
+    -->
 </project>
