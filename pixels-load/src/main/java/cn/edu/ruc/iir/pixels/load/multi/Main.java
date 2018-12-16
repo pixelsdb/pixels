@@ -55,7 +55,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact -d hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact_2
  * </p>
  * <p>
- * COMPACT -s pixels -t test_105_perf -l 3
+ * COMPACT -s pixels -t test_105_perf -l 3 -n no
  * </p>
  */
 public class Main
@@ -381,6 +381,8 @@ public class Main
                         .help("specify the name of table.");
                 argumentParser.addArgument("-l", "--layout").required(true)
                         .help("Specify the id of the layout to compact.");
+                argumentParser.addArgument("-n", "--naive").required(true)
+                        .help("Specify whether or not to create naive compact layout.");
 
                 Namespace ns = null;
                 try
@@ -398,6 +400,7 @@ public class Main
                     String schema = ns.getString("schema");
                     String table = ns.getString("table");
                     int layoutId = ns.getInt("layout");
+                    String naive = ns.getString("naive");
 
                     String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
                     int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
@@ -418,7 +421,16 @@ public class Main
 
                     Compact compact = layout.getCompactObject();
                     int numRowGroupInBlock = compact.getNumRowGroupInBlock();
-                    CompactLayout compactLayout = CompactLayout.fromCompact(compact);
+                    CompactLayout compactLayout;
+                    if (naive.equalsIgnoreCase("yes") || naive.equalsIgnoreCase("y"))
+                    {
+                        compactLayout = CompactLayout.buildNaive(
+                                compact.getNumRowGroupInBlock(), compact.getNumColumn());
+                    }
+                    else
+                    {
+                        compactLayout = CompactLayout.fromCompact(compact);
+                    }
 
                     // get input file paths
                     ConfigFactory configFactory = ConfigFactory.Instance();
