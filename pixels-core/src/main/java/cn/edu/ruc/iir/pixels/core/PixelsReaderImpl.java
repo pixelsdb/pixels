@@ -104,7 +104,6 @@ public class PixelsReaderImpl
         public Builder setEnableCache(boolean enableCache)
         {
             this.builderEnableCache = enableCache;
-            LOGGER.debug("setEnableCache as " + enableCache);
             return this;
         }
 

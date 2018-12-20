@@ -44,7 +44,7 @@ public class PixelsSplit
     private final String path;
     private final int start;
     private final int len;
-    private boolean isCached;
+    private boolean cached;
     private final List<HostAddress> addresses;
     private final List<String> order;
     private final List<String> cacheOrder;
@@ -58,7 +58,7 @@ public class PixelsSplit
             @JsonProperty("path") String path,
             @JsonProperty("start") int start,
             @JsonProperty("len") int len,
-            @JsonProperty("isCached") boolean isCached,
+            @JsonProperty("cached") boolean cached,
             @JsonProperty("addresses") List<HostAddress> addresses,
             @JsonProperty("order") List<String> order,
             @JsonProperty("cacheOrder") List<String> cacheOrder,
@@ -69,17 +69,12 @@ public class PixelsSplit
         this.path = requireNonNull(path, "path is null");
         this.start = start;
         this.len = len;
-        this.isCached = isCached;
+        this.cached = cached;
         this.addresses = ImmutableList.copyOf(requireNonNull(addresses, "addresses is null"));
         this.order = requireNonNull(order, "order is null");
         this.cacheOrder = requireNonNull(cacheOrder, "cache order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
-        log.info("PixelsSplit Constructor: " + schemaName + ", " + tableName + ", " + path + ", isCached: " + isCached);
-    }
-
-    @JsonProperty
-    public boolean isCached() {
-        return isCached;
+        log.info("PixelsSplit Constructor: " + schemaName + ", " + tableName + ", " + path + ", cached: " + cached);
     }
 
     @JsonProperty
@@ -119,6 +114,12 @@ public class PixelsSplit
     @JsonProperty
     public int getLen() {
         return len;
+    }
+
+    @JsonProperty
+    public boolean getCached()
+    {
+        return cached;
     }
 
     @Override
@@ -163,13 +164,13 @@ public class PixelsSplit
                 Objects.equals(this.start, that.start) &&
                 Objects.equals(this.len, that.len) &&
                 Objects.equals(this.addresses, that.addresses) &&
-                Objects.equals(this.isCached, that.isCached) &&
+                Objects.equals(this.cached, that.cached) &&
                 Objects.equals(this.constraint, that.constraint);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, isCached, constraint);
+        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, cached, constraint);
     }
 
     @Override
@@ -181,7 +182,7 @@ public class PixelsSplit
                 ", path='" + path + '\'' +
                 ", start=" + start +
                 ", len=" + len +
-                ", isCached=" + isCached +
+                ", isCached=" + cached +
                 ", addresses=" + addresses +
                 '}';
     }
