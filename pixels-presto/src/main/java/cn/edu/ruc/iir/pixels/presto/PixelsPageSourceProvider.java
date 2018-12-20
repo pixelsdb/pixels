@@ -56,8 +56,10 @@ public class PixelsPageSourceProvider
         List<PixelsColumnHandle> pixelsColumns = columns.stream()
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
+        logger.info("Create page source for split: " + split.toString());
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
+        logger.info("Create page source for pixels split: " + pixelsSplit.toString());
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
         return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, pixelsCacheReader, connectorId);
     }

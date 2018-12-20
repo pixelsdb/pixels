@@ -1,22 +1,27 @@
 package cn.edu.ruc.iir.pixels.load.multi;
 
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
+import cn.edu.ruc.iir.pixels.core.compactor.CompactLayout;
+import cn.edu.ruc.iir.pixels.core.compactor.PixelsCompactor;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 
 import java.io.*;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
@@ -49,10 +54,12 @@ import java.util.concurrent.LinkedBlockingDeque;
  * <p>
  * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact -d hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact_2
  * </p>
+ * <p>
+ * COMPACT -s pixels -t test_105_perf -l 3 -n no
+ * </p>
  */
 public class Main
 {
-
     public static void main(String args[])
     {
         Config config = null;
@@ -121,7 +128,7 @@ public class Main
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels ETL (link).");
+                    System.out.println("Pixels Load.");
                     System.exit(0);
                 }
 
@@ -201,7 +208,7 @@ public class Main
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels QUERY (link).");
+                    System.out.println("Pixels QUERY.");
                     System.exit(0);
                 }
 
@@ -311,7 +318,7 @@ public class Main
                 } catch (ArgumentParserException e)
                 {
                     argumentParser.handleError(e);
-                    System.out.println("Pixels COPY (link).");
+                    System.out.println("Pixels COPY.");
                     System.exit(0);
                 }
 
@@ -361,13 +368,128 @@ public class Main
                 {
                     e.printStackTrace();
                 }
+            }
 
+            if (command.equals("COMPACT"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COPY")
+                        .defaultHelp(true);
 
+                argumentParser.addArgument("-s", "--schema").required(true)
+                        .help("Specify the name of schema.");
+                argumentParser.addArgument("-t", "--table").required(true)
+                        .help("specify the name of table.");
+                argumentParser.addArgument("-l", "--layout").required(true)
+                        .help("Specify the id of the layout to compact.");
+                argumentParser.addArgument("-n", "--naive").required(true)
+                        .help("Specify whether or not to create naive compact layout.");
+
+                Namespace ns = null;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    System.out.println("Pixels Compact.");
+                    System.exit(0);
+                }
+
+                try
+                {
+                    String schema = ns.getString("schema");
+                    String table = ns.getString("table");
+                    int layoutId = ns.getInt("layout");
+                    String naive = ns.getString("naive");
+
+                    String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
+                    int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
+
+                    // get compact layout
+                    MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
+                    List<Layout> layouts = metadataService.getLayouts(schema, table);
+                    System.out.println("existing number of layouts: " + layouts.size());
+                    Layout layout = null;
+                    for (Layout layout1 : layouts)
+                    {
+                        if (layout1.getId() == layoutId)
+                        {
+                            layout = layout1;
+                            break;
+                        }
+                    }
+
+                    Compact compact = layout.getCompactObject();
+                    int numRowGroupInBlock = compact.getNumRowGroupInBlock();
+                    CompactLayout compactLayout;
+                    if (naive.equalsIgnoreCase("yes") || naive.equalsIgnoreCase("y"))
+                    {
+                        compactLayout = CompactLayout.buildNaive(
+                                compact.getNumRowGroupInBlock(), compact.getNumColumn());
+                    }
+                    else
+                    {
+                        compactLayout = CompactLayout.fromCompact(compact);
+                    }
+
+                    // get input file paths
+                    ConfigFactory configFactory = ConfigFactory.Instance();
+                    FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
+                    FileSystem fs = fsFactory.getFileSystem().get();
+                    long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
+                    short replication = Short.parseShort(configFactory.getProperty("block.replication"));
+                    FileStatus[] statuses = fs.listStatus(
+                            new Path(layout.getOrderPath()));
+
+                    // compact
+                    for (int i = 0; i + numRowGroupInBlock < statuses.length; i+=numRowGroupInBlock)
+                    {
+                        List<Path> sourcePaths = new ArrayList<>();
+                        for (int j = 0; j < numRowGroupInBlock; ++j)
+                        {
+                            //System.out.println(statuses[i+j].getPath().toString());
+                            sourcePaths.add(statuses[i+j].getPath());
+                        }
+
+                        long start = System.currentTimeMillis();
+
+                        String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/") +
+                                DateUtil.getCurTime() +
+                                ".compact.pxl";
+                        PixelsCompactor pixelsCompactor =
+                                PixelsCompactor.newBuilder()
+                                        .setSourcePaths(sourcePaths)
+                                        .setCompactLayout(compactLayout)
+                                        .setFS(fs)
+                                        .setFilePath(new Path(filePath))
+                                        .setBlockSize(blockSize)
+                                        .setReplication(replication)
+                                        .setBlockPadding(false)
+                                        .build();
+                        pixelsCompactor.compact();
+                        pixelsCompactor.close();
+
+                        System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
+                    }
+                } catch (MetadataException e)
+                {
+                    e.printStackTrace();
+                } catch (FileNotFoundException e)
+                {
+                    e.printStackTrace();
+                } catch (IOException e)
+                {
+                    e.printStackTrace();
+                } catch (FSException e)
+                {
+                    e.printStackTrace();
+                }
             }
 
             if (!command.equals("QUERY") &&
                     !command.equals("LOAD") &&
-                    !command.equals("COPY"))
+                    !command.equals("COPY") &&
+                    !command.equals("COMPACT"))
             {
                 System.out.println("Command error");
             }

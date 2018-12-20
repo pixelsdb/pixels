@@ -74,7 +74,6 @@ public class PixelsSplit
         this.order = requireNonNull(order, "order is null");
         this.cacheOrder = requireNonNull(cacheOrder, "cache order is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
-        log.info("PixelsSplit Constructor: " + schemaName + ", " + tableName + ", " + path + ", cached: " + cached);
     }
 
     @JsonProperty
