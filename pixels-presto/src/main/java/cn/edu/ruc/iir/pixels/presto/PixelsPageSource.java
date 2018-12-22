@@ -110,7 +110,7 @@ class PixelsPageSource implements ConnectorPageSource {
                         .newBuilder()
                         .setFS(this.fsFactory.getFileSystem().get())
                         .setPath(new Path(split.getPath()))
-                        .setEnableCache(split.isCached())
+                        .setEnableCache(split.getCached())
                         .setCacheOrder(split.getCacheOrder())
                         .setPixelsCacheReader(pixelsCacheReader)
                         .build();

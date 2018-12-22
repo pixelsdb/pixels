@@ -22,7 +22,6 @@ import java.sql.Connection;
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.daemon.metadata.server
  * @ClassName: MetadataServer
- * @Description: 时间服务器 服务端
  * @author: taoyouxian
  * @date: Create in 2018-01-26 15:09
  **/
@@ -53,7 +52,7 @@ public class MetadataServer implements Server {
 
     @Override
     public void run() {
-        //配置服务端NIO 线程组
+        // configure server-end NIO thread group.
         this.boss = new NioEventLoopGroup();
         this.worker = new NioEventLoopGroup();
         Connection conn = DBUtil.Instance().getConnection();
@@ -66,8 +65,6 @@ public class MetadataServer implements Server {
                     .channel(NioServerSocketChannel.class)
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true)
-                    //TODO: currently, the message received by server can not be longer than this fixed buffer size.
-//                    .childOption(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(1024*128))
                     .childHandler(new ChannelInitializer<SocketChannel>()
                     {
                         @Override
@@ -75,7 +72,7 @@ public class MetadataServer implements Server {
                         {
                             channel.pipeline().addLast(
                                     new ObjectEncoder(),
-                                    // 线程安全的类加载器进行缓存，支持多线程并发访问
+                                    // thread-safe class loader cache
                                     new ObjectDecoder(Integer.MAX_VALUE, ClassResolvers.weakCachingConcurrentResolver(this.getClass().getClassLoader())),
                                     new MetadataServerHandler());
 //                            channel.pipeline().addLast("decoder", new KryoDecoder());
@@ -84,17 +81,16 @@ public class MetadataServer implements Server {
                         }
                     });
 
-            //绑定端口, 同步等待成功
-            //System.out.println("port: " + port);
+            // bind port, synchronously
             this.running = true;
             ChannelFuture future = server.bind(port).sync();
 
-            //等待服务端监听端口关闭
+            // waiting for closing the server-end port.
             future.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             log.error("error while binding port in metadata server.", e);
         } finally {
-            //优雅关闭 线程组
+            // close thread group.
             this.running = false;
             boss.shutdownGracefully();
             worker.shutdownGracefully();
