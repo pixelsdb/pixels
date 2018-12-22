@@ -17,12 +17,12 @@
  */
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.orc.OrcConf;
-import org.apache.orc.TypeDescription;
 
 import java.io.DataInput;
 import java.io.DataOutput;

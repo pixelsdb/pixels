@@ -56,7 +56,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
         <dep.hadoop.version>2.7.3</dep.hadoop.version>
-        <dep.hive.version>2.7.0</dep.hive.version>
+        <dep.hive.version>2.3.0</dep.hive.version>
         <dep.orc.version>1.4.3</dep.orc.version>
         <dep.presto.version>0.192</dep.presto.version>
         <dep.zookeeper.version>3.4.6</dep.zookeeper.version>
@@ -167,6 +167,16 @@
             <dependency>
                 <groupId>org.apache.hive</groupId>
                 <artifactId>hive-storage-api</artifactId>
+                <version>${dep.hive.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-serde</artifactId>
+                <version>${dep.hive.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-exec</artifactId>
                 <version>${dep.hive.version}</version>
             </dependency>
 
