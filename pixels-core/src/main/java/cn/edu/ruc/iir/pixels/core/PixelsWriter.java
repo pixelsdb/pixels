@@ -10,12 +10,18 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public abstract class PixelsWriter
-        implements Closeable
+public interface PixelsWriter
+        extends Closeable
 {
     /**
      * add row batch into the file
      * @return if the file adds a new row group, return false. Else, return true.
      * */
-    public abstract boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
+    boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
+
+    /**
+     * Get schema of this file
+     * @return schema
+     * */
+    TypeDescription getSchema();
 }

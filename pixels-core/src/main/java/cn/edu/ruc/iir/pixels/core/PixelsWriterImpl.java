@@ -45,7 +45,7 @@ import static java.util.Objects.requireNonNull;
  */
 @NotThreadSafe
 public class PixelsWriterImpl
-        extends PixelsWriter
+        implements PixelsWriter
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsWriterImpl.class);
 
