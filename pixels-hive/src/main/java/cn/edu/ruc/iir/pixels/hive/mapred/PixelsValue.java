@@ -30,11 +30,12 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 /**
- * This type provides a wrapper for OrcStruct so that it can be sent through
+ * This type provides a wrapper for PixelsStruct so that it can be sent through
  * the MapReduce shuffle as a value.
  * <p>
- * The user should set the JobConf with orc.mapred.value.type with the type
+ * The user should set the JobConf with pixels.mapred.value.type with the type
  * string of the type.
+ * refer: [OrcValue](https://github.com/apache/orc/blob/master/java/mapreduce/src/java/org/apache/orc/mapred/OrcValue.java)
  */
 public final class PixelsValue implements Writable, JobConfigurable {
 

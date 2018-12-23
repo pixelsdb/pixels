@@ -15,16 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.hive.PixelsNewOutputFormat;
 import cn.edu.ruc.iir.pixels.hive.core.PixelsConf;
 import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileOutputFormat;
@@ -33,15 +34,17 @@ import org.apache.hadoop.mapred.RecordWriter;
 import org.apache.hadoop.util.Progressable;
 
 import java.io.IOException;
+import java.util.Properties;
 
 /**
- * An ORC output format that satisfies the org.apache.hadoop.mapred API.
+ * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
+ * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
  */
 public class PixelsOutputFormat<V extends Writable>
-        extends FileOutputFormat<NullWritable, V> {
+        extends FileOutputFormat<NullWritable, V> implements PixelsNewOutputFormat<NullWritable, V> {
 
     /**
-     * This function builds the options for the ORC Writer based on the JobConf.
+     * This function builds the options for the PIXELS Writer based on the JobConf.
      *
      * @param conf the job configuration
      * @return a new options object
@@ -68,5 +71,10 @@ public class PixelsOutputFormat<V extends Writable>
         PixelsWriter writer = PixelsFile.createWriter(path,
                 buildOptions(conf).fileSystem(fileSystem));
         return new PixelsMapredRecordWriter<>(writer);
+    }
+
+    @Override
+    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class aClass, boolean b, Properties properties, Progressable progressable) throws IOException {
+        return null;
     }
 }

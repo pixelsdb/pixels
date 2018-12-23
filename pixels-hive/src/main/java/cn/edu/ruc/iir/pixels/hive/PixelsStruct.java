@@ -1,9 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package cn.edu.ruc.iir.pixels.hive;
 
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
-import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.*;
@@ -22,6 +38,7 @@ import java.util.Map;
  * @Package: cn.edu.ruc.iir.pixels.hive
  * @ClassName: PixelsStruct
  * @Description:
+ * refer: [OrcStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcStruct.java)
  * @author: tao
  * @date: Create in 2018-12-12 22:35
  **/
@@ -30,7 +47,7 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
     private WritableComparable[] fields;
     private final TypeDescription schema;
 
-    PixelsStruct(int children) {
+    public PixelsStruct(int children) {
         fields = new WritableComparable[children];
         schema = null;
     }
@@ -182,8 +199,7 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
         return buffer.toString();
     }
 
-  /* Routines for stubbing into Writables */
-
+    /* Routines for stubbing into Writables */
     public static WritableComparable createValue(TypeDescription type) {
         switch (type.getCategory()) {
             case BOOLEAN:
@@ -687,14 +703,14 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
             case CHAR:
                 if (!type.hasMaximumLength()) {
                     throw new UnsupportedOperationException(
-                            "Illegal use of char type without length in ORC type definition.");
+                            "Illegal use of char type without length in PIXELS type definition.");
                 }
                 return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
                         TypeInfoFactory.getCharTypeInfo(type.getMaximumLength()));
             case VARCHAR:
                 if (!type.hasMaximumLength()) {
                     throw new UnsupportedOperationException(
-                            "Illegal use of varchar type without length in ORC type definition.");
+                            "Illegal use of varchar type without length in PIXELS type definition.");
                 }
                 return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
                         TypeInfoFactory.getVarcharTypeInfo(type.getMaximumLength()));

@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package cn.edu.ruc.iir.pixels.hive;
 
 import org.apache.hadoop.conf.Configuration;
@@ -25,7 +42,7 @@ import java.util.Properties;
  * @Package: cn.edu.ruc.iir.pixels.hive
  * @ClassName: PixelsSerDe
  * @Description: A serde class for PIXELS. It transparently passes the object to/from the PIXELS file reader/writer.
- * refer: [orcSerde](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java)
+ * refer: [OrcSerde](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java)
  * @author: tao
  * @date: Create in 2018-12-11 15:29
  **/
@@ -93,7 +110,7 @@ public class PixelsSerDe extends AbstractSerDe {
 
     @Override
     public ObjectInspector getObjectInspector() throws SerDeException {
-        return null;
+        return inspector;
     }
 
     private class PixelsSerdeRow implements Writable {

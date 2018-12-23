@@ -19,39 +19,36 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.io.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.List;
 
 /**
  * This record reader implements the org.apache.hadoop.mapred API.
- *
+ * refer: [RecordReaderImpl](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/RecordReaderImpl.java)
  * @param <V> the root type of the file
  */
 public class PixelsMapredRecordReader<V extends WritableComparable>
-        implements org.apache.hadoop.mapred.RecordReader<NullWritable, V> {
+        implements org.apache.hadoop.mapred.RecordReader<NullWritable, PixelsStruct> {
+    private static Logger log = LogManager.getLogger(PixelsMapredRecordReader.class);
+    private static final int BATCH_SIZE = 10000;
+
     private final TypeDescription schema;
     private final PixelsRecordReader batchReader;
-    private final VectorizedRowBatch batch;
+    private VectorizedRowBatch batch;
     private int rowInBatch;
 
-    public PixelsMapredRecordReader(PixelsRecordReader reader,
-                                    TypeDescription schema) throws IOException {
-        this.batchReader = reader;
-        this.batch = schema.createRowBatch();
-        this.schema = schema;
-        rowInBatch = 0;
-    }
-
     protected PixelsMapredRecordReader(PixelsReader fileReader,
-                                       PixelsReaderOption options) throws IOException {
-        this.batchReader = fileReader.read(options);
+                                       PixelsFile.ReaderOptions options) throws IOException {
+        this.batchReader = fileReader.read(options.getOption());
         this.schema = fileReader.getFileSchema();
         this.batch = schema.createRowBatch();
         rowInBatch = 0;
@@ -66,26 +63,39 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     boolean ensureBatch() throws IOException {
         if (rowInBatch >= batch.size) {
             rowInBatch = 0;
-            return batchReader.readBatch().endOfFile;
+            batch = batchReader.readBatch(BATCH_SIZE);
+            if (this.batch.size <= 0) {
+                return false;
+            }
         }
         return true;
     }
 
     @Override
-    public boolean next(NullWritable key, V value) throws IOException {
+    public boolean next(NullWritable key, PixelsStruct value) throws IOException {
         if (!ensureBatch()) {
             return false;
         }
         if (schema.getCategory() == TypeDescription.Category.STRUCT) {
-            PixelsStruct result = (PixelsStruct) value;
             List<TypeDescription> children = schema.getChildren();
             int numberOfChildren = children.size();
+            PixelsStruct result;
+            if (value == null) {
+                result = new PixelsStruct(numberOfChildren);
+                value = result;
+            } else {
+                result = value;
+                if (result.getNumFields() != numberOfChildren) {
+                    result.setNumFields(numberOfChildren);
+                }
+            }
+
             for (int i = 0; i < numberOfChildren; ++i) {
                 result.setFieldValue(i, nextValue(batch.cols[i], rowInBatch,
                         children.get(i), result.getFieldValue(i)));
             }
         } else {
-            nextValue(batch.cols[0], rowInBatch, schema, value);
+            value = (PixelsStruct) nextValue(batch.cols[0], rowInBatch, schema, value);
         }
         rowInBatch += 1;
         return true;
@@ -97,8 +107,8 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     }
 
     @Override
-    public V createValue() {
-        return (V) PixelsStruct.createValue(schema);
+    public PixelsStruct createValue() {
+        return (PixelsStruct) PixelsStruct.createValue(schema);
     }
 
     @Override
@@ -111,6 +121,7 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
         batchReader.close();
     }
 
+    // todo get progress
     @Override
     public float getProgress() throws IOException {
         return 0;
@@ -270,7 +281,13 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
                 result = (Text) previous;
             }
             BytesColumnVector bytes = (BytesColumnVector) vector;
+
             result.set(bytes.vector[row], bytes.start[row], bytes.lens[row]);
+            // see the result
+//            log.info(new String(bytes.vector[row], UTF_8));
+//            log.info(bytes.start[row]);
+//            log.info(bytes.lens[row]);
+//            log.info(String.valueOf(result));
             return result;
         } else {
             return null;

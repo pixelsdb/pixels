@@ -17,12 +17,12 @@
  */
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.core.PixelsConf;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobConfigurable;
-import org.apache.orc.OrcConf;
-import org.apache.orc.TypeDescription;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -31,9 +31,10 @@ import java.io.IOException;
 /**
  * This type provides a wrapper for PixelsStruct so that it can be sent through
  * the MapReduce shuffle as a key.
- *
- * The user should set the JobConf with orc.mapred.key.type with the type
+ * <p>
+ * The user should set the JobConf with pixels.mapred.key.type with the type
  * string of the type.
+ * refer: [OrcKey](https://github.com/apache/orc/blob/master/java/mapreduce/src/java/org/apache/orc/mapred/OrcKey.java)
  */
 public final class PixelsKey
         implements WritableComparable<PixelsKey>, JobConfigurable {
@@ -62,7 +63,7 @@ public final class PixelsKey
     public void configure(JobConf conf) {
         if (key == null) {
             TypeDescription schema =
-                    TypeDescription.fromString(OrcConf.MAPRED_SHUFFLE_KEY_SCHEMA
+                    TypeDescription.fromString(PixelsConf.MAPRED_SHUFFLE_KEY_SCHEMA
                             .getString(conf));
             key = PixelsStruct.createValue(schema);
         }

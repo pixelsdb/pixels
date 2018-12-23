@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
@@ -30,7 +29,11 @@ import org.apache.hadoop.mapred.Reporter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-
+/**
+ * This record writer implements the org.apache.hadoop.mapred API.
+ * refer: [WriterImpl](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/WriterImpl.java)
+ * @param <V> the root type of the file
+ */
 public class PixelsMapredRecordWriter<V extends Writable>
         implements RecordWriter<NullWritable, V> {
     private final PixelsWriter writer;
