@@ -15,61 +15,33 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
-            <artifactId>pixels-presto</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
-        </dependency>
-        <!-- hadoop -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>asm</groupId>
-                    <artifactId>asm</artifactId>
-                </exclusion>
-            </exclusions>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>asm</groupId>
-                    <artifactId>asm</artifactId>
-                </exclusion>
-            </exclusions>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
-            <optional>true</optional>
-        </dependency>
+
         <!-- hive -->
+        <!--
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-storage-api</artifactId>
+            <optional>true</optional>
         </dependency>
+        -->
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-serde</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
             <optional>true</optional>
         </dependency>
+
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
@@ -80,9 +52,22 @@
             <artifactId>kryo-serializers</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- hadoop -->
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

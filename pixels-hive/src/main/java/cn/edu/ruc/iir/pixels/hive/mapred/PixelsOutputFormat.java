@@ -38,7 +38,7 @@ import java.util.Properties;
 
 /**
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
- * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
+ * refer: [OrcValue](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
  */
 public class PixelsOutputFormat<V extends Writable>
         extends FileOutputFormat<NullWritable, V> implements PixelsNewOutputFormat<NullWritable, V> {
@@ -74,7 +74,7 @@ public class PixelsOutputFormat<V extends Writable>
     }
 
     @Override
-    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class aClass, boolean b, Properties properties, Progressable progressable) throws IOException {
+    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class<? extends Writable> aClass, boolean b, Properties properties, Progressable progressable) throws IOException {
         return null;
     }
 }
