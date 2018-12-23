@@ -9,7 +9,8 @@ import static com.facebook.presto.spi.ErrorType.*;
 public enum ListenerErrorCode
         implements ErrorCodeSupplier
 {
-    PIXELS_EVENT_LISTENER_ERROR(1, EXTERNAL)
+    PIXELS_EVENT_LISTENER_ERROR(1, EXTERNAL),
+    PIXELS_EVENT_LISTENER_METRIC_ERROR(2, EXTERNAL)
     /**/;
 
     private final ErrorCode errorCode;
