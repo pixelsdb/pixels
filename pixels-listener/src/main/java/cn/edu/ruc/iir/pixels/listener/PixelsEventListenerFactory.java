@@ -26,12 +26,15 @@ public class PixelsEventListenerFactory implements EventListenerFactory
     public EventListener create(Map<String, String> config)
     {
         String logDir = config.get("log.dir");
+        String prefix = config.get("listened.user.prefix");
+        String schema = config.get("listened.schema");
+        String queryType = config.get("listened.query.type");
         if (logDir == null)
         {
             logger.error("log.dir for pixels-event-listener is not defined.");
             return null;
         }
         boolean enabled = Boolean.parseBoolean(config.getOrDefault("enabled", "true"));
-        return new PixelsEventListener(logDir, enabled);
+        return new PixelsEventListener(logDir, enabled, prefix, schema, queryType);
     }
 }

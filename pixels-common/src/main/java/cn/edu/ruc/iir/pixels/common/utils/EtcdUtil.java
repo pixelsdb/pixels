@@ -34,7 +34,7 @@ public class EtcdUtil {
         Random random = new Random(System.nanoTime());
         String host = hosts[random.nextInt(hosts.length)];
         System.out.println(host);
-        logger.info("Etcd hosts: " + host);
+        logger.info("Using etcd host: " + host);
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 
         this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
