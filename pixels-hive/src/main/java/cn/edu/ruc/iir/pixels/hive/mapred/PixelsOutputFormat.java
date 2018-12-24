@@ -38,7 +38,7 @@ import java.util.Properties;
 
 /**
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
- * refer: [OrcValue](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
+ * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
  */
 public class PixelsOutputFormat<V extends Writable>
         extends FileOutputFormat<NullWritable, V> implements PixelsNewOutputFormat<NullWritable, V> {
