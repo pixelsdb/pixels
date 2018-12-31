@@ -55,7 +55,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_0_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_0_order -n 3
  * </p>
  * <p>
- * COMPACT -s pixels -t test_105 -l 3 -n no
+ * COMPACT -s pixels -t test_105 -l 3 -n yes
  * </p>
  */
 public class Main
@@ -399,7 +399,7 @@ public class Main
                 {
                     String schema = ns.getString("schema");
                     String table = ns.getString("table");
-                    int layoutId = ns.getInt("layout");
+                    int layoutId = Integer.parseInt(ns.getString("layout"));
                     String naive = ns.getString("naive");
 
                     String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
