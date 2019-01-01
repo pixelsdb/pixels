@@ -40,7 +40,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 /**
  * pixels loader command line tool
  * <p>
- * LOAD -f pixels -o hdfs://dbiir10:9000/pixels/pixels/test_1187/source -d pixels -t test_1187 -n 25000 -r \t -c 16
+ * LOAD -f pixels -o hdfs://dbiir27:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 150000 -r \t -c 16
  * -p false [optional, default false]
  * </p>
  * <p>
@@ -57,10 +57,10 @@ import java.util.concurrent.LinkedBlockingDeque;
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
  * </p>
  * <p>
- * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact -d hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact_2
+ * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_0_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_0_order -n 3
  * </p>
  * <p>
- * COMPACT -s pixels -t test_105_perf -l 3 -n no
+ * COMPACT -s pixels -t test_105 -l 3 -n yes
  * </p>
  */
 public class Main
@@ -335,7 +335,7 @@ public class Main
                     String postfix = ns.getString("postfix");
                     String source = ns.getString("source");
                     String destination = ns.getString("destination");
-                    int n = ns.getInt("number");
+                    int n = Integer.parseInt(ns.getString("number"));
 
                     if (!destination.endsWith("/"))
                     {
@@ -407,7 +407,7 @@ public class Main
                 {
                     String schema = ns.getString("schema");
                     String table = ns.getString("table");
-                    int layoutId = ns.getInt("layout");
+                    int layoutId = Integer.parseInt(ns.getString("layout"));
                     String naive = ns.getString("naive");
 
                     String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
