@@ -43,6 +43,11 @@ import java.util.concurrent.LinkedBlockingDeque;
  * LOAD -f pixels -o hdfs://dbiir27:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 220000 -r \t -c 16
  * -p false [optional, default false]
  * </p>
+ * <p>
+ * LOAD -f orc -o hdfs://dbiir10:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 150000 -r \t -c 16
+ * -l hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order_orc/
+ * </p>
+ * [-l] is optimal, assign a path not the 'OrderPath' in db(Defined in Config.java)
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
@@ -120,6 +125,8 @@ public class Main
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-p", "--producer").setDefault(false)
                         .help("specify the option of choosing producer");
+                argumentParser.addArgument("-l", "--loading_data_path")
+                        .help("specify the path of loading data");
 
                 Namespace ns = null;
                 try
@@ -140,6 +147,7 @@ public class Main
                     String originalDataPath = ns.getString("original_data_path");
                     int rowNum = Integer.parseInt(ns.getString("row_num"));
                     String regex = ns.getString("row_regex");
+                    String loadingDataPath = ns.getString("loading_data_path");
 
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
@@ -150,7 +158,7 @@ public class Main
 
                     if (format != null)
                     {
-                        config = new Config(dbName, tableName, rowNum, regex, format);
+                        config = new Config(dbName, tableName, rowNum, regex, format, loadingDataPath);
                     }
 
                     if (producer && config != null)

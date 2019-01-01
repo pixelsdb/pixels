@@ -179,6 +179,11 @@
                 <artifactId>hive-exec</artifactId>
                 <version>${dep.hive.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-jdbc</artifactId>
+                <version>${dep.hive.version}</version>
+            </dependency>
 
             <!-- orc -->
             <dependency>
