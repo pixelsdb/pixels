@@ -24,6 +24,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.*;
 import org.apache.hadoop.io.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -37,32 +39,25 @@ import java.util.Map;
  * @version V1.0
  * @Package: cn.edu.ruc.iir.pixels.hive
  * @ClassName: PixelsStruct
- * @Description:
- * refer: [OrcStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcStruct.java)
+ * @Description: refer: [PixelsStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/PixelsStruct.java)
  * @author: tao
  * @date: Create in 2018-12-12 22:35
  **/
-final public class PixelsStruct implements WritableComparable<PixelsStruct> {
+final public class PixelsStruct implements Writable {
+    private static Logger log = LogManager.getLogger(PixelsStruct.class);
 
-    private WritableComparable[] fields;
-    private final TypeDescription schema;
+    private Object[] fields;
 
     public PixelsStruct(int children) {
-        fields = new WritableComparable[children];
-        schema = null;
+        fields = new Object[children];
     }
 
-    public PixelsStruct(TypeDescription schema) {
-        this.schema = schema;
-        fields = new WritableComparable[schema.getChildren().size()];
-    }
-
-    public WritableComparable getFieldValue(int fieldIndex) {
+    public Object getFieldValue(int fieldIndex) {
         return fields[fieldIndex];
     }
 
     public void setFieldValue(int fieldIndex, Object value) {
-        fields[fieldIndex] = (WritableComparable) value;
+        fields[fieldIndex] = value;
     }
 
     public int getNumFields() {
@@ -77,77 +72,30 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
      */
     public void setNumFields(int numFields) {
         if (fields.length != numFields) {
-            WritableComparable[] oldFields = fields;
-            fields = new WritableComparable[numFields];
+            Object[] oldFields = fields;
+            fields = new Object[numFields];
             System.arraycopy(oldFields, 0, fields, 0,
                     Math.min(oldFields.length, numFields));
         }
     }
 
-    @Override
-    public void write(DataOutput output) throws IOException {
-        for (WritableComparable field : fields) {
-            output.writeBoolean(field != null);
-            if (field != null) {
-                field.write(output);
-            }
-        }
-    }
-
-    @Override
-    public void readFields(DataInput input) throws IOException {
-        for (int f = 0; f < fields.length; ++f) {
-            if (input.readBoolean()) {
-                if (fields[f] == null) {
-                    fields[f] = createValue(schema.getChildren().get(f));
-                }
-                fields[f].readFields(input);
-            } else {
-                fields[f] = null;
-            }
-        }
-    }
-
     /**
-     * Get the schema for this object.
+     * Destructively make this object link to other's values.
      *
-     * @return the schema object
+     * @param other the value to point to
      */
-    public TypeDescription getSchema() {
-        return schema;
+    void linkFields(PixelsStruct other) {
+        fields = other.fields;
     }
 
-    /**
-     * Set all of the fields in the struct
-     *
-     * @param values the list of values for each of the fields.
-     */
-    public void setAllFields(WritableComparable... values) {
-        if (fields.length != values.length) {
-            throw new IllegalArgumentException("Wrong number (" + values.length +
-                    ") of fields for " + schema);
-        }
-        for (int col = 0; col < fields.length && col < values.length; ++col) {
-            fields[col] = values[col];
-        }
+    @Override
+    public void write(DataOutput dataOutput) throws IOException {
+        throw new UnsupportedOperationException("write unsupported");
     }
 
-    public void setFieldValue(String fieldName, WritableComparable value) {
-        int fieldIdx = schema.getFieldNames().indexOf(fieldName);
-        if (fieldIdx == -1) {
-            throw new IllegalArgumentException("Field " + fieldName +
-                    " not found in " + schema);
-        }
-        fields[fieldIdx] = value;
-    }
-
-    public WritableComparable getFieldValue(String fieldName) {
-        int fieldIdx = schema.getFieldNames().indexOf(fieldName);
-        if (fieldIdx == -1) {
-            throw new IllegalArgumentException("Field " + fieldName +
-                    " not found in " + schema);
-        }
-        return fields[fieldIdx];
+    @Override
+    public void readFields(DataInput dataInput) throws IOException {
+        throw new UnsupportedOperationException("readFields unsupported");
     }
 
     @Override
@@ -199,8 +147,10 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
         return buffer.toString();
     }
 
-    /* Routines for stubbing into Writables */
-    public static WritableComparable createValue(TypeDescription type) {
+    
+  /* Routines for stubbing into Writables */
+
+    public static Object createValue(TypeDescription type, int[] colIndexs) {
         switch (type.getCategory()) {
             case BOOLEAN:
                 return new BooleanWritable();
@@ -225,42 +175,21 @@ final public class PixelsStruct implements WritableComparable<PixelsStruct> {
             case DATE:
                 return new DateWritable();
             case STRUCT: {
-                PixelsStruct result = new PixelsStruct(type);
+                PixelsStruct result = new PixelsStruct(colIndexs.length);
                 int c = 0;
-                for (TypeDescription child : type.getChildren()) {
-                    result.setFieldValue(c++, createValue(child));
-                }
+                List<TypeDescription> child = type.getChildren();
+                for (int index : colIndexs)
+                    result.setFieldValue(c++, createValue(child.get(index), colIndexs));
+
+//                for (TypeDescription child : type.getChildren()) {
+//                    result.setFieldValue(c++, createValue(child, colIndexs));
+//                }
+                log.info("result:" + result);
                 return result;
             }
             default:
                 throw new IllegalArgumentException("Unknown type " + type);
         }
-    }
-
-    @Override
-    public int compareTo(PixelsStruct other) {
-        if (other == null) {
-            return -1;
-        }
-        int result = schema.compareTo(other.schema);
-        if (result != 0) {
-            return result;
-        }
-        for (int c = 0; c < fields.length && c < other.fields.length; ++c) {
-            if (fields[c] == null) {
-                if (other.fields[c] != null) {
-                    return 1;
-                }
-            } else if (other.fields[c] == null) {
-                return -1;
-            } else {
-                int val = fields[c].compareTo(other.fields[c]);
-                if (val != 0) {
-                    return val;
-                }
-            }
-        }
-        return fields.length - other.fields.length;
     }
 
     static class Field implements StructField {

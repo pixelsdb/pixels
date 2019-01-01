@@ -9,17 +9,20 @@ import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.orc.OrcFile;
+import org.apache.orc.Reader;
+import org.apache.orc.RecordReader;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-public class TestPixelsReader {
-    String filePath = "hdfs://dbiir10:9000/pixels/pixels/pixelsserde/20181122014500_1101.pxl";
+public class TestReader {
+    String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order/20181224023132_31.pxl";
 
     @Test
-    public void testReader() {
+    public void testPixelsReader() {
         Configuration conf = new Configuration();
         Path currentPath = new Path(filePath);
         try {
@@ -65,4 +68,33 @@ public class TestPixelsReader {
             e.printStackTrace();
         }
     }
+
+    String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order_orc/20181226133514_0.orc";
+
+    @Test
+    public void testOrcReader() {
+        Configuration conf = new Configuration();
+        Reader reader = null;
+        try {
+            reader = OrcFile.createReader(new Path(orcPath),
+                    OrcFile.readerOptions(conf));
+            System.out.println("Row: " + reader.getNumberOfRows());
+            RecordReader rows = null;
+            rows = reader.rows();
+            org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch batch = reader.getSchema().createRowBatch();
+            long num = 0;
+            int row = 0;
+            while (rows.nextBatch(batch)) {
+                System.out.println("loop:" + row++ + "," + batch.size);
+                if (row == 147)
+                    System.out.println(batch.toString());
+                num += batch.size;
+            }
+            System.out.println(row + "," + num);
+            rows.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

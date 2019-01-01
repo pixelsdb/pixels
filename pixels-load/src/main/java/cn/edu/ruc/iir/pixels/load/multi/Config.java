@@ -55,13 +55,14 @@ public class Config
         return format;
     }
 
-    public Config(String dbName, String tableName, int maxRowNum, String regex, String format)
+    public Config(String dbName, String tableName, int maxRowNum, String regex, String format, String pixelsPath)
     {
         this.dbName = dbName;
         this.tableName = tableName;
         this.maxRowNum = maxRowNum;
         this.regex = regex;
         this.format = format;
+        this.pixelsPath = pixelsPath;
     }
 
     public boolean load(ConfigFactory configFactory) throws IOException, MetadataException
@@ -104,12 +105,6 @@ public class Config
         // get the column order of the latest writing layout
         Order order = JSON.parseObject(writingLayout.getOrder(), Order.class);
         List<String> layoutColumnOrder = order.getColumnOrder();
-        // get path of loading
-        String loadingDataPath = writingLayout.getOrderPath();
-        if (!loadingDataPath.endsWith("/"))
-        {
-            loadingDataPath += "/";
-        }
         // check size consistency
         if (layoutColumnOrder.size() != colSize)
         {
@@ -150,8 +145,24 @@ public class Config
         }
         schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
 
+        // get path of loading
+        if(this.pixelsPath == null)
+        {
+            String loadingDataPath = writingLayout.getOrderPath();
+            if (!loadingDataPath.endsWith("/"))
+            {
+                loadingDataPath += "/";
+            }
+            this.pixelsPath = loadingDataPath;
+        }
+        else
+        {
+            if (!this.pixelsPath.endsWith("/"))
+            {
+                this.pixelsPath += "/";
+            }
+        }
         // init the params
-        this.pixelsPath = loadingDataPath;
         this.schema = schemaBuilder.toString();
         this.orderMapping = orderMapping;
         return true;

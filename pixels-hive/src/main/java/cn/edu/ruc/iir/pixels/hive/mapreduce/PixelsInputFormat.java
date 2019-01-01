@@ -15,25 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive.mapred;
+package cn.edu.ruc.iir.pixels.hive.mapreduce;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
+import cn.edu.ruc.iir.pixels.hive.mapred.PixelsMapredRecordReader;
+import org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 
 /**
  * A MapReduce/Hive input format for PIXELS files.
- * refer: [OrcInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcInputFormat.java)
+ * refer: [PixelsInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/pixels/PixelsInputFormat.java)
  */
-public class PixelsInputFormat
-        extends FileInputFormat<NullWritable, PixelsStruct> {
-    private static Logger log = LogManager.getLogger(PixelsInputFormat.class);
+public class PixelsInputFormat extends CombineHiveInputFormat<NullWritable, PixelsStruct> implements
+        InputFormat<NullWritable, PixelsStruct> {
 
     @Override
     public RecordReader<NullWritable, PixelsStruct>
@@ -42,10 +41,9 @@ public class PixelsInputFormat
                     Reporter reporter) throws IOException {
         FileSplit split = (FileSplit) inputSplit;
         PixelsFile.ReaderOptions option = PixelsFile.readerOptions(conf, split);
-        log.info(split.toString());
+
         PixelsReader reader = PixelsFile.createReader(split.getPath(), option);
         return new PixelsMapredRecordReader<>(reader,
                 option.setOption(reader.getFileSchema()));
     }
-
 }
