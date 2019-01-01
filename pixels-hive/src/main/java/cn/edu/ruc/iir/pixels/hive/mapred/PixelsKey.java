@@ -65,7 +65,7 @@ public final class PixelsKey
             TypeDescription schema =
                     TypeDescription.fromString(PixelsConf.MAPRED_SHUFFLE_KEY_SCHEMA
                             .getString(conf));
-            key = PixelsStruct.createValue(schema);
+//            key = PixelsStruct.createValue(schema);
         }
     }
 

@@ -41,6 +41,11 @@
             <artifactId>hive-exec</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-jdbc</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>com.esotericsoftware</groupId>
@@ -68,6 +73,13 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- fastjson -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

@@ -22,11 +22,14 @@ import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -44,16 +47,23 @@ public class PixelsFile {
         private final Configuration conf;
         private FileSystem filesystem;
         private PixelsReaderOption option;
+        private List<Integer> included;
 
         // TODO: We can generalize FileMetada interface. Make OrcTail implement FileMetadata interface
         // and remove this class altogether. Both footer caching and llap caching just needs OrcTail.
         // For now keeping this around to avoid complex surgery
 
-        public ReaderOptions(Configuration conf) {
+        public ReaderOptions(Configuration conf, FileSplit split) {
             this.conf = conf;
+            try {
+                this.filesystem = FileSystem.get(conf);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             this.option = new PixelsReaderOption();
             this.option.skipCorruptRecords(true);
             this.option.tolerantSchemaEvolution(true);
+//            this.option.rgRange((int) split.getStart(), (int) split.getLength());
             // todo 'includeCols' be a method
 //            this.option.includeCols(new String[]{});
         }
@@ -76,14 +86,18 @@ public class PixelsFile {
         }
 
         public ReaderOptions setOption(TypeDescription schema) {
-            log.info("TypeDescription: " + schema.toString());
-            List<String> fieldNames = schema.getFieldNames();
-            String[] cols = new String[fieldNames.size()];
-            for (int i = 0; i < fieldNames.size(); i++) {
-                cols[i] = fieldNames.get(i);
+            if (!ColumnProjectionUtils.isReadAllColumns(conf)) {
+                included = ColumnProjectionUtils.getReadColumnIDs(conf);
+                log.info("genIncludedColumns:" + included.toString());
+            } else {
+                log.info("genIncludedColumns:null");
             }
 
-            this.option.includeCols(cols);
+            String[] columns = ColumnProjectionUtils.getReadColumnNames(conf);
+            System.out.println("Result:" + Arrays.toString(columns));
+            System.out.println("ResultIndex:" + included.toString());
+
+            this.option.includeCols(columns);
             return this;
         }
 
@@ -95,10 +109,15 @@ public class PixelsFile {
             }
             return this;
         }
+
+        public List<Integer> getIncluded() {
+            return included;
+        }
+
     }
 
-    public static ReaderOptions readerOptions(Configuration conf) {
-        return new ReaderOptions(conf);
+    public static ReaderOptions readerOptions(Configuration conf, FileSplit split) {
+        return new ReaderOptions(conf, split);
     }
 
     public static PixelsReader createReader(Path path,

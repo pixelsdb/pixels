@@ -65,7 +65,7 @@ public final class PixelsValue implements Writable, JobConfigurable {
             TypeDescription schema =
                     TypeDescription.fromString(PixelsConf.MAPRED_SHUFFLE_VALUE_SCHEMA
                             .getString(conf));
-            value = PixelsStruct.createValue(schema);
+//            value = PixelsStruct.createValue(schema);
         }
     }
 }

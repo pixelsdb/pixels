@@ -20,6 +20,7 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.hive.PixelsNewOutputFormat;
+import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
 import cn.edu.ruc.iir.pixels.hive.core.PixelsConf;
 import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
 import org.apache.hadoop.conf.Configuration;
@@ -40,8 +41,8 @@ import java.util.Properties;
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
  * refer: [OrcValue](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
  */
-public class PixelsOutputFormat<V extends Writable>
-        extends FileOutputFormat<NullWritable, V> implements PixelsNewOutputFormat<NullWritable, V> {
+public class PixelsOutputFormat
+        extends FileOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> implements PixelsNewOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> {
 
     /**
      * This function builds the options for the PIXELS Writer based on the JobConf.
@@ -62,10 +63,10 @@ public class PixelsOutputFormat<V extends Writable>
     }
 
     @Override
-    public RecordWriter<NullWritable, V> getRecordWriter(FileSystem fileSystem,
-                                                         JobConf conf,
-                                                         String name,
-                                                         Progressable progressable
+    public RecordWriter<NullWritable, PixelsSerDe.PixelsSerdeRow> getRecordWriter(FileSystem fileSystem,
+                                                                                  JobConf conf,
+                                                                                  String name,
+                                                                                  Progressable progressable
     ) throws IOException {
         Path path = getTaskOutputPath(conf, name);
         PixelsWriter writer = PixelsFile.createWriter(path,

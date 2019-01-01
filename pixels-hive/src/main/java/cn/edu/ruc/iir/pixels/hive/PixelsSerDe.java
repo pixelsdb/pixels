@@ -47,6 +47,7 @@ import java.util.Properties;
  * @date: Create in 2018-12-11 15:29
  **/
 public class PixelsSerDe extends AbstractSerDe {
+//    private static Logger log = LogManager.getLogger(PixelsSerDe.class);
 
     private final PixelsSerdeRow row = new PixelsSerdeRow();
     private ObjectInspector inspector = null;
@@ -65,7 +66,7 @@ public class PixelsSerDe extends AbstractSerDe {
         if (columnNameProperty != null && columnNameProperty.length() > 0) {
             Collections.addAll(columnNames, columnNameProperty.split(columnNameDelimiter));
         }
-        if (columnTypeProperty == null) {
+        if (columnTypeProperty != null) {
             // Default type: all string
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < columnNames.size(); i++) {
@@ -83,6 +84,7 @@ public class PixelsSerDe extends AbstractSerDe {
         // The source column names for PIXELS serde that will be used in the schema.
         rootType.setAllStructFieldNames(columnNames);
         rootType.setAllStructFieldTypeInfos(fieldTypes);
+//        log.info("setAllStructFieldNames:" + columnNames.toString());
         inspector = PixelsStruct.createObjectInspector(rootType);
     }
 
@@ -105,6 +107,7 @@ public class PixelsSerDe extends AbstractSerDe {
 
     @Override
     public Object deserialize(Writable writable) throws SerDeException {
+//        log.info("deserialize");
         return writable;
     }
 
@@ -113,7 +116,7 @@ public class PixelsSerDe extends AbstractSerDe {
         return inspector;
     }
 
-    private class PixelsSerdeRow implements Writable {
+    public class PixelsSerdeRow implements Writable {
         Object realRow;
         ObjectInspector inspector;
 
