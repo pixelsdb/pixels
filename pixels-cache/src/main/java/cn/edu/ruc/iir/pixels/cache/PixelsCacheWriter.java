@@ -249,6 +249,7 @@ public class PixelsCacheWriter
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
         flushIndex();
+        logger.debug("Cache index ends at offset: " + currentIndexOffset);
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
     }
@@ -289,9 +290,10 @@ public class PixelsCacheWriter
      * */
     private void writeRadix(RadixNode node)
     {
-        flushNode(node);
-        for (RadixNode n : node.getChildren().values()) {
-            writeRadix(n);
+        if (flushNode(node)) {
+            for (RadixNode n : node.getChildren().values()) {
+                writeRadix(n);
+            }
         }
     }
 
@@ -302,8 +304,12 @@ public class PixelsCacheWriter
      * Child: leader(1 byte) + child_offset(7 bytes)
      * */
     // todo add index file size limitation
-    private void flushNode(RadixNode node)
+    private boolean flushNode(RadixNode node)
     {
+        if (currentIndexOffset >= indexFile.getSize()) {
+            logger.debug("Index file have exceeded cache size. Break. Current size: " + currentIndexOffset);
+            return false;
+        }
         if (node.offset == 0) {
             node.offset = currentIndexOffset;
         }
@@ -338,6 +344,7 @@ public class PixelsCacheWriter
             indexFile.putBytes(currentIndexOffset, node.getValue().getBytes());
             currentIndexOffset += 12;
         }
+        return true;
     }
 
     /**
