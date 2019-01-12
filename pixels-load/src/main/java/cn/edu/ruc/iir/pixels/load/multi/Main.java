@@ -40,22 +40,27 @@ import java.util.concurrent.LinkedBlockingDeque;
 /**
  * pixels loader command line tool
  * <p>
- * LOAD -f pixels -o hdfs://dbiir10:9000/pixels/pixels/test_1187/source -d pixels -t test_1187 -n 25000 -r \t -c 16
+ * LOAD -f pixels -o hdfs://dbiir27:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 220000 -r \t -c 16
  * -p false [optional, default false]
  * </p>
+ * <p>
+ * LOAD -f orc -o hdfs://dbiir10:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 150000 -r \t -c 16
+ * -l hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order_orc/
+ * </p>
+ * [-l] is optimal, assign a path not the 'OrderPath' in db(Defined in Config.java)
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_0_order.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
  * </p>
  * <p>
- * COPY -p .pxl -s hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact -d hdfs://dbiir10:9000/pixels/pixels/test_105_perf/v_0_compact_2
+ * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3
  * </p>
  * <p>
- * COMPACT -s pixels -t test_105_perf -l 3 -n no
+ * COMPACT -s pixels -t test_105 -l 3 -n yes
  * </p>
  */
 public class Main
@@ -120,6 +125,8 @@ public class Main
                         .help("specify the number of consumer threads used for data generation");
                 argumentParser.addArgument("-p", "--producer").setDefault(false)
                         .help("specify the option of choosing producer");
+                argumentParser.addArgument("-l", "--loading_data_path")
+                        .help("specify the path of loading data");
 
                 Namespace ns = null;
                 try
@@ -140,6 +147,7 @@ public class Main
                     String originalDataPath = ns.getString("original_data_path");
                     int rowNum = Integer.parseInt(ns.getString("row_num"));
                     String regex = ns.getString("row_regex");
+                    String loadingDataPath = ns.getString("loading_data_path");
 
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
@@ -150,7 +158,7 @@ public class Main
 
                     if (format != null)
                     {
-                        config = new Config(dbName, tableName, rowNum, regex, format);
+                        config = new Config(dbName, tableName, rowNum, regex, format, loadingDataPath);
                     }
 
                     if (producer && config != null)
@@ -248,27 +256,27 @@ public class Main
                             String defaultUser = null;
                             while ((line = workloadReader.readLine()) != null)
                             {
-                                if (cache != null)
-                                {
-                                    long start = System.currentTimeMillis();
-                                    ProcessBuilder processBuilder = new ProcessBuilder(cache);
-                                    Process process = processBuilder.start();
-                                    process.waitFor();
-                                    Thread.sleep(1000);
-                                    System.out.println("clear cache: " + (System.currentTimeMillis() - start) + "ms\n");
-                                }
-                                else
-                                {
-                                    Thread.sleep(15 * 1000);
-                                    System.out.println("wait 15000 ms\n");
-                                }
-
                                 if (!line.contains("SELECT"))
                                 {
                                     defaultUser = line;
                                     properties.setProperty("user", type + "_" + defaultUser);
                                 } else
                                 {
+                                    if (cache != null)
+                                    {
+                                        long start = System.currentTimeMillis();
+                                        ProcessBuilder processBuilder = new ProcessBuilder(cache);
+                                        Process process = processBuilder.start();
+                                        process.waitFor();
+                                        Thread.sleep(1000);
+                                        System.out.println("clear cache: " + (System.currentTimeMillis() - start) + "ms\n");
+                                    }
+                                    else
+                                    {
+                                        Thread.sleep(15 * 1000);
+                                        System.out.println("wait 15000 ms\n");
+                                    }
+
                                     long cost = executeSQL(jdbc, properties, line, defaultUser);
                                     timeWriter.write(defaultUser + "," + i + "," + cost + "\n");
 
@@ -327,7 +335,7 @@ public class Main
                     String postfix = ns.getString("postfix");
                     String source = ns.getString("source");
                     String destination = ns.getString("destination");
-                    int n = ns.getInt("number");
+                    int n = Integer.parseInt(ns.getString("number"));
 
                     if (!destination.endsWith("/"))
                     {
@@ -399,7 +407,7 @@ public class Main
                 {
                     String schema = ns.getString("schema");
                     String table = ns.getString("table");
-                    int layoutId = ns.getInt("layout");
+                    int layoutId = Integer.parseInt(ns.getString("layout"));
                     String naive = ns.getString("naive");
 
                     String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
@@ -504,8 +512,8 @@ public class Main
             Statement statement = connection.createStatement();
             start = System.currentTimeMillis();
             ResultSet resultSet = statement.executeQuery(sql);
-            end = System.currentTimeMillis();
             while (resultSet.next()) {}
+            end = System.currentTimeMillis();
             resultSet.close();
             statement.close();
         } catch (SQLException e)

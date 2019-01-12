@@ -17,6 +17,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 import static cn.edu.ruc.iir.pixels.listener.exception.ListenerErrorCode.PIXELS_EVENT_LISTENER_ERROR;
+import static cn.edu.ruc.iir.pixels.listener.exception.ListenerErrorCode.PIXELS_EVENT_LISTENER_METRIC_ERROR;
 
 /**
  * Created at: 18-12-8
@@ -28,6 +29,9 @@ public class PixelsEventListener implements EventListener
 
     private final String logDir;
     private final boolean enabled;
+    private final String userPrefix;
+    private final String schema;
+    private final String queryType;
     private static BufferedWriter LogWriter = null;
 
     static
@@ -35,10 +39,16 @@ public class PixelsEventListener implements EventListener
         ParserConfig.getGlobalInstance().setAutoTypeSupport(true);
     }
 
-    public PixelsEventListener (String logDir, boolean enabled)
+    public PixelsEventListener (String logDir, boolean enabled,
+                                String userPrefix,
+                                String schema,
+                                String queryType)
     {
         this.logDir = logDir.endsWith("/") ? logDir : logDir + "/";
         this.enabled = enabled;
+        this.userPrefix = userPrefix;
+        this.schema = schema;
+        this.queryType = queryType;
         try
         {
             if (this.enabled == true && LogWriter == null)
@@ -72,27 +82,55 @@ public class PixelsEventListener implements EventListener
 
         String queryId = queryCompletedEvent.getMetadata().getQueryId();
         String user = queryCompletedEvent.getContext().getUser();
+        String schema = queryCompletedEvent.getContext().getSchema().get();
         String uri = queryCompletedEvent.getMetadata().getUri().toString();
-        try
+        if (schema.equalsIgnoreCase(this.schema))
         {
-            String content = HttpUtil.GetContentByGet(uri.toString());
-            JSONObject object = JSONObject.parseObject(content);
-            JSONObject statsObject = object.getJSONObject("queryStats");
-            double elapsed = this.parseElapsedToMillis(statsObject.getString("elapsedTime"));
-            double queued = this.parseElapsedToMillis(statsObject.getString("queuedTime"));
-            double analysis = this.parseElapsedToMillis(statsObject.getString("analysisTime"));
-            double planning = this.parseElapsedToMillis(statsObject.getString("totalPlanningTime"));
-            double finishing = this.parseElapsedToMillis(statsObject.getString("finishingTime"));
-            double inputDataSize = this.parseDataSizeToMB(statsObject.getString("rawInputDataSize"));
-            double execution = elapsed - queued - analysis - planning - finishing;
-            double throughput = inputDataSize / execution * 1000;
-            LogWriter.write(queryId + "," + user + "," + elapsed + "," + execution + "," + throughput);
-            LogWriter.newLine();
-            LogWriter.flush();
-        } catch (IOException e)
-        {
-            logger.error("can not write log in pixels event listener.");
-            logger.info("query id: " + queryId + ", user: " + user + ", uri: " + uri.toString());
+            if (this.userPrefix.equals("none") ||
+                    (!this.userPrefix.equals("none") && user.startsWith(this.userPrefix)))
+            {
+                try
+                {
+                    String content = HttpUtil.GetContentByGet(uri.toString());
+                    JSONObject object = JSONObject.parseObject(content);
+                    String query = object.getString("query");
+                    if (query.toLowerCase().contains(this.queryType.toLowerCase()))
+                    {
+                        JSONObject statsObject = object.getJSONObject("queryStats");
+                        double elapsed = this.parseElapsedToMillis(statsObject.getString("elapsedTime"));
+                        double queued = this.parseElapsedToMillis(statsObject.getString("queuedTime"));
+                        double analysis = this.parseElapsedToMillis(statsObject.getString("analysisTime"));
+                        double planning = this.parseElapsedToMillis(statsObject.getString("totalPlanningTime"));
+                        double finishing = this.parseElapsedToMillis(statsObject.getString("finishingTime"));
+                        double inputDataSize = this.parseDataSizeToMB(statsObject.getString("rawInputDataSize"));
+                        if (elapsed < 0 || queued < 0 || analysis < 0 ||
+                                planning < 0 || finishing < 0 || inputDataSize < 0)
+                        {
+                            throw new ListenerExecption("elapsedTime:" + statsObject.getString("elapsedTime") +
+                                    ",queuedTime:" + statsObject.getString("queuedTime") +
+                                    ",analysisTime:" + statsObject.getString("analysisTime") +
+                                    ",totalPlanningTime:" + statsObject.getString("totalPlanningTime") +
+                                    ",finishingTime:" + statsObject.getString("finishingTime") +
+                                    ",rawInputDataSize:" + statsObject.getString("rawInputDataSize")
+                            );
+                        }
+                        double execution = elapsed - queued - analysis - planning - finishing;
+                        double throughput = inputDataSize / execution * 1000;
+                        LogWriter.write(queryId + "," + user + "," + elapsed + "," + execution + "," + throughput);
+                        LogWriter.newLine();
+                        LogWriter.flush();
+                    }
+                } catch (IOException e)
+                {
+                    logger.error("can not write log in pixels event listener.");
+                    logger.info("query id: " + queryId + ", user: " + user + ", uri: " + uri.toString());
+                } catch (ListenerExecption e)
+                {
+                    logger.error("can not parse metrics in presto json.");
+                    logger.info("query id: " + queryId + ", user: " + user + ", uri: " + uri.toString());
+                    throw new PrestoException(PIXELS_EVENT_LISTENER_METRIC_ERROR, e);
+                }
+            }
         }
     }
 
@@ -109,6 +147,11 @@ public class PixelsEventListener implements EventListener
      */
     private double parseElapsedToMillis (String str)
     {
+        if (str == null)
+        {
+            return 0;
+        }
+
         if (str.endsWith("ns"))
         {
             return Double.parseDouble(str.substring(0, str.indexOf("ns"))) / 1000 / 1000;
@@ -147,6 +190,11 @@ public class PixelsEventListener implements EventListener
      */
     private double parseDataSizeToMB (String str)
     {
+        if (str == null)
+        {
+            return 0;
+        }
+
         if (str.endsWith("KB"))
         {
             return Double.parseDouble(str.substring(0, str.indexOf("KB"))) / 1024;

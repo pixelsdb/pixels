@@ -84,7 +84,7 @@ public class ConsumerGenerator
                         c.join();
                     } catch (InterruptedException e)
                     {
-                        throw new Exception("PixelsConsumer InterruptedException, " + e.getMessage());
+                        throw new Exception("ConsumerGenerator InterruptedException, " + e.getMessage());
                     }
                 }
                 flag = true;
@@ -92,7 +92,7 @@ public class ConsumerGenerator
             {
                 try
                 {
-                    throw new Exception("PixelsConsumer Error, " + e.getMessage());
+                    throw new Exception("ConsumerGenerator Error, " + e.getMessage());
                 } catch (Exception e1)
                 {
                     e1.printStackTrace();
