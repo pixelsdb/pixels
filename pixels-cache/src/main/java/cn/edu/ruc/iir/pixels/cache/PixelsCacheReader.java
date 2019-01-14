@@ -92,7 +92,7 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
+//        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
         short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
@@ -120,7 +120,7 @@ public class PixelsCacheReader
         if (cacheIdx != null) {
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
-            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
+//            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);

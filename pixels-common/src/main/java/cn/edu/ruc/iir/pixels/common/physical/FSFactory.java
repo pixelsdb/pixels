@@ -60,12 +60,14 @@ public final class FSFactory {
                     hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
                     logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " + hdfsConfigFiles[1].toURI());
                 }
+                logger.debug("conf file not match");
             } else {
                 logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
                 throw new FSException("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
             }
             this.fileSystem = FileSystem.get(hdfsConfig);
-        } catch (IOException e) {
+        } catch (Exception e) {
+            e.printStackTrace();
             throw new FSException("I/O error occurs when reading HDFS config files.", e);
         }
     }

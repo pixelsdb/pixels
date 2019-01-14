@@ -329,9 +329,6 @@ public class PixelsRecordReaderImpl
         logger.debug("enableCache is " + enableCache);
         if (enableCache) {
             // read data from local caching
-            logger.info("PixelsRecordReader reads data from local caching");
-            logger.info("cacheOrder size: " + cacheOrder.size());
-            logger.info("cacheOrder: " + cacheOrder);
             for (String cacheId : cacheOrder) {
                 String[] cacheIdParts = cacheId.split(":");
                 short cacheRGId = Short.parseShort(cacheIdParts[0]);
@@ -340,19 +337,23 @@ public class PixelsRecordReaderImpl
                 if (cacheRGIdx < 0 || cacheRGIdx >= RGLen) {
                     continue;
                 }
-                logger.info("RGStart: " + RGStart + ", cacheRGId: " + cacheRGId + ", cacheColId: " + cacheColId +
-                            ", cacheRGIdx: " + cacheRGIdx + ", includedColsLen: " + includedColumns.length);
-                logger.info("Try to read " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId + " from caching.");
+//                logger.info("RGStart: " + RGStart + ", cacheRGId: " + cacheRGId + ", cacheColId: " + cacheColId +
+//                            ", cacheRGIdx: " + cacheRGIdx + ", includedColsLen: " + includedColumns.length);
+//                logger.info("Try to read " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId + " from caching.");
                 long cacheAccessStart = System.nanoTime();
-                byte[] columnlet = cacheReader.get(physicalFSReader.getPath().toString(), cacheRGId, cacheColId);
+                String blockName = physicalFSReader.getPath().toString();
+                byte[] columnlet = cacheReader.get(blockName, cacheRGId, cacheColId);
                 long cacheAccessEnd = System.nanoTime();
-                logger.info("Cache access time cost: " + (cacheAccessEnd - cacheAccessStart) + "ns");
+                boolean cacheHit = false;
                 if (columnlet != null && columnlet.length > 0) {
-                    logger.info("Got cache for " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId);
-                    logger.info("chunkBuffer idx: " + cacheRGIdx * includedColumns.length + cacheColId);
+//                    logger.info("Got cache for " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId);
+//                    logger.info("chunkBuffer idx: " + cacheRGIdx * includedColumns.length + cacheColId);
                     chunkBuffers[cacheRGIdx * includedColumns.length + cacheColId] = columnlet;
                     isCached[cacheRGIdx][cacheColId] = true;
+                    cacheHit = true;
                 }
+                logger.info("Cache access " + blockName + "-" + cacheRGId + "-" + cacheColId + ", hit: "
+                            + cacheHit + ", time cost: " + (cacheAccessEnd - cacheAccessStart) + "ns");
             }
         }
         for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)

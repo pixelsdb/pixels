@@ -51,7 +51,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  *
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
- * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_2_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
+ * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_2_compact_1.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_105_v_1_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
