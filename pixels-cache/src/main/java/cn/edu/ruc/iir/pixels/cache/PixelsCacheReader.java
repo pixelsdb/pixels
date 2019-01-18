@@ -90,7 +90,7 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(String blockId, short rowGroupId, short columnId)
+    public synchronized byte[] get(String blockId, short rowGroupId, short columnId)
     {
 //        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
@@ -102,13 +102,13 @@ public class PixelsCacheReader
         }
 
         // check if reader count reaches its max value, if so no more reads are allowed
-        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
-        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
-            logger.debug("Index reader count has exceeded the maximum value. Stop.");
-            return content;
-        }
+//        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
+//        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
+//            logger.debug("Index reader count has exceeded the maximum value. Stop.");
+//            return content;
+//        }
         // update reader count
-        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
+//        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
@@ -127,7 +127,7 @@ public class PixelsCacheReader
         }
 
         // decrease reader count
-        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
+//        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
 
         return content;
     }

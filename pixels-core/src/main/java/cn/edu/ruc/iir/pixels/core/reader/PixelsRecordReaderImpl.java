@@ -340,8 +340,8 @@ public class PixelsRecordReaderImpl
 //                logger.info("RGStart: " + RGStart + ", cacheRGId: " + cacheRGId + ", cacheColId: " + cacheColId +
 //                            ", cacheRGIdx: " + cacheRGIdx + ", includedColsLen: " + includedColumns.length);
 //                logger.info("Try to read " + physicalFSReader.getPath() + "-" + cacheRGId + "-" + cacheColId + " from caching.");
-                long cacheAccessStart = System.nanoTime();
                 String blockName = physicalFSReader.getPath().toString();
+                long cacheAccessStart = System.nanoTime();
                 byte[] columnlet = cacheReader.get(blockName, cacheRGId, cacheColId);
                 long cacheAccessEnd = System.nanoTime();
                 boolean cacheHit = false;

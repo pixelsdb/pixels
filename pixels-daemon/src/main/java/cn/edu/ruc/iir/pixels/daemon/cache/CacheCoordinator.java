@@ -254,7 +254,7 @@ public class CacheCoordinator
     }
 
     private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
-            throws FSException, IOException
+            throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
@@ -272,8 +272,6 @@ public class CacheCoordinator
             {
                 hostAddressSet.addAll(toHostAddress(blockLocation.getHosts()));
             }
-//            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
-//            List<HostAddress> locations = Arrays.asList(nodes);
             List<HostAddress> locations = new ArrayList<>(hostAddressSet);
             if (locations.size() == 0) {
                 continue;
