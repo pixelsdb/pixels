@@ -235,11 +235,11 @@ public class PixelsCacheWriter
                     break outer_loop;
                 }
                 else {
-                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId);
                     radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
                               new PixelsCacheIdx(cacheOffset, physicalLens[i]));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
                     cacheFile.putBytes(cacheOffset, columnlet);
+                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + cacheOffset + ", length: " + columnlet.length);
                     cacheOffset += physicalLens[i];
                 }
             }

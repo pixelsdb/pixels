@@ -3,6 +3,8 @@ package cn.edu.ruc.iir.pixels.cache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -17,12 +19,14 @@ public class PixelsCacheReader
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
+    private final ReentrantLock lock;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
+        this.lock = new ReentrantLock();
     }
 
     public static class Builder
@@ -90,16 +94,17 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public synchronized byte[] get(String blockId, short rowGroupId, short columnId)
+    public byte[] get(String blockId, short rowGroupId, short columnId)
     {
+        lock.lock();
 //        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
-        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
-        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
-            logger.debug("Index rwFlag is not set as READ. Stop.");
-            return content;
-        }
+//        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
+//        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
+//            logger.debug("Index rwFlag is not set as READ. Stop.");
+//            return content;
+//        }
 
         // check if reader count reaches its max value, if so no more reads are allowed
 //        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
@@ -125,6 +130,7 @@ public class PixelsCacheReader
             // read content
             cacheFile.getBytes(offset, content, 0, length);
         }
+        lock.unlock();
 
         // decrease reader count
 //        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
