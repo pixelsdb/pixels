@@ -3,6 +3,8 @@ package cn.edu.ruc.iir.pixels.cache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -17,12 +19,14 @@ public class PixelsCacheReader
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
+    private final ReentrantLock lock;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
+        this.lock = new ReentrantLock();
     }
 
     public static class Builder
@@ -92,23 +96,24 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
+        lock.lock();
+//        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
-        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
-        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
-            logger.debug("Index rwFlag is not set as READ. Stop.");
-            return content;
-        }
+//        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
+//        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
+//            logger.debug("Index rwFlag is not set as READ. Stop.");
+//            return content;
+//        }
 
         // check if reader count reaches its max value, if so no more reads are allowed
-        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
-        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
-            logger.debug("Index reader count has exceeded the maximum value. Stop.");
-            return content;
-        }
+//        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
+//        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
+//            logger.debug("Index reader count has exceeded the maximum value. Stop.");
+//            return content;
+//        }
         // update reader count
-        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
+//        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
@@ -120,14 +125,15 @@ public class PixelsCacheReader
         if (cacheIdx != null) {
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
-            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
+//            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);
         }
+        lock.unlock();
 
         // decrease reader count
-        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
+//        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
 
         return content;
     }

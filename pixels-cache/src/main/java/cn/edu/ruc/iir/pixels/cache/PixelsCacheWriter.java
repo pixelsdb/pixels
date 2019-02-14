@@ -201,16 +201,16 @@ public class PixelsCacheWriter
         logger.debug("Set index rwFlag as write");
         PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
         // wait until readerCount is 0
-        long start = System.currentTimeMillis();
-        while (System.currentTimeMillis() - start < 5000) {
-            logger.debug("Wait until all previous started reads are finished");
-            if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
-                logger.debug("No more reads are going on. Break.");
-                break;
-            }
-        }
-        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
-        logger.debug("Set index reader count to 0");
+//        long start = System.currentTimeMillis();
+//        while (System.currentTimeMillis() - start < 5000) {
+//            logger.debug("Wait until all previous started reads are finished");
+//            if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
+//                logger.debug("No more reads are going on. Break.");
+//                break;
+//            }
+//        }
+//        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
+//        logger.debug("Set index reader count to 0");
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
@@ -235,11 +235,11 @@ public class PixelsCacheWriter
                     break outer_loop;
                 }
                 else {
-                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId);
                     radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
                               new PixelsCacheIdx(cacheOffset, physicalLens[i]));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
                     cacheFile.putBytes(cacheOffset, columnlet);
+                    logger.debug("Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + cacheOffset + ", length: " + columnlet.length);
                     cacheOffset += physicalLens[i];
                 }
             }
@@ -249,6 +249,7 @@ public class PixelsCacheWriter
         PixelsCacheUtil.setIndexVersion(indexFile, version);
         // flush index
         flushIndex();
+        logger.debug("Cache index ends at offset: " + currentIndexOffset);
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
     }
@@ -289,9 +290,10 @@ public class PixelsCacheWriter
      * */
     private void writeRadix(RadixNode node)
     {
-        flushNode(node);
-        for (RadixNode n : node.getChildren().values()) {
-            writeRadix(n);
+        if (flushNode(node)) {
+            for (RadixNode n : node.getChildren().values()) {
+                writeRadix(n);
+            }
         }
     }
 
@@ -302,8 +304,12 @@ public class PixelsCacheWriter
      * Child: leader(1 byte) + child_offset(7 bytes)
      * */
     // todo add index file size limitation
-    private void flushNode(RadixNode node)
+    private boolean flushNode(RadixNode node)
     {
+        if (currentIndexOffset >= indexFile.getSize()) {
+            logger.debug("Index file have exceeded cache size. Break. Current size: " + currentIndexOffset);
+            return false;
+        }
         if (node.offset == 0) {
             node.offset = currentIndexOffset;
         }
@@ -338,6 +344,7 @@ public class PixelsCacheWriter
             indexFile.putBytes(currentIndexOffset, node.getValue().getBytes());
             currentIndexOffset += 12;
         }
+        return true;
     }
 
     /**

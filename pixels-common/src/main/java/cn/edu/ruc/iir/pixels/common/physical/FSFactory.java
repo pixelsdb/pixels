@@ -23,11 +23,14 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.util.*;
 
 public final class FSFactory {
+    private static Logger logger = LogManager.getLogger(FSFactory.class);
     private static Map<String, FSFactory> instances = new HashMap<>();
 
     public static FSFactory Instance(String hdfsConfigDir) throws FSException {
@@ -55,12 +58,16 @@ public final class FSFactory {
                 if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2) {
                     hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
                     hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
+                    logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " + hdfsConfigFiles[1].toURI());
                 }
+                logger.debug("conf file not match");
             } else {
+                logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
                 throw new FSException("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
             }
             this.fileSystem = FileSystem.get(hdfsConfig);
-        } catch (IOException e) {
+        } catch (Exception e) {
+            e.printStackTrace();
             throw new FSException("I/O error occurs when reading HDFS config files.", e);
         }
     }
