@@ -43,7 +43,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import org.apache.hadoop.fs.Path;
 
@@ -192,21 +191,21 @@ public class PixelsSplitManager
                         try
                         {
                             // 3. add splits in orderedPath
-                            Balancer orderedBalancer = new Balancer();
+//                            Balancer orderedBalancer = new Balancer();
                             List<Path> orderedPaths = fsFactory.listFiles(layout.getOrderPath());
-                            for (Path path : orderedPaths) {
-                                List<HostAddress> hostAddresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-                                orderedBalancer.put(hostAddresses.get(0), path);
-                            }
-                            orderedBalancer.balance();
+//                            for (Path path : orderedPaths) {
+//                                List<HostAddress> hostAddresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+//                                orderedBalancer.put(hostAddresses.get(0), path);
+//                            }
+//                            orderedBalancer.balance();
                             for (Path path : orderedPaths)
                             {
-                                ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-                                builder.add(orderedBalancer.get(path));
+//                                ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                                builder.add(orderedBalancer.get(path));
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         path.toString(), 0, 1,
-                                        false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                        false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
                                 log.info("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
@@ -250,62 +249,64 @@ public class PixelsSplitManager
             {
                 log.info("cache is not enabled");
                 List<Path> orderedPaths;
-                Balancer orderedBalancer = new Balancer();
+//                Balancer orderedBalancer = new Balancer();
                 List<Path> compactPaths;
-                Balancer compactBalancer = new Balancer();
+//                Balancer compactBalancer = new Balancer();
                 try
                 {
                     orderedPaths = fsFactory.listFiles(layout.getOrderPath());
-                    for (Path path : orderedPaths)
-                    {
-                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-                        orderedBalancer.put(addresses.get(0), path);
-                    }
-                    orderedBalancer.balance();
-                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
+//                    for (Path path : orderedPaths)
+//                    {
+//                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+//                        orderedBalancer.put(addresses.get(0), path);
+//                    }
+//                    orderedBalancer.balance();
+//                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
 
                     compactPaths = fsFactory.listFiles(layout.getCompactPath());
-                    for (Path path : compactPaths)
-                    {
-                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-                        compactBalancer.put(addresses.get(0), path);
-                    }
-                    compactBalancer.balance();
-                    log.info("compact files balanced=" + compactBalancer.isBalanced());
-                } catch (FSException e)
-                {
-                    throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
-                }
+//                    for (Path path : compactPaths)
+//                    {
+//                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+//                        compactBalancer.put(addresses.get(0), path);
+//                    }
+//                    compactBalancer.balance();
+//                    log.info("compact files balanced=" + compactBalancer.isBalanced());
+
 
                 // add splits in orderedPath
                 for (Path path : orderedPaths)
                 {
-                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-                    builder.add(orderedBalancer.get(path));
+//                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                    builder.add(orderedBalancer.get(path));
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             path.toString(), 0, 1,
-                            false, builder.build(), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                            false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE) ,order.getColumnOrder(), new ArrayList<>(0), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
                 // add splits in compactPath
                 int curFileRGIdx;
                 for (Path path : compactPaths)
                 {
-                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-                    builder.add(compactBalancer.get(path));
+//                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                    builder.add(compactBalancer.get(path));
                     // log.info("balanced path:" + compactBalancer.get(path).toString());
-                    List<HostAddress> hostAddresses = builder.build();
+//                    List<HostAddress> hostAddresses = builder.build();
                     curFileRGIdx = 0;
                     while (curFileRGIdx < rowGroupNum)
                     {
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                 path.toString(), curFileRGIdx, splitSize,
-                                false, hostAddresses, order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
                         pixelsSplits.add(pixelsSplit);
                         curFileRGIdx += splitSize;
                     }
+                }
+                }
+                catch (FSException e)
+                {
+                    throw new PrestoException(PIXELS_HDFS_FILE_ERROR, e);
                 }
             }
         }

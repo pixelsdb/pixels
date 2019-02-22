@@ -3,9 +3,7 @@ package cn.edu.ruc.iir.pixels.cache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.concurrent.locks.ReentrantLock;
-
-import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * pixels cache reader.
@@ -19,64 +17,43 @@ public class PixelsCacheReader
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final ReentrantLock lock;
+//    private final ReentrantLock lock;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.lock = new ReentrantLock();
+//        this.lock = new ReentrantLock();
     }
 
     public static class Builder
     {
-        private String builderCacheLocation = "";
-        private long builderCacheSize;
-        private String builderIndexLocation = "";
-        private long builderIndexSize;
+        private MemoryMappedFile builderCacheFile;
+        private MemoryMappedFile builderIndexFile;
 
         private Builder()
         {}
 
-        public PixelsCacheReader.Builder setCacheLocation(String cacheLocation)
+        public PixelsCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
         {
-            checkArgument(!cacheLocation.isEmpty(), "location should not be empty");
-            this.builderCacheLocation = cacheLocation;
+            requireNonNull(cacheFile, "cache file is null");
+            this.builderCacheFile = cacheFile;
 
             return this;
         }
 
-        public PixelsCacheReader.Builder setCacheSize(long cacheSize)
+        public PixelsCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
         {
-            checkArgument(cacheSize > 0, "size should be positive");
-            this.builderCacheSize = cacheSize;
+            requireNonNull(indexFile, "index file is null");
+            this.builderIndexFile = indexFile;
 
             return this;
         }
 
-        public PixelsCacheReader.Builder setIndexLocation(String location)
+        public PixelsCacheReader build()
         {
-            checkArgument(!location.isEmpty(), "index location should not be empty");
-            this.builderIndexLocation = location;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setIndexSize(long size)
-        {
-            checkArgument(size > 0, "index size should be positive");
-            this.builderIndexSize = size;
-
-            return this;
-        }
-
-        public PixelsCacheReader build() throws Exception
-        {
-            MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize);
-            MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
-
-            return new PixelsCacheReader(cacheFile, indexFile);
+            return new PixelsCacheReader(builderCacheFile, builderIndexFile);
         }
     }
 
@@ -96,9 +73,10 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-        lock.lock();
+//        lock.lock();
 //        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
+        String cacheGetId = blockId + "-" + rowGroupId + "-" + columnId;
         // check rw flag, if not readable, return empty bytes
 //        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
 //        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
@@ -120,17 +98,23 @@ public class PixelsCacheReader
         byte[] cacheKeyBytes = cacheKey.getBytes();
 
         // search cache key
+        long searchBeginNano = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
+        long searchEndNano = System.nanoTime();
+        logger.debug("[cache search]" + cacheGetId + "," + (searchEndNano - searchBeginNano));
         // if found, read content from cache
         if (cacheIdx != null) {
+            long readBeginNano = System.nanoTime();
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
 //            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);
+            long readEndNano = System.nanoTime();
+            logger.debug("[cache read]" + cacheGetId + "," + (readEndNano - readBeginNano));
         }
-        lock.unlock();
+//        lock.unlock();
 
         // decrease reader count
 //        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
@@ -207,6 +191,7 @@ public class PixelsCacheReader
     public void close()
     {
         try {
+            logger.info("cache reader close and unmap");
             cacheFile.unmap();
             indexFile.unmap();
         }
