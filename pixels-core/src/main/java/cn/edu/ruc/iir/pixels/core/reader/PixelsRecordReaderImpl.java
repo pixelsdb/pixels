@@ -323,13 +323,14 @@ public class PixelsRecordReaderImpl
                         long cacheAccessStart = System.nanoTime();
                         byte[] columnlet = cacheReader.get(blockName, (short) rgId, (short) colId);
                         long cacheAccessEnd = System.nanoTime();
-                        boolean cacheHit = false;
                         if (columnlet != null && columnlet.length > 0) {
                             chunkBuffers[rgIdx * includedColumns.length + colId] = columnlet;
-                            cacheHit = true;
+                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",true," + columnlet.length + "," + (cacheAccessEnd - cacheAccessStart));
                         }
-                        logger.info("Cache access " + blockName + "-" + rgId + "-" + colId + ", hit: "
-                                    + cacheHit + ", time cost: " + (cacheAccessEnd - cacheAccessStart) + "ns");
+                        else {
+                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",false,0," +
+                                        (cacheAccessEnd - cacheAccessStart));
+                        }
                     }
                     // else, read from disks
                     else {

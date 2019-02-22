@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
@@ -28,7 +29,8 @@ public class PixelsPageSourceProvider
 
     private final String connectorId;
     private final FSFactory fsFactory;
-    private final PixelsCacheReader pixelsCacheReader;
+    private final MemoryMappedFile cacheFile;
+    private final MemoryMappedFile indexFile;
 
     @Inject
     public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
@@ -36,18 +38,21 @@ public class PixelsPageSourceProvider
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
+        long initBeginNano = System.nanoTime();
         if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
-            this.pixelsCacheReader = PixelsCacheReader
-                    .newBuilder()
-                    .setCacheLocation(config.getConfigFactory().getProperty("cache.location"))
-                    .setCacheSize(Long.parseLong(config.getConfigFactory().getProperty("cache.size")))
-                    .setIndexLocation(config.getConfigFactory().getProperty("index.location"))
-                    .setIndexSize(Long.parseLong(config.getConfigFactory().getProperty("index.size")))
-                    .build();
+            this.cacheFile = new MemoryMappedFile(
+                    config.getConfigFactory().getProperty("cache.location"),
+                    Long.parseLong(config.getConfigFactory().getProperty("cache.size")));
+            this.indexFile = new MemoryMappedFile(
+                    config.getConfigFactory().getProperty("index.location"),
+                    Long.parseLong(config.getConfigFactory().getProperty("index.size")));
         }
         else {
-            this.pixelsCacheReader = null;
+            this.cacheFile = null;
+            this.indexFile = null;
         }
+        long initEndNano = System.nanoTime();
+        logger.info("[cache init]" + (initEndNano - initBeginNano));
     }
 
     @Override
@@ -59,6 +64,20 @@ public class PixelsPageSourceProvider
         requireNonNull(split, "split is null");
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
+
+        PixelsCacheReader pixelsCacheReader = null;
+        if (cacheFile != null && indexFile != null) {
+            try {
+                pixelsCacheReader = PixelsCacheReader
+                        .newBuilder()
+                        .setCacheFile(cacheFile)
+                        .setIndexFile(indexFile)
+                        .build();
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, pixelsCacheReader, connectorId);
     }
 }

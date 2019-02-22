@@ -197,7 +197,7 @@ public class PixelsReaderImpl
         if (diceValue < metricsCollectProb) {
             enableMetrics = true;
         }
-        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
+//        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
                 enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader);
         recordReaders.add(recordReader);

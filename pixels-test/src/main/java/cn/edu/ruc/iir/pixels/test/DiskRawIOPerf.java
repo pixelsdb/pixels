@@ -18,9 +18,9 @@ import java.net.URI;
  *
  * @author guodong
  */
-public class PixelsIOTest
+public class DiskRawIOPerf
 {
-    private static Logger logger = LogManager.getLogger(PixelsIOTest.class);
+    private static Logger logger = LogManager.getLogger(DiskRawIOPerf.class);
     public static void main(String[] args)
     {
 //        String dir = "hdfs://dbiir27:9000/pixels/pixels/test_1187/v_1_compact/";

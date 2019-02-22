@@ -11,7 +11,7 @@
 
     <artifactId>pixels-test</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.PixelsIOTest</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CacheReaderPerf</mainClass>
     </properties>
 
     <dependencies>
@@ -24,6 +24,14 @@
             <artifactId>pixels-common</artifactId>
         </dependency>
         <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-spi</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
         </dependency>
@@ -31,10 +39,24 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <optional>true</optional>
+        </dependency>
     </dependencies>
 
     <build>
-        <finalName>pixels-test</finalName>
+        <finalName>copy-tool</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -52,7 +74,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>pixels-test</finalName>
+                            <finalName>copy-tool</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-test/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
