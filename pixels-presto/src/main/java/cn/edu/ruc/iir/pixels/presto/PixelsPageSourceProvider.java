@@ -38,7 +38,7 @@ public class PixelsPageSourceProvider
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
-        long initBeginNano = System.nanoTime();
+//        long initBeginNano = System.nanoTime();
         if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
             this.cacheFile = new MemoryMappedFile(
                     config.getConfigFactory().getProperty("cache.location"),
@@ -51,8 +51,8 @@ public class PixelsPageSourceProvider
             this.cacheFile = null;
             this.indexFile = null;
         }
-        long initEndNano = System.nanoTime();
-        logger.info("[cache init]" + (initEndNano - initBeginNano));
+//        long initEndNano = System.nanoTime();
+//        logger.info("[cache init]" + (initEndNano - initBeginNano));
     }
 
     @Override

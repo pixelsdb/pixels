@@ -21,7 +21,7 @@ public class PixelsCacheReader
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
-        logger.info("Pixels cache reader is initialized");
+//        logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
 //        this.lock = new ReentrantLock();
@@ -98,21 +98,21 @@ public class PixelsCacheReader
         byte[] cacheKeyBytes = cacheKey.getBytes();
 
         // search cache key
-        long searchBeginNano = System.nanoTime();
+//        long searchBeginNano = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
-        long searchEndNano = System.nanoTime();
-        logger.debug("[cache search]" + cacheGetId + "," + (searchEndNano - searchBeginNano));
+//        long searchEndNano = System.nanoTime();
+//        logger.debug("[cache search]" + cacheGetId + "," + (searchEndNano - searchBeginNano));
         // if found, read content from cache
         if (cacheIdx != null) {
-            long readBeginNano = System.nanoTime();
+//            long readBeginNano = System.nanoTime();
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
 //            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);
-            long readEndNano = System.nanoTime();
-            logger.debug("[cache read]" + cacheGetId + "," + (readEndNano - readBeginNano));
+//            long readEndNano = System.nanoTime();
+//            logger.debug("[cache read]" + cacheGetId + "," + (readEndNano - readBeginNano));
         }
 //        lock.unlock();
 

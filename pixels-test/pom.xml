@@ -25,6 +25,10 @@
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-daemon</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-cache</artifactId>
         </dependency>
         <dependency>

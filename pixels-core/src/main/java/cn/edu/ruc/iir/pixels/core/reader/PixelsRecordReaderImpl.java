@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
-import cn.edu.ruc.iir.pixels.common.metrics.BytesMsCost;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
@@ -94,7 +93,10 @@ public class PixelsRecordReaderImpl
         this.enableCache = enableCache;
         this.cacheOrder = cacheOrder;
         this.cacheReader = cacheReader;
+        long checkStartNano = System.nanoTime();
         checkBeforeRead();
+        long checkCost = System.nanoTime() - checkStartNano;
+        logger.debug("[check before read]" + checkCost);
     }
 
     private void checkBeforeRead()
@@ -214,6 +216,8 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
+        String fileName = physicalFSReader.getPath().getName();
+        long readStartNano = System.nanoTime();
         everRead = true;
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
@@ -284,6 +288,7 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
+        long readRGFootersStartNano = System.nanoTime();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -305,6 +310,8 @@ public class PixelsRecordReaderImpl
                 return false;
             }
         }
+        long readRGFooterEndNano = System.nanoTime();
+//        logger.debug("[read rg footers]" + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
@@ -315,21 +322,34 @@ public class PixelsRecordReaderImpl
                 int rgId = rgIdx + RGStart;
                 PixelsProto.RowGroupIndex rowGroupIndex =
                         rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                long cacheReadStartNano = System.nanoTime();
+                int cacheReadCount = 0;
+                long cacheReadSize = 0L;
                 for (int colId : targetColumns) {
                     String cacheIdentifier = "" + rgId + ":" + colId;
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier)) {
                         String blockName = physicalFSReader.getPath().toString();
-                        long cacheAccessStart = System.nanoTime();
+//                        long cacheAccessStart = System.nanoTime();
                         byte[] columnlet = cacheReader.get(blockName, (short) rgId, (short) colId);
-                        long cacheAccessEnd = System.nanoTime();
+//                        long cacheAccessEnd = System.nanoTime();
+                        // if cache hit, read columnlet into buffer
                         if (columnlet != null && columnlet.length > 0) {
+                            cacheReadCount++;
+                            cacheReadSize += columnlet.length;
                             chunkBuffers[rgIdx * includedColumns.length + colId] = columnlet;
-                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",true," + columnlet.length + "," + (cacheAccessEnd - cacheAccessStart));
+//                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",true," + columnlet.length + "," + (cacheAccessEnd - cacheAccessStart));
                         }
+                        // if cache miss, add chunkId to be read from disks
                         else {
-                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",false,0," +
-                                        (cacheAccessEnd - cacheAccessStart));
+//                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",false,0," +
+//                                        (cacheAccessEnd - cacheAccessStart));
+                            PixelsProto.ColumnChunkIndex chunkIndex =
+                                    rowGroupIndex.getColumnChunkIndexEntries(colId);
+                            ChunkId chunk = new ChunkId(rgIdx, colId,
+                                                        chunkIndex.getChunkOffset(),
+                                                        chunkIndex.getChunkLength());
+                            chunks.add(chunk);
                         }
                     }
                     // else, read from disks
@@ -342,6 +362,9 @@ public class PixelsRecordReaderImpl
                         chunks.add(chunk);
                     }
                 }
+                long cacheReadEndNano = System.nanoTime();
+                long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
+                logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
             }
         }
         else {
@@ -379,6 +402,9 @@ public class PixelsRecordReaderImpl
         // read chunk blocks into buffers
         try
         {
+            long diskReadStartNano = System.nanoTime();
+            int diskReadCount = 0;
+            long diskReadSize = 0L;
             long offsetBeforeSeek = 0;
             for (ChunkSeq seq : chunkSeqs)
             {
@@ -386,34 +412,36 @@ public class PixelsRecordReaderImpl
                 {
                     continue;
                 }
+                diskReadCount++;
                 int offset = (int) seq.getOffset();
                 int length = (int) seq.getLength();
+                diskReadSize += length;
                 completedBytes += length;
                 byte[] chunkBlockBuffer = new byte[length];
-                if (enableMetrics)
-                {
-                    long seekStart = System.currentTimeMillis();
+//                if (enableMetrics)
+//                {
+//                    long seekStart = System.currentTimeMillis();
+//                    physicalFSReader.seek(offset);
+//                    long seekEnd = System.currentTimeMillis();
+//                    BytesMsCost seekCost = new BytesMsCost();
+//                    seekCost.setBytes(Math.abs(offsetBeforeSeek - offset));
+//                    seekCost.setMs(seekEnd - seekStart);
+//                    readPerfMetrics.addSeek(seekCost);
+//                    offsetBeforeSeek = offset;
+//
+//                    long readStart = System.currentTimeMillis();
+//                    physicalFSReader.readFully(chunkBlockBuffer);
+//                    long readEnd = System.currentTimeMillis();
+//                    BytesMsCost readCost = new BytesMsCost();
+//                    readCost.setBytes(length);
+//                    readCost.setMs(readEnd - readStart);
+//                    readPerfMetrics.addSeqRead(readCost);
+//                }
+//                else
+//                {
                     physicalFSReader.seek(offset);
-                    long seekEnd = System.currentTimeMillis();
-                    BytesMsCost seekCost = new BytesMsCost();
-                    seekCost.setBytes(Math.abs(offsetBeforeSeek - offset));
-                    seekCost.setMs(seekEnd - seekStart);
-                    readPerfMetrics.addSeek(seekCost);
-                    offsetBeforeSeek = offset;
-
-                    long readStart = System.currentTimeMillis();
                     physicalFSReader.readFully(chunkBlockBuffer);
-                    long readEnd = System.currentTimeMillis();
-                    BytesMsCost readCost = new BytesMsCost();
-                    readCost.setBytes(length);
-                    readCost.setMs(readEnd - readStart);
-                    readPerfMetrics.addSeqRead(readCost);
-                }
-                else
-                {
-                    physicalFSReader.seek(offset);
-                    physicalFSReader.readFully(chunkBlockBuffer);
-                }
+//                }
                 List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
                 for (ChunkId chunkId : chunkIds)
@@ -427,12 +455,17 @@ public class PixelsRecordReaderImpl
                     chunkSliceOffset += chunkLength;
                 }
             }
+            long diskReadEndNano = System.nanoTime();
+            long diskReadCost = diskReadEndNano - diskReadStartNano;
+            logger.debug("[disk stat]" + fileName + "," + diskReadCount + "," + diskReadSize + "," + diskReadCost);
         }
         catch (IOException e)
         {
             e.printStackTrace();
             return false;
         }
+        long readEndNano = System.nanoTime();
+        logger.debug("[pixels read]" + fileName + "," + (readEndNano - readStartNano));
 
         return true;
     }
