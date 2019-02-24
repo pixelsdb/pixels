@@ -546,8 +546,17 @@ public class PixelsRecordReaderImpl
                     curChunkIdx = index;
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    try
+                    {
+                        readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                                        postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.debug("[read exception]" + curRGIdx + ":" + RGStart + ":" + resultColumns[i] + ","
+                                     + chunkBuffers[index].length);
+                        throw e;
+                    }
                 }
             }
 

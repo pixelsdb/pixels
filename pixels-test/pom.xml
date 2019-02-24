@@ -11,7 +11,7 @@
 
     <artifactId>pixels-test</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.CacheReaderPerf</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CheckCacheContent</mainClass>
     </properties>
 
     <dependencies>

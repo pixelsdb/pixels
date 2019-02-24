@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Base;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import org.junit.Test;
@@ -72,10 +73,14 @@ public class TestDaos
     {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
         LayoutDao layoutDao = new LayoutDao();
-        Layout layout = layoutDao.getById(10);
-        String splits = layout.getSplits();
-        writer.write(splits);
-        writer.flush();
+        Layout layout = layoutDao.getById(21);
+        Order order = layout.getOrderObject();
+        List<String> columnOrder = order.getColumnOrder();
+        for (String col : columnOrder)
+        {
+            writer.write(col);
+            writer.newLine();
+        }
         writer.close();
     }
 
