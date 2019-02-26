@@ -86,7 +86,7 @@ public class CacheReaderPerf
             System.out.println("cache file init: " + cacheMemInitCost + ", index file init: " + indexMemInitCost);
 
             // get cached columnlets
-            MetadataService metadataService = new MetadataService("dbiir27", 18888);
+            MetadataService metadataService = new MetadataService("dbiir01", 18888);
             Layout layout = metadataService.getLayout("pixels", "test_1187", 2).get(0);
             Compact compact = layout.getCompactObject();
             int cacheBorder = compact.getCacheBorder();

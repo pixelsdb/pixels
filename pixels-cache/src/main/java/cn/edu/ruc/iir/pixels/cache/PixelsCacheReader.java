@@ -17,14 +17,11 @@ public class PixelsCacheReader
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-//    private final ReentrantLock lock;
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
-        logger.info("Pixels cache reader is initialized");
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-//        this.lock = new ReentrantLock();
     }
 
     public static class Builder
@@ -73,10 +70,7 @@ public class PixelsCacheReader
      * */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-//        lock.lock();
-//        logger.debug("Cache access: " + blockId + "-" + rowGroupId + "-" + columnId);
         byte[] content = new byte[0];
-        String cacheGetId = blockId + "-" + rowGroupId + "-" + columnId;
         // check rw flag, if not readable, return empty bytes
 //        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
 //        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
@@ -98,28 +92,32 @@ public class PixelsCacheReader
         byte[] cacheKeyBytes = cacheKey.getBytes();
 
         // search cache key
-        long searchBeginNano = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
-        long searchEndNano = System.nanoTime();
-        logger.debug("[cache search]" + cacheGetId + "," + (searchEndNano - searchBeginNano));
         // if found, read content from cache
         if (cacheIdx != null) {
-            long readBeginNano = System.nanoTime();
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
-//            logger.debug("Cache entry(" + offset + "," + length + ") is found for " + blockId + "-" + rowGroupId + "-" + columnId);
             content = new byte[length];
             // read content
             cacheFile.getBytes(offset, content, 0, length);
-            long readEndNano = System.nanoTime();
-            logger.debug("[cache read]" + cacheGetId + "," + (readEndNano - readBeginNano));
         }
-//        lock.unlock();
 
         // decrease reader count
 //        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
 
         return content;
+    }
+
+    /**
+     * This interface is only used by TESTS, DO NOT USE.
+     * It will be removed soon!
+     * */
+    public PixelsCacheIdx search(String blockId, short rowGroupId, short columnId)
+    {
+        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
+        byte[] cacheKeyBytes = cacheKey.getBytes();
+
+        return search(cacheKeyBytes);
     }
 
     /**
@@ -191,7 +189,7 @@ public class PixelsCacheReader
     public void close()
     {
         try {
-            logger.info("cache reader close and unmap");
+            logger.info("cache reader unmaps cache/index file");
             cacheFile.unmap();
             indexFile.unmap();
         }

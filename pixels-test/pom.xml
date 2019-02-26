@@ -11,7 +11,7 @@
 
     <artifactId>pixels-test</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.CacheReaderPerf</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CheckCacheConcurrentReader</mainClass>
     </properties>
 
     <dependencies>
@@ -22,6 +22,10 @@
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-daemon</artifactId>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
