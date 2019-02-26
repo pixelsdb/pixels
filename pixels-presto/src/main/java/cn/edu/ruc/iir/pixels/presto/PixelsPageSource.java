@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
@@ -60,13 +61,17 @@ class PixelsPageSource implements ConnectorPageSource {
     private volatile long nanoEnd;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory,
-                            PixelsCacheReader pixelsCacheReader, String connectorId)
+                            MemoryMappedFile cacheFile, MemoryMappedFile indexFile, String connectorId)
     {
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
 
-//        logger.info("Create page source for split: " + split.toString());
+        PixelsCacheReader pixelsCacheReader = PixelsCacheReader
+                .newBuilder()
+                .setCacheFile(cacheFile)
+                .setIndexFile(indexFile)
+                .build();
         getPixelsReaderBySchema(split, pixelsCacheReader);
 
         this.recordReader = this.pixelsReader.read(this.option);

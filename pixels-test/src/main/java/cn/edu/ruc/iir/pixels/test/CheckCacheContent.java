@@ -19,6 +19,7 @@ import java.util.List;
 /**
  * pixels
  *
+ * String path = "hdfs://dbiir01:9000/pixels/pixels/test_1187/v_1_compact/20190223144340_13.compact_copy_20190223153853_93.pxl";
  * @author guodong
  */
 public class CheckCacheContent
@@ -26,7 +27,10 @@ public class CheckCacheContent
     public static void main(String[] args)
             throws Exception
     {
-        String path = "hdfs://dbiir01:9000/pixels/pixels/test_1187/v_1_compact/20190223144340_13.compact_copy_20190223153853_93.pxl";
+        String path = args[0];
+        int rgId = Integer.parseInt(args[1]);
+        int colId = Integer.parseInt(args[2]);
+        int layoutVersion = Integer.parseInt(args[3]);
 
         MemoryMappedFile cacheFile;
         MemoryMappedFile indexFile;
@@ -36,7 +40,7 @@ public class CheckCacheContent
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", 2).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
         Compact compact = layout.getCompactObject();
         int cacheBorder = compact.getCacheBorder();
         List<String> columnletOrder = compact.getColumnletOrder();
@@ -47,7 +51,7 @@ public class CheckCacheContent
                 .setCacheFile(cacheFile)
                 .setIndexFile(indexFile)
                 .build();
-        byte[] cacheContent = cacheReader.get(path, (short) 8, (short) 337);
+        byte[] cacheContent = cacheReader.get(path, (short) rgId, (short) colId);
         System.out.println("Cache content length " + cacheContent.length);
 
         PixelsReader pixelsReader = PixelsReaderImpl
@@ -58,10 +62,10 @@ public class CheckCacheContent
                 .setCacheOrder(cachedColumnlets)
                 .setPixelsCacheReader(cacheReader)
                 .build();
-        PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(8);
+        PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(rgId);
         PhysicalReader physicalReader =
                 PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), new Path(path));
-        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(337);
+        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(colId);
         physicalReader.seek(chunkIndex.getChunkOffset());
         byte[] diskContent = new byte[(int) chunkIndex.getChunkLength()];
         physicalReader.readFully(diskContent);

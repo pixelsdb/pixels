@@ -1,13 +1,19 @@
 package cn.edu.ruc.iir.pixels.test;
 
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
-import com.alibaba.fastjson.JSON;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
+import org.apache.hadoop.fs.Path;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -30,6 +36,7 @@ import java.util.Set;
 public class WorkloadAnalyzer
 {
     public static void main(String[] args)
+            throws Exception
     {
         String workloadPath = "/Users/Jelly/Desktop/pixels/experiments/1187_dedup_query.txt";
         String workloadColsLog = "/Users/Jelly/Desktop/pixels/cache/workload_cols.csv";
@@ -38,7 +45,7 @@ public class WorkloadAnalyzer
 
         WorkloadAnalyzer analyzer = new WorkloadAnalyzer();
 //        analyzer.analyze(workloadPath, workloadColsLog, workloadcacheLog);
-        analyzer.updateMetadata(updateCacheFile);
+        analyzer.checkMetadata();
     }
 
     private void analyze(String workloadPath, String workloadColsLog, String workloadcacheLog)
@@ -147,56 +154,45 @@ public class WorkloadAnalyzer
         }
     }
 
-    private void updateMetadata(String cacheFile)
+    private void checkMetadata()
+            throws Exception
     {
-        try {
-            MetadataService metadataService = new MetadataService("dbiir27", 18888);
-            Layout layoutv1 = metadataService.getLayout("pixels", "test_1187", 1).get(0);
-            Order layoutOrder = layoutv1.getOrderObject();
-            List<String> columnOrder = layoutOrder.getColumnOrder();
+        String path = "hdfs://dbiir01:9000/pixels/pixels/test_1187/v_1_compact/20190223141959_0.compact.pxl";
+        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 2).get(0);
+        Order layoutOrder = layout.getOrderObject();
+        List<String> columnOrder = layoutOrder.getColumnOrder();
+        Compact compact = layout.getCompactObject();
+        List<String> cachedColumnlets = compact.getColumnletOrder().subList(0, compact.getCacheBorder());
 
-            BufferedReader reader = new BufferedReader(new FileReader(cacheFile));
-            String line;
-            List<Integer> orderIds = new ArrayList<>();
-            while ((line = reader.readLine()) != null)
+        MemoryMappedFile cacheFile;
+        MemoryMappedFile indexFile;
+        ConfigFactory config = ConfigFactory.Instance();
+        cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
+        indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
+        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+        PixelsCacheReader cacheReader = PixelsCacheReader
+                .newBuilder()
+                .setCacheFile(cacheFile)
+                .setIndexFile(indexFile)
+                .build();
+        PixelsReader pixelsReader = PixelsReaderImpl
+                .newBuilder()
+                .setPath(new Path(path))
+                .setFS(fsFactory.getFileSystem().get())
+                .setEnableCache(false)
+                .setCacheOrder(cachedColumnlets)
+                .setPixelsCacheReader(cacheReader)
+                .build();
+        PixelsProto.Footer footer = pixelsReader.getFooter();
+        List<PixelsProto.Type> types = footer.getTypesList();
+        for (int i = 0; i < 1187; i++)
+        {
+            System.out.println(types.get(i).getName() + "," + columnOrder.get(i));
+            if (false == types.get(i).getName().equalsIgnoreCase(columnOrder.get(i)))
             {
-                String colName = line.trim();
-                int id = columnOrder.indexOf(colName);
-                orderIds.add(id);
+                System.out.println("[schema not match]" + types.get(i).getName() + "," + columnOrder.get(i));
             }
-            reader.close();
-
-            Compact compactv2 = layoutv1.getCompactObject();
-            compactv2.setCacheBorder(32 * orderIds.size());
-            compactv2.setNumRowGroupInBlock(32);
-            compactv2.setNumColumn(orderIds.size());
-            compactv2.setColumnletOrder(new ArrayList<>());
-
-            for (int orderId : orderIds)
-            {
-                for (int i = 0; i < 32; i++)
-                {
-                    String columnlet = "" + i + ":" + orderId;
-                    compactv2.addColumnletOrder(columnlet);
-                }
-            }
-
-            LayoutDao layoutDao = new LayoutDao();
-            Layout layoutv2 = new Layout();
-            layoutv2.setId(-1);
-            layoutv2.setPermission(1);
-            layoutv2.setVersion(2);
-            layoutv2.setCreateAt(System.currentTimeMillis());
-            layoutv2.setOrder(layoutv1.getOrder());
-            layoutv2.setOrderPath(layoutv1.getOrderPath());
-            layoutv2.setCompact(JSON.toJSONString(compactv2));
-            layoutv2.setCompactPath(layoutv1.getCompactPath());
-            layoutv2.setSplits(layoutv1.getSplits());
-            layoutv2.setTable(layoutv1.getTable());
-            layoutDao.save(layoutv2);
-        }
-        catch (MetadataException | IOException e) {
-            e.printStackTrace();
         }
     }
 }

@@ -11,7 +11,7 @@ import java.util.Objects;
 public class PixelsCacheIdx
 {
     static final int SIZE = Long.BYTES + Integer.BYTES;
-    private static ByteBuffer buffer = ByteBuffer.allocate(SIZE);
+    private ByteBuffer buffer = ByteBuffer.allocate(SIZE);
     private final long offset;
     private final int length;
 

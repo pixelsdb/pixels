@@ -12,13 +12,10 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import com.alibaba.fastjson.JSON;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -156,6 +153,12 @@ public class PixelsRecordReaderImpl
                 }
             }
         }
+        StringBuilder sb = new StringBuilder("[included columns]");
+        for (boolean str : includedColumns)
+        {
+            sb.append(str);
+        }
+        logger.debug(sb.toString());
 
         // check included columns
         if (includedColumnsNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
@@ -170,6 +173,12 @@ public class PixelsRecordReaderImpl
         {
             this.resultColumns[i] = optionColsIndices.get(i);
         }
+        sb = new StringBuilder("[result columns]");
+        for (int str : resultColumns)
+        {
+            sb.append(str);
+        }
+        logger.debug(sb.toString());
 
         // assign target columns, ordered by original column order in schema
         int targetColumnsNum = new HashSet<>(optionColsIndices).size();
@@ -183,6 +192,12 @@ public class PixelsRecordReaderImpl
                 targetColIdx++;
             }
         }
+        sb = new StringBuilder("[target columns]");
+        for (int str : targetColumns)
+        {
+            sb.append(str);
+        }
+        logger.debug(sb.toString());
 
         // create column readers
         List<TypeDescription> columnSchemas = fileSchema.getChildren();
@@ -311,7 +326,7 @@ public class PixelsRecordReaderImpl
             }
         }
         long readRGFooterEndNano = System.nanoTime();
-//        logger.debug("[read rg footers]" + (readRGFooterEndNano - readRGFootersStartNano));
+        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
@@ -330,20 +345,16 @@ public class PixelsRecordReaderImpl
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier)) {
                         String blockName = physicalFSReader.getPath().toString();
-//                        long cacheAccessStart = System.nanoTime();
                         byte[] columnlet = cacheReader.get(blockName, (short) rgId, (short) colId);
-//                        long cacheAccessEnd = System.nanoTime();
                         // if cache hit, read columnlet into buffer
                         if (columnlet != null && columnlet.length > 0) {
                             cacheReadCount++;
                             cacheReadSize += columnlet.length;
-                            chunkBuffers[rgIdx * includedColumns.length + colId] = columnlet;
-//                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",true," + columnlet.length + "," + (cacheAccessEnd - cacheAccessStart));
+                            int bufferIdx = rgIdx * includedColumns.length + colId;
+                            chunkBuffers[bufferIdx] = columnlet;
                         }
                         // if cache miss, add chunkId to be read from disks
                         else {
-//                            logger.debug("[cache access]" + blockName + "-" + rgId + "-" + colId + ",false,0," +
-//                                        (cacheAccessEnd - cacheAccessStart));
                             PixelsProto.ColumnChunkIndex chunkIndex =
                                     rowGroupIndex.getColumnChunkIndexEntries(colId);
                             ChunkId chunk = new ChunkId(rgIdx, colId,
@@ -540,23 +551,11 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
-                    if (curChunkIdx != -1 && curChunkIdx != index) {
-                        chunkBuffers[curChunkIdx] = null;
-                    }
                     curChunkIdx = index;
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    try
-                    {
                         readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                                         postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.debug("[read exception]" + curRGIdx + ":" + RGStart + ":" + resultColumns[i] + ","
-                                     + chunkBuffers[index].length);
-                        throw e;
-                    }
                 }
             }
 
@@ -657,13 +656,13 @@ public class PixelsRecordReaderImpl
             }
         }
         // write out read performance metrics
-        if (enableMetrics)
-        {
-            String metrics = JSON.toJSONString(readPerfMetrics);
-            Path metricsFilePath = Paths.get(metricsDir,
-                    String.valueOf(System.nanoTime()) +
-                    physicalFSReader.getPath().getName() +
-                    ".json");
+//        if (enableMetrics)
+//        {
+//            String metrics = JSON.toJSONString(readPerfMetrics);
+//            Path metricsFilePath = Paths.get(metricsDir,
+//                    String.valueOf(System.nanoTime()) +
+//                    physicalFSReader.getPath().getName() +
+//                    ".json");
 //            try {
 //                RandomAccessFile raf = new RandomAccessFile(metricsFilePath.toFile(), "rw");
 //                raf.seek(0L);
@@ -673,8 +672,8 @@ public class PixelsRecordReaderImpl
 //            catch (IOException e) {
 //                e.printStackTrace();
 //            }
-        }
+//        }
         // reset read performance metrics
-        readPerfMetrics.clear();
+//        readPerfMetrics.clear();
     }
 }
