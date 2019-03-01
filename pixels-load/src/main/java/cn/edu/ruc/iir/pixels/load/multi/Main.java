@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @version V1.0
@@ -170,7 +170,7 @@ public class Main
                     {
                         // source already exist, producer option is false, add list of source to the queue
                         List<Path> hdfsList = fsFactory.listFiles(originalDataPath);
-                        fileQueue = new LinkedBlockingDeque<>(hdfsList);
+                        fileQueue = new LinkedBlockingQueue<>(hdfsList);
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
                         long startTime = System.currentTimeMillis();

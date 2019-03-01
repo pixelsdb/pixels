@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.load;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
@@ -19,7 +19,7 @@ import java.net.URI;
 import java.util.List;
 
 public class TestReader {
-    String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order/20181224023132_31.pxl";
+    String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_1_order/20190111212837_0.pxl";
 
     @Test
     public void testPixelsReader() {
@@ -44,6 +44,8 @@ public class TestReader {
             option.tolerantSchemaEvolution(true);
             option.includeCols(cols);
             PixelsRecordReader recordReader = reader.read(option);
+            System.out.println(recordReader.getRowNumber());
+            System.out.println(reader.getRowGroupInfo(0).getNumberOfRows());
             int batchSize = 10000;
             VectorizedRowBatch rowBatch;
             int len = 0;

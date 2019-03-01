@@ -48,6 +48,8 @@ public class PixelsFile {
         private FileSystem filesystem;
         private PixelsReaderOption option;
         private List<Integer> included;
+        private long offset = 0L;
+        private long length = 9223372036854775807L;
 
         // TODO: We can generalize FileMetada interface. Make OrcTail implement FileMetadata interface
         // and remove this class altogether. Both footer caching and llap caching just needs OrcTail.
@@ -110,6 +112,17 @@ public class PixelsFile {
             return this;
         }
 
+        public ReaderOptions include(List<Integer> included) {
+            this.included = included;
+            return this;
+        }
+
+        public ReaderOptions range(long offset, long length) {
+            this.offset = offset;
+            this.length = length;
+            return this;
+        }
+        
         public List<Integer> getIncluded() {
             return included;
         }
