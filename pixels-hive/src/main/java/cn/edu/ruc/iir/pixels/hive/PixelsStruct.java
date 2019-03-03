@@ -607,8 +607,8 @@ final public class PixelsStruct implements Writable {
         }
     }
 
-    static ObjectInspector createObjectInspector(int columnId,
-                                                 List<PixelsProto.Type> types) {
+    public static ObjectInspector createObjectInspector(int columnId,
+                                                        List<PixelsProto.Type> types) {
         PixelsProto.Type type = types.get(columnId);
         switch (type.getKind()) {
             case FLOAT:

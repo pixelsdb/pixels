@@ -9,66 +9,58 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>pixels-cache</artifactId>
-
+    <artifactId>pixels-test</artifactId>
     <properties>
-        <jdk.version>1.8</jdk.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>cn.edu.ruc.iir.pixels.cache.TestMemFileRead</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CheckCacheConcurrentReader</mainClass>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
         </dependency>
-
         <dependency>
-            <groupId>com.coreos</groupId>
-            <artifactId>jetcd-core</artifactId>
-            <optional>true</optional>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-daemon</artifactId>
         </dependency>
-
         <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <optional>true</optional>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-cache</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
-
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-            <optional>true</optional>
-        </dependency>
     </dependencies>
 
     <build>
-        <finalName>pixels-cache</finalName>
+        <finalName>copy-tool</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -86,8 +78,8 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>pixels-cache</finalName>
-                            <outputDirectory>${project.parent.basedir}/pixels-cache/target</outputDirectory>
+                            <finalName>copy-tool</finalName>
+                            <outputDirectory>${project.parent.basedir}/pixels-test/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
                             <filters>

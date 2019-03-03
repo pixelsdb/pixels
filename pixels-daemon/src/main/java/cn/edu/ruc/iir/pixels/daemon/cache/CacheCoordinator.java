@@ -6,7 +6,6 @@ import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import cn.edu.ruc.iir.pixels.daemon.Server;
@@ -18,13 +17,22 @@ import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
+import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,7 +57,8 @@ public class CacheCoordinator
     private final ScheduledExecutorService scheduledExecutor;
     private final MetadataService metadataService;
     private String hostName;
-    private FSFactory fsFactory = null;
+//    private FSFactory fsFactory = null;
+    private FileSystem fs = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
     private CacheCoordinatorRegister cacheCoordinatorRegister = null;
@@ -85,6 +94,12 @@ public class CacheCoordinator
             return;
         }
         try {
+            Configuration configuration = new Configuration();
+            configuration.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+            configuration.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+            if (fs == null) {
+                fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), configuration);
+            }
             // register coordinator
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
@@ -142,7 +157,7 @@ public class CacheCoordinator
                     }
                 }
             }
-            catch (InterruptedException | FSException | MetadataException e) {
+            catch (InterruptedException | FSException | MetadataException | IOException e) {
                 logger.error(e.getMessage());
                 e.printStackTrace();
                 break;
@@ -172,11 +187,11 @@ public class CacheCoordinator
      * 2. for each file, decide which node to cache it
      * */
     private void update(int layoutVersion)
-            throws FSException, MetadataException
+            throws FSException, MetadataException, IOException
     {
-        if (fsFactory == null) {
-            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
-        }
+//        if (fsFactory == null) {
+//            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
+//        }
         List<Layout> layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
         String[] paths = select(layout);
@@ -198,7 +213,7 @@ public class CacheCoordinator
     }
 
     private String[] select(List<Layout> layout)
-            throws FSException
+            throws IOException
     {
         if (layout.isEmpty()) {
             logger.info("Layout is empty, return a 0-length array");
@@ -206,7 +221,17 @@ public class CacheCoordinator
         }
         else {
             String compactPath = layout.get(0).getCompactPath();
-            List<Path> files = fsFactory.listFiles(compactPath);
+            List<Path> files = new ArrayList<>();
+            FileStatus[] fileStatuses = fs.listStatus(new Path(compactPath));
+            if (fileStatuses != null) {
+                for (FileStatus fileStatus : fileStatuses)
+                {
+                    if (fileStatus.isFile()) {
+                        files.add(fileStatus.getPath());
+                    }
+                }
+            }
+//            List<Path> files = fsFactory.listFiles(compactPath);
             String[] result = new String[files.size()];
             List<String> paths = files.stream().map(Path::toString).collect(Collectors.toList());
             paths.toArray(result);
@@ -215,7 +240,7 @@ public class CacheCoordinator
     }
 
     private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
-            throws FSException
+            throws FSException, IOException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
         for (int i = 0; i < size; i++)
@@ -229,7 +254,7 @@ public class CacheCoordinator
     }
 
     private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
-            throws FSException
+            throws IOException
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
@@ -241,8 +266,13 @@ public class CacheCoordinator
         for (String path : paths)
         {
             // get a set of nodes where the file is located (location_set)
-            List<HostAddress> locations = fsFactory.getBlockLocations(new Path(path), 0, Long.MAX_VALUE);
-//            List<HostAddress> locations = Arrays.asList(nodes);
+            Set<HostAddress> hostAddressSet = new HashSet<>();
+            BlockLocation[] blockLocations = fs.getFileBlockLocations(new Path(path), 0, Long.MAX_VALUE);
+            for (BlockLocation blockLocation : blockLocations)
+            {
+                hostAddressSet.addAll(toHostAddress(blockLocation.getHosts()));
+            }
+            List<HostAddress> locations = new ArrayList<>(hostAddressSet);
             if (locations.size() == 0) {
                 continue;
             }
@@ -265,6 +295,15 @@ public class CacheCoordinator
         }
 
         return locationDistribution;
+    }
+
+    private List<HostAddress> toHostAddress(String[] hosts) {
+        ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+        for (String host : hosts) {
+            builder.add(HostAddress.fromString(host));
+            break;
+        }
+        return builder.build();
     }
 
     private static class CacheCoordinatorRegister

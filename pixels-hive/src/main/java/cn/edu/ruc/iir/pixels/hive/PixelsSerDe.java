@@ -19,15 +19,14 @@ package cn.edu.ruc.iir.pixels.hive;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.AbstractSerDe;
-import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.SerDeStats;
-import org.apache.hadoop.hive.serde2.SerDeUtils;
+import org.apache.hadoop.hive.serde2.*;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.Writable;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nullable;
 import java.io.DataInput;
@@ -35,6 +34,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -47,13 +47,16 @@ import java.util.Properties;
  * @date: Create in 2018-12-11 15:29
  **/
 public class PixelsSerDe extends AbstractSerDe {
-//    private static Logger log = LogManager.getLogger(PixelsSerDe.class);
+    private static Logger log = LogManager.getLogger(PixelsSerDe.class);
 
     private final PixelsSerdeRow row = new PixelsSerdeRow();
     private ObjectInspector inspector = null;
 
     @Override
     public void initialize(@Nullable Configuration configuration, Properties table) throws SerDeException {
+        List<Integer> included = ColumnProjectionUtils.getReadColumnIDs(configuration);
+        log.info("configuration:" + included.toString());
+
         // Read the configuration parameters
         String columnNameProperty = table.getProperty(serdeConstants.LIST_COLUMNS);
         // NOTE: if "columns.types" is missing, all columns will be of String type
@@ -82,9 +85,10 @@ public class PixelsSerDe extends AbstractSerDe {
                 TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
         StructTypeInfo rootType = new StructTypeInfo();
         // The source column names for PIXELS serde that will be used in the schema.
-        rootType.setAllStructFieldNames(columnNames);
-        rootType.setAllStructFieldTypeInfos(fieldTypes);
-//        log.info("setAllStructFieldNames:" + columnNames.toString());
+        rootType.setAllStructFieldNames(new ArrayList<>());
+        rootType.setAllStructFieldTypeInfos(new ArrayList<>());
+        log.info("setAllStructFieldNames:" + columnNames.toString());
+//        log.info("setAllStructFieldTypeInfos:" + fieldTypes.toString());
         inspector = PixelsStruct.createObjectInspector(rootType);
     }
 

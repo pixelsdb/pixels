@@ -36,6 +36,7 @@
         <module>pixels-load</module>
         <module>pixels-listener</module>
         <module>pixels-hive</module>
+        <module>pixels-test</module>
     </modules>
 
     <packaging>pom</packaging>

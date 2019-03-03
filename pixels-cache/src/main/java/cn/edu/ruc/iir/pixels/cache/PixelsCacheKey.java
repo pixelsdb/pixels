@@ -17,8 +17,8 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private static final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
+    private final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
     private String blockId;
     private short rowGroupId;
     private short columnId;

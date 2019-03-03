@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheKey;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheWriter;
 import cn.edu.ruc.iir.pixels.cache.PixelsPhysicalReader;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
@@ -33,12 +32,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
-import static junit.framework.TestCase.assertEquals;
-import static org.junit.Assert.assertArrayEquals;
 
 /**
  * pixels
@@ -300,48 +294,48 @@ public class TestPixelsWriter {
             throws Exception
     {
         // get fs
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
-        // validation
-        PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
-                                                         .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                                         .setCacheSize(1024*1024*128L)
-                                                         .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                                         .setIndexSize(1024*1024*128L)
-                                                         .build();
-        String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_compact";
-        for (FileStatus fileStatus : fs.listStatus(new Path(directory)))
-        {
-            Path file = fileStatus.getPath();
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, file);
-            for (short i = 0; i < 16; i++)
-            {
-                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(i);
-                for (short j = 0; j < 105; j++)
-                {
-                    PixelsProto.ColumnChunkIndex chunkIndex =
-                            rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(j);
-                    int chunkLen = (int) chunkIndex.getChunkLength();
-                    long chunkOffset = chunkIndex.getChunkOffset();
-                    byte[] expectedColumnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
-                    byte[] actualColumnlet = cacheReader.get(file.toString(), i, j);
-                    for (int k = 0; k < expectedColumnlet.length; k++)
-                    {
-                        byte exp = expectedColumnlet[k];
-                        byte act = actualColumnlet[k];
-                        if (exp != act) {
-                            System.out.println(k + ", expected: " + exp + ", actual: " + act);
-                        }
-                    }
-                    if (!Arrays.equals(expectedColumnlet, actualColumnlet)) {
-                        System.out.println(file.getName() + "-" + i + "-" + j);
-                    }
-                }
-            }
-        }
+//        Configuration conf = new Configuration();
+//        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+//        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+//        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+//        FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
+//        // validation
+//        PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
+//                                                         .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+//                                                         .setCacheSize(1024*1024*128L)
+//                                                         .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+//                                                         .setIndexSize(1024*1024*128L)
+//                                                         .build();
+//        String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_compact";
+//        for (FileStatus fileStatus : fs.listStatus(new Path(directory)))
+//        {
+//            Path file = fileStatus.getPath();
+//            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, file);
+//            for (short i = 0; i < 16; i++)
+//            {
+//                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(i);
+//                for (short j = 0; j < 105; j++)
+//                {
+//                    PixelsProto.ColumnChunkIndex chunkIndex =
+//                            rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(j);
+//                    int chunkLen = (int) chunkIndex.getChunkLength();
+//                    long chunkOffset = chunkIndex.getChunkOffset();
+//                    byte[] expectedColumnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
+//                    byte[] actualColumnlet = cacheReader.get(file.toString(), i, j);
+//                    for (int k = 0; k < expectedColumnlet.length; k++)
+//                    {
+//                        byte exp = expectedColumnlet[k];
+//                        byte act = actualColumnlet[k];
+//                        if (exp != act) {
+//                            System.out.println(k + ", expected: " + exp + ", actual: " + act);
+//                        }
+//                    }
+//                    if (!Arrays.equals(expectedColumnlet, actualColumnlet)) {
+//                        System.out.println(file.getName() + "-" + i + "-" + j);
+//                    }
+//                }
+//            }
+//        }
     }
 
     @Test
@@ -349,88 +343,88 @@ public class TestPixelsWriter {
             throws Exception
     {
         // get fs
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
-        // validation
-        PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
-                                                         .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                                         .setCacheSize(1024*1024*1024L)
-                                                         .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                                         .setIndexSize(1024*1024*1024L)
-                                                         .build();
-        MetadataService metadataService = new MetadataService("dbiir10", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_105", 0).get(0);
-        Compact compact = layout.getCompactObject();
-        int cacheBorder = compact.getCacheBorder();
-        List<String> cacheOrders = compact.getColumnletOrder().subList(0, cacheBorder);
-        String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_1_compact";
-        // varchar, varchar, int, boolean, varchar, varchar
-        String[] includedCols = new String[]{"formlevel2","visitformlevel1","overallplt","isnormalquery", "userfbid", "followonformlevel3"};
-        PixelsReaderOption option = new PixelsReaderOption();
-        option.rgRange(0, 16);
-        option.includeCols(includedCols);
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        for (FileStatus fileStatus : fs.listStatus(new Path(directory)))
-        {
-            Path file = fileStatus.getPath();
-
-            // turn on caching
-            PixelsReader pixelsReaderWithCache = PixelsReaderImpl
-                    .newBuilder()
-                    .setFS(fs)
-                    .setPath(file)
-                    .setEnableCache(true)
-                    .setCacheOrder(cacheOrders)
-                    .setPixelsCacheReader(cacheReader)
-                    .build();
-
-            PixelsRecordReader pixelsRecordReaderWithCache = pixelsReaderWithCache.read(option);
-            VectorizedRowBatch rowBatchWithCache = pixelsRecordReaderWithCache.readBatch();
-            BytesColumnVector cache_c0 = (BytesColumnVector) rowBatchWithCache.cols[0];
-            BytesColumnVector cache_c1 = (BytesColumnVector) rowBatchWithCache.cols[1];
-            LongColumnVector cache_c2 = (LongColumnVector) rowBatchWithCache.cols[2];
-            LongColumnVector cache_c3 = (LongColumnVector) rowBatchWithCache.cols[3];
-            BytesColumnVector cache_c4 = (BytesColumnVector) rowBatchWithCache.cols[4];
-            BytesColumnVector cache_c5 = (BytesColumnVector) rowBatchWithCache.cols[5];
-
-            // turn off caching
-            PixelsReader pixelsReaderWithoutCache = PixelsReaderImpl
-                    .newBuilder()
-                    .setFS(fs)
-                    .setPath(file)
-                    .setEnableCache(false)
-                    .setCacheOrder(new ArrayList<>(0))
-                    .build();
-            PixelsRecordReader pixelsRecordReaderWithoutCache = pixelsReaderWithoutCache.read(option);
-            VectorizedRowBatch rowBatchWithoutCache = pixelsRecordReaderWithoutCache.readBatch();
-            BytesColumnVector c0 = (BytesColumnVector) rowBatchWithoutCache.cols[0];
-            BytesColumnVector c1 = (BytesColumnVector) rowBatchWithoutCache.cols[1];
-            LongColumnVector c2 = (LongColumnVector) rowBatchWithoutCache.cols[2];
-            LongColumnVector c3 = (LongColumnVector) rowBatchWithoutCache.cols[3];
-            BytesColumnVector c4 = (BytesColumnVector) rowBatchWithoutCache.cols[4];
-            BytesColumnVector c5 = (BytesColumnVector) rowBatchWithoutCache.cols[5];
-
-            // validate
-            assert rowBatchWithCache.size == rowBatchWithoutCache.size;
-            assertArrayEquals(cache_c0.isNull, c0.isNull);
-            assertArrayEquals(cache_c1.isNull, c1.isNull);
-            assertArrayEquals(cache_c2.isNull, c2.isNull);
-            assertArrayEquals(cache_c3.isNull, c3.isNull);
-            assertArrayEquals(cache_c4.isNull, c4.isNull);
-            assertArrayEquals(cache_c5.isNull, c5.isNull);
-            for (int i = 0; i < rowBatchWithCache.size; i++)
-            {
-                assertEquals(c0.toString(i), cache_c0.toString(i));
-                assertEquals(c1.toString(i), cache_c1.toString(i));
-                assertEquals(c2.vector[i], cache_c2.vector[i]);
-                assertEquals(c3.vector[i], cache_c3.vector[i]);
-                assertEquals(c4.toString(i), cache_c4.toString(i));
-                assertEquals(c5.toString(i), cache_c5.toString(i));
-            }
-        }
+//        Configuration conf = new Configuration();
+//        conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
+//        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+//        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+//        FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
+//        // validation
+//        PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
+//                                                         .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+//                                                         .setCacheSize(1024*1024*1024L)
+//                                                         .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+//                                                         .setIndexSize(1024*1024*1024L)
+//                                                         .build();
+//        MetadataService metadataService = new MetadataService("dbiir10", 18888);
+//        Layout layout = metadataService.getLayout("pixels", "test_105", 0).get(0);
+//        Compact compact = layout.getCompactObject();
+//        int cacheBorder = compact.getCacheBorder();
+//        List<String> cacheOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+//        String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_1_compact";
+//        // varchar, varchar, int, boolean, varchar, varchar
+//        String[] includedCols = new String[]{"formlevel2","visitformlevel1","overallplt","isnormalquery", "userfbid", "followonformlevel3"};
+//        PixelsReaderOption option = new PixelsReaderOption();
+//        option.rgRange(0, 16);
+//        option.includeCols(includedCols);
+//        option.skipCorruptRecords(true);
+//        option.tolerantSchemaEvolution(true);
+//        for (FileStatus fileStatus : fs.listStatus(new Path(directory)))
+//        {
+//            Path file = fileStatus.getPath();
+//
+//            // turn on caching
+//            PixelsReader pixelsReaderWithCache = PixelsReaderImpl
+//                    .newBuilder()
+//                    .setFS(fs)
+//                    .setPath(file)
+//                    .setEnableCache(true)
+//                    .setCacheOrder(cacheOrders)
+//                    .setPixelsCacheReader(cacheReader)
+//                    .build();
+//
+//            PixelsRecordReader pixelsRecordReaderWithCache = pixelsReaderWithCache.read(option);
+//            VectorizedRowBatch rowBatchWithCache = pixelsRecordReaderWithCache.readBatch();
+//            BytesColumnVector cache_c0 = (BytesColumnVector) rowBatchWithCache.cols[0];
+//            BytesColumnVector cache_c1 = (BytesColumnVector) rowBatchWithCache.cols[1];
+//            LongColumnVector cache_c2 = (LongColumnVector) rowBatchWithCache.cols[2];
+//            LongColumnVector cache_c3 = (LongColumnVector) rowBatchWithCache.cols[3];
+//            BytesColumnVector cache_c4 = (BytesColumnVector) rowBatchWithCache.cols[4];
+//            BytesColumnVector cache_c5 = (BytesColumnVector) rowBatchWithCache.cols[5];
+//
+//            // turn off caching
+//            PixelsReader pixelsReaderWithoutCache = PixelsReaderImpl
+//                    .newBuilder()
+//                    .setFS(fs)
+//                    .setPath(file)
+//                    .setEnableCache(false)
+//                    .setCacheOrder(new ArrayList<>(0))
+//                    .build();
+//            PixelsRecordReader pixelsRecordReaderWithoutCache = pixelsReaderWithoutCache.read(option);
+//            VectorizedRowBatch rowBatchWithoutCache = pixelsRecordReaderWithoutCache.readBatch();
+//            BytesColumnVector c0 = (BytesColumnVector) rowBatchWithoutCache.cols[0];
+//            BytesColumnVector c1 = (BytesColumnVector) rowBatchWithoutCache.cols[1];
+//            LongColumnVector c2 = (LongColumnVector) rowBatchWithoutCache.cols[2];
+//            LongColumnVector c3 = (LongColumnVector) rowBatchWithoutCache.cols[3];
+//            BytesColumnVector c4 = (BytesColumnVector) rowBatchWithoutCache.cols[4];
+//            BytesColumnVector c5 = (BytesColumnVector) rowBatchWithoutCache.cols[5];
+//
+//            // validate
+//            assert rowBatchWithCache.size == rowBatchWithoutCache.size;
+//            assertArrayEquals(cache_c0.isNull, c0.isNull);
+//            assertArrayEquals(cache_c1.isNull, c1.isNull);
+//            assertArrayEquals(cache_c2.isNull, c2.isNull);
+//            assertArrayEquals(cache_c3.isNull, c3.isNull);
+//            assertArrayEquals(cache_c4.isNull, c4.isNull);
+//            assertArrayEquals(cache_c5.isNull, c5.isNull);
+//            for (int i = 0; i < rowBatchWithCache.size; i++)
+//            {
+//                assertEquals(c0.toString(i), cache_c0.toString(i));
+//                assertEquals(c1.toString(i), cache_c1.toString(i));
+//                assertEquals(c2.vector[i], cache_c2.vector[i]);
+//                assertEquals(c3.vector[i], cache_c3.vector[i]);
+//                assertEquals(c4.toString(i), cache_c4.toString(i));
+//                assertEquals(c5.toString(i), cache_c5.toString(i));
+//            }
+//        }
     }
 }
