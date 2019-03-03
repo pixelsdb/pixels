@@ -12,44 +12,46 @@ import java.util.concurrent.TimeUnit;
 
 public class Daemon implements Runnable
 {
-    private FileChannel mainChannel = null;
-    private FileChannel guardChannel = null;
-    private String[] guardCmd = null;
+    private FileChannel myChannel = null;
+    private FileChannel partnerChannel = null;
+    private String[] partnerCmd = null;
+    private volatile boolean running = false;
     private static Logger log = LogManager.getLogger(Daemon.class);
 
-    public void setup (String mainFilePath, String guardFilePath, String[] guardCmd)
+    public void setup (String selfFilePath, String partnerFilePath, String[] partnerCmd)
     {
-        File mainLockFile = new File(mainFilePath);
-        File guardLockFile = new File(guardFilePath);
-        this.guardCmd = guardCmd;
-        if (!mainLockFile.exists())
+        File myLockFile = new File(selfFilePath);
+        File partnerLockFile = new File(partnerFilePath);
+        this.partnerCmd = partnerCmd;
+        if (!myLockFile.exists())
         {
             try
             {
-                mainLockFile.createNewFile();
+                myLockFile.createNewFile();
             } catch (IOException e)
             {
-                log.error("create main lock file failed.", e);
+                log.error("failed to create my own lock file.", e);
             }
         }
-        if (!guardLockFile.exists())
+        if (!partnerLockFile.exists())
         {
             try
             {
-                guardLockFile.createNewFile();
+                partnerLockFile.createNewFile();
             } catch (IOException e)
             {
-                log.error("create guard lock file failed.", e);
+                log.error("failed to create my partner's lock file.", e);
             }
         }
         try
         {
-            mainChannel = new FileOutputStream(mainLockFile).getChannel();
-            guardChannel = new FileOutputStream(guardLockFile).getChannel();
+            this.myChannel = new FileOutputStream(myLockFile).getChannel();
+            this.partnerChannel = new FileOutputStream(partnerLockFile).getChannel();
 
         } catch (IOException e)
         {
-            log.error("I/O exception when create file channels.", e);
+            log.error("I/O exception when creating lock file channels.", e);
+            this.clean();
         }
     }
 
@@ -57,55 +59,86 @@ public class Daemon implements Runnable
     {
         try
         {
-            if (this.mainChannel != null)
+            if (this.myChannel != null)
             {
-                this.mainChannel.close();
+                this.myChannel.close();
             }
         } catch (IOException e)
         {
-            log.error("close channel A error", e);
+            log.error("error when closing my own channel.", e);
         }
         try
         {
-            if (this.guardChannel != null)
+            if (this.partnerChannel != null)
             {
-                this.guardChannel.close();
+                this.partnerChannel.close();
             }
         } catch (IOException e)
         {
-            log.error("close channel B error", e);
+            log.error("error when closing my partner's channel", e);
         }
     }
 
     @Override
     public void run()
     {
+        FileLock myLock = null;
         try
         {
-            FileLock mainLock = this.mainChannel.tryLock();
-            if (mainLock == null)
+            myLock = this.myChannel.tryLock();
+            if (myLock == null)
             {
                 // this process has been started
                 this.clean();
+                log.info("Such daemon process has already been started, exiting...");
+                this.running = false;
                 System.exit(0);
             }
-
-            while (true)
+            else
             {
-                FileLock guardLock = this.guardChannel.tryLock();
-                if (guardLock != null)
+                this.running = true;
+                log.info("starting daemon...");
+            }
+
+            while (this.running)
+            {
+                // make sure the partner is running too.
+                FileLock partnerLock = this.partnerChannel.tryLock();
+                if (partnerLock != null)
                 {
-                    guardLock.release();
                     // the guarded process is not running.
-                    ProcessBuilder builder = new ProcessBuilder(this.guardCmd);
+                    partnerLock.release();
+                    log.info("starting partner...");
+                    ProcessBuilder builder = new ProcessBuilder(this.partnerCmd);
                     builder.start();
                 }
                 TimeUnit.SECONDS.sleep(3);
             }
-
         } catch (Exception e)
         {
-            log.error("exception when running.", e);
+            log.error("exception occurs when running.", e);
         }
+        log.info("shutdown, exiting...");
+        this.running = false;
+        try
+        {
+            if (myLock != null)
+            {
+                myLock.release();
+            }
+        } catch (IOException e1)
+        {
+            log.error("error when releasing my lock.");
+        }
+    }
+
+    public void shutdown()
+    {
+        this.running = false;
+    }
+
+    public boolean isRunning()
+    {
+        return this.running;
     }
 }
