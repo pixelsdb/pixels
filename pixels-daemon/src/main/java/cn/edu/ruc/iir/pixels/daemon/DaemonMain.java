@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * example command to start pixels-daemon:
  * java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar datanode|coordinator
  * */
 public class DaemonMain
@@ -35,23 +36,25 @@ public class DaemonMain
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
                     (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
             {
-                // this is the main daemon
+                // this is the main daemon.
                 System.out.println("starting main daemon...");
-                Daemon guardDaemon = new Daemon();
+                Daemon mainDaemon = new Daemon();
                 String[] guardCmd = {"java", "-Drole=guard", "-jar", daemonJarPath, args[0]};
-                guardDaemon.setup(mainFile, guardFile, guardCmd);
-                Thread daemonThread = new Thread(guardDaemon);
+                mainDaemon.setup(mainFile, guardFile, guardCmd);
+                // the main daemon logic will be running in a thread,
+                // and it will start the gard daemon process to protect itself.
+                Thread daemonThread = new Thread(mainDaemon);
                 daemonThread.setName("main daemon thread");
                 daemonThread.setDaemon(true);
                 daemonThread.start();
 
                 ServerContainer container = new ServerContainer();
 
-                ConfigFactory config = ConfigFactory.Instance();
-                int port = Integer.valueOf(config.getProperty("metadata.server.port"));
-
                 if (args[0].equalsIgnoreCase("coordinator"))
                 {
+                    ConfigFactory config = ConfigFactory.Instance();
+                    int port = Integer.valueOf(config.getProperty("metadata.server.port"));
+
                     // start metadata
                     MetadataServer metadataServer = new MetadataServer(port);
                     container.addServer("metadata", metadataServer);
@@ -61,14 +64,14 @@ public class DaemonMain
                 }
                 else
                 {
-                    // start data node
+                    // start metrics server and cache manager on data node
                     MetricsServer metricsServer = new MetricsServer();
                     container.addServer("metrics", metricsServer);
-                    CacheManager cacheServer = new CacheManager();
-                    container.addServer("cache_manager", cacheServer);
+                    CacheManager cacheManager = new CacheManager();
+                    container.addServer("cache_manager", cacheManager);
                 }
 
-                // continue the main thread
+                // continue the main thread, start and check the server threads.
                 while (true)
                 {
                     try
@@ -99,8 +102,10 @@ public class DaemonMain
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
                 Daemon guardDaemon = new Daemon();
-                String[] guardCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
-                guardDaemon.setup(guardFile, mainFile, guardCmd);
+                String[] mainCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
+                // start the guard daemon, and guard daemon will start the main daemon shortly after.
+                guardDaemon.setup(guardFile, mainFile, mainCmd);
+                // run() contains an endless loop().
                 guardDaemon.run();
             }
             else if (role.equalsIgnoreCase("kill"))
