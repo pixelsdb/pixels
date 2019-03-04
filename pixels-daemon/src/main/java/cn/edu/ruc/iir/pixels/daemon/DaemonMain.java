@@ -141,7 +141,8 @@ public class DaemonMain
                             }
                             int pid = Integer.parseInt(splits[0]);
                             System.out.println("killing " + roleName + ", pid (" + pid + ")");
-                            // TODO: this is not a gentle manner to terminate the daemon, we should notify the killing daemon to close database connection.
+                            // TODO: this is not a gentle manner to terminate the daemon, \
+                            // we should notify the daemon (by sending a signal) to shutdown itself.
                             Runtime.getRuntime().exec("kill -9 " + pid);
                         }
                     }
@@ -154,12 +155,12 @@ public class DaemonMain
             }
             else
             {
-                System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be an args [metadata/datanode]");
+                System.err.println("Run with -Drole={main,guard,kill} {coordinator/datanode}");
             }
         }
         else
         {
-            System.err.println("Run with -Drole=[main,guard,kill], when role=main, there should be an args [metadata/datanode]");
+            System.err.println("Run with -Drole={main,guard,kill} {coordinator/datanode}");
         }
     }
 }

@@ -116,10 +116,11 @@ public class Daemon implements Runnable
             }
         } catch (Exception e)
         {
+            this.running = false;
             log.error("exception occurs when running.", e);
         }
+
         log.info("shutdown, exiting...");
-        this.running = false;
         try
         {
             if (myLock != null)
@@ -130,6 +131,7 @@ public class Daemon implements Runnable
         {
             log.error("error when releasing my lock.");
         }
+        this.clean();
     }
 
     public void shutdown()
