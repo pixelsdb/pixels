@@ -174,6 +174,7 @@ public class CacheCoordinator
     @Override
     public void shutdown()
     {
+        // TODO: check if the objects here are not null in case that coordinator was not started successfully.
         coordinatorStatus.set(-1);
         cacheCoordinatorRegister.stop();
         etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
