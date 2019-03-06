@@ -2,6 +2,8 @@ package cn.edu.ruc.iir.pixels.daemon;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,6 +18,7 @@ public class Daemon implements Runnable
     private FileChannel partnerChannel = null;
     private String[] partnerCmd = null;
     private volatile boolean running = false;
+    private ShutdownHandler shutdownHandler = null;
     private static Logger log = LogManager.getLogger(Daemon.class);
 
     public void setup (String selfFilePath, String partnerFilePath, String[] partnerCmd)
@@ -47,7 +50,9 @@ public class Daemon implements Runnable
         {
             this.myChannel = new FileOutputStream(myLockFile).getChannel();
             this.partnerChannel = new FileOutputStream(partnerLockFile).getChannel();
-
+            // bind handler for SIGTERM(15) signal.
+            this.shutdownHandler = new ShutdownHandler(this);
+            Signal.handle(new Signal("TERM"), shutdownHandler);
         } catch (IOException e)
         {
             log.error("I/O exception when creating lock file channels.", e);
@@ -77,6 +82,7 @@ public class Daemon implements Runnable
         {
             log.error("error when closing my partner's channel", e);
         }
+        this.shutdownHandler.unbind();
     }
 
     @Override
@@ -142,5 +148,29 @@ public class Daemon implements Runnable
     public boolean isRunning()
     {
         return this.running;
+    }
+
+    public static class ShutdownHandler implements SignalHandler
+    {
+        private volatile Daemon target = null;
+
+        public ShutdownHandler(Daemon target)
+        {
+            this.target = target;
+        }
+
+        public void unbind()
+        {
+            this.target = null;
+        }
+
+        @Override
+        public void handle(Signal signal)
+        {
+            if (this.target != null)
+            {
+                this.target.shutdown();
+            }
+        }
     }
 }

@@ -48,6 +48,7 @@ public class MetadataServer implements Server {
         this.running = false;
         boss.shutdownGracefully();
         worker.shutdownGracefully();
+        DBUtil.Instance().close();
     }
 
     @Override

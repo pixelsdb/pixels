@@ -28,12 +28,12 @@ public class ServerContainer
         this.serverMap.put(name, server);
     }
 
-    public List<String> getServerNames ()
+    public List<String> getServerNames()
     {
         return new ArrayList<>(this.serverMap.keySet());
     }
 
-    public boolean chechServer (String name) throws NoSuchServerException
+    public boolean chechServer(String name) throws NoSuchServerException
     {
         Server server = this.serverMap.get(name);
         if (server == null)
@@ -68,7 +68,7 @@ public class ServerContainer
         return serverIsRunning;
     }
 
-    public void startServer (String name) throws NoSuchServerException
+    public void startServer(String name) throws NoSuchServerException
     {
         Server server = this.serverMap.get(name);
         if (server == null)
@@ -81,5 +81,18 @@ public class ServerContainer
         }
         Thread serverThread = new Thread(server);
         serverThread.start();
+    }
+
+    public void shutdownServer(String name) throws NoSuchServerException
+    {
+        Server server = this.serverMap.get(name);
+        if (server == null)
+        {
+            throw new NoSuchServerException();
+        }
+        if (chechServer(name) == true)
+        {
+            server.shutdown();
+        }
     }
 }
