@@ -45,8 +45,6 @@ public class DaemonMain
                 // and it will start the gard daemon process to protect each other.
                 Thread daemonThread = new Thread(mainDaemon);
                 daemonThread.setName("main daemon thread");
-                // jvm will not wait for a daemon thread to terminate.
-                daemonThread.setDaemon(true);
                 daemonThread.start();
 
                 try

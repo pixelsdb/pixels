@@ -106,6 +106,10 @@ public class Daemon implements Runnable
                 log.info("starting daemon...");
             }
 
+            // TODO: due to that main daemon and its guard daemon are not guaranteed
+            // to receive the TERM signal at the same time, there is a very small interval
+            // between the two moment. so that there is a very small chance that the processes
+            // will not be killed.
             while (this.running)
             {
                 // make sure the partner is running too.
