@@ -14,7 +14,7 @@ import java.io.IOException;
 
 public class TestOrcReader {
 
-    String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/2.orc";
+    String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/orc/000014_0";
 
     @Test
     public void testReader()

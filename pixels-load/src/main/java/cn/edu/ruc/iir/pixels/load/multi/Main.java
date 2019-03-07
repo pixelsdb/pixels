@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @version V1.0
@@ -52,7 +52,6 @@ import java.util.concurrent.LinkedBlockingDeque;
  * <br>This shall be run under root user to execute cache cleaning commands
  * <p>
  * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact_cache.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
- * QUERY -t pixels -w /home/iir/opt/pixels/105_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_105_v_1_compact.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
  * <p> Local
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
@@ -170,7 +169,7 @@ public class Main
                     {
                         // source already exist, producer option is false, add list of source to the queue
                         List<Path> hdfsList = fsFactory.listFiles(originalDataPath);
-                        fileQueue = new LinkedBlockingDeque<>(hdfsList);
+                        fileQueue = new LinkedBlockingQueue<>(hdfsList);
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
                         long startTime = System.currentTimeMillis();
