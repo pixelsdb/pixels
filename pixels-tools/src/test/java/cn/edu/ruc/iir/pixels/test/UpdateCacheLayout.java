@@ -24,12 +24,12 @@ import java.util.Set;
  *
  * @author guodong
  */
-public class TestWorkload
+public class UpdateCacheLayout
 {
     @Test
-    public void updateMetadata()
+    public void updateCacheLayout()
     {
-        String cacheFile = "";
+        String cacheFile = "/Users/Jelly/Desktop";
         try {
             MetadataService metadataService = new MetadataService("dbiir01", 18888);
             Layout layoutv1 = metadataService.getLayout("pixels", "test_1187", 1).get(0);

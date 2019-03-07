@@ -18,7 +18,7 @@ import java.util.Map;
  *
  * @author guodong
  */
-public class TestHDFSFileDistribution
+public class GetHDFSFileDistribution
 {
     @Test
     public void test()

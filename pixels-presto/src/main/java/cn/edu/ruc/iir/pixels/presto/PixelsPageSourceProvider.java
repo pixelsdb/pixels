@@ -61,12 +61,6 @@ public class PixelsPageSourceProvider
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        if (cacheFile != null && indexFile != null) {
-            return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, cacheFile, indexFile, connectorId);
-        }
-        else {
-            logger.error("Index/Cache file is null");
-            return null;
-        }
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, cacheFile, indexFile, connectorId);
     }
 }

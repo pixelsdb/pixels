@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.test;
 
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import org.junit.Test;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -15,7 +16,8 @@ import java.sql.Statement;
  */
 public class CopyMetadata
 {
-    public static void main(String[] args)
+    @Test
+    public void copy()
     {
         ConfigFactory config = ConfigFactory.Instance();
         String driver = config.getProperty("metadata.db.driver");
@@ -28,6 +30,8 @@ public class CopyMetadata
         String dstUser = "pixels";
         String dstPwd = "pixels";
 
+        int srcTableId = 3;
+
         try {
             Class.forName(driver);
             Connection srcConn = DriverManager.getConnection(srcURL, srcUser, srcPwd);
@@ -36,8 +40,7 @@ public class CopyMetadata
             Statement dstConnStatement = dstConn.createStatement();
 
             // get table from src
-            int tableId = 3;
-            ResultSet resultSet = srcConnStatement.executeQuery("SELECT TBL_NAME, TBL_TYPE, DBS_DB_ID FROM TBLS WHERE TBL_ID=" + tableId);
+            ResultSet resultSet = srcConnStatement.executeQuery("SELECT TBL_NAME, TBL_TYPE, DBS_DB_ID FROM TBLS WHERE TBL_ID=" + srcTableId);
             String tblName = "";
             String tblType = "";
             int dbId = 0;
@@ -90,7 +93,7 @@ public class CopyMetadata
             // insert cols
             srcConnStatement = srcConn.createStatement();
             dstConnStatement = dstConn.createStatement();
-            resultSet = srcConnStatement.executeQuery("SELECT COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + tableId);
+            resultSet = srcConnStatement.executeQuery("SELECT COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + srcTableId);
             while (resultSet.next())
             {
                 String colName = resultSet.getString("COL_NAME");
@@ -107,7 +110,7 @@ public class CopyMetadata
             dstConnStatement = dstConn.createStatement();
             resultSet = srcConnStatement.executeQuery("SELECT LAYOUT_VERSION, LAYOUT_CREATE_AT, LAYOUT_PERMISSION, " +
                                                       "LAYOUT_ORDER, LAYOUT_ORDER_PATH, LAYOUT_COMPACT, LAYOUT_COMPACT_PATH, " +
-                                                      "LAYOUT_SPLITS FROM LAYOUTS WHERE LAYOUT_PERMISSION=1 AND TBLS_TBL_ID=" + tableId);
+                                                      "LAYOUT_SPLITS FROM LAYOUTS WHERE LAYOUT_PERMISSION=1 AND TBLS_TBL_ID=" + srcTableId);
             while (resultSet.next())
             {
                 String layout_version = resultSet.getString("LAYOUT_VERSION");

@@ -11,7 +11,7 @@
 
     <artifactId>pixels-test</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.CheckCacheConcurrentReader</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CacheConcurrentReaderPerf</mainClass>
     </properties>
 
     <dependencies>
@@ -79,7 +79,7 @@
                         </goals>
                         <configuration>
                             <finalName>copy-tool</finalName>
-                            <outputDirectory>${project.parent.basedir}/pixels-test/target</outputDirectory>
+                            <outputDirectory>/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
                             <filters>

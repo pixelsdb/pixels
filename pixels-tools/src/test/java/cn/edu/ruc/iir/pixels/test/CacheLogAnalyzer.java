@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.test;
 
+import org.junit.Test;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
@@ -19,32 +21,14 @@ import java.util.List;
  */
 public class CacheLogAnalyzer
 {
-    private final String logPath;
-    private final String csvPath;
+    private String logPath = "/Users/Jelly/Desktop/pixels/cache/logs/";
+    private String csvPath = "/Users/Jelly/Desktop/pixels/cache/csv/";
 
-    public static void main(String[] args)
-    {
-        String logPath = "/Users/Jelly/Desktop/pixels/cache/logs/";
-        String csvPath = "/Users/Jelly/Desktop/pixels/cache/csv/";
-        CacheLogAnalyzer analyzer = new CacheLogAnalyzer(logPath, csvPath);
-        try {
-            analyzer.analyze();
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public CacheLogAnalyzer(String logPath, String csvPath)
-    {
-        this.logPath = logPath;
-        this.csvPath = csvPath;
-    }
-
+    @Test
     private void analyze()
             throws IOException
     {
-//        Files.list(Paths.get(logPath)).forEach(this::processLogFile);
+        Files.list(Paths.get(logPath)).forEach(this::processLogFile);
         Files.list(Paths.get(csvPath)).forEach(this::summarize);
     }
 
@@ -84,7 +68,7 @@ public class CacheLogAnalyzer
                     CacheSearchItem searchFound = null;
                     for (CacheReadItem cacheReadItem : windowReadBuffer)
                     {
-                        if (cacheReadItem.cacheId.equalsIgnoreCase(cacheId) && Math.abs(lineNum - cacheReadItem.getLineNum()) <= lineWindow)
+                        if (cacheReadItem.cacheId.equalsIgnoreCase(cacheId) && Math.abs(lineNum - cacheReadItem.lineNum) <= lineWindow)
                         {
                             accessMetric.readTime = cacheReadItem.readTime;
                             accessMetric.readLineNum = cacheReadItem.lineNum;
@@ -98,7 +82,7 @@ public class CacheLogAnalyzer
                     }
                     for (CacheSearchItem cacheSearchItem : windowSearchBuffer)
                     {
-                        if (cacheSearchItem.cacheId.equalsIgnoreCase(cacheId) && Math.abs(lineNum - cacheSearchItem.getLineNum()) <= lineWindow)
+                        if (cacheSearchItem.cacheId.equalsIgnoreCase(cacheId) && Math.abs(lineNum - cacheSearchItem.lineNum) <= lineWindow)
                         {
                             accessMetric.searchTime = cacheSearchItem.searchTime;
                             accessMetric.searchLineNum = cacheSearchItem.lineNum;
@@ -424,32 +408,12 @@ public class CacheLogAnalyzer
         private final int searchTime;
         private final long lineNum;
 
-        public CacheSearchItem(String cacheId, Timestamp timestamp, int searchTime, long lineNum)
+        CacheSearchItem(String cacheId, Timestamp timestamp, int searchTime, long lineNum)
         {
             this.cacheId = cacheId;
             this.timestamp = timestamp;
             this.searchTime = searchTime;
             this.lineNum = lineNum;
-        }
-
-        public String getCacheId()
-        {
-            return cacheId;
-        }
-
-        public Timestamp getTimestamp()
-        {
-            return timestamp;
-        }
-
-        public int getSearchTime()
-        {
-            return searchTime;
-        }
-
-        public long getLineNum()
-        {
-            return lineNum;
         }
     }
 
@@ -460,32 +424,12 @@ public class CacheLogAnalyzer
         private final int readTime;
         private final long lineNum;
 
-        public CacheReadItem(String cacheId, Timestamp timestamp, int readTime, long lineNum)
+        CacheReadItem(String cacheId, Timestamp timestamp, int readTime, long lineNum)
         {
             this.cacheId = cacheId;
             this.timestamp = timestamp;
             this.readTime = readTime;
             this.lineNum = lineNum;
-        }
-
-        public String getCacheId()
-        {
-            return cacheId;
-        }
-
-        public Timestamp getTimestamp()
-        {
-            return timestamp;
-        }
-
-        public int getReadTime()
-        {
-            return readTime;
-        }
-
-        public long getLineNum()
-        {
-            return lineNum;
         }
     }
 }

@@ -15,9 +15,11 @@ import java.net.URI;
 /**
  * pixels
  *
+ * java -jar xxx.jar srcPath dstPath
+ *
  * @author guodong
  */
-public class CopyTool
+public class CopyFiles
 {
     public static void main(String[] args)
     {

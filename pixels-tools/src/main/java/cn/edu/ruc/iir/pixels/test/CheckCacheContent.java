@@ -20,6 +20,8 @@ import java.util.List;
  * pixels
  *
  * String path = "hdfs://dbiir01:9000/pixels/pixels/test_1187/v_1_compact/20190223144340_13.compact_copy_20190223153853_93.pxl";
+ *
+ * java -jar xxx.jar path rowgroup_id col_id layout_version
  * @author guodong
  */
 public class CheckCacheContent

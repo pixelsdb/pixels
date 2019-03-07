@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @author guodong
  */
-public class CheckCacheConcurrentReader
+public class CacheConcurrentReaderPerf
 {
     private ConcurrentHashMap<String, PixelsCacheIdx> cacheContainer = new ConcurrentHashMap<>();
     private List<String> readColumnetIds = new ArrayList<>();
@@ -36,7 +36,7 @@ public class CheckCacheConcurrentReader
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
-    public CheckCacheConcurrentReader()
+    public CacheConcurrentReaderPerf()
             throws Exception
     {
         cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
@@ -47,17 +47,17 @@ public class CheckCacheConcurrentReader
     public static void main(String[] args)
     {
         try {
-            CheckCacheConcurrentReader checkCacheConcurrentReader = new CheckCacheConcurrentReader();
-            checkCacheConcurrentReader.prepare(args[0], Integer.parseInt(args[1]));
+            CacheConcurrentReaderPerf cacheConcurrentReaderPerf = new CacheConcurrentReaderPerf();
+            cacheConcurrentReaderPerf.prepare(args[0], Integer.parseInt(args[1]));
 
             Thread[] threads = new Thread[10];
             for (int i = 0; i < 10; i++)
             {
-                CacheSearcher cacheReader = new CacheSearcher(i, checkCacheConcurrentReader.cacheFile,
-                                                          checkCacheConcurrentReader.indexFile,
-                                                          checkCacheConcurrentReader.readColumnetIds,
-                                                          checkCacheConcurrentReader.cacheContainer,
-                                                          args[2]);
+                CacheSearcher cacheReader = new CacheSearcher(i, cacheConcurrentReaderPerf.cacheFile,
+                                                              cacheConcurrentReaderPerf.indexFile,
+                                                              cacheConcurrentReaderPerf.readColumnetIds,
+                                                              cacheConcurrentReaderPerf.cacheContainer,
+                                                              args[2]);
                 Thread t = new Thread(cacheReader);
                 threads[i] = t;
                 t.start();
