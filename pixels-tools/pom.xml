@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>pixels-test</artifactId>
+    <artifactId>pixels-tools</artifactId>
     <properties>
         <mainClass>cn.edu.ruc.iir.pixels.test.CacheConcurrentReaderPerf</mainClass>
     </properties>
@@ -60,7 +60,7 @@
     </dependencies>
 
     <build>
-        <finalName>copy-tool</finalName>
+        <finalName>pixels-tool</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -78,8 +78,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <finalName>copy-tool</finalName>
-                            <outputDirectory>/target</outputDirectory>
+                            <outputDirectory>target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>full</shadedClassifierName>
                             <filters>
