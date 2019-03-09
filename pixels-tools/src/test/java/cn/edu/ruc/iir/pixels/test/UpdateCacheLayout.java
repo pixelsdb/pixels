@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.test;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
@@ -15,8 +16,10 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,26 +29,56 @@ import java.util.Set;
  */
 public class UpdateCacheLayout
 {
-    @Test
-    public void updateCacheLayout()
+    public static void main(String[] args)
     {
-        String cacheFile = "/Users/Jelly/Desktop";
+        UpdateCacheLayout object = new UpdateCacheLayout();
+        object.updateCacheLayout();
+    }
+
+    private void updateCacheLayout()
+    {
+        final String cacheFile = "/Users/Jelly/Desktop/pixels/cache/Mar07/updated_cached_cols";
+        final String metaHost = "dbiir01";
+        final int metaPort = 18888;
+        final String schemaName = "pixels";
+        final String tableName = "test_1187";
+
         try {
-            MetadataService metadataService = new MetadataService("dbiir01", 18888);
-            Layout layoutv1 = metadataService.getLayout("pixels", "test_1187", 1).get(0);
+            MetadataService metadataService = new MetadataService(metaHost, metaPort);
+            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1).get(0);
             Order layoutOrder = layoutv1.getOrderObject();
             List<String> columnOrder = layoutOrder.getColumnOrder();
+            List<Column> columns = metadataService.getColumns(schemaName, tableName);
+            Map<String, Double> columnSizeMap = new HashMap<>();
+            for (Column column : columns)
+            {
+                columnSizeMap.put(column.getName(), column.getSize());
+            }
 
             BufferedReader reader = new BufferedReader(new FileReader(cacheFile));
             String line;
-            List<Integer> orderIds = new ArrayList<>();
+            Set<Integer> orderIds = new HashSet<>();
+            double size = 0d;
             while ((line = reader.readLine()) != null)
             {
-                String colName = line.trim();
-                int id = columnOrder.indexOf(colName);
-                orderIds.add(id);
+                String[] colNames = line.trim().split(",");
+                for (String colName : colNames)
+                {
+                    colName = colName.trim().toLowerCase();
+                    int id = columnOrder.indexOf(colName);
+                    orderIds.add(id);
+                    size += columnSizeMap.getOrDefault(colName, 0.0d);
+                }
             }
             reader.close();
+
+            System.out.println("Estimated size of caching: " + (32 * size * 26 / 1024.0 / 1024.0) + " MB");
+            StringBuilder sb = new StringBuilder();
+            for (int id : orderIds)
+            {
+                sb.append(columnOrder.get(id)).append(",");
+            }
+            System.out.println(sb.toString());
 
             Compact compactv2 = layoutv1.getCompactObject();
             compactv2.setCacheBorder(32 * orderIds.size());
@@ -64,7 +97,7 @@ public class UpdateCacheLayout
 
             LayoutDao layoutDao = new LayoutDao();
             Layout layoutv2 = new Layout();
-            layoutv2.setId(-1);
+            layoutv2.setId(21);
             layoutv2.setPermission(1);
             layoutv2.setVersion(2);
             layoutv2.setCreateAt(System.currentTimeMillis());

@@ -3,8 +3,6 @@ package cn.edu.ruc.iir.pixels.cache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * pixels cache reader.
  *
@@ -34,7 +32,7 @@ public class PixelsCacheReader
 
         public PixelsCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
         {
-            requireNonNull(cacheFile, "cache file is null");
+//            requireNonNull(cacheFile, "cache file is null");
             this.builderCacheFile = cacheFile;
 
             return this;
@@ -42,7 +40,7 @@ public class PixelsCacheReader
 
         public PixelsCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
         {
-            requireNonNull(indexFile, "index file is null");
+//            requireNonNull(indexFile, "index file is null");
             this.builderIndexFile = indexFile;
 
             return this;

@@ -21,8 +21,8 @@ import java.util.Random;
 
 /**
  * pixels
- *
- * java -jar xxx.jar dbiir02 2 /home/iir/opt/pixels/logs/
+ * java -jar xxx.jar hostname layout_version logs_dir thread_num
+ * java -jar xxx.jar dbiir02 2 /home/iir/opt/pixels/logs/ 1
  *
  * @author guodong
  */
@@ -47,9 +47,10 @@ public class CacheConcurrentReadPerf
         try {
             CacheConcurrentReadPerf checkCacheConcurrentReader = new CacheConcurrentReadPerf();
             checkCacheConcurrentReader.prepare(args[0], Integer.parseInt(args[1]));
+            int threadNum = Integer.parseInt(args[3]);
 
-            Thread[] threads = new Thread[10];
-            for (int i = 0; i < 10; i++)
+            Thread[] threads = new Thread[threadNum];
+            for (int i = 0; i < threadNum; i++)
             {
                 CacheReader cacheReader = new CacheReader(i, checkCacheConcurrentReader.cacheFile,
                                                           checkCacheConcurrentReader.indexFile,
@@ -77,7 +78,7 @@ public class CacheConcurrentReadPerf
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
-        this.cachedColumnlets = layout.getCompactObject().getColumnletOrder().subList(0, 100);
+        this.cachedColumnlets = layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
         List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
         this.cachedPaths = new ArrayList<>(30);
@@ -107,7 +108,7 @@ public class CacheConcurrentReadPerf
             this.cachedColumnlets = cachedColumnlets;
             this.cachedPaths = cachedPaths;
             this.logDir = logDir;
-            this.readLimit = 5000;
+            this.readLimit = cachedColumnlets.size();
             this.cacheReader = PixelsCacheReader
                     .newBuilder()
                     .setIndexFile(indexFile)
@@ -123,7 +124,7 @@ public class CacheConcurrentReadPerf
                 {
                     logDir = logDir + "/";
                 }
-                BufferedWriter writer = new BufferedWriter(new FileWriter(logDir + id));
+                BufferedWriter writer = new BufferedWriter(new FileWriter(logDir + id + ".csv"));
                 Random random = new Random(System.nanoTime());
                 long id = 0;
                 for (Path path : cachedPaths)
@@ -137,7 +138,7 @@ public class CacheConcurrentReadPerf
                             continue;
                         }
                         String columnletId = cachedColumnlets.get(readIndex);
-                        String[] columnletIdSplits = columnletId.split("-");
+                        String[] columnletIdSplits = columnletId.split(":");
                         long startNano = System.nanoTime();
                         byte[] columnlet = cacheReader.get(path.toString(), Short.parseShort(columnletIdSplits[0]),
                                                            Short.parseShort(columnletIdSplits[1]));

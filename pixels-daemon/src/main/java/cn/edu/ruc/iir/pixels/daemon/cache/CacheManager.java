@@ -38,8 +38,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheManager
         implements Server
 {
+    enum CacheNodeStatus
+    {
+        UNHEALTHY(-1), READY(0), UPDATING(1), OUT_OF_SIZE(2);
+
+        int statusCode;
+        CacheNodeStatus(int statusCode)
+        {
+            this.statusCode = statusCode;
+        }
+    }
     private static Logger logger = LogManager.getLogger(CacheManager.class);
-    // cache status: initializing(0), ready(1), updating(2), dead(-1)
+    // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
     private static AtomicInteger cacheStatus = new AtomicInteger(0);
 
     private PixelsCacheWriter cacheWriter = null;
@@ -121,18 +131,15 @@ public class CacheManager
                     update(globalCacheVersion);
                 }
             }
-            // register datanode
+            // register a datanode
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
-            etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_NODE_STATUS_LITERAL + hostName,
-                                            "" + cacheStatus.get(), leaseId);
             // start a scheduled thread to update node status periodically
             this.cacheManagerRegister = new CacheManagerRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(cacheManagerRegister, 1, 10, TimeUnit.SECONDS);
-            cacheStatus.set(1);
-            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
             initializeSuccess = true;
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
         }
         catch (Exception e) {
             logger.error(e.getMessage());
@@ -140,32 +147,23 @@ public class CacheManager
         }
     }
 
-    private boolean update(int version)
+    private void update(int version)
             throws MetadataException
     {
-        logger.info("Update cache to version " + version);
         List<Layout> matchedLayouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (!matchedLayouts.isEmpty()) {
             // update cache status
-            cacheStatus.set(2);
+            cacheStatus.set(CacheNodeStatus.UPDATING.statusCode);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
-            logger.debug("Update cache. Status changed to 2");
             // update cache content
-            if (cacheWriter.updateAll(version, matchedLayouts.iterator().next())) {
-                cacheStatus.set(1);
-                etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
-                localCacheVersion = version;
-                logger.debug("Update cache content ok. Status changed back to 1");
-                return true;
-            }
-            else {
-                logger.warn("Cache update to version" + version + " failed.");
-            }
+            int status = cacheWriter.updateAll(version, matchedLayouts.iterator().next());
+            cacheStatus.set(status);
+            etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
+            localCacheVersion = version;
         }
         else {
             logger.warn("No matching layout found for the update version " + version);
         }
-        return false;
     }
 
     @Override
@@ -179,7 +177,7 @@ public class CacheManager
         Watch watch = etcdUtil.getClient().getWatchClient();
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.CACHE_VERSION_LITERAL), WatchOption.DEFAULT);
-        outer_loop: while (cacheStatus.get() > 0) {
+        outer_loop: while (cacheStatus.get() >= 0) {
             try {
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
@@ -194,7 +192,7 @@ public class CacheManager
                     }
                     else if (event.getEventType() == WatchEvent.EventType.DELETE){
                         logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
-                        cacheStatus.set(-1);
+                        cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
                         break outer_loop;
                     }
                 }
@@ -216,7 +214,7 @@ public class CacheManager
     @Override
     public void shutdown()
     {
-        cacheStatus.set(-1);
+        cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
         cacheManagerRegister.stop();
         etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
         logger.info("CacheManager on " + hostName + " shut down.");

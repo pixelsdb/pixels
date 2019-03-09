@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.presto;
 
 import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
@@ -30,6 +31,7 @@ public class PixelsPageSourceProvider
     private final FSFactory fsFactory;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
+    private final PixelsFooterCache pixelsFooterCache;
 
     @Inject
     public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
@@ -49,6 +51,7 @@ public class PixelsPageSourceProvider
             this.cacheFile = null;
             this.indexFile = null;
         }
+        this.pixelsFooterCache = new PixelsFooterCache();
     }
 
     @Override
@@ -61,6 +64,6 @@ public class PixelsPageSourceProvider
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, cacheFile, indexFile, connectorId);
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, cacheFile, indexFile, pixelsFooterCache, connectorId);
     }
 }
