@@ -278,17 +278,15 @@ public class CacheCoordinator
         for (String path : paths)
         {
             // get a set of nodes where the blocks of the file is located (location_set)
-            Set<HostAddress> locationSet = new HashSet<>();
+            Set<HostAddress> locations = new HashSet<>();
             BlockLocation[] blockLocations = fs.getFileBlockLocations(new Path(path), 0, Long.MAX_VALUE);
             for (BlockLocation blockLocation : blockLocations)
             {
-                locationSet.addAll(toHostAddress(blockLocation.getHosts()));
+                locations.addAll(toHostAddress(blockLocation.getHosts()));
             }
-            List<HostAddress> locations = new ArrayList<>(locationSet);
             if (locations.size() == 0) {
                 continue;
             }
-            Collections.shuffle(locations);
             int leastCounter = Integer.MAX_VALUE;
             HostAddress chosenLocation = null;
             // find a node in the location_set with the least number of caching files
