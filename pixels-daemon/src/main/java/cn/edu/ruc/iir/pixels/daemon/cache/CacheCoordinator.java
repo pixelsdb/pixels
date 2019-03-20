@@ -30,12 +30,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -144,6 +139,7 @@ public class CacheCoordinator
         // watch layout version change, and update cache distribution and cache version
         while (coordinatorStatus.get() > 0) {
             try {
+                // layout version can be changed by rainbow.
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
                     if (event.getEventType() == WatchEvent.EventType.PUT) {
@@ -151,7 +147,7 @@ public class CacheCoordinator
                         // update the cache distribution
                         int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
                         update(layoutVersion);
-                        // update cache version
+                        // update cache version, notify cache managers on each node to update cache.
                         logger.debug("Update cache version to " + layoutVersion);
                         etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
                     }
@@ -190,12 +186,10 @@ public class CacheCoordinator
     private void update(int layoutVersion)
             throws FSException, MetadataException, IOException
     {
-//        if (fsFactory == null) {
-//            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
-//        }
-        List<Layout> layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
+        List<Layout> layouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
-        String[] paths = select(layout);
+        assert layouts.size() == 1;
+        String[] paths = select(layouts.get(0));
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
         if (nodes == null || nodes.isEmpty()) {
@@ -206,6 +200,7 @@ public class CacheCoordinator
         int hostIndex = 0;
         for (int i = 0; i < nodes.size(); i++) {
             KeyValue node = nodes.get(i);
+            // key: host_[hostname]; value: [status]. available if status == 1.
             if (Integer.parseInt(node.getValue().toStringUtf8()) == 1) {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey().toStringUtf8().substring(5));
             }
@@ -213,33 +208,41 @@ public class CacheCoordinator
         allocate(paths, hosts, hostIndex, layoutVersion);
     }
 
-    private String[] select(List<Layout> layout)
+    /**
+     * get the HDFS file paths under the compact path of the first layout.
+     * @param layout
+     * @return the file paths
+     * @throws IOException
+     */
+    private String[] select(Layout layout)
             throws IOException
     {
-        if (layout.isEmpty()) {
-            logger.info("Layout is empty, return a 0-length array");
-            return new String[0];
-        }
-        else {
-            String compactPath = layout.get(0).getCompactPath();
-            List<Path> files = new ArrayList<>();
-            FileStatus[] fileStatuses = fs.listStatus(new Path(compactPath));
-            if (fileStatuses != null) {
-                for (FileStatus fileStatus : fileStatuses)
-                {
-                    if (fileStatus.isFile()) {
-                        files.add(fileStatus.getPath());
-                    }
+        String compactPath = layout.getCompactPath();
+        List<Path> files = new ArrayList<>();
+        FileStatus[] fileStatuses = fs.listStatus(new Path(compactPath));
+        if (fileStatuses != null) {
+            for (FileStatus fileStatus : fileStatuses)
+            {
+                if (fileStatus.isFile()) {
+                    files.add(fileStatus.getPath());
                 }
             }
-//            List<Path> files = fsFactory.listFiles(compactPath);
-            String[] result = new String[files.size()];
-            List<String> paths = files.stream().map(Path::toString).collect(Collectors.toList());
-            paths.toArray(result);
-            return result;
         }
+        String[] result = new String[files.size()];
+        List<String> paths = files.stream().map(Path::toString).collect(Collectors.toList());
+        paths.toArray(result);
+        return result;
     }
 
+    /**
+     * allocate (maps) file paths to nodes, and persists the result in etcd.
+     * @param paths
+     * @param nodes
+     * @param size
+     * @param layoutVersion
+     * @throws FSException
+     * @throws IOException
+     */
     private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
             throws FSException, IOException
     {
@@ -254,6 +257,14 @@ public class CacheCoordinator
         }
     }
 
+    /**
+     * assign hdfs files to cache manager nodes randomly, guaranty load balance.
+     * @param paths
+     * @param nodes
+     * @param size
+     * @return
+     * @throws IOException
+     */
     private CacheLocationDistribution assignCacheLocations(String[] paths, HostAddress[] nodes, int size)
             throws IOException
     {
@@ -266,17 +277,18 @@ public class CacheCoordinator
 
         for (String path : paths)
         {
-            // get a set of nodes where the file is located (location_set)
-            Set<HostAddress> hostAddressSet = new HashSet<>();
+            // get a set of nodes where the blocks of the file is located (location_set)
+            Set<HostAddress> locationSet = new HashSet<>();
             BlockLocation[] blockLocations = fs.getFileBlockLocations(new Path(path), 0, Long.MAX_VALUE);
             for (BlockLocation blockLocation : blockLocations)
             {
-                hostAddressSet.addAll(toHostAddress(blockLocation.getHosts()));
+                locationSet.addAll(toHostAddress(blockLocation.getHosts()));
             }
-            List<HostAddress> locations = new ArrayList<>(hostAddressSet);
+            List<HostAddress> locations = new ArrayList<>(locationSet);
             if (locations.size() == 0) {
                 continue;
             }
+            Collections.shuffle(locations);
             int leastCounter = Integer.MAX_VALUE;
             HostAddress chosenLocation = null;
             // find a node in the location_set with the least number of caching files
@@ -291,6 +303,7 @@ public class CacheCoordinator
                 }
             }
             if (chosenLocation != null) {
+                nodesCacheStats.put(chosenLocation.toString(), leastCounter+1);
                 locationDistribution.addCacheLocation(chosenLocation.toString(), path);
             }
         }
@@ -307,6 +320,9 @@ public class CacheCoordinator
         return builder.build();
     }
 
+    /**
+     * TODO: there may be a gap between two calls of keepAliveOnce.
+     */
     private static class CacheCoordinatorRegister
             implements Runnable
     {
