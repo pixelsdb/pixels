@@ -37,8 +37,8 @@ public class UpdateCacheLayout
 
     private void updateCacheLayout()
     {
-        final String cacheFile = "/Users/Jelly/Desktop/pixels/cache/Mar07/updated_cached_cols";
-        final String metaHost = "dbiir01";
+        final String cacheFile = "/Users/Jelly/Desktop/pixels/cache/Mar10/updated_cached_cols";
+        final String metaHost = "dbiir27";
         final int metaPort = 18888;
         final String schemaName = "pixels";
         final String tableName = "test_1187";
@@ -97,9 +97,9 @@ public class UpdateCacheLayout
 
             LayoutDao layoutDao = new LayoutDao();
             Layout layoutv2 = new Layout();
-            layoutv2.setId(21);
+            layoutv2.setId(13);
             layoutv2.setPermission(1);
-            layoutv2.setVersion(2);
+            layoutv2.setVersion(3);
             layoutv2.setCreateAt(System.currentTimeMillis());
             layoutv2.setOrder(layoutv1.getOrder());
             layoutv2.setOrderPath(layoutv1.getOrderPath());

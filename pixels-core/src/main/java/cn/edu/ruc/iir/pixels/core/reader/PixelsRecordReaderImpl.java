@@ -98,7 +98,7 @@ public class PixelsRecordReaderImpl
         long checkStartNano = System.nanoTime();
         checkBeforeRead();
         long checkCost = System.nanoTime() - checkStartNano;
-        logger.debug("[check before read]" + checkCost);
+//        logger.debug("[check before read]" + checkCost);
     }
 
     private void checkBeforeRead()
@@ -289,7 +289,7 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
-        long readRGFootersStartNano = System.nanoTime();
+//        long readRGFootersStartNano = System.nanoTime();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -298,7 +298,7 @@ public class PixelsRecordReaderImpl
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)
             {
-                logger.debug("[rg cache miss]" + rgCacheId);
+//                logger.debug("[rg cache miss]" + rgCacheId);
                 PixelsProto.RowGroupInformation rowGroupInformation =
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
@@ -319,12 +319,12 @@ public class PixelsRecordReaderImpl
             // cache hit
             else
             {
-                logger.debug("[rg cache hit]" + rgCacheId);
+//                logger.debug("[rg cache hit]" + rgCacheId);
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
-        long readRGFooterEndNano = System.nanoTime();
-        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
+//        long readRGFooterEndNano = System.nanoTime();
+//        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
@@ -374,7 +374,7 @@ public class PixelsRecordReaderImpl
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
+//            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
         }
         else {
             for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
@@ -466,7 +466,7 @@ public class PixelsRecordReaderImpl
             }
             long diskReadEndNano = System.nanoTime();
             long diskReadCost = diskReadEndNano - diskReadStartNano;
-            logger.debug("[disk stat]" + fileName + "," + diskReadCount + "," + diskReadSize + "," + diskReadCost);
+//            logger.debug("[disk stat]" + fileName + "," + diskReadCount + "," + diskReadSize + "," + diskReadCost);
         }
         catch (IOException e)
         {
@@ -474,7 +474,7 @@ public class PixelsRecordReaderImpl
             return false;
         }
         long readEndNano = System.nanoTime();
-        logger.debug("[pixels read]" + fileName + "," + (readEndNano - readStartNano));
+//        logger.debug("[pixels read]" + fileName + "," + (readEndNano - readStartNano));
 
         return true;
     }

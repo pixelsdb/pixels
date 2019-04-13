@@ -28,16 +28,64 @@ import java.util.Set;
  */
 public class WorkloadAnalyzer
 {
-    private String workloadPath = "/Users/Jelly/Desktop/pixels/experiments/1187_dedup_query.txt";
+    private String workloadPath = "/Users/Jelly/Desktop/pixels/cache/Mar17/1187_dedup_query.txt";
     private String workloadColsLog = "/Users/Jelly/Desktop/pixels/cache/workload_cols.csv";
     private String workloadCacheLog = "/Users/Jelly/Desktop/pixels/cache/workload_cache.csv";
+    private String workloadCachedQuery = "/Users/Jelly/Desktop/pixels/cache/Mar17/1187_cached_qid.txt";
+    private String cachedWorkloadPath = "/Users/Jelly/Desktop/pixels/cache/Mar17/1187_cached_query.txt";
+
+    @Test
+    public void processWorkload()
+    {
+        try
+        {
+            BufferedReader workloadReader = new BufferedReader(new FileReader(workloadPath));
+            BufferedReader workloadCachedQReader = new BufferedReader(new FileReader(workloadCachedQuery));
+            BufferedWriter cachedWorkloadWriter = new BufferedWriter(new FileWriter(cachedWorkloadPath));
+            String line;
+            String qId = "";
+            Map<String, String> queries = new HashMap<>();
+            while ((line = workloadReader.readLine()) != null)
+            {
+                if (line.isEmpty())
+                {
+                    continue;
+                }
+                if (false == line.startsWith("SELECT"))
+                {
+                    qId = line;
+                }
+                else
+                {
+                    String query = line;
+                    queries.put(qId, query);
+                }
+            }
+            while ((line = workloadCachedQReader.readLine()) != null)
+            {
+                String id = line.split("_")[1];
+                cachedWorkloadWriter.write(id);
+                cachedWorkloadWriter.newLine();
+                cachedWorkloadWriter.write(queries.get(id));
+                cachedWorkloadWriter.newLine();
+                cachedWorkloadWriter.newLine();
+            }
+            workloadReader.close();
+            workloadCachedQReader.close();
+            cachedWorkloadWriter.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * Analyze workload file.
      * Report column visit frequency and cache status
      * */
     @Test
-    private void analyze()
+    public void analyze0()
     {
         try {
             BufferedReader reader = new BufferedReader(new FileReader(workloadPath));
@@ -139,6 +187,90 @@ public class WorkloadAnalyzer
             writer.close();
         }
         catch (IOException | MetadataException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void analyze1()
+    {
+        String workloadPath = "/Users/Jelly/Desktop/pixels/cache/Mar12/1187_dedup_query.txt";
+        String cachedColsPath = "/Users/Jelly/Desktop/pixels/cache/Mar12/updated_cached_cols";
+        String colStatsPath = "/Users/Jelly/Desktop/pixels/cache/Mar12/workload_cols.csv";
+        String queryInCacheStatPath = "/Users/Jelly/Desktop/pixels/cache/Mar12/query_cols_in_cache.csv";
+
+        Set<String> cachedCols = new HashSet<>();
+        Map<String, Double> colSizeMap = new HashMap<>();
+
+        try {
+            BufferedReader cachedColsReader = new BufferedReader(new FileReader(cachedColsPath));
+            BufferedReader colsStatsReader = new BufferedReader(new FileReader(colStatsPath));
+            BufferedReader workloadReader = new BufferedReader(new FileReader(workloadPath));
+            BufferedWriter queryInCacheStatWriter = new BufferedWriter(new FileWriter(queryInCacheStatPath));
+
+            String line;
+            String qId;
+
+            while ((line = cachedColsReader.readLine()) != null)
+            {
+                String[] cols = line.toLowerCase().split(",");
+                cachedCols.addAll(Arrays.asList(cols));
+            }
+
+            colsStatsReader.readLine();  // skip the header
+            while ((line = colsStatsReader.readLine()) != null)
+            {
+                String colName = line.split(",")[0].toLowerCase();
+                Double colSize = Double.parseDouble(line.split(",")[3]);
+                colSizeMap.put(colName, colSize);
+            }
+
+            while ((line = workloadReader.readLine()) != null)
+            {
+                if (line.isEmpty())
+                {
+                    continue;
+                }
+                if (false == line.contains("SELECT"))
+                {
+                    qId = line;
+                    queryInCacheStatWriter.write(qId + ",");
+                }
+                else
+                {
+                    line = line.toLowerCase();
+                    String[] lineSplits = line.split("\\s");
+                    String selection = lineSplits[1];
+                    String orderBy = lineSplits[6];
+                    String[] selectionCols = selection.split(",");
+                    String[] orderCols = orderBy.split(",");
+                    String[] cols = new String[selectionCols.length + orderCols.length];
+                    System.arraycopy(selectionCols, 0, cols, 0, selectionCols.length);
+                    System.arraycopy(orderCols, 0, cols, selectionCols.length, orderCols.length);
+                    int inCacheNum = 0;
+                    int totalNum = cols.length;
+                    double inCacheSize = 0;
+                    double totalSize = 0;
+                    for (String col : cols)
+                    {
+                        double colSize = colSizeMap.get(col);
+                        if (cachedCols.contains(col))
+                        {
+                            inCacheNum++;
+                            inCacheSize += colSize;
+                        }
+                        totalSize += colSize;
+                    }
+                    queryInCacheStatWriter.write(inCacheNum + "," + totalNum + "," + inCacheSize + "," + totalSize);
+                    queryInCacheStatWriter.newLine();
+                }
+            }
+            colsStatsReader.close();
+            workloadReader.close();
+            cachedColsReader.close();
+            queryInCacheStatWriter.close();
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }

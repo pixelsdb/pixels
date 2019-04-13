@@ -21,8 +21,8 @@ import java.util.Random;
 
 /**
  * pixels
- * java -jar xxx.jar hostname layout_version logs_dir thread_num
- * java -jar xxx.jar dbiir02 2 /home/iir/opt/pixels/logs/ 1
+ * java -jar xxx.jar hostname metahost layout_version logs_dir thread_num
+ * java -jar pixels-tools-0.1.0-SNAPSHOT-full.jar dbiir26 dbiir27 3 /home/iir/opt/pixels/logs/ 1
  *
  * @author guodong
  */
@@ -46,8 +46,8 @@ public class CacheConcurrentReadPerf
     {
         try {
             CacheConcurrentReadPerf checkCacheConcurrentReader = new CacheConcurrentReadPerf();
-            checkCacheConcurrentReader.prepare(args[0], Integer.parseInt(args[1]));
-            int threadNum = Integer.parseInt(args[3]);
+            checkCacheConcurrentReader.prepare(args[0], args[1], Integer.parseInt(args[2]));
+            int threadNum = Integer.parseInt(args[4]);
 
             Thread[] threads = new Thread[threadNum];
             for (int i = 0; i < threadNum; i++)
@@ -56,7 +56,7 @@ public class CacheConcurrentReadPerf
                                                           checkCacheConcurrentReader.indexFile,
                                                           checkCacheConcurrentReader.cachedColumnlets,
                                                           checkCacheConcurrentReader.cachedPaths,
-                                                          args[2]);
+                                                          args[3]);
                 Thread t = new Thread(cacheReader);
                 threads[i] = t;
                 t.start();
@@ -73,10 +73,10 @@ public class CacheConcurrentReadPerf
     }
 
     // prepare correct answers
-    private void prepare(String hostName, int layoutVersion)
+    private void prepare(String hostName, String metaHost, int layoutVersion)
             throws MetadataException, FSException
     {
-        MetadataService metadataService = new MetadataService("dbiir01", 18888);
+        MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
         this.cachedColumnlets = layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
