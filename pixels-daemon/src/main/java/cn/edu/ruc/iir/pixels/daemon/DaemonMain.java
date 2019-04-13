@@ -116,12 +116,17 @@ public class DaemonMain
                     System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
                     try
                     {
+                        boolean done = true;
                         for (String name : container.getServerNames())
                         {
                             if (container.checkServer(name, 0))
                             {
-                                container.shutdownServer(name);
+                                done = false;
                             }
+                        }
+                        if (done)
+                        {
+                            break;
                         }
                         TimeUnit.SECONDS.sleep(1);
                     } catch (Exception e)
