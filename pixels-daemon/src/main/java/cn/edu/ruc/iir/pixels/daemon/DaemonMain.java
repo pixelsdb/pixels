@@ -87,12 +87,12 @@ public class DaemonMain
                     {
                         for (String name : container.getServerNames())
                         {
-                            if (container.chechServer(name) == false)
+                            if (container.checkServer(name) == false)
                             {
                                 container.startServer(name);
                             }
                         }
-                        TimeUnit.SECONDS.sleep(3);
+                        TimeUnit.SECONDS.sleep(1);
                     } catch (Exception e)
                     {
                         log.error("error in the main loop of daemon.", e);
@@ -108,7 +108,31 @@ public class DaemonMain
                         container.shutdownServer(name);
                     } catch (NoSuchServerException e)
                     {
-                        log.error("error when stoping server threads.", e);
+                        log.error("error when stopping server threads.", e);
+                    }
+                }
+                for (int i = 60; i > 0; --i)
+                {
+                    System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
+                    try
+                    {
+                        boolean done = true;
+                        for (String name : container.getServerNames())
+                        {
+                            if (container.checkServer(name, 0))
+                            {
+                                done = false;
+                                break;
+                            }
+                        }
+                        if (done)
+                        {
+                            break;
+                        }
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (Exception e)
+                    {
+                        log.error("error when waiting server threads shutdown.", e);
                     }
                 }
             }

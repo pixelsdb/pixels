@@ -1,20 +1,12 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Base;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TestDaos
 {
@@ -43,7 +35,7 @@ public class TestDaos
     public void testLayout ()
     {
         String schemaName = "pixels";
-        String tableName = "test_105";
+        String tableName = "test_1187";
 
         SchemaDao schemaDao = new SchemaDao();
         TableDao tableDao = new TableDao();
@@ -63,6 +55,50 @@ public class TestDaos
         for (Layout layout : table.getLayouts())
         {
             System.out.println(layout.getOrderPath());
+        }
+    }
+
+    @Test
+    public void checkCompactLayout ()
+    {
+        String schemaName = "pixels";
+        String tableName = "test_1187";
+
+        SchemaDao schemaDao = new SchemaDao();
+        TableDao tableDao = new TableDao();
+        ColumnDao columnDao = new ColumnDao();
+        LayoutDao layoutDao = new LayoutDao();
+
+        Schema schema = schemaDao.getByName(schemaName);
+        Table table = tableDao.getByNameAndSchema(tableName, schema);
+        columnDao.getByTable(table);
+        layoutDao.getByTable(table);
+
+
+        Layout layout = null;
+
+        for (Layout layout1 : table.getLayouts())
+        {
+            if (layout1.getId() == 14)
+            {
+                layout = layout1;
+                break;
+            }
+        }
+
+        List<String> columnOrder = layout.getOrderObject().getColumnOrder();
+        int cacheBorder = layout.getCompactObject().getCacheBorder();
+        List<String> columnletOrder = layout.getCompactObject().getColumnletOrder();
+        Set<String> cachedColumns = new HashSet<>();
+        for (int i = 0; i < cacheBorder; ++i)
+        {
+            int columnId = Integer.parseInt(columnletOrder.get(i).split(":")[1]);
+            cachedColumns.add(columnOrder.get(columnId));
+        }
+
+        for (String column : cachedColumns)
+        {
+            System.out.println(column);
         }
     }
 
