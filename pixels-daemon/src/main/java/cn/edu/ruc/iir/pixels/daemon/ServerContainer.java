@@ -48,7 +48,7 @@ public class ServerContainer
      *
      * @param name
      * @param retry times to retry, sleep one second after each retry.
-     * @return
+     * @return true if server is running.
      * @throws NoSuchServerException
      */
     public boolean checkServer(String name, int retry) throws NoSuchServerException

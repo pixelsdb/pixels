@@ -122,6 +122,7 @@ public class DaemonMain
                             if (container.checkServer(name, 0))
                             {
                                 done = false;
+                                break;
                             }
                         }
                         if (done)
