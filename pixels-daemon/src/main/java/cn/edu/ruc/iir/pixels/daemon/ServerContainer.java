@@ -33,7 +33,25 @@ public class ServerContainer
         return new ArrayList<>(this.serverMap.keySet());
     }
 
-    public boolean chechServer(String name) throws NoSuchServerException
+    /**
+     * retry 3 times by default. sleep one second after each retry.
+     * @param name
+     * @return
+     * @throws NoSuchServerException
+     */
+    public boolean checkServer(String name) throws NoSuchServerException
+    {
+        return this.checkServer(name, 3);
+    }
+
+    /**
+     *
+     * @param name
+     * @param retry times to retry, sleep one second after each retry.
+     * @return
+     * @throws NoSuchServerException
+     */
+    public boolean checkServer(String name, int retry) throws NoSuchServerException
     {
         Server server = this.serverMap.get(name);
         if (server == null)
@@ -45,7 +63,7 @@ public class ServerContainer
         {
             if (!server.isRunning())
             {
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < retry; ++i)
                 {
                     // try 3 times
                     TimeUnit.SECONDS.sleep(1);
@@ -70,16 +88,8 @@ public class ServerContainer
 
     public void startServer(String name) throws NoSuchServerException
     {
-        Server server = this.serverMap.get(name);
-        if (server == null)
-        {
-            throw new NoSuchServerException();
-        }
-        if (chechServer(name) == true)
-        {
-            server.shutdown();
-        }
-        Thread serverThread = new Thread(server);
+        this.shutdownServer(name);
+        Thread serverThread = new Thread(this.serverMap.get(name));
         serverThread.start();
     }
 
@@ -90,7 +100,7 @@ public class ServerContainer
         {
             throw new NoSuchServerException();
         }
-        if (chechServer(name) == true)
+        if (checkServer(name, 0) == true)
         {
             server.shutdown();
         }
