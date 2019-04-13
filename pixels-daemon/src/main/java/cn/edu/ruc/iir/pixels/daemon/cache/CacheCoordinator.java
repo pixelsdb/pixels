@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.daemon.cache;
 
 import cn.edu.ruc.iir.pixels.cache.CacheLocationDistribution;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
-import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
@@ -57,7 +56,6 @@ public class CacheCoordinator
     private final ScheduledExecutorService scheduledExecutor;
     private final MetadataService metadataService;
     private String hostName;
-//    private FSFactory fsFactory = null;
     private FileSystem fs = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
@@ -121,7 +119,7 @@ public class CacheCoordinator
                 logger.debug("Current cache version is left behind of current layout version. Update.");
                 update(layout_version);
             }
-            coordinatorStatus.set(1);
+            coordinatorStatus.set(CacheManager.CacheNodeStatus.READY.statusCode);
             initializeSuccess = true;
             logger.info("CacheCoordinator on " + hostName + " has started.");
         }
@@ -142,7 +140,7 @@ public class CacheCoordinator
         Watch.Watcher watcher = watch.watch(
                 ByteSequence.fromString(Constants.LAYOUT_VERSION_LITERAL), WatchOption.DEFAULT);
         // watch layout version change, and update cache distribution and cache version
-        while (coordinatorStatus.get() > 0) {
+        while (coordinatorStatus.get() >= 0) {
             try {
                 WatchResponse watchResponse = watcher.listen();
                 for (WatchEvent event : watchResponse.getEvents()) {
@@ -157,7 +155,7 @@ public class CacheCoordinator
                     }
                 }
             }
-            catch (InterruptedException | FSException | MetadataException | IOException e) {
+            catch (InterruptedException | MetadataException | IOException e) {
                 logger.error(e.getMessage());
                 e.printStackTrace();
                 break;
@@ -175,7 +173,7 @@ public class CacheCoordinator
     public void shutdown()
     {
         // TODO: check if the objects here are not null in case that coordinator was not started successfully.
-        coordinatorStatus.set(-1);
+        coordinatorStatus.set(CacheManager.CacheNodeStatus.UNHEALTHY.statusCode);
         cacheCoordinatorRegister.stop();
         etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
         logger.info("CacheCoordinator shuts down.");
@@ -188,7 +186,7 @@ public class CacheCoordinator
      * 2. for each file, decide which node to cache it
      * */
     private void update(int layoutVersion)
-            throws FSException, MetadataException, IOException
+            throws MetadataException, IOException
     {
 //        if (fsFactory == null) {
 //            fsFactory = FSFactory.Instance(cacheConfig.getHDFSConfigDir());
@@ -206,7 +204,7 @@ public class CacheCoordinator
         int hostIndex = 0;
         for (int i = 0; i < nodes.size(); i++) {
             KeyValue node = nodes.get(i);
-            if (Integer.parseInt(node.getValue().toStringUtf8()) == 1) {
+            if (Integer.parseInt(node.getValue().toStringUtf8()) == CacheManager.CacheNodeStatus.READY.statusCode) {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey().toStringUtf8().substring(5));
             }
         }
@@ -241,7 +239,7 @@ public class CacheCoordinator
     }
 
     private void allocate(String[] paths, HostAddress[] nodes, int size, int layoutVersion)
-            throws FSException, IOException
+            throws IOException
     {
         CacheLocationDistribution cacheLocationDistribution = assignCacheLocations(paths, nodes, size);
         for (int i = 0; i < size; i++)

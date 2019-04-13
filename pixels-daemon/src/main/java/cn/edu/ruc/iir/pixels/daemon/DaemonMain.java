@@ -159,7 +159,7 @@ public class DaemonMain
                             int pid = Integer.parseInt(splits[0]);
                             System.out.println("killing " + roleName + ", pid (" + pid + ")");
                             // terminate the daemon gracefully by sending SIGTERM(15) signal.
-                            Runtime.getRuntime().exec("kill -15 " + pid);
+                            Runtime.getRuntime().exec("kill -9 " + pid);
                         }
                     }
                     reader.close();

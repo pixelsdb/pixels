@@ -18,7 +18,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
-import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -47,6 +46,7 @@ public class PixelsReaderImpl
     private final boolean enableCache;
     private final List<String> cacheOrder;
     private final PixelsCacheReader pixelsCacheReader;
+    private final PixelsFooterCache pixelsFooterCache;
     private final Random random;
 
     private PixelsReaderImpl(TypeDescription fileSchema,
@@ -56,7 +56,8 @@ public class PixelsReaderImpl
                              float metricsCollectProb,
                              boolean enableCache,
                              List<String> cacheOrder,
-                             PixelsCacheReader pixelsCacheReader)
+                             PixelsCacheReader pixelsCacheReader,
+                             PixelsFooterCache pixelsFooterCache)
     {
         this.fileSchema = fileSchema;
         this.physicalFSReader = physicalFSReader;
@@ -68,6 +69,7 @@ public class PixelsReaderImpl
         this.enableCache = enableCache;
         this.cacheOrder = cacheOrder;
         this.pixelsCacheReader = pixelsCacheReader;
+        this.pixelsFooterCache = pixelsFooterCache;
         this.random = new Random();
     }
 
@@ -79,6 +81,7 @@ public class PixelsReaderImpl
         private TypeDescription builderSchema = null;
         private boolean builderEnableCache = false;
         private PixelsCacheReader builderPixelsCacheReader = null;
+        private PixelsFooterCache builderPixelsFooterCache = null;
 
         private Builder()
         {}
@@ -113,6 +116,12 @@ public class PixelsReaderImpl
             return this;
         }
 
+        public Builder setPixelsFooterCache(PixelsFooterCache pixelsFooterCache)
+        {
+            this.builderPixelsFooterCache = pixelsFooterCache;
+            return this;
+        }
+
         public PixelsReader build() throws IllegalArgumentException, IOException
         {
             // check arguments
@@ -121,19 +130,26 @@ public class PixelsReaderImpl
             }
             // get PhysicalFSReader
             PhysicalFSReader fsReader = PhysicalReaderUtil.newPhysicalFSReader(builderFS, builderPath);
-            if (fsReader == null) {
-                LOGGER.error("Failed to create PhysicalFSReader");
-                throw new PixelsReaderException("Failed to create PixelsReader due to error of creating PhysicalFSReader");
+            // try to get file tail from cache
+            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(builderPath.getName());
+            if (fileTail == null)
+            {
+                if (fsReader == null) {
+                    LOGGER.error("Failed to create PhysicalFSReader");
+                    throw new PixelsReaderException(
+                            "Failed to create PixelsReader due to error of creating PhysicalFSReader");
+                }
+                // get FileTail
+                long fileLen = fsReader.getFileLength();
+                fsReader.seek(fileLen - Long.BYTES);
+                long fileTailOffset = fsReader.readLong();
+                int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
+                fsReader.seek(fileTailOffset);
+                byte[] fileTailBuffer = new byte[fileTailLength];
+                fsReader.readFully(fileTailBuffer);
+                fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
+                builderPixelsFooterCache.putFileTail(builderPath.getName(), fileTail);
             }
-            // get FileTail
-            long fileLen = fsReader.getFileLength();
-            fsReader.seek(fileLen - Long.BYTES);
-            long fileTailOffset = fsReader.readLong();
-            int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
-            fsReader.seek(fileTailOffset);
-            byte[] fileTailBuffer = new byte[fileTailLength];
-            fsReader.readFully(fileTailBuffer);
-            PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
 
             // check file MAGIC and file version
             PixelsProto.PostScript postScript = fileTail.getPostscript();
@@ -152,10 +168,10 @@ public class PixelsReaderImpl
             // check metrics file
             PixelsCoreConfig coreConfig = new PixelsCoreConfig();
             String metricsDir = coreConfig.getMetricsDir();
-            File file = new File(metricsDir);
-            if (!file.isDirectory() || !file.exists()) {
+//            File file = new File(metricsDir);
+//            if (!file.isDirectory() || !file.exists()) {
 //                throw new PixelsMetricsDirNotFoundException(metricsDir);
-            }
+//            }
 
             // check metrics collect probability
             float metricCollectProb = coreConfig.getMetricsCollectProb();
@@ -165,7 +181,8 @@ public class PixelsReaderImpl
 
             // create a default PixelsReader
             return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb,
-                                        builderEnableCache, builderCacheOrder, builderPixelsCacheReader);
+                                        builderEnableCache, builderCacheOrder, builderPixelsCacheReader,
+                                        builderPixelsFooterCache);
         }
     }
 
@@ -199,7 +216,7 @@ public class PixelsReaderImpl
         }
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
-                enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader);
+                enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader, pixelsFooterCache);
         recordReaders.add(recordReader);
         return recordReader;
     }

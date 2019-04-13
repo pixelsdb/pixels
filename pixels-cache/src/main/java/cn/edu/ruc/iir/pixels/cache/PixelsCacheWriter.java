@@ -149,7 +149,13 @@ public class PixelsCacheWriter
         return indexFile;
     }
 
-    public boolean updateAll(int version, Layout layout)
+    /**
+     * Return code:
+     * -1: update failed.
+     * 0: no updates are needed or update successfully.
+     * 2: update size exceeds the limit.
+     * */
+    public int updateAll(int version, Layout layout)
     {
         try {
             // get the caching file list
@@ -157,16 +163,15 @@ public class PixelsCacheWriter
             KeyValue keyValue = etcdUtil.getKeyValue(key);
             if (keyValue == null) {
                 logger.debug("Found no allocated files. No updates are needed. " + key);
-                return false;
+                return 0;
             }
             String fileStr =  keyValue.getValue().toStringUtf8();
             String[] files = fileStr.split(";"); // todo split is inefficient
-            internalUpdate(version, layout, files);
-            return true;
+            return internalUpdate(version, layout, files);
         }
         catch (IOException e) {
             e.printStackTrace();
-            return false;
+            return -1;
         }
     }
 
@@ -190,9 +195,10 @@ public class PixelsCacheWriter
         flushIndex();
     }
 
-    private void internalUpdate(int version, Layout layout, String[] files)
+    private int internalUpdate(int version, Layout layout, String[] files)
             throws IOException
     {
+        int status = 0;
         // get the new caching layout
         Compact compact = layout.getCompactObject();
         int cacheBorder = compact.getCacheBorder();
@@ -232,6 +238,7 @@ public class PixelsCacheWriter
                 physicalOffsets[i] = chunkIndex.getChunkOffset();
                 if (cacheOffset + physicalLens[i] >= cacheFile.getSize()) {
                     logger.debug("Cache writes have exceeded cache size. Break. Current size: " + cacheOffset);
+                    status = 2;
                     break outer_loop;
                 }
                 else {
@@ -252,6 +259,7 @@ public class PixelsCacheWriter
         logger.debug("Cache index ends at offset: " + currentIndexOffset);
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
+        return status;
     }
 
     /**
