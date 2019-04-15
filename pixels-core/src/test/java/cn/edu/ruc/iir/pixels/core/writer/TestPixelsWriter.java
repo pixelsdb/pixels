@@ -248,7 +248,7 @@ public class TestPixelsWriter {
             long cacheLength = 0L;
             FileStatus[] fileStatuses = fs.listStatus(new Path(directory));
             MetadataService metadataService = new MetadataService("dbiir10", 18888);
-            Layout layout = metadataService.getLayout("pixels", "test_105", 0).get(0);
+            Layout layout = metadataService.getLayout("pixels", "test_105", 0);
             Compact compact = layout.getCompactObject();
             int cacheBorder = compact.getCacheBorder();
             List<String> cacheOrders = compact.getColumnletOrder().subList(0, cacheBorder);

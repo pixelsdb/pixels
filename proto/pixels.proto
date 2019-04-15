@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+// File format definition of Pixels
+
 syntax = "proto2";
 
 package pixels.proto;

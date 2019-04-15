@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.daemon.Server;
+import io.grpc.ServerBuilder;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -29,12 +30,17 @@ public class MetadataServer implements Server {
     private static Logger log = LogManager.getLogger(MetadataServer.class);
 
     private boolean running = false;
-    private int port;
+    private final int port;
+    private final io.grpc.Server rpcServer;
     private EventLoopGroup boss = null;
     private EventLoopGroup worker = null;
 
     public MetadataServer(int port) {
+        assert (port > 0 && port <= 65535);
         this.port = port;
+        this.rpcServer = ServerBuilder.forPort(port)
+                .addService(new MetadataServiceImpl())
+                .build();
     }
 
     @Override

@@ -1,8 +1,14 @@
 package cn.edu.ruc.iir.pixels.common.metadata;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.daemon.MetadataServiceGrpc;
 import com.alibaba.fastjson.JSON;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,13 +19,21 @@ import java.util.UUID;
  */
 public class MetadataService
 {
-    private String host;
-    private int port;
+
+    private final String host;
+    private final int port;
+    private final ManagedChannel channel;
+    private final MetadataServiceGrpc.MetadataServiceBlockingStub stub;
 
     public MetadataService(String host, int port)
     {
+        assert (host != null);
+        assert (port > 0 && port <= 65535);
         this.host = host;
         this.port = port;
+        this.channel = ManagedChannelBuilder.forAddress(host, port)
+                .usePlaintext(true).build();
+        this.stub = MetadataServiceGrpc.newBlockingStub(channel);
     }
 
     public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
@@ -80,9 +94,9 @@ public class MetadataService
         return layouts != null ? layouts : new ArrayList<>();
     }
 
-    public List<Layout> getLayout(String schemaName, String tableName, int version) throws MetadataException
+    public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException
     {
-        List<Layout> layouts = null;
+        Layout layout = null;
         String token = UUID.randomUUID().toString();
         ReqParams params = new ReqParams(Action.getLayout.toString());
         params.setParam("tableName", tableName);
@@ -99,7 +113,7 @@ public class MetadataService
                 {
                     if(isError(res))
                         break;
-                    layouts = (List<Layout>) res;
+                    layout = (Layout) res;
                     break;
                 }
             }
@@ -107,7 +121,7 @@ public class MetadataService
         {
             throw new MetadataException("can not get layouts from metadata", e);
         }
-        return layouts != null ? layouts : new ArrayList<>();
+        return layout;
     }
 
     public List<Table> getTables(String schemaName) throws MetadataException

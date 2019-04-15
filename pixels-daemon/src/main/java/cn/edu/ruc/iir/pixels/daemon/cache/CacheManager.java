@@ -24,7 +24,6 @@ import org.apache.logging.log4j.Logger;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -150,13 +149,13 @@ public class CacheManager
     private void update(int version)
             throws MetadataException
     {
-        List<Layout> matchedLayouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
-        if (!matchedLayouts.isEmpty()) {
+        Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
+        if (matchedLayout != null) {
             // update cache status
             cacheStatus.set(CacheNodeStatus.UPDATING.statusCode);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             // update cache content
-            int status = cacheWriter.updateAll(version, matchedLayouts.iterator().next());
+            int status = cacheWriter.updateAll(version, matchedLayout);
             cacheStatus.set(status);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             localCacheVersion = version;
