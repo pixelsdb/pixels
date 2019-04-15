@@ -1,6 +1,6 @@
 #!/bin/bash
 
-node="dbiir01"
+node="dbiir27"
 
 mvn clean package
 

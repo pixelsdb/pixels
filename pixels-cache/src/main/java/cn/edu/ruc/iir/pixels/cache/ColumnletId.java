@@ -38,6 +38,21 @@ public class ColumnletId
     public ColumnletId()
     {}
 
+    public String getBlockId()
+    {
+        return blockId;
+    }
+
+    public short getRowGroupId()
+    {
+        return rowGroupId;
+    }
+
+    public short getColumnId()
+    {
+        return columnId;
+    }
+
     public byte[] getBytes()
     {
         keyBuffer.clear();
