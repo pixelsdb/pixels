@@ -45,7 +45,7 @@ public class UpdateCacheLayout
 
         try {
             MetadataService metadataService = new MetadataService(metaHost, metaPort);
-            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1).get(0);
+            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1);
             Order layoutOrder = layoutv1.getOrderObject();
             List<String> columnOrder = layoutOrder.getColumnOrder();
             List<Column> columns = metadataService.getColumns(schemaName, tableName);
@@ -119,7 +119,7 @@ public class UpdateCacheLayout
             throws MetadataException, IOException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", 3).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Order order = layout.getOrderObject();
         List<String> orderCols = order.getColumnOrder();
         BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/pixels/cache/layout_order_dbiir01_v3"));
@@ -136,7 +136,7 @@ public class UpdateCacheLayout
             throws MetadataException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", 3).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Compact compact = layout.getCompactObject();
         List<String> cachedColumnlets = compact.getColumnletOrder().subList(0, compact.getCacheBorder());
         List<String> columnOrder = layout.getOrderObject().getColumnOrder();

@@ -184,10 +184,10 @@ public class CacheCoordinator
     private void update(int layoutVersion)
             throws MetadataException, IOException
     {
-        List<Layout> layouts = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
+        Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
         // select: decide which files to cache
-        assert layouts.size() == 1;
-        String[] paths = select(layouts.get(0));
+        assert layout != null;
+        String[] paths = select(layout);
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
         if (nodes == null || nodes.isEmpty()) {

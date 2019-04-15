@@ -87,7 +87,7 @@ public class CacheReaderPerf
 
             // get cached columnlets
             MetadataService metadataService = new MetadataService("dbiir01", 18888);
-            Layout layout = metadataService.getLayout("pixels", "test_1187", 2).get(0);
+            Layout layout = metadataService.getLayout("pixels", "test_1187", 2);
             Compact compact = layout.getCompactObject();
             int cacheBorder = compact.getCacheBorder();
             List<String> columnletOrder = compact.getColumnletOrder();

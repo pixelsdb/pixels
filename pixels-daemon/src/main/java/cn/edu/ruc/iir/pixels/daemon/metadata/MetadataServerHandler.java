@@ -117,8 +117,8 @@ public class MetadataServerHandler extends ChannelInboundHandlerAdapter
                         layoutList = layoutDao.getReadableByTable(table, params.getParam("version"));
                     }
                 }
-                if(layoutList != null)
-                    response = layoutList;
+                if(layoutList != null && layoutList.size() == 1)
+                    response = layoutList.get(0);
                 else
                     res = "ERROR";
                 break;
