@@ -428,7 +428,7 @@ public class PixelsRecordReaderImpl
 //                }
 //            }
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
+//            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
         }
         else {
             for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {

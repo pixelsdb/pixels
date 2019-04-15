@@ -90,7 +90,7 @@ public class PixelsCacheReader
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
         byte[] cacheKeyBytes = cacheKey.getBytes();
         long serEnd = System.nanoTime();
-        logger.debug("[serialize key] " + (serEnd - serStart));
+//        logger.debug("[serialize key] " + (serEnd - serStart));
 
         // search cache key
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
@@ -100,18 +100,18 @@ public class PixelsCacheReader
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
             long getEnd = System.nanoTime();
-            logger.debug("[get off&len] " + (getEnd - getStart));
+//            logger.debug("[get off&len] " + (getEnd - getStart));
             content = new byte[length];
             // read content
             long readStart = System.nanoTime();
             cacheFile.getBytes(offset, content, 0, length);
             long readEnd = System.nanoTime();
-            logger.debug("[data read] " + length + "," + (readEnd - readStart));
+//            logger.debug("[data read] " + length + "," + (readEnd - readStart));
         }
 
         // decrease reader count
 //        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
-        logger.debug("[cache read] " + (System.nanoTime() - serStart));
+//        logger.debug("[cache read] " + (System.nanoTime() - serStart));
         return content;
     }
 
@@ -195,23 +195,23 @@ public class PixelsCacheReader
                                          idx, 0, 12);
                 dramAccessCounter++;
                 long end = System.nanoTime();
-                logger.debug("[index search] " + dramAccessCounter + "," + (end - start));
+//                logger.debug("[index search] " + dramAccessCounter + "," + (end - start));
                 long deSerStart = System.nanoTime();
                 PixelsCacheIdx cacheIdx = new PixelsCacheIdx(idx);
                 long deSerEnd = System.nanoTime();
-                logger.debug("[key deser] " + (deSerEnd - deSerStart));
+//                logger.debug("[key deser] " + (deSerEnd - deSerStart));
                 return cacheIdx;
             }
         }
         long end = System.currentTimeMillis();
-        logger.debug("[index null] " + dramAccessCounter + "," + (end - start));
+//        logger.debug("[index null] " + dramAccessCounter + "," + (end - start));
         return null;
     }
 
     public void close()
     {
         try {
-            logger.info("cache reader unmaps cache/index file");
+//            logger.info("cache reader unmaps cache/index file");
             cacheFile.unmap();
             indexFile.unmap();
         }
