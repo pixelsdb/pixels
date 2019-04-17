@@ -1,9 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
-import cn.edu.ruc.iir.pixels.common.metadata.MetadataClientHandler;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import org.apache.logging.log4j.LogManager;
@@ -15,7 +13,7 @@ import java.util.List;
 
 public class PbColumnDao implements PbDao<MetadataProto.Column>
 {
-    private static Logger log = LogManager.getLogger(MetadataClientHandler.class);
+    private static Logger log = LogManager.getLogger(PbColumnDao.class);
 
     public PbColumnDao() {}
 
@@ -54,7 +52,7 @@ public class PbColumnDao implements PbDao<MetadataProto.Column>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public List<MetadataProto.Column> getByTable(Table table)
+    public List<MetadataProto.Column> getByTable(MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())

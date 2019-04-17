@@ -3,7 +3,7 @@ package cn.edu.ruc.iir.pixels.core.compactor;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.LayoutWrapper;
 import cn.edu.ruc.iir.pixels.common.utils.DateUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
@@ -12,6 +12,7 @@ import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,9 +37,9 @@ public class TestPixelsCompactor
 
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
+        List<MetadataProto.Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
-        Layout layout = layouts.get(0);
+        LayoutWrapper layout = new LayoutWrapper(layouts.get(0));
         Compact compact = layout.getCompactObject();
         int rowGroupNum = compact.getNumRowGroupInBlock();
         int colNum = compact.getNumColumn();
@@ -97,15 +98,15 @@ public class TestPixelsCompactor
     {
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
+        List<MetadataProto.Layout> layouts = metadataService.getLayouts("pixels", "test_105");
         System.out.println("existing number of layouts: " + layouts.size());
-        Layout layout = null;
+        LayoutWrapper layout = null;
         int layoutId = 1;
-        for (Layout layout1 : layouts)
+        for (MetadataProto.Layout layout1 : layouts)
         {
             if (layout1.getId() == layoutId)
             {
-                layout = layout1;
+                layout = new LayoutWrapper(layout1);
                 break;
             }
         }
