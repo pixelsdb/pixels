@@ -51,6 +51,7 @@
             <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
+
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
