@@ -1,14 +1,24 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
+
 import java.util.HashSet;
 import java.util.Set;
 
 public class Schema extends Base
 {
-    private static final long serialVersionUID = -9007336459109419883L;
     private String name;
     private String desc;
-    private Set<Table> tables = new HashSet<>();
+    private Set<Long> tableIds = new HashSet<>();
+
+    public Schema () { }
+
+    public Schema (MetadataProto.Schema schema)
+    {
+        this.name = schema.getName();
+        this.desc = schema.getDesc();
+        this.tableIds.addAll(schema.getTableIdsList());
+    }
 
     public String getName()
     {
@@ -30,19 +40,19 @@ public class Schema extends Base
         this.desc = desc;
     }
 
-    public Set<Table> getTables()
+    public Set<Long> getTableIds()
     {
-        return tables;
+        return tableIds;
     }
 
-    public void setTables(Set<Table> tables)
+    public void setTables(Set<Long> tableIds)
     {
-        this.tables = tables;
+        this.tableIds = tableIds;
     }
 
-    public void addTable (Table table)
+    public void addTableId (long tableId)
     {
-        this.tables.add(table);
+        this.tableIds.add(tableId);
     }
 
     @Override

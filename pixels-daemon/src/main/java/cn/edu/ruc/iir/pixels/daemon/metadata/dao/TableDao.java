@@ -9,12 +9,12 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PbTableDao implements PbDao<MetadataProto.Table>
+public class TableDao implements Dao<MetadataProto.Table>
 {
-    public PbTableDao() {}
+    public TableDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static Logger log = LogManager.getLogger(PbTableDao.class);
+    private static Logger log = LogManager.getLogger(TableDao.class);
 
     @Override
     public MetadataProto.Table getById(long id)

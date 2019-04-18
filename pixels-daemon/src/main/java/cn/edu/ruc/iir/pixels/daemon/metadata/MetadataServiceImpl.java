@@ -2,10 +2,10 @@ package cn.edu.ruc.iir.pixels.daemon.metadata;
 
 import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import cn.edu.ruc.iir.pixels.daemon.MetadataServiceGrpc;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbColumnDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbLayoutDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbSchemaDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbTableDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.SchemaDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.TableDao;
 import io.grpc.stub.StreamObserver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,10 +20,10 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 {
     private static Logger log = LogManager.getLogger(MetadataServiceImpl.class);
 
-    private PbSchemaDao schemaDao = new PbSchemaDao();
-    private PbTableDao tableDao = new PbTableDao();
-    private PbLayoutDao layoutDao = new PbLayoutDao();
-    private PbColumnDao columnDao = new PbColumnDao();
+    private SchemaDao schemaDao = new SchemaDao();
+    private TableDao tableDao = new TableDao();
+    private LayoutDao layoutDao = new LayoutDao();
+    private ColumnDao columnDao = new ColumnDao();
 
     public MetadataServiceImpl () { }
 
@@ -96,7 +96,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                layouts = layoutDao.getReadableByTable(table, null);
+                layouts = layoutDao.getReadableByTable(table, -1); // version < 0 means get all versions
                 if (layouts == null || layouts.isEmpty())
                 {
                     headerBuilder.setErrorCode(1).setErrorMsg("no layouts found");
@@ -145,7 +145,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                List<MetadataProto.Layout> layouts = layoutDao.getReadableByTable(table, request.getVersion()+"");
+                List<MetadataProto.Layout> layouts = layoutDao.getReadableByTable(table, request.getVersion());
                 if (layouts == null || layouts.isEmpty())
                 {
                     headerBuilder.setErrorCode(1).setErrorMsg("layout not exist");

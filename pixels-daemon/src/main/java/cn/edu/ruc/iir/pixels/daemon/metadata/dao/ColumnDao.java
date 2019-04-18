@@ -11,14 +11,14 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PbColumnDao implements PbDao<MetadataProto.Column>
+public class ColumnDao implements Dao<MetadataProto.Column>
 {
-    private static Logger log = LogManager.getLogger(PbColumnDao.class);
+    private static Logger log = LogManager.getLogger(ColumnDao.class);
 
-    public PbColumnDao() {}
+    public ColumnDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final PbTableDao tableDao = new PbTableDao();
+    private static final TableDao tableDao = new TableDao();
 
     @Override
     public MetadataProto.Column getById(long id)

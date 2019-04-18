@@ -1,10 +1,10 @@
 package cn.edu.ruc.iir.pixels.common;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
-import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import com.alibaba.fastjson.JSON;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -25,7 +25,13 @@ public class TestMetadataService {
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("dbiir10", 18888);
+        this.instance = new MetadataService("127.0.0.1", 18888);
+    }
+
+    @After
+    public void shutdown () throws InterruptedException
+    {
+        this.instance.shutdown();
     }
 
     @Test
@@ -33,7 +39,7 @@ public class TestMetadataService {
     {
         for (int i = 1; i <= 5; i++) {
             Thread t = new Thread(() -> {
-                List<MetadataProto.Schema> schemas = null;
+                List<Schema> schemas = null;
                 try
                 {
                     schemas = instance.getSchemas();
@@ -47,7 +53,7 @@ public class TestMetadataService {
             t.join();
         }
 
-        List<MetadataProto.Schema> schemas = instance.getSchemas();
+        List<Schema> schemas = instance.getSchemas();
         System.out.println("Command: " + schemas.size());
     }
 
@@ -56,8 +62,8 @@ public class TestMetadataService {
     {
         String schemaName = "pixels";
         List<String> tableList = new ArrayList<String>();
-        List<MetadataProto.Table> tables = instance.getTables(schemaName);
-        for (MetadataProto.Table t : tables) {
+        List<Table> tables = instance.getTables(schemaName);
+        for (Table t : tables) {
             tableList.add(t.getName());
         }
         System.out.println("Show tables, " + tableList.toString());
@@ -66,8 +72,8 @@ public class TestMetadataService {
     @Test
     public void testGetColumnsBySchemaNameAndTblName () throws MetadataException
     {
-        List<MetadataProto.Column> columns = instance.getColumns("pixels", "test_105");
-        for (MetadataProto.Column column : columns)
+        List<Column> columns = instance.getColumns("pixels", "test_105");
+        for (Column column : columns)
         {
             System.out.println(column.getName() + ", " + column.getType());
         }
@@ -77,28 +83,26 @@ public class TestMetadataService {
     public void testGetTableLayouts () throws MetadataException
     {
         long start = System.currentTimeMillis();
-        List<MetadataProto.Layout> layouts = instance.getLayouts("pixels", "test_105");
+        List<Layout> layouts = instance.getLayouts("pixels", "test_105");
         long end = System.currentTimeMillis();
         System.out.println("Last: " + (end - start));
         System.out.println(layouts.get(0).getSplits());
 
-        for (MetadataProto.Layout layout : layouts) {
+        for (Layout layout : layouts) {
             // get index
             int version = layout.getVersion();
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
-            System.out.println(order.toString());
-            System.out.println(splits.toString());
+            System.out.println(JSON.toJSONString(order));
+            System.out.println(JSON.toJSONString(splits));
         }
-
     }
-
 
     @Test
     public void testGetTableLayoutsByVersion () throws MetadataException
     {
         long start = System.currentTimeMillis();
-        MetadataProto.Layout layout = instance.getLayout("pixels", "test_105", 0);
+        Layout layout = instance.getLayout("pixels", "test_105", 1);
         long end = System.currentTimeMillis();
         System.out.println("Last: " + (end - start));
         System.out.println(layout.getSplits());

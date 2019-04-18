@@ -10,11 +10,11 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PbLayoutDao implements PbDao<MetadataProto.Layout>
+public class LayoutDao implements Dao<MetadataProto.Layout>
 {
-    public PbLayoutDao() {}
+    public LayoutDao() {}
 
-    private static Logger log = LogManager.getLogger(PbLayoutDao.class);
+    private static Logger log = LogManager.getLogger(LayoutDao.class);
 
     private static final DBUtil db = DBUtil.Instance();
 
@@ -157,7 +157,7 @@ public class PbLayoutDao implements PbDao<MetadataProto.Layout>
     }
 
     @SuppressWarnings("Duplicates")
-    public List<MetadataProto.Layout> getReadableByTable (MetadataProto.Table table, String version)
+    public List<MetadataProto.Layout> getReadableByTable (MetadataProto.Table table, int version)
     {
         if(table == null)
         {
@@ -168,7 +168,7 @@ public class PbLayoutDao implements PbDao<MetadataProto.Layout>
         {
             String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
                     " AND LAYOUT_PERMISSION>=0";
-            if(version != null)
+            if(version >= 0)
             {
                 sql += " AND LAYOUT_VERSION=" + version;
             }

@@ -3,8 +3,8 @@ package cn.edu.ruc.iir.pixels.load.benchmark;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.utils.FileUtil;
 import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbColumnDao;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbLayoutDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.ColumnDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ColumnDefinition;
@@ -176,10 +176,10 @@ public class BenchmarkTest
     public void testGetSchemaByOrder()
     {
         MetadataProto.Table table = MetadataProto.Table.newBuilder().setId(6).build();
-        PbColumnDao columnDao = new PbColumnDao();
+        ColumnDao columnDao = new ColumnDao();
         List<MetadataProto.Column> columnList = columnDao.getByTable(table);
         System.out.println(columnList.size());
-        PbLayoutDao layoutDao = new PbLayoutDao();
+        LayoutDao layoutDao = new LayoutDao();
         MetadataProto.Layout layout = layoutDao.getById(9);
         System.out.println(layout.getOrder());
         Order columnOrder = JSON.parseObject(layout.getOrder(), Order.class);
@@ -238,13 +238,13 @@ public class BenchmarkTest
     {
         String tableName = "test_105";
         String oldPath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
-        PbColumnDao columnDao = new PbColumnDao();
+        ColumnDao columnDao = new ColumnDao();
         MetadataProto.Table table = MetadataProto.Table.newBuilder().setId(6).build();
 
         Order columnOrder = columnDao.getOrderByTable(table);
         String order = JSON.toJSONString(columnOrder);
 
-        PbLayoutDao layoutDao = new PbLayoutDao();
+        LayoutDao layoutDao = new LayoutDao();
         MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
                 .setOrderPath(oldPath)
                 .setOrder(order)

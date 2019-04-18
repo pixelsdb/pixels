@@ -4,7 +4,7 @@ import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
 import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
-import cn.edu.ruc.iir.pixels.daemon.metadata.dao.PbLayoutDao;
+import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import com.alibaba.fastjson.JSON;
 import org.junit.Test;
 
@@ -34,13 +34,13 @@ public class UpdateCacheLayout
 
         try {
             MetadataService metadataService = new MetadataService(metaHost, metaPort);
-            LayoutWrapper layoutv1 = new LayoutWrapper(metadataService.getLayout(schemaName, tableName, 1));
+            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1);
 
             Order layoutOrder = layoutv1.getOrderObject();
             List<String> columnOrder = layoutOrder.getColumnOrder();
-            List<MetadataProto.Column> columns = metadataService.getColumns(schemaName, tableName);
+            List<Column> columns = metadataService.getColumns(schemaName, tableName);
             Map<String, Double> columnSizeMap = new HashMap<>();
-            for (MetadataProto.Column column : columns)
+            for (Column column : columns)
             {
                 columnSizeMap.put(column.getName(), column.getSize());
             }
@@ -85,7 +85,7 @@ public class UpdateCacheLayout
                 }
             }
 
-            PbLayoutDao layoutDao = new PbLayoutDao();
+            LayoutDao layoutDao = new LayoutDao();
             MetadataProto.Layout layoutv2 = MetadataProto.Layout.newBuilder()
             .setId(21)
             .setPermission(MetadataProto.Layout.PERMISSION.READWRITE)
@@ -109,7 +109,7 @@ public class UpdateCacheLayout
             throws MetadataException, IOException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        LayoutWrapper layout = new LayoutWrapper(metadataService.getLayout("pixels", "test_1187", 3));
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Order order = layout.getOrderObject();
         List<String> orderCols = order.getColumnOrder();
         BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/pixels/cache/layout_order_dbiir01_v3"));
@@ -126,7 +126,7 @@ public class UpdateCacheLayout
             throws MetadataException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        LayoutWrapper layout = new LayoutWrapper(metadataService.getLayout("pixels", "test_1187", 3));
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Compact compact = layout.getCompactObject();
         List<String> cachedColumnlets = compact.getColumnletOrder().subList(0, compact.getCacheBorder());
         List<String> columnOrder = layout.getOrderObject().getColumnOrder();

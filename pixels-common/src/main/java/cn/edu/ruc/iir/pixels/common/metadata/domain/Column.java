@@ -1,12 +1,24 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
+
 public class Column extends Base
 {
-    private static final long serialVersionUID = -7648468928635345167L;
     private String name;
     private String type;
     private double size;
-    private Table table;
+    private long tableId;
+
+    public Column () { }
+
+    public Column (MetadataProto.Column column)
+    {
+        this.setId(column.getId());
+        this.name = column.getName();
+        this.type = column.getType();
+        this.size = column.getSize();
+        this.tableId = column.getTableId();
+    }
 
     public String getName()
     {
@@ -38,14 +50,14 @@ public class Column extends Base
         this.size = size;
     }
 
-    public Table getTable()
+    public long getTableId()
     {
-        return table;
+        return tableId;
     }
 
-    public void setTable(Table table)
+    public void setTableId(long tableId)
     {
-        this.table = table;
+        this.tableId = tableId;
     }
 
     @Override
@@ -53,7 +65,8 @@ public class Column extends Base
         return "Column{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
-                ", size=" + size +
+                ", size=" + size + '\'' +
+                ", tableId=" + tableId +
                 '}';
     }
 }

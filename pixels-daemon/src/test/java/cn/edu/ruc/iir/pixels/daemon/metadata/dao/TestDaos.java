@@ -14,7 +14,7 @@ public class TestDaos
     @Test
     public void testSchema ()
     {
-        PbSchemaDao schemaDao = new PbSchemaDao();
+        SchemaDao schemaDao = new SchemaDao();
         MetadataProto.Schema schema = schemaDao.getByName("pixels");
         System.out.println(schema.getId() + ", " + schema.getName() + ", " + schema.getDesc());
     }
@@ -22,7 +22,7 @@ public class TestDaos
     @Test
     public void testTable ()
     {
-        PbTableDao tableDao = new PbTableDao();
+        TableDao tableDao = new TableDao();
         List<MetadataProto.Table> tables = tableDao.getByName("test_105");
         for (MetadataProto.Table table : tables)
         {
@@ -36,10 +36,10 @@ public class TestDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        PbSchemaDao schemaDao = new PbSchemaDao();
-        PbTableDao tableDao = new PbTableDao();
-        PbColumnDao columnDao = new PbColumnDao();
-        PbLayoutDao layoutDao = new PbLayoutDao();
+        SchemaDao schemaDao = new SchemaDao();
+        TableDao tableDao = new TableDao();
+        ColumnDao columnDao = new ColumnDao();
+        LayoutDao layoutDao = new LayoutDao();
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -63,10 +63,10 @@ public class TestDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        PbSchemaDao schemaDao = new PbSchemaDao();
-        PbTableDao tableDao = new PbTableDao();
-        PbColumnDao columnDao = new PbColumnDao();
-        PbLayoutDao layoutDao = new PbLayoutDao();
+        SchemaDao schemaDao = new SchemaDao();
+        TableDao tableDao = new TableDao();
+        ColumnDao columnDao = new ColumnDao();
+        LayoutDao layoutDao = new LayoutDao();
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -85,10 +85,10 @@ public class TestDaos
             }
         }
 
-        LayoutWrapper layoutWrapper = new LayoutWrapper(layout);
-        List<String> columnOrder = layoutWrapper.getOrderObject().getColumnOrder();
-        int cacheBorder = layoutWrapper.getCompactObject().getCacheBorder();
-        List<String> columnletOrder = layoutWrapper.getCompactObject().getColumnletOrder();
+        Layout layout1 = new Layout(layout);
+        List<String> columnOrder = layout1.getOrderObject().getColumnOrder();
+        int cacheBorder = layout1.getCompactObject().getCacheBorder();
+        List<String> columnletOrder = layout1.getCompactObject().getColumnletOrder();
         Set<String> cachedColumns = new HashSet<>();
         for (int i = 0; i < cacheBorder; ++i)
         {
@@ -108,8 +108,8 @@ public class TestDaos
             throws IOException
     {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
-        PbLayoutDao layoutDao = new PbLayoutDao();
-        LayoutWrapper layout = new LayoutWrapper(layoutDao.getById(21));
+        LayoutDao layoutDao = new LayoutDao();
+        Layout layout = new Layout(layoutDao.getById(21));
         Order order = layout.getOrderObject();
         List<String> columnOrder = order.getColumnOrder();
         for (String col : columnOrder)
@@ -127,7 +127,7 @@ public class TestDaos
     {
         BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/Jelly/Desktop/splits")));
         String splits = reader.readLine();
-        PbLayoutDao layoutDao = new PbLayoutDao();
+        LayoutDao layoutDao = new LayoutDao();
         layoutDao.update(layoutDao.getById(10).toBuilder().setSplits(splits).build());
         reader.close();
     }

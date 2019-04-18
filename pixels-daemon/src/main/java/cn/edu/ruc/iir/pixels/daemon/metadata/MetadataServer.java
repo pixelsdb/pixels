@@ -50,7 +50,14 @@ public class MetadataServer implements Server
         {
             this.rpcServer.start();
             this.running = true;
+            this.rpcServer.awaitTermination();
         } catch (IOException e)
+        {
+            log.error("I/O error when running.", e);
+        } catch (InterruptedException e)
+        {
+            log.error("Interrupted when running.", e);
+        } finally
         {
             this.shutdown();
         }
