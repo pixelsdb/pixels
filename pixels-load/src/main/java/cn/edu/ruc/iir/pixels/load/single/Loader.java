@@ -67,7 +67,7 @@ public abstract class Loader
         int writingLayoutVersion = -1;
         for (Layout layout : layouts)
         {
-            if (layout.getPermission() > 0)
+            if (layout.isWritable())
             {
                 if (layout.getVersion() > writingLayoutVersion)
                 {

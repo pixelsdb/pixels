@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import org.junit.Test;
 
 import java.io.*;
@@ -14,7 +15,7 @@ public class TestDaos
     public void testSchema ()
     {
         SchemaDao schemaDao = new SchemaDao();
-        Schema schema = schemaDao.getByName("pixels");
+        MetadataProto.Schema schema = schemaDao.getByName("pixels");
         System.out.println(schema.getId() + ", " + schema.getName() + ", " + schema.getDesc());
     }
 
@@ -22,12 +23,10 @@ public class TestDaos
     public void testTable ()
     {
         TableDao tableDao = new TableDao();
-        List<Table> tables = tableDao.getByName("test_105");
-        for (Table table : tables)
+        List<MetadataProto.Table> tables = tableDao.getByName("test_105");
+        for (MetadataProto.Table table : tables)
         {
-            System.out.println(table.getId() + ", " + table.getSchema().getName());
-            Base base = table;
-            System.out.println(base.toString());
+            System.out.println(table.getId() + ", " + table.getSchemaId());
         }
     }
 
@@ -42,17 +41,17 @@ public class TestDaos
         ColumnDao columnDao = new ColumnDao();
         LayoutDao layoutDao = new LayoutDao();
 
-        Schema schema = schemaDao.getByName(schemaName);
-        Table table = tableDao.getByNameAndSchema(tableName, schema);
-        columnDao.getByTable(table);
-        layoutDao.getByTable(table);
+        MetadataProto.Schema schema = schemaDao.getByName(schemaName);
+        MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
+        List<MetadataProto.Column> columns = columnDao.getByTable(table);
+        List<MetadataProto.Layout> layouts = layoutDao.getByTable(table);
 
-        for (Column column : table.getColumns())
+        for (MetadataProto.Column column : columns)
         {
             System.out.println(column.getName() + ", " + column.getType());
         }
 
-        for (Layout layout : table.getLayouts())
+        for (MetadataProto.Layout layout : layouts)
         {
             System.out.println(layout.getOrderPath());
         }
@@ -69,15 +68,15 @@ public class TestDaos
         ColumnDao columnDao = new ColumnDao();
         LayoutDao layoutDao = new LayoutDao();
 
-        Schema schema = schemaDao.getByName(schemaName);
-        Table table = tableDao.getByNameAndSchema(tableName, schema);
+        MetadataProto.Schema schema = schemaDao.getByName(schemaName);
+        MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
         columnDao.getByTable(table);
-        layoutDao.getByTable(table);
+        List<MetadataProto.Layout> layouts = layoutDao.getByTable(table);
 
 
-        Layout layout = null;
+        MetadataProto.Layout layout = null;
 
-        for (Layout layout1 : table.getLayouts())
+        for (MetadataProto.Layout layout1 : layouts)
         {
             if (layout1.getId() == 14)
             {
@@ -86,9 +85,10 @@ public class TestDaos
             }
         }
 
-        List<String> columnOrder = layout.getOrderObject().getColumnOrder();
-        int cacheBorder = layout.getCompactObject().getCacheBorder();
-        List<String> columnletOrder = layout.getCompactObject().getColumnletOrder();
+        Layout layout1 = new Layout(layout);
+        List<String> columnOrder = layout1.getOrderObject().getColumnOrder();
+        int cacheBorder = layout1.getCompactObject().getCacheBorder();
+        List<String> columnletOrder = layout1.getCompactObject().getColumnletOrder();
         Set<String> cachedColumns = new HashSet<>();
         for (int i = 0; i < cacheBorder; ++i)
         {
@@ -109,7 +109,7 @@ public class TestDaos
     {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
         LayoutDao layoutDao = new LayoutDao();
-        Layout layout = layoutDao.getById(21);
+        Layout layout = new Layout(layoutDao.getById(21));
         Order order = layout.getOrderObject();
         List<String> columnOrder = order.getColumnOrder();
         for (String col : columnOrder)
@@ -128,9 +128,7 @@ public class TestDaos
         BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/Jelly/Desktop/splits")));
         String splits = reader.readLine();
         LayoutDao layoutDao = new LayoutDao();
-        Layout layout = layoutDao.getById(10);
-        layout.setSplits(splits);
-        layoutDao.update(layout);
+        layoutDao.update(layoutDao.getById(10).toBuilder().setSplits(splits).build());
         reader.close();
     }
 }

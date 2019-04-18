@@ -1,16 +1,26 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class Table extends Base
 {
-    private static final long serialVersionUID = -5992595471962291836L;
     private String name;
     private String type;
-    private Schema schema;
-    private List<Column> columns = new ArrayList<>();
-    private List<Layout> layouts = new ArrayList<>();
+    private long schemaId;
+    private List<Long> columnIds = new ArrayList<>();
+
+    public Table () { }
+
+    public Table (MetadataProto.Table table)
+    {
+        this.name = table.getName();
+        this.type = table.getType();
+        this.schemaId = table.getSchemaId();
+        this.columnIds.addAll(table.getColumnIdsList());
+    }
 
     public String getName()
     {
@@ -32,44 +42,29 @@ public class Table extends Base
         this.type = type;
     }
 
-    public Schema getSchema()
+    public long getSchemaId()
     {
-        return schema;
+        return schemaId;
     }
 
-    public void setSchema(Schema schema)
+    public void setSchema(long schemaId)
     {
-        this.schema = schema;
+        this.schemaId = schemaId;
     }
 
-    public List<Column> getColumns()
+    public List<Long> getColumnIds()
     {
-        return columns;
+        return columnIds;
     }
 
-    public void setColumns(List<Column> columns)
+    public void setColumnIds(List<Long> columnIds)
     {
-        this.columns = columns;
+        this.columnIds = columnIds;
     }
 
-    public void addColumn (Column column)
+    public void addColumnId (long columnId)
     {
-        this.columns.add(column);
-    }
-
-    public List<Layout> getLayouts()
-    {
-        return layouts;
-    }
-
-    public void setLayouts(List<Layout> layouts)
-    {
-        this.layouts = layouts;
-    }
-
-    public void addLayout (Layout layout)
-    {
-        this.layouts.add(layout);
+        this.columnIds.add(columnId);
     }
 
     @Override
@@ -77,9 +72,7 @@ public class Table extends Base
         return "Table{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
-                ", schema=" + schema +
-                ", columns=" + columns +
-                ", layouts=" + layouts +
+                ", schemaId=" + schemaId +
                 '}';
     }
 }

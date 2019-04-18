@@ -5,23 +5,21 @@ import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import cn.edu.ruc.iir.pixels.daemon.MetadataServiceGrpc;
-import com.alibaba.fastjson.JSON;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by hank on 18-6-17.
  */
 public class MetadataService
 {
-
-    private final String host;
-    private final int port;
     private final ManagedChannel channel;
     private final MetadataServiceGrpc.MetadataServiceBlockingStub stub;
 
@@ -29,64 +27,76 @@ public class MetadataService
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
-        this.host = host;
-        this.port = port;
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext(true).build();
         this.stub = MetadataServiceGrpc.newBlockingStub(channel);
     }
 
-    public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
+    public void shutdown() throws InterruptedException {
+        this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    public List<Schema> getSchemas() throws MetadataException
     {
-        List<Column> columns = null;
+        List<Schema> schemas = new ArrayList<>();
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.getColumns.toString());
-        params.setParam("tableName", tableName);
-        params.setParam("schemaName", schemaName);
-        MetadataClient client = new MetadataClient(params, token);
+        MetadataProto.GetSchemasRequest request = MetadataProto.GetSchemasRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build()).build();
         try
         {
-            client.connect(port, host);
-            while (true)
+            MetadataProto.GetSchemasResponse response = this.stub.getSchemas(request);
+            if (response.getHeader().getErrorCode() != 0)
             {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    if(isError(res))
-                        break;
-                    columns = (List<Column>) res;
-                    break;
-                }
+                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
+                        + " error message: " + response.getHeader().getErrorMsg());
             }
+            response.getSchemasList().forEach( schema -> schemas.add(new Schema(schema)) );
+        } catch (Exception e)
+        {
+            throw new MetadataException("can not get schemas from metadata", e);
+        }
+        return schemas;
+    }
+
+    public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
+    {
+        List<Column> columns = new ArrayList<>();
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetColumnsRequest request = MetadataProto.GetColumnsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        try
+        {
+            MetadataProto.GetColumnsResponse response = this.stub.getColumns(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
+                + " error message: " + response.getHeader().getErrorMsg());
+            }
+            response.getColumnsList().forEach( column -> columns.add(new Column(column)) );
         } catch (Exception e)
         {
             throw new MetadataException("can not get columns from metadata", e);
         }
-        return columns != null ? columns : new ArrayList<>();
+        return columns;
     }
 
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
-        List<Layout> layouts = null;
+        List<Layout> layouts = new ArrayList<>();
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.getLayouts.toString());
-        params.setParam("tableName", tableName);
-        params.setParam("schemaName", schemaName);
-        MetadataClient client = new MetadataClient(params, token);
+        MetadataProto.GetLayoutsRequest request = MetadataProto.GetLayoutsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
         try
         {
-            client.connect(port, host);
-            while (true)
+            MetadataProto.GetLayoutsResponse response = this.stub.getLayouts(request);
+            if (response.getHeader().getErrorCode() != 0)
             {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    if(isError(res))
-                        break;
-                    layouts = (List<Layout>) res;
-                    break;
-                }
+                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
+                        + " error message: " + response.getHeader().getErrorMsg());
             }
+            response.getLayoutsList().forEach( layout -> layouts.add(new Layout(layout)) );
         } catch (Exception e)
         {
             throw new MetadataException("can not get layouts from metadata", e);
@@ -96,27 +106,22 @@ public class MetadataService
 
     public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException
     {
-        Layout layout = null;
+        Layout layout;
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.getLayout.toString());
-        params.setParam("tableName", tableName);
-        params.setParam("schemaName", schemaName);
-        params.setParam("version", String.valueOf(version));
-        MetadataClient client = new MetadataClient(params, token);
+        MetadataProto.GetLayoutRequest request = MetadataProto.GetLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .setVersion(version).build();
         try
         {
-            client.connect(port, host);
-            while (true)
+            MetadataProto.GetLayoutResponse response = this.stub.getLayout(request);
+            if (response.getHeader().getErrorCode() != 0)
             {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    if(isError(res))
-                        break;
-                    layout = (Layout) res;
-                    break;
-                }
+                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
+                        + " error message: " + response.getHeader().getErrorMsg());
             }
+            layout = new Layout(response.getLayout());
         } catch (Exception e)
         {
             throw new MetadataException("can not get layouts from metadata", e);
@@ -126,79 +131,57 @@ public class MetadataService
 
     public List<Table> getTables(String schemaName) throws MetadataException
     {
-        List<Table> tables = null;
+        List<Table> tables = new ArrayList<>();
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.getTables.toString());
-        params.setParam("schemaName", schemaName);
-        MetadataClient client = new MetadataClient(params, token);
+        MetadataProto.GetTablesRequest request = MetadataProto.GetTablesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
         try
         {
-            client.connect(port, host);
-            while (true)
+            MetadataProto.GetTablesResponse response = this.stub.getTables(request);
+            if (response.getHeader().getErrorCode() != 0)
             {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    if(isError(res))
-                        break;
-                    tables = (List<Table>) res;
-                    break;
-                }
+                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
+                        + " error message: " + response.getHeader().getErrorMsg());
             }
+            response.getTablesList().forEach( table -> tables.add(new Table(table)) );
         } catch (Exception e)
         {
             throw new MetadataException("can not get tables from metadata", e);
         }
-        return tables != null ? tables : new ArrayList<>();
-    }
-
-    private boolean isError(Object res) {
-        return String.valueOf(res).equals("ERROR");
-    }
-
-    public List<Schema> getSchemas() throws MetadataException
-    {
-        List<Schema> schemas = null;
-        String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.getSchemas.toString());
-        MetadataClient client = new MetadataClient(params, token);
-        try
-        {
-            client.connect(port, host);
-            while (true)
-            {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    if(isError(res))
-                        break;
-                    schemas = (List<Schema>) res;
-                    break;
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new MetadataException("can not get schemas from metadata", e);
-        }
-        return schemas != null ? schemas : new ArrayList<>();
+        return tables;
     }
 
     public boolean createSchema (String schemaName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.createSchema.toString());
-        params.setParam("schemaName", schemaName);
-        return submitCheckRequest(params, token).equals("success");
+        MetadataProto.CreateSchemaRequest request = MetadataProto.CreateSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setSchemaDesc("Created by Pixels MetadataService").build();
+        MetadataProto.CreateSchemaResponse response = this.stub.createSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("can not create schema. error code: " + response.getHeader().getErrorCode()
+                    + " error message: " + response.getHeader().getErrorMsg());
+        }
+        return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
 
     public boolean dropSchema (String schemaName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.dropSchema.toString());
-        params.setParam("schemaName", schemaName);
-        return submitCheckRequest(params, token).equals("success");
+        MetadataProto.DropSchemaRequest request = MetadataProto.DropSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
+        MetadataProto.DropSchemaResponse response = this.stub.dropSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("can not drop schema. error code: " + response.getHeader().getErrorCode()
+                    + " error message: " + response.getHeader().getErrorMsg());
+        }
+        return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
 
     public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
@@ -208,11 +191,23 @@ public class MetadataService
         assert columns != null && !columns.isEmpty();
 
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.createTable.toString());
-        params.setParam("schemaName", schemaName);
-        params.setParam("tableName", tableName);
-        params.setParam("columns", JSON.toJSONString(columns));
-        return submitCheckRequest(params, token).equals("success");
+        List<MetadataProto.Column> columnList = new ArrayList<>();
+        for (Column column : columns)
+        {
+            columnList.add(MetadataProto.Column.newBuilder()
+                    .setId(column.getId()).setName(column.getName()).setType(column.getType())
+                    .setSize(column.getSize()).build()); // no need to set table id.
+        }
+        MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).addAllColumns(columnList).build();
+        MetadataProto.CreateTableResponse response = this.stub.createTable(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("can not create table. error code: " + response.getHeader().getErrorCode()
+                    + " error message: " + response.getHeader().getErrorMsg());
+        }
+        return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
 
     public boolean dropTable (String schemaName, String tableName) throws MetadataException
@@ -221,10 +216,16 @@ public class MetadataService
         assert tableName != null && !tableName.isEmpty();
 
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.dropTable.toString());
-        params.setParam("schemaName", schemaName);
-        params.setParam("tableName", tableName);
-        return submitCheckRequest(params, token).equals("success");
+        MetadataProto.DropTableRequest request = MetadataProto.DropTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        MetadataProto.DropTableResponse response = this.stub.dropTable(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("can not drop table. error code: " + response.getHeader().getErrorCode()
+                    + " error message: " + response.getHeader().getErrorMsg());
+        }
+        return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
 
     public boolean existTable (String schemaName, String tableName) throws MetadataException
@@ -233,29 +234,15 @@ public class MetadataService
         assert tableName != null && !tableName.isEmpty();
 
         String token = UUID.randomUUID().toString();
-        ReqParams params = new ReqParams(Action.existTable.toString());
-        params.setParam("schemaName", schemaName);
-        params.setParam("tableName", tableName);
-        return submitCheckRequest(params, token).equals("true");
-    }
-
-    private String submitCheckRequest (ReqParams params, String token) throws MetadataException
-    {
-        MetadataClient client = new MetadataClient(params, token);
-        try
+        MetadataProto.ExistTableRequest request = MetadataProto.ExistTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        MetadataProto.ExistTableResponse response = this.stub.existTable(request);
+        if (response.getHeader().getErrorCode() != 0)
         {
-            client.connect(port, host);
-            while (true)
-            {
-                Object res = client.getResponse().get(token);
-                if (res != null)
-                {
-                    return String.valueOf(res);
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new MetadataException("failed to execute check request on metadata", e);
+            throw new MetadataException("failed to check table. error code: " + response.getHeader().getErrorCode()
+                    + " error message: " + response.getHeader().getErrorMsg());
         }
+        return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
 }

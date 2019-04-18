@@ -1,19 +1,60 @@
 package cn.edu.ruc.iir.pixels.common.metadata.domain;
 
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import com.alibaba.fastjson.JSON;
 
 public class Layout extends Base
 {
-    private static final long serialVersionUID = -8188182830085955370L;
+    public enum Permission
+    {
+        DISABLED,
+        READONLY,
+        READWRITE,
+        UNRECOGNIZED
+    }
+
     private int version;
     private long createAt;
-    private int permission;
+    private Permission permission;
     private String order;
     private String orderPath;
     private String compact;
     private String compactPath;
     private String splits;
-    private Table table;
+    private long tableId;
+    private Order orderObj = null;
+    private Compact compactObj = null;
+    private Splits splitsObj = null;
+
+    public Layout () { }
+
+    public Layout (MetadataProto.Layout layout)
+    {
+        this.setId(layout.getId());
+        this.version = layout.getVersion();
+        this.createAt = layout.getCreateAt();
+        switch (layout.getPermission())
+        {
+            case DISABLED:
+                this.permission = Permission.DISABLED;
+                break;
+            case READONLY:
+                this.permission = Permission.READONLY;
+                break;
+            case READWRITE:
+                this.permission = Permission.READWRITE;
+                break;
+            case UNRECOGNIZED:
+                this.permission = Permission.UNRECOGNIZED;
+                break;
+        }
+        this.order = layout.getOrder();
+        this.orderPath = layout.getOrderPath();
+        this.compact = layout.getCompact();
+        this.compactPath = layout.getCompactPath();
+        this.splits = layout.getSplits();
+        this.tableId = layout.getTableId();
+    }
 
     public int getVersion()
     {
@@ -37,20 +78,21 @@ public class Layout extends Base
 
     public boolean isWritable()
     {
-        return this.permission > 0;
+        return this.permission == Permission.READWRITE;
     }
 
     public boolean isReadable()
     {
-        return this.permission >= 0;
+        return this.permission == Permission.READONLY ||
+                this.permission == Permission.READWRITE;
     }
 
-    public int getPermission()
+    public Permission getPermission()
     {
         return permission;
     }
 
-    public void setPermission(int permission)
+    public void setPermission(Permission permission)
     {
         this.permission = permission;
     }
@@ -62,7 +104,11 @@ public class Layout extends Base
 
     public Order getOrderObject()
     {
-        return JSON.parseObject(this.order, Order.class);
+        if (this.orderObj == null)
+        {
+            this.orderObj = JSON.parseObject(this.order, Order.class);
+        }
+        return this.orderObj;
     }
 
     public void setOrder(String order)
@@ -87,7 +133,11 @@ public class Layout extends Base
 
     public Compact getCompactObject()
     {
-        return JSON.parseObject(this.compact, Compact.class);
+        if (this.compactObj == null)
+        {
+            this.compactObj = JSON.parseObject(this.compact, Compact.class);
+        }
+        return this.compactObj;
     }
 
     public void setCompact(String compact)
@@ -112,7 +162,11 @@ public class Layout extends Base
 
     public Splits getSplitsObject()
     {
-        return JSON.parseObject(this.splits, Splits.class);
+        if (this.splitsObj == null)
+        {
+            this.splitsObj = JSON.parseObject(this.splits, Splits.class);
+        }
+        return this.splitsObj;
     }
 
     public void setSplits(String split)
@@ -120,14 +174,14 @@ public class Layout extends Base
         this.splits = split;
     }
 
-    public Table getTable()
+    public long getTableId()
     {
-        return table;
+        return tableId;
     }
 
-    public void setTable(Table table)
+    public void setTableId(long tableId)
     {
-        this.table = table;
+        this.tableId = tableId;
     }
 
     @Override
@@ -141,6 +195,7 @@ public class Layout extends Base
                 ", compact='" + compact + '\'' +
                 ", compactPath='" + compactPath + '\'' +
                 ", splits='" + splits + '\'' +
+                ", tableId=" + tableId +
                 '}';
     }
 }

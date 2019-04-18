@@ -1,27 +1,23 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SchemaDao implements Dao<Schema>
+public class SchemaDao implements Dao<MetadataProto.Schema>
 {
     public SchemaDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static Logger log = LogManager.getLogger(DBUtil.class);
+    private static Logger log = LogManager.getLogger(SchemaDao.class);
 
     @Override
-    public Schema getById(int id)
+    public MetadataProto.Schema getById(long id)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -29,10 +25,10 @@ public class SchemaDao implements Dao<Schema>
             ResultSet rs = st.executeQuery("SELECT DB_NAME, DB_DESC FROM DBS WHERE DB_ID=" + id);
             if (rs.next())
             {
-                Schema schema = new Schema();
-                schema.setId(id);
-                schema.setName(rs.getString("DB_NAME"));
-                schema.setDesc(rs.getString("DB_DESC"));
+                MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
+                .setId(id)
+                .setName(rs.getString("DB_NAME"))
+                .setDesc(rs.getString("DB_DESC")).build();
                 return schema;
             }
 
@@ -45,19 +41,19 @@ public class SchemaDao implements Dao<Schema>
     }
 
     @Override
-    public List<Schema> getAll()
+    public List<MetadataProto.Schema> getAll()
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
             ResultSet rs = st.executeQuery("SELECT * FROM DBS");
-            List<Schema> schemas = new ArrayList<>();
+            List<MetadataProto.Schema> schemas = new ArrayList<>();
             while (rs.next())
             {
-                Schema schema = new Schema();
-                schema.setId(rs.getInt("DB_ID"));
-                schema.setName(rs.getString("DB_NAME"));
-                schema.setDesc(rs.getString("DB_DESC"));
+                MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
+                .setId(rs.getLong("DB_ID"))
+                .setName(rs.getString("DB_NAME"))
+                .setDesc(rs.getString("DB_DESC")).build();
                 schemas.add(schema);
             }
             return schemas;
@@ -70,7 +66,7 @@ public class SchemaDao implements Dao<Schema>
         return null;
     }
 
-    public Schema getByName(String name)
+    public MetadataProto.Schema getByName(String name)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -78,10 +74,10 @@ public class SchemaDao implements Dao<Schema>
             ResultSet rs = st.executeQuery("SELECT DB_ID, DB_DESC FROM DBS WHERE DB_NAME='" + name + "'");
             if (rs.next())
             {
-                Schema schema = new Schema();
-                schema.setId(rs.getInt("DB_ID"));
-                schema.setName(name);
-                schema.setDesc(rs.getString("DB_DESC"));
+                MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
+                .setId(rs.getLong("DB_ID"))
+                .setName(name)
+                .setDesc(rs.getString("DB_DESC")).build();
                 return schema;
             }
 
@@ -93,7 +89,7 @@ public class SchemaDao implements Dao<Schema>
         return null;
     }
 
-    public boolean save (Schema schema)
+    public boolean save (MetadataProto.Schema schema)
     {
         if (exists(schema))
         {
@@ -105,7 +101,8 @@ public class SchemaDao implements Dao<Schema>
         }
     }
 
-    public boolean exists (Schema schema)
+    @SuppressWarnings("Duplicates")
+    public boolean exists (MetadataProto.Schema schema)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -124,7 +121,8 @@ public class SchemaDao implements Dao<Schema>
         return false;
     }
 
-    public boolean insert (Schema schema)
+    @SuppressWarnings("Duplicates")
+    public boolean insert (MetadataProto.Schema schema)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO DBS(" +
@@ -142,7 +140,7 @@ public class SchemaDao implements Dao<Schema>
         return false;
     }
 
-    public boolean update (Schema schema)
+    public boolean update (MetadataProto.Schema schema)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE DBS\n" +
@@ -154,7 +152,7 @@ public class SchemaDao implements Dao<Schema>
         {
             pst.setString(1, schema.getName());
             pst.setString(2, schema.getDesc());
-            pst.setInt(3, schema.getId());
+            pst.setLong(3, schema.getId());
             return pst.execute();
         } catch (SQLException e)
         {
