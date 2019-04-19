@@ -12,6 +12,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
+import static cn.edu.ruc.iir.pixels.common.error.ErrorCode.*;
+
 /**
  * Created at: 19-4-16
  * Author: hank
@@ -37,12 +39,19 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
         List<MetadataProto.Schema> schemas = this.schemaDao.getAll();
-        MetadataProto.ResponseHeader header = headerBuilder
-                .setErrorCode(0)
-                .setErrorMsg("").build();
-        MetadataProto.GetSchemasResponse response = MetadataProto.GetSchemasResponse.newBuilder()
-                .setHeader(header)
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetSchemasResponse response;
+        if (schemas == null || schemas.isEmpty())
+        {
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
+            response = MetadataProto.GetSchemasResponse.newBuilder().setHeader(header).build();
+        }
+        else
+        {
+            header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+            response = MetadataProto.GetSchemasResponse.newBuilder().setHeader(header)
                 .addAllSchemas(schemas).build();
+        }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -64,15 +73,24 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         if(schema != null)
         {
             tables = tableDao.getBySchema(schema);
-            header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
-            response = MetadataProto.GetTablesResponse.newBuilder()
-                    .setHeader(header)
-                    .addAllTables(tables).build();
+            if (tables == null || tables.isEmpty())
+            {
+                header = headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND)
+                        .setErrorMsg("table not found").build();
+                response = MetadataProto.GetTablesResponse.newBuilder()
+                        .setHeader(header).build();
+            }
+            else
+            {
+                header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                response = MetadataProto.GetTablesResponse.newBuilder()
+                        .setHeader(header)
+                        .addAllTables(tables).build();
+            }
         }
         else
         {
-            // TODO: configure and use error code in common.
-            header = headerBuilder.setErrorCode(1).setErrorMsg("schema not exists").build();
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
             response = MetadataProto.GetTablesResponse.newBuilder().setHeader(header).build();
         }
         responseObserver.onNext(response);
@@ -99,17 +117,17 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 layouts = layoutDao.getReadableByTable(table, -1); // version < 0 means get all versions
                 if (layouts == null || layouts.isEmpty())
                 {
-                    headerBuilder.setErrorCode(1).setErrorMsg("no layouts found");
+                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");
                 }
             }
             else
             {
-                headerBuilder.setErrorCode(1).setErrorMsg("table not exist");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("schema not exist");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
         }
         if(layouts != null && layouts.isEmpty() == false)
         {
@@ -148,11 +166,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 List<MetadataProto.Layout> layouts = layoutDao.getReadableByTable(table, request.getVersion());
                 if (layouts == null || layouts.isEmpty())
                 {
-                    headerBuilder.setErrorCode(1).setErrorMsg("layout not exist");
+                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");
                 }
                 else if (layouts.size() != 1)
                 {
-                    headerBuilder.setErrorCode(1).setErrorMsg("duplicate layouts");
+                    headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicate layouts");
                 }
                 else
                 {
@@ -161,12 +179,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                headerBuilder.setErrorCode(1).setErrorMsg("table not exist");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("schema not exist");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
         }
         if(layout != null)
         {
@@ -204,12 +222,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                headerBuilder.setErrorCode(1).setErrorMsg("table not exist");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("schema not exist");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
         }
         if(columns != null && columns.isEmpty() == false)
         {
@@ -220,7 +238,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("no columns found");
+            headerBuilder.setErrorCode(METADATA_COLUMN_NOT_FOUND).setErrorMsg("column not found");
             response = MetadataProto.GetColumnsResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .addAllColumns(columns).build();
@@ -245,12 +263,12 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         .setDesc(request.getSchemaDesc()).build();
         if (schemaDao.exists(schema))
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("exists");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_EXIST).setErrorMsg("schema already exist");
         }
         else
         {
             schemaDao.insert(schema);
-            headerBuilder.setErrorCode(0).setErrorMsg("exists");
+            headerBuilder.setErrorCode(0).setErrorMsg("");
         }
         MetadataProto.CreateSchemaResponse response = MetadataProto.CreateSchemaResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
@@ -275,7 +293,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("failed to drop schema");
+            headerBuilder.setErrorCode(METADATA_DELETE_SCHEMA_FAILED).setErrorMsg("failed to delete schema");
         }
         MetadataProto.DropSchemaResponse response = MetadataProto.DropSchemaResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
@@ -301,7 +319,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         .setSchemaId(schema.getId()).build();
         if (tableDao.exists(table))
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("table already exist");
+            headerBuilder.setErrorCode(METADATA_TABLE_EXIST).setErrorMsg("table already exist");
         }
         else
         {
@@ -316,7 +334,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             else
             {
                 tableDao.deleteByNameAndSchema(table.getName(), schema);
-                headerBuilder.setErrorCode(1).setErrorMsg("failed to create table");
+                headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns");
             }
         }
 
@@ -344,7 +362,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(1).setErrorMsg("failed to drop table");
+            headerBuilder.setErrorCode(METADATA_DELETE_TABLE_FAILED).setErrorMsg("failed to delete table");
         }
         MetadataProto.DropTableResponse response = MetadataProto.DropTableResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();

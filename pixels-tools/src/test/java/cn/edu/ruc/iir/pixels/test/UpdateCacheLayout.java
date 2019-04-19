@@ -88,7 +88,7 @@ public class UpdateCacheLayout
             LayoutDao layoutDao = new LayoutDao();
             MetadataProto.Layout layoutv2 = MetadataProto.Layout.newBuilder()
             .setId(21)
-            .setPermission(MetadataProto.Layout.PERMISSION.READWRITE)
+            .setPermission(MetadataProto.Layout.PERMISSION.READ_WRITE)
             .setVersion(2)
             .setCreateAt(System.currentTimeMillis())
             .setOrder(layoutv1.getOrder())

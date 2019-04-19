@@ -47,15 +47,46 @@ public class MetadataService
             MetadataProto.GetSchemasResponse response = this.stub.getSchemas(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
-                        + " error message: " + response.getHeader().getErrorMsg());
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
             }
             response.getSchemasList().forEach( schema -> schemas.add(new Schema(schema)) );
         } catch (Exception e)
         {
-            throw new MetadataException("can not get schemas from metadata", e);
+            throw new MetadataException("failed to get schemas from metadata", e);
         }
         return schemas;
+    }
+
+    public List<Table> getTables(String schemaName) throws MetadataException
+    {
+        List<Table> tables = new ArrayList<>();
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetTablesRequest request = MetadataProto.GetTablesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
+        try
+        {
+            MetadataProto.GetTablesResponse response = this.stub.getTables(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            response.getTablesList().forEach( table -> tables.add(new Table(table)) );
+        } catch (Exception e)
+        {
+            throw new MetadataException("failed to get tables from metadata", e);
+        }
+        return tables;
     }
 
     public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
@@ -70,13 +101,17 @@ public class MetadataService
             MetadataProto.GetColumnsResponse response = this.stub.getColumns(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
-                + " error message: " + response.getHeader().getErrorMsg());
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
             }
             response.getColumnsList().forEach( column -> columns.add(new Column(column)) );
         } catch (Exception e)
         {
-            throw new MetadataException("can not get columns from metadata", e);
+            throw new MetadataException("failed to get columns from metadata", e);
         }
         return columns;
     }
@@ -93,13 +128,17 @@ public class MetadataService
             MetadataProto.GetLayoutsResponse response = this.stub.getLayouts(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
-                        + " error message: " + response.getHeader().getErrorMsg());
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
             }
             response.getLayoutsList().forEach( layout -> layouts.add(new Layout(layout)) );
         } catch (Exception e)
         {
-            throw new MetadataException("can not get layouts from metadata", e);
+            throw new MetadataException("failed to get layouts from metadata", e);
         }
         return layouts != null ? layouts : new ArrayList<>();
     }
@@ -118,38 +157,19 @@ public class MetadataService
             MetadataProto.GetLayoutResponse response = this.stub.getLayout(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
-                        + " error message: " + response.getHeader().getErrorMsg());
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
             }
             layout = new Layout(response.getLayout());
         } catch (Exception e)
         {
-            throw new MetadataException("can not get layouts from metadata", e);
+            throw new MetadataException("failed to get layouts from metadata", e);
         }
         return layout;
-    }
-
-    public List<Table> getTables(String schemaName) throws MetadataException
-    {
-        List<Table> tables = new ArrayList<>();
-        String token = UUID.randomUUID().toString();
-        MetadataProto.GetTablesRequest request = MetadataProto.GetTablesRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).build();
-        try
-        {
-            MetadataProto.GetTablesResponse response = this.stub.getTables(request);
-            if (response.getHeader().getErrorCode() != 0)
-            {
-                throw new MetadataException("error code: " + response.getHeader().getErrorCode()
-                        + " error message: " + response.getHeader().getErrorMsg());
-            }
-            response.getTablesList().forEach( table -> tables.add(new Table(table)) );
-        } catch (Exception e)
-        {
-            throw new MetadataException("can not get tables from metadata", e);
-        }
-        return tables;
     }
 
     public boolean createSchema (String schemaName) throws MetadataException
@@ -162,8 +182,12 @@ public class MetadataService
         MetadataProto.CreateSchemaResponse response = this.stub.createSchema(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("can not create schema. error code: " + response.getHeader().getErrorCode()
-                    + " error message: " + response.getHeader().getErrorMsg());
+            throw new MetadataException("failed to create schema. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (response.getHeader().getToken().equals(token) == false)
+        {
+            throw new MetadataException("response token does not match.");
         }
         return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
@@ -178,8 +202,8 @@ public class MetadataService
         MetadataProto.DropSchemaResponse response = this.stub.dropSchema(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("can not drop schema. error code: " + response.getHeader().getErrorCode()
-                    + " error message: " + response.getHeader().getErrorMsg());
+            throw new MetadataException("failed to drop schema. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
         }
         return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
@@ -204,8 +228,12 @@ public class MetadataService
         MetadataProto.CreateTableResponse response = this.stub.createTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("can not create table. error code: " + response.getHeader().getErrorCode()
-                    + " error message: " + response.getHeader().getErrorMsg());
+            throw new MetadataException("failed to create table. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (response.getHeader().getToken().equals(token) == false)
+        {
+            throw new MetadataException("response token does not match.");
         }
         return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
@@ -222,8 +250,12 @@ public class MetadataService
         MetadataProto.DropTableResponse response = this.stub.dropTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("can not drop table. error code: " + response.getHeader().getErrorCode()
-                    + " error message: " + response.getHeader().getErrorMsg());
+            throw new MetadataException("failed to drop table. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (response.getHeader().getToken().equals(token) == false)
+        {
+            throw new MetadataException("response token does not match.");
         }
         return (response.getHeader().getErrorCode() == 0) ? true : false;
     }
@@ -240,8 +272,12 @@ public class MetadataService
         MetadataProto.ExistTableResponse response = this.stub.existTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("failed to check table. error code: " + response.getHeader().getErrorCode()
-                    + " error message: " + response.getHeader().getErrorMsg());
+            throw new MetadataException("failed to check table. error code=" + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (response.getHeader().getToken().equals(token) == false)
+        {
+            throw new MetadataException("response token does not match.");
         }
         return (response.getHeader().getErrorCode() == 0) ? true : false;
     }

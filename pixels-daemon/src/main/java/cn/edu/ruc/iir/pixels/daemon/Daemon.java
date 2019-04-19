@@ -106,10 +106,16 @@ public class Daemon implements Runnable
                 log.info("starting daemon...");
             }
 
-            // TODO: due to that main daemon and its guard daemon are not guaranteed
-            // to receive the TERM signal at the same time, there is a very small interval
-            // between the two moment. so that there is a very small chance that the processes
-            // will not be killed.
+            /*
+            Due to that main daemon and its guard daemon are not guaranteed to receive the
+            TERM signal at the same time. So that there is a case that:
+            The first process receives the signal and terminates with the file lock released.
+            After that but before the other process receives the signal, the other process
+            obtains its partner's lock and restart its partner.
+            In such a case, the main/guard daemons will not be terminated.
+            To solve this problem, we make the process sleep 1 second before tries to start
+            its partner. One second should be enough to send TERM signals to each daemon.
+            */
             while (this.running)
             {
                 // make sure the partner is running too.
@@ -117,6 +123,7 @@ public class Daemon implements Runnable
                 if (partnerLock != null)
                 {
                     // the guarded process is not running.
+                    TimeUnit.SECONDS.sleep(1); // make sure
                     partnerLock.release();
                     log.info("starting partner...");
                     ProcessBuilder builder = new ProcessBuilder(this.partnerCmd);

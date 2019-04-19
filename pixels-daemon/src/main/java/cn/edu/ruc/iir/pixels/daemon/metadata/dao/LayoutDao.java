@@ -55,9 +55,9 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
             case -1:
                 return MetadataProto.Layout.PERMISSION.DISABLED;
             case 0:
-                return MetadataProto.Layout.PERMISSION.READONLY;
+                return MetadataProto.Layout.PERMISSION.READ_ONLY;
             case 1:
-                return MetadataProto.Layout.PERMISSION.READWRITE;
+                return MetadataProto.Layout.PERMISSION.READ_WRITE;
         }
         return MetadataProto.Layout.PERMISSION.DISABLED;
     }
@@ -124,7 +124,6 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         return res;
     }
 
-    @SuppressWarnings("Duplicates")
     public List<MetadataProto.Layout> getByTable (MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
@@ -156,7 +155,12 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         return null;
     }
 
-    @SuppressWarnings("Duplicates")
+    /**
+     * get layouts of which the permission is READ_ONLY or READ_WRITE
+     * @param table
+     * @param version < 0 to get all versions of layouts.
+     * @return
+     */
     public List<MetadataProto.Layout> getReadableByTable (MetadataProto.Table table, int version)
     {
         if(table == null)
@@ -266,9 +270,9 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         {
             case DISABLED:
                 return -1;
-            case READONLY:
+            case READ_ONLY:
                 return 0;
-            case READWRITE:
+            case READ_WRITE:
                 return -1;
         }
         return -1;

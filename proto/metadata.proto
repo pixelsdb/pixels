@@ -70,8 +70,8 @@ message Layout {
     uint64 createAt = 3;
     enum PERMISSION {
         DISABLED = 0;
-        READONLY = 1;
-        READWRITE = 2;
+        READ_ONLY = 1;
+        READ_WRITE = 2;
     }
     PERMISSION permission = 4;
     string order = 5;
