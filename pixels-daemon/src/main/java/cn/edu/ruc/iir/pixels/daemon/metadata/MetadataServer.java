@@ -7,6 +7,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created at: 19-4-17
@@ -17,13 +18,11 @@ public class MetadataServer implements Server
     private static Logger log = LogManager.getLogger(MetadataServer.class);
 
     private boolean running = false;
-    private final int port;
     private final io.grpc.Server rpcServer;
 
     public MetadataServer(int port)
     {
         assert (port > 0 && port <= 65535);
-        this.port = port;
         this.rpcServer = ServerBuilder.forPort(port)
                 .addService(new MetadataServiceImpl())
                 .build();
@@ -39,7 +38,13 @@ public class MetadataServer implements Server
     public void shutdown()
     {
         this.running = false;
-        this.rpcServer.shutdownNow();
+        try
+        {
+            this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e)
+        {
+            log.error("Interrupted when shutdown rpc server.", e);
+        }
         DBUtil.Instance().close();
     }
 

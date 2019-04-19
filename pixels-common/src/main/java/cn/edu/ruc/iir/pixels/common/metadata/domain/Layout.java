@@ -8,8 +8,8 @@ public class Layout extends Base
     public enum Permission
     {
         DISABLED,
-        READONLY,
-        READWRITE,
+        READ_ONLY,
+        READ_WRITE,
         UNRECOGNIZED
     }
 
@@ -38,11 +38,11 @@ public class Layout extends Base
             case DISABLED:
                 this.permission = Permission.DISABLED;
                 break;
-            case READONLY:
-                this.permission = Permission.READONLY;
+            case READ_ONLY:
+                this.permission = Permission.READ_ONLY;
                 break;
-            case READWRITE:
-                this.permission = Permission.READWRITE;
+            case READ_WRITE:
+                this.permission = Permission.READ_WRITE;
                 break;
             case UNRECOGNIZED:
                 this.permission = Permission.UNRECOGNIZED;
@@ -78,13 +78,13 @@ public class Layout extends Base
 
     public boolean isWritable()
     {
-        return this.permission == Permission.READWRITE;
+        return this.permission == Permission.READ_WRITE;
     }
 
     public boolean isReadable()
     {
-        return this.permission == Permission.READONLY ||
-                this.permission == Permission.READWRITE;
+        return this.permission == Permission.READ_ONLY ||
+                this.permission == Permission.READ_WRITE;
     }
 
     public Permission getPermission()
