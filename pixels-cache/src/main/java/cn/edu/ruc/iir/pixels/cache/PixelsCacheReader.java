@@ -111,7 +111,7 @@ public class PixelsCacheReader
 
         // decrease reader count
 //        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
-//        logger.debug("[cache read] " + (System.nanoTime() - serStart));
+        logger.debug("[cache read] " + (System.nanoTime() - serStart));
         return content;
     }
 
