@@ -317,6 +317,11 @@ public class PixelsRadix
         return new SearchResult(key, currentNode, bytesMatched, bytesMatchedInNodeFound, parentNode, grandParentNode);
     }
 
+    public void printStats()
+    {
+        // todo print stats of the radix, including the depth, number of nodes, etc.
+    }
+
     static class SearchResult
     {
         final byte[] key;

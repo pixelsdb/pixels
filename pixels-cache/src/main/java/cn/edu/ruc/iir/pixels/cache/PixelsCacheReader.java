@@ -32,7 +32,6 @@ public class PixelsCacheReader
 
         public PixelsCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
         {
-//            requireNonNull(cacheFile, "cache file is null");
             this.builderCacheFile = cacheFile;
 
             return this;
@@ -40,7 +39,6 @@ public class PixelsCacheReader
 
         public PixelsCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
         {
-//            requireNonNull(indexFile, "index file is null");
             this.builderIndexFile = indexFile;
 
             return this;
