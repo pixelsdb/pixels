@@ -10,10 +10,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.common.etcd
- * @ClassName: EtcdMutex
- * @Description:
  * @author: tao
  * @date: Create in 2018-10-27 14:33
  **/

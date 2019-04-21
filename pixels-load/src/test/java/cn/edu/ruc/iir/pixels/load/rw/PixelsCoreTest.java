@@ -13,10 +13,6 @@ import java.io.IOException;
 import java.sql.Timestamp;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.rw
- * @ClassName: PixelsCoreTest
- * @Description:
  * @author: tao
  * @date: Create in 2018-11-07 16:05
  **/

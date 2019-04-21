@@ -6,9 +6,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.multi
- * @ClassName: PixelsProducer
  * @Description: souce -> BlockingQueue
  * @author: tao
  * @date: Create in 2018-10-30 12:57
