@@ -21,10 +21,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.common.etcd
- * @ClassName: LockInternals
- * @Description:
  * @author: tao
  * @date: Create in 2018-10-27 18:31
  **/

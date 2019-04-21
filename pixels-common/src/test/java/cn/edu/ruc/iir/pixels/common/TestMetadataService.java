@@ -11,21 +11,13 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto.client
- * @ClassName: TestMetadataService
- * @Description:
- * @author: tao
- * @date: Create in 2018-01-30 15:36
- **/
 public class TestMetadataService {
     MetadataService instance = null;
 
     @Before
     public void init ()
     {
-        this.instance = new MetadataService("127.0.0.1", 18888);
+        this.instance = new MetadataService("dbiir27", 18888);
     }
 
     @After

@@ -3,10 +3,6 @@ package cn.edu.ruc.iir.pixels.common.lock;
 import com.coreos.jetcd.Client;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.common.etcd
- * @ClassName: EtcdReadWriteLock
- * @Description:
  * @author: tao
  * @date: Create in 2018-10-27 14:29
  **/

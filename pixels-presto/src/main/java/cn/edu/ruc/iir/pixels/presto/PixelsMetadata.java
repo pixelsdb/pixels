@@ -34,10 +34,6 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: PixelsMetadata
- * @Description:
  * @author: tao
  * @date: Create in 2018-01-19 14:16
  **/

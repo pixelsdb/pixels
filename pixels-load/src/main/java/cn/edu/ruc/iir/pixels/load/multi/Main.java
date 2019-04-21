@@ -29,10 +29,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.multi
- * @ClassName: Main
- * @Description:
  * @author: tao
  * @date: Create in 2018-10-30 11:07
  **/

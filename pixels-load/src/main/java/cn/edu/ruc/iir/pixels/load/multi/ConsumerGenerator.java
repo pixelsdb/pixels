@@ -9,9 +9,6 @@ import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.load.multi
- * @ClassName: PixelsConsumerGenerator
  * @Description: source -> pixels file
  * @author: tao
  * @date: Create in 2018-10-30 11:59
