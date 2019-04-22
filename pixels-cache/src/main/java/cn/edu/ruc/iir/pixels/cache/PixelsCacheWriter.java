@@ -206,17 +206,6 @@ public class PixelsCacheWriter
         // set rwFlag as write
         logger.debug("Set index rwFlag as write");
         PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
-        // wait until readerCount is 0
-//        long start = System.currentTimeMillis();
-//        while (System.currentTimeMillis() - start < 5000) {
-//            logger.debug("Wait until all previous started reads are finished");
-//            if (PixelsCacheUtil.getIndexReaderCount(indexFile) == 0) {
-//                logger.debug("No more reads are going on. Break.");
-//                break;
-//            }
-//        }
-//        PixelsCacheUtil.setIndexReaderCount(indexFile, (short) 0);
-//        logger.debug("Set index reader count to 0");
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;

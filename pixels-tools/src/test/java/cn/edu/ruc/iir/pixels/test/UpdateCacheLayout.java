@@ -37,7 +37,7 @@ public class UpdateCacheLayout
 
     private void updateCacheLayout()
     {
-        final String cacheFile = "/Users/Jelly/Desktop/pixels/cache/Mar10/updated_cached_cols";
+        final String cacheFile = "/Users/Jelly/Desktop/pixels/cache/Apr15/updated_cached_cols";
         final String metaHost = "dbiir27";
         final int metaPort = 18888;
         final String schemaName = "pixels";

@@ -1,8 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 /**
  * pixels cache reader.
  *
@@ -11,8 +8,6 @@ import org.apache.logging.log4j.Logger;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
-
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
@@ -67,49 +62,22 @@ public class PixelsCacheReader
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
-        // check rw flag, if not readable, return empty bytes
-//        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
-//        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
-//            logger.debug("Index rwFlag is not set as READ. Stop.");
-//            return content;
-//        }
-
-        // check if reader count reaches its max value, if so no more reads are allowed
-//        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
-//        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
-//            logger.debug("Index reader count has exceeded the maximum value. Stop.");
-//            return content;
-//        }
-        // update reader count
-//        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
-        long serStart = System.nanoTime();
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
         byte[] cacheKeyBytes = cacheKey.getBytes();
-        long serEnd = System.nanoTime();
-//        logger.debug("[serialize key] " + (serEnd - serStart));
 
         // search cache key
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
         // if found, read content from cache
         if (cacheIdx != null) {
-            long getStart = System.nanoTime();
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
-            long getEnd = System.nanoTime();
-//            logger.debug("[get off&len] " + (getEnd - getStart));
             content = new byte[length];
             // read content
-            long readStart = System.nanoTime();
             cacheFile.getBytes(offset, content, 0, length);
-            long readEnd = System.nanoTime();
-//            logger.debug("[data read] " + length + "," + (readEnd - readStart));
         }
 
-        // decrease reader count
-//        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
-        logger.debug("[cache read] " + (System.nanoTime() - serStart));
         return content;
     }
 
@@ -132,8 +100,6 @@ public class PixelsCacheReader
      * */
     private PixelsCacheIdx search(byte[] key)
     {
-        int dramAccessCounter = 0;
-        long start = System.nanoTime();
         final int keyLen = key.length;
         long currentNodeOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         int bytesMatched = 0;
@@ -141,7 +107,6 @@ public class PixelsCacheReader
 
         // get root
         int currentNodeHeader = indexFile.getInt(currentNodeOffset);
-        dramAccessCounter++;
         int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
         int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
         if (currentNodeChildrenNum == 0 && currentNodeEdgeSize == 0) {
@@ -154,7 +119,6 @@ public class PixelsCacheReader
             long matchingChildOffset = 0L;
             for (int i = 0; i < currentNodeChildrenNum; i++) {
                 long child = indexFile.getLong(currentNodeOffset + 4 + (8 * i));
-                dramAccessCounter++;
                 byte leader = (byte) ((child >>> 56) & 0xFF);
                 if (leader == key[bytesMatched]) {
                     matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
@@ -168,13 +132,11 @@ public class PixelsCacheReader
             currentNodeOffset = matchingChildOffset;
             bytesMatchedInNodeFound = 0;
             currentNodeHeader = indexFile.getInt(currentNodeOffset);
-            dramAccessCounter++;
             currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
             currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
             byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
             indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
                                currentNodeEdge, 0, currentNodeEdgeSize);
-            dramAccessCounter++;
             for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
                 if (currentNodeEdge[i] != key[bytesMatched]) {
@@ -191,25 +153,16 @@ public class PixelsCacheReader
                 byte[] idx = new byte[12];
                 indexFile.getBytes(currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
                                          idx, 0, 12);
-                dramAccessCounter++;
-                long end = System.nanoTime();
-//                logger.debug("[index search] " + dramAccessCounter + "," + (end - start));
-                long deSerStart = System.nanoTime();
                 PixelsCacheIdx cacheIdx = new PixelsCacheIdx(idx);
-                long deSerEnd = System.nanoTime();
-//                logger.debug("[key deser] " + (deSerEnd - deSerStart));
                 return cacheIdx;
             }
         }
-        long end = System.currentTimeMillis();
-//        logger.debug("[index null] " + dramAccessCounter + "," + (end - start));
         return null;
     }
 
     public void close()
     {
         try {
-//            logger.info("cache reader unmaps cache/index file");
             cacheFile.unmap();
             indexFile.unmap();
         }
