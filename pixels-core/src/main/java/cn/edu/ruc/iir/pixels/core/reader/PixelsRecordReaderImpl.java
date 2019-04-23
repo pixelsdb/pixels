@@ -294,6 +294,7 @@ public class PixelsRecordReaderImpl
         {
             int rgId = targetRGs[i];
             String rgCacheId = fileName + "-" + rgId;
+            // TODO: is it meaningful to cache footers? record reader is created to read a split and then released.
             PixelsProto.RowGroupFooter rowGroupFooter = pixelsFooterCache.getRGFooter(rgCacheId);
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)
@@ -458,6 +459,7 @@ public class PixelsRecordReaderImpl
                     int chunkLength = (int) chunkId.getLength();
                     int rgIdx = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
+                    // TODO: do not copy, we should use a buffer slice wrapper instead of byte array.
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
                     chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBytes;
@@ -551,8 +553,11 @@ public class PixelsRecordReaderImpl
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                        readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                                        postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    // TODO: chunk buffer is decoded in read, this produces more garbage in heap. we should use late decoding.
+                    // late decoding only decodes a value from buffer when the value is read, and the value is stored in stack,
+                    // instead of in heap, without increasing the burden of garbage collection.
+                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 
@@ -583,6 +588,7 @@ public class PixelsRecordReaderImpl
         {
             if (cv.duplicated)
             {
+                // TODO: why copy duplicated cvs?
                 cv.copyFrom(columnVectors[cv.originVecId]);
             }
         }
