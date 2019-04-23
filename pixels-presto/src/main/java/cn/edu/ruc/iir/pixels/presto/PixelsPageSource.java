@@ -225,6 +225,7 @@ class PixelsPageSource implements ConnectorPageSource {
                             int elementLen = scv.lens[i];
                             if (!scv.isNull[i])
                             {
+                                // TODO: try to eliminate this memory copy.
                                 System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
                             }
                             vectorOffsets[i] = curVectorOffset;
