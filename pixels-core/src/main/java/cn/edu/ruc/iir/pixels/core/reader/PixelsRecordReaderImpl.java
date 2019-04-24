@@ -524,6 +524,16 @@ public class PixelsRecordReaderImpl
         // ensure size for result row batch
         resultRowBatch.ensureSize(batchSize);
 
+        /**
+         * TODO:
+         * Here, we immediately decode and copy data items from chunk buffers into resultRowBatch.cols.
+         * If the resultRowBatch is not immediately consumed by upper layers (such as a presto worker),
+         * the decoded column vectors will hold the memory, increasing risk of OOM and GC problems.
+         * We should put such decoding in a separate function, so that clients can make their choice of
+         * decoding lazily or not.
+         * And to support presto lazy block, we have to support decoding one column (in a batch) at a time.
+         */
+
         int rgRowCount = 0;
         int curBatchSize = 0;
         if (curRGIdx < targetRGNum)
@@ -553,9 +563,13 @@ public class PixelsRecordReaderImpl
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(resultColumns[i]);
-                    // TODO: chunk buffer is decoded in read, this produces more garbage in heap. we should use late decoding.
-                    // late decoding only decodes a value from buffer when the value is read, and the value is stored in stack,
-                    // instead of in heap, without increasing the burden of garbage collection.
+                    /**
+                     * Chunk buffer is decoded in read, this produces more garbage in heap. We can consider using late decoding,
+                     * which only decodes a value from buffer when the value is needed, and the decoded value is stored in stack
+                     * instead of in heap, without increasing the burden of garbage collection.
+                     * But reading all items from chunk buffer to column vector in a single function may benefit from
+                     * vectorized execution. This is a trade-off.
+                     */
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }

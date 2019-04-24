@@ -29,7 +29,7 @@ import java.io.IOException;
 
 /**
  * A MapReduce/Hive input format for PIXELS files.
- * refer: [PixelsInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/pixels/PixelsInputFormat.java)
+ * refer: [OrcInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcInputFormat.java)
  */
 public class PixelsInputFormat extends CombineHiveInputFormat<NullWritable, PixelsStruct> implements
         InputFormat<NullWritable, PixelsStruct> {
