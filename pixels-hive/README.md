@@ -1,5 +1,5 @@
 # Pixels-Hive
-SerDe is a short name for “Serializer and Deserializer.”
+SerDe is short for “Serializer and Deserializer.”
 
 Hive uses SerDe (and !FileFormat) to read and write table rows.
 
@@ -8,22 +8,23 @@ HDFS files –> InputFileFormat –> <key, value> –> Deserializer –> Row obj
 Row object –> Serializer –> <key, value> –> OutputFileFormat –> HDFS files
 
 ## Note
-This module is referred to [ORC](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java).
+Source code in this module partially refers to [ORC SerDe](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java).
 
-## Run Hive Configuration
+## Usage
 ./bin/hive
 
-hive>add jar {PATH}/pixels-hive-0.1.0-SNAPSHOT-full.jar
+1. In hive cli:
+```sql
+hive> add jar {PATH}/pixels-hive-0.1.0-SNAPSHOT-full.jar
+```
+You can also put `pixels-hive-0.1.0-SNAPSHOT-full.jar` in the path `apache-hive-2.1.1-bin/auxlib/`, and hive will load the jar when launching.
 
-hive>`create sql` with the text in `resources/pixels-ddl_single.sql`
+2. Create tables in hive with the text in `resources/pixels-ddl_single.sql`
 
-hive>`query`
+3. Load data by pixels-load and then execute queries. Currently, we only implemented PixelsInputFormat for hive. 
 
-`Hive SerDe`: You can also mv `pixels-hive-0.1.0-SNAPSHOT-full.jar` to the path`apache-hive-2.1.1-bin/auxlib/`, and hive will load the jar when beginning.
-
-## QA
+## FAQ
 1. Q: "FAILED: SemanticException [Error 10055]: Output Format must implement HiveOutputFormat, otherwise it should be either IgnoreKeyTextOutputFormat or SequenceFileOutputFormat"
-
    A: Add `cn.edu.ruc.iir.pixels.hive.PixelsNewOutputFormat`.
    
 2. Q: Wrong FS in hdfs
