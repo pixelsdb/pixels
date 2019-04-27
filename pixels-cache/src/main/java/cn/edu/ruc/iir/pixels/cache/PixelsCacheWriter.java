@@ -242,7 +242,7 @@ public class PixelsCacheWriter
                     break outer_loop;
                 }
                 else {
-                    radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
+                    radix.put(new PixelsCacheKey(file, rowGroupId, columnId), // TODO: it is not a good idea to use filename as block id.
                               new PixelsCacheIdx(cacheOffset, physicalLens[i]));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
                     cacheFile.putBytes(cacheOffset, columnlet);
