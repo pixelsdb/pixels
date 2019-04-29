@@ -15,20 +15,25 @@ public class DoubleStatsRecorder
     private double maximum = Double.MAX_VALUE;
     private double sum = 0;
 
-    DoubleStatsRecorder() {}
+    DoubleStatsRecorder()
+    {
+    }
 
     DoubleStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         super(statistic);
         PixelsProto.DoubleStatistic dbStat = statistic.getDoubleStatistics();
-        if (dbStat.hasMinimum()) {
+        if (dbStat.hasMinimum())
+        {
             hasMinimum = true;
             minimum = dbStat.getMinimum();
         }
-        if (dbStat.hasMaximum()) {
+        if (dbStat.hasMaximum())
+        {
             maximum = dbStat.getMaximum();
         }
-        if (dbStat.hasSum()) {
+        if (dbStat.hasSum())
+        {
             sum = dbStat.getSum();
         }
     }
@@ -46,15 +51,18 @@ public class DoubleStatsRecorder
     @Override
     public void updateDouble(double value)
     {
-        if (!hasMinimum) {
+        if (!hasMinimum)
+        {
             hasMinimum = true;
             minimum = value;
             maximum = value;
         }
-        else if (value < minimum) {
+        else if (value < minimum)
+        {
             minimum = value;
         }
-        else if (value > maximum) {
+        else if (value > maximum)
+        {
             maximum = value;
         }
         sum += value;
@@ -64,15 +72,18 @@ public class DoubleStatsRecorder
     @Override
     public void updateFloat(float value)
     {
-        if (!hasMinimum) {
+        if (!hasMinimum)
+        {
             hasMinimum = true;
             minimum = value;
             maximum = value;
         }
-        else if (value < minimum) {
+        else if (value < minimum)
+        {
             minimum = value;
         }
-        else if (value > maximum) {
+        else if (value > maximum)
+        {
             maximum = value;
         }
         sum += value;
@@ -82,23 +93,29 @@ public class DoubleStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof DoubleColumnStats) {
+        if (other instanceof DoubleColumnStats)
+        {
             DoubleStatsRecorder dbStat = (DoubleStatsRecorder) other;
-            if (!hasMinimum) {
+            if (!hasMinimum)
+            {
                 hasMinimum = dbStat.hasMinimum;
                 minimum = dbStat.minimum;
                 maximum = dbStat.maximum;
             }
-            else if (dbStat.minimum < minimum) {
+            else if (dbStat.minimum < minimum)
+            {
                 minimum = dbStat.minimum;
             }
-            else if (dbStat.maximum > maximum) {
+            else if (dbStat.maximum > maximum)
+            {
                 maximum = dbStat.maximum;
             }
             sum += dbStat.sum;
         }
-        else {
-            if (isStatsExists() && hasMinimum) {
+        else
+        {
+            if (isStatsExists() && hasMinimum)
+            {
                 throw new IllegalArgumentException("Incompatible merging of double column statistics");
             }
         }
@@ -111,7 +128,8 @@ public class DoubleStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.DoubleStatistic.Builder dbBuilder =
                 PixelsProto.DoubleStatistic.newBuilder();
-        if (hasMinimum) {
+        if (hasMinimum)
+        {
             dbBuilder.setMinimum(minimum);
             dbBuilder.setMaximum(maximum);
         }
@@ -140,9 +158,11 @@ public class DoubleStatsRecorder
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (hasMinimum) {
+        if (hasMinimum)
+        {
             buf.append(" min: ");
             buf.append(minimum);
             buf.append(" max: ");
@@ -156,33 +176,42 @@ public class DoubleStatsRecorder
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof DoubleStatsRecorder)) {
+        if (!(o instanceof DoubleStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         DoubleStatsRecorder that = (DoubleStatsRecorder) o;
 
-        if (hasMinimum != that.hasMinimum) {
+        if (hasMinimum != that.hasMinimum)
+        {
             return false;
         }
-        if (Double.compare(that.minimum, minimum) != 0) {
+        if (Double.compare(that.minimum, minimum) != 0)
+        {
             return false;
         }
-        if (Double.compare(that.maximum, maximum) != 0) {
+        if (Double.compare(that.maximum, maximum) != 0)
+        {
             return false;
         }
-        if (Double.compare(that.sum, sum) != 0) {
+        if (Double.compare(that.sum, sum) != 0)
+        {
             return false;
         }
 
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -190,7 +219,8 @@ public class DoubleStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         long temp;
         result = 31 * result + (hasMinimum ? 1 : 0);

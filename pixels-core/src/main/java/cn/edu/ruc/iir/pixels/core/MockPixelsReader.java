@@ -35,19 +35,22 @@ public class MockPixelsReader
         option.tolerantSchemaEvolution(true);
         option.includeCols(schema);
 
-        try {
+        try
+        {
             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(filePath)
-                    .build();
+                                                        .setFS(fs)
+                                                        .setPath(filePath)
+                                                        .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             VectorizedRowBatch rowBatch;
             int batchSize = 10000;
             long num = 0;
             long start = System.currentTimeMillis();
-            while (true) {
+            while (true)
+            {
                 rowBatch = recordReader.readBatch(batchSize);
-                if (rowBatch.endOfFile) {
+                if (rowBatch.endOfFile)
+                {
                     num += rowBatch.size;
                     break;
                 }
@@ -55,9 +58,11 @@ public class MockPixelsReader
             }
             long end = System.currentTimeMillis();
             System.out.println("[" + filePath.getName() + "] "
-                    + start + " " + end + " " + num + ", cpu cost: " + (end - start));
+                                       + start + " " + end + " " + num + ", cpu cost: " + (end - start));
             pixelsReader.close();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

@@ -162,7 +162,8 @@ public class StringColumnReader
     private void readContent(byte[] input, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
-        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY)) {
+        if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
+        {
             // read offsets
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(input.length - 3 * Integer.BYTES);
@@ -178,7 +179,8 @@ public class StringColumnReader
             int originNum = 0;
             DynamicIntArray startsArray = new DynamicIntArray();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
-            while (startsDecoder.hasNext()) {
+            while (startsDecoder.hasNext())
+            {
                 startsArray.add((int) startsDecoder.next());
                 originNum++;
             }
@@ -186,13 +188,15 @@ public class StringColumnReader
             RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
             starts = new int[originNum];
             orders = new int[originNum];
-            for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++) {
+            for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++)
+            {
                 starts[i] = startsArray.get(i);
                 orders[i] = (int) ordersDecoder.next();
             }
             contentDecoder = new RunLenIntDecoder(new ByteBufInputStream(contentBuf), false);
         }
-        else {
+        else
+        {
             // read lens field offset
             inputBuffer.markReaderIndex();
             inputBuffer.skipBytes(input.length - Integer.BYTES);

@@ -2,9 +2,9 @@ package cn.edu.ruc.iir.pixels.core.vector;
 
 /**
  * StructColumnVector from org.apache.hadoop.hive.ql.exec.vector
- *
+ * <p>
  * The representation of a vectorized column of struct objects.
- *
+ * <p>
  * Each field is represented by a separate inner ColumnVector. Since this
  * ColumnVector doesn't own any per row data other that the isNull flag, the
  * isRepeating only covers the isNull array.
@@ -13,25 +13,29 @@ public class StructColumnVector extends ColumnVector
 {
     public ColumnVector[] fields;
 
-    public StructColumnVector() {
+    public StructColumnVector()
+    {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
     /**
      * Constructor for StructColumnVector
      *
-     * @param len Vector length
+     * @param len    Vector length
      * @param fields the field column vectors
      */
-    public StructColumnVector(int len, ColumnVector... fields) {
+    public StructColumnVector(int len, ColumnVector... fields)
+    {
         super(len);
         this.fields = fields;
     }
 
     @Override
-    public void flatten(boolean selectedInUse, int[] sel, int size) {
+    public void flatten(boolean selectedInUse, int[] sel, int size)
+    {
         flattenPush();
-        for(int i=0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].flatten(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -39,17 +43,23 @@ public class StructColumnVector extends ColumnVector
 
     @Override
     public void setElement(int outElementNum, int inputElementNum,
-                           ColumnVector inputVector) {
-        if (inputVector.isRepeating) {
+                           ColumnVector inputVector)
+    {
+        if (inputVector.isRepeating)
+        {
             inputElementNum = 0;
         }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum]) {
+        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
+        {
             isNull[outElementNum] = false;
             ColumnVector[] inputFields = ((StructColumnVector) inputVector).fields;
-            for (int i = 0; i < inputFields.length; ++i) {
+            for (int i = 0; i < inputFields.length; ++i)
+            {
                 fields[i].setElement(outElementNum, inputElementNum, inputFields[i]);
             }
-        } else {
+        }
+        else
+        {
             noNulls = false;
             isNull[outElementNum] = true;
         }
@@ -58,69 +68,88 @@ public class StructColumnVector extends ColumnVector
     @Override
     public void copyFrom(ColumnVector inputVector)
     {
-        if (inputVector instanceof StructColumnVector) {
+        if (inputVector instanceof StructColumnVector)
+        {
             StructColumnVector srcVector = (StructColumnVector) inputVector;
-            for (int i = 0; i < fields.length; i++) {
+            for (int i = 0; i < fields.length; i++)
+            {
                 fields[i].copyFrom(srcVector.fields[i]);
             }
         }
     }
 
     @Override
-    public void stringifyValue(StringBuilder buffer, int row) {
-        if (isRepeating) {
+    public void stringifyValue(StringBuilder buffer, int row)
+    {
+        if (isRepeating)
+        {
             row = 0;
         }
-        if (noNulls || !isNull[row]) {
+        if (noNulls || !isNull[row])
+        {
             buffer.append('[');
-            for(int i=0; i < fields.length; ++i) {
-                if (i != 0) {
+            for (int i = 0; i < fields.length; ++i)
+            {
+                if (i != 0)
+                {
                     buffer.append(", ");
                 }
                 fields[i].stringifyValue(buffer, row);
             }
             buffer.append(']');
-        } else {
+        }
+        else
+        {
             buffer.append("null");
         }
     }
 
     @Override
-    public void ensureSize(int size, boolean preserveData) {
+    public void ensureSize(int size, boolean preserveData)
+    {
         super.ensureSize(size, preserveData);
-        for(int i=0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].ensureSize(size, preserveData);
         }
     }
 
     @Override
-    public void reset() {
+    public void reset()
+    {
         super.reset();
-        for(int i =0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].reset();
         }
     }
 
     @Override
-    public void init() {
+    public void init()
+    {
         super.init();
-        for(int i =0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].init();
         }
     }
 
     @Override
-    public void unFlatten() {
+    public void unFlatten()
+    {
         super.unFlatten();
-        for(int i=0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].unFlatten();
         }
     }
 
     @Override
-    public void setRepeating(boolean isRepeating) {
+    public void setRepeating(boolean isRepeating)
+    {
         super.setRepeating(isRepeating);
-        for(int i=0; i < fields.length; ++i) {
+        for (int i = 0; i < fields.length; ++i)
+        {
             fields[i].setRepeating(isRepeating);
         }
     }
