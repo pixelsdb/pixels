@@ -69,49 +69,22 @@ public class PixelsCacheReader
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
-        // check rw flag, if not readable, return empty bytes
-//        short rwFlag = PixelsCacheUtil.getIndexRW(indexFile);
-//        if (rwFlag != PixelsCacheUtil.RWFlag.READ.getId()) {
-//            logger.debug("Index rwFlag is not set as READ. Stop.");
-//            return content;
-//        }
-
-        // check if reader count reaches its max value, if so no more reads are allowed
-//        int readerCount = PixelsCacheUtil.getIndexReaderCount(indexFile);
-//        if (readerCount >= PixelsCacheUtil.MAX_READER_COUNT) {
-//            logger.debug("Index reader count has exceeded the maximum value. Stop.");
-//            return content;
-//        }
-        // update reader count
-//        PixelsCacheUtil.indexReaderCountIncrement(indexFile);
 
         // search index file for columnlet id
-        long serStart = System.nanoTime();
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
         byte[] cacheKeyBytes = cacheKey.getBytes();
-        long serEnd = System.nanoTime();
-        logger.debug("[serialize key] " + (serEnd - serStart));
 
         // search cache key
         PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
         // if found, read content from cache
         if (cacheIdx != null) {
-            long getStart = System.nanoTime();
             long offset = cacheIdx.getOffset();
             int length = cacheIdx.getLength();
-            long getEnd = System.nanoTime();
-            logger.debug("[get off&len] " + (getEnd - getStart));
             content = new byte[length];
             // read content
-            long readStart = System.nanoTime();
             cacheFile.getBytes(offset, content, 0, length);
-            long readEnd = System.nanoTime();
-            logger.debug("[data read] " + length + "," + (readEnd - readStart));
         }
 
-        // decrease reader count
-//        PixelsCacheUtil.indexReaderCountDecrement(indexFile);
-        logger.debug("[cache read] " + (System.nanoTime() - serStart));
         return content;
     }
 
