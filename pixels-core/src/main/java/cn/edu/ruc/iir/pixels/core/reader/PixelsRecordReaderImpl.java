@@ -144,6 +144,7 @@ public class PixelsRecordReaderImpl
             checkValid = true;
             return;
         }
+        // TODO optimize arraylist initial size
         List<Integer> optionColsIndices = new ArrayList<>();
         this.includedColumns = new boolean[fileColTypes.size()];
         for (String col : optionIncludedCols)
@@ -414,7 +415,7 @@ public class PixelsRecordReaderImpl
         diskChunks.sort(Comparator.comparingLong(ChunkId::getOffset));
 
         // get chunk blocks
-        List<ChunkSeq> diskChunkSeqs = new ArrayList<>();
+        List<ChunkSeq> diskChunkSeqs = new ArrayList<>(diskChunks.size());
         ChunkSeq diskChunkSeq = new ChunkSeq();
         for (ChunkId chunk : diskChunks)
         {
