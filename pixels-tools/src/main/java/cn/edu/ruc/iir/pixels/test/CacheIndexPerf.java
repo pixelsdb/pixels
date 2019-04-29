@@ -32,7 +32,8 @@ public class CacheIndexPerf
 
     public static void main(String[] args)
     {
-        try {
+        try
+        {
             long prepareStart = System.currentTimeMillis();
             CacheIndexPerf cacheIndexPerf = new CacheIndexPerf();
             cacheIndexPerf.prepare(args[0], args[1], Integer.parseInt(args[2]));
@@ -42,7 +43,8 @@ public class CacheIndexPerf
             int readCount = cachedColumnlets.size() * cachedPaths.size();
             pixelsCacheKeys = new PixelsCacheKey[readCount];
 
-            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
+            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
+                                                              Long.parseLong(config.getProperty("index.size")));
 
             int idx = 0;
             for (Path path : cachedPaths)
@@ -61,7 +63,7 @@ public class CacheIndexPerf
             {
                 int[] accesses = new int[readCount];
                 Random random = new Random(System.nanoTime());
-                for (int k = 0; k < readCount ; k++)
+                for (int k = 0; k < readCount; k++)
                 {
                     accesses[k] = random.nextInt(readCount);
                 }
@@ -82,7 +84,8 @@ public class CacheIndexPerf
             long searchEnd = System.nanoTime();
             System.out.println("[search]: " + (searchEnd - searchStart));
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
@@ -130,7 +133,8 @@ public class CacheIndexPerf
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
                 PixelsCacheIdx idx = cacheReader.search(cacheKey.getBlockId(),
-                                                        (short) cacheKey.getRowGroupId(), (short) cacheKey.getColumnId());
+                                                        (short) cacheKey.getRowGroupId(),
+                                                        (short) cacheKey.getColumnId());
                 if (idx == null)
                 {
                     System.out.println("[error] cannot find " + cacheKey.getBlockId()

@@ -30,7 +30,8 @@ public class CacheGetPerf
     // args: hostname layout_version log_path
     public static void main(String[] args)
     {
-        try {
+        try
+        {
             long prepareStart = System.currentTimeMillis();
             CacheGetPerf checkCacheConcurrentReader = new CacheGetPerf();
             int readCount = checkCacheConcurrentReader.prepare(args[0], args[1], Integer.parseInt(args[2]));
@@ -39,8 +40,10 @@ public class CacheGetPerf
             CacheReader[] readers = new CacheReader[threadNum];
             Thread[] threads = new Thread[threadNum];
 
-            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
-            MemoryMappedFile cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
+            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
+                                                              Long.parseLong(config.getProperty("index.size")));
+            MemoryMappedFile cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
+                                                              Long.parseLong(config.getProperty("cache.size")));
 
             for (int i = 0; i < threadNum; i++)
             {
@@ -70,14 +73,16 @@ public class CacheGetPerf
             long readEnd = System.currentTimeMillis();
             System.out.println("[get total]: " + (readEnd - readStart) + "ms");
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
 
     // prepare correct answers
     private int prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, FSException {
+            throws MetadataException, FSException
+    {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
         List<String> cachedColumnlets =
@@ -100,7 +105,8 @@ public class CacheGetPerf
             for (String columnlet : cachedColumnlets)
             {
                 String[] parts = columnlet.split(":");
-                PixelsCacheKey cacheKey = new PixelsCacheKey(path.toString(), Short.parseShort(parts[0]), Short.parseShort(parts[1]));
+                PixelsCacheKey cacheKey = new PixelsCacheKey(path.toString(), Short.parseShort(parts[0]),
+                                                             Short.parseShort(parts[1]));
                 cacheKeys[idx++] = cacheKey;
             }
         }
@@ -130,11 +136,13 @@ public class CacheGetPerf
             for (int i : idxes)
             {
                 PixelsCacheKey key = cacheKeys[i];
-                byte[] content = cacheReader.get(key.getBlockId(), (short) key.getRowGroupId(), (short) key.getColumnId());
+                byte[] content = cacheReader
+                        .get(key.getBlockId(), (short) key.getRowGroupId(), (short) key.getColumnId());
                 readSize += content.length;
             }
             long readEnd = System.nanoTime();
-            System.out.println("[get]: " + readSize + "," + (readEnd - readStart) + "," + (readSize*1.0/(readEnd-readStart)));
+            System.out.println(
+                    "[get]: " + readSize + "," + (readEnd - readStart) + "," + (readSize * 1.0 / (readEnd - readStart)));
         }
     }
 }
