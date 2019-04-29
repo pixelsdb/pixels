@@ -30,8 +30,9 @@ import java.util.Random;
 
 /**
  * pixels
- *
+ * <p>
  * java -jar pixels-test-0.1.0-SNAPSHOT-full.jar /home/iir/sbin/drop_caches.sh /home/iir/opt/pixels/logs/cache_perf.csv /home/iir/opt/pixels/logs/cache_workload.txt
+ *
  * @author guodong
  */
 public class CacheReadStat
@@ -74,7 +75,8 @@ public class CacheReadStat
         }
         System.out.println("Hostname: " + hostName);
 
-        try {
+        try
+        {
             long mapFileStartNano = System.nanoTime();
             cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
                                              Long.parseLong(config.getProperty("cache.size")));
@@ -102,7 +104,8 @@ public class CacheReadStat
             localFiles = new ArrayList<>(30);
             for (Path path : paths)
             {
-                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText()
+                             .equalsIgnoreCase(hostName))
                 {
                     localFiles.add(path);
                 }
@@ -312,7 +315,8 @@ public class CacheReadStat
 
             writer.close();
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
