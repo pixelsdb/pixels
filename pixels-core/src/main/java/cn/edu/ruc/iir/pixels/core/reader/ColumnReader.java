@@ -45,21 +45,22 @@ public abstract class ColumnReader
                 return new TimestampColumnReader(type);
             case VARCHAR:
                 return new VarcharColumnReader(type);
-                default:
-                    throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
+            default:
+                throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }
     }
 
     /**
      * Read values from input buffer.
      * Values after specified offset are gonna be put into the specified vector.
-     * @param input input buffer
+     *
+     * @param input    input buffer
      * @param encoding encoding type
-     * @param offset starting reading offset of values
-     * @param size number of values to read
-     * @param vector vector to read into
+     * @param offset   starting reading offset of values
+     * @param size     number of values to read
+     * @param vector   vector to read into
      * @throws java.io.IOException
-     * */
+     */
     public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
                               int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)

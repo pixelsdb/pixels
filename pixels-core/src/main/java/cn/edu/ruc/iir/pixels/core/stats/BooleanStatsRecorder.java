@@ -12,7 +12,9 @@ public class BooleanStatsRecorder
 {
     private long trueCount = 0L;
 
-    BooleanStatsRecorder() {}
+    BooleanStatsRecorder()
+    {
+    }
 
     BooleanStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -31,7 +33,8 @@ public class BooleanStatsRecorder
     @Override
     public void updateBoolean(boolean value, int repetitions)
     {
-        if (value) {
+        if (value)
+        {
             trueCount += repetitions;
         }
         numberOfValues += repetitions;
@@ -40,12 +43,15 @@ public class BooleanStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof BooleanColumnStats) {
+        if (other instanceof BooleanColumnStats)
+        {
             BooleanStatsRecorder statsRecorder = (BooleanStatsRecorder) other;
             this.trueCount += statsRecorder.trueCount;
         }
-        else {
-            if (isStatsExists() && trueCount != 0) {
+        else
+        {
+            if (isStatsExists() && trueCount != 0)
+            {
                 throw new IllegalArgumentException("Incompatible merging of boolean column statistics");
             }
         }
@@ -77,23 +83,29 @@ public class BooleanStatsRecorder
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof BooleanStatsRecorder)) {
+        if (!(o instanceof BooleanStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         BooleanStatsRecorder that = (BooleanStatsRecorder) o;
 
-        if (trueCount != that.trueCount) {
+        if (trueCount != that.trueCount)
+        {
             return false;
         }
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -101,7 +113,8 @@ public class BooleanStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         result = 31 * result + (int) (trueCount ^ (trueCount >>> 32));
         return result;

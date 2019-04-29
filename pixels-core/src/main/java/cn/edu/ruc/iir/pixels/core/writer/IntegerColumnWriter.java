@@ -29,7 +29,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
@@ -74,7 +75,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    void newPixel() throws IOException
+    void newPixel()
+            throws IOException
     {
         // update stats
         for (int i = 0; i < curPixelVectorIndex; i++)
@@ -120,14 +122,15 @@ public class IntegerColumnWriter extends BaseColumnWriter
         if (isEncoding)
         {
             return PixelsProto.ColumnEncoding.newBuilder()
-                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+                                             .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         encoder.close();
         super.close();

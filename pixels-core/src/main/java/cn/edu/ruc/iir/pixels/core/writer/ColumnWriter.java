@@ -13,7 +13,8 @@ import java.io.IOException;
  */
 public interface ColumnWriter
 {
-    int write(ColumnVector vector, int length) throws IOException;
+    int write(ColumnVector vector, int length)
+            throws IOException;
 
     byte[] getColumnChunkContent();
 
@@ -29,7 +30,9 @@ public interface ColumnWriter
 
     void reset();
 
-    void flush() throws IOException;
+    void flush()
+            throws IOException;
 
-    void close() throws IOException;
+    void close()
+            throws IOException;
 }

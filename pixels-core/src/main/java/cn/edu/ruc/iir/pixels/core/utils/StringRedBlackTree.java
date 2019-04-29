@@ -27,16 +27,19 @@ public class StringRedBlackTree extends RedBlackTree
 
     public int add(String value)
     {
-        try {
+        try
+        {
             ByteBuffer bb = EncodingUtils.encodeString(value, true);
             keyBytes = bb.array();
             keyLength = bb.limit();
-            if (add()) {
+            if (add())
+            {
                 keyOffsets.add(byteArray.add(keyBytes, 0, keyLength));
             }
             return lastAdd;
         }
-        catch (CharacterCodingException e) {
+        catch (CharacterCodingException e)
+        {
             e.printStackTrace();
             return -1;
         }
@@ -47,17 +50,23 @@ public class StringRedBlackTree extends RedBlackTree
         setCapacity(length, false);
         System.arraycopy(value, offset, keyBytes, 0, length);
         this.keyLength = length;
-        if (add()) {
+        if (add())
+        {
             keyOffsets.add(byteArray.add(keyBytes, 0, keyLength));
         }
         return lastAdd;
     }
 
-    private void setCapacity(int len, boolean keepData) {
-        if (keyBytes == null || keyBytes.length < len) {
-            if (keyBytes != null && keepData) {
+    private void setCapacity(int len, boolean keepData)
+    {
+        if (keyBytes == null || keyBytes.length < len)
+        {
+            if (keyBytes != null && keepData)
+            {
                 keyBytes = Arrays.copyOf(keyBytes, Math.max(len, keyLength << 1));
-            } else {
+            }
+            else
+            {
                 keyBytes = new byte[len];
             }
         }
@@ -86,14 +95,16 @@ public class StringRedBlackTree extends RedBlackTree
     {
         int start = keyOffsets.get(position);
         int end;
-        if (position + 1 == keyOffsets.size()) {
+        if (position + 1 == keyOffsets.size())
+        {
             end = byteArray.size();
         }
-        else {
+        else
+        {
             end = keyOffsets.get(position + 1);
         }
         return byteArray.compare(keyBytes, 0, keyLength,
-                start, end - start);
+                                 start, end - start);
     }
 
     /**
@@ -114,7 +125,8 @@ public class StringRedBlackTree extends RedBlackTree
          * @param out the stream to write to.
          * @throws IOException
          */
-        void writeBytes(OutputStream out) throws IOException;
+        void writeBytes(OutputStream out)
+                throws IOException;
 
         /**
          * Get the original string.
@@ -142,7 +154,8 @@ public class StringRedBlackTree extends RedBlackTree
          * @param context the information about each node
          * @throws IOException
          */
-        void visit(VisitorContext context) throws IOException;
+        void visit(VisitorContext context)
+                throws IOException;
     }
 
     private class VisitorContextImpl implements VisitorContext
@@ -163,7 +176,8 @@ public class StringRedBlackTree extends RedBlackTree
             return text.toString();
         }
 
-        public void writeBytes(OutputStream out) throws IOException
+        public void writeBytes(OutputStream out)
+                throws IOException
         {
             byteArray.write(out, start, end - start);
         }
@@ -180,7 +194,8 @@ public class StringRedBlackTree extends RedBlackTree
             if (position + 1 == keyOffsets.size())
             {
                 end = byteArray.size();
-            } else
+            }
+            else
             {
                 end = keyOffsets.get(originalPosition + 1);
             }
@@ -188,7 +203,8 @@ public class StringRedBlackTree extends RedBlackTree
     }
 
     private void recurse(int node, Visitor visitor, VisitorContextImpl context
-    ) throws IOException
+    )
+            throws IOException
     {
         if (node != NULL)
         {
@@ -205,7 +221,8 @@ public class StringRedBlackTree extends RedBlackTree
      * @param visitor the action to be applied to each node
      * @throws IOException
      */
-    public void visit(Visitor visitor) throws IOException
+    public void visit(Visitor visitor)
+            throws IOException
     {
         recurse(root, visitor, new VisitorContextImpl());
     }
@@ -228,7 +245,8 @@ public class StringRedBlackTree extends RedBlackTree
         if (originalPosition + 1 == keyOffsets.size())
         {
             length = byteArray.size() - offset;
-        } else
+        }
+        else
         {
             length = keyOffsets.get(originalPosition + 1) - offset;
         }

@@ -4,7 +4,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 /**
  * memory efficient dynamic array
- *
+ * <p>
  * the dynamic array will resize itself to fit its real usage.
  * when the array is full, upon new add() operations, the array will grow to its capacity
  * according to its growth factor(default value is 2x) automatically.
@@ -60,10 +60,11 @@ public class DynamicArray<T>
     /**
      * Grow the array according to specified growth factor.
      * If growth factor is 2, then capacity of array will be double of its original one after growth.
-     * */
+     */
     private void grow(int chunkIndex)
     {
-        if (chunkIndex >= chunkNum) {
+        if (chunkIndex >= chunkNum)
+        {
             // grow content length
             int newChunkNum = chunkNum * growthFactor;
             Object[][] newContent = new Object[newChunkNum][];
@@ -72,7 +73,8 @@ public class DynamicArray<T>
             chunkNum = newChunkNum;
         }
         // allocate new chunk
-        for (int i = initializedChunkNum; i <= chunkIndex; i++) {
+        for (int i = initializedChunkNum; i <= chunkIndex; i++)
+        {
             content[i] = new Object[chunkSize];
         }
         initializedChunkNum = chunkIndex + 1;
@@ -81,20 +83,22 @@ public class DynamicArray<T>
     /**
      * Compact the array to avoid useless memory occupation. During compaction, useless chunks are removed.
      * Compaction is triggered when utilization is lower than utilization payload.
-     * */
+     */
     private void compact()
-    {}
+    {
+    }
 
     /**
      * Add an element.
-     * */
+     */
     public int add(T v)
     {
         int index = size;
         int chunkIndex = index / chunkSize;
         int chunkOffset = index % chunkSize;
         // check capacity
-        if (index >= chunkSize * initializedChunkNum) {
+        if (index >= chunkSize * initializedChunkNum)
+        {
             grow(chunkIndex);
         }
         // add element
@@ -108,10 +112,11 @@ public class DynamicArray<T>
      * Set value of the specified index.
      *
      * @throws ArrayIndexOutOfBoundsException array index out of bounds
-     * */
+     */
     public void set(int index, T v)
     {
-        if (index >= size) {
+        if (index >= size)
+        {
             throw new ArrayIndexOutOfBoundsException("array index " + index + " is out of bound");
         }
         int chunkIndex = index / chunkSize;
@@ -123,11 +128,12 @@ public class DynamicArray<T>
      * Get value of the specified index.
      *
      * @throws ArrayIndexOutOfBoundsException array index out of bounds
-     * */
+     */
     @SuppressWarnings("unchecked")
     public T get(int index)
     {
-        if (index >= size) {
+        if (index >= size)
+        {
             throw new ArrayIndexOutOfBoundsException("array index " + index + " is out of bound");
         }
         int chunkIndex = index / chunkSize;
@@ -137,7 +143,7 @@ public class DynamicArray<T>
 
     /**
      * Remove value of the specified index.
-     * */
+     */
     public void remove(int index)
     {
     }
@@ -147,10 +153,11 @@ public class DynamicArray<T>
      * After release, the object may be cleared to let GC do its work.
      *
      * @throws ArrayIndexOutOfBoundsException array index out of bounds
-     * */
+     */
     public void release(int index)
     {
-        if (index >= size) {
+        if (index >= size)
+        {
             throw new ArrayIndexOutOfBoundsException("array index " + index + " is out of bound");
         }
         int chunkIndex = index / chunkSize;

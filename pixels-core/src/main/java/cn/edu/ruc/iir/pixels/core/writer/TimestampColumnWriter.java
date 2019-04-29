@@ -27,7 +27,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
         long[] times = columnVector.time;
@@ -35,7 +36,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
             curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
             newPixel();
@@ -69,19 +71,22 @@ public class TimestampColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel()
+            throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
             pixelStatRecorder.updateTimestamp(curPixelVector[i]);
         }
 
-        if (isEncoding) {
+        if (isEncoding)
+        {
             long[] values = new long[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
         }
-        else {
+        else
+        {
             ByteBuffer curVecPartitionBuffer =
                     ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
             for (int i = 0; i < curPixelVectorIndex; i++)
@@ -97,16 +102,18 @@ public class TimestampColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding) {
+        if (isEncoding)
+        {
             return PixelsProto.ColumnEncoding.newBuilder()
-                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+                                             .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         encoder.close();
         super.close();

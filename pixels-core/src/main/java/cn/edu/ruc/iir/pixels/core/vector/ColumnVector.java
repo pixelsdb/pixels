@@ -5,13 +5,13 @@ import java.util.Arrays;
 
 /**
  * ColumnVector from org.apache.hadoop.hive.ql.exec.vector.
- *
+ * <p>
  * ColumnVector contains the shared structure for the sub-types,
  * including NULL information, and whether this vector
  * repeats, i.e. has all values the same, so only the first
  * one is set. This is used to accelerate query performance
  * by handling a whole vector in O(1) time when applicable.
- *
+ * <p>
  * The fields are public by design since this is a performance-critical
  * structure that is used in the inner loop of query execution.
  */
@@ -23,7 +23,8 @@ public abstract class ColumnVector
     /**
      * The current kinds of column vectors.
      */
-    public static enum Type {
+    public static enum Type
+    {
         NONE,    // Useful when the type of column vector has not be determined yet.
         LONG,
         DOUBLE,
@@ -39,12 +40,12 @@ public abstract class ColumnVector
 
     /**
      * If this column vector is a duplication of another column vector
-     * */
+     */
     public boolean duplicated = false;
 
     /**
      * The id of the origin column vector
-     * */
+     */
     public int originVecId = -1;
 
     /**
@@ -73,7 +74,8 @@ public abstract class ColumnVector
      *
      * @param len Vector length
      */
-    public ColumnVector(int len) {
+    public ColumnVector(int len)
+    {
         this.length = len;
         isNull = new boolean[len];
         noNulls = true;
@@ -124,12 +126,14 @@ public abstract class ColumnVector
 
     /**
      * Resets the column to default state
-     *  - fills the isNull array with false
-     *  - sets noNulls to true
-     *  - sets isRepeating to false
+     * - fills the isNull array with false
+     * - sets noNulls to true
+     * - sets isRepeating to false
      */
-    public void reset() {
-        if (!noNulls) {
+    public void reset()
+    {
+        if (!noNulls)
+        {
             Arrays.fill(isNull, false);
         }
         noNulls = true;
@@ -142,38 +146,49 @@ public abstract class ColumnVector
     /**
      * Sets the isRepeating flag. Recurses over structs and unions so that the
      * flags are set correctly.
+     *
      * @param isRepeating
      */
-    public void setRepeating(boolean isRepeating) {
+    public void setRepeating(boolean isRepeating)
+    {
         this.isRepeating = isRepeating;
     }
 
     abstract public void flatten(boolean selectedInUse, int[] sel, int size);
 
-    /** Simplify vector by brute-force flattening noNulls if isRepeating
+    /**
+     * Simplify vector by brute-force flattening noNulls if isRepeating
      * This can be used to reduce combinatorial explosion of code paths in VectorExpressions
      * with many arguments.
      *
      * @param selectedInUse if set true, it means part of the vector is selected in use
-     * @param sel in use selection array
-     * @param size in use size
+     * @param sel           in use selection array
+     * @param size          in use size
      */
     protected void flattenRepeatingNulls(boolean selectedInUse, int[] sel,
-                                         int size) {
+                                         int size)
+    {
         boolean nullFillValue;
 
-        if (noNulls) {
+        if (noNulls)
+        {
             nullFillValue = false;
-        } else {
+        }
+        else
+        {
             nullFillValue = isNull[0];
         }
 
-        if (selectedInUse) {
-            for (int j = 0; j < size; j++) {
+        if (selectedInUse)
+        {
+            for (int j = 0; j < size; j++)
+            {
                 int i = sel[j];
                 isNull[i] = nullFillValue;
             }
-        } else {
+        }
+        else
+        {
             Arrays.fill(isNull, 0, size, nullFillValue);
         }
 
@@ -182,14 +197,20 @@ public abstract class ColumnVector
     }
 
     protected void flattenNoNulls(boolean selectedInUse, int[] sel,
-                                  int size) {
-        if (noNulls) {
+                                  int size)
+    {
+        if (noNulls)
+        {
             noNulls = false;
-            if (selectedInUse) {
-                for (int j = 0; j < size; j++) {
+            if (selectedInUse)
+            {
+                for (int j = 0; j < size; j++)
+                {
                     isNull[sel[j]] = false;
                 }
-            } else {
+            }
+            else
+            {
                 Arrays.fill(isNull, 0, size, false);
             }
         }
@@ -203,13 +224,15 @@ public abstract class ColumnVector
      * column to continue to benefit from the isRepeating and noNulls
      * indicators.
      */
-    public void unFlatten() {
+    public void unFlatten()
+    {
         isRepeating = preFlattenIsRepeating;
         noNulls = preFlattenNoNulls;
     }
 
     // Record repeating and no nulls state to be restored later.
-    protected void flattenPush() {
+    protected void flattenPush()
+    {
         preFlattenIsRepeating = isRepeating;
         preFlattenNoNulls = noNulls;
     }
@@ -225,7 +248,7 @@ public abstract class ColumnVector
      * Copy from input vector.
      * This is used for duplicated reference column vector.
      * This method does not guarantee deep clone of vector content.
-     * */
+     */
     public abstract void copyFrom(ColumnVector inputVector);
 
     /**
@@ -233,7 +256,8 @@ public abstract class ColumnVector
      * Use this method only if the individual type of the column vector is not known, otherwise its
      * preferable to call specific initialization methods.
      */
-    public void init() {
+    public void init()
+    {
         // Do nothing by default
     }
 
@@ -241,17 +265,24 @@ public abstract class ColumnVector
      * Ensure the ColumnVector can hold at least size values.
      * This method is deliberately *not* recursive because the complex types
      * can easily have more (or less) children than the upper levels.
-     * @param size the new minimum size
+     *
+     * @param size         the new minimum size
      * @param preserveData should the old data be preserved?
      */
-    public void ensureSize(int size, boolean preserveData) {
-        if (isNull.length < size) {
+    public void ensureSize(int size, boolean preserveData)
+    {
+        if (isNull.length < size)
+        {
             boolean[] oldArray = isNull;
             isNull = new boolean[size];
-            if (preserveData && !noNulls) {
-                if (isRepeating) {
+            if (preserveData && !noNulls)
+            {
+                if (isRepeating)
+                {
                     isNull[0] = oldArray[0];
-                } else {
+                }
+                else
+                {
                     System.arraycopy(oldArray, 0, isNull, 0, oldArray.length);
                 }
             }
@@ -260,8 +291,9 @@ public abstract class ColumnVector
 
     /**
      * Print the value for this column into the given string builder.
+     *
      * @param buffer the buffer to print into
-     * @param row the id of the row to print
+     * @param row    the id of the row to print
      */
     public abstract void stringifyValue(StringBuilder buffer,
                                         int row);

@@ -58,10 +58,12 @@ public class PixelsCacheIdx
     @Override
     public boolean equals(Object other)
     {
-        if (other == this) {
+        if (other == this)
+        {
             return true;
         }
-        if (other != null && other instanceof PixelsCacheIdx) {
+        if (other != null && other instanceof PixelsCacheIdx)
+        {
             PixelsCacheIdx o = (PixelsCacheIdx) other;
             return Objects.equals(offset, o.offset) &&
                     Objects.equals(length, o.length);

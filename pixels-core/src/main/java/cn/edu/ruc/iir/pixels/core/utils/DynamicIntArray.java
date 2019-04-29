@@ -2,17 +2,17 @@ package cn.edu.ruc.iir.pixels.core.utils;
 
 /**
  * dynamic int array from apache orc project
- *
+ * <p>
  * Dynamic int array that uses primitive types and chunks to avoid copying
  * large number of integers when it resizes.
- *
+ * <p>
  * The motivation for this class is memory optimization, i.e. space efficient
  * storage of potentially huge arrays without good a-priori size guesses.
- *
+ * <p>
  * The API of this class is between a primitive array and a AbstractList. It's
  * not a Collection implementation because it handles primitive types, but the
  * API could be extended to support iterators and the like.
- *
+ * <p>
  * NOTE: Like standard Collection implementations/arrays, this class is not
  * synchronized.
  */
@@ -65,8 +65,8 @@ public final class DynamicIntArray
         if (index >= length)
         {
             throw new IndexOutOfBoundsException("Index " + index +
-                    " is outside of 0.." +
-                    (length - 1));
+                                                        " is outside of 0.." +
+                                                        (length - 1));
         }
         int i = index / chunkSize;
         int j = index % chunkSize;

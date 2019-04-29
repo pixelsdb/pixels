@@ -8,11 +8,11 @@ import java.nio.charset.StandardCharsets;
 /**
  * pixels cache header
  * index:
- *     - HEADER: MAGIC(6 bytes), RW(2 bytes), VERSION(4 bytes), READER_COUNT(4 bytes)
- *     - RADIX
+ * - HEADER: MAGIC(6 bytes), RW(2 bytes), VERSION(4 bytes), READER_COUNT(4 bytes)
+ * - RADIX
  * cache:
- *     - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
- *     - CONTENT
+ * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
+ * - CONTENT
  *
  * @author guodong
  */
@@ -21,10 +21,12 @@ public class PixelsCacheUtil
     public static final int MAX_READER_COUNT = 2 ^ 31 - 1;
     public static final int INDEX_RADIX_OFFSET = 16;
 
-    public enum RWFlag {
+    public enum RWFlag
+    {
         READ((short) 0), WRITE((short) 1);
 
         private final short id;
+
         RWFlag(short id)
         {
             this.id = id;
@@ -36,10 +38,12 @@ public class PixelsCacheUtil
         }
     }
 
-    public enum CacheStatus {
+    public enum CacheStatus
+    {
         INCONSISTENT((short) -1), EMPTY((short) 0), OK((short) 1);
 
         private final short id;
+
         CacheStatus(short id)
         {
             this.id = id;
@@ -115,7 +119,8 @@ public class PixelsCacheUtil
     public static boolean indexReaderCountIncrement(MemoryMappedFile indexFile)
     {
         int count = getIndexReaderCount(indexFile) + 1;
-        if (count <= MAX_READER_COUNT) {
+        if (count <= MAX_READER_COUNT)
+        {
             return indexFile.compareAndSwapInt(12, count - 1, count);
         }
         return false;
@@ -124,7 +129,8 @@ public class PixelsCacheUtil
     public static boolean indexReaderCountDecrement(MemoryMappedFile indexFile)
     {
         int count = getIndexReaderCount(indexFile) - 1;
-        if (count >= 0) {
+        if (count >= 0)
+        {
             return indexFile.compareAndSwapInt(12, count + 1, count);
         }
         return false;

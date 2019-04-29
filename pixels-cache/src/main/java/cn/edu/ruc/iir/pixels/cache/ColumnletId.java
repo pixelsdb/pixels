@@ -36,11 +36,12 @@ public class ColumnletId
     }
 
     public ColumnletId()
-    {}
-
-    public String getBlockId()
     {
-        return blockId;
+    }
+
+    public short getColumnId()
+    {
+        return columnId;
     }
 
     public short getRowGroupId()
@@ -48,9 +49,9 @@ public class ColumnletId
         return rowGroupId;
     }
 
-    public short getColumnId()
+    public String getBlockId()
     {
-        return columnId;
+        return blockId;
     }
 
     public byte[] getBytes()
@@ -104,10 +105,12 @@ public class ColumnletId
     @Override
     public boolean equals(Object o)
     {
-        if (this == o) {
+        if (this == o)
+        {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null || getClass() != o.getClass())
+        {
             return false;
         }
         ColumnletId other = (ColumnletId) o;

@@ -12,7 +12,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-public class TestOrcReader {
+public class TestOrcReader
+{
 
     String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/orc/000014_0";
 
@@ -21,15 +22,17 @@ public class TestOrcReader {
     {
         Configuration conf = new Configuration();
         Reader reader = null;
-        try {
+        try
+        {
             reader = OrcFile.createReader(new Path(orcPath),
-                    OrcFile.readerOptions(conf));
+                                          OrcFile.readerOptions(conf));
             RecordReader rows = null;
             rows = reader.rows();
             VectorizedRowBatch batch = reader.getSchema().createRowBatch();
             long num = 0;
             long begin = System.currentTimeMillis();
-            while (rows.nextBatch(batch)) {
+            while (rows.nextBatch(batch))
+            {
                 num += batch.size;
             }
             long end = System.currentTimeMillis();
@@ -47,7 +50,9 @@ public class TestOrcReader {
             System.out.println(reader.getStripes().get(1).getFooterLength());
             System.out.println(reader.getStripes().get(1).getNumberOfRows());
             rows.close();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -57,28 +62,34 @@ public class TestOrcReader {
     {
         Configuration conf = new Configuration();
         Reader reader = null;
-        try {
+        try
+        {
             reader = OrcFile.createReader(new Path(TestParams.orcPath),
-                    OrcFile.readerOptions(conf));
+                                          OrcFile.readerOptions(conf));
             RecordReader rows = null;
             rows = reader.rows();
             VectorizedRowBatch batch = reader.getSchema().createRowBatch();
             long num = 0;
             long begin = System.currentTimeMillis();
-            while (rows.nextBatch(batch)) {
+            while (rows.nextBatch(batch))
+            {
                 num += batch.size;
 //                System.out.println(batch.toString());
                 int i, j, k;
                 StringBuilder b = new StringBuilder();
-                for(i = 0; i < batch.size; ++i) {
-                    for(k = 0; k < batch.projectionSize; ++k) {
+                for (i = 0; i < batch.size; ++i)
+                {
+                    for (k = 0; k < batch.projectionSize; ++k)
+                    {
                         int projIndex = batch.projectedColumns[k];
                         ColumnVector cv = batch.cols[projIndex];
                         cv.stringifyValue(b, i);
                     }
                     System.out.println(b.toString());
-                    if(i == 1)
+                    if (i == 1)
+                    {
                         break;
+                    }
                 }
                 break;
             }
@@ -86,7 +97,9 @@ public class TestOrcReader {
             System.out.println("Size: " + num);
             System.out.println("Time: " + (end - begin));
             rows.close();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

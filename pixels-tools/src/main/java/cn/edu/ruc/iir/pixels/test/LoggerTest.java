@@ -23,10 +23,12 @@ public class LoggerTest
         }
         for (int i = 0; i < 20; i++)
         {
-            try {
+            try
+            {
                 threads[i].join();
             }
-            catch (InterruptedException e) {
+            catch (InterruptedException e)
+            {
                 e.printStackTrace();
             }
         }

@@ -4,14 +4,14 @@ import java.util.Arrays;
 
 /**
  * LongColumnVector from org.apache.hadoop.hive.ql.exec.vector
- *
+ * <p>
  * This class represents a nullable int column vector.
  * This class will be used for operations on all integer types (tinyint, smallint, int, bigint)
  * and as such will use a 64-bit long value to hold the biggest possible value.
  * During copy-in/copy-out, smaller int types will be converted as needed. This will
  * reduce the amount of code that needs to be generated and also will run fast since the
  * machine operates with 64-bit words.
- *
+ * <p>
  * The vector[] field is public by design for high-performance access in the inner
  * loop of query execution.
  */
@@ -24,7 +24,8 @@ public class LongColumnVector extends ColumnVector
      * Use this constructor by default. All column vectors
      * should normally be the default size.
      */
-    public LongColumnVector() {
+    public LongColumnVector()
+    {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
@@ -33,7 +34,8 @@ public class LongColumnVector extends ColumnVector
      *
      * @param len the number of rows
      */
-    public LongColumnVector(int len) {
+    public LongColumnVector(int len)
+    {
         super(len);
         vector = new long[len];
     }
@@ -43,9 +45,15 @@ public class LongColumnVector extends ColumnVector
     {
         switch (value.toLowerCase())
         {
-            case "true": add(1); break;
-            case "false": add(0); break;
-            default: add(Long.parseLong(value)); break;
+            case "true":
+                add(1);
+                break;
+            case "false":
+                add(0);
+                break;
+            default:
+                add(Long.parseLong(value));
+                break;
         }
     }
 
@@ -58,7 +66,8 @@ public class LongColumnVector extends ColumnVector
     @Override
     public void add(long v)
     {
-        if (writeIndex >= getLength()) {
+        if (writeIndex >= getLength())
+        {
             ensureSize(writeIndex * 2, true);
         }
         vector[writeIndex++] = v;
@@ -67,13 +76,15 @@ public class LongColumnVector extends ColumnVector
     // Copy the current object contents into the output. Only copy selected entries,
     // as indicated by selectedInUse and the sel array.
     public void copySelected(
-            boolean selectedInUse, int[] sel, int size, LongColumnVector output) {
+            boolean selectedInUse, int[] sel, int size, LongColumnVector output)
+    {
         // Output has nulls if and only if input has nulls.
         output.noNulls = noNulls;
         output.isRepeating = false;
 
         // Handle repeating case
-        if (isRepeating) {
+        if (isRepeating)
+        {
             output.vector[0] = vector[0];
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
@@ -83,39 +94,48 @@ public class LongColumnVector extends ColumnVector
         // Handle normal case
 
         // Copy data values over
-        if (selectedInUse) {
-            for (int j = 0; j < size; j++) {
+        if (selectedInUse)
+        {
+            for (int j = 0; j < size; j++)
+            {
                 int i = sel[j];
                 output.vector[i] = vector[i];
             }
         }
-        else {
+        else
+        {
             System.arraycopy(vector, 0, output.vector, 0, size);
         }
 
         // Copy nulls over if needed
-        if (!noNulls) {
-            if (selectedInUse) {
-                for (int j = 0; j < size; j++) {
+        if (!noNulls)
+        {
+            if (selectedInUse)
+            {
+                for (int j = 0; j < size; j++)
+                {
                     int i = sel[j];
                     output.isNull[i] = isNull[i];
                 }
             }
-            else {
+            else
+            {
                 System.arraycopy(isNull, 0, output.isNull, 0, size);
             }
         }
     }
 
     // Fill the column vector with the provided value
-    public void fill(long value) {
+    public void fill(long value)
+    {
         noNulls = true;
         isRepeating = true;
         vector[0] = value;
     }
 
     // Fill the column vector with nulls
-    public void fillWithNulls() {
+    public void fillWithNulls()
+    {
         noNulls = false;
         isRepeating = true;
         vector[0] = NULL_VALUE;
@@ -125,17 +145,23 @@ public class LongColumnVector extends ColumnVector
     // Simplify vector by brute-force flattening noNulls and isRepeating
     // This can be used to reduce combinatorial explosion of code paths in VectorExpressions
     // with many arguments.
-    public void flatten(boolean selectedInUse, int[] sel, int size) {
+    public void flatten(boolean selectedInUse, int[] sel, int size)
+    {
         flattenPush();
-        if (isRepeating) {
+        if (isRepeating)
+        {
             isRepeating = false;
             long repeatVal = vector[0];
-            if (selectedInUse) {
-                for (int j = 0; j < size; j++) {
+            if (selectedInUse)
+            {
+                for (int j = 0; j < size; j++)
+                {
                     int i = sel[j];
                     vector[i] = repeatVal;
                 }
-            } else {
+            }
+            else
+            {
                 Arrays.fill(vector, 0, size, repeatVal);
             }
             flattenRepeatingNulls(selectedInUse, sel, size);
@@ -144,15 +170,20 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector) {
-        if (inputVector.isRepeating) {
+    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    {
+        if (inputVector.isRepeating)
+        {
             inputElementNum = 0;
         }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum]) {
+        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
+        {
             isNull[outElementNum] = false;
             vector[outElementNum] =
                     ((LongColumnVector) inputVector).vector[inputElementNum];
-        } else {
+        }
+        else
+        {
             isNull[outElementNum] = true;
             noNulls = false;
         }
@@ -161,7 +192,8 @@ public class LongColumnVector extends ColumnVector
     @Override
     public void copyFrom(ColumnVector inputVector)
     {
-        if (inputVector instanceof LongColumnVector) {
+        if (inputVector instanceof LongColumnVector)
+        {
             LongColumnVector srcVector = (LongColumnVector) inputVector;
 //            System.arraycopy(srcVector.vector, 0, this.vector, 0, vector.length);
 //            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
@@ -174,29 +206,40 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
-    public void stringifyValue(StringBuilder buffer, int row) {
-        if (isRepeating) {
+    public void stringifyValue(StringBuilder buffer, int row)
+    {
+        if (isRepeating)
+        {
             row = 0;
         }
-        if (noNulls || !isNull[row]) {
+        if (noNulls || !isNull[row])
+        {
             buffer.append(vector[row]);
-        } else {
+        }
+        else
+        {
             buffer.append("null");
         }
     }
 
     @Override
-    public void ensureSize(int size, boolean preserveData) {
+    public void ensureSize(int size, boolean preserveData)
+    {
         super.ensureSize(size, preserveData);
-        if (size > vector.length) {
+        if (size > vector.length)
+        {
             long[] oldArray = vector;
             vector = new long[size];
             length = size;
-            if (preserveData) {
-                if (isRepeating) {
+            if (preserveData)
+            {
+                if (isRepeating)
+                {
                     vector[0] = oldArray[0];
-                } else {
-                    System.arraycopy(oldArray, 0, vector, 0 , oldArray.length);
+                }
+                else
+                {
+                    System.arraycopy(oldArray, 0, vector, 0, oldArray.length);
                 }
             }
         }
