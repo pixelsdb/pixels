@@ -6,7 +6,7 @@ package cn.edu.ruc.iir.pixels.core.exception;
  * @author guodong
  */
 public class PixelsMetricsCollectProbOutOfRange
-    extends PixelsReaderException
+        extends PixelsReaderException
 {
     public PixelsMetricsCollectProbOutOfRange(float prob)
     {

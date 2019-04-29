@@ -23,7 +23,8 @@ public enum PixelsVersion
 
     public static PixelsVersion from(int version)
     {
-        if (version == 1) {
+        if (version == 1)
+        {
             return PixelsVersion.valueOf("V1");
         }
         throw new IllegalArgumentException("Wrong version.");

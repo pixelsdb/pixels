@@ -9,5 +9,6 @@ import java.io.IOException;
  */
 public abstract class IntDecoder extends Decoder
 {
-    public abstract long next() throws IOException;
+    public abstract long next()
+            throws IOException;
 }

@@ -14,7 +14,7 @@ import java.nio.ByteBuffer;
 
 /**
  * String column writer.
- *
+ * <p>
  * The string column chunk consists of seven fields:
  * 1. pixels field (run length encoded pixels after dictionary encoding or un-encoded string values)
  * 2. lengths field (run length encoded raw string length)
@@ -25,7 +25,7 @@ import java.nio.ByteBuffer;
  * 7. origins field offset (an integer value indicating offset of the origins field in the chunk)
  * 8. starts field offset (an integer value indicating offset of the starts field in the chunk)
  * 9. orders field offset (an integer value indicating offset of the orders field in the chunk)
- *
+ * <p>
  * Pixels field is necessary in all cases.
  * Lengths field only exists when un-encoded.
  * Other fields only exist when dictionary encoding is enabled.
@@ -50,7 +50,8 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BytesColumnVector columnVector = (BytesColumnVector) vector;
@@ -75,7 +76,8 @@ public class StringColumnWriter extends BaseColumnWriter
             curPartLength = nextPartLength;
             writeCurPartWithDict(columnVector, values, vLens, vOffsets, curPartLength, curPartOffset);
         }
-        else {
+        else
+        {
             // directly add to outputStream if not using dictionary encoding
             while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
             {
@@ -106,7 +108,9 @@ public class StringColumnWriter extends BaseColumnWriter
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 lensArray.add(vLens[curPartOffset + i]);
-                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
+                pixelStatRecorder
+                        .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
+                                      1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -125,8 +129,11 @@ public class StringColumnWriter extends BaseColumnWriter
             }
             else
             {
-                curPixelVector[curPixelVectorIndex++] = dictionary.add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i], 1);
+                curPixelVector[curPixelVectorIndex++] = dictionary
+                        .add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
+                pixelStatRecorder
+                        .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
+                                      1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -134,9 +141,11 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel()
+            throws IOException
     {
-        if (currentUseDictionaryEncoding) {
+        if (currentUseDictionaryEncoding)
+        {
             // for dictionary encoding. run length encode again.
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
@@ -146,19 +155,23 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void flush() throws IOException
+    public void flush()
+            throws IOException
     {
         // flush out pixels field
         super.flush();
         // check if continue using dictionary encoding or not in the coming chunks
-        if (!doneDictionaryEncodingCheck) {
+        if (!doneDictionaryEncodingCheck)
+        {
             checkDictionaryEncoding();
         }
         // flush out other fields
-        if (currentUseDictionaryEncoding) {
+        if (currentUseDictionaryEncoding)
+        {
             flushDictionary();
         }
-        else {
+        else
+        {
             flushLens();
         }
     }
@@ -166,16 +179,18 @@ public class StringColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (currentUseDictionaryEncoding) {
+        if (currentUseDictionaryEncoding)
+        {
             return PixelsProto.ColumnEncoding.newBuilder()
-                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
+                                             .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         lensArray.clear();
         dictionary.clear();
@@ -183,11 +198,13 @@ public class StringColumnWriter extends BaseColumnWriter
         super.close();
     }
 
-    private void flushLens() throws IOException
+    private void flushLens()
+            throws IOException
     {
         int lensFieldOffset = outputStream.size();
         long[] tmpLens = new long[lensArray.size()];
-        for (int i = 0; i < lensArray.size(); i++) {
+        for (int i = 0; i < lensArray.size(); i++)
+        {
             tmpLens[i] = lensArray.get(i);
         }
         lensArray.clear();
@@ -198,7 +215,8 @@ public class StringColumnWriter extends BaseColumnWriter
         outputStream.write(offsetBuf.array());
     }
 
-    private void flushDictionary() throws IOException
+    private void flushDictionary()
+            throws IOException
     {
         int originsFieldOffset;
         int startsFieldOffset;
@@ -216,7 +234,8 @@ public class StringColumnWriter extends BaseColumnWriter
             private int currentId = 0;
 
             @Override
-            public void visit(StringRedBlackTree.VisitorContext context) throws IOException
+            public void visit(StringRedBlackTree.VisitorContext context)
+                    throws IOException
             {
                 context.writeBytes(outputStream);
                 starts[currentId] = initStart;

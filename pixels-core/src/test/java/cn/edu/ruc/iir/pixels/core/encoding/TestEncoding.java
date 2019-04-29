@@ -26,22 +26,26 @@ public class TestEncoding
         values[0] = 0;
         values[1] = -1;
         values[2] = -2;
-        for (int i = 3; i < TestParams.rowNum; i++) {
+        for (int i = 3; i < TestParams.rowNum; i++)
+        {
             values[i] = random.nextInt();
         }
         long[] decoderValues = new long[TestParams.rowNum];
         RunLenIntEncoder encoder = new RunLenIntEncoder(true, true);
-        try {
+        try
+        {
             byte[] bytes = encoder.encode(values);
             IntDecoder decoder = new RunLenIntDecoder(new ByteArrayInputStream(bytes), true);
             int i = 0;
-            while (decoder.hasNext()) {
+            while (decoder.hasNext())
+            {
                 decoderValues[i++] = decoder.next();
             }
             System.out.println(bytes.length);
             assertArrayEquals(values, decoderValues);
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -69,12 +73,14 @@ public class TestEncoding
     public void byteTest()
     {
         int[] bytes = new int[256];
-        for (int i = 0; i < 256; i++) {
+        for (int i = 0; i < 256; i++)
+        {
             int b = (Byte.MIN_VALUE + i) & 0xff;
             bytes[i] = b;
             System.out.println(b);
         }
-        for (int i = 0; i < 256; i++) {
+        for (int i = 0; i < 256; i++)
+        {
             byte b = (byte) (bytes[i]);
             System.out.println(b);
         }
@@ -85,7 +91,8 @@ public class TestEncoding
     {
         boolean[] exp = new boolean[TestParams.rowNum];
         long[] cur = new long[TestParams.rowNum];
-        for (int i = 0; i < TestParams.rowNum; i++) {
+        for (int i = 0; i < TestParams.rowNum; i++)
+        {
             cur[i] = i > 25 ? 1 : 0;
             exp[i] = i > 25;
         }
@@ -93,7 +100,8 @@ public class TestEncoding
 
         boolean[] res = new boolean[TestParams.rowNum];
         byte[] bytesRes = BitUtils.bitWiseDeCompact(input);
-        for (int i = 0; i < TestParams.rowNum; i++) {
+        for (int i = 0; i < TestParams.rowNum; i++)
+        {
             res[i] = bytesRes[i] == 1;
         }
         assertArrayEquals(exp, res);

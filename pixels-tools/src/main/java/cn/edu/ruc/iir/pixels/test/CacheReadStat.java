@@ -18,6 +18,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -29,11 +30,12 @@ import java.util.Random;
 
 /**
  * pixels
- *
+ * <p>
  * java -jar pixels-test-0.1.0-SNAPSHOT-full.jar /home/iir/sbin/drop_caches.sh /home/iir/opt/pixels/logs/cache_perf.csv /home/iir/opt/pixels/logs/cache_workload.txt
+ *
  * @author guodong
  */
-public class CacheReaderPerf
+public class CacheReadStat
 {
     private static MemoryMappedFile cacheFile;
     private static MemoryMappedFile indexFile;
@@ -53,7 +55,7 @@ public class CacheReaderPerf
         cacheDropScript = args[0];
         String logFile = args[1];
         String workloadFile = args[2];
-        CacheReaderPerf cacheReaderPerf = new CacheReaderPerf();
+        CacheReadStat cacheReaderPerf = new CacheReadStat();
 
         List<String> cachedColumnlets;
         List<Path> localFiles;
@@ -73,13 +75,16 @@ public class CacheReaderPerf
         }
         System.out.println("Hostname: " + hostName);
 
-        try {
+        try
+        {
             long mapFileStartNano = System.nanoTime();
-            cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
+            cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
+                                             Long.parseLong(config.getProperty("cache.size")));
             long mapFileEndNano = System.nanoTime();
             long cacheMemInitCost = mapFileEndNano - mapFileStartNano;
             mapFileStartNano = System.nanoTime();
-            indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
+            indexFile = new MemoryMappedFile(config.getProperty("index.location"),
+                                             Long.parseLong(config.getProperty("index.size")));
             mapFileEndNano = System.nanoTime();
             long indexMemInitCost = mapFileEndNano - mapFileStartNano;
             fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
@@ -99,7 +104,8 @@ public class CacheReaderPerf
             localFiles = new ArrayList<>(30);
             for (Path path : paths)
             {
-                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText()
+                             .equalsIgnoreCase(hostName))
                 {
                     localFiles.add(path);
                 }
@@ -309,7 +315,8 @@ public class CacheReaderPerf
 
             writer.close();
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
@@ -479,3 +486,4 @@ public class CacheReaderPerf
         }
     }
 }
+

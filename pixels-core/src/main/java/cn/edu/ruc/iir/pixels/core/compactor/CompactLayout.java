@@ -15,10 +15,10 @@ public class CompactLayout
     {
         this.rowGroupNumber = rowGroupNumber;
         this.columnNumber = columnNumber;
-        this.indices = new ArrayList<>(rowGroupNumber*columnNumber);
+        this.indices = new ArrayList<>(rowGroupNumber * columnNumber);
     }
 
-    public static CompactLayout fromCompact (Compact compact)
+    public static CompactLayout fromCompact(Compact compact)
     {
         CompactLayout layout = new CompactLayout(compact.getNumRowGroupInBlock(), compact.getNumColumn());
         for (String columnletStr : compact.getColumnletOrder())
@@ -31,7 +31,7 @@ public class CompactLayout
         return layout;
     }
 
-    public static CompactLayout buildNaive (int rowGroupNumber, int columnNumber)
+    public static CompactLayout buildNaive(int rowGroupNumber, int columnNumber)
     {
         CompactLayout layout = new CompactLayout(rowGroupNumber, columnNumber);
         for (int i = 0; i < rowGroupNumber; i++)
@@ -44,7 +44,7 @@ public class CompactLayout
         return layout;
     }
 
-    protected void append (int rowGroupId, int columnId)
+    protected void append(int rowGroupId, int columnId)
     {
         this.indices.add(new ColumnletIndex(rowGroupId, columnId));
     }
@@ -54,7 +54,7 @@ public class CompactLayout
         return rowGroupNumber * columnNumber;
     }
 
-    public ColumnletIndex get (int i)
+    public ColumnletIndex get(int i)
     {
         return this.indices.get(i);
     }

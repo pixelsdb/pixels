@@ -24,14 +24,16 @@ public class CacheLocationDistribution
     public CacheLocationDistribution(HostAddress[] locations, int size)
     {
         this.locationDistributionMap = new HashMap<>(locations.length);
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
+        {
             locationDistributionMap.put(locations[i].toString(), new HashSet<>());
         }
     }
 
     public void addCacheLocation(String location, String file)
     {
-        if (locationDistributionMap.get(location) != null) {
+        if (locationDistributionMap.get(location) != null)
+        {
             locationDistributionMap.get(location).add(file);
         }
     }

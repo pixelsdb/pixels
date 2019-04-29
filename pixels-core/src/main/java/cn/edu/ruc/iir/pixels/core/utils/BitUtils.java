@@ -10,7 +10,8 @@ import java.io.ByteArrayOutputStream;
 public class BitUtils
 {
     private BitUtils()
-    {}
+    {
+    }
 
     public static byte[] bitWiseCompact(boolean[] values, int length)
     {
@@ -19,18 +20,21 @@ public class BitUtils
         int bitsLeft = 8;
         byte current = 0;
 
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             long v = values[i] ? 1 : 0;
             bitsLeft -= bitsToWrite;
             current |= v << bitsLeft;
-            if (bitsLeft == 0) {
+            if (bitsLeft == 0)
+            {
                 bitWiseOutput.write(current);
                 current = 0;
                 bitsLeft = 8;
             }
         }
 
-        if (bitsLeft != 8) {
+        if (bitsLeft != 8)
+        {
             bitWiseOutput.write(current);
         }
 
@@ -44,18 +48,21 @@ public class BitUtils
         int bitsLeft = 8;
         byte current = 0;
 
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             long v = values[i];
             bitsLeft -= bitsToWrite;
             current |= v << bitsLeft;
-            if (bitsLeft == 0) {
+            if (bitsLeft == 0)
+            {
                 bitWiseOutput.write(current);
                 current = 0;
                 bitsLeft = 8;
             }
         }
 
-        if (bitsLeft != 8) {
+        if (bitsLeft != 8)
+        {
             bitWiseOutput.write(current);
         }
 
@@ -64,9 +71,10 @@ public class BitUtils
 
     /**
      * Bit de-compaction
+     *
      * @param input input byte array
      * @return result bits
-     * */
+     */
     public static byte[] bitWiseDeCompact(byte[] input)
     {
         byte[] result = new byte[input.length * 8];
@@ -93,11 +101,12 @@ public class BitUtils
 
     /**
      * Bit de-compaction
-     * @param input input byte array
+     *
+     * @param input  input byte array
      * @param offset starting offset of the input
      * @param length byte length of the input
      * @return result bits
-     * */
+     */
     public static byte[] bitWiseDeCompact(byte[] input, int offset, int length)
     {
         byte[] result = new byte[length * 8];

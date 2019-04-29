@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.core.vector;
 
 /**
  * VectorizedRowBatch from org.apache.hadoop.hive.ql.exec.vector
- *
+ * <p>
  * A VectorizedRowBatch is a set of rows, organized with each column
  * as a vector. It is the unit of query execution, organized to minimize
  * the cost per row and achieve high cycles-per-instruction.
@@ -44,7 +44,8 @@ public class VectorizedRowBatch
      *
      * @param numCols the number of columns to include in the batch
      */
-    public VectorizedRowBatch(int numCols) {
+    public VectorizedRowBatch(int numCols)
+    {
         this(numCols, DEFAULT_SIZE);
     }
 
@@ -54,9 +55,10 @@ public class VectorizedRowBatch
      * Batch size should normally always be defaultSize.
      *
      * @param numCols the number of columns to include in the batch
-     * @param size  the number of rows to include in the batch
+     * @param size    the number of rows to include in the batch
      */
-    public VectorizedRowBatch(int numCols, int size) {
+    public VectorizedRowBatch(int numCols, int size)
+    {
         this.numCols = numCols;
         this.size = size;
         this.maxSize = size;
@@ -67,7 +69,8 @@ public class VectorizedRowBatch
 
         // Initially all columns are projected and in the same order
         projectionSize = numCols;
-        for (int i = 0; i < numCols; i++) {
+        for (int i = 0; i < numCols; i++)
+        {
             projectedColumns[i] = i;
         }
 
@@ -75,23 +78,27 @@ public class VectorizedRowBatch
         partitionColumnCount = -1;
     }
 
-    public void setPartitionInfo(int dataColumnCount, int partitionColumnCount) {
+    public void setPartitionInfo(int dataColumnCount, int partitionColumnCount)
+    {
         this.dataColumnCount = dataColumnCount;
         this.partitionColumnCount = partitionColumnCount;
     }
 
-    public int getDataColumnCount() {
+    public int getDataColumnCount()
+    {
         return dataColumnCount;
     }
 
-    public int getPartitionColumnCount() {
+    public int getPartitionColumnCount()
+    {
         return partitionColumnCount;
     }
 
     /**
      * Returns the maximum size of the batch (number of rows it can hold)
      */
-    public int getMaxSize() {
+    public int getMaxSize()
+    {
         return maxSize;
     }
 
@@ -100,55 +107,72 @@ public class VectorizedRowBatch
      *
      * @return number of rows that have not been filtered out
      */
-    public long count() {
+    public long count()
+    {
         return size;
     }
 
-    private static String toUTF8(Object o) {
-        if(o == null) {
+    private static String toUTF8(Object o)
+    {
+        if (o == null)
+        {
             return "\\N"; /* as found in LazySimpleSerDe's nullSequence */
         }
         return o.toString();
     }
 
     @Override
-    public String toString() {
-        if (size == 0) {
+    public String toString()
+    {
+        if (size == 0)
+        {
             return "";
         }
         StringBuilder b = new StringBuilder();
-        if (this.selectedInUse) {
-            for (int j = 0; j < size; j++) {
+        if (this.selectedInUse)
+        {
+            for (int j = 0; j < size; j++)
+            {
                 int i = selected[j];
                 b.append('[');
-                for (int k = 0; k < projectionSize; k++) {
+                for (int k = 0; k < projectionSize; k++)
+                {
                     int projIndex = projectedColumns[k];
                     ColumnVector cv = cols[projIndex];
-                    if (k > 0) {
+                    if (k > 0)
+                    {
                         b.append(", ");
                     }
                     cv.stringifyValue(b, i);
                 }
                 b.append(']');
-                if (j < size - 1) {
+                if (j < size - 1)
+                {
                     b.append('\n');
                 }
             }
-        } else {
-            for (int i = 0; i < size; i++) {
+        }
+        else
+        {
+            for (int i = 0; i < size; i++)
+            {
                 b.append('[');
-                for (int k = 0; k < projectionSize; k++) {
+                for (int k = 0; k < projectionSize; k++)
+                {
                     int projIndex = projectedColumns[k];
                     ColumnVector cv = cols[projIndex];
-                    if (k > 0) {
+                    if (k > 0)
+                    {
                         b.append(", ");
                     }
-                    if (cv != null) {
+                    if (cv != null)
+                    {
                         cv.stringifyValue(b, i);
                     }
                 }
                 b.append(']');
-                if (i < size - 1) {
+                if (i < size - 1)
+                {
                     b.append('\n');
                 }
             }
@@ -158,18 +182,21 @@ public class VectorizedRowBatch
 
     /**
      * Resets the row batch to default state
-     *  - sets selectedInUse to false
-     *  - sets size to 0
-     *  - sets endOfFile to false
-     *  - resets each column
-     *  - inits each column
+     * - sets selectedInUse to false
+     * - sets size to 0
+     * - sets endOfFile to false
+     * - resets each column
+     * - inits each column
      */
-    public void reset() {
+    public void reset()
+    {
         selectedInUse = false;
         size = 0;
         endOfFile = false;
-        for (ColumnVector vc : cols) {
-            if (vc != null) {
+        for (ColumnVector vc : cols)
+        {
+            if (vc != null)
+            {
                 vc.reset();
                 vc.init();
             }
@@ -180,8 +207,10 @@ public class VectorizedRowBatch
      * Set the maximum number of rows in the batch.
      * Data is not preserved.
      */
-    public void ensureSize(int rows) {
-        for(int i=0; i < cols.length; ++i) {
+    public void ensureSize(int rows)
+    {
+        for (int i = 0; i < cols.length; ++i)
+        {
             cols[i].ensureSize(rows, false);
         }
     }

@@ -6,7 +6,7 @@ package cn.edu.ruc.iir.pixels.core.exception;
  * @author guodong
  */
 public class PixelsMetricsDirNotFoundException
-    extends PixelsReaderException
+        extends PixelsReaderException
 {
     private static final long serialVersionUID = 1910875895078923380L;
 

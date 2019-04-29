@@ -17,7 +17,8 @@ public class TestPixelsCacheWriter
     @Test
     public void testSimpleCacheWriter()
     {
-        try {
+        try
+        {
             // get fs
             Configuration conf = new Configuration();
             conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
@@ -27,9 +28,9 @@ public class TestPixelsCacheWriter
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
                                      .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                     .setCacheSize(1024*1024*64L)
+                                     .setCacheSize(1024 * 1024 * 64L)
                                      .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                     .setIndexSize(1024*1024*64L)
+                                     .setIndexSize(1024 * 1024 * 64L)
                                      .setOverwrite(true)
                                      .setFS(fs)
                                      .build();
@@ -37,7 +38,8 @@ public class TestPixelsCacheWriter
             int index = 0;
             for (short i = 0; i < 1000; i++)
             {
-                for (short j = 0; j < 64; j++) {
+                for (short j = 0; j < 64; j++)
+                {
                     PixelsCacheKey cacheKey = new PixelsCacheKey(path, i, j);
                     ByteBuffer byteBuffer = ByteBuffer.allocate(4);
                     byteBuffer.putInt(index++);
@@ -47,7 +49,8 @@ public class TestPixelsCacheWriter
             }
             cacheWriter.flush();
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
