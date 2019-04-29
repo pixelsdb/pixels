@@ -17,10 +17,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: Types
- * @Description:
  * @author: tao
  * @date: Create in 2018-01-21 20:50
  **/

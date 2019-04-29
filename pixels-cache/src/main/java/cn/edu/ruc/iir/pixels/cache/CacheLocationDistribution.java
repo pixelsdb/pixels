@@ -16,6 +16,11 @@ public class CacheLocationDistribution
 {
     private final Map<String, Set<String>> locationDistributionMap;
 
+    /**
+     * currently, cache location is allocated by the simple hash function.
+     * @param locations
+     * @param size
+     */
     public CacheLocationDistribution(HostAddress[] locations, int size)
     {
         this.locationDistributionMap = new HashMap<>(locations.length);

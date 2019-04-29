@@ -45,8 +45,6 @@ public class DaemonMain
                 // and it will start the gard daemon process to protect each other.
                 Thread daemonThread = new Thread(mainDaemon);
                 daemonThread.setName("main daemon thread");
-                // jvm will not wait for a daemon thread to terminate.
-                daemonThread.setDaemon(true);
                 daemonThread.start();
 
                 try
@@ -81,6 +79,47 @@ public class DaemonMain
                     container.addServer("cache_manager", cacheManager);
                 }
 
+                // a shutdown hook ensures the servers are shutdown graceful.
+                // even if this main daemon is not terminated by TERM signal.
+                Runtime.getRuntime().addShutdownHook( new Thread( () ->
+                {
+                    for (String name : container.getServerNames())
+                    {
+                        // shutdown the server threads.
+                        try
+                        {
+                            container.shutdownServer(name);
+                        } catch (NoSuchServerException e)
+                        {
+                            log.error("error when stopping server threads.", e);
+                        }
+                    }
+                    for (int i = 60; i > 0; --i)
+                    {
+                        System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
+                        try
+                        {
+                            boolean done = true;
+                            for (String name : container.getServerNames())
+                            {
+                                if (container.checkServer(name, 0))
+                                {
+                                    done = false;
+                                    break;
+                                }
+                            }
+                            if (done)
+                            {
+                                break;
+                            }
+                            TimeUnit.SECONDS.sleep(1);
+                        } catch (Exception e)
+                        {
+                            log.error("error when waiting server threads shutdown.", e);
+                        }
+                    }
+                }));
+
                 // continue the main thread, start and check the server threads.
                 // main thread will be terminated with the daemon thread.
                 while (mainDaemon.isRunning())
@@ -89,30 +128,19 @@ public class DaemonMain
                     {
                         for (String name : container.getServerNames())
                         {
-                            if (container.chechServer(name) == false)
+                            if (container.checkServer(name) == false)
                             {
                                 container.startServer(name);
                             }
                         }
-                        TimeUnit.SECONDS.sleep(3);
+                        TimeUnit.SECONDS.sleep(1);
                     } catch (Exception e)
                     {
                         log.error("error in the main loop of daemon.", e);
                         break;
                     }
                 }
-
-                for (String name : container.getServerNames())
-                {
-                    // shutdown the server threads.
-                    try
-                    {
-                        container.shutdownServer(name);
-                    } catch (NoSuchServerException e)
-                    {
-                        log.error("error when stoping server threads.", e);
-                    }
-                }
+                // when goes here, the ShutdownHook is going to shutdown all the servers gracefully.
             }
             else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
                     (args[0].equalsIgnoreCase("coordinator") ||

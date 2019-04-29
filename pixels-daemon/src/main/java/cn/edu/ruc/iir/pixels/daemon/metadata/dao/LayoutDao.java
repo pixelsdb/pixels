@@ -1,31 +1,25 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class LayoutDao implements Dao<Layout>
+public class LayoutDao implements Dao<MetadataProto.Layout>
 {
     public LayoutDao() {}
 
     private static Logger log = LogManager.getLogger(LayoutDao.class);
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final TableDao tableModel = new TableDao();
 
     @Override
-    public Layout getById(int id)
+    public MetadataProto.Layout getById(long id)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -33,17 +27,17 @@ public class LayoutDao implements Dao<Layout>
             ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE LAYOUT_ID=" + id);
             if (rs.next())
             {
-                Layout layout = new Layout();
-                layout.setId(id);
-                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
-                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
-                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
-                layout.setOrder(rs.getString("LAYOUT_ORDER"));
-                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
-                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
-                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
-                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
-                layout.setTable(tableModel.getById(rs.getInt("TBLS_TBL_ID")));
+                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
+                .setId(id)
+                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                .setOrder(rs.getString("LAYOUT_ORDER"))
+                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setCompact(rs.getString("LAYOUT_COMPACT"))
+                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setTableId(rs.getInt("TBLS_TBL_ID")).build();
                 return layout;
             }
         } catch (SQLException e)
@@ -54,13 +48,27 @@ public class LayoutDao implements Dao<Layout>
         return null;
     }
 
+    private MetadataProto.Layout.PERMISSION convertPermission (short permission)
+    {
+        switch (permission)
+        {
+            case -1:
+                return MetadataProto.Layout.PERMISSION.DISABLED;
+            case 0:
+                return MetadataProto.Layout.PERMISSION.READ_ONLY;
+            case 1:
+                return MetadataProto.Layout.PERMISSION.READ_WRITE;
+        }
+        return MetadataProto.Layout.PERMISSION.DISABLED;
+    }
+
     @Override
-    public List<Layout> getAll()
+    public List<MetadataProto.Layout> getAll()
     {
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public Layout getWritableByTable(Table table)
+    public MetadataProto.Layout getWritableByTable(MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -69,21 +77,21 @@ public class LayoutDao implements Dao<Layout>
             " AND LAYOUT_PERMISSION>0");
             if (rs.next())
             {
-                Layout layout = new Layout();
-                layout.setId(rs.getInt("LAYOUT_ID"));
-                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
-                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
-                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
-                layout.setOrder(rs.getString("LAYOUT_ORDER"));
-                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
-                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
-                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
-                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
-                layout.setTable(tableModel.getById(rs.getInt("TBLS_TBL_ID")));
+                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
+                .setId(rs.getInt("LAYOUT_ID"))
+                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                .setOrder(rs.getString("LAYOUT_ORDER"))
+                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setCompact(rs.getString("LAYOUT_COMPACT"))
+                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setTableId(rs.getInt("TBLS_TBL_ID")).build();
                 if (rs.next())
                 {
                     throw new ColumnOrderException("multiple writable layouts founded for table: " +
-                            table.getSchema().getName() + "." + table.getName());
+                            table.getSchemaId() + "." + table.getName());
                 }
                 return layout;
             }
@@ -95,15 +103,15 @@ public class LayoutDao implements Dao<Layout>
         return null;
     }
 
-    public Layout getLatestByTable(Table table)
+    public MetadataProto.Layout getLatestByTable(MetadataProto.Table table)
     {
-        List<Layout> layouts = this.getByTable(table);
+        List<MetadataProto.Layout> layouts = this.getByTable(table);
 
-        Layout res = null;
+        MetadataProto.Layout res = null;
         if (layouts != null)
         {
-            int maxId = -1;
-            for (Layout layout : layouts)
+            long maxId = -1;
+            for (MetadataProto.Layout layout : layouts)
             {
                 if (layout.getId() > maxId)
                 {
@@ -116,28 +124,26 @@ public class LayoutDao implements Dao<Layout>
         return res;
     }
 
-    @SuppressWarnings("Duplicates")
-    public List<Layout> getByTable (Table table)
+    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
             ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId());
-            List<Layout> layouts = new ArrayList<>();
+            List<MetadataProto.Layout> layouts = new ArrayList<>();
             while (rs.next())
             {
-                Layout layout = new Layout();
-                layout.setId(rs.getInt("LAYOUT_ID"));
-                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
-                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
-                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
-                layout.setOrder(rs.getString("LAYOUT_ORDER"));
-                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
-                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
-                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
-                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
-                layout.setTable(table);
-                table.addLayout(layout);
+                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
+                .setId(rs.getInt("LAYOUT_ID"))
+                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                .setOrder(rs.getString("LAYOUT_ORDER"))
+                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setCompact(rs.getString("LAYOUT_COMPACT"))
+                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
             return layouts;
@@ -149,8 +155,13 @@ public class LayoutDao implements Dao<Layout>
         return null;
     }
 
-    @SuppressWarnings("Duplicates")
-    public List<Layout> getReadableByTable (Table table, String version)
+    /**
+     * get layouts of which the permission is READ_ONLY or READ_WRITE
+     * @param table
+     * @param version < 0 to get all versions of layouts.
+     * @return
+     */
+    public List<MetadataProto.Layout> getReadableByTable (MetadataProto.Table table, int version)
     {
         if(table == null)
         {
@@ -161,26 +172,25 @@ public class LayoutDao implements Dao<Layout>
         {
             String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
                     " AND LAYOUT_PERMISSION>=0";
-            if(version != null)
+            if(version >= 0)
             {
                 sql += " AND LAYOUT_VERSION=" + version;
             }
             ResultSet rs = st.executeQuery(sql);
-            List<Layout> layouts = new ArrayList<>();
+            List<MetadataProto.Layout> layouts = new ArrayList<>();
             while (rs.next())
             {
-                Layout layout = new Layout();
-                layout.setId(rs.getInt("LAYOUT_ID"));
-                layout.setVersion(rs.getInt("LAYOUT_VERSION"));
-                layout.setPermission(rs.getShort("LAYOUT_PERMISSION"));
-                layout.setCreateAt(rs.getLong("LAYOUT_CREATE_AT"));
-                layout.setOrder(rs.getString("LAYOUT_ORDER"));
-                layout.setOrderPath(rs.getString("LAYOUT_ORDER_PATH"));
-                layout.setCompact(rs.getString("LAYOUT_COMPACT"));
-                layout.setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"));
-                layout.setSplits(rs.getString("LAYOUT_SPLITS"));
-                layout.setTable(table);
-                table.addLayout(layout);
+                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
+                .setId(rs.getInt("LAYOUT_ID"))
+                .setVersion(rs.getInt("LAYOUT_VERSION"))
+                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                .setOrder(rs.getString("LAYOUT_ORDER"))
+                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                .setCompact(rs.getString("LAYOUT_COMPACT"))
+                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
             return layouts;
@@ -192,7 +202,7 @@ public class LayoutDao implements Dao<Layout>
         return null;
     }
 
-    public boolean save (Layout layout)
+    public boolean save (MetadataProto.Layout layout)
     {
         if (exists(layout))
         {
@@ -204,7 +214,7 @@ public class LayoutDao implements Dao<Layout>
         }
     }
 
-    public boolean exists (Layout layout)
+    public boolean exists (MetadataProto.Layout layout)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -222,7 +232,7 @@ public class LayoutDao implements Dao<Layout>
         return false;
     }
 
-    public boolean insert (Layout layout)
+    public boolean insert (MetadataProto.Layout layout)
     {
         Connection conn = db.getConnection();
         String sql = "INSERT INTO LAYOUTS(" +
@@ -239,13 +249,13 @@ public class LayoutDao implements Dao<Layout>
         {
             pst.setInt(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
-            pst.setInt(3, layout.getPermission());
+            pst.setInt(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrder());
             pst.setString(5, layout.getOrderPath());
             pst.setString(6, layout.getCompact());
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
-            pst.setInt(9, layout.getTable().getId());
+            pst.setLong(9, layout.getTableId());
             return pst.execute();
         } catch (SQLException e)
         {
@@ -254,7 +264,21 @@ public class LayoutDao implements Dao<Layout>
         return false;
     }
 
-    public boolean update (Layout layout)
+    private short convertPermission (MetadataProto.Layout.PERMISSION permission)
+    {
+        switch (permission)
+        {
+            case DISABLED:
+                return -1;
+            case READ_ONLY:
+                return 0;
+            case READ_WRITE:
+                return -1;
+        }
+        return -1;
+    }
+
+    public boolean update (MetadataProto.Layout layout)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE LAYOUTS\n" +
@@ -272,13 +296,13 @@ public class LayoutDao implements Dao<Layout>
         {
             pst.setInt(1, layout.getVersion());
             pst.setLong(2, layout.getCreateAt());
-            pst.setInt(3, layout.getPermission());
+            pst.setInt(3, convertPermission(layout.getPermission()));
             pst.setString(4, layout.getOrder());
             pst.setString(5, layout.getOrderPath());
             pst.setString(6, layout.getCompact());
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
-            pst.setInt(9, layout.getId());
+            pst.setLong(9, layout.getId());
             return pst.execute();
         } catch (SQLException e)
         {

@@ -38,9 +38,6 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.hive
- * @ClassName: PixelsSerDe
  * @Description: A serde class for PIXELS. It transparently passes the object to/from the PIXELS file reader/writer.
  * refer: [OrcSerde](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java)
  * @author: tao

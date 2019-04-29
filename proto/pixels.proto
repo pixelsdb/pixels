@@ -16,6 +16,10 @@
  * limitations under the License.
  */
 
+// File format definition of Pixels
+
+syntax = "proto2";
+
 package pixels.proto;
 
 option java_package = "cn.edu.ruc.iir.pixels.core";

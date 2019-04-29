@@ -28,10 +28,6 @@ import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: PixelsSplit
- * @Description:
  * @author: tao
  * @date: Create in 2018-01-20 19:15
  **/

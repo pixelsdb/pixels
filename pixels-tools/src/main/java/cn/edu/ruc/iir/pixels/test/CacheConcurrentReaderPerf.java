@@ -78,7 +78,7 @@ public class CacheConcurrentReaderPerf
             throws MetadataException, FSException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
         List<String> cachedColumnletIds = layout.getCompactObject().getColumnletOrder().subList(0, 100);
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
         List<Path> paths = fsFactory.listFiles(layout.getCompactPath());

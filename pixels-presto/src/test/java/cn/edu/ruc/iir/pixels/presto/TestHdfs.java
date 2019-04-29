@@ -21,10 +21,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: TestHdfs
- * @Description: read info from hdfs
  * @author: tao
  * @date: Create in 2018-02-23 11:21
  **/

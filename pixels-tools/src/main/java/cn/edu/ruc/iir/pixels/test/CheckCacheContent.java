@@ -42,7 +42,7 @@ public class CheckCacheContent
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
         Compact compact = layout.getCompactObject();
         int cacheBorder = compact.getCacheBorder();
         List<String> columnletOrder = compact.getColumnletOrder();
