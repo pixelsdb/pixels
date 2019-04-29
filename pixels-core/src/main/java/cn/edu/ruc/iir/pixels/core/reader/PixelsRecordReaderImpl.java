@@ -96,10 +96,7 @@ public class PixelsRecordReaderImpl
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = physicalFSReader.getPath().getName();
-        long checkStartNano = System.nanoTime();
         checkBeforeRead();
-        long checkCost = System.nanoTime() - checkStartNano;
-//        logger.debug("[check before read]" + checkCost);
     }
 
     private void checkBeforeRead()
@@ -144,7 +141,7 @@ public class PixelsRecordReaderImpl
             checkValid = true;
             return;
         }
-        // TODO optimize arraylist initial size
+        // TODO optimize the initial size of ArrayList
         List<Integer> optionColsIndices = new ArrayList<>();
         this.includedColumns = new boolean[fileColTypes.size()];
         for (String col : optionIncludedCols)
@@ -360,7 +357,6 @@ public class PixelsRecordReaderImpl
                     }
                 }
             }
-            // TODO merge cached chunks to reduce cache access times
             // read cached chunks
             long cacheReadStartNano = System.nanoTime();
             for (ColumnletId chunkId : cacheChunks)
@@ -496,7 +492,8 @@ public class PixelsRecordReaderImpl
      * @throws java.io.IOException
      */
     @Override
-    public VectorizedRowBatch readBatch(int batchSize) throws IOException
+    public VectorizedRowBatch readBatch(int batchSize)
+            throws IOException
     {
         if (!checkValid)
         {
@@ -601,7 +598,8 @@ public class PixelsRecordReaderImpl
     }
 
     @Override
-    public VectorizedRowBatch readBatch() throws IOException
+    public VectorizedRowBatch readBatch()
+            throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }

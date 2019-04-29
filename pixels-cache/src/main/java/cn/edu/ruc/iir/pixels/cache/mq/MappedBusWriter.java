@@ -85,7 +85,8 @@ public class MappedBusWriter
      *
      * @throws IOException if there was an error opening the file
      */
-    public void open() throws IOException
+    public void open()
+            throws IOException
     {
         if (!append)
         {
@@ -115,7 +116,8 @@ public class MappedBusWriter
      * @param message the message object to write
      * @throws EOFException in case the end of the file was reached
      */
-    public void write(MappedBusMessage message) throws EOFException
+    public void write(MappedBusMessage message)
+            throws EOFException
     {
         long limit = allocate();
         long commitPos = limit;
@@ -134,7 +136,8 @@ public class MappedBusWriter
      * @param length the length of the data
      * @throws EOFException in case the end of the file was reached
      */
-    public void write(byte[] src, int offset, int length) throws EOFException
+    public void write(byte[] src, int offset, int length)
+            throws EOFException
     {
         long limit = allocate();
         long commitPos = limit;
@@ -145,7 +148,8 @@ public class MappedBusWriter
         commit(commitPos);
     }
 
-    private long allocate() throws EOFException
+    private long allocate()
+            throws EOFException
     {
         long limit = mem.getAndAddLong(Structure.Limit, entrySize);
         if (limit + entrySize > fileSize)
@@ -165,7 +169,8 @@ public class MappedBusWriter
      *
      * @throws IOException if there was an error closing the file
      */
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         try
         {

@@ -37,6 +37,7 @@ public class ChunkSeq
         if (length == 0)
         {
             chunks.add(chunk);
+            // TODO remove function calls by getting object attributes directly
             offset = chunk.getOffset();
             length += chunk.getLength();
             return true;

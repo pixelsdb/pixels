@@ -39,17 +39,20 @@ import java.util.List;
  *
  * @author guodong
  */
-public class TestPixelsWriter {
+public class TestPixelsWriter
+{
 
     @Test
-    public void testWriterWithNull() {
+    public void testWriterWithNull()
+    {
         String filePath = TestParams.filePath;
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
@@ -62,21 +65,22 @@ public class TestPixelsWriter {
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
-                            .setSchema(schema)
-                            .setPixelStride(TestParams.pixelStride)
-                            .setRowGroupSize(TestParams.rowGroupSize)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
-                            .setBlockSize(TestParams.blockSize)
-                            .setReplication(TestParams.blockReplication)
-                            .setBlockPadding(TestParams.blockPadding)
-                            .setEncoding(TestParams.encoding)
-                            .setCompressionBlockSize(TestParams.compressionBlockSize)
-                            .build();
+                                    .setSchema(schema)
+                                    .setPixelStride(TestParams.pixelStride)
+                                    .setRowGroupSize(TestParams.rowGroupSize)
+                                    .setFS(fs)
+                                    .setFilePath(new Path(filePath))
+                                    .setBlockSize(TestParams.blockSize)
+                                    .setReplication(TestParams.blockReplication)
+                                    .setBlockPadding(TestParams.blockPadding)
+                                    .setEncoding(TestParams.encoding)
+                                    .setCompressionBlockSize(TestParams.compressionBlockSize)
+                                    .build();
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            for (int i = 0; i < TestParams.rowNum; i++) {
+            for (int i = 0; i < TestParams.rowNum; i++)
+            {
                 int row = rowBatch.size++;
                 if (i % 100 == 0)
                 {
@@ -109,17 +113,21 @@ public class TestPixelsWriter {
                     z.setVal(row, String.valueOf(i).getBytes());
                     z.isNull[row] = false;
                 }
-                if (rowBatch.size == rowBatch.getMaxSize()) {
+                if (rowBatch.size == rowBatch.getMaxSize())
+                {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
                 }
             }
-            if (rowBatch.size != 0) {
+            if (rowBatch.size != 0)
+            {
                 pixelsWriter.addRowBatch(rowBatch);
                 rowBatch.reset();
             }
             pixelsWriter.close();
-        } catch (IOException | PixelsWriterException e) {
+        }
+        catch (IOException | PixelsWriterException e)
+        {
             e.printStackTrace();
         }
     }
@@ -133,7 +141,8 @@ public class TestPixelsWriter {
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
@@ -146,21 +155,22 @@ public class TestPixelsWriter {
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
-                            .setSchema(schema)
-                            .setPixelStride(TestParams.pixelStride)
-                            .setRowGroupSize(TestParams.rowGroupSize)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
-                            .setBlockSize(TestParams.blockSize)
-                            .setReplication(TestParams.blockReplication)
-                            .setBlockPadding(TestParams.blockPadding)
-                            .setEncoding(TestParams.encoding)
-                            .setCompressionBlockSize(TestParams.compressionBlockSize)
-                            .build();
+                                    .setSchema(schema)
+                                    .setPixelStride(TestParams.pixelStride)
+                                    .setRowGroupSize(TestParams.rowGroupSize)
+                                    .setFS(fs)
+                                    .setFilePath(new Path(filePath))
+                                    .setBlockSize(TestParams.blockSize)
+                                    .setReplication(TestParams.blockReplication)
+                                    .setBlockPadding(TestParams.blockPadding)
+                                    .setEncoding(TestParams.encoding)
+                                    .setCompressionBlockSize(TestParams.compressionBlockSize)
+                                    .build();
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
-            for (int i = 0; i < TestParams.rowNum; i++) {
+            for (int i = 0; i < TestParams.rowNum; i++)
+            {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
                 a.isNull[row] = false;
@@ -174,17 +184,21 @@ public class TestPixelsWriter {
                 e.isNull[row] = false;
                 z.setVal(row, String.valueOf(i).getBytes());
                 z.isNull[row] = false;
-                if (rowBatch.size == rowBatch.getMaxSize()) {
+                if (rowBatch.size == rowBatch.getMaxSize())
+                {
                     pixelsWriter.addRowBatch(rowBatch);
                     rowBatch.reset();
                 }
             }
-            if (rowBatch.size != 0) {
+            if (rowBatch.size != 0)
+            {
                 pixelsWriter.addRowBatch(rowBatch);
                 rowBatch.reset();
             }
             pixelsWriter.close();
-        } catch (IOException | PixelsWriterException e) {
+        }
+        catch (IOException | PixelsWriterException e)
+        {
             e.printStackTrace();
         }
     }
@@ -204,13 +218,14 @@ public class TestPixelsWriter {
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(TestParams.filePath), conf);
             Path path = new Path(TestParams.filePath);
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(path)
-                    .build();
+                                           .setFS(fs)
+                                           .setPath(path)
+                                           .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             rowBatch = recordReader.readBatch(5000);
             LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
@@ -220,7 +235,8 @@ public class TestPixelsWriter {
             LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
             BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -228,7 +244,8 @@ public class TestPixelsWriter {
     @Test
     public void prepareCacheData()
     {
-        try {
+        try
+        {
             // get fs
             Configuration conf = new Configuration();
             conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
@@ -238,9 +255,9 @@ public class TestPixelsWriter {
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
                                      .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                     .setCacheSize(1024*1024*1024L)
+                                     .setCacheSize(1024 * 1024 * 1024L)
                                      .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                     .setIndexSize(1024*1024*1024L)
+                                     .setIndexSize(1024 * 1024 * 1024L)
                                      .setOverwrite(true)
                                      .setFS(fs)
                                      .build();
@@ -284,7 +301,8 @@ public class TestPixelsWriter {
             long flushEndNano = System.nanoTime();
             System.out.println("Flush time cost: " + (flushEndNano - flushStartNano) + "ns");
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }

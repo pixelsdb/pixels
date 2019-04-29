@@ -24,7 +24,8 @@ public class ByteColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         long[] values = columnVector.vector;
@@ -72,7 +73,8 @@ public class ByteColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel()
+            throws IOException
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
@@ -104,7 +106,8 @@ public class ByteColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         encoder.close();
         super.close();

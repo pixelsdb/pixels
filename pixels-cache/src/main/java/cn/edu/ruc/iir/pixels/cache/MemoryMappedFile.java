@@ -66,7 +66,8 @@ public class MemoryMappedFile
         }
     }
 
-    private static Method getMethod(Class<?> cls, String name, Class<?>... params) throws Exception
+    private static Method getMethod(Class<?> cls, String name, Class<?>... params)
+            throws Exception
     {
         Method m = cls.getDeclaredMethod(name, params);
         m.setAccessible(true);
@@ -78,7 +79,8 @@ public class MemoryMappedFile
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    private void mapAndSetOffset() throws Exception
+    private void mapAndSetOffset()
+            throws Exception
     {
         final RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
         backingFile.setLength(this.size);
@@ -95,14 +97,16 @@ public class MemoryMappedFile
      * @param len the file length
      * @throws Exception in case there was an error creating the memory mapped file
      */
-    public MemoryMappedFile(final String loc, long len) throws Exception
+    public MemoryMappedFile(final String loc, long len)
+            throws Exception
     {
         this.loc = loc;
         this.size = roundTo4096(len);
         mapAndSetOffset();
     }
 
-    public void unmap() throws Exception
+    public void unmap()
+            throws Exception
     {
         unmmap.invoke(null, addr, this.size);
     }

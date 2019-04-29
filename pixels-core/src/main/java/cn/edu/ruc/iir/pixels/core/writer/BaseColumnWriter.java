@@ -69,7 +69,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
      * @return size in bytes of the current column chunk
      */
     @Override
-    public abstract int write(ColumnVector vector, int size) throws IOException;
+    public abstract int write(ColumnVector vector, int size)
+            throws IOException;
 
     /**
      * Get byte array of column chunk content
@@ -110,7 +111,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     }
 
     @Override
-    public void flush() throws IOException
+    public void flush()
+            throws IOException
     {
         if (curPixelEleIndex > 0)
         {
@@ -122,7 +124,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
         isNullStream.writeTo(outputStream);
     }
 
-    void newPixel() throws IOException
+    void newPixel()
+            throws IOException
     {
         // isNull
         if (hasNull)
@@ -166,7 +169,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         outputStream.close();
         isNullStream.close();
