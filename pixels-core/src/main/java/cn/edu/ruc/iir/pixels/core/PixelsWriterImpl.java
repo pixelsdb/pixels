@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * Pixels file writer default implementation
- *
+ * <p>
  * This writer is NOT thread safe!
  *
  * @author guodong
@@ -126,7 +126,8 @@ public class PixelsWriterImpl
         private boolean encoding = true;
 
         private Builder()
-        {}
+        {
+        }
 
         public Builder setSchema(TypeDescription schema)
         {
@@ -217,13 +218,16 @@ public class PixelsWriterImpl
         public PixelsWriter build() throws PixelsWriterException
         {
             PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
-                    this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication, this.builderBlockPadding);
+                    this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication,
+                    this.builderBlockPadding);
             checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
-                    "schema is empty");
+                          "schema is empty");
 
-            if (fsWriter == null) {
+            if (fsWriter == null)
+            {
                 LOGGER.error("Failed to create PhysicalWriter");
-                throw new PixelsWriterException("Failed to create PixelsWriter due to error of creating PhysicalWriter");
+                throw new PixelsWriterException(
+                        "Failed to create PixelsWriter due to error of creating PhysicalWriter");
             }
 
             return new PixelsWriterImpl(
@@ -281,11 +285,12 @@ public class PixelsWriterImpl
     /**
      * Add a row batch
      * Repeating is not supported currently in ColumnVector
-     * */
+     */
     @Override
     public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
     {
-        if (isNewRowGroup) {
+        if (isNewRowGroup)
+        {
             this.isNewRowGroup = false;
             this.curRowGroupNumOfRows = 0L;
         }
@@ -298,7 +303,8 @@ public class PixelsWriterImpl
             curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
         }
         // see if current size has exceeded the row group size. if so, write out current row group
-        if (curRowGroupDataLength >= rowGroupSize) {
+        if (curRowGroupDataLength >= rowGroupSize)
+        {
             writeRowGroup();
             curRowGroupDataLength = 0;
             return false;
@@ -308,13 +314,14 @@ public class PixelsWriterImpl
 
     /**
      * Close PixelsWriterImpl, indicating the end of file
-     * */
+     */
     @Override
     public void close()
     {
         try
         {
-            if (curRowGroupNumOfRows != 0) {
+            if (curRowGroupNumOfRows != 0)
+            {
                 writeRowGroup();
             }
             writeFileTail();
@@ -323,7 +330,8 @@ public class PixelsWriterImpl
             {
                 cw.close();
             }
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             LOGGER.error(e.getMessage());
             e.printStackTrace();
@@ -353,9 +361,11 @@ public class PixelsWriterImpl
         }
 
         // write and flush row group content
-        try {
+        try
+        {
             curRowGroupOffset = physicalWriter.prepare(rowGroupDataLength);
-            if (curRowGroupOffset != -1) {
+            if (curRowGroupOffset != -1)
+            {
                 for (ColumnWriter writer : columnWriters)
                 {
                     byte[] rowGroupBuffer = writer.getColumnChunkContent();
@@ -363,11 +373,13 @@ public class PixelsWriterImpl
                 }
                 physicalWriter.flush();
             }
-            else {
+            else
+            {
                 LOGGER.warn("Write row group prepare failed");
             }
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             LOGGER.error(e.getMessage());
             return;
         }
@@ -396,18 +408,20 @@ public class PixelsWriterImpl
         // put curRowGroupIndex into rowGroupFooter
         PixelsProto.RowGroupFooter rowGroupFooter =
                 PixelsProto.RowGroupFooter.newBuilder()
-                        .setRowGroupIndexEntry(curRowGroupIndex.build())
-                        .setRowGroupEncoding(curRowGroupEncoding.build())
-                        .build();
+                                          .setRowGroupIndexEntry(curRowGroupIndex.build())
+                                          .setRowGroupEncoding(curRowGroupEncoding.build())
+                                          .build();
 
         // write and flush row group footer
-        try {
+        try
+        {
             byte[] footerBuffer = rowGroupFooter.toByteArray();
             physicalWriter.prepare(footerBuffer.length);
             curRowGroupFooterOffset = physicalWriter.append(footerBuffer, 0, footerBuffer.length);
             physicalWriter.flush();
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             LOGGER.error(e.getMessage());
             return;
         }
@@ -450,24 +464,24 @@ public class PixelsWriterImpl
 
         // build PostScript
         postScript = PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.VERSION)
-                .setContentLength(fileContentLength)
-                .setNumberOfRows(fileRowNum)
-                .setCompression(compressionKind)
-                .setCompressionBlockSize(compressionBlockSize)
-                .setPixelStride(pixelStride)
-                .setWriterTimezone(timeZone.getDisplayName())
-                .setMagic(Constants.MAGIC)
-                .build();
+                                           .setVersion(Constants.VERSION)
+                                           .setContentLength(fileContentLength)
+                                           .setNumberOfRows(fileRowNum)
+                                           .setCompression(compressionKind)
+                                           .setCompressionBlockSize(compressionBlockSize)
+                                           .setPixelStride(pixelStride)
+                                           .setWriterTimezone(timeZone.getDisplayName())
+                                           .setMagic(Constants.MAGIC)
+                                           .build();
 
         // build FileTail
         PixelsProto.FileTail fileTail =
                 PixelsProto.FileTail.newBuilder()
-                        .setFooter(footer)
-                        .setPostscript(postScript)
-                        .setFooterLength(footer.getSerializedSize())
-                        .setPostscriptLength(postScript.getSerializedSize())
-                        .build();
+                                    .setFooter(footer)
+                                    .setPostscript(postScript)
+                                    .setFooterLength(footer.getSerializedSize())
+                                    .setPostscriptLength(postScript.getSerializedSize())
+                                    .build();
 
         // write and flush FileTail plus FileTail physical offset at the end of the file
         int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
@@ -483,7 +497,8 @@ public class PixelsWriterImpl
     {
         List<TypeDescription> children = schema.getChildren();
         List<String> names = schema.getFieldNames();
-        if (children == null || children.isEmpty()) {
+        if (children == null || children.isEmpty())
+        {
             return;
         }
         for (int i = 0; i < children.size(); i++)
@@ -533,7 +548,7 @@ public class PixelsWriterImpl
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
-                            schema.getCategory());
+                                                               schema.getCategory());
             }
             builder.addTypes(tmpType.build());
         }

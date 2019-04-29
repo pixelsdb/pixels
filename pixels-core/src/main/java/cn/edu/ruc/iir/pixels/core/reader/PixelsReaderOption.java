@@ -19,7 +19,8 @@ public class PixelsReaderOption
     private int rgLen = -1;     // -1 means reading to the end of the file
 
     public PixelsReaderOption()
-    {}
+    {
+    }
 
     public void includeCols(String[] columnNames)
     {
@@ -38,7 +39,8 @@ public class PixelsReaderOption
 
     public Optional<PixelsPredicate> getPredicate()
     {
-        if (predicate == null) {
+        if (predicate == null)
+        {
             return Optional.empty();
         }
         return Optional.of(predicate);

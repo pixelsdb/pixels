@@ -16,17 +16,21 @@ public class TimestampStatsRecorder
     private long minimum = Long.MAX_VALUE;
     private long maximum = Long.MIN_VALUE;
 
-    TimestampStatsRecorder() {}
+    TimestampStatsRecorder()
+    {
+    }
 
     TimestampStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         super(statistic);
         PixelsProto.TimestampStatistic tsState = statistic.getTimestampStatistics();
-        if (tsState.hasMinimum()) {
+        if (tsState.hasMinimum())
+        {
             minimum = tsState.getMinimum();
             hasMinimum = true;
         }
-        if (tsState.hasMaximum()) {
+        if (tsState.hasMaximum())
+        {
             maximum = tsState.getMaximum();
             hasMinimum = true;
         }
@@ -44,15 +48,19 @@ public class TimestampStatsRecorder
     @Override
     public void updateTimestamp(long value)
     {
-        if (hasMinimum) {
-            if (value < minimum) {
+        if (hasMinimum)
+        {
+            if (value < minimum)
+            {
                 minimum = value;
             }
-            if (value > maximum) {
+            if (value > maximum)
+            {
                 maximum = value;
             }
         }
-        else {
+        else
+        {
             minimum = maximum = value;
             hasMinimum = true;
         }
@@ -62,15 +70,19 @@ public class TimestampStatsRecorder
     @Override
     public void updateTimestamp(Timestamp value)
     {
-        if (hasMinimum) {
-            if (value.getTime() < minimum) {
+        if (hasMinimum)
+        {
+            if (value.getTime() < minimum)
+            {
                 minimum = value.getTime();
             }
-            if (value.getTime() > maximum) {
+            if (value.getTime() > maximum)
+            {
                 maximum = value.getTime();
             }
         }
-        else {
+        else
+        {
             minimum = maximum = value.getTime();
             hasMinimum = true;
         }
@@ -80,23 +92,30 @@ public class TimestampStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof TimestampColumnStats) {
+        if (other instanceof TimestampColumnStats)
+        {
             TimestampStatsRecorder tsStat = (TimestampStatsRecorder) other;
-            if (hasMinimum) {
-                if (tsStat.getMinimum() < minimum) {
+            if (hasMinimum)
+            {
+                if (tsStat.getMinimum() < minimum)
+                {
                     minimum = tsStat.getMinimum();
                 }
-                if (tsStat.getMaximum() > maximum) {
+                if (tsStat.getMaximum() > maximum)
+                {
                     maximum = tsStat.getMaximum();
                 }
             }
-            else {
+            else
+            {
                 minimum = tsStat.getMinimum();
                 maximum = tsStat.getMaximum();
             }
         }
-        else {
-            if (isStatsExists() && hasMinimum) {
+        else
+        {
+            if (isStatsExists() && hasMinimum)
+            {
                 throw new IllegalArgumentException("Incompatible merging of timestamp column statistics");
             }
         }
@@ -129,9 +148,11 @@ public class TimestampStatsRecorder
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (hasMinimum) {
+        if (hasMinimum)
+        {
             buf.append(" min: ");
             buf.append(getMinimum());
             buf.append(" max: ");
@@ -143,27 +164,34 @@ public class TimestampStatsRecorder
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof TimestampStatsRecorder)) {
+        if (!(o instanceof TimestampStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         TimestampStatsRecorder that = (TimestampStatsRecorder) o;
 
-        if (hasMinimum ? !(minimum == that.minimum) : that.hasMinimum) {
+        if (hasMinimum ? !(minimum == that.minimum) : that.hasMinimum)
+        {
             return false;
         }
-        if (hasMinimum ? !(maximum == that.maximum) : that.hasMinimum) {
+        if (hasMinimum ? !(maximum == that.maximum) : that.hasMinimum)
+        {
             return false;
         }
 
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -171,7 +199,8 @@ public class TimestampStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         result = 31 * result + (int) (minimum ^ (minimum >>> 32));
         result = 31 * result + (int) (maximum ^ (maximum >>> 32));

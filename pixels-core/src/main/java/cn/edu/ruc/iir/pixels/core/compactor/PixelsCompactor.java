@@ -123,11 +123,13 @@ public class PixelsCompactor
         private List<Path> rowGroupPaths = new LinkedList<>();
 
         private Builder()
-        {}
+        {
+        }
 
         /**
          * set schema is optional, if schema is not set, the schema read from the first source file will be used as this.schema.
          * and this.schema will be used as the schema of the compacted file.
+         *
          * @param schema
          * @return
          */
@@ -223,7 +225,8 @@ public class PixelsCompactor
                 fsReader.readFully(fileTailBuffer);
                 PixelsProto.FileTail fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
 
-                if (fileTail == null) {
+                if (fileTail == null)
+                {
                     throw new IOException("read file tail failed.");
                 }
 
@@ -231,14 +234,17 @@ public class PixelsCompactor
                 PixelsProto.PostScript postScript = fileTail.getPostscript();
                 int fileVersion = postScript.getVersion();
                 String fileMagic = postScript.getMagic();
-                if (!PixelsVersion.matchVersion(fileVersion)) {
+                if (!PixelsVersion.matchVersion(fileVersion))
+                {
                     throw new PixelsFileVersionInvalidException(fileVersion);
                 }
-                if (!fileMagic.contentEquals(Constants.MAGIC)) {
+                if (!fileMagic.contentEquals(Constants.MAGIC))
+                {
                     throw new PixelsFileMagicInvalidException(fileMagic);
                 }
 
-                if (i == 0) {
+                if (i == 0)
+                {
                     compressionKind = fileTail.getPostscript().getCompression();
                     compressionBlockSize = fileTail.getPostscript().getCompressionBlockSize();
                     pixelStride = fileTail.getPostscript().getPixelStride();
@@ -253,7 +259,8 @@ public class PixelsCompactor
                     fileColStatRecorders = new StatsRecorder[childrenSchema.size()];
                     for (int j = 0; j < childrenSchema.size(); ++j)
                     {
-                        this.fileColStatRecorders[j] = StatsRecorder.create(childrenSchema.get(j)); // to be updated when compacting
+                        this.fileColStatRecorders[j] = StatsRecorder
+                                .create(childrenSchema.get(j)); // to be updated when compacting
                     }
                 }
 
@@ -262,7 +269,8 @@ public class PixelsCompactor
 
                 PixelsProto.Footer footer = fileTail.getFooter();
                 // init rowGroupStatisticList
-                for (PixelsProto.RowGroupStatistic stat : footer.getRowGroupStatsList()) {
+                for (PixelsProto.RowGroupStatistic stat : footer.getRowGroupStatsList())
+                {
                     rowGroupStatBuilderList.add(stat.toBuilder());
                 }
                 for (PixelsProto.RowGroupInformation info : footer.getRowGroupInfosList())
@@ -275,13 +283,14 @@ public class PixelsCompactor
                     fsReader.readFully(footerBuffer);
                     PixelsProto.RowGroupFooter rowGroupFooter =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
-                    rowGroupFooterBuilderList.add(rowGroupFooter.toBuilder()); // chunkOffset to be updated when compacting
+                    rowGroupFooterBuilderList
+                            .add(rowGroupFooter.toBuilder()); // chunkOffset to be updated when compacting
                     rowGroupPaths.add(path);
                 }
             }
 
             fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(builderFS, builderFilePath, builderBlockSize,
-                    builderReplication, builderBlockPadding);
+                                                              builderReplication, builderBlockPadding);
 
             return new PixelsCompactor(
                     schema,
@@ -323,13 +332,14 @@ public class PixelsCompactor
             int columnId = index.getColumnId();
             PixelsProto.ColumnChunkIndex.Builder columnChunkIndexBuilder =
                     this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
-                            .getColumnChunkIndexEntriesBuilder(columnId);
+                                                  .getColumnChunkIndexEntriesBuilder(columnId);
             long columnChunkOffset = columnChunkIndexBuilder.getChunkOffset();
             long columnChunkLength = columnChunkIndexBuilder.getChunkLength();
             Path path = this.rowGroupPaths.get(rowGroupId);
             try (PhysicalFSReader fsReader = PhysicalReaderUtil.newPhysicalFSReader(fs, path))
             {
-                if (fsReader == null) {
+                if (fsReader == null)
+                {
                     throw new IOException("read file failed.");
                 }
                 fsReader.seek(columnChunkOffset);
@@ -339,7 +349,8 @@ public class PixelsCompactor
                 long offset = this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
                 columnChunkIndexBuilder.setChunkOffset(offset);
                 this.fsWriter.flush();
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 LOGGER.error(e.getMessage());
                 e.printStackTrace();
@@ -360,7 +371,8 @@ public class PixelsCompactor
                 fsWriter.flush();
                 this.rowGroupInfoBuilderList.get(i).setFooterOffset(rowGroupFooterOffset);
                 this.rowGroupInfoBuilderList.get(i).setFooterLength(rowGroupFooter.getSerializedSize());
-            } catch (IOException e)
+            }
+            catch (IOException e)
             {
                 LOGGER.error(e.getMessage());
                 e.printStackTrace();
@@ -385,11 +397,11 @@ public class PixelsCompactor
 
         PixelsProto.FileTail fileTail =
                 PixelsProto.FileTail.newBuilder()
-                        .setFooter(footer)
-                        .setPostscript(postScript)
-                        .setFooterLength(footer.getSerializedSize())
-                        .setPostscriptLength(postScript.getSerializedSize())
-                        .build();
+                                    .setFooter(footer)
+                                    .setPostscript(postScript)
+                                    .setFooterLength(footer.getSerializedSize())
+                                    .setPostscriptLength(postScript.getSerializedSize())
+                                    .build();
 
         try
         {
@@ -401,7 +413,8 @@ public class PixelsCompactor
             tailOffsetBuffer.putLong(tailOffset);
             fsWriter.append(tailOffsetBuffer);
             fsWriter.flush();
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             LOGGER.error(e.getMessage());
             System.out.println("Error writing file tail out.");
@@ -433,26 +446,27 @@ public class PixelsCompactor
     private PixelsProto.PostScript writePostScript()
     {
         return PixelsProto.PostScript.newBuilder()
-                .setVersion(Constants.VERSION)
-                .setContentLength(fileContentLength)
-                .setNumberOfRows(fileRowNum)
-                .setCompression(compressionKind)
-                .setCompressionBlockSize(compressionBlockSize)
-                .setPixelStride(pixelStride)
-                .setWriterTimezone(timeZone.getDisplayName())
-                .setMagic(Constants.MAGIC)
-                .build();
+                                     .setVersion(Constants.VERSION)
+                                     .setContentLength(fileContentLength)
+                                     .setNumberOfRows(fileRowNum)
+                                     .setCompression(compressionKind)
+                                     .setCompressionBlockSize(compressionBlockSize)
+                                     .setPixelStride(pixelStride)
+                                     .setWriterTimezone(timeZone.getDisplayName())
+                                     .setMagic(Constants.MAGIC)
+                                     .build();
     }
 
     /**
      * Close PixelsCompactor, indicating the end of file
-     * */
+     */
     public void close()
     {
         try
         {
             fsWriter.close();
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             LOGGER.error(e.getMessage());
             System.out.println("Error writing file tail out.");

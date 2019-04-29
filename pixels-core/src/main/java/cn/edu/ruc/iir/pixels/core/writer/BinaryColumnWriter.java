@@ -28,7 +28,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
             curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartBinary(columnVector, values, curPartLength, curPartOffset);
             newPixel();
@@ -45,7 +46,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private void writeCurPartBinary(BytesColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
             throws IOException
     {
-        for (int i = 0; i < curPartLength; i++) {
+        for (int i = 0; i < curPartLength; i++)
+        {
             curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {

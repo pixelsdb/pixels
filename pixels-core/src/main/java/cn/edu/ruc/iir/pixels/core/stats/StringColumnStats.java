@@ -15,7 +15,8 @@ public interface StringColumnStats extends RangeStats<Slice>
 
     /**
      * Get the total length of all strings
+     *
      * @return the sum (total length)
-     * */
+     */
     long getSum();
 }

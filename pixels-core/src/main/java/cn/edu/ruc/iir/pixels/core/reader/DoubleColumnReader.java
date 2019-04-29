@@ -77,7 +77,8 @@ public class DoubleColumnReader
             }
             else
             {
-                columnVector.vector[i + vectorIndex] = Double.longBitsToDouble(encodingUtils.readLongLE(this.input, inputIndex));
+                columnVector.vector[i + vectorIndex] = Double
+                        .longBitsToDouble(encodingUtils.readLongLE(this.input, inputIndex));
                 inputIndex += 8;
             }
             if (hasNull)

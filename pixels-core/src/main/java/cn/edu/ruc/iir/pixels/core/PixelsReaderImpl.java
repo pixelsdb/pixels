@@ -84,7 +84,8 @@ public class PixelsReaderImpl
         private PixelsFooterCache builderPixelsFooterCache = null;
 
         private Builder()
-        {}
+        {
+        }
 
         public Builder setFS(FileSystem fs)
         {
@@ -125,7 +126,8 @@ public class PixelsReaderImpl
         public PixelsReader build() throws IllegalArgumentException, IOException
         {
             // check arguments
-            if (builderFS == null || builderPath == null) {
+            if (builderFS == null || builderPath == null)
+            {
                 throw new IllegalArgumentException("Missing argument to build PixelsReader");
             }
             // get PhysicalFSReader
@@ -134,7 +136,8 @@ public class PixelsReaderImpl
             PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(builderPath.getName());
             if (fileTail == null)
             {
-                if (fsReader == null) {
+                if (fsReader == null)
+                {
                     LOGGER.error("Failed to create PhysicalFSReader");
                     throw new PixelsReaderException(
                             "Failed to create PixelsReader due to error of creating PhysicalFSReader");
@@ -155,10 +158,12 @@ public class PixelsReaderImpl
             PixelsProto.PostScript postScript = fileTail.getPostscript();
             int fileVersion = postScript.getVersion();
             String fileMagic = postScript.getMagic();
-            if (!PixelsVersion.matchVersion(fileVersion)) {
+            if (!PixelsVersion.matchVersion(fileVersion))
+            {
                 throw new PixelsFileVersionInvalidException(fileVersion);
             }
-            if (!fileMagic.contentEquals(Constants.MAGIC)) {
+            if (!fileMagic.contentEquals(Constants.MAGIC))
+            {
                 throw new PixelsFileMagicInvalidException(fileMagic);
             }
 
@@ -175,7 +180,8 @@ public class PixelsReaderImpl
 
             // check metrics collect probability
             float metricCollectProb = coreConfig.getMetricsCollectProb();
-            if (metricCollectProb > 1.0f || metricCollectProb < 0.0f) {
+            if (metricCollectProb > 1.0f || metricCollectProb < 0.0f)
+            {
                 throw new PixelsMetricsCollectProbOutOfRange(metricCollectProb);
             }
 
@@ -211,12 +217,14 @@ public class PixelsReaderImpl
     {
         float diceValue = random.nextFloat();
         boolean enableMetrics = false;
-        if (diceValue < metricsCollectProb) {
+        if (diceValue < metricsCollectProb)
+        {
             enableMetrics = true;
         }
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
-                enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader, pixelsFooterCache);
+                                                                     enableMetrics, metricsDir, enableCache, cacheOrder,
+                                                                     pixelsCacheReader, pixelsFooterCache);
         recordReaders.add(recordReader);
         return recordReader;
     }
@@ -331,7 +339,8 @@ public class PixelsReaderImpl
     {
         List<String> fieldNames = fileSchema.getFieldNames();
         int fieldId = fieldNames.indexOf(columnName);
-        if (fieldId == -1) {
+        if (fieldId == -1)
+        {
             return null;
         }
         return this.footer.getColumnStats(fieldId);
@@ -357,7 +366,8 @@ public class PixelsReaderImpl
     @Override
     public PixelsProto.RowGroupInformation getRowGroupInfo(int rowGroupId)
     {
-        if (rowGroupId < 0) {
+        if (rowGroupId < 0)
+        {
             return null;
         }
         return this.footer.getRowGroupInfos(rowGroupId);
@@ -372,7 +382,8 @@ public class PixelsReaderImpl
     @Override
     public PixelsProto.RowGroupStatistic getRowGroupStat(int rowGroupId)
     {
-        if (rowGroupId < 0) {
+        if (rowGroupId < 0)
+        {
             return null;
         }
         return this.footer.getRowGroupStats(rowGroupId);
@@ -380,6 +391,7 @@ public class PixelsReaderImpl
 
     /**
      * Get statistics of all row groups
+     *
      * @return row groups statistics
      */
     @Override
@@ -406,7 +418,8 @@ public class PixelsReaderImpl
     @Override
     public void close() throws IOException
     {
-        for (PixelsRecordReader recordReader : recordReaders) {
+        for (PixelsRecordReader recordReader : recordReaders)
+        {
             recordReader.close();
         }
         this.physicalFSReader.close();

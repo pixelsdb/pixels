@@ -46,7 +46,8 @@ public class RunLenIntDecoder
     public long next() throws IOException
     {
         long result;
-        if (used == numLiterals) {
+        if (used == numLiterals)
+        {
             numLiterals = 0;
             used = 0;
             readValues();
@@ -66,14 +67,16 @@ public class RunLenIntDecoder
         // read the first 2 bits and determine the encoding type
         isRepeating = false;
         int firstByte = inputStream.read();
-        if (firstByte < 0) {
+        if (firstByte < 0)
+        {
             // todo deal with error
             LOGGER.error("error first byte is negative");
             used = numLiterals = 0;
             return;
         }
         currentEncoding = encodings[(firstByte >>> 6) & 0x03];
-        switch (currentEncoding) {
+        switch (currentEncoding)
+        {
             case SHORT_REPEAT:
                 readShortRepeatValues(firstByte);
                 break;
@@ -106,11 +109,13 @@ public class RunLenIntDecoder
         // read the repeated value which is stored using fixed bytes
         long val = bytesToLongBE(inputStream, size);
 
-        if (isSigned) {
+        if (isSigned)
+        {
             val = zigzagDecode(val);
         }
 
-        if (numLiterals != 0) {
+        if (numLiterals != 0)
+        {
             // currently this always holds, which makes peekNextAvailLength simpler.
             // if this changes, peekNextAvailLength should be adjusted accordingly.
             LOGGER.error("numLiterals is not zero");
@@ -120,7 +125,8 @@ public class RunLenIntDecoder
         // repeat the value for length times
         isRepeating = true;
         // TODO: this is not so useful and V1 reader doesn't do that. Fix? Same if delta == 0
-        for (int i = 0; i < len; i++) {
+        for (int i = 0; i < len; i++)
+        {
             literals[i] = val;
         }
         numLiterals = len;
@@ -140,13 +146,16 @@ public class RunLenIntDecoder
 
         // write the unpacked values and zigzag decode to result buffer
         readInts(literals, numLiterals, len, fb, inputStream);
-        if (isSigned) {
-            for (int i = 0; i < len; i++) {
+        if (isSigned)
+        {
+            for (int i = 0; i < len; i++)
+            {
                 literals[numLiterals] = zigzagDecode(literals[numLiterals]);
                 numLiterals++;
             }
         }
-        else {
+        else
+        {
             numLiterals += len;
         }
     }
@@ -186,7 +195,8 @@ public class RunLenIntDecoder
         long base = bytesToLongBE(inputStream, bw);
         long mask = (1L << ((bw * 8) - 1));
         // if MSB of base value is 1 then base is negative value else positive
-        if ((base & mask) != 0) {
+        if ((base & mask) != 0)
+        {
             base = base & ~mask;
             base = -base;
         }
@@ -198,7 +208,8 @@ public class RunLenIntDecoder
         // unpack the patch blob
         long[] unpackedPatch = new long[pl];
 
-        if ((pw + pgw) > 64) {
+        if ((pw + pgw) > 64)
+        {
             LOGGER.error("pw add pgw is bigger than 64");
             return;
         }
@@ -216,7 +227,8 @@ public class RunLenIntDecoder
 
         // special case: gap is greater than 255 then patch value will be 0
         // if gap is smaller or equal than 255 then patch value cannot be 0
-        while (currGap == 255 && currPatch == 0) {
+        while (currGap == 255 && currPatch == 0)
+        {
             actualGap += 255;
             patchIdx++;
             currGap = unpackedPatch[patchIdx] >>> pw;
@@ -226,15 +238,18 @@ public class RunLenIntDecoder
         actualGap += currGap;
 
         // unpack data blob, patch it (if required), add base to get final result
-        for (int i = 0; i < unpacked.length; i++) {
-            if (i == actualGap) {
+        for (int i = 0; i < unpacked.length; i++)
+        {
+            if (i == actualGap)
+            {
                 // extract the patch value
                 long patchedVal = unpacked[i] | (currPatch << fb);
                 // add base to patched value
                 literals[numLiterals++] = base + patchedVal;
                 // increment the patch to point to next entry in patch list
                 patchIdx++;
-                if (patchIdx < pl) {
+                if (patchIdx < pl)
+                {
                     // read the next gap and patch
                     currGap = unpackedPatch[patchIdx] >>> pw;
                     currPatch = unpackedPatch[patchIdx] & patchMask;
@@ -242,7 +257,8 @@ public class RunLenIntDecoder
 
                     // special case: gap is grater than 255 then patch will be 0
                     // if gap is smaller or equal than 255 then patch cannot be 0
-                    while (currGap == 255 && currPatch == 0) {
+                    while (currGap == 255 && currPatch == 0)
+                    {
                         actualGap += 255;
                         patchIdx++;
                         currGap = unpackedPatch[patchIdx] >>> pw;
@@ -255,7 +271,8 @@ public class RunLenIntDecoder
                     actualGap += i;
                 }
             }
-            else {
+            else
+            {
                 // no patching required. add base to unpacked value to get final value
                 literals[numLiterals++] = base + unpacked[i];
             }
@@ -266,7 +283,8 @@ public class RunLenIntDecoder
     {
         // extract the number of fixed bits
         int fb = (firstByte >>> 1) & 0x1f;
-        if (fb != 0) {
+        if (fb != 0)
+        {
             fb = encodingUtils.decodeBitWidth(fb);
         }
 
@@ -276,10 +294,12 @@ public class RunLenIntDecoder
 
         // read the first value stored as vint
         long firstVal = 0;
-        if (isSigned) {
+        if (isSigned)
+        {
             firstVal = readVslong(inputStream);
         }
-        else {
+        else
+        {
             firstVal = readVulong(inputStream);
         }
 
@@ -288,24 +308,29 @@ public class RunLenIntDecoder
         literals[numLiterals++] = firstVal;
 
         // if fixed bits is 0 then all values have fixed delta
-        if (fb == 0) {
+        if (fb == 0)
+        {
             // read the fixed delta value stored as vint (deltas
             // can be negative even if all number are positive)
             long fd = readVslong(inputStream);
-            if (fd == 0) {
+            if (fd == 0)
+            {
                 isRepeating = true;
                 checkArgument(numLiterals == 1, "num literals is not equal to 1");
                 Arrays.fill(literals, numLiterals, numLiterals + len, literals[0]);
                 numLiterals += len;
             }
-            else {
+            else
+            {
                 // add fixed deltas to adjacent values
-                for (int i = 0; i < len; i++) {
+                for (int i = 0; i < len; i++)
+                {
                     literals[numLiterals++] = literals[numLiterals - 2] + fd;
                 }
             }
         }
-        else {
+        else
+        {
             long deltaBase = readVslong(inputStream);
             // add delta base and first value
             literals[numLiterals++] = firstVal + deltaBase;
@@ -316,11 +341,14 @@ public class RunLenIntDecoder
             // value to result buffer. if the delta base value is negative then it
             // is a decreasing sequence else an increasing sequence
             readInts(literals, numLiterals, len, fb, inputStream);
-            while (len > 0) {
-                if (deltaBase < 0) {
+            while (len > 0)
+            {
+                if (deltaBase < 0)
+                {
                     literals[numLiterals] = prevVal - literals[numLiterals];
                 }
-                else {
+                else
+                {
                     literals[numLiterals] = prevVal + literals[numLiterals];
                 }
                 prevVal = literals[numLiterals];
@@ -332,13 +360,15 @@ public class RunLenIntDecoder
 
     /**
      * Read bitpacked integers from input stream
-     * */
+     */
     private void readInts(long[] buffer, int offset, int len, int bitSize,
-                         InputStream input) throws IOException {
+                          InputStream input) throws IOException
+    {
         int bitsLeft = 0;
         int current = 0;
 
-        switch (bitSize) {
+        switch (bitSize)
+        {
             case 1:
                 encodingUtils.unrolledUnPack1(buffer, offset, len, input);
                 return;
@@ -376,10 +406,12 @@ public class RunLenIntDecoder
                 break;
         }
 
-        for(int i = offset; i < (offset + len); i++) {
+        for (int i = offset; i < (offset + len); i++)
+        {
             long result = 0;
             int bitsLeftToRead = bitSize;
-            while (bitsLeftToRead > bitsLeft) {
+            while (bitsLeftToRead > bitsLeft)
+            {
                 result <<= bitsLeft;
                 result |= current & ((1 << bitsLeft) - 1);
                 bitsLeftToRead -= bitsLeft;
@@ -388,7 +420,8 @@ public class RunLenIntDecoder
             }
 
             // handle the left over bits
-            if (bitsLeftToRead > 0) {
+            if (bitsLeftToRead > 0)
+            {
                 result <<= bitsLeftToRead;
                 bitsLeft -= bitsLeftToRead;
                 result |= (current >> bitsLeft) & ((1 << bitsLeftToRead) - 1);
@@ -413,19 +446,22 @@ public class RunLenIntDecoder
 
     /**
      * zigzag decode given value
-     * */
+     */
     private long zigzagDecode(long val)
     {
         return (val >>> 1) ^ -(val & 1);
     }
 
-    private long readVulong(InputStream in) throws IOException {
+    private long readVulong(InputStream in) throws IOException
+    {
         long result = 0;
         long b;
         int offset = 0;
-        do {
+        do
+        {
             b = in.read();
-            if (b == -1) {
+            if (b == -1)
+            {
                 throw new EOFException("Reading Vulong past EOF");
             }
             result |= (0x7f & b) << offset;
@@ -434,7 +470,8 @@ public class RunLenIntDecoder
         return result;
     }
 
-    private long readVslong(InputStream in) throws IOException {
+    private long readVslong(InputStream in) throws IOException
+    {
         long result = readVulong(in);
         return (result >>> 1) ^ -(result & 1);
     }

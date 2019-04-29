@@ -72,5 +72,6 @@ public abstract class Encoder
     }
 
     public void close() throws IOException
-    {}
+    {
+    }
 }

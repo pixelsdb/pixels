@@ -12,7 +12,9 @@ public class BinaryStatsRecorder
 {
     private long sum = 0L;
 
-    BinaryStatsRecorder() {}
+    BinaryStatsRecorder()
+    {
+    }
 
     BinaryStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -41,12 +43,15 @@ public class BinaryStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof BinaryColumnStats) {
+        if (other instanceof BinaryColumnStats)
+        {
             BinaryStatsRecorder binaryStat = (BinaryStatsRecorder) other;
             this.sum += binaryStat.sum;
         }
-        else {
-            if (isStatsExists() && sum != 0) {
+        else
+        {
+            if (isStatsExists() && sum != 0)
+            {
                 throw new IllegalArgumentException("Incompatible merging of binary column statistics");
             }
         }
@@ -76,36 +81,44 @@ public class BinaryStatsRecorder
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (getNumberOfValues() != 0) {
+        if (getNumberOfValues() != 0)
+        {
             buf.append(" sum: ");
             buf.append(sum);
         }
         buf.append(" numberOfValues: ")
-                .append(numberOfValues);
+           .append(numberOfValues);
         return buf.toString();
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof BinaryStatsRecorder)) {
+        if (!(o instanceof BinaryStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         BinaryStatsRecorder that = (BinaryStatsRecorder) o;
 
-        if (sum != that.sum) {
+        if (sum != that.sum)
+        {
             return false;
         }
 
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -113,7 +126,8 @@ public class BinaryStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         result = 31 * result + (int) (sum ^ (sum >>> 32));
         return result;

@@ -37,7 +37,8 @@ public class ByteColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
             curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartByte(columnVector, bvalues, curPartLength, curPartOffset);
             newPixel();
@@ -53,7 +54,8 @@ public class ByteColumnWriter extends BaseColumnWriter
 
     private void writeCurPartByte(LongColumnVector columnVector, byte[] bvalues, int curPartLength, int curPartOffset)
     {
-        for (int i = 0; i < curPartLength; i++) {
+        for (int i = 0; i < curPartLength; i++)
+        {
             curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {
@@ -77,10 +79,12 @@ public class ByteColumnWriter extends BaseColumnWriter
             pixelStatRecorder.updateInteger(curPixelVector[i], 1);
         }
 
-        if (isEncoding) {
+        if (isEncoding)
+        {
             outputStream.write(encoder.encode(curPixelVector, 0, curPixelVectorIndex));
         }
-        else {
+        else
+        {
             outputStream.write(curPixelVector, 0, curPixelVectorIndex);
         }
 
@@ -90,12 +94,13 @@ public class ByteColumnWriter extends BaseColumnWriter
     @Override
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
-        if (isEncoding) {
+        if (isEncoding)
+        {
             return PixelsProto.ColumnEncoding.newBuilder()
-                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+                                             .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override

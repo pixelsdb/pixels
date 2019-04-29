@@ -57,25 +57,30 @@ public class TupleDomainPixelsPredicate<C>
     public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)
     {
         Optional<Map<C, Domain>> optionalDomains = predicate.getDomains();
-        if (!optionalDomains.isPresent()) {
+        if (!optionalDomains.isPresent())
+        {
             // predicate is none, so skip the reading content
             return false;
         }
         Map<C, Domain> domains = optionalDomains.get();
 
-        for (ColumnReference<C> columnReference : columnReferences) {
+        for (ColumnReference<C> columnReference : columnReferences)
+        {
             Domain predicateDomain = domains.get(columnReference.getColumn());
-            if (predicateDomain == null) {
+            if (predicateDomain == null)
+            {
                 // no predicate on this column, so continue
                 continue;
             }
             ColumnStats columnStats = statisticsByColumnIndex.get(columnReference.getOrdinal());
-            if (columnStats == null) {
+            if (columnStats == null)
+            {
                 // no column statistics, so continue
                 continue;
             }
 
-            if (!domainOverlaps(columnReference, predicateDomain, numberOfRows, columnStats)) {
+            if (!domainOverlaps(columnReference, predicateDomain, numberOfRows, columnStats))
+            {
                 return false;
             }
         }
@@ -87,16 +92,19 @@ public class TupleDomainPixelsPredicate<C>
                                    long numberOfRows, ColumnStats columnStats)
     {
         Domain columnDomain = getDomain(columnReference.getType(), numberOfRows, columnStats);
-        if (!columnDomain.overlaps(predicateDomain)) {
+        if (!columnDomain.overlaps(predicateDomain))
+        {
             return false;
         }
 
-        if (predicateDomain.isNullAllowed() && columnDomain.isNullAllowed()) {
+        if (predicateDomain.isNullAllowed() && columnDomain.isNullAllowed())
+        {
             return true;
         }
 
         Optional<Collection<Object>> discreteValues = getDiscreteValues(predicateDomain.getValues());
-        if (!discreteValues.isPresent()) {
+        if (!discreteValues.isPresent())
+        {
             return true;
         }
 
@@ -108,8 +116,10 @@ public class TupleDomainPixelsPredicate<C>
         return valueSet.getValuesProcessor().transform(
                 ranges -> {
                     ImmutableList.Builder<Object> discreteValues = ImmutableList.builder();
-                    for (Range range : ranges.getOrderedRanges()) {
-                        if (!range.isSingleValue()) {
+                    for (Range range : ranges.getOrderedRanges())
+                    {
+                        if (!range.isSingleValue())
+                        {
                             return Optional.empty();
                         }
                         discreteValues.add(range.getSingleValue());
@@ -122,47 +132,59 @@ public class TupleDomainPixelsPredicate<C>
 
     private Domain getDomain(Type type, long rowCount, ColumnStats columnStats)
     {
-        if (rowCount == 0) {
+        if (rowCount == 0)
+        {
             return Domain.none(type);
         }
 
-        if (columnStats == null) {
+        if (columnStats == null)
+        {
             return Domain.all(type);
         }
 
-        if (columnStats.getNumberOfValues() == 0) {
+        if (columnStats.getNumberOfValues() == 0)
+        {
             return Domain.onlyNull(type);
         }
 
         boolean hasNullValue = columnStats.getNumberOfValues() != rowCount;
 
-        if (type.getJavaType() == boolean.class) {
+        if (type.getJavaType() == boolean.class)
+        {
             BooleanColumnStats booleanColumnStats = (BooleanColumnStats) columnStats;
             boolean hasTrueValues = booleanColumnStats.getTrueCount() != 0;
             boolean hasFalseValues = booleanColumnStats.getFalseCount() != 0;
-            if (hasTrueValues && hasFalseValues) {
+            if (hasTrueValues && hasFalseValues)
+            {
                 return Domain.all(BOOLEAN);
             }
-            if (hasTrueValues) {
+            if (hasTrueValues)
+            {
                 return Domain.create(ValueSet.of(BOOLEAN, true), hasNullValue);
             }
-            if (hasFalseValues) {
+            if (hasFalseValues)
+            {
                 return Domain.create(ValueSet.of(BOOLEAN, false), hasNullValue);
             }
         }
-        else if (isCharType(type)) {
+        else if (isCharType(type))
+        {
             return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
         }
-        else if (isVarcharType(type)) {
+        else if (isVarcharType(type))
+        {
             return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
         }
-        else if (type instanceof TimestampType) {
+        else if (type instanceof TimestampType)
+        {
             return createDomain(type, hasNullValue, (TimestampColumnStats) columnStats);
         }
-        else if (type.getJavaType() == long.class) {
+        else if (type.getJavaType() == long.class)
+        {
             return createDomain(type, hasNullValue, (IntegerColumnStats) columnStats);
         }
-        else if (type.getJavaType() == double.class) {
+        else if (type.getJavaType() == double.class)
+        {
             return createDomain(type, hasNullValue, (DoubleColumnStats) columnStats);
         }
         return Domain.create(ValueSet.all(type), hasNullValue);
@@ -171,7 +193,8 @@ public class TupleDomainPixelsPredicate<C>
     private <T extends Comparable<T>> Domain createDomain(Type type, boolean hasNullValue,
                                                           RangeStats<T> rangeStats)
     {
-        if (type instanceof VarcharType || type instanceof CharType) {
+        if (type instanceof VarcharType || type instanceof CharType)
+        {
             return createDomain(type, hasNullValue, rangeStats, value -> value);
         }
         return createDomain(type, hasNullValue, rangeStats, value -> value);
@@ -184,16 +207,19 @@ public class TupleDomainPixelsPredicate<C>
         F min = rangeStats.getMinimum();
         F max = rangeStats.getMaximum();
 
-        if (min != null && max != null) {
+        if (min != null && max != null)
+        {
             return Domain.create(
                     ValueSet.ofRanges(
                             Range.range(type, function.apply(min), true, function.apply(max), true)),
                     hasNullValue);
         }
-        if (max != null) {
+        if (max != null)
+        {
             return Domain.create(ValueSet.ofRanges(Range.lessThanOrEqual(type, function.apply(max))), hasNullValue);
         }
-        if (min != null) {
+        if (min != null)
+        {
             return Domain.create(ValueSet.ofRanges(Range.greaterThanOrEqual(type, function.apply(min))), hasNullValue);
         }
 
