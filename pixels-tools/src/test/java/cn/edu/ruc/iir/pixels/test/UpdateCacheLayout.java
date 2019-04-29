@@ -2,25 +2,14 @@ package cn.edu.ruc.iir.pixels.test;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.*;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import cn.edu.ruc.iir.pixels.daemon.metadata.dao.LayoutDao;
 import com.alibaba.fastjson.JSON;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.*;
+import java.util.*;
 
 /**
  * pixels
@@ -45,7 +34,8 @@ public class UpdateCacheLayout
 
         try {
             MetadataService metadataService = new MetadataService(metaHost, metaPort);
-            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1).get(0);
+            Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1);
+
             Order layoutOrder = layoutv1.getOrderObject();
             List<String> columnOrder = layoutOrder.getColumnOrder();
             List<Column> columns = metadataService.getColumns(schemaName, tableName);
@@ -96,17 +86,17 @@ public class UpdateCacheLayout
             }
 
             LayoutDao layoutDao = new LayoutDao();
-            Layout layoutv2 = new Layout();
-            layoutv2.setId(13);
-            layoutv2.setPermission(1);
-            layoutv2.setVersion(3);
-            layoutv2.setCreateAt(System.currentTimeMillis());
-            layoutv2.setOrder(layoutv1.getOrder());
-            layoutv2.setOrderPath(layoutv1.getOrderPath());
-            layoutv2.setCompact(JSON.toJSONString(compactv2));
-            layoutv2.setCompactPath(layoutv1.getCompactPath());
-            layoutv2.setSplits(layoutv1.getSplits());
-            layoutv2.setTable(layoutv1.getTable());
+            MetadataProto.Layout layoutv2 = MetadataProto.Layout.newBuilder()
+            .setId(21)
+            .setPermission(MetadataProto.Layout.PERMISSION.READ_WRITE)
+            .setVersion(2)
+            .setCreateAt(System.currentTimeMillis())
+            .setOrder(layoutv1.getOrder())
+            .setOrderPath(layoutv1.getOrderPath())
+            .setCompact(JSON.toJSONString(compactv2))
+            .setCompactPath(layoutv1.getCompactPath())
+            .setSplits(layoutv1.getSplits())
+            .setTableId(layoutv1.getTableId()).build();
             layoutDao.save(layoutv2);
         }
         catch (MetadataException | IOException e) {
@@ -119,7 +109,7 @@ public class UpdateCacheLayout
             throws MetadataException, IOException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", 3).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Order order = layout.getOrderObject();
         List<String> orderCols = order.getColumnOrder();
         BufferedWriter writer = new BufferedWriter(new FileWriter("/Users/Jelly/Desktop/pixels/cache/layout_order_dbiir01_v3"));
@@ -136,7 +126,7 @@ public class UpdateCacheLayout
             throws MetadataException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
-        Layout layout = metadataService.getLayout("pixels", "test_1187", 3).get(0);
+        Layout layout = metadataService.getLayout("pixels", "test_1187", 3);
         Compact compact = layout.getCompactObject();
         List<String> cachedColumnlets = compact.getColumnletOrder().subList(0, compact.getCacheBorder());
         List<String> columnOrder = layout.getOrderObject().getColumnOrder();

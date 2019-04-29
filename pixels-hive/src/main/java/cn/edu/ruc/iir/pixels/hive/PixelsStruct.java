@@ -36,9 +36,6 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.hive
- * @ClassName: PixelsStruct
  * @Description: refer: [PixelsStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/PixelsStruct.java)
  * @author: tao
  * @date: Create in 2018-12-12 22:35

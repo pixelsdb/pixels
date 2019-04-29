@@ -1,33 +1,27 @@
 package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 
-import cn.edu.ruc.iir.pixels.common.metadata.MetadataClientHandler;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Table;
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
+import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ColumnDao implements Dao<Column>
+public class ColumnDao implements Dao<MetadataProto.Column>
 {
-    private static Logger log = LogManager.getLogger(MetadataClientHandler.class);
+    private static Logger log = LogManager.getLogger(ColumnDao.class);
 
     public ColumnDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static final TableDao tableModel = new TableDao();
+    private static final TableDao tableDao = new TableDao();
 
     @Override
-    public Column getById(int id)
+    public MetadataProto.Column getById(long id)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
@@ -35,12 +29,12 @@ public class ColumnDao implements Dao<Column>
             ResultSet rs = st.executeQuery("SELECT COL_NAME, COL_TYPE, COL_SIZE, TBLS_TBL_ID FROM COLS WHERE COL_ID=" + id);
             if (rs.next())
             {
-                Column column = new Column();
-                column.setId(id);
-                column.setName(rs.getString("COL_NAME"));
-                column.setType(rs.getString("COL_TYPE"));
-                column.setSize(rs.getDouble("COL_SIZE"));
-                column.setTable(tableModel.getById(rs.getInt("TBLS_TBL_ID")));
+                MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                .setId(id)
+                .setName(rs.getString("COL_NAME"))
+                .setType(rs.getString("COL_TYPE"))
+                .setSize(rs.getDouble("COL_SIZE"))
+                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return column;
             }
 
@@ -53,28 +47,27 @@ public class ColumnDao implements Dao<Column>
     }
 
     @Override
-    public List<Column> getAll()
+    public List<MetadataProto.Column> getAll()
     {
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public List<Column> getByTable(Table table)
+    public List<MetadataProto.Column> getByTable(MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
             ResultSet rs = st.executeQuery("SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
                     " ORDER BY COL_ID");
-            List<Column> columns = new ArrayList<>();
+            List<MetadataProto.Column> columns = new ArrayList<>();
             while (rs.next())
             {
-                Column column = new Column();
-                column.setId(rs.getInt("COL_ID"));
-                column.setName(rs.getString("COL_NAME"));
-                column.setType(rs.getString("COL_TYPE"));
-                column.setSize(rs.getDouble("COL_SIZE"));
-                column.setTable(table);
-                table.addColumn(column);
+                MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                .setId(rs.getLong("COL_ID"))
+                .setName(rs.getString("COL_NAME"))
+                .setType(rs.getString("COL_TYPE"))
+                .setSize(rs.getDouble("COL_SIZE"))
+                .setTableId(table.getId()).build();
                 columns.add(column);
             }
             return columns;
@@ -87,7 +80,8 @@ public class ColumnDao implements Dao<Column>
         return null;
     }
 
-    public Order getOrderByTable(Table table)
+    @SuppressWarnings("Duplicates")
+    public Order getOrderByTable(MetadataProto.Table table)
     {
         Order columnOrder = new Order();
         Connection conn = db.getConnection();
@@ -95,14 +89,14 @@ public class ColumnDao implements Dao<Column>
         {
             ResultSet rs = st.executeQuery("SELECT COL_NAME FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
                     " ORDER BY COL_ID");
-            List<String> column = new ArrayList<>();
+            List<String> columns = new ArrayList<>();
             String colName = null;
             while (rs.next())
             {
                 colName = rs.getString("COL_NAME");
-                column.add(colName);
+                columns.add(colName);
             }
-            columnOrder.setColumnOrder(column);
+            columnOrder.setColumnOrder(columns);
             return columnOrder;
 
         } catch (SQLException e)
@@ -113,7 +107,7 @@ public class ColumnDao implements Dao<Column>
         return null;
     }
 
-    public boolean update(Column column)
+    public boolean update(MetadataProto.Column column)
     {
         Connection conn = db.getConnection();
         String sql = "UPDATE COLS\n" +
@@ -127,7 +121,7 @@ public class ColumnDao implements Dao<Column>
             pst.setString(1, column.getName());
             pst.setString(2, column.getType());
             pst.setDouble(3, column.getSize());
-            pst.setInt(4, column.getId());
+            pst.setLong(4, column.getId());
 
             return pst.execute();
         } catch (SQLException e)
@@ -138,11 +132,11 @@ public class ColumnDao implements Dao<Column>
         return false;
     }
 
-    public int insertBatch (Table table, List<Column> columns)
+    public int insertBatch (MetadataProto.Table table, List<MetadataProto.Column> columns)
     {
         StringBuilder sql = new StringBuilder("INSERT INTO COLS (COL_NAME,COL_TYPE,COL_SIZE,TBLS_TBL_ID)" +
                 "VALUES ");
-        for (Column column : columns)
+        for (MetadataProto.Column column : columns)
         {
             sql.append("('").append(column.getName()).append("','").append(column.getType())
                     .append("',").append(column.getSize()).append(",").append(table.getId()).append("),");
@@ -159,13 +153,13 @@ public class ColumnDao implements Dao<Column>
         return 0;
     }
 
-    public boolean deleteByTable (Table table)
+    public boolean deleteByTable (MetadataProto.Table table)
     {
         Connection conn = db.getConnection();
         String sql = "DELETE FROM COLS WHERE TBLS_TBL_ID=?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
-            pst.setInt(1, table.getId());
+            pst.setLong(1, table.getId());
             return pst.execute();
         } catch (SQLException e)
         {

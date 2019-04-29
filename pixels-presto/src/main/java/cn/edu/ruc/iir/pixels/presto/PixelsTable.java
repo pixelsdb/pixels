@@ -23,10 +23,6 @@ import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.presto
- * @ClassName: PixelsTable
- * @Description:
  * @author: tao
  * @date: Create in 2018-01-19 15:16
  **/

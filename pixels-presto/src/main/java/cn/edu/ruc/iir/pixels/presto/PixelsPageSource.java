@@ -44,7 +44,8 @@ import static cn.edu.ruc.iir.pixels.presto.exception.PixelsErrorCode.PIXELS_READ
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-class PixelsPageSource implements ConnectorPageSource {
+class PixelsPageSource implements ConnectorPageSource
+{
     private static Logger logger = Logger.get(PixelsPageSource.class);
     private static final int BATCH_SIZE = 10000;
     private List<PixelsColumnHandle> columns;
@@ -82,16 +83,19 @@ class PixelsPageSource implements ConnectorPageSource {
     private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader, PixelsFooterCache pixelsFooterCache)
     {
         String[] cols = new String[columns.size()];
-        for (int i = 0; i < columns.size(); i++) {
+        for (int i = 0; i < columns.size(); i++)
+        {
             cols[i] = columns.get(i).getColumnName();
         }
 
         Map<PixelsColumnHandle, Domain> domains = new HashMap<>();
-        if (split.getConstraint().getDomains().isPresent()) {
+        if (split.getConstraint().getDomains().isPresent())
+        {
             domains = split.getConstraint().getDomains().get();
         }
         List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
-        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet()) {
+        for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet())
+        {
             PixelsColumnHandle column = entry.getKey();
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
@@ -111,7 +115,8 @@ class PixelsPageSource implements ConnectorPageSource {
         this.option.predicate(predicate);
         this.option.rgRange(split.getStart(), split.getLen());
 
-        try {
+        try
+        {
             if (this.fsFactory.getFileSystem().isPresent())
             {
                 this.pixelsReader = PixelsReaderImpl
@@ -123,11 +128,12 @@ class PixelsPageSource implements ConnectorPageSource {
                         .setPixelsCacheReader(pixelsCacheReader)
                         .setPixelsFooterCache(pixelsFooterCache)
                         .build();
+            } else
+            {
+                logger.error("pixelsReader error: getFileSystem() returns null");
             }
-            else {
-                logger.error("pixelsReader error: getFileSystem() null");
-            }
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
             throw new PrestoException(PIXELS_READER_ERROR, e);
@@ -135,33 +141,41 @@ class PixelsPageSource implements ConnectorPageSource {
     }
 
     @Override
-    public long getCompletedBytes() {
+    public long getCompletedBytes()
+    {
         return recordReader.getCompletedBytes();
     }
 
     @Override
-    public long getReadTimeNanos() {
+    public long getReadTimeNanos()
+    {
         return ((this.nanoStart > 0L) ? ((this.nanoEnd == 0L) ? System.nanoTime() : this.nanoEnd) - this.nanoStart : 0L);
     }
 
     @Override
-    public boolean isFinished() {
+    public boolean isFinished()
+    {
         return this.closed;
     }
 
     @Override
-    public Page getNextPage() {
-        if (this.nanoStart == 0L) {
+    public Page getNextPage()
+    {
+        if (this.nanoStart == 0L)
+        {
             this.nanoStart = System.nanoTime();
         }
-        try {
+        try
+        {
             this.batchId++;
             this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
             int batchSize = this.rowBatch.size;
-            if (batchSize <= 0 || (endOfFile && batchId >1) ) {
+            if (batchSize <= 0 || (endOfFile && batchId > 1))
+            {
                 close();
                 return null;
             }
+            // TODO: we should use lazy block here.
             Block[] blocks = new Block[this.numColumnToRead];
 
             for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
@@ -185,8 +199,7 @@ class PixelsPageSource implements ConnectorPageSource {
                             if (lcv.isNull[i])
                             {
                                 blockBuilder.appendNull();
-                            }
-                            else
+                            } else
                             {
                                 type.writeLong(blockBuilder, lcv.vector[i]);
                             }
@@ -201,8 +214,7 @@ class PixelsPageSource implements ConnectorPageSource {
                             if (dcv.isNull[i])
                             {
                                 blockBuilder.appendNull();
-                            }
-                            else
+                            } else
                             {
                                 type.writeDouble(blockBuilder, dcv.vector[i]);
                             }
@@ -218,13 +230,14 @@ class PixelsPageSource implements ConnectorPageSource {
                             vectorContentLen += scv.lens[i];
                         }
                         byte[] vectorContent = new byte[vectorContentLen];
-                        int[] vectorOffsets = new int[batchSize+1];
+                        int[] vectorOffsets = new int[batchSize + 1];
                         int curVectorOffset = 0;
                         for (int i = 0; i < batchSize; ++i)
                         {
                             int elementLen = scv.lens[i];
                             if (!scv.isNull[i])
                             {
+                                // TODO: try to eliminate this memory copy.
                                 System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
                             }
                             vectorOffsets[i] = curVectorOffset;
@@ -243,8 +256,7 @@ class PixelsPageSource implements ConnectorPageSource {
                             if (bcv.isNull[i])
                             {
                                 blockBuilder.appendNull();
-                            }
-                            else
+                            } else
                             {
                                 type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
                             }
@@ -258,8 +270,7 @@ class PixelsPageSource implements ConnectorPageSource {
                             if (tcv.isNull[i])
                             {
                                 blockBuilder.appendNull();
-                            }
-                            else
+                            } else
                             {
                                 type.writeLong(blockBuilder, tcv.time[i]);
                             }
@@ -276,49 +287,61 @@ class PixelsPageSource implements ConnectorPageSource {
                 }
             }
             sizeOfData += batchSize;
-            if (this.rowBatch.endOfFile) {
+            if (this.rowBatch.endOfFile)
+            {
                 endOfFile = true;
             }
             return new Page(batchSize, blocks);
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             closeWithSuppression(e);
             throw new PrestoException(PIXELS_BAD_DATA, e);
         }
     }
 
     @Override
-    public long getSystemMemoryUsage() {
+    public long getSystemMemoryUsage()
+    {
         return sizeOfData;
     }
 
     @Override
-    public void close() {
-        try {
-            if (pixelsReader != null) {
+    public void close()
+    {
+        try
+        {
+            if (pixelsReader != null)
+            {
                 pixelsReader.close();
             }
             rowBatch = null;
             nanoEnd = System.nanoTime();
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             logger.error("close error: " + e.getMessage());
             throw new PrestoException(PIXELS_READER_CLOSE_ERROR, e);
         }
 
         // some hive input formats are broken and bad things can happen if you close them multiple times
-        if (closed) {
+        if (closed)
+        {
             return;
         }
         closed = true;
     }
 
-    private void closeWithSuppression(Throwable throwable) {
+    private void closeWithSuppression(Throwable throwable)
+    {
         requireNonNull(throwable, "throwable is null");
-        try {
+        try
+        {
             close();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException e)
+        {
             // Self-suppression not permitted
             logger.error(e, e.getMessage());
-            if (throwable != e) {
+            if (throwable != e)
+            {
                 throwable.addSuppressed(e);
             }
             throw new PrestoException(PIXELS_CLIENT_ERROR, e);
@@ -329,26 +352,28 @@ class PixelsPageSource implements ConnectorPageSource {
      * Lazy Block Implementation for the Pixels
      */
     private final class PixelsBlockLoader
-            implements LazyBlockLoader<LazyBlock> {
-
-        private Logger logger = Logger.get(PixelsBlockLoader.class);
-
+            implements LazyBlockLoader<LazyBlock>
+    {
         private final int expectedBatchId = batchId;
         private final int columnIndex;
         private final Type type;
         private boolean loaded;
 
-        public PixelsBlockLoader(int columnIndex, Type type) {
+        public PixelsBlockLoader(int columnIndex, Type type)
+        {
             this.columnIndex = columnIndex;
             this.type = requireNonNull(type, "type is null");
         }
 
         @Override
-        public final void load(LazyBlock lazyBlock) {
-            if (loaded) {
+        public final void load(LazyBlock lazyBlock)
+        {
+            if (loaded)
+            {
                 return;
             }
             checkState(batchId == expectedBatchId);
+            // TODO: lazy block is to be implemented.
             BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), BATCH_SIZE);
             Block block = builder.build();
             lazyBlock.setBlock(block);

@@ -6,10 +6,6 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.common
- * @ClassName: DateUtil
- * @Description: To sum some static useful functions
  * @author: Tao
  * @date: Create in 2017-07-28 7:11
  **/

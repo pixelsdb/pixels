@@ -11,15 +11,11 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * @version V1.0
- * @Package: cn.edu.ruc.iir.pixels.cache
- * @ClassName: TestMemFile
- * @Description:
  * @author: tao
  * @date: Create in 2019-02-21 16:41
  **/
 public class TestMemFile {
-    String path = "/home/tao/software/station/bitbucket/pixels/pixels-cache/src/test/java/cn/edu/ruc/iir/pixels/cache/pixels.index";
+    String path = "/dev/shm/pixels.index";
 
     @Test
     public void testMulti() throws Exception {

@@ -19,7 +19,7 @@ public class PixelsCacheKey
 {
     private final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
-    private String blockId;
+    private String blockId;  // TODO: it could be better to use long as the type of blockid
     private short rowGroupId;
     private short columnId;
 
@@ -48,6 +48,11 @@ public class PixelsCacheKey
     public byte[] getBytes()
     {
         keyBuffer.clear();
+        // TODO: is it better to ensure big-endian in keyBuffer? big-endian is prefix comparable,
+        // from which radix-tree may benifit.
+        // And we'd better use long (int64) for block id, instead of a string file name.
+        // Fixed key length (12 bytes) should be more efficient. I noticed that block ids in hdfs-2.7.3 looks
+        // like a sequence number, not really random.
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);

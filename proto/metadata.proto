@@ -1,0 +1,207 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// grpc protocol of pixels metadata
+
+syntax = "proto3";
+
+option java_multiple_files = false;
+option java_package = "cn.edu.ruc.iir.pixels.daemon";
+option java_outer_classname = "MetadataProto";
+
+package metadata.proto;
+
+// The metadata services definition.
+service MetadataService {
+    rpc GetSchemas (GetSchemasRequest) returns (GetSchemasResponse);
+    rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
+    rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
+    rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
+    rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
+    rpc CreateSchema (CreateSchemaRequest) returns (CreateSchemaResponse);
+    rpc DropSchema (DropSchemaRequest) returns (DropSchemaResponse);
+    rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
+    rpc DropTable (DropTableRequest) returns (DropTableResponse);
+    rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
+}
+
+// begin domain objects definition
+message Schema {
+    uint64 id = 1;
+    string name = 2;
+    string desc = 3;
+    repeated uint64 tableIds = 4;
+}
+
+message Table {
+    uint64 id = 1;
+    string name = 2;
+    string type = 3;
+    uint64 schemaId = 4;
+    repeated uint64 columnIds = 5;
+}
+
+message Column {
+    uint64 id = 1;
+    string name = 2;
+    string type = 3;
+    double size = 4;
+    uint64 tableId = 5;
+}
+
+message Layout {
+    uint64 id = 1;
+    uint32 version = 2;
+    uint64 createAt = 3;
+    enum PERMISSION {
+        DISABLED = 0;
+        READ_ONLY = 1;
+        READ_WRITE = 2;
+    }
+    PERMISSION permission = 4;
+    string order = 5;
+    string orderPath = 6;
+    string compact = 7;
+    string compactPath = 8;
+    string splits = 9;
+    uint64 tableId = 10;
+}
+// end domain objects defitions
+
+// begin requeset/response defition for rpc services
+
+// header
+message RequestHeader {
+    string token = 1;
+}
+
+message ResponseHeader {
+    string token = 1;
+    int32 errorCode = 2; // errorCode == 0 means success
+    string errorMsg = 3; // empty if errorCode == 0
+}
+
+// schema
+message GetSchemasRequest {
+    RequestHeader header = 1;
+}
+
+message GetSchemasResponse {
+    ResponseHeader header = 1;
+    repeated Schema schemas = 2;
+}
+
+message CreateSchemaRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string schemaDesc = 3;
+}
+
+message CreateSchemaResponse {
+    ResponseHeader header = 1;
+}
+
+message DropSchemaRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+}
+
+message DropSchemaResponse {
+    ResponseHeader header = 1;
+}
+
+// table
+message GetTablesRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+}
+
+message GetTablesResponse {
+    ResponseHeader header = 1;
+    repeated Table tables = 2;
+}
+
+message ExistTableRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message ExistTableResponse {
+    ResponseHeader header = 1;
+    bool exists = 2;
+}
+
+message CreateTableRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    repeated Column columns = 4;
+}
+
+message CreateTableResponse {
+    ResponseHeader header = 1;
+}
+
+message DropTableRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message DropTableResponse {
+    ResponseHeader header = 1;
+}
+
+// column
+message GetColumnsRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message GetColumnsResponse {
+    ResponseHeader header = 1;
+    repeated Column columns = 2;
+}
+
+// layout
+message GetLayoutsRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message GetLayoutsResponse {
+    ResponseHeader header = 1;
+    repeated Layout layouts = 2;
+}
+
+message GetLayoutRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+    uint32 version = 4;
+}
+
+message GetLayoutResponse {
+    ResponseHeader header = 1;
+    Layout layout = 2;
+}
+
+// end requeset/response defition for rpc services
