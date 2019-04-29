@@ -55,7 +55,8 @@ public class RadixNode
     public void addChild(RadixNode child, boolean overwrite)
     {
         byte firstByte = child.edge[0];
-        if (!overwrite && children.containsKey(firstByte)) {
+        if (!overwrite && children.containsKey(firstByte))
+        {
             return;
         }
         children.put(firstByte, child);
@@ -88,10 +89,12 @@ public class RadixNode
     public void setValue(PixelsCacheIdx value)
     {
         this.value = value;
-        if (value == null) {
+        if (value == null)
+        {
             this.isKey = false;
         }
-        else {
+        else
+        {
             this.isKey = true;
         }
     }
@@ -103,12 +106,13 @@ public class RadixNode
 
     /**
      * Content length in bytes
-     * */
+     */
     public int getLengthInBytes()
     {
         int len = 4 + edge.length;
         len += 8 * children.size();
-        if (isKey) {
+        if (isKey)
+        {
             len += PixelsCacheIdx.SIZE;
         }
         return len;
