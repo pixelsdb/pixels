@@ -330,19 +330,23 @@ public class PixelsRecordReaderImpl
             String blockName = physicalFSReader.getPath().toString();
             List<ColumnletId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
             // find cached chunks
-            for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
-                int rgId = rgIdx + RGStart;
-                PixelsProto.RowGroupIndex rowGroupIndex =
-                        rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-                for (int colId : targetColumns) {
+            for (int colId : targetColumns)
+            {
+                for (int rgIdx = 0;  rgIdx < targetRGNum; rgIdx++)
+                {
+                    int rgId = rgIdx + RGStart;
                     String cacheIdentifier = "" + rgId + ":" + colId;
                     // if cached, read from cache files
-                    if (cacheOrder.contains(cacheIdentifier)) {
+                    if (cacheOrder.contains(cacheIdentifier))
+                    {
                         ColumnletId chunkId = new ColumnletId(blockName, (short) rgId, (short) colId);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
-                    else {
+                    else
+                    {
+                        PixelsProto.RowGroupIndex rowGroupIndex =
+                                rowGroupFooters[rgIdx].getRowGroupIndexEntry();
                         PixelsProto.ColumnChunkIndex chunkIndex =
                                 rowGroupIndex.getColumnChunkIndexEntries(colId);
                         ChunkId chunk = new ChunkId(rgIdx, colId,
