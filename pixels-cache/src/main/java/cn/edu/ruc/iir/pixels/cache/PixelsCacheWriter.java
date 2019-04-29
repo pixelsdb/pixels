@@ -223,6 +223,7 @@ public class PixelsCacheWriter
         outer_loop: for (String file : files)
         {
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            // TODO why use array? seems no need at all
             int[] physicalLens = new int[cacheColumnletOrders.size()];
             long[] physicalOffsets = new long[cacheColumnletOrders.size()];
             // update radix and cache content
