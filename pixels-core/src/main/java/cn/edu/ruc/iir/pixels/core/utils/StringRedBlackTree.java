@@ -125,7 +125,8 @@ public class StringRedBlackTree extends RedBlackTree
          * @param out the stream to write to.
          * @throws IOException
          */
-        void writeBytes(OutputStream out) throws IOException;
+        void writeBytes(OutputStream out)
+                throws IOException;
 
         /**
          * Get the original string.
@@ -153,7 +154,8 @@ public class StringRedBlackTree extends RedBlackTree
          * @param context the information about each node
          * @throws IOException
          */
-        void visit(VisitorContext context) throws IOException;
+        void visit(VisitorContext context)
+                throws IOException;
     }
 
     private class VisitorContextImpl implements VisitorContext
@@ -174,7 +176,8 @@ public class StringRedBlackTree extends RedBlackTree
             return text.toString();
         }
 
-        public void writeBytes(OutputStream out) throws IOException
+        public void writeBytes(OutputStream out)
+                throws IOException
         {
             byteArray.write(out, start, end - start);
         }
@@ -200,7 +203,8 @@ public class StringRedBlackTree extends RedBlackTree
     }
 
     private void recurse(int node, Visitor visitor, VisitorContextImpl context
-    ) throws IOException
+    )
+            throws IOException
     {
         if (node != NULL)
         {
@@ -217,7 +221,8 @@ public class StringRedBlackTree extends RedBlackTree
      * @param visitor the action to be applied to each node
      * @throws IOException
      */
-    public void visit(Visitor visitor) throws IOException
+    public void visit(Visitor visitor)
+            throws IOException
     {
         recurse(root, visitor, new VisitorContextImpl());
     }

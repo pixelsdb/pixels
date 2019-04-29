@@ -9,5 +9,6 @@ import java.io.IOException;
  */
 public abstract class Decoder
 {
-    public abstract boolean hasNext() throws IOException;
+    public abstract boolean hasNext()
+            throws IOException;
 }

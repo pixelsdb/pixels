@@ -102,7 +102,8 @@ public interface PixelsReader
      * @return row group footer
      * @throws java.io.IOException
      */
-    PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException;
+    PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
+            throws IOException;
 
     /**
      * Get information of all row groups
@@ -147,5 +148,6 @@ public interface PixelsReader
      * @throws java.io.IOException
      */
     @Override
-    void close() throws IOException;
+    void close()
+            throws IOException;
 }

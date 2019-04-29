@@ -128,7 +128,8 @@ public final class DynamicByteArray
      * @param in the stream to read from
      * @throws IOException
      */
-    public void readAll(InputStream in) throws IOException
+    public void readAll(InputStream in)
+            throws IOException
     {
         int currentChunk = length / chunkSize;
         int currentOffset = length % chunkSize;
@@ -241,7 +242,8 @@ public final class DynamicByteArray
      * @throws IOException
      */
     public void write(OutputStream out, int offset,
-                      int length) throws IOException
+                      int length)
+            throws IOException
     {
         int currentChunk = offset / chunkSize;
         int currentOffset = offset % chunkSize;

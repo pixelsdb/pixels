@@ -123,7 +123,8 @@ public class PixelsReaderImpl
             return this;
         }
 
-        public PixelsReader build() throws IllegalArgumentException, IOException
+        public PixelsReader build()
+                throws IllegalArgumentException, IOException
         {
             // check arguments
             if (builderFS == null || builderPath == null)
@@ -197,7 +198,8 @@ public class PixelsReaderImpl
         return new Builder();
     }
 
-    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId) throws IOException
+    public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
+            throws IOException
     {
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
         int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
@@ -416,7 +418,8 @@ public class PixelsReaderImpl
      * @throws IOException
      */
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         for (PixelsRecordReader recordReader : recordReaders)
         {

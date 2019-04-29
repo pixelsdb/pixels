@@ -68,7 +68,8 @@ public class RunLenIntEncoder
         clear();
     }
 
-    public byte[] encode(long[] values, long offset, long length) throws IOException
+    public byte[] encode(long[] values, long offset, long length)
+            throws IOException
     {
         for (int i = 0; i < length; i++)
         {
@@ -81,13 +82,15 @@ public class RunLenIntEncoder
     }
 
     @Override
-    public byte[] encode(long[] values) throws IOException
+    public byte[] encode(long[] values)
+            throws IOException
     {
         return encode(values, 0, values.length);
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         gapVsPatchList = null;
         outputStream.close();
@@ -356,7 +359,8 @@ public class RunLenIntEncoder
         }
     }
 
-    private void writeValues() throws IOException
+    private void writeValues()
+            throws IOException
     {
         if (numLiterals != 0)
         {
@@ -382,7 +386,8 @@ public class RunLenIntEncoder
         }
     }
 
-    private void write(long value) throws IOException
+    private void write(long value)
+            throws IOException
     {
         if (numLiterals == 0)
         {
@@ -502,7 +507,8 @@ public class RunLenIntEncoder
         }
     }
 
-    private void flush() throws IOException
+    private void flush()
+            throws IOException
     {
         if (numLiterals != 0)
         {
@@ -575,7 +581,8 @@ public class RunLenIntEncoder
         fixedRunLength = 0;
     }
 
-    private void writeDirectValues() throws IOException
+    private void writeDirectValues()
+            throws IOException
     {
         // write the number of fixed bits required in next 5 bits
         int fb = zzBits100p;
@@ -610,7 +617,8 @@ public class RunLenIntEncoder
         variableRunLength = 0;
     }
 
-    private void writePatchedBaseValues() throws IOException
+    private void writePatchedBaseValues()
+            throws IOException
     {
         // NOTE: Aligned bit packing cannot be applied for PATCHED_BASE encoding
         // because patch is applied to MSB bits. For example: If fixed bit width of
@@ -684,7 +692,8 @@ public class RunLenIntEncoder
         variableRunLength = 0;
     }
 
-    private void writeDeltaValues() throws IOException
+    private void writeDeltaValues()
+            throws IOException
     {
         int len;
         int fb = bitsDeltaMax;
@@ -775,7 +784,8 @@ public class RunLenIntEncoder
     /**
      * Bitpack and write the input values to underlying output stream
      */
-    private void writeInts(long[] input, int offset, int len, int bitSize) throws IOException
+    private void writeInts(long[] input, int offset, int len, int bitSize)
+            throws IOException
     {
         if (input == null || input.length < 1 || offset < 0 || len < 1 || bitSize < 1)
         {
@@ -1014,7 +1024,8 @@ public class RunLenIntEncoder
     }
 
     private void writeVulong(OutputStream output,
-                             long value) throws IOException
+                             long value)
+            throws IOException
     {
         while (true)
         {
@@ -1032,7 +1043,8 @@ public class RunLenIntEncoder
     }
 
     private void writeVslong(OutputStream output,
-                             long value) throws IOException
+                             long value)
+            throws IOException
     {
         writeVulong(output, (value << 1) ^ (value >> 63));
     }

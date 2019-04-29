@@ -43,7 +43,8 @@ public class RunLenIntDecoder
     }
 
     @Override
-    public long next() throws IOException
+    public long next()
+            throws IOException
     {
         long result;
         if (used == numLiterals)
@@ -57,12 +58,14 @@ public class RunLenIntDecoder
     }
 
     @Override
-    public boolean hasNext() throws IOException
+    public boolean hasNext()
+            throws IOException
     {
         return used != numLiterals || inputStream.available() > 0;
     }
 
-    private void readValues() throws IOException
+    private void readValues()
+            throws IOException
     {
         // read the first 2 bits and determine the encoding type
         isRepeating = false;
@@ -94,7 +97,8 @@ public class RunLenIntDecoder
         }
     }
 
-    private void readShortRepeatValues(int firstByte) throws IOException
+    private void readShortRepeatValues(int firstByte)
+            throws IOException
     {
         // read the number of bytes occupied by the value
         int size = (firstByte >>> 3) & 0x07;
@@ -132,7 +136,8 @@ public class RunLenIntDecoder
         numLiterals = len;
     }
 
-    private void readDirectValues(int firstByte) throws IOException
+    private void readDirectValues(int firstByte)
+            throws IOException
     {
         // extract the number of fixed bits
         int fbo = (firstByte >>> 1) & 0x1f;
@@ -160,7 +165,8 @@ public class RunLenIntDecoder
         }
     }
 
-    private void readPatchedBaseValues(int firstByte) throws IOException
+    private void readPatchedBaseValues(int firstByte)
+            throws IOException
     {
         // extract the number of fixed bits
         int fbo = (firstByte >>> 1) & 0x1f;
@@ -279,7 +285,8 @@ public class RunLenIntDecoder
         }
     }
 
-    private void readDeltaValues(int firstByte) throws IOException
+    private void readDeltaValues(int firstByte)
+            throws IOException
     {
         // extract the number of fixed bits
         int fb = (firstByte >>> 1) & 0x1f;
@@ -362,7 +369,8 @@ public class RunLenIntDecoder
      * Read bitpacked integers from input stream
      */
     private void readInts(long[] buffer, int offset, int len, int bitSize,
-                          InputStream input) throws IOException
+                          InputStream input)
+            throws IOException
     {
         int bitsLeft = 0;
         int current = 0;
@@ -430,7 +438,8 @@ public class RunLenIntDecoder
         }
     }
 
-    private long bytesToLongBE(InputStream input, int n) throws IOException
+    private long bytesToLongBE(InputStream input, int n)
+            throws IOException
     {
         long out = 0;
         long val = 0;
@@ -452,7 +461,8 @@ public class RunLenIntDecoder
         return (val >>> 1) ^ -(val & 1);
     }
 
-    private long readVulong(InputStream in) throws IOException
+    private long readVulong(InputStream in)
+            throws IOException
     {
         long result = 0;
         long b;
@@ -470,7 +480,8 @@ public class RunLenIntDecoder
         return result;
     }
 
-    private long readVslong(InputStream in) throws IOException
+    private long readVslong(InputStream in)
+            throws IOException
     {
         long result = readVulong(in);
         return (result >>> 1) ^ -(result & 1);

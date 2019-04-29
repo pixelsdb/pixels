@@ -15,7 +15,7 @@ import java.net.URI;
 public class TestFileMetadata
 {
     @Test
-    public void test ()
+    public void test()
     {
         PixelsReader pixelsReader = null;
         //String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
@@ -24,16 +24,17 @@ public class TestFileMetadata
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             FileStatus[] fileStatuses = fs.listStatus(path);
             int i = 0;
             for (FileStatus fileStatus : fileStatuses)
             {
                 pixelsReader = PixelsReaderImpl.newBuilder()
-                        .setFS(fs)
-                        .setPath(fileStatus.getPath())
-                        .build();
+                                               .setFS(fs)
+                                               .setPath(fileStatus.getPath())
+                                               .build();
 //                System.out.println(pixelsReader.getRowGroupNum());
                 if (pixelsReader.getFooter().getRowGroupStatsList().size() != 1)
                 {
@@ -42,7 +43,9 @@ public class TestFileMetadata
                 i++;
                 pixelsReader.close();
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

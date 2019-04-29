@@ -27,7 +27,8 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public byte[] encode(byte[] values) throws IOException
+    public byte[] encode(byte[] values)
+            throws IOException
     {
         for (byte v : values)
         {
@@ -40,7 +41,8 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public byte[] encode(byte[] values, long offset, long length) throws IOException
+    public byte[] encode(byte[] values, long offset, long length)
+            throws IOException
     {
         for (int i = 0; i < length; i++)
         {
@@ -53,7 +55,8 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         output.close();
     }
@@ -78,7 +81,8 @@ public class RunLenByteEncoder
         }
     }
 
-    private void flush() throws IOException
+    private void flush()
+            throws IOException
     {
         writeValues();
         output.flush();

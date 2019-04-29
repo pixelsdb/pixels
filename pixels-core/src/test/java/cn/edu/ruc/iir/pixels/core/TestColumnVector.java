@@ -25,7 +25,8 @@ public class TestColumnVector
     public void testCVSet()
     {
         LongColumnVector a = new LongColumnVector(100);
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 100; i++)
+        {
             a.vector[i] = i;
         }
         ColumnVector b = new LongColumnVector(100);
@@ -34,7 +35,8 @@ public class TestColumnVector
             b.setElement(i, i, a);
         }
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < b.getLength(); i++) {
+        for (int i = 0; i < b.getLength(); i++)
+        {
             b.stringifyValue(sb, i);
             sb.append("\n");
         }
@@ -46,7 +48,7 @@ public class TestColumnVector
     {
         int testNum = 1000_000;
         String mockSchema = "struct<a:int,b:double,c:string,d:timestamp>";
-        
+
         VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
         LongColumnVector src0 = (LongColumnVector) srcRowBatch.cols[0];
         DoubleColumnVector src1 = (DoubleColumnVector) srcRowBatch.cols[1];
@@ -59,7 +61,8 @@ public class TestColumnVector
         BytesColumnVector dst2 = (BytesColumnVector) dstRowBatch.cols[2];
         TimestampColumnVector dst3 = (TimestampColumnVector) dstRowBatch.cols[3];
 
-        for (int i = 0; i < testNum; i++) {
+        for (int i = 0; i < testNum; i++)
+        {
             src0.vector[i] = i;
             src1.vector[i] = i * 1.0d;
             src2.setVal(i, String.valueOf(i).getBytes());
@@ -74,7 +77,8 @@ public class TestColumnVector
         long end = System.nanoTime();
         System.out.println("Copy cost: " + (end - begin));
 
-        for (int i = 0; i < testNum; i++) {
+        for (int i = 0; i < testNum; i++)
+        {
             assert dst0.vector[i] == i;
             assert i * 1.0d == dst1.vector[i];
             assertEquals(String.valueOf(i), dst2.toString(i));

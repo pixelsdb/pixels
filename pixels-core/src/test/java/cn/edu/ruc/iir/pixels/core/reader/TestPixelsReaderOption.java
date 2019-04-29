@@ -31,7 +31,8 @@ public class TestPixelsReaderOption
     private int elementSize = 0;
 
     @Test
-    public void test0RGRange() throws IOException
+    public void test0RGRange()
+            throws IOException
     {
         // `test-large-null.pxl` is set as the testing file
         // this file consists of 6 row groups
@@ -154,9 +155,9 @@ public class TestPixelsReaderOption
                 assertEquals(rowId * 3.1415f, bcv.vector[i], 0.000001f);
                 assertEquals(rowId * 3.14159d, ccv.vector[i], 0.000001d);
                 assertEquals(time, dcv.time[i]);
-                assertEquals(rowId >  25 ? 1 : 0, ecv.vector[i]);
+                assertEquals(rowId > 25 ? 1 : 0, ecv.vector[i]);
                 assertEquals(String.valueOf(rowId),
-                        new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                             new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
             }
             elementSize++;
         }
@@ -171,13 +172,16 @@ public class TestPixelsReaderOption
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(path)
-                    .build();
-        } catch (IOException e) {
+                                           .setFS(fs)
+                                           .setPath(path)
+                                           .build();
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
 

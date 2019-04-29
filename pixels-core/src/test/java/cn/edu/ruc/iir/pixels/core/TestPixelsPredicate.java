@@ -47,8 +47,10 @@ public class TestPixelsPredicate
                 .add(new TupleDomainPixelsPredicate.ColumnReference<>(COLUMN_A_NAME, COLUMN_A_ORDINAL, BIGINT))
                 .build();
 
-        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate, columnReferences);
-        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate, columnReferences);
+        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
+                                                                                        columnReferences);
+        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
+                                                                                             columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createInt();
         StatsRecorder statsRecorder = StatsRecorder.create(typeDescription);
@@ -77,8 +79,10 @@ public class TestPixelsPredicate
                 .add(new TupleDomainPixelsPredicate.ColumnReference<>(COLUMN_B_NAME, COLUMN_B_ORDINAL, VARCHAR))
                 .build();
 
-        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate, columnReferences);
-        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate, columnReferences);
+        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
+                                                                                        columnReferences);
+        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
+                                                                                             columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createVarchar();
         StatsRecorder statsRecorder = StatsRecorder.create(typeDescription);

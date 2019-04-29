@@ -50,7 +50,8 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         currentUseDictionaryEncoding = futureUseDictionaryEncoding;
         BytesColumnVector columnVector = (BytesColumnVector) vector;
@@ -140,7 +141,8 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void newPixel() throws IOException
+    public void newPixel()
+            throws IOException
     {
         if (currentUseDictionaryEncoding)
         {
@@ -153,7 +155,8 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void flush() throws IOException
+    public void flush()
+            throws IOException
     {
         // flush out pixels field
         super.flush();
@@ -186,7 +189,8 @@ public class StringColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         lensArray.clear();
         dictionary.clear();
@@ -194,7 +198,8 @@ public class StringColumnWriter extends BaseColumnWriter
         super.close();
     }
 
-    private void flushLens() throws IOException
+    private void flushLens()
+            throws IOException
     {
         int lensFieldOffset = outputStream.size();
         long[] tmpLens = new long[lensArray.size()];
@@ -210,7 +215,8 @@ public class StringColumnWriter extends BaseColumnWriter
         outputStream.write(offsetBuf.array());
     }
 
-    private void flushDictionary() throws IOException
+    private void flushDictionary()
+            throws IOException
     {
         int originsFieldOffset;
         int startsFieldOffset;
@@ -228,7 +234,8 @@ public class StringColumnWriter extends BaseColumnWriter
             private int currentId = 0;
 
             @Override
-            public void visit(StringRedBlackTree.VisitorContext context) throws IOException
+            public void visit(StringRedBlackTree.VisitorContext context)
+                    throws IOException
             {
                 context.writeBytes(outputStream);
                 starts[currentId] = initStart;

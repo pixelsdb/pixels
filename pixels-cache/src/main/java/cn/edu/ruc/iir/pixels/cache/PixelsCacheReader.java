@@ -3,6 +3,8 @@ package cn.edu.ruc.iir.pixels.cache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.List;
+
 /**
  * pixels cache reader.
  *
@@ -89,6 +91,11 @@ public class PixelsCacheReader
         }
 
         return content;
+    }
+
+    public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
+    {
+        // TODO batch get cache items. merge cache accesses to reduce the number of jni invocation.
     }
 
     /**

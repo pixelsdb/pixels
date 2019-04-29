@@ -215,7 +215,8 @@ public class PixelsWriterImpl
             return this;
         }
 
-        public PixelsWriter build() throws PixelsWriterException
+        public PixelsWriter build()
+                throws PixelsWriterException
         {
             PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication,
@@ -287,7 +288,8 @@ public class PixelsWriterImpl
      * Repeating is not supported currently in ColumnVector
      */
     @Override
-    public boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException
+    public boolean addRowBatch(VectorizedRowBatch rowBatch)
+            throws IOException
     {
         if (isNewRowGroup)
         {
@@ -338,7 +340,8 @@ public class PixelsWriterImpl
         }
     }
 
-    private void writeRowGroup() throws IOException
+    private void writeRowGroup()
+            throws IOException
     {
         this.isNewRowGroup = true;
         int rowGroupDataLength = 0;
@@ -439,7 +442,8 @@ public class PixelsWriterImpl
         this.fileContentLength += rowGroupDataLength;
     }
 
-    private void writeFileTail() throws IOException
+    private void writeFileTail()
+            throws IOException
     {
         PixelsProto.Footer footer;
         PixelsProto.PostScript postScript;

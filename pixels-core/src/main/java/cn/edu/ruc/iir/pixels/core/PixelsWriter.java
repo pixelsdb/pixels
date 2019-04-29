@@ -18,7 +18,8 @@ public interface PixelsWriter
      *
      * @return if the file adds a new row group, return false. Else, return true.
      */
-    boolean addRowBatch(VectorizedRowBatch rowBatch) throws IOException;
+    boolean addRowBatch(VectorizedRowBatch rowBatch)
+            throws IOException;
 
     /**
      * Get schema of this file
