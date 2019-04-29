@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.cache.ColumnletId;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
@@ -218,7 +219,6 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
-        long readStartNano = System.nanoTime();
         everRead = true;
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
@@ -289,7 +289,6 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
-//        long readRGFootersStartNano = System.nanoTime();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -298,7 +297,6 @@ public class PixelsRecordReaderImpl
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)
             {
-//                logger.debug("[rg cache miss]" + rgCacheId);
                 PixelsProto.RowGroupInformation rowGroupInformation =
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
@@ -319,21 +317,19 @@ public class PixelsRecordReaderImpl
             // cache hit
             else
             {
-//                logger.debug("[rg cache hit]" + rgCacheId);
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
-//        long readRGFooterEndNano = System.nanoTime();
-//        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
-        List<ChunkId> chunks = new ArrayList<>();
+        List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumns.length);
         // read cached data which are in need
         if (enableCache) {
-            long cacheReadStartNano = System.nanoTime();
-            int cacheReadCount = 0;
             long cacheReadSize = 0L;
+            String blockName = physicalFSReader.getPath().toString();
+            List<ColumnletId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
+            // find cached chunks
             for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
                 int rgId = rgIdx + RGStart;
                 PixelsProto.RowGroupIndex rowGroupIndex =
@@ -342,39 +338,51 @@ public class PixelsRecordReaderImpl
                     String cacheIdentifier = "" + rgId + ":" + colId;
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier)) {
-                        String blockName = physicalFSReader.getPath().toString();
-                        byte[] columnlet = cacheReader.get(blockName, (short) rgId, (short) colId);
-                        // if cache hit, read columnlet into buffer
-                        if (columnlet != null && columnlet.length > 0) {
-                            cacheReadCount++;
-                            cacheReadSize += columnlet.length;
-                            int bufferIdx = rgIdx * includedColumns.length + colId;
-                            chunkBuffers[bufferIdx] = columnlet;
-                        }
-                        // if cache miss, add chunkId to be read from disks
-                        else {
-                            PixelsProto.ColumnChunkIndex chunkIndex =
-                                    rowGroupIndex.getColumnChunkIndexEntries(colId);
-                            ChunkId chunk = new ChunkId(rgIdx, colId,
-                                                        chunkIndex.getChunkOffset(),
-                                                        chunkIndex.getChunkLength());
-                            chunks.add(chunk);
-                        }
+                        ColumnletId chunkId = new ColumnletId(blockName, (short) rgId, (short) colId);
+                        cacheChunks.add(chunkId);
                     }
-                    // else, read from disks
+                    // if cache miss, add chunkId to be read from disks
                     else {
                         PixelsProto.ColumnChunkIndex chunkIndex =
                                 rowGroupIndex.getColumnChunkIndexEntries(colId);
                         ChunkId chunk = new ChunkId(rgIdx, colId,
-                                                    chunkIndex.getChunkOffset(),
-                                                    chunkIndex.getChunkLength());
-                        chunks.add(chunk);
+                                chunkIndex.getChunkOffset(),
+                                chunkIndex.getChunkLength());
+                        diskChunks.add(chunk);
                     }
                 }
             }
+            // TODO merge cached chunks to reduce cache access times
+            // read cached chunks
+            long cacheReadStartNano = System.nanoTime();
+            for (ColumnletId chunkId : cacheChunks)
+            {
+                short rgId = chunkId.getRowGroupId();
+                short colId = chunkId.getColumnId();
+                byte[] columnlet = cacheReader.get(blockName, rgId, colId);
+                cacheReadSize += columnlet.length;
+                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+            }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-//            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
+            logger.debug("[cache stat] " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
+            // deal with null or empty cache chunk
+            for (ColumnletId chunkId : cacheChunks)
+            {
+                short rgId = chunkId.getRowGroupId();
+                short colId = chunkId.getColumnId();
+                int rgIdx = rgId - RGStart;
+                int bufferIdx = rgIdx * includedColumns.length + colId;
+                if (chunkBuffers[bufferIdx] == null || chunkBuffers[bufferIdx].length == 0)
+                {
+                    PixelsProto.RowGroupIndex rowGroupIndex =
+                            rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupIndex.getColumnChunkIndexEntries(colId);
+                    ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(), chunkIndex.getChunkLength());
+                    diskChunks.add(diskChunk);
+                }
+            }
         }
         else {
             for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
@@ -386,45 +394,39 @@ public class PixelsRecordReaderImpl
                     ChunkId chunk = new ChunkId(rgIdx, colId,
                                                 chunkIndex.getChunkOffset(),
                                                 chunkIndex.getChunkLength());
-                    chunks.add(chunk);
+                    diskChunks.add(chunk);
                 }
             }
         }
 
         // sort chunks by starting offset
-        chunks.sort(Comparator.comparingLong(ChunkId::getOffset));
+        diskChunks.sort(Comparator.comparingLong(ChunkId::getOffset));
 
         // get chunk blocks
-        List<ChunkSeq> chunkSeqs = new ArrayList<>();
-        ChunkSeq chunkSeq = new ChunkSeq();
-        for (ChunkId chunk : chunks)
+        List<ChunkSeq> diskChunkSeqs = new ArrayList<>();
+        ChunkSeq diskChunkSeq = new ChunkSeq();
+        for (ChunkId chunk : diskChunks)
         {
-            if (!chunkSeq.addChunk(chunk))
+            if (!diskChunkSeq.addChunk(chunk))
             {
-                chunkSeqs.add(chunkSeq);
-                chunkSeq = new ChunkSeq();
-                chunkSeq.addChunk(chunk);
+                diskChunkSeqs.add(diskChunkSeq);
+                diskChunkSeq = new ChunkSeq();
+                diskChunkSeq.addChunk(chunk);
             }
         }
-        chunkSeqs.add(chunkSeq);
+        diskChunkSeqs.add(diskChunkSeq);
 
         // read chunk blocks into buffers
         try
         {
-            long diskReadStartNano = System.nanoTime();
-            int diskReadCount = 0;
-            long diskReadSize = 0L;
-            long offsetBeforeSeek = 0;
-            for (ChunkSeq seq : chunkSeqs)
+            for (ChunkSeq seq : diskChunkSeqs)
             {
                 if (seq.getLength() == 0)
                 {
                     continue;
                 }
-                diskReadCount++;
                 int offset = (int) seq.getOffset();
                 int length = (int) seq.getLength();
-                diskReadSize += length;
                 completedBytes += length;
                 byte[] chunkBlockBuffer = new byte[length];
 //                if (enableMetrics)
@@ -464,17 +466,12 @@ public class PixelsRecordReaderImpl
                     chunkSliceOffset += chunkLength;
                 }
             }
-            long diskReadEndNano = System.nanoTime();
-            long diskReadCost = diskReadEndNano - diskReadStartNano;
-//            logger.debug("[disk stat]" + fileName + "," + diskReadCount + "," + diskReadSize + "," + diskReadCost);
         }
         catch (IOException e)
         {
             e.printStackTrace();
             return false;
         }
-        long readEndNano = System.nanoTime();
-//        logger.debug("[pixels read]" + fileName + "," + (readEndNano - readStartNano));
 
         return true;
     }
