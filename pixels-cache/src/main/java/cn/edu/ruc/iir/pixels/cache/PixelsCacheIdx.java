@@ -15,6 +15,8 @@ public class PixelsCacheIdx
     private final long offset;
     private final int length;
 
+    public int dramAccessCount;
+
     public PixelsCacheIdx(long offset, int length)
     {
         this.offset = offset;

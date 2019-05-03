@@ -2,6 +2,9 @@ package cn.edu.ruc.iir.pixels.cache;
 
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
 /**
  * pixels
  *
@@ -30,5 +33,24 @@ public class TestSerialization
     private void optimizedSer(String blockId, short rowGroupId, short columnId)
     {
 
+    }
+
+    @Test
+    public void testOrder()
+    {
+        ByteOrder order = ByteOrder.nativeOrder();
+        System.out.println("native order: " + order.toString());
+        ByteBuffer buffer = ByteBuffer.allocate(80);
+        buffer.order(ByteOrder.BIG_ENDIAN);
+
+        for (int i = 0; i < 4; i++)
+        {
+            buffer.putInt(i);
+        }
+
+        buffer.flip();
+        byte[] res = new byte[16];
+        buffer.get(res);
+        System.out.println(res.length);
     }
 }
