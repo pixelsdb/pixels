@@ -143,7 +143,7 @@ public class CacheIndexPerf
                 }
                 else
                 {
-//                    totalAcNum += idx.getAccNum();
+                    totalAcNum += idx.dramAccessCount;
                 }
             }
             long searchEnd = System.nanoTime();

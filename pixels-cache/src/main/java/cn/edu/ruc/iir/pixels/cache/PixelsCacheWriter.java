@@ -12,6 +12,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -35,6 +37,7 @@ public class PixelsCacheWriter
     private long currentIndexOffset;
     private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = 0L;  // this is used in the write() method.
+    private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -49,6 +52,7 @@ public class PixelsCacheWriter
         this.radix = radix;
         this.etcdUtil = etcdUtil;
         this.host = host;
+        this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
     }
 
     public static class Builder
@@ -135,7 +139,6 @@ public class PixelsCacheWriter
                 radix = new PixelsRadix();
                 PixelsCacheUtil.initialize(indexFile, cacheFile);
             }
-            // todo check nulls
             EtcdUtil etcdUtil = EtcdUtil.Instance();
 
             return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, builderHostName);
@@ -171,7 +174,7 @@ public class PixelsCacheWriter
                 return 0;
             }
             String fileStr = keyValue.getValue().toStringUtf8();
-            String[] files = fileStr.split(";"); // todo split is inefficient
+            String[] files = fileStr.split(";");
             return internalUpdate(version, layout, files);
         }
         catch (IOException e)
@@ -219,9 +222,8 @@ public class PixelsCacheWriter
         for (String file : files)
         {
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
-            // TODO why use array? seems no need at all
-            int[] physicalLens = new int[cacheColumnletOrders.size()];
-            long[] physicalOffsets = new long[cacheColumnletOrders.size()];
+            int physicalLen;
+            long physicalOffset;
             // update radix and cache content
             for (int i = 0; i < cacheColumnletOrders.size(); i++)
             {
@@ -231,9 +233,9 @@ public class PixelsCacheWriter
                 PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
-                physicalLens[i] = (int) chunkIndex.getChunkLength();
-                physicalOffsets[i] = chunkIndex.getChunkOffset();
-                if (cacheOffset + physicalLens[i] >= cacheFile.getSize())
+                physicalLen = (int) chunkIndex.getChunkLength();
+                physicalOffset = chunkIndex.getChunkOffset();
+                if (cacheOffset + physicalLen >= cacheFile.getSize())
                 {
                     logger.debug("Cache writes have exceeded cache size. Break. Current size: " + cacheOffset);
                     status = 2;
@@ -242,12 +244,12 @@ public class PixelsCacheWriter
                 else
                 {
                     radix.put(new PixelsCacheKey(file, rowGroupId, columnId),
-                              new PixelsCacheIdx(cacheOffset, physicalLens[i]));
-                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
+                              new PixelsCacheIdx(cacheOffset, physicalLen));
+                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                     cacheFile.putBytes(cacheOffset, columnlet);
                     logger.debug(
                             "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + cacheOffset + ", length: " + columnlet.length);
-                    cacheOffset += physicalLens[i];
+                    cacheOffset += physicalLen;
                 }
             }
         }
@@ -318,6 +320,7 @@ public class PixelsCacheWriter
      */
     private boolean flushNode(RadixNode node)
     {
+        nodeBuffer.clear();
         if (currentIndexOffset >= indexFile.getSize())
         {
             logger.debug("Index file have exceeded cache size. Break. Current size: " + currentIndexOffset);
@@ -352,9 +355,15 @@ public class PixelsCacheWriter
             long childId = 0L;
             childId = childId | ((long) key << 56);  // leader
             childId = childId | n.offset;  // offset
-            indexFile.putLong(currentIndexOffset, childId);
-            currentIndexOffset += 8;
+            nodeBuffer.putLong(childId);
+//            indexFile.putLong(currentIndexOffset, childId);
+//            currentIndexOffset += 8;
         }
+        byte[] nodeBytes = new byte[node.getChildren().size() * 8];
+        nodeBuffer.flip();
+        nodeBuffer.get(nodeBytes);
+        indexFile.putBytes(currentIndexOffset, nodeBytes);
+        currentIndexOffset += nodeBytes.length;
         indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
         if (node.isKey())
