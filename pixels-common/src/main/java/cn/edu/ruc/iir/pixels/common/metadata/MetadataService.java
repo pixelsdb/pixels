@@ -145,13 +145,33 @@ public class MetadataService
 
     public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException
     {
-        Layout layout;
         String token = UUID.randomUUID().toString();
         MetadataProto.GetLayoutRequest request = MetadataProto.GetLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
-                .setVersion(version).build();
+                .setVersion(version)
+                .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.READABLE).build();
+        return internalGetLayout (request);
+    }
+
+    public Layout getLatestLayout(String schemaName, String tableName) throws MetadataException
+    {
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetLayoutRequest request = MetadataProto.GetLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .setVersion(-1)
+                .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.ALL).build();
+
+        return internalGetLayout (request);
+    }
+
+    private Layout internalGetLayout (MetadataProto.GetLayoutRequest request) throws MetadataException
+    {
+        Layout layout = null;
         try
         {
             MetadataProto.GetLayoutResponse response = this.stub.getLayout(request);
@@ -160,7 +180,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (response.getHeader().getToken().equals(request.getHeader().getToken()) == false)
             {
                 throw new MetadataException("response token does not match.");
             }

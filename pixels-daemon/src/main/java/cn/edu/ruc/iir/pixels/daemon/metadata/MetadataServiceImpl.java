@@ -114,7 +114,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                layouts = layoutDao.getReadableByTable(table, -1); // version < 0 means get all versions
+                layouts = layoutDao.getByTable(table, -1, MetadataProto.GetLayoutRequest.PermissionRange.READABLE); // version < 0 means get all versions
                 if (layouts == null || layouts.isEmpty())
                 {
                     headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");
@@ -163,7 +163,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                List<MetadataProto.Layout> layouts = layoutDao.getReadableByTable(table, request.getVersion());
+                List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
+                        request.getPermissionRange());
                 if (layouts == null || layouts.isEmpty())
                 {
                     headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");

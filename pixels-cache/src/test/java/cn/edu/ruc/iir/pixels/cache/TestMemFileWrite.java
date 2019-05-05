@@ -7,7 +7,7 @@ import java.util.Random;
 
 public class TestMemFileWrite
 {
-    public static final long TEST_NUM = 100L;
+    public static final long TEST_NUM = 10000L;
     public static final long MEM_SIZE = 1024L*1000L*1000L;
 
     public static void main(String[] args) throws Exception
@@ -23,7 +23,25 @@ public class TestMemFileWrite
 
         ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
         buffer.putLong(1);
-        byte[] bytes = buffer.array();
+        byte[] bytes = new byte[1000];
+
+        for (int i = 0; i < 100000000; ++i)
+        {
+            //byte[] bytes = new byte[1000];
+            long pos = random.nextLong() % MEM_SIZE;
+            if (pos < 0)
+            {
+                pos = -pos;
+            }
+            if (pos > MEM_SIZE - 1000)
+            {
+                pos -= 1000;
+            }
+            //mem.getAndAddLong(pos, 8);
+            //mem.getBytes(pos, bytes, 0, 1000);
+            mem.getByte(pos);
+            //mem.putLong(pos, 1);
+        }
 
         start = System.nanoTime();
         for (int i = 0; i < TEST_NUM; ++i)
@@ -39,8 +57,9 @@ public class TestMemFileWrite
                 pos -= 1000;
             }
             //mem.getAndAddLong(pos, 8);
-            //mem.getBytes(pos, bytes, 0, 1000);
-            mem.putLong(pos, 1);
+            mem.getBytes(pos, bytes, 0, 1000);
+            //mem.getByte(pos);
+            //mem.putLong(pos, 1);
         }
         System.out.println("ns/op: " + (System.nanoTime()-start)*1.0/TEST_NUM);
     }

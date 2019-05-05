@@ -68,12 +68,12 @@ message Layout {
     uint64 id = 1;
     uint32 version = 2;
     uint64 createAt = 3;
-    enum PERMISSION {
+    enum Permission {
         DISABLED = 0;
         READ_ONLY = 1;
         READ_WRITE = 2;
     }
-    PERMISSION permission = 4;
+    Permission permission = 4;
     string order = 5;
     string orderPath = 6;
     string compact = 7;
@@ -196,12 +196,19 @@ message GetLayoutRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
-    uint32 version = 4;
+    uint32 version = 4; // if version = -1, get the latest version
+    enum PermissionRange {
+        ALL = 0;
+        READABLE = 1;
+        READ_WRITE = 2;
+    }
+    PermissionRange permissionRange = 5;
 }
 
 message GetLayoutResponse {
     ResponseHeader header = 1;
     Layout layout = 2;
 }
+
 
 // end requeset/response defition for rpc services
