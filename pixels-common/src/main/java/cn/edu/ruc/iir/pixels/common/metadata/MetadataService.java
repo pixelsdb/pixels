@@ -116,7 +116,7 @@ public class MetadataService
         return columns;
     }
 
-    public boolean UpdateColumn(Column column) throws MetadataException
+    public boolean updateColumn(Column column) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Column columnPb = MetadataProto.Column.newBuilder()
@@ -234,7 +234,7 @@ public class MetadataService
         return MetadataProto.Layout.Permission.UNRECOGNIZED;
     }
 
-    public boolean UpdateLayout(Layout layout) throws MetadataException
+    public boolean updateLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
@@ -265,7 +265,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean AddLayout(Layout layout) throws MetadataException
+    public boolean addLayout(Layout layout) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
