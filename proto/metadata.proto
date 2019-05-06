@@ -32,7 +32,10 @@ service MetadataService {
     rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
+    rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
+    rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
+    rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
     rpc CreateSchema (CreateSchemaRequest) returns (CreateSchemaResponse);
     rpc DropSchema (DropSchemaRequest) returns (DropSchemaResponse);
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
@@ -180,6 +183,15 @@ message GetColumnsResponse {
     repeated Column columns = 2;
 }
 
+message UpdateColumnRequest {
+    RequestHeader header = 1;
+    Column column = 2;
+}
+
+message UpdateColumnResponse {
+    ResponseHeader header = 1;
+}
+
 // layout
 message GetLayoutsRequest {
     RequestHeader header = 1;
@@ -210,5 +222,22 @@ message GetLayoutResponse {
     Layout layout = 2;
 }
 
+message AddLayoutRequest {
+    RequestHeader header = 1;
+    Layout layout = 2;
+}
+
+message AddLayoutResponse {
+    ResponseHeader header = 1;
+}
+
+message UpdateLayoutRequest {
+    RequestHeader header = 1;
+    Layout layout = 2;
+}
+
+message UpdateLayoutResponse {
+    ResponseHeader header = 1;
+}
 
 // end requeset/response defition for rpc services

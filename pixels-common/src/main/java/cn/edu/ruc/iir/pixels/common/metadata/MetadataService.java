@@ -116,6 +116,34 @@ public class MetadataService
         return columns;
     }
 
+    public boolean UpdateColumn(Column column) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.Column columnPb = MetadataProto.Column.newBuilder()
+                .setId(column.getId()).setName(column.getName()).setType(column.getType())
+                .setSize(column.getSize()).setTableId(column.getTableId()).build();
+        MetadataProto.UpdateColumnRequest request = MetadataProto.UpdateColumnRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setColumn(columnPb).build();
+        try
+        {
+            MetadataProto.UpdateColumnResponse response = this.stub.updateColumn(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("failed to update column in metadata", e);
+        }
+        return true;
+    }
+
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
         List<Layout> layouts = new ArrayList<>();
@@ -190,6 +218,82 @@ public class MetadataService
             throw new MetadataException("failed to get layouts from metadata", e);
         }
         return layout;
+    }
+
+    private MetadataProto.Layout.Permission convertPermission (Layout.Permission permission)
+    {
+        switch (permission)
+        {
+            case DISABLED:
+                return MetadataProto.Layout.Permission.DISABLED;
+            case READ_ONLY:
+                return MetadataProto.Layout.Permission.READ_ONLY;
+            case READ_WRITE:
+                return MetadataProto.Layout.Permission.READ_WRITE;
+        }
+        return MetadataProto.Layout.Permission.UNRECOGNIZED;
+    }
+
+    public boolean UpdateLayout(Layout layout) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
+                .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
+                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
+                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
+                .setVersion(layout.getVersion()).setTableId(layout.getTableId()).build();
+        MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setLayout(layoutPb).build();
+        try
+        {
+            MetadataProto.UpdateLayoutResponse response = this.stub.updateLayout(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("failed to update layout in metadata", e);
+        }
+        return true;
+    }
+
+    public boolean AddLayout(Layout layout) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.Layout layoutPb = MetadataProto.Layout.newBuilder()
+                .setId(layout.getId()).setPermission(convertPermission(layout.getPermission()))
+                .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
+                .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
+                .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
+                .setVersion(layout.getVersion()).setTableId(layout.getTableId()).build();
+        MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setLayout(layoutPb).build();
+        try
+        {
+            MetadataProto.AddLayoutResponse response = this.stub.addLayout(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        } catch (Exception e)
+        {
+            throw new MetadataException("failed to add layout into metadata", e);
+        }
+        return true;
     }
 
     public boolean createSchema (String schemaName) throws MetadataException

@@ -204,6 +204,52 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void addLayout (MetadataProto.AddLayoutRequest request, StreamObserver<MetadataProto.AddLayoutResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        boolean res = layoutDao.save(request.getLayout());
+
+        if (res)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ADD_LAYOUT_FAILED).setErrorMsg("add layout failed");
+        }
+
+        MetadataProto.AddLayoutResponse response = MetadataProto.AddLayoutResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateLayout (MetadataProto.UpdateLayoutRequest request, StreamObserver<MetadataProto.UpdateLayoutResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        boolean res = layoutDao.update(request.getLayout());
+
+        if (res)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_LAYOUT_FAILED).setErrorMsg("layout not found");
+        }
+
+        MetadataProto.UpdateLayoutResponse response = MetadataProto.UpdateLayoutResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
     /**
      * @param request
      * @param responseObserver
@@ -216,9 +262,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.GetColumnsResponse response;
         MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
         List<MetadataProto.Column> columns = null;
-        if(schema != null) {
+        if(schema != null)
+        {
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
-            if (table != null) {
+            if (table != null)
+            {
                 columns = columnDao.getByTable(table);
             }
             else
@@ -245,6 +293,29 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                     .addAllColumns(columns).build();
         }
 
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void updateColumn (MetadataProto.UpdateColumnRequest request, StreamObserver<MetadataProto.UpdateColumnResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        boolean res = columnDao.update(request.getColumn());
+
+        if (res)
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_UPDATE_COUMN_FAILED).setErrorMsg("column not found");
+        }
+
+        MetadataProto.UpdateColumnResponse response = MetadataProto.UpdateColumnResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
