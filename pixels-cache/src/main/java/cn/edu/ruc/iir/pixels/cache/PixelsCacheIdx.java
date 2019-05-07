@@ -16,6 +16,7 @@ public class PixelsCacheIdx
     private final int length;
 
     public int dramAccessCount;
+    public int radixLevel;
 
     public PixelsCacheIdx(long offset, int length)
     {
