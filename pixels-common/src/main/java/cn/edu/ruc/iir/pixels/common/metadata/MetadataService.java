@@ -313,7 +313,7 @@ public class MetadataService
         {
             throw new MetadataException("response token does not match.");
         }
-        return (response.getHeader().getErrorCode() == 0) ? true : false;
+        return true;
     }
 
     public boolean dropSchema (String schemaName) throws MetadataException
@@ -329,7 +329,7 @@ public class MetadataService
             throw new MetadataException("failed to drop schema. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        return (response.getHeader().getErrorCode() == 0) ? true : false;
+        return true;
     }
 
     public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
@@ -359,7 +359,7 @@ public class MetadataService
         {
             throw new MetadataException("response token does not match.");
         }
-        return (response.getHeader().getErrorCode() == 0) ? true : false;
+        return true;
     }
 
     public boolean dropTable (String schemaName, String tableName) throws MetadataException
@@ -381,7 +381,7 @@ public class MetadataService
         {
             throw new MetadataException("response token does not match.");
         }
-        return (response.getHeader().getErrorCode() == 0) ? true : false;
+        return true;
     }
 
     public boolean existTable (String schemaName, String tableName) throws MetadataException
@@ -403,6 +403,6 @@ public class MetadataService
         {
             throw new MetadataException("response token does not match.");
         }
-        return (response.getHeader().getErrorCode() == 0) ? true : false;
+        return response.getExists();
     }
 }
