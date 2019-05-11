@@ -170,6 +170,11 @@ public class PixelsRadix
         }
     }
 
+    /**
+     * @Deprecated
+     * DO NOT USE THIS
+     * This method currently is only used in tests
+     * */
     public PixelsCacheIdx get(PixelsCacheKey cacheKey)
     {
         RadixNode root = nodes.get(0);
@@ -186,6 +191,11 @@ public class PixelsRadix
         return null;
     }
 
+    /**
+     * @Deprecated
+     * DO NOT USE THIS
+     * This method currently is only used in tests
+     * */
     public boolean remove(PixelsCacheKey cacheKey)
     {
         checkArgument(cacheKey != null, "cache key is null");
