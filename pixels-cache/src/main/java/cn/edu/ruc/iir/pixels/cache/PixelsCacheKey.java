@@ -18,30 +18,15 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class PixelsCacheKey
 {
     final static int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    private String blockId;  // TODO: it could be better to use long as the type of blockid
-    private short rowGroupId;
-    private short columnId;
+    public String blockId;  // TODO: it could be better to use long as the type of blockid
+    public short rowGroupId;
+    public short columnId;
 
     public PixelsCacheKey(String blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
-    }
-
-    public String getBlockId()
-    {
-        return blockId;
-    }
-
-    public int getRowGroupId()
-    {
-        return rowGroupId;
-    }
-
-    public int getColumnId()
-    {
-        return columnId;
     }
 
     public void getBytes(ByteBuffer keyBuffer)

@@ -289,8 +289,8 @@ public class PixelsCacheWriter
         {
             PixelsCacheIdx value = node.getValue();
             ColumnletId columnletId = new ColumnletId();
-            columnletId.cacheOffset = value.getOffset();
-            columnletId.cacheLength = value.getLength();
+            columnletId.cacheOffset = value.offset;
+            columnletId.cacheLength = value.length;
             cacheColumnlets.add(columnletId);
         }
         for (RadixNode n : node.getChildren().values())
