@@ -38,6 +38,7 @@ public class PixelsCacheWriter
     private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = 0L;  // this is used in the write() method.
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
+    private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -368,7 +369,8 @@ public class PixelsCacheWriter
         currentIndexOffset += node.getEdge().length;
         if (node.isKey())
         {  // value
-            indexFile.putBytes(currentIndexOffset, node.getValue().getBytes());
+            node.getValue().getBytes(cacheIdxBuffer);
+            indexFile.putBytes(currentIndexOffset, cacheIdxBuffer.array());
             currentIndexOffset += 12;
         }
         return true;
