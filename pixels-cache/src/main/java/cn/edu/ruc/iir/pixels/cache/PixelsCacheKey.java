@@ -17,8 +17,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
+    public final static int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private String blockId;  // TODO: it could be better to use long as the type of blockid
     private short rowGroupId;
     private short columnId;
@@ -45,7 +44,7 @@ public class PixelsCacheKey
         return columnId;
     }
 
-    public byte[] getBytes()
+    public void getBytes(ByteBuffer keyBuffer)
     {
         keyBuffer.clear();
         // TODO: is it better to ensure big-endian in keyBuffer? big-endian is prefix comparable,
@@ -56,12 +55,6 @@ public class PixelsCacheKey
         keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
-    }
-
-    public int getSize()
-    {
-        return keyBuffer.position();
     }
 
     @Override

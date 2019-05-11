@@ -21,6 +21,7 @@ public class PixelsCacheReader
 
     private byte[] children = new byte[256 * 8];
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
+    private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE);
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
@@ -80,10 +81,10 @@ public class PixelsCacheReader
 
         // search index file for columnlet id
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        byte[] cacheKeyBytes = cacheKey.getBytes();
+        cacheKey.getBytes(keyBuffer);
 
         // search cache key
-        PixelsCacheIdx cacheIdx = search(cacheKeyBytes);
+        PixelsCacheIdx cacheIdx = search(keyBuffer);
         // if found, read content from cache
         if (cacheIdx != null)
         {
@@ -109,9 +110,9 @@ public class PixelsCacheReader
     public PixelsCacheIdx search(String blockId, short rowGroupId, short columnId)
     {
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        byte[] cacheKeyBytes = cacheKey.getBytes();
+        cacheKey.getBytes(keyBuffer);
 
-        return search(cacheKeyBytes);
+        return search(keyBuffer);
     }
 
     /**
@@ -119,11 +120,11 @@ public class PixelsCacheReader
      * If found, update counter in cache idx.
      * Else, return null
      */
-    private PixelsCacheIdx search(byte[] key)
+    private PixelsCacheIdx search(ByteBuffer keyBuffer)
     {
         int dramAccessCounter = 0;
         int radixLevel = 0;
-        final int keyLen = key.length;
+        final int keyLen = keyBuffer.position();
         long currentNodeOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         int bytesMatched = 0;
         int bytesMatchedInNodeFound = 0;
@@ -154,7 +155,7 @@ public class PixelsCacheReader
             {
                 long child = childrenBuffer.getLong();
                 byte leader = (byte) ((child >>> 56) & 0xFF);
-                if (leader == key[bytesMatched])
+                if (leader == keyBuffer.get(bytesMatched))
                 {
                     matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
                     break;
@@ -177,7 +178,7 @@ public class PixelsCacheReader
             dramAccessCounter++;
             for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
-                if (currentNodeEdge[i] != key[bytesMatched])
+                if (currentNodeEdge[i] != keyBuffer.get(bytesMatched))
                 {
                     break outer_loop;
                 }
