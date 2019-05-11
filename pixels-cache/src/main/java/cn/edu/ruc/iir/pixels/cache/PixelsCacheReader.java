@@ -19,6 +19,9 @@ public class PixelsCacheReader
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
+    private byte[] children = new byte[256 * 8];
+    private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
+
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
         this.cacheFile = cacheFile;
@@ -120,7 +123,6 @@ public class PixelsCacheReader
     {
         int dramAccessCounter = 0;
         int radixLevel = 0;
-//        long start = System.nanoTime();
         final int keyLen = key.length;
         long currentNodeOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         int bytesMatched = 0;
@@ -137,8 +139,6 @@ public class PixelsCacheReader
         }
         radixLevel++;
 
-        byte[] children = new byte[256 * 8];
-        ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
         // search
         outer_loop:
         while (bytesMatched < keyLen)
@@ -154,7 +154,6 @@ public class PixelsCacheReader
             {
                 long child = childrenBuffer.getLong();
                 byte leader = (byte) ((child >>> 56) & 0xFF);
-//                byte leader = children[8 * i];
                 if (leader == key[bytesMatched])
                 {
                     matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
@@ -202,8 +201,6 @@ public class PixelsCacheReader
                 return cacheIdx;
             }
         }
-        long end = System.currentTimeMillis();
-//        logger.debug("[index null] " + dramAccessCounter + "," + (end - start));
         return null;
     }
 
