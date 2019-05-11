@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -15,6 +16,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PixelsRadix
 {
     private final DynamicArray<RadixNode> nodes;    // tree nodes.
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE);
 
     public PixelsRadix()
     {
@@ -74,7 +76,8 @@ public class PixelsRadix
     {
         checkArgument(cacheKey != null, "cache key is null");
         checkArgument(cacheIdx != null, "cache index item is null");
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchingType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
 
@@ -125,8 +128,8 @@ public class PixelsRadix
             // -> add a new child to the node, containing the trailing bytes from the key.
             case MATCH_END_AT_END_EDGE:
             {
-                byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                                                      searchResult.bytesMatched, cacheKey.getSize());
+                byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
+                                                      searchResult.bytesMatched, keyBuffer.position());
                 RadixNode newNode = new RadixNode();
                 newNode.setEdge(keySuffix);
                 newNode.setValue(cacheIdx);
@@ -144,8 +147,8 @@ public class PixelsRadix
             {
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
                                                          0, searchResult.bytesMatchedInNodeFound);
-                byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                                                      searchResult.bytesMatched, cacheKey.getSize());
+                byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
+                                                      searchResult.bytesMatched, keyBuffer.position());
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
                                                        searchResult.bytesMatchedInNodeFound,
                                                        nodeFound.getEdge().length);
@@ -183,7 +186,8 @@ public class PixelsRadix
         {
             return null;
         }
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         if (searchResult.matchType.equals(SearchResult.Type.EXACT_MATCH))
         {
             return searchResult.nodeFound.getValue();
@@ -199,7 +203,8 @@ public class PixelsRadix
     public boolean remove(PixelsCacheKey cacheKey)
     {
         checkArgument(cacheKey != null, "cache key is null");
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
         switch (matchType)
@@ -316,18 +321,18 @@ public class PixelsRadix
         // todo remove all
     }
 
-    private SearchResult searchInternal(byte[] key)
+    private SearchResult searchInternal(ByteBuffer keyBuffer)
     {
         RadixNode currentNode = nodes.get(0);
         RadixNode parentNode = null;
         RadixNode grandParentNode = null;
         int bytesMatched = 0, bytesMatchedInNodeFound = 0;
 
-        final int keyLen = key.length;
+        final int keyLen = keyBuffer.position();
         outer_loop:
         while (bytesMatched < keyLen)
         {
-            RadixNode nextNode = currentNode.getChild(key[bytesMatched]);
+            RadixNode nextNode = currentNode.getChild(keyBuffer.get(bytesMatched));
             if (nextNode == null)
             {
                 break;
@@ -340,7 +345,7 @@ public class PixelsRadix
             byte[] currentNodeEdge = currentNode.getEdge();
             for (int i = 0, numEdgeBytes = currentNodeEdge.length; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
-                if (currentNodeEdge[i] != key[bytesMatched])
+                if (currentNodeEdge[i] != keyBuffer.get(bytesMatched))
                 {
                     break outer_loop;
                 }
@@ -349,7 +354,7 @@ public class PixelsRadix
             }
         }
 
-        return new SearchResult(key, currentNode, bytesMatched, bytesMatchedInNodeFound, parentNode, grandParentNode);
+        return new SearchResult(keyLen, currentNode, bytesMatched, bytesMatchedInNodeFound, parentNode, grandParentNode);
     }
 
     public void printStats()
@@ -359,7 +364,6 @@ public class PixelsRadix
 
     static class SearchResult
     {
-        final byte[] key;
         final RadixNode nodeFound;
         final int bytesMatched;
         final int bytesMatchedInNodeFound;
@@ -375,21 +379,20 @@ public class PixelsRadix
             MATCH_END_AT_MID_EDGE   // match end before reaching key end, because the matching hits end already
         }
 
-        SearchResult(byte[] key, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound,
+        SearchResult(int keyLen, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound,
                      RadixNode parentNode, RadixNode grandParentNode)
         {
-            this.key = key;
             this.nodeFound = nodeFound;
             this.bytesMatched = bytesMatched;
             this.bytesMatchedInNodeFound = bytesMatchedInNodeFound;
             this.parentNode = parentNode;
             this.grandParentNode = grandParentNode;
-            this.matchType = match(key, nodeFound, bytesMatched, bytesMatchedInNodeFound);
+            this.matchType = match(keyLen, nodeFound, bytesMatched, bytesMatchedInNodeFound);
         }
 
-        private Type match(byte[] key, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound)
+        private Type match(int keyLen, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound)
         {
-            if (bytesMatched == key.length)
+            if (bytesMatched == keyLen)
             {
                 if (bytesMatchedInNodeFound == nodeFound.getEdge().length)
                 {
@@ -400,7 +403,7 @@ public class PixelsRadix
                     return Type.KEY_ENDS_AT_MID_EDGE;
                 }
             }
-            else if (bytesMatched < key.length)
+            else if (bytesMatched < keyLen)
             {
                 if (bytesMatchedInNodeFound == nodeFound.getEdge().length)
                 {
@@ -412,41 +415,6 @@ public class PixelsRadix
                 }
             }
             throw new IllegalStateException("Unexpected matching type for SearchResult");
-        }
-
-        public byte[] getKey()
-        {
-            return key;
-        }
-
-        public RadixNode getNodeFound()
-        {
-            return nodeFound;
-        }
-
-        public int getBytesMatched()
-        {
-            return bytesMatched;
-        }
-
-        public int getBytesMatchedInNodeFound()
-        {
-            return bytesMatchedInNodeFound;
-        }
-
-        public RadixNode getParentNode()
-        {
-            return parentNode;
-        }
-
-        public RadixNode getGrandParentNode()
-        {
-            return grandParentNode;
-        }
-
-        public Type getMatchType()
-        {
-            return matchType;
         }
     }
 }
