@@ -158,14 +158,14 @@ public class CacheIndexPerf
             for (int i = 0; i < idxes.length; i++)
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
-                PixelsCacheIdx idx = cacheReader.search(cacheKey.getBlockId(),
-                                                        (short) cacheKey.getRowGroupId(),
-                                                        (short) cacheKey.getColumnId());
+                PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
+                                                        cacheKey.rowGroupId,
+                                                        cacheKey.columnId);
                 if (idx == null)
                 {
-                    System.out.println("[error] cannot find " + cacheKey.getBlockId()
-                                               + "-" + cacheKey.getRowGroupId()
-                                               + "-" + cacheKey.getColumnId());
+                    System.out.println("[error] cannot find " + cacheKey.blockId
+                                               + "-" + cacheKey.rowGroupId
+                                               + "-" + cacheKey.columnId);
                 }
                 else
                 {

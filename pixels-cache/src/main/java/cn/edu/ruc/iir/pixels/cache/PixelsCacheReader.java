@@ -88,11 +88,9 @@ public class PixelsCacheReader
         // if found, read content from cache
         if (cacheIdx != null)
         {
-            long offset = cacheIdx.getOffset();
-            int length = cacheIdx.getLength();
-            content = new byte[length];
+            content = new byte[cacheIdx.length];
             // read content
-            cacheFile.getBytes(offset, content, 0, length);
+            cacheFile.getBytes(cacheIdx.offset, content, 0, cacheIdx.length);
         }
 
         return content;

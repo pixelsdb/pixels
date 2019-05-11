@@ -78,8 +78,8 @@ public class CacheReadPerf
                 for (int k = 0; k < readCount; k++)
                 {
                     int id = random.nextInt(readCount);
-                    offsets[k] = cacheIdxes[id].getOffset();
-                    lengths[k] = cacheIdxes[id].getLength();
+                    offsets[k] = cacheIdxes[id].offset;
+                    lengths[k] = cacheIdxes[id].length;
                 }
                 CacheReader reader = new CacheReader(cacheFile, offsets, lengths);
                 readers[i] = reader;
