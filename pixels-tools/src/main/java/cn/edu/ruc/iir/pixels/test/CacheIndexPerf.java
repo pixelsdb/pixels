@@ -10,13 +10,8 @@ import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -41,18 +36,18 @@ public class CacheIndexPerf
         {
             long prepareStart = System.currentTimeMillis();
             CacheIndexPerf cacheIndexPerf = new CacheIndexPerf();
-//            cacheIndexPerf.prepare(args[0], args[1], Integer.parseInt(args[2]));
-            cacheIndexPerf.prepare("dbiir24", "dbiir27", 3);
-//            int threadNum = Integer.parseInt(args[3]);
-            int threadNum = 1;
+            cacheIndexPerf.prepare(args[0], args[1], Integer.parseInt(args[2]));
+//            cacheIndexPerf.prepare("dbiir24", "dbiir27", 3);
+            int threadNum = Integer.parseInt(args[3]);
+//            int threadNum = 1;
 
             Thread[] threads = new Thread[threadNum];
             int readCount = cachedColumnlets.size() * cachedPaths.size();
             pixelsCacheKeys = new PixelsCacheKey[readCount];
 
-//            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-//                                                              Long.parseLong(config.getProperty("index.size")));
-            MemoryMappedFile indexFile = new MemoryMappedFile("/home/guod/Desktop/pixels.index", 1024*1024*1024);
+            MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
+                                                              Long.parseLong(config.getProperty("index.size")));
+//            MemoryMappedFile indexFile = new MemoryMappedFile("/home/guod/Desktop/pixels.index", 1024*1024*1024);
 
             int idx = 0;
             for (Path path : cachedPaths)
@@ -106,37 +101,37 @@ public class CacheIndexPerf
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
         cachedColumnlets =
                 layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
-        Configuration hdfsConfig = new Configuration();
-        hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
-        try
-        {
-            Path basePath = new Path(layout.getCompactPath());
-            FileSystem fs = FileSystem.get(basePath.toUri(), hdfsConfig);
-            FSFactory fsFactory = new FSFactory(fs);
-            List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
-
-            for (Path path : paths)
-            {
-                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
-                {
-                    cachedPaths.add(path);
-                }
-            }
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
-//        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
-//        List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
-//        for (Path path : paths)
+//        Configuration hdfsConfig = new Configuration();
+//        hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+//        hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
+//        try
 //        {
-//            if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+//            Path basePath = new Path(layout.getCompactPath());
+//            FileSystem fs = FileSystem.get(basePath.toUri(), hdfsConfig);
+//            FSFactory fsFactory = new FSFactory(fs);
+//            List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
+//
+//            for (Path path : paths)
 //            {
-//                cachedPaths.add(path);
+//                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+//                {
+//                    cachedPaths.add(path);
+//                }
 //            }
 //        }
+//        catch (IOException e)
+//        {
+//            e.printStackTrace();
+//        }
+        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+        List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
+        for (Path path : paths)
+        {
+            if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+            {
+                cachedPaths.add(path);
+            }
+        }
     }
 
     static class CacheSearcher implements Runnable
@@ -158,6 +153,7 @@ public class CacheIndexPerf
                                                              .setIndexFile(indexFile)
                                                              .build();
             int totalAcNum = 0;
+            int totalLevel = 0;
             long searchStart = System.nanoTime();
             for (int i = 0; i < idxes.length; i++)
             {
@@ -174,10 +170,11 @@ public class CacheIndexPerf
                 else
                 {
                     totalAcNum += idx.dramAccessCount;
+                    totalLevel += idx.radixLevel;
                 }
             }
             long searchEnd = System.nanoTime();
-            System.out.println("[search]: " + totalAcNum + "," + (searchEnd - searchStart));
+            System.out.println("[thread search]: " + totalAcNum + "," + (searchEnd - searchStart) + "," + totalLevel);
         }
     }
 }
