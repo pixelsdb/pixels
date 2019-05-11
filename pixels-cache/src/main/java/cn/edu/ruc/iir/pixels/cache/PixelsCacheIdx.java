@@ -11,8 +11,8 @@ import java.util.Objects;
 public class PixelsCacheIdx
 {
     static final int SIZE = Long.BYTES + Integer.BYTES;
-    private final long offset;
-    private final int length;
+    public final long offset;
+    public final int length;
 
     public int dramAccessCount;
     public int radixLevel;
@@ -28,16 +28,6 @@ public class PixelsCacheIdx
         ByteBuffer idxBuffer = ByteBuffer.wrap(content);
         this.offset = idxBuffer.getLong();
         this.length = idxBuffer.getInt();
-    }
-
-    public long getOffset()
-    {
-        return offset;
-    }
-
-    public int getLength()
-    {
-        return length;
     }
 
     public void getBytes(ByteBuffer cacheIdxBuffer)
