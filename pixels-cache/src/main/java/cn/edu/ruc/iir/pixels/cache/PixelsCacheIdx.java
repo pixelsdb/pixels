@@ -11,7 +11,6 @@ import java.util.Objects;
 public class PixelsCacheIdx
 {
     static final int SIZE = Long.BYTES + Integer.BYTES;
-    private ByteBuffer buffer = ByteBuffer.allocate(SIZE);
     private final long offset;
     private final int length;
 
@@ -41,13 +40,11 @@ public class PixelsCacheIdx
         return length;
     }
 
-    public byte[] getBytes()
+    public void getBytes(ByteBuffer cacheIdxBuffer)
     {
-        buffer.clear();
-        buffer.putLong(offset);
-        buffer.putInt(length);
-
-        return buffer.array();
+        cacheIdxBuffer.clear();
+        cacheIdxBuffer.putLong(offset);
+        cacheIdxBuffer.putInt(length);
     }
 
     @Override

@@ -17,7 +17,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    public final static int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
+    final static int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
     private String blockId;  // TODO: it could be better to use long as the type of blockid
     private short rowGroupId;
     private short columnId;
