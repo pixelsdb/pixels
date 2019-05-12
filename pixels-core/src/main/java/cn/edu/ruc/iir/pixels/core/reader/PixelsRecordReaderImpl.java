@@ -287,7 +287,6 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
-//        long readRGFootersStartNano = System.nanoTime();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -296,7 +295,6 @@ public class PixelsRecordReaderImpl
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)
             {
-//                logger.debug("[rg cache miss]" + rgCacheId);
                 PixelsProto.RowGroupInformation rowGroupInformation =
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
@@ -319,12 +317,9 @@ public class PixelsRecordReaderImpl
             // cache hit
             else
             {
-//                logger.debug("[rg cache hit]" + rgCacheId);
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
-//        long readRGFooterEndNano = System.nanoTime();
-//        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
@@ -368,12 +363,15 @@ public class PixelsRecordReaderImpl
             {
                 short rgId = chunkId.getRowGroupId();
                 short colId = chunkId.getColumnId();
+                long getBegin = System.nanoTime();
                 byte[] columnlet = cacheReader.get(blockName, rgId, colId);
+                long getEnd = System.nanoTime();
+                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            logger.debug("[cache stat] " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
             // deal with null or empty cache chunk
             for (ColumnletId chunkId : cacheChunks)
             {
