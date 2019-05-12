@@ -369,7 +369,6 @@ public class PixelsRecordReaderImpl
                 short rgId = chunkId.getRowGroupId();
                 short colId = chunkId.getColumnId();
                 byte[] columnlet = cacheReader.get(blockName, rgId, colId);
-                cacheReadSize += columnlet.length;
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
             }
             long cacheReadEndNano = System.nanoTime();
@@ -391,6 +390,10 @@ public class PixelsRecordReaderImpl
                     ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
                                                     chunkIndex.getChunkLength());
                     diskChunks.add(diskChunk);
+                }
+                else
+                {
+                    cacheReadSize += chunkBuffers[bufferIdx].length;
                 }
             }
         }
