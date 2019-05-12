@@ -1,8 +1,5 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -14,7 +11,8 @@ import java.util.List;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+//    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+    private static CacheLogger cacheLogger = new CacheLogger();
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
@@ -22,6 +20,10 @@ public class PixelsCacheReader
     private byte[] children = new byte[256 * 8];
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE);
+
+    static {
+        new Thread(cacheLogger).start();
+    }
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {
@@ -85,19 +87,21 @@ public class PixelsCacheReader
         cacheKey.getBytes(keyBuffer);
 
         // search cache key
-//        long searchBegin = System.nanoTime();
+        long searchBegin = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(keyBuffer);
-//        long searchEnd = System.nanoTime();
+        long searchEnd = System.nanoTime();
+        cacheLogger.addSearchLatency(searchEnd - searchBegin);
 //        logger.debug("[cache search]: " + (searchEnd - searchBegin));
         // if found, read content from cache
-//        long readBegin = System.nanoTime();
+        long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
             content = new byte[cacheIdx.length];
             // read content
             cacheFile.getBytes(cacheIdx.offset, content, 0, cacheIdx.length);
         }
-//        long readEnd = System.nanoTime();
+        long readEnd = System.nanoTime();
+        cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
 
         return content;
@@ -214,7 +218,7 @@ public class PixelsCacheReader
     {
         try
         {
-            logger.info("cache reader unmaps cache/index file");
+//            logger.info("cache reader unmaps cache/index file");
             cacheFile.unmap();
             indexFile.unmap();
         }
