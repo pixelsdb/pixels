@@ -63,7 +63,7 @@ public class CacheReadPerf
                 {
                     String[] columnletIdSplits = cachedColumnlets.get(i).split(":");
                     PixelsCacheIdx pixelsCacheIdx = cacheReader
-                            .search(path.toString(), Short.parseShort(columnletIdSplits[0]),
+                            .search(-1, Short.parseShort(columnletIdSplits[0]),
                                     Short.parseShort(columnletIdSplits[1]));
                     cacheIdxes[idx] = pixelsCacheIdx;
                     idx++;

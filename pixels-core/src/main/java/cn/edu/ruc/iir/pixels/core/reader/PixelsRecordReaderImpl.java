@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.cache.ColumnletId;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
@@ -14,8 +15,6 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -364,7 +363,15 @@ public class PixelsRecordReaderImpl
                 short rgId = chunkId.getRowGroupId();
                 short colId = chunkId.getColumnId();
 //                long getBegin = System.nanoTime();
-                byte[] columnlet = cacheReader.get(blockName, rgId, colId);
+                long blockId = -1;
+                try
+                {
+                    blockId = physicalFSReader.getCurrentBlockId();
+                }
+                catch (FSException e)
+                {
+                }
+                byte[] columnlet = cacheReader.get(blockId, rgId, colId);
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;

@@ -105,7 +105,7 @@ public class CacheGetPerf
             for (String columnlet : cachedColumnlets)
             {
                 String[] parts = columnlet.split(":");
-                PixelsCacheKey cacheKey = new PixelsCacheKey(path.toString(), Short.parseShort(parts[0]),
+                PixelsCacheKey cacheKey = new PixelsCacheKey(-1, Short.parseShort(parts[0]),
                                                              Short.parseShort(parts[1]));
                 cacheKeys[idx++] = cacheKey;
             }

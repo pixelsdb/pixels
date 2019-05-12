@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
@@ -68,5 +69,11 @@ public class PixelsPhysicalReader
         physicalReader.readFully(content);
 
         return content;
+    }
+
+    public long getCurrentBlockId()
+            throws FSException
+    {
+        return physicalReader.getCurrentBlockId();
     }
 }

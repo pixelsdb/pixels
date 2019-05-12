@@ -1,11 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
-import org.apache.commons.compress.utils.CharsetNames;
-
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -17,12 +12,17 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    final static int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    public String blockId;  // TODO: it could be better to use long as the type of blockid
+    final static int SIZE = 2 * Short.BYTES + Long.BYTES;
+    public long blockId;
     public short rowGroupId;
     public short columnId;
+    // Big-endian is prefix comparable and efficient for radix-tree.
+    // Although big endian is used as the default byte order in ByteBuffer, we still want to make sure.
+    // Block id in hdfs-2.7.3 is a sequence number in each block-id pool, not really random.
+    // Currently we only support HDFS cluster without NameNode federation, in which there is only one
+    // block-id pool.
 
-    public PixelsCacheKey(String blockId, short rowGroupId, short columnId)
+    public PixelsCacheKey(long blockId, short rowGroupId, short columnId)
     {
         this.blockId = blockId;
         this.rowGroupId = rowGroupId;
@@ -32,12 +32,7 @@ public class PixelsCacheKey
     public void getBytes(ByteBuffer keyBuffer)
     {
         keyBuffer.clear();
-        // TODO: is it better to ensure big-endian in keyBuffer? big-endian is prefix comparable,
-        // from which radix-tree may benifit.
-        // And we'd better use long (int64) for block id, instead of a string file name.
-        // Fixed key length (12 bytes) should be more efficient. I noticed that block ids in hdfs-2.7.3 looks
-        // like a sequence number, not really random.
-        keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
+        keyBuffer.putLong(blockId);
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
     }

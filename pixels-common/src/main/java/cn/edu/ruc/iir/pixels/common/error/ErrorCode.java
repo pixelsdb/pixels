@@ -17,5 +17,8 @@ public class ErrorCode
     public static final int METADATA_DELETE_SCHEMA_FAILED = 10007;
     public static final int METADATA_DELETE_TABLE_FAILED = 10008;
     public static final int METADATA_ADD_COUMNS_FAILED = 10009;
+    public static final int METADATA_UPDATE_COUMN_FAILED = 10010;
+    public static final int METADATA_UPDATE_LAYOUT_FAILED = 10010;
+    public static final int METADATA_ADD_LAYOUT_FAILED = 10010;
     // end error code for metadata rpc
 }
