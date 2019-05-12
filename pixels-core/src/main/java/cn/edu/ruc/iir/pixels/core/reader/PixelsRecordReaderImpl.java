@@ -368,8 +368,9 @@ public class PixelsRecordReaderImpl
                 {
                     blockId = physicalFSReader.getCurrentBlockId();
                 }
-                catch (FSException e)
+                catch (FSException | IOException e)
                 {
+                    e.printStackTrace();
                 }
                 byte[] columnlet = cacheReader.get(blockId, rgId, colId);
 //                long getEnd = System.nanoTime();

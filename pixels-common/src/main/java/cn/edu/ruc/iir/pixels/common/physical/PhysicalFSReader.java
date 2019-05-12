@@ -91,13 +91,14 @@ public class PhysicalFSReader
     }
 
     @Override
-    public long getCurrentBlockId() throws FSException
+    public long getCurrentBlockId() throws FSException, IOException
     {
         HdfsDataInputStream hdis = null;
         if (rawReader instanceof HdfsDataInputStream)
         {
             hdis = (HdfsDataInputStream) rawReader;
-            return hdis.getCurrentBlock().getBlockId();
+//            return hdis.getCurrentBlock().getBlockId();
+            return hdis.getAllBlocks().get(0).getBlock().getBlockId();
         }
         else
         {
