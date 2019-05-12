@@ -85,14 +85,20 @@ public class PixelsCacheReader
         cacheKey.getBytes(keyBuffer);
 
         // search cache key
+        long searchBegin = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(keyBuffer);
+        long searchEnd = System.nanoTime();
+        logger.debug("[cache search]: " + (searchEnd - searchBegin));
         // if found, read content from cache
+        long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
             content = new byte[cacheIdx.length];
             // read content
             cacheFile.getBytes(cacheIdx.offset, content, 0, cacheIdx.length);
         }
+        long readEnd = System.nanoTime();
+        logger.debug("[cache read]: " + (readEnd - readBegin));
 
         return content;
     }
