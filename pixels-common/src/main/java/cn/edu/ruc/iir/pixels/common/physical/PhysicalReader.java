@@ -1,5 +1,7 @@
 package cn.edu.ruc.iir.pixels.common.physical;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
+
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -28,4 +30,6 @@ public interface PhysicalReader
     int readInt() throws IOException;
 
     void close() throws IOException;
+
+    long getCurrentBlockId() throws FSException;
 }

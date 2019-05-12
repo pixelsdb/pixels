@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.test;
 
 import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
@@ -389,7 +390,7 @@ public class CacheReaderPerf
     }
 
     private List<StatisticMetric> cacheRead(String id, String[] columnlets, List<Path> files)
-            throws IOException, InterruptedException
+            throws IOException, InterruptedException, FSException
     {
         System.out.println("Cache reading workload " + id);
         // clear cache
@@ -418,10 +419,11 @@ public class CacheReaderPerf
         for (Path path : files)
         {
             System.out.println("Cache reading file " + path.toString());
+            long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(path.toString(), columnletId.rgId, columnletId.colId);
+                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
                 size += content.length;
             }
             long readEndNano = System.nanoTime();

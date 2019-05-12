@@ -66,7 +66,7 @@ public class PixelsCacheReader
      * @param columnId column id
      * @return columnlet content
      * */
-    public byte[] get(String blockId, short rowGroupId, short columnId)
+    public byte[] get(long blockId, short rowGroupId, short columnId)
     {
         byte[] content = new byte[0];
         // check rw flag, if not readable, return empty bytes
@@ -110,7 +110,7 @@ public class PixelsCacheReader
      * This interface is only used by TESTS, DO NOT USE.
      * It will be removed soon!
      * */
-    public PixelsCacheIdx search(String blockId, short rowGroupId, short columnId)
+    public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
         byte[] cacheKeyBytes = cacheKey.getBytes();

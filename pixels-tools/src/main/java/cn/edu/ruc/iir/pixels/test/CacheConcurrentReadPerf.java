@@ -119,6 +119,15 @@ public class CacheConcurrentReadPerf
         @Override
         public void run()
         {
+            ConfigFactory config = ConfigFactory.Instance();
+            FSFactory fsFactory = null;
+            try
+            {
+                fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.fir"));
+            } catch (FSException e)
+            {
+                e.printStackTrace();
+            }
             try {
                 if (!logDir.endsWith("/"))
                 {
@@ -130,6 +139,7 @@ public class CacheConcurrentReadPerf
                 for (Path path : cachedPaths)
                 {
                     int counter = 0;
+                    long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
                     while (counter < readLimit)
                     {
                         int readIndex = random.nextInt(readLimit);
@@ -140,7 +150,7 @@ public class CacheConcurrentReadPerf
                         String columnletId = cachedColumnlets.get(readIndex);
                         String[] columnletIdSplits = columnletId.split(":");
                         long startNano = System.nanoTime();
-                        byte[] columnlet = cacheReader.get(path.toString(), Short.parseShort(columnletIdSplits[0]),
+                        byte[] columnlet = cacheReader.get(blockId, Short.parseShort(columnletIdSplits[0]),
                                                            Short.parseShort(columnletIdSplits[1]));
                         long cost = System.nanoTime() - startNano;
                         CacheStat stat = new CacheStat(id, columnlet.length, cost);
@@ -155,7 +165,11 @@ public class CacheConcurrentReadPerf
                 }
                 writer.close();
             }
-            catch (IOException e) {
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            } catch (FSException e)
+            {
                 e.printStackTrace();
             }
         }
