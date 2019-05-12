@@ -363,10 +363,10 @@ public class PixelsRecordReaderImpl
             {
                 short rgId = chunkId.getRowGroupId();
                 short colId = chunkId.getColumnId();
-                long getBegin = System.nanoTime();
+//                long getBegin = System.nanoTime();
                 byte[] columnlet = cacheReader.get(blockName, rgId, colId);
-                long getEnd = System.nanoTime();
-                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
+//                long getEnd = System.nanoTime();
+//                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
             }
             long cacheReadEndNano = System.nanoTime();
