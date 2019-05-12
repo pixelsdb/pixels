@@ -371,7 +371,6 @@ public class PixelsRecordReaderImpl
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
             // deal with null or empty cache chunk
             for (ColumnletId chunkId : cacheChunks)
             {
@@ -394,6 +393,7 @@ public class PixelsRecordReaderImpl
                     cacheReadSize += chunkBuffers[bufferIdx].length;
                 }
             }
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
         }
         else
         {
