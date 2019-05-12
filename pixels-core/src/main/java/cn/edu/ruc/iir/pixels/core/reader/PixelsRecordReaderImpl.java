@@ -1,15 +1,9 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
-import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.ChunkId;
-import cn.edu.ruc.iir.pixels.core.ChunkSeq;
-import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
-import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -18,13 +12,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * pixels
@@ -348,7 +336,7 @@ public class PixelsRecordReaderImpl
                         try
                         {
                             blockId = physicalFSReader.getCurrentBlockId();
-                        } catch (FSException e)
+                        } catch (Exception e)
                         {
                             logger.error(e);
                             return false;

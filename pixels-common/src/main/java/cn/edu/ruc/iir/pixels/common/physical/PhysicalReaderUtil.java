@@ -21,14 +21,27 @@ public class PhysicalReaderUtil
         FSDataInputStream rawReader = null;
         try {
             rawReader = fs.open(path);
+            if (rawReader != null)
+            {
+                return new PhysicalFSReader(fs, path, rawReader);
+            }
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
+            // TODO: deal with this exception
+            if (rawReader != null)
+            {
+                try
+                {
+                    rawReader.close();
+                } catch (IOException e1)
+                {
+                    e1.printStackTrace();
+                }
+            }
             e.printStackTrace();
         }
 
-        if (rawReader == null) {
-            return null;
-        }
-        return new PhysicalFSReader(fs, path, rawReader);
+        return null;
     }
 }
