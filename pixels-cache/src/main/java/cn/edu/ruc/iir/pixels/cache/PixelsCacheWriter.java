@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
@@ -172,6 +173,10 @@ public class PixelsCacheWriter
         catch (IOException e) {
             e.printStackTrace();
             return -1;
+        } catch (FSException e)
+        {
+            e.printStackTrace();
+            return -1;
         }
     }
 
@@ -196,7 +201,7 @@ public class PixelsCacheWriter
     }
 
     private int internalUpdate(int version, Layout layout, String[] files)
-            throws IOException
+            throws IOException, FSException
     {
         int status = 0;
         // get the new caching layout
@@ -242,7 +247,7 @@ public class PixelsCacheWriter
                     break outer_loop;
                 }
                 else {
-                    radix.put(new PixelsCacheKey(file, rowGroupId, columnId), // TODO: it is not a good idea to use filename as block id.
+                    radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId), // TODO: it is not a good idea to use filename as block id.
                               new PixelsCacheIdx(cacheOffset, physicalLens[i]));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffsets[i], physicalLens[i]);
                     cacheFile.putBytes(cacheOffset, columnlet);

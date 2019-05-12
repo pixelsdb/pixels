@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.core.ChunkId;
@@ -343,8 +344,16 @@ public class PixelsRecordReaderImpl
                     String cacheIdentifier = "" + rgId + ":" + colId;
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier)) {
-                        String blockName = physicalFSReader.getPath().toString();
-                        byte[] columnlet = cacheReader.get(blockName, (short) rgId, (short) colId);
+                        long blockId = -1;
+                        try
+                        {
+                            blockId = physicalFSReader.getCurrentBlockId();
+                        } catch (FSException e)
+                        {
+                            logger.error(e);
+                            return false;
+                        }
+                        byte[] columnlet = cacheReader.get(blockId, (short) rgId, (short) colId);
                         // if cache hit, read columnlet into buffer
                         if (columnlet != null && columnlet.length > 0) {
                             cacheReadCount++;
@@ -472,7 +481,7 @@ public class PixelsRecordReaderImpl
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            logger.error(e);
             return false;
         }
         long readEndNano = System.nanoTime();

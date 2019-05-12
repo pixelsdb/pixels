@@ -104,8 +104,9 @@ public class CacheConcurrentReaderPerf
                 String[] columnletIdSplits = columnletId.split(":");
                 short rgId = Short.parseShort(columnletIdSplits[0]);
                 short colId = Short.parseShort(columnletIdSplits[1]);
-                String id = fileName + "-" + rgId + "-" + colId;
-                PixelsCacheIdx cacheIdx = cacheReader.search(fileName, rgId, colId);
+                long blockId = fsFactory.listLocatedBlocks(fileName).get(0).getBlock().getBlockId();
+                String id = blockId + "-" + rgId + "-" + colId;
+                PixelsCacheIdx cacheIdx = cacheReader.search(blockId, rgId, colId);
                 if (cacheIdx == null)
                 {
                     System.out.println("Find null for " + id);
@@ -163,7 +164,7 @@ public class CacheConcurrentReaderPerf
                     }
                     String columnletId = readColumnletIds.get(readIndex);
                     String[] columnletIdSplits = columnletId.split("-");
-                    PixelsCacheIdx cacheIdx = cacheReader.search(columnletIdSplits[0], Short.parseShort(columnletIdSplits[1]),
+                    PixelsCacheIdx cacheIdx = cacheReader.search(Long.parseLong(columnletIdSplits[0]), Short.parseShort(columnletIdSplits[1]),
                                                        Short.parseShort(columnletIdSplits[2]));
                     PixelsCacheIdx expected = cacheContainer.get(columnletId);
                     if (cacheIdx == null)
@@ -245,7 +246,7 @@ public class CacheConcurrentReaderPerf
                     }
                     String columnletId = readColumnletIds.get(readIndex);
                     String[] columnletIdSplits = columnletId.split("-");
-                    byte[] columnlet = cacheReader.get(columnletIdSplits[0], Short.parseShort(columnletIdSplits[1]),
+                    byte[] columnlet = cacheReader.get(Long.parseLong(columnletIdSplits[0]), Short.parseShort(columnletIdSplits[1]),
                                                        Short.parseShort(columnletIdSplits[2]));
                     byte[] expected = cacheContainer.get(columnletId);
                     if (Arrays.equals(columnlet, expected))

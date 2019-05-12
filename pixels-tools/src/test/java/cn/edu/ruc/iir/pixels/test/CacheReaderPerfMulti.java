@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.test;
 
 import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
@@ -382,7 +383,7 @@ public class CacheReaderPerfMulti
     }
 
     private void cacheRead(String id, String[] columnlets, List<Path> files, BlockingQueue<StatisticMetric> metricQueue)
-            throws IOException, InterruptedException
+            throws IOException, InterruptedException, FSException
     {
         System.out.println("Cache reading workload " + id);
         // clear cache
@@ -401,7 +402,8 @@ public class CacheReaderPerfMulti
         // multiple thread to read cache
         CacheReader[] readers = new CacheReader[files.size()];
         for (int i = 0; i < files.size(); i++) {
-            readers[i] = new CacheReader(cacheReader, columnlets, files.get(i), metricQueue);
+            readers[i] = new CacheReader(cacheReader, columnlets, files.get(i),
+                    fsFactory.listLocatedBlocks(files.get(i)).get(0).getBlock().getBlockId(), metricQueue);
             readers[i].start();
 
         }
@@ -466,12 +468,14 @@ public class CacheReaderPerfMulti
         PixelsCacheReader cacheReader;
         String[] columnlets;
         Path path;
+        long blockId;
         BlockingQueue<StatisticMetric> metricQueue;
 
-        public CacheReader( PixelsCacheReader cacheReader, String[] columnlets, Path path, BlockingQueue<StatisticMetric> metricQueue) {
+        public CacheReader( PixelsCacheReader cacheReader, String[] columnlets, Path path, long blockId, BlockingQueue<StatisticMetric> metricQueue) {
             this.cacheReader = cacheReader;
             this.columnlets = columnlets;
             this.path = path;
+            this.blockId = blockId;
             this.metricQueue = metricQueue;
         }
 
@@ -492,7 +496,7 @@ public class CacheReaderPerfMulti
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(path.toString(), columnletId.rgId, columnletId.colId);
+                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
                 size += content.length;
             }
             long readEndNano = System.nanoTime();
