@@ -69,7 +69,7 @@ public class PixelsPhysicalReader
         return content;
     }
 
-    public long getCurrentBlockId() throws FSException
+    public long getCurrentBlockId() throws FSException, IOException
     {
         return physicalReader.getCurrentBlockId();
     }
