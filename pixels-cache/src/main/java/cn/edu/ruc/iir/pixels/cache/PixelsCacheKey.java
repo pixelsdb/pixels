@@ -1,9 +1,7 @@
 package cn.edu.ruc.iir.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
-
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.nio.ByteOrder;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -15,9 +13,14 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private final int SIZE = 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
-    private long blockId;  // TODO: it could be better to use long as the type of blockid
+    private final int SIZE = 2 * Short.BYTES + Long.BYTES;
+    // Big-endian is prefix comparable and efficient for radix-tree.
+    // Although big endian is used as the default byte order in ByteBuffer, we still want to make sure.
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE).order(ByteOrder.BIG_ENDIAN);
+    // Block id in hdfs-2.7.3 is a sequence number in each block-id pool, not really random.
+    // Currently we only support HDFS cluster without NameNode federation, in which there is only one
+    // block-id pool.
+    private long blockId;
     private short rowGroupId;
     private short columnId;
 
@@ -43,18 +46,18 @@ public class PixelsCacheKey
         return columnId;
     }
 
+    /**
+     * this method does not make a copy of the internal byte array.
+     * so *DO NOT* modify the returned value.
+     * @return
+     */
     public byte[] getBytes()
     {
         keyBuffer.clear();
-        // TODO: is it better to ensure big-endian in keyBuffer? big-endian is prefix comparable,
-        // from which radix-tree may benifit.
-        // And we'd better use long (int64) for block id, instead of a string file name.
-        // Fixed key length (12 bytes) should be more efficient. I noticed that block ids in hdfs-2.7.3 looks
-        // like a sequence number, not really random.
         keyBuffer.putLong(blockId);
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
+        return keyBuffer.array();
     }
 
     public int getSize()
