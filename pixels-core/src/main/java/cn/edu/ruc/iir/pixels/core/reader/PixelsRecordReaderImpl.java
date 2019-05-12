@@ -34,7 +34,7 @@ import java.util.Map;
 public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
-    private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
+//    private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
@@ -393,7 +393,7 @@ public class PixelsRecordReaderImpl
                     cacheReadSize += chunkBuffers[bufferIdx].length;
                 }
             }
-            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
+//            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
         }
         else
         {
