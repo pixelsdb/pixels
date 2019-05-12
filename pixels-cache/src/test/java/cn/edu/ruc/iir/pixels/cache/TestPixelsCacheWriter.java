@@ -40,7 +40,7 @@ public class TestPixelsCacheWriter
             {
                 for (short j = 0; j < 64; j++)
                 {
-                    PixelsCacheKey cacheKey = new PixelsCacheKey(path, i, j);
+                    PixelsCacheKey cacheKey = new PixelsCacheKey(-1, i, j);
                     ByteBuffer byteBuffer = ByteBuffer.allocate(4);
                     byteBuffer.putInt(index++);
                     byte[] value = byteBuffer.array();

@@ -26,7 +26,7 @@ public class TestPixelsCacheReader
             int index = 0;
             for (short i = 0; i < 1000; i++) {
                 for (short j = 0; j < 64; j++) {
-                    byte[] value = cacheReader.get(path, i, j);
+                    byte[] value = cacheReader.get(-1, i, j);
                     ByteBuffer buffer = ByteBuffer.wrap(value);
                     assert buffer.getInt() == index;
                     index++;
