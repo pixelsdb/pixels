@@ -2,7 +2,6 @@ package cn.edu.ruc.iir.pixels.daemon.metadata.dao;
 
 import cn.edu.ruc.iir.pixels.common.utils.DBUtil;
 import cn.edu.ruc.iir.pixels.daemon.MetadataProto;
-import cn.edu.ruc.iir.pixels.daemon.exception.ColumnOrderException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -48,18 +47,18 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         return null;
     }
 
-    private MetadataProto.Layout.PERMISSION convertPermission (short permission)
+    private MetadataProto.Layout.Permission convertPermission (short permission)
     {
         switch (permission)
         {
             case -1:
-                return MetadataProto.Layout.PERMISSION.DISABLED;
+                return MetadataProto.Layout.Permission.DISABLED;
             case 0:
-                return MetadataProto.Layout.PERMISSION.READ_ONLY;
+                return MetadataProto.Layout.Permission.READ_ONLY;
             case 1:
-                return MetadataProto.Layout.PERMISSION.READ_WRITE;
+                return MetadataProto.Layout.Permission.READ_WRITE;
         }
-        return MetadataProto.Layout.PERMISSION.DISABLED;
+        return MetadataProto.Layout.Permission.DISABLED;
     }
 
     @Override
@@ -68,44 +67,10 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public MetadataProto.Layout getWritableByTable(MetadataProto.Table table)
+    public MetadataProto.Layout getLatestByTable(MetadataProto.Table table,
+                                                 MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
-        Connection conn = db.getConnection();
-        try (Statement st = conn.createStatement())
-        {
-            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
-            " AND LAYOUT_PERMISSION>0");
-            if (rs.next())
-            {
-                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(rs.getInt("LAYOUT_ID"))
-                .setVersion(rs.getInt("LAYOUT_VERSION"))
-                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
-                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrder(rs.getString("LAYOUT_ORDER"))
-                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
-                .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
-                .setSplits(rs.getString("LAYOUT_SPLITS"))
-                .setTableId(rs.getInt("TBLS_TBL_ID")).build();
-                if (rs.next())
-                {
-                    throw new ColumnOrderException("multiple writable layouts founded for table: " +
-                            table.getSchemaId() + "." + table.getName());
-                }
-                return layout;
-            }
-        } catch (Exception e)
-        {
-            log.error("getById in LayoutDao", e);
-        }
-
-        return null;
-    }
-
-    public MetadataProto.Layout getLatestByTable(MetadataProto.Table table)
-    {
-        List<MetadataProto.Layout> layouts = this.getByTable(table);
+        List<MetadataProto.Layout> layouts = this.getByTable(table, -1, permissionRange);
 
         MetadataProto.Layout res = null;
         if (layouts != null)
@@ -124,44 +89,19 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         return res;
     }
 
-    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table)
+    public List<MetadataProto.Layout> getAllByTable (MetadataProto.Table table)
     {
-        Connection conn = db.getConnection();
-        try (Statement st = conn.createStatement())
-        {
-            ResultSet rs = st.executeQuery("SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId());
-            List<MetadataProto.Layout> layouts = new ArrayList<>();
-            while (rs.next())
-            {
-                MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(rs.getInt("LAYOUT_ID"))
-                .setVersion(rs.getInt("LAYOUT_VERSION"))
-                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
-                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrder(rs.getString("LAYOUT_ORDER"))
-                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
-                .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
-                .setSplits(rs.getString("LAYOUT_SPLITS"))
-                .setTableId(table.getId()).build();
-                layouts.add(layout);
-            }
-            return layouts;
-        } catch (SQLException e)
-        {
-            log.error("getById in LayoutDao", e);
-        }
-
-        return null;
+        return getByTable(table, -1, MetadataProto.GetLayoutRequest.PermissionRange.ALL);
     }
 
     /**
-     * get layouts of which the permission is READ_ONLY or READ_WRITE
+     * get layout of a table by version and permission range.
      * @param table
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    public List<MetadataProto.Layout> getReadableByTable (MetadataProto.Table table, int version)
+    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
+                                                          MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         if(table == null)
         {
@@ -170,8 +110,15 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId() +
-                    " AND LAYOUT_PERMISSION>=0";
+            String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId();
+            if (permissionRange == MetadataProto.GetLayoutRequest.PermissionRange.READABLE)
+            {
+                sql += " AND LAYOUT_PERMISSION>=0";
+            }
+            else if (permissionRange == MetadataProto.GetLayoutRequest.PermissionRange.READ_WRITE)
+            {
+                sql += " AND LAYOUT_PERMISSION>=1";
+            }
             if(version >= 0)
             {
                 sql += " AND LAYOUT_VERSION=" + version;
@@ -264,7 +211,7 @@ public class LayoutDao implements Dao<MetadataProto.Layout>
         return false;
     }
 
-    private short convertPermission (MetadataProto.Layout.PERMISSION permission)
+    private short convertPermission (MetadataProto.Layout.Permission permission)
     {
         switch (permission)
         {

@@ -22,3 +22,5 @@ package-info.java
 test30G_pixels/
 *.csv
 resources/*.xml
+*.so
+.vscode

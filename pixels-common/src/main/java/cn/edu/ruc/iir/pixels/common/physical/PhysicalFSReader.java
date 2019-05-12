@@ -1,8 +1,10 @@
 package cn.edu.ruc.iir.pixels.common.physical;
 
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 
 import java.io.IOException;
 
@@ -86,5 +88,20 @@ public class PhysicalFSReader
     public Path getPath()
     {
         return path;
+    }
+
+    @Override
+    public long getCurrentBlockId() throws FSException
+    {
+        HdfsDataInputStream hdis = null;
+        if (rawReader instanceof HdfsDataInputStream)
+        {
+            hdis = (HdfsDataInputStream) rawReader;
+            return hdis.getCurrentBlock().getBlockId();
+        }
+        else
+        {
+            throw new FSException("can not get block id from non-hdfs data input stream.");
+        }
     }
 }

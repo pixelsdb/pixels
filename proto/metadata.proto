@@ -32,7 +32,10 @@ service MetadataService {
     rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
+    rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
+    rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
+    rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
     rpc CreateSchema (CreateSchemaRequest) returns (CreateSchemaResponse);
     rpc DropSchema (DropSchemaRequest) returns (DropSchemaResponse);
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
@@ -68,12 +71,12 @@ message Layout {
     uint64 id = 1;
     uint32 version = 2;
     uint64 createAt = 3;
-    enum PERMISSION {
+    enum Permission {
         DISABLED = 0;
         READ_ONLY = 1;
         READ_WRITE = 2;
     }
-    PERMISSION permission = 4;
+    Permission permission = 4;
     string order = 5;
     string orderPath = 6;
     string compact = 7;
@@ -180,6 +183,15 @@ message GetColumnsResponse {
     repeated Column columns = 2;
 }
 
+message UpdateColumnRequest {
+    RequestHeader header = 1;
+    Column column = 2;
+}
+
+message UpdateColumnResponse {
+    ResponseHeader header = 1;
+}
+
 // layout
 message GetLayoutsRequest {
     RequestHeader header = 1;
@@ -196,12 +208,36 @@ message GetLayoutRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
-    uint32 version = 4;
+    uint32 version = 4; // if version = -1, get the latest version
+    enum PermissionRange {
+        ALL = 0;
+        READABLE = 1;
+        READ_WRITE = 2;
+    }
+    PermissionRange permissionRange = 5;
 }
 
 message GetLayoutResponse {
     ResponseHeader header = 1;
     Layout layout = 2;
+}
+
+message AddLayoutRequest {
+    RequestHeader header = 1;
+    Layout layout = 2;
+}
+
+message AddLayoutResponse {
+    ResponseHeader header = 1;
+}
+
+message UpdateLayoutRequest {
+    RequestHeader header = 1;
+    Layout layout = 2;
+}
+
+message UpdateLayoutResponse {
+    ResponseHeader header = 1;
 }
 
 // end requeset/response defition for rpc services

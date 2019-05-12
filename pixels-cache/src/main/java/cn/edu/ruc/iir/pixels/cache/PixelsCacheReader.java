@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.List;
 
 /**
@@ -19,7 +20,7 @@ public class PixelsCacheReader
 
     private byte[] children = new byte[256 * 8];
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
-    private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE);
+    private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
     static {
         new Thread(cacheLogger).start();
@@ -78,7 +79,7 @@ public class PixelsCacheReader
      * @param columnId   column id
      * @return columnlet content
      */
-    public byte[] get(String blockId, short rowGroupId, short columnId)
+    public byte[] get(long blockId, short rowGroupId, short columnId)
     {
         byte[] content = null;
 
@@ -116,7 +117,7 @@ public class PixelsCacheReader
      * This interface is only used by TESTS, DO NOT USE.
      * It will be removed soon!
      */
-    public PixelsCacheIdx search(String blockId, short rowGroupId, short columnId)
+    public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
         cacheKey.getBytes(keyBuffer);

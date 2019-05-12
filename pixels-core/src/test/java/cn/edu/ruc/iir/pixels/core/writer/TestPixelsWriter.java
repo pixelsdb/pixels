@@ -278,7 +278,7 @@ public class TestPixelsWriter
                     cacheLength += chunkLen;
                     byte[] columnlet = pixelsPhysicalReader.read(chunkOffset, chunkLen);
 //                  byte[] columnlet = new byte[0];
-                    PixelsCacheKey cacheKey = new PixelsCacheKey(file.toString(), cacheRGId, cacheColId);
+                    PixelsCacheKey cacheKey = new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), cacheRGId, cacheColId);
                     cacheWriter.write(cacheKey, columnlet);
                 }
             }

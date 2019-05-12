@@ -55,7 +55,7 @@ public class CacheIndexPerf
                 for (int i = 0; i < cachedColumnlets.size(); i++)
                 {
                     String[] columnletIdSplits = cachedColumnlets.get(i).split(":");
-                    PixelsCacheKey cacheKey = new PixelsCacheKey(path.toString(),
+                    PixelsCacheKey cacheKey = new PixelsCacheKey(-1,
                                                                  Short.parseShort(columnletIdSplits[0]),
                                                                  Short.parseShort(columnletIdSplits[1]));
                     pixelsCacheKeys[idx++] = cacheKey;
