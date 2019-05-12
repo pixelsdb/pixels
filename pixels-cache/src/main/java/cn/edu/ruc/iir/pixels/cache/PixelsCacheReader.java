@@ -69,6 +69,7 @@ public class PixelsCacheReader
      * Read specified columnlet from cache.
      * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
      * If cache is hit, columnlet content is returned as byte array.
+     * This method may return NULL value. Be careful dealing with null!!!
      *
      * @param blockId    block id
      * @param rowGroupId row group id
@@ -77,7 +78,7 @@ public class PixelsCacheReader
      */
     public byte[] get(String blockId, short rowGroupId, short columnId)
     {
-        byte[] content = new byte[0];
+        byte[] content = null;
 
         // search index file for columnlet id
         PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
