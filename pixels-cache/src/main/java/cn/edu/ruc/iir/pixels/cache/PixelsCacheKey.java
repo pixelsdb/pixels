@@ -17,7 +17,7 @@ public class PixelsCacheKey
     // Big-endian is prefix comparable and efficient for radix-tree.
     // Although big endian is used as the default byte order in ByteBuffer, we still want to make sure.
     private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE).order(ByteOrder.BIG_ENDIAN);
-    // block id
+    // block id in hdfs-2.7.3 is a sequence number, not really random.
     private long blockId;
     private short rowGroupId;
     private short columnId;
