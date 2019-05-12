@@ -393,7 +393,7 @@ public class PixelsRecordReaderImpl
                     cacheReadSize += chunkBuffers[bufferIdx].length;
                 }
             }
-            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost);
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
         }
         else
         {
