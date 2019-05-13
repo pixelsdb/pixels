@@ -325,7 +325,7 @@ public class BytesColumnVector extends ColumnVector
                     if (newLength < 0)
                     {
                         throw new RuntimeException("Overflow of newLength. smallBuffer.length="
-                                                           + smallBuffer.length + ", nextElemLength=" + nextElemLength);
+                                + smallBuffer.length + ", nextElemLength=" + nextElemLength);
                     }
                     newLength *= 2;
                 }
@@ -470,7 +470,7 @@ public class BytesColumnVector extends ColumnVector
             isNull[outElementNum] = false;
             BytesColumnVector in = (BytesColumnVector) inputVector;
             setVal(outElementNum, in.vector[inputElementNum],
-                   in.start[inputElementNum], in.lens[inputElementNum]);
+                    in.start[inputElementNum], in.lens[inputElementNum]);
         }
         else
         {

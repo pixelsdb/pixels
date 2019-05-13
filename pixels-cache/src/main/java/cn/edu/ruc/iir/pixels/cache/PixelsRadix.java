@@ -106,10 +106,10 @@ public class PixelsRadix
             case KEY_ENDS_AT_MID_EDGE:
             {
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
-                                                         0, searchResult.bytesMatchedInNodeFound);
+                        0, searchResult.bytesMatchedInNodeFound);
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
-                                                       searchResult.bytesMatchedInNodeFound,
-                                                       nodeFound.getEdge().length);
+                        searchResult.bytesMatchedInNodeFound,
+                        nodeFound.getEdge().length);
 
                 RadixNode newParent = new RadixNode();
                 RadixNode newChild = new RadixNode();
@@ -129,7 +129,7 @@ public class PixelsRadix
             case MATCH_END_AT_END_EDGE:
             {
                 byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
-                                                      searchResult.bytesMatched, keyBuffer.position());
+                        searchResult.bytesMatched, keyBuffer.position());
                 RadixNode newNode = new RadixNode();
                 newNode.setEdge(keySuffix);
                 newNode.setValue(cacheIdx);
@@ -146,12 +146,12 @@ public class PixelsRadix
             case MATCH_END_AT_MID_EDGE:
             {
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
-                                                         0, searchResult.bytesMatchedInNodeFound);
+                        0, searchResult.bytesMatchedInNodeFound);
                 byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
-                                                      searchResult.bytesMatched, keyBuffer.position());
+                        searchResult.bytesMatched, keyBuffer.position());
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
-                                                       searchResult.bytesMatchedInNodeFound,
-                                                       nodeFound.getEdge().length);
+                        searchResult.bytesMatchedInNodeFound,
+                        nodeFound.getEdge().length);
                 RadixNode parentNode = new RadixNode();
                 RadixNode childNode1 = new RadixNode();
                 RadixNode childNode2 = new RadixNode();
@@ -174,10 +174,9 @@ public class PixelsRadix
     }
 
     /**
-     * @Deprecated
-     * DO NOT USE THIS
+     * @Deprecated DO NOT USE THIS
      * This method currently is only used in tests
-     * */
+     */
     public PixelsCacheIdx get(PixelsCacheKey cacheKey)
     {
         RadixNode root = nodes.get(0);
@@ -196,10 +195,9 @@ public class PixelsRadix
     }
 
     /**
-     * @Deprecated
-     * DO NOT USE THIS
+     * @Deprecated DO NOT USE THIS
      * This method currently is only used in tests
-     * */
+     */
     public boolean remove(PixelsCacheKey cacheKey)
     {
         checkArgument(cacheKey != null, "cache key is null");
@@ -258,7 +256,7 @@ public class PixelsRadix
                 else
                 {
                     Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values()
-                                                                                        .iterator();
+                            .iterator();
 //                    RadixNode[] parentChildren = searchResult.parentNode.getChildren();
                     List<RadixNode> parentChildrenNodes = new ArrayList<>();
 //                    for (RadixNode radixNode : parentChildren) {

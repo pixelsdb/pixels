@@ -48,9 +48,9 @@ public class TestPixelsPredicate
                 .build();
 
         TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
-                                                                                        columnReferences);
+                columnReferences);
         TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
-                                                                                             columnReferences);
+                columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createInt();
         StatsRecorder statsRecorder = StatsRecorder.create(typeDescription);
@@ -80,9 +80,9 @@ public class TestPixelsPredicate
                 .build();
 
         TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
-                                                                                        columnReferences);
+                columnReferences);
         TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
-                                                                                             columnReferences);
+                columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createVarchar();
         StatsRecorder statsRecorder = StatsRecorder.create(typeDescription);

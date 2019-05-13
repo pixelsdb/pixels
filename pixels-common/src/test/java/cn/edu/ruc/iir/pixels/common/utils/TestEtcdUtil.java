@@ -18,7 +18,7 @@ public class TestEtcdUtil
         //EtcdUtil.putEtcdKey(key, "hello world");
         KeyValue keyValue = etcdUtil.getKeyValue(key);
         long end = System.currentTimeMillis();
-        System.out.println((end-start));
+        System.out.println((end - start));
         if (keyValue != null)
             System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
         else

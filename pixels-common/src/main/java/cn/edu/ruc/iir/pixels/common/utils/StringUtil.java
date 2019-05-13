@@ -8,7 +8,8 @@ package cn.edu.ruc.iir.pixels.common.utils;
 public class StringUtil
 {
     private StringUtil()
-    {}
+    {
+    }
 
     public static String replaceAll(String text, String searchString, String replacement)
     {

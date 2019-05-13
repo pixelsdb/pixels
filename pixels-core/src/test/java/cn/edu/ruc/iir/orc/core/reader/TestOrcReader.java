@@ -25,7 +25,7 @@ public class TestOrcReader
         try
         {
             reader = OrcFile.createReader(new Path(orcPath),
-                                          OrcFile.readerOptions(conf));
+                    OrcFile.readerOptions(conf));
             RecordReader rows = null;
             rows = reader.rows();
             VectorizedRowBatch batch = reader.getSchema().createRowBatch();
@@ -65,7 +65,7 @@ public class TestOrcReader
         try
         {
             reader = OrcFile.createReader(new Path(TestParams.orcPath),
-                                          OrcFile.readerOptions(conf));
+                    OrcFile.readerOptions(conf));
             RecordReader rows = null;
             rows = reader.rows();
             VectorizedRowBatch batch = reader.getSchema().createRowBatch();

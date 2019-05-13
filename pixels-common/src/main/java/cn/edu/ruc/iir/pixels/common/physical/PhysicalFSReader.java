@@ -97,7 +97,7 @@ public class PhysicalFSReader
             {
                 this.blocks.add(
                         new BlockWrapper(block.getStartOffset(),
-                        block.getBlockSize(), block.getBlock()));
+                                block.getBlockSize(), block.getBlock()));
             }
             Collections.sort(this.blocks, comp);
         }
@@ -172,6 +172,7 @@ public class PhysicalFSReader
 
     /**
      * if this is not
+     *
      * @return
      * @throws IOException
      */
@@ -181,7 +182,7 @@ public class PhysicalFSReader
         if (this.blocks != null)
         {
             BlockWrapper key = new BlockWrapper(this.rawReader.getPos(), 1);
-            int i =  Collections.binarySearch(blocks, key, comp);
+            int i = Collections.binarySearch(blocks, key, comp);
             return this.blocks.get(i).getBlock().getBlockId();
         }
         else

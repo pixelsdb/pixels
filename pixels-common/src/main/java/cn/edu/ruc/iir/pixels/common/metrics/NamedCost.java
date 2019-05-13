@@ -5,7 +5,9 @@ public class NamedCost
     private String name;
     private double ms;
 
-    public NamedCost() {}
+    public NamedCost()
+    {
+    }
 
     public NamedCost(String name, double ms)
     {

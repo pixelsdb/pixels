@@ -41,9 +41,9 @@ public class CacheGetPerf
             Thread[] threads = new Thread[threadNum];
 
             MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                                              Long.parseLong(config.getProperty("index.size")));
+                    Long.parseLong(config.getProperty("index.size")));
             MemoryMappedFile cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
-                                                              Long.parseLong(config.getProperty("cache.size")));
+                    Long.parseLong(config.getProperty("cache.size")));
 
             for (int i = 0; i < threadNum; i++)
             {
@@ -106,7 +106,7 @@ public class CacheGetPerf
             {
                 String[] parts = columnlet.split(":");
                 PixelsCacheKey cacheKey = new PixelsCacheKey(-1, Short.parseShort(parts[0]),
-                                                             Short.parseShort(parts[1]));
+                        Short.parseShort(parts[1]));
                 cacheKeys[idx++] = cacheKey;
             }
         }
@@ -123,9 +123,9 @@ public class CacheGetPerf
         {
             this.idxes = idxes;
             this.cacheReader = PixelsCacheReader.newBuilder()
-                                                .setCacheFile(cacheFile)
-                                                .setIndexFile(indexFile)
-                                                .build();
+                    .setCacheFile(cacheFile)
+                    .setIndexFile(indexFile)
+                    .build();
         }
 
         @Override

@@ -42,17 +42,20 @@ public class PhysicalFSWriter
     @Override
     public long prepare(int length) throws IOException
     {
-        if (length > blockSize) {
+        if (length > blockSize)
+        {
             return -1L;
         }
         // see if row group can fit in the current hdfs block, else pad the remaining space in the block
         long start = rawWriter.getPos();
         long availBlockSpace = blockSize - (start % blockSize);
-        if (length < blockSize && length > availBlockSpace && addBlockPadding) {
+        if (length < blockSize && length > availBlockSpace && addBlockPadding)
+        {
             byte[] pad = new byte[(int) Math.min(Constants.HDFS_BUFFER_SIZE, availBlockSpace)];
             LOGGER.info(String.format("Padding Pixels by %d bytes while appending row group buffer...", availBlockSpace));
             start += availBlockSpace;
-            while (availBlockSpace > 0) {
+            while (availBlockSpace > 0)
+            {
                 int writeLen = (int) Math.min(availBlockSpace, pad.length);
                 rawWriter.write(pad, 0, writeLen);
                 availBlockSpace -= writeLen;
