@@ -244,7 +244,7 @@ public class PixelsRecordReaderImpl
             for (int id : targetColumns)
             {
                 columnStatsMap.put(id,
-                                   StatsRecorder.create(columnSchemas.get(id), fileColumnStatistics.get(id)));
+                        StatsRecorder.create(columnSchemas.get(id), fileColumnStatistics.get(id)));
             }
             if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap))
             {
@@ -261,7 +261,7 @@ public class PixelsRecordReaderImpl
                 for (int id : targetColumns)
                 {
                     columnStatsMap.put(id,
-                                       StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
+                            StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
                 }
                 includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
             }
@@ -361,8 +361,8 @@ public class PixelsRecordReaderImpl
                         PixelsProto.ColumnChunkIndex chunkIndex =
                                 rowGroupIndex.getColumnChunkIndexEntries(colId);
                         ChunkId chunk = new ChunkId(rgIdx, colId,
-                                                    chunkIndex.getChunkOffset(),
-                                                    chunkIndex.getChunkLength());
+                                chunkIndex.getChunkOffset(),
+                                chunkIndex.getChunkLength());
                         diskChunks.add(chunk);
                     }
                 }
@@ -395,7 +395,7 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
-                                                    chunkIndex.getChunkLength());
+                            chunkIndex.getChunkLength());
                     diskChunks.add(diskChunk);
                 }
                 else
@@ -416,8 +416,8 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId chunk = new ChunkId(rgIdx, colId,
-                                                chunkIndex.getChunkOffset(),
-                                                chunkIndex.getChunkLength());
+                            chunkIndex.getChunkOffset(),
+                            chunkIndex.getChunkLength());
                     diskChunks.add(chunk);
                 }
             }
@@ -486,7 +486,7 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     // TODO: do not copy, we should use a buffer slice wrapper instead of byte array.
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
-                                                           chunkSliceOffset, chunkSliceOffset + chunkLength);
+                            chunkSliceOffset, chunkSliceOffset + chunkLength);
                     chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
@@ -570,13 +570,13 @@ public class PixelsRecordReaderImpl
                     PixelsProto.RowGroupFooter rowGroupFooter =
                             rowGroupFooters[curRGIdx];
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
-                                                                        .getColumnChunkEncodings(resultColumns[i]);
+                            .getColumnChunkEncodings(resultColumns[i]);
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                                                                            .getColumnChunkIndexEntries(
-                                                                                    resultColumns[i]);
+                            .getColumnChunkIndexEntries(
+                                    resultColumns[i]);
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                                    postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 

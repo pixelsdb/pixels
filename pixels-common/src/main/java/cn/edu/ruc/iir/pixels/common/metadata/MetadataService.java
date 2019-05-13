@@ -32,7 +32,8 @@ public class MetadataService
         this.stub = MetadataServiceGrpc.newBlockingStub(channel);
     }
 
-    public void shutdown() throws InterruptedException {
+    public void shutdown() throws InterruptedException
+    {
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
@@ -54,8 +55,9 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getSchemasList().forEach( schema -> schemas.add(new Schema(schema)) );
-        } catch (Exception e)
+            response.getSchemasList().forEach(schema -> schemas.add(new Schema(schema)));
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to get schemas from metadata", e);
         }
@@ -81,8 +83,9 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getTablesList().forEach( table -> tables.add(new Table(table)) );
-        } catch (Exception e)
+            response.getTablesList().forEach(table -> tables.add(new Table(table)));
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to get tables from metadata", e);
         }
@@ -102,14 +105,15 @@ public class MetadataService
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
-                + ", error message=" + response.getHeader().getErrorMsg());
+                        + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (response.getHeader().getToken().equals(token) == false)
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getColumnsList().forEach( column -> columns.add(new Column(column)) );
-        } catch (Exception e)
+            response.getColumnsList().forEach(column -> columns.add(new Column(column)));
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to get columns from metadata", e);
         }
@@ -137,7 +141,8 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to update column in metadata", e);
         }
@@ -163,8 +168,9 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            response.getLayoutsList().forEach( layout -> layouts.add(new Layout(layout)) );
-        } catch (Exception e)
+            response.getLayoutsList().forEach(layout -> layouts.add(new Layout(layout)));
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
@@ -180,7 +186,7 @@ public class MetadataService
                 .setTableName(tableName)
                 .setVersion(version)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.READABLE).build();
-        return internalGetLayout (request);
+        return internalGetLayout(request);
     }
 
     public Layout getLatestLayout(String schemaName, String tableName) throws MetadataException
@@ -194,10 +200,10 @@ public class MetadataService
                 .setVersion(-1)
                 .setPermissionRange(MetadataProto.GetLayoutRequest.PermissionRange.ALL).build();
 
-        return internalGetLayout (request);
+        return internalGetLayout(request);
     }
 
-    private Layout internalGetLayout (MetadataProto.GetLayoutRequest request) throws MetadataException
+    private Layout internalGetLayout(MetadataProto.GetLayoutRequest request) throws MetadataException
     {
         Layout layout = null;
         try
@@ -213,14 +219,15 @@ public class MetadataService
                 throw new MetadataException("response token does not match.");
             }
             layout = new Layout(response.getLayout());
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
         return layout;
     }
 
-    private MetadataProto.Layout.Permission convertPermission (Layout.Permission permission)
+    private MetadataProto.Layout.Permission convertPermission(Layout.Permission permission)
     {
         switch (permission)
         {
@@ -258,7 +265,8 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to update layout in metadata", e);
         }
@@ -289,14 +297,15 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new MetadataException("failed to add layout into metadata", e);
         }
         return true;
     }
 
-    public boolean createSchema (String schemaName) throws MetadataException
+    public boolean createSchema(String schemaName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         String token = UUID.randomUUID().toString();
@@ -316,7 +325,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean dropSchema (String schemaName) throws MetadataException
+    public boolean dropSchema(String schemaName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         String token = UUID.randomUUID().toString();
@@ -332,7 +341,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean createTable (String schemaName, String tableName, List<Column> columns) throws MetadataException
+    public boolean createTable(String schemaName, String tableName, List<Column> columns) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
@@ -362,7 +371,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean dropTable (String schemaName, String tableName) throws MetadataException
+    public boolean dropTable(String schemaName, String tableName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
@@ -384,7 +393,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean existTable (String schemaName, String tableName) throws MetadataException
+    public boolean existTable(String schemaName, String tableName) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();

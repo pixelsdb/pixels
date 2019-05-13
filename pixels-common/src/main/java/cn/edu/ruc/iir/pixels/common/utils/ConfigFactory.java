@@ -12,9 +12,10 @@ public class ConfigFactory
 
     /**
      * Injected classes in pixels-presto should not use this method to get ConfigFactory Instance.
+     *
      * @return
      */
-    public static ConfigFactory Instance ()
+    public static ConfigFactory Instance()
     {
         if (instance == null)
         {
@@ -45,17 +46,21 @@ public class ConfigFactory
             try
             {
                 in = new FileInputStream(pixelsHome + "pixels.properties");
-            } catch (FileNotFoundException e)
+            }
+            catch (FileNotFoundException e)
             {
                 e.printStackTrace();
             }
         }
-        try {
+        try
+        {
             if (in != null)
             {
                 prop.load(in);
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -67,17 +72,20 @@ public class ConfigFactory
         {
             in = new FileInputStream(propFilePath);
             this.prop.load(in);
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             throw e;
-        } finally
+        }
+        finally
         {
             if (in != null)
             {
                 try
                 {
                     in.close();
-                } catch (IOException e)
+                }
+                catch (IOException e)
                 {
                     throw e;
                 }
@@ -85,12 +93,12 @@ public class ConfigFactory
         }
     }
 
-    public void addProperty (String key, String value)
+    public void addProperty(String key, String value)
     {
         this.prop.setProperty(key, value);
     }
-    
-    public String getProperty (String key)
+
+    public String getProperty(String key)
     {
         return this.prop.getProperty(key);
     }

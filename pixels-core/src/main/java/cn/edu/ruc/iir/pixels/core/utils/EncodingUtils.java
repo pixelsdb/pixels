@@ -1049,12 +1049,12 @@ public class EncodingUtils
     private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
             ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
                     onMalformedInput(CodingErrorAction.REPORT).
-                                                         onUnmappableCharacter(CodingErrorAction.REPORT));
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
 
     private static ThreadLocal<CharsetDecoder> DECODER_FACTORY =
             ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newDecoder().
                     onMalformedInput(CodingErrorAction.REPORT).
-                                                         onUnmappableCharacter(CodingErrorAction.REPORT));
+                    onUnmappableCharacter(CodingErrorAction.REPORT));
 
     public static ByteBuffer encodeString(String string, boolean replace)
             throws CharacterCodingException

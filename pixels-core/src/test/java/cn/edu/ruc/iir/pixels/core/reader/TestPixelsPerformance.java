@@ -36,9 +36,9 @@ public class TestPixelsPerformance
             {
                 currentPath = fileStatus.getPath();
                 reader = PixelsReaderImpl.newBuilder()
-                                         .setFS(fs)
-                                         .setPath(currentPath)
-                                         .build();
+                        .setFS(fs)
+                        .setPath(currentPath)
+                        .build();
                 PixelsReaderOption option = new PixelsReaderOption();
                 String[] cols = {"UserIsStable", "UserIsCrossMarket"};
 //                String[] cols = {"IsBotVNext"};

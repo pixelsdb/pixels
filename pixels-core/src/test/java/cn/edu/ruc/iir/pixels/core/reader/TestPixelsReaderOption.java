@@ -157,7 +157,7 @@ public class TestPixelsReaderOption
                 assertEquals(time, dcv.time[i]);
                 assertEquals(rowId > 25 ? 1 : 0, ecv.vector[i]);
                 assertEquals(String.valueOf(rowId),
-                             new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                        new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
             }
             elementSize++;
         }
@@ -176,9 +176,9 @@ public class TestPixelsReaderOption
         {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             pixelsReader = PixelsReaderImpl.newBuilder()
-                                           .setFS(fs)
-                                           .setPath(path)
-                                           .build();
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
         }
         catch (IOException e)
         {

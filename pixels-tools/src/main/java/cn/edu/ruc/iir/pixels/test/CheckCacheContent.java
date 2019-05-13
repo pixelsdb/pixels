@@ -39,9 +39,9 @@ public class CheckCacheContent
         MemoryMappedFile indexFile;
         ConfigFactory config = ConfigFactory.Instance();
         cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
-                                         Long.parseLong(config.getProperty("cache.size")));
+                Long.parseLong(config.getProperty("cache.size")));
         indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                         Long.parseLong(config.getProperty("index.size")));
+                Long.parseLong(config.getProperty("index.size")));
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -72,7 +72,7 @@ public class CheckCacheContent
         PhysicalReader physicalReader =
                 PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), new Path(path));
         PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                                                                .getColumnChunkIndexEntries(colId);
+                .getColumnChunkIndexEntries(colId);
         physicalReader.seek(chunkIndex.getChunkOffset());
         byte[] diskContent = new byte[(int) chunkIndex.getChunkLength()];
         physicalReader.readFully(diskContent);

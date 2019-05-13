@@ -12,7 +12,7 @@ import java.util.List;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-//    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+    //    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
     private static CacheLogger cacheLogger = new CacheLogger();
 
     private final MemoryMappedFile cacheFile;
@@ -22,7 +22,8 @@ public class PixelsCacheReader
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
-    static {
+    static
+    {
         new Thread(cacheLogger).start();
     }
 
@@ -184,7 +185,7 @@ public class PixelsCacheReader
             currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
             byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
             indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
-                               currentNodeEdge, 0, currentNodeEdgeSize);
+                    currentNodeEdge, 0, currentNodeEdgeSize);
             dramAccessCounter++;
             for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
@@ -204,7 +205,7 @@ public class PixelsCacheReader
             {
                 byte[] idx = new byte[12];
                 indexFile.getBytes(currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
-                                   idx, 0, 12);
+                        idx, 0, 12);
                 dramAccessCounter++;
                 PixelsCacheIdx cacheIdx = new PixelsCacheIdx(idx);
                 cacheIdx.dramAccessCount = dramAccessCounter;

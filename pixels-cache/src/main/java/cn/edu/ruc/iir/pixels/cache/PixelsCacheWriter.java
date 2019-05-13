@@ -183,7 +183,8 @@ public class PixelsCacheWriter
         {
             e.printStackTrace();
             return -1;
-        } catch (FSException e)
+        }
+        catch (FSException e)
         {
             e.printStackTrace();
             return -1;
@@ -250,7 +251,7 @@ public class PixelsCacheWriter
                 else
                 {
                     radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
-                              new PixelsCacheIdx(cacheOffset, physicalLen));
+                            new PixelsCacheIdx(cacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                     cacheFile.putBytes(cacheOffset, columnlet);
                     logger.debug(

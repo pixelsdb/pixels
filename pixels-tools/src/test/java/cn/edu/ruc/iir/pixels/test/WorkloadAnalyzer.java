@@ -83,11 +83,12 @@ public class WorkloadAnalyzer
     /**
      * Analyze workload file.
      * Report column visit frequency and cache status
-     * */
+     */
     @Test
     public void analyze0()
     {
-        try {
+        try
+        {
             BufferedReader reader = new BufferedReader(new FileReader(workloadPath));
             Map<String, Integer> colCounts = new HashMap<>();
             Map<String, Integer> colAppearCounts = new HashMap<>();
@@ -181,12 +182,13 @@ public class WorkloadAnalyzer
             for (String col : cachedColumns)
             {
                 writer.write(col + "," + (colCounts.get(col) == null ? 0 : colCounts.get(col)) + ","
-                             + (colAppearCounts.get(col) == null ? 0 : colAppearCounts.get(col)) + "," + columnSizes.get(col));
+                        + (colAppearCounts.get(col) == null ? 0 : colAppearCounts.get(col)) + "," + columnSizes.get(col));
                 writer.newLine();
             }
             writer.close();
         }
-        catch (IOException | MetadataException e) {
+        catch (IOException | MetadataException e)
+        {
             e.printStackTrace();
         }
     }
@@ -202,7 +204,8 @@ public class WorkloadAnalyzer
         Set<String> cachedCols = new HashSet<>();
         Map<String, Double> colSizeMap = new HashMap<>();
 
-        try {
+        try
+        {
             BufferedReader cachedColsReader = new BufferedReader(new FileReader(cachedColsPath));
             BufferedReader colsStatsReader = new BufferedReader(new FileReader(colStatsPath));
             BufferedReader workloadReader = new BufferedReader(new FileReader(workloadPath));
@@ -270,7 +273,8 @@ public class WorkloadAnalyzer
             cachedColsReader.close();
             queryInCacheStatWriter.close();
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

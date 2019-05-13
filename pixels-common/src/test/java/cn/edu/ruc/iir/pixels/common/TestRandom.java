@@ -11,7 +11,7 @@ import java.util.Random;
 public class TestRandom
 {
     @Test
-    public void test ()
+    public void test()
     {
         Random random = new Random(System.nanoTime());
         System.out.println(random.nextInt(1));

@@ -63,8 +63,8 @@ public final class DynamicByteArray
         if (index >= length)
         {
             throw new IndexOutOfBoundsException("Index " + index +
-                                                        " is outside of 0.." +
-                                                        (length - 1));
+                    " is outside of 0.." +
+                    (length - 1));
         }
         int i = index / chunkSize;
         int j = index % chunkSize;
@@ -135,7 +135,7 @@ public final class DynamicByteArray
         int currentOffset = length % chunkSize;
         grow(currentChunk);
         int currentLength = in.read(data[currentChunk], currentOffset,
-                                    chunkSize - currentOffset);
+                chunkSize - currentOffset);
         while (currentLength > 0)
         {
             length += currentLength;
@@ -146,7 +146,7 @@ public final class DynamicByteArray
                 grow(currentChunk);
             }
             currentLength = in.read(data[currentChunk], currentOffset,
-                                    chunkSize - currentOffset);
+                    chunkSize - currentOffset);
         }
     }
 

@@ -13,7 +13,7 @@ import java.util.Map;
 public class TestHttpUtil
 {
     @Test
-    public void testPost () throws IOException
+    public void testPost() throws IOException
     {
 
         Map<String, String> headers = new HashMap<String, String>();
@@ -31,7 +31,7 @@ public class TestHttpUtil
     }
 
     @Test
-    public void testGet () throws IOException
+    public void testGet() throws IOException
     {
         String content = HttpUtil.GetContentByGet("http://dbiir10:8080/v1/query");
         System.out.println(content);

@@ -13,8 +13,10 @@ public class TestJni
     }
 
     public static native void sayHello();
-    public static native int add (int a);
-    public static native byte[] echo (byte[] bytes, int length);
+
+    public static native int add(int a);
+
+    public static native byte[] echo(byte[] bytes, int length);
 
     public static void main(String[] args)
     {

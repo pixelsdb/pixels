@@ -7,7 +7,7 @@ import org.junit.Test;
 public class TestConfigFactory
 {
     @Test
-    public void test ()
+    public void test()
     {
         System.out.println(ConfigFactory.Instance().getProperty("hello"));
     }

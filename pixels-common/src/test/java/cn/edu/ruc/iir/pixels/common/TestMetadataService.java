@@ -11,17 +11,18 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TestMetadataService {
+public class TestMetadataService
+{
     MetadataService instance = null;
 
     @Before
-    public void init ()
+    public void init()
     {
         this.instance = new MetadataService("dbiir27", 18888);
     }
 
     @After
-    public void shutdown () throws InterruptedException
+    public void shutdown() throws InterruptedException
     {
         this.instance.shutdown();
     }
@@ -29,13 +30,15 @@ public class TestMetadataService {
     @Test
     public void testGetSchemaNames() throws InterruptedException, MetadataException
     {
-        for (int i = 1; i <= 5; i++) {
+        for (int i = 1; i <= 5; i++)
+        {
             Thread t = new Thread(() -> {
                 List<Schema> schemas = null;
                 try
                 {
                     schemas = instance.getSchemas();
-                } catch (MetadataException e)
+                }
+                catch (MetadataException e)
                 {
                     e.printStackTrace();
                 }
@@ -50,19 +53,20 @@ public class TestMetadataService {
     }
 
     @Test
-    public void testGetTableNames () throws MetadataException
+    public void testGetTableNames() throws MetadataException
     {
         String schemaName = "pixels";
         List<String> tableList = new ArrayList<String>();
         List<Table> tables = instance.getTables(schemaName);
-        for (Table t : tables) {
+        for (Table t : tables)
+        {
             tableList.add(t.getName());
         }
         System.out.println("Show tables, " + tableList.toString());
     }
 
     @Test
-    public void testGetColumnsBySchemaNameAndTblName () throws MetadataException
+    public void testGetColumnsBySchemaNameAndTblName() throws MetadataException
     {
         List<Column> columns = instance.getColumns("pixels", "test_105");
         for (Column column : columns)
@@ -72,7 +76,7 @@ public class TestMetadataService {
     }
 
     @Test
-    public void testGetTableLayouts () throws MetadataException
+    public void testGetTableLayouts() throws MetadataException
     {
         long start = System.currentTimeMillis();
         List<Layout> layouts = instance.getLayouts("pixels", "test_105");
@@ -80,7 +84,8 @@ public class TestMetadataService {
         System.out.println("Last: " + (end - start));
         System.out.println(layouts.get(0).getSplits());
 
-        for (Layout layout : layouts) {
+        for (Layout layout : layouts)
+        {
             // get index
             int version = layout.getVersion();
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
@@ -91,7 +96,7 @@ public class TestMetadataService {
     }
 
     @Test
-    public void testGetTableLayoutsByVersion () throws MetadataException
+    public void testGetTableLayoutsByVersion() throws MetadataException
     {
         long start = System.currentTimeMillis();
         Layout layout = instance.getLayout("pixels", "test_105", 1);
