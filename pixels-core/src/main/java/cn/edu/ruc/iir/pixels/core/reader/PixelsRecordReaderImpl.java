@@ -15,6 +15,8 @@ import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,7 +35,7 @@ import java.util.Map;
 public class PixelsRecordReaderImpl
         implements PixelsRecordReader
 {
-//    private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
+    private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
     private final PhysicalFSReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
@@ -327,7 +329,16 @@ public class PixelsRecordReaderImpl
         if (enableCache)
         {
             long cacheReadSize = 0L;
-            String blockName = physicalFSReader.getPath().toString();
+            long blockId;
+            try
+            {
+                blockId = physicalFSReader.getCurrentBlockId();
+            }
+            catch (IOException | FSException e)
+            {
+                e.printStackTrace();
+                return false;
+            }
             List<ColumnletId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
             // find cached chunks
             for (int colId : targetColumns)
@@ -339,7 +350,7 @@ public class PixelsRecordReaderImpl
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnletId chunkId = new ColumnletId(blockName, (short) rgId, (short) colId);
+                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
@@ -360,18 +371,9 @@ public class PixelsRecordReaderImpl
             long cacheReadStartNano = System.nanoTime();
             for (ColumnletId chunkId : cacheChunks)
             {
-                short rgId = chunkId.getRowGroupId();
-                short colId = chunkId.getColumnId();
+                short rgId = chunkId.rowGroupId;
+                short colId = chunkId.columnId;
 //                long getBegin = System.nanoTime();
-                long blockId = -1;
-                try
-                {
-                    blockId = physicalFSReader.getCurrentBlockId();
-                }
-                catch (FSException | IOException e)
-                {
-                    e.printStackTrace();
-                }
                 byte[] columnlet = cacheReader.get(blockId, rgId, colId);
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
@@ -382,8 +384,8 @@ public class PixelsRecordReaderImpl
             // deal with null or empty cache chunk
             for (ColumnletId chunkId : cacheChunks)
             {
-                short rgId = chunkId.getRowGroupId();
-                short colId = chunkId.getColumnId();
+                short rgId = chunkId.rowGroupId;
+                short colId = chunkId.columnId;
                 int rgIdx = rgId - RGStart;
                 int bufferIdx = rgIdx * includedColumns.length + colId;
                 if (chunkBuffers[bufferIdx] == null || chunkBuffers[bufferIdx].length == 0)
@@ -401,7 +403,7 @@ public class PixelsRecordReaderImpl
                     cacheReadSize += chunkBuffers[bufferIdx].length;
                 }
             }
-//            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
         }
         else
         {

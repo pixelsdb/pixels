@@ -19,48 +19,20 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 public class ColumnletId
         implements MappedBusMessage
 {
-    private static final int SIZE = Long.BYTES + 2 * Short.BYTES + Constants.MAX_BLOCK_ID_LEN;
-    private static final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE);
-
-    private String blockId;
-    private short rowGroupId;
-    private short columnId;
+    public long blockId;
+    public short rowGroupId;
+    public short columnId;
     long cacheOffset;
     int cacheLength;
 
-    public ColumnletId(String blockId, short rowGroupId, short columnId)
+    public ColumnletId(short rowGroupId, short columnId)
     {
-        this.blockId = blockId;
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
     }
 
     public ColumnletId()
     {
-    }
-
-    public short getColumnId()
-    {
-        return columnId;
-    }
-
-    public short getRowGroupId()
-    {
-        return rowGroupId;
-    }
-
-    public String getBlockId()
-    {
-        return blockId;
-    }
-
-    public byte[] getBytes()
-    {
-        keyBuffer.clear();
-        keyBuffer.put(blockId.getBytes(Charset.forName(CharsetNames.UTF_8)));
-        keyBuffer.putShort(rowGroupId);
-        keyBuffer.putShort(columnId);
-        return Arrays.copyOfRange(keyBuffer.array(), 0, keyBuffer.position());
     }
 
     /**
