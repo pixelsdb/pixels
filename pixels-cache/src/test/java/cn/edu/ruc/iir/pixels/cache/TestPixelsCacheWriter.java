@@ -1,13 +1,9 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 
@@ -21,7 +17,8 @@ public class TestPixelsCacheWriter
     @Test
     public void testSimpleCacheWriter()
     {
-        try {
+        try
+        {
             // get fs
             Configuration conf = new Configuration();
             conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
@@ -31,28 +28,19 @@ public class TestPixelsCacheWriter
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
                                      .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                     .setCacheSize(1024*1024*64L)
+                                     .setCacheSize(1024 * 1024 * 64L)
                                      .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                     .setIndexSize(1024*1024*64L)
+                                     .setIndexSize(1024 * 1024 * 64L)
                                      .setOverwrite(true)
                                      .setFS(fs)
                                      .build();
             String path = "/pixels/pixels/test_105/2121211211212.pxl";
-            long blockId = -1;
-            try (FSDataInputStream in = fs.open(new Path(path)))
-            {
-                HdfsDataInputStream hdis = (HdfsDataInputStream) in;
-                blockId = hdis.getCurrentBlock().getBlockId();
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-            }
             int index = 0;
             for (short i = 0; i < 1000; i++)
             {
-                for (short j = 0; j < 64; j++) {
-                    PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, i, j);
+                for (short j = 0; j < 64; j++)
+                {
+                    PixelsCacheKey cacheKey = new PixelsCacheKey(-1, i, j);
                     ByteBuffer byteBuffer = ByteBuffer.allocate(4);
                     byteBuffer.putInt(index++);
                     byte[] value = byteBuffer.array();
@@ -61,7 +49,8 @@ public class TestPixelsCacheWriter
             }
             cacheWriter.flush();
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }

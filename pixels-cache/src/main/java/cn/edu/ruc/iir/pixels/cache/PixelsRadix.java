@@ -1,5 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -15,6 +16,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PixelsRadix
 {
     private final DynamicArray<RadixNode> nodes;    // tree nodes.
+    private final ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE);
 
     public PixelsRadix()
     {
@@ -42,43 +44,45 @@ public class PixelsRadix
     /**
      * Take a radix tree containing 'team' and 'test' as example.
      * The original tree is:
-     *   |root| -> |te|
-     *                  -> |am|
-     *                  -> |st|
+     * |root| -> |te|
+     * -> |am|
+     * -> |st|
      * 1. If we put <test, new_value> into the original tree, it's a EXACT_MATCH with the |st| node.
      * Then we add the new_value into the node or replace the node.
-     *
+     * <p>
      * 2. If we put <tea, new_value> into the original tree, it's a KEY_ENDS_AT_MID_EDGE with the |am| node.
      * Then we split the |am| node into two.
-     *   |root| -> |te|
-     *                  -> |a|
-     *                         -> |m|
-     *                  -> |st|
-     *
+     * |root| -> |te|
+     * -> |a|
+     * -> |m|
+     * -> |st|
+     * <p>
      * 3. If we put <teak, new_value> into the original tree, it's a MATCH_END_AT_MID_EDGE with the |am| node.
      * Then we split the |am| node into three.
-     *   |root| -> |te|
-     *                  -> |a|
-     *                         -> |m|
-     *                         -> |k|
-     *                  -> |st|
-     *
+     * |root| -> |te|
+     * -> |a|
+     * -> |m|
+     * -> |k|
+     * -> |st|
+     * <p>
      * 4. If we put <teamster, new_value> into the original tree, it's a MATCH_END_AT_END_EDGE with the |am| node.
      * Then we add a new node containing the trailing bytes from the key, and append it to the |am| node.
-     *   |root| -> |te|
-     *                  -> |am|
-     *                         -> |ster|
-     *                  -> |st|
-     * */
+     * |root| -> |te|
+     * -> |am|
+     * -> |ster|
+     * -> |st|
+     */
     private void putInternal(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx, boolean overwrite)
     {
         checkArgument(cacheKey != null, "cache key is null");
         checkArgument(cacheIdx != null, "cache index item is null");
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchingType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
 
-        switch (matchingType) {
+        switch (matchingType)
+        {
             // an exact match for all edges leading to this node.
             // -> add or update the value in the node found.
             case EXACT_MATCH:
@@ -86,7 +90,8 @@ public class PixelsRadix
                 // check if found node has value.
                 // if overwrite is not allowed and the node has a value, then return early.
                 PixelsCacheIdx existingValue = nodeFound.getValue();
-                if (!overwrite && existingValue != null) {
+                if (!overwrite && existingValue != null)
+                {
                     return;
                 }
                 // if overwrite is allowed, then replace existing node
@@ -101,10 +106,10 @@ public class PixelsRadix
             case KEY_ENDS_AT_MID_EDGE:
             {
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
-                        0, searchResult.bytesMatchedInNodeFound);
+                                                         0, searchResult.bytesMatchedInNodeFound);
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
-                        searchResult.bytesMatchedInNodeFound,
-                        nodeFound.getEdge().length);
+                                                       searchResult.bytesMatchedInNodeFound,
+                                                       nodeFound.getEdge().length);
 
                 RadixNode newParent = new RadixNode();
                 RadixNode newChild = new RadixNode();
@@ -123,8 +128,8 @@ public class PixelsRadix
             // -> add a new child to the node, containing the trailing bytes from the key.
             case MATCH_END_AT_END_EDGE:
             {
-                byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getSize());
+                byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
+                                                      searchResult.bytesMatched, keyBuffer.position());
                 RadixNode newNode = new RadixNode();
                 newNode.setEdge(keySuffix);
                 newNode.setValue(cacheIdx);
@@ -141,11 +146,12 @@ public class PixelsRadix
             case MATCH_END_AT_MID_EDGE:
             {
                 byte[] commonPrefix = Arrays.copyOfRange(nodeFound.getEdge(),
-                        0, searchResult.bytesMatchedInNodeFound);
-                byte[] keySuffix = Arrays.copyOfRange(cacheKey.getBytes(),
-                        searchResult.bytesMatched, cacheKey.getSize());
+                                                         0, searchResult.bytesMatchedInNodeFound);
+                byte[] keySuffix = Arrays.copyOfRange(keyBuffer.array(),
+                                                      searchResult.bytesMatched, keyBuffer.position());
                 byte[] edgeSuffix = Arrays.copyOfRange(nodeFound.getEdge(),
-                        searchResult.bytesMatchedInNodeFound, nodeFound.getEdge().length);
+                                                       searchResult.bytesMatchedInNodeFound,
+                                                       nodeFound.getEdge().length);
                 RadixNode parentNode = new RadixNode();
                 RadixNode childNode1 = new RadixNode();
                 RadixNode childNode2 = new RadixNode();
@@ -167,41 +173,60 @@ public class PixelsRadix
         }
     }
 
+    /**
+     * @Deprecated
+     * DO NOT USE THIS
+     * This method currently is only used in tests
+     * */
     public PixelsCacheIdx get(PixelsCacheKey cacheKey)
     {
         RadixNode root = nodes.get(0);
         // if tree is empty, return null
-        if (root.getSize() == 0) {
+        if (root.getSize() == 0)
+        {
             return null;
         }
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
-        if (searchResult.matchType.equals(SearchResult.Type.EXACT_MATCH)) {
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
+        if (searchResult.matchType.equals(SearchResult.Type.EXACT_MATCH))
+        {
             return searchResult.nodeFound.getValue();
         }
         return null;
     }
 
+    /**
+     * @Deprecated
+     * DO NOT USE THIS
+     * This method currently is only used in tests
+     * */
     public boolean remove(PixelsCacheKey cacheKey)
     {
         checkArgument(cacheKey != null, "cache key is null");
-        SearchResult searchResult = searchInternal(cacheKey.getBytes());
+        cacheKey.getBytes(keyBuffer);
+        SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
-        switch (matchType) {
-            case EXACT_MATCH: {
+        switch (matchType)
+        {
+            case EXACT_MATCH:
+            {
                 // if node has no value, then no need to delete it
-                if (nodeFound.getValue() == null) {
+                if (nodeFound.getValue() == null)
+                {
                     return false;
                 }
                 int childrenNum = nodeFound.getSize();
                 // if node has more than one child, just delete the associated value, and keep the node
-                if (childrenNum > 1) {
+                if (childrenNum > 1)
+                {
                     nodeFound.setValue(null);
                 }
                 // if node has exactly one child, create a new node to merge this node and its child.
                 // the new node has concatenated bytes from this node and its child node,
                 // and the new node has the children of the child node and the value from the child node.
-                if (childrenNum == 1) {
+                if (childrenNum == 1)
+                {
                     RadixNode node = new RadixNode();
                     byte[] currentNodeEdge = nodeFound.getEdge();
                     RadixNode childNode = nodeFound.getChildren().values().iterator().next();
@@ -212,7 +237,8 @@ public class PixelsRadix
 //                            break;
 //                        }
 //                    }
-                    if (childNode == null) {
+                    if (childNode == null)
+                    {
                         // todo fix exception, though this cannot happen due to the logical constraint
                         return false;
                     }
@@ -229,8 +255,10 @@ public class PixelsRadix
                 // if node has no children, delete this node from parent.
                 // and if after deletion, the parent itself with only one child left and has no value,
                 // then we need also merge the parent and its remaining child.
-                else {
-                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values().iterator();
+                else
+                {
+                    Iterator<RadixNode> parentChildrenIterator = searchResult.parentNode.getChildren().values()
+                                                                                        .iterator();
 //                    RadixNode[] parentChildren = searchResult.parentNode.getChildren();
                     List<RadixNode> parentChildrenNodes = new ArrayList<>();
 //                    for (RadixNode radixNode : parentChildren) {
@@ -238,9 +266,11 @@ public class PixelsRadix
 //                            parentChildrenNodes.add(radixNode);
 //                        }
 //                    }
-                    while (parentChildrenIterator.hasNext()) {
+                    while (parentChildrenIterator.hasNext())
+                    {
                         RadixNode node = parentChildrenIterator.next();
-                        if (node != nodeFound) {
+                        if (node != nodeFound)
+                        {
                             parentChildrenNodes.add(node);
                         }
                     }
@@ -248,7 +278,8 @@ public class PixelsRadix
                     RadixNode newNode = new RadixNode();
                     // if parent has only one child left and has no value, then we can merge parent as a new node
                     // the new node has concatenated edge, children and value from the remaining child node
-                    if (parentChildrenNodes.size() == 1 && searchResult.parentNode.getValue() == null) {
+                    if (parentChildrenNodes.size() == 1 && searchResult.parentNode.getValue() == null)
+                    {
                         RadixNode remainingChild = parentChildrenNodes.get(0);
                         // concatenate parent and remaining child edge
                         byte[] parentEdge = searchResult.parentNode.getEdge();
@@ -259,23 +290,27 @@ public class PixelsRadix
                         newNode.setEdge(edge);
                         newNode.setChildren(remainingChild.getChildren(), remainingChild.getSize());
                         newNode.setValue(remainingChild.getValue());
-                        if (searchResult.grandParentNode == null) {
+                        if (searchResult.grandParentNode == null)
+                        {
                             nodes.get(0).addChild(newNode, true);
                         }
-                        else {
+                        else
+                        {
                             searchResult.grandParentNode.addChild(newNode, true);
                         }
                     }
                     // parent cannot be merged with remaining children
                     // then just delete the node
-                    else {
+                    else
+                    {
                         searchResult.parentNode.removeChild(nodeFound);
                     }
                     nodeFound = null;
                 }
                 return true;
             }
-            default: {
+            default:
+            {
                 return false;
             }
         }
@@ -286,17 +321,20 @@ public class PixelsRadix
         // todo remove all
     }
 
-    private SearchResult searchInternal(byte[] key)
+    private SearchResult searchInternal(ByteBuffer keyBuffer)
     {
         RadixNode currentNode = nodes.get(0);
         RadixNode parentNode = null;
         RadixNode grandParentNode = null;
         int bytesMatched = 0, bytesMatchedInNodeFound = 0;
 
-        final int keyLen = key.length;
-        outer_loop: while (bytesMatched < keyLen) {
-            RadixNode nextNode = currentNode.getChild(key[bytesMatched]);
-            if (nextNode == null) {
+        final int keyLen = keyBuffer.position();
+        outer_loop:
+        while (bytesMatched < keyLen)
+        {
+            RadixNode nextNode = currentNode.getChild(keyBuffer.get(bytesMatched));
+            if (nextNode == null)
+            {
                 break;
             }
 
@@ -305,8 +343,10 @@ public class PixelsRadix
             currentNode = nextNode;
             bytesMatchedInNodeFound = 0;
             byte[] currentNodeEdge = currentNode.getEdge();
-            for (int i = 0, numEdgeBytes = currentNodeEdge.length; i < numEdgeBytes && bytesMatched < keyLen; i++) {
-                if (currentNodeEdge[i] != key[bytesMatched]) {
+            for (int i = 0, numEdgeBytes = currentNodeEdge.length; i < numEdgeBytes && bytesMatched < keyLen; i++)
+            {
+                if (currentNodeEdge[i] != keyBuffer.get(bytesMatched))
+                {
                     break outer_loop;
                 }
                 bytesMatched++;
@@ -314,12 +354,16 @@ public class PixelsRadix
             }
         }
 
-        return new SearchResult(key, currentNode, bytesMatched, bytesMatchedInNodeFound, parentNode, grandParentNode);
+        return new SearchResult(keyLen, currentNode, bytesMatched, bytesMatchedInNodeFound, parentNode, grandParentNode);
+    }
+
+    public void printStats()
+    {
+        // todo print stats of the radix, including the depth, number of nodes, etc.
     }
 
     static class SearchResult
     {
-        final byte[] key;
         final RadixNode nodeFound;
         final int bytesMatched;
         final int bytesMatchedInNodeFound;
@@ -327,79 +371,50 @@ public class PixelsRadix
         final RadixNode grandParentNode;
         final Type matchType;
 
-        enum Type {
+        enum Type
+        {
             EXACT_MATCH,            // key exactly matches the node
             KEY_ENDS_AT_MID_EDGE,   // match end before reaching edge end, because key hits end already
             MATCH_END_AT_END_EDGE,  // match end before reaching key end, because edge hits end already
             MATCH_END_AT_MID_EDGE   // match end before reaching key end, because the matching hits end already
         }
 
-        SearchResult(byte[] key, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound,
+        SearchResult(int keyLen, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound,
                      RadixNode parentNode, RadixNode grandParentNode)
         {
-            this.key = key;
             this.nodeFound = nodeFound;
             this.bytesMatched = bytesMatched;
             this.bytesMatchedInNodeFound = bytesMatchedInNodeFound;
             this.parentNode = parentNode;
             this.grandParentNode = grandParentNode;
-            this.matchType = match(key, nodeFound, bytesMatched, bytesMatchedInNodeFound);
+            this.matchType = match(keyLen, nodeFound, bytesMatched, bytesMatchedInNodeFound);
         }
 
-        private Type match(byte[] key, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound)
+        private Type match(int keyLen, RadixNode nodeFound, int bytesMatched, int bytesMatchedInNodeFound)
         {
-            if (bytesMatched == key.length) {
-                if (bytesMatchedInNodeFound == nodeFound.getEdge().length) {
+            if (bytesMatched == keyLen)
+            {
+                if (bytesMatchedInNodeFound == nodeFound.getEdge().length)
+                {
                     return Type.EXACT_MATCH;
                 }
-                else if (bytesMatchedInNodeFound < nodeFound.getEdge().length) {
+                else if (bytesMatchedInNodeFound < nodeFound.getEdge().length)
+                {
                     return Type.KEY_ENDS_AT_MID_EDGE;
                 }
             }
-            else if (bytesMatched < key.length) {
-                if (bytesMatchedInNodeFound == nodeFound.getEdge().length) {
+            else if (bytesMatched < keyLen)
+            {
+                if (bytesMatchedInNodeFound == nodeFound.getEdge().length)
+                {
                     return Type.MATCH_END_AT_END_EDGE;
                 }
-                else if (bytesMatchedInNodeFound < nodeFound.getEdge().length) {
+                else if (bytesMatchedInNodeFound < nodeFound.getEdge().length)
+                {
                     return Type.MATCH_END_AT_MID_EDGE;
                 }
             }
             throw new IllegalStateException("Unexpected matching type for SearchResult");
-        }
-
-        public byte[] getKey()
-        {
-            return key;
-        }
-
-        public RadixNode getNodeFound()
-        {
-            return nodeFound;
-        }
-
-        public int getBytesMatched()
-        {
-            return bytesMatched;
-        }
-
-        public int getBytesMatchedInNodeFound()
-        {
-            return bytesMatchedInNodeFound;
-        }
-
-        public RadixNode getParentNode()
-        {
-            return parentNode;
-        }
-
-        public RadixNode getGrandParentNode()
-        {
-            return grandParentNode;
-        }
-
-        public Type getMatchType()
-        {
-            return matchType;
         }
     }
 }

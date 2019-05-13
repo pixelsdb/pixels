@@ -7,7 +7,6 @@ import java.io.IOException;
  * A encoder for a sequence of bytes.
  * A control byte is written before each run with positive values 0 to 127 meaning 2 to 129 repetitions.
  * If the bytes is -1 to -128, 1 to 128 literal byte values follow.
- *
  */
 public class RunLenByteEncoder
         extends Encoder
@@ -28,7 +27,8 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public byte[] encode(byte[] values) throws IOException
+    public byte[] encode(byte[] values)
+            throws IOException
     {
         for (byte v : values)
         {
@@ -41,7 +41,8 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public byte[] encode(byte[] values, long offset, long length) throws IOException
+    public byte[] encode(byte[] values, long offset, long length)
+            throws IOException
     {
         for (int i = 0; i < length; i++)
         {
@@ -54,21 +55,25 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         output.close();
     }
 
     private void writeValues()
     {
-        if (numLiterals != 0) {
-            if (repeat) {
+        if (numLiterals != 0)
+        {
+            if (repeat)
+            {
                 output.write(numLiterals - MIN_REPEAT_SIZE);
                 output.write(literals, 0, 1);
             }
-            else {
+            else
+            {
                 output.write(-numLiterals);
-                output.write(literals, 0 , numLiterals);
+                output.write(literals, 0, numLiterals);
             }
             repeat = false;
             tailRunLength = 0;
@@ -76,7 +81,8 @@ public class RunLenByteEncoder
         }
     }
 
-    private void flush() throws IOException
+    private void flush()
+            throws IOException
     {
         writeValues();
         output.flush();
@@ -84,36 +90,47 @@ public class RunLenByteEncoder
 
     private void write(byte value)
     {
-        if (numLiterals == 0) {
+        if (numLiterals == 0)
+        {
             literals[numLiterals++] = value;
             tailRunLength = 1;
         }
-        else if (repeat) {
-            if (value == literals[0]) {
+        else if (repeat)
+        {
+            if (value == literals[0])
+            {
                 numLiterals += 1;
-                if (numLiterals == MAX_REPEAT_SIZE) {
+                if (numLiterals == MAX_REPEAT_SIZE)
+                {
                     writeValues();
                 }
             }
-            else {
+            else
+            {
                 writeValues();
                 literals[numLiterals++] = value;
                 tailRunLength = 1;
             }
         }
-        else {
-            if (value == literals[numLiterals - 1]) {
+        else
+        {
+            if (value == literals[numLiterals - 1])
+            {
                 tailRunLength += 1;
             }
-            else {
+            else
+            {
                 tailRunLength = 1;
             }
-            if (tailRunLength == MIN_REPEAT_SIZE) {
-                if (numLiterals + 1 == MIN_REPEAT_SIZE) {
+            if (tailRunLength == MIN_REPEAT_SIZE)
+            {
+                if (numLiterals + 1 == MIN_REPEAT_SIZE)
+                {
                     repeat = true;
                     numLiterals += 1;
                 }
-                else {
+                else
+                {
                     numLiterals -= MIN_REPEAT_SIZE - 1;
                     writeValues();
                     literals[0] = value;
@@ -121,9 +138,11 @@ public class RunLenByteEncoder
                     numLiterals = MIN_REPEAT_SIZE;
                 }
             }
-            else {
+            else
+            {
                 literals[numLiterals++] = value;
-                if (numLiterals == MAX_LITERAL_SIZE) {
+                if (numLiterals == MAX_LITERAL_SIZE)
+                {
                     writeValues();
                 }
             }

@@ -16,23 +16,29 @@ public class IntegerStatsRecorder
     private boolean hasMinimum = false;
     private boolean overflow = false;
 
-    IntegerStatsRecorder() {}
+    IntegerStatsRecorder()
+    {
+    }
 
     IntegerStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         super(statistic);
         PixelsProto.IntegerStatistic intStat = statistic.getIntStatistics();
-        if (intStat.hasMinimum()) {
+        if (intStat.hasMinimum())
+        {
             hasMinimum = true;
             minimum = intStat.getMinimum();
         }
-        if (intStat.hasMaximum()) {
+        if (intStat.hasMaximum())
+        {
             maximum = intStat.getMaximum();
         }
-        if (intStat.hasSum()) {
+        if (intStat.hasSum())
+        {
             sum = intStat.getSum();
         }
-        else {
+        else
+        {
             overflow = true;
         }
     }
@@ -52,21 +58,26 @@ public class IntegerStatsRecorder
     public void updateInteger(long value, int repetitions)
     {
         numberOfValues += repetitions;
-        if (!hasMinimum) {
+        if (!hasMinimum)
+        {
             hasMinimum = true;
             minimum = value;
             maximum = value;
         }
-        else if (value < minimum) {
+        else if (value < minimum)
+        {
             minimum = value;
         }
-        else if (value > maximum) {
+        else if (value > maximum)
+        {
             maximum = value;
         }
-        if (!overflow) {
+        if (!overflow)
+        {
             boolean wasPositive = sum >= 0;
             sum += value * repetitions;
-            if ((value >= 0) == wasPositive) {
+            if ((value >= 0) == wasPositive)
+            {
                 overflow = (sum >= 0) != wasPositive;
             }
         }
@@ -75,33 +86,42 @@ public class IntegerStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof IntegerStatsRecorder) {
+        if (other instanceof IntegerStatsRecorder)
+        {
             IntegerStatsRecorder intStat = (IntegerStatsRecorder) other;
-            if (!hasMinimum) {
+            if (!hasMinimum)
+            {
                 hasMinimum = intStat.hasMinimum;
                 minimum = intStat.minimum;
                 maximum = intStat.maximum;
             }
-            else if (intStat.hasMinimum) {
-                if (intStat.minimum < minimum) {
+            else if (intStat.hasMinimum)
+            {
+                if (intStat.minimum < minimum)
+                {
                     minimum = intStat.minimum;
                 }
-                if (intStat.maximum > maximum) {
+                if (intStat.maximum > maximum)
+                {
                     maximum = intStat.maximum;
                 }
             }
 
             overflow |= intStat.overflow;
-            if (!overflow) {
+            if (!overflow)
+            {
                 boolean wasPositive = sum >= 0;
                 sum += intStat.sum;
-                if ((intStat.sum >= 0) == wasPositive) {
+                if ((intStat.sum >= 0) == wasPositive)
+                {
                     overflow = (sum >= 0) != wasPositive;
                 }
             }
         }
-        else {
-            if (isStatsExists() && hasMinimum) {
+        else
+        {
+            if (isStatsExists() && hasMinimum)
+            {
                 throw new IllegalArgumentException("Incompatible merging of integer column statistics");
             }
         }
@@ -114,11 +134,13 @@ public class IntegerStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.IntegerStatistic.Builder intBuilder =
                 PixelsProto.IntegerStatistic.newBuilder();
-        if (hasMinimum) {
+        if (hasMinimum)
+        {
             intBuilder.setMinimum(minimum);
             intBuilder.setMaximum(maximum);
         }
-        if (!overflow) {
+        if (!overflow)
+        {
             intBuilder.setSum(sum);
         }
         builder.setIntStatistics(intBuilder);
@@ -151,53 +173,66 @@ public class IntegerStatsRecorder
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (hasMinimum) {
+        if (hasMinimum)
+        {
             buf.append(" min: ");
             buf.append(minimum);
             buf.append(" max: ");
             buf.append(maximum);
         }
-        if (!overflow) {
+        if (!overflow)
+        {
             buf.append(" sum: ");
             buf.append(sum);
         }
         buf.append(" numberOfValues: ")
-                .append(numberOfValues);
+           .append(numberOfValues);
         return buf.toString();
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof IntegerStatsRecorder)) {
+        if (!(o instanceof IntegerStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         IntegerStatsRecorder that = (IntegerStatsRecorder) o;
 
-        if (minimum != that.minimum) {
+        if (minimum != that.minimum)
+        {
             return false;
         }
-        if (maximum != that.maximum) {
+        if (maximum != that.maximum)
+        {
             return false;
         }
-        if (sum != that.sum) {
+        if (sum != that.sum)
+        {
             return false;
         }
-        if (hasMinimum != that.hasMinimum) {
+        if (hasMinimum != that.hasMinimum)
+        {
             return false;
         }
-        if (overflow != that.overflow) {
+        if (overflow != that.overflow)
+        {
             return false;
         }
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -205,7 +240,8 @@ public class IntegerStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         result = 31 * result + (int) (minimum ^ (minimum >>> 32));
         result = 31 * result + (int) (maximum ^ (maximum >>> 32));

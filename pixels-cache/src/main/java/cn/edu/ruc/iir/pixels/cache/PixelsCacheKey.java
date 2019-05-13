@@ -1,7 +1,6 @@
 package cn.edu.ruc.iir.pixels.cache;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -13,16 +12,15 @@ import static com.google.common.base.MoreObjects.toStringHelper;
  */
 public class PixelsCacheKey
 {
-    private final int SIZE = 2 * Short.BYTES + Long.BYTES;
+    final static int SIZE = 2 * Short.BYTES + Long.BYTES;
+    public long blockId;
+    public short rowGroupId;
+    public short columnId;
     // Big-endian is prefix comparable and efficient for radix-tree.
     // Although big endian is used as the default byte order in ByteBuffer, we still want to make sure.
-    private final ByteBuffer keyBuffer = ByteBuffer.allocate(SIZE).order(ByteOrder.BIG_ENDIAN);
     // Block id in hdfs-2.7.3 is a sequence number in each block-id pool, not really random.
     // Currently we only support HDFS cluster without NameNode federation, in which there is only one
     // block-id pool.
-    private long blockId;
-    private short rowGroupId;
-    private short columnId;
 
     public PixelsCacheKey(long blockId, short rowGroupId, short columnId)
     {
@@ -31,47 +29,23 @@ public class PixelsCacheKey
         this.columnId = columnId;
     }
 
-    public long getBlockId()
-    {
-        return blockId;
-    }
-
-    public int getRowGroupId()
-    {
-        return rowGroupId;
-    }
-
-    public int getColumnId()
-    {
-        return columnId;
-    }
-
-    /**
-     * this method does not make a copy of the internal byte array.
-     * so *DO NOT* modify the returned value.
-     * @return
-     */
-    public byte[] getBytes()
+    public void getBytes(ByteBuffer keyBuffer)
     {
         keyBuffer.clear();
         keyBuffer.putLong(blockId);
         keyBuffer.putShort(rowGroupId);
         keyBuffer.putShort(columnId);
-        return keyBuffer.array();
-    }
-
-    public int getSize()
-    {
-        return keyBuffer.position();
     }
 
     @Override
     public boolean equals(Object o)
     {
-        if (this == o) {
+        if (this == o)
+        {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (o == null || getClass() != o.getClass())
+        {
             return false;
         }
         PixelsCacheKey other = (PixelsCacheKey) o;

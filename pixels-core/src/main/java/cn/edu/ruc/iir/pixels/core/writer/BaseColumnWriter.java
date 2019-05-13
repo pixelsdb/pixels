@@ -59,21 +59,22 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     /**
      * Write ColumnVector
-     *
+     * <p>
      * Serialize vector into {@code ByteBufferOutputStream}.
      * Update pixel statistics and positions.
      * Update column chunk statistics.
      *
      * @param vector vector
-     * @param size size of vector
+     * @param size   size of vector
      * @return size in bytes of the current column chunk
-     * */
+     */
     @Override
-    public abstract int write(ColumnVector vector, int size) throws IOException;
+    public abstract int write(ColumnVector vector, int size)
+            throws IOException;
 
     /**
      * Get byte array of column chunk content
-     * */
+     */
     @Override
     public byte[] getColumnChunkContent()
     {
@@ -82,7 +83,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     /**
      * Get column chunk size in bytes
-     * */
+     */
     public int getColumnChunkSize()
     {
         return outputStream.size();
@@ -106,13 +107,15 @@ public abstract class BaseColumnWriter implements ColumnWriter
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
         return PixelsProto.ColumnEncoding.newBuilder()
-                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override
-    public void flush() throws IOException
+    public void flush()
+            throws IOException
     {
-        if (curPixelEleIndex > 0) {
+        if (curPixelEleIndex > 0)
+        {
             newPixel();
         }
         // record isNull offset in the column chunk
@@ -121,7 +124,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
         isNullStream.writeTo(outputStream);
     }
 
-    void newPixel() throws IOException
+    void newPixel()
+            throws IOException
     {
         // isNull
         if (hasNull)
@@ -165,7 +169,8 @@ public abstract class BaseColumnWriter implements ColumnWriter
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
+            throws IOException
     {
         outputStream.close();
         isNullStream.close();

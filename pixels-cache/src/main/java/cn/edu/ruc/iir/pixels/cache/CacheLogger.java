@@ -41,7 +41,8 @@ public class CacheLogger implements Runnable
             try
             {
                 Thread.sleep(5000);
-            } catch (InterruptedException e)
+            }
+            catch (InterruptedException e)
             {
                 e.printStackTrace();
             }
@@ -55,14 +56,14 @@ public class CacheLogger implements Runnable
             {
                 sum += (Long) latency;
             }
-            logger.info("avg search latency: (" + (sum*1.0/searches.length) + ") ns");
+            logger.info("avg search latency: (" + (sum * 1.0 / searches.length) + ") ns");
 
             sum = 0;
             for (Object latency : reads)
             {
                 sum += (Long) latency;
             }
-            logger.info("avg read latency: (" + (sum*1.0/reads.length) + ") ns");
+            logger.info("avg read latency: (" + (sum * 1.0 / reads.length) + ") ns");
 
         }
     }

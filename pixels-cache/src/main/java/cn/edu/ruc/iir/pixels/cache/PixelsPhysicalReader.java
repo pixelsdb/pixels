@@ -27,8 +27,10 @@ public class PixelsPhysicalReader
 
     private PixelsProto.FileTail readFileTail()
     {
-        if (physicalReader != null) {
-            try {
+        if (physicalReader != null)
+        {
+            try
+            {
                 long fileLen = physicalReader.getFileLength();
                 physicalReader.seek(fileLen - Long.BYTES);
                 long fileTailOffset = physicalReader.readLong();
@@ -38,8 +40,8 @@ public class PixelsPhysicalReader
                 physicalReader.readFully(fileTailBuffer);
                 return PixelsProto.FileTail.parseFrom(fileTailBuffer);
             }
-            catch (IOException e) {
-                // TODO: deal with this exception or throw it
+            catch (IOException e)
+            {
                 e.printStackTrace();
             }
         }

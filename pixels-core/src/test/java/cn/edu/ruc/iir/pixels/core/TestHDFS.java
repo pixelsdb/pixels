@@ -21,7 +21,8 @@ import java.net.URLConnection;
 public class TestHDFS
 {
     @Test
-    public void testGetFileByBlockId() throws IOException
+    public void testGetFileByBlockId()
+            throws IOException
     {
         Configuration conf = new Configuration();
         UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -30,7 +31,8 @@ public class TestHDFS
         long blockId = 1073742421;
         long start = System.currentTimeMillis();
         String file = "";
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 10000; i++)
+        {
             file = getFileByBlockId(ugi, connectionFactory, blockId);
         }
         long end = System.currentTimeMillis();
@@ -39,7 +41,8 @@ public class TestHDFS
     }
 
     private String getFileByBlockId(UserGroupInformation ugi, URLConnectionFactory connectionFactory,
-                                  long blockId) throws IOException
+                                    long blockId)
+            throws IOException
     {
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append("/fsck?ugi=").append(ugi.getShortUserName());
@@ -48,19 +51,24 @@ public class TestHDFS
         urlBuilder.append("&path=").append("%2F");
         URL path = new URL(urlBuilder.toString());
         URLConnection connection;
-        try {
+        try
+        {
             connection = connectionFactory.openConnection(path);
         }
-        catch (AuthenticationException e) {
+        catch (AuthenticationException e)
+        {
             throw new IOException(e);
         }
         InputStream stream = connection.getInputStream();
         String line = null;
         String file = "";
         try (BufferedReader input = new BufferedReader(
-                new InputStreamReader(stream, "UTF-8"))) {
-            while ((line = input.readLine()) != null) {
-                if (line.startsWith("Block belongs to:")) {
+                new InputStreamReader(stream, "UTF-8")))
+        {
+            while ((line = input.readLine()) != null)
+            {
+                if (line.startsWith("Block belongs to:"))
+                {
                     file = line.split(": ")[1].trim();
                 }
             }

@@ -11,9 +11,11 @@ import java.util.Objects;
 public class PixelsCacheIdx
 {
     static final int SIZE = Long.BYTES + Integer.BYTES;
-    private ByteBuffer buffer = ByteBuffer.allocate(SIZE);
-    private final long offset;
-    private final int length;
+    public final long offset;
+    public final int length;
+
+    public int dramAccessCount;
+    public int radixLevel;
 
     public PixelsCacheIdx(long offset, int length)
     {
@@ -28,23 +30,11 @@ public class PixelsCacheIdx
         this.length = idxBuffer.getInt();
     }
 
-    public long getOffset()
+    public void getBytes(ByteBuffer cacheIdxBuffer)
     {
-        return offset;
-    }
-
-    public int getLength()
-    {
-        return length;
-    }
-
-    public byte[] getBytes()
-    {
-        buffer.clear();
-        buffer.putLong(offset);
-        buffer.putInt(length);
-
-        return buffer.array();
+        cacheIdxBuffer.clear();
+        cacheIdxBuffer.putLong(offset);
+        cacheIdxBuffer.putInt(length);
     }
 
     @Override
@@ -58,10 +48,12 @@ public class PixelsCacheIdx
     @Override
     public boolean equals(Object other)
     {
-        if (other == this) {
+        if (other == this)
+        {
             return true;
         }
-        if (other != null && other instanceof PixelsCacheIdx) {
+        if (other != null && other instanceof PixelsCacheIdx)
+        {
             PixelsCacheIdx o = (PixelsCacheIdx) other;
             return Objects.equals(offset, o.offset) &&
                     Objects.equals(length, o.length);

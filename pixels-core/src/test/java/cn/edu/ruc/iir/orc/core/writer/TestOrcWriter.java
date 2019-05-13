@@ -14,26 +14,28 @@ import java.sql.Timestamp;
 
 import static org.apache.orc.CompressionKind.NONE;
 
-public class TestOrcWriter {
+public class TestOrcWriter
+{
 
     String orcPath = "hdfs://dbiir10:9000/pixels/pixels/test_105/11.orc";
 
     @Test
-    public void testWriterAll() {
+    public void testWriterAll()
+    {
         Configuration conf = new Configuration();
         TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
         Writer writer = null;
         try
         {
             writer = OrcFile.createWriter(new Path(orcPath),
-                    OrcFile.writerOptions(conf)
-                            .blockSize(TestParams.blockSize)
-                            .blockPadding(true)
-                            .stripeSize(64)
-                            .rowIndexStride(TestParams.pixelStride)
-                            .setSchema(schema)
-                            .compress(NONE)
-                            .setSchema(schema));
+                                          OrcFile.writerOptions(conf)
+                                                 .blockSize(TestParams.blockSize)
+                                                 .blockPadding(true)
+                                                 .stripeSize(64)
+                                                 .rowIndexStride(TestParams.pixelStride)
+                                                 .setSchema(schema)
+                                                 .compress(NONE)
+                                                 .setSchema(schema));
             VectorizedRowBatch batch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) batch.cols[0];      // int
             DoubleColumnVector b = (DoubleColumnVector) batch.cols[1];      // float
@@ -55,11 +57,14 @@ public class TestOrcWriter {
                 e.vector[row] = i > 25000 ? 1 : 0;
                 z.setVal(row, String.valueOf(i).getBytes());
                 // If the batch is full, write it out and start over.
-                if (batch.size == batch.getMaxSize()) {
-                    try {
+                if (batch.size == batch.getMaxSize())
+                {
+                    try
+                    {
                         writer.addRowBatch(batch);
                     }
-                    catch (IOException e2) {
+                    catch (IOException e2)
+                    {
                         e2.printStackTrace();
                     }
                     batch.reset();
@@ -80,7 +85,8 @@ public class TestOrcWriter {
             }
             writer.close();
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
