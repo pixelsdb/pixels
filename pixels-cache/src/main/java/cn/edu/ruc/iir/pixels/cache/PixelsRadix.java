@@ -31,14 +31,14 @@ public class PixelsRadix
         return nodes.get(0);
     }
 
-    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheItem)
+    public void put(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheItem)
     {
-        putInternal(cacheKey, cacheItem, true);
+        putInternal(blockId, rowGroupId, columnId, cacheItem, true);
     }
 
-    public void putIfAbsent(PixelsCacheKey cacheKey, PixelsCacheIdx cacheItem)
+    public void putIfAbsent(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheItem)
     {
-        putInternal(cacheKey, cacheItem, false);
+        putInternal(blockId, rowGroupId, columnId, cacheItem, false);
     }
 
     /**
@@ -72,11 +72,10 @@ public class PixelsRadix
      * -> |ster|
      * -> |st|
      */
-    private void putInternal(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx, boolean overwrite)
+    private void putInternal(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheIdx, boolean overwrite)
     {
-        checkArgument(cacheKey != null, "cache key is null");
         checkArgument(cacheIdx != null, "cache index item is null");
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(blockId, rowGroupId, columnId, keyBuffer);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchingType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;

@@ -85,8 +85,7 @@ public class PixelsCacheReader
         byte[] content = null;
 
         // search index file for columnlet id
-        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(blockId, rowGroupId, columnId, keyBuffer);
 
         // search cache key
         long searchBegin = System.nanoTime();
@@ -120,8 +119,7 @@ public class PixelsCacheReader
      */
     public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
-        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(blockId, rowGroupId, columnId, keyBuffer);
 
         return search(keyBuffer);
     }
