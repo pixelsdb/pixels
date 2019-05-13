@@ -75,7 +75,7 @@ public class PixelsRadix
     private void putInternal(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheIdx, boolean overwrite)
     {
         checkArgument(cacheIdx != null, "cache index item is null");
-        PixelsCacheKeyUtil.getBytes(blockId, rowGroupId, columnId, keyBuffer);
+        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchingType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
@@ -176,7 +176,7 @@ public class PixelsRadix
      * @Deprecated DO NOT USE THIS
      * This method currently is only used in tests
      */
-    public PixelsCacheIdx get(PixelsCacheKey cacheKey)
+    public PixelsCacheIdx get(long blockId, short rowGroupId, short columnId)
     {
         RadixNode root = nodes.get(0);
         // if tree is empty, return null
@@ -184,7 +184,7 @@ public class PixelsRadix
         {
             return null;
         }
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         if (searchResult.matchType.equals(SearchResult.Type.EXACT_MATCH))
         {
@@ -197,10 +197,9 @@ public class PixelsRadix
      * @Deprecated DO NOT USE THIS
      * This method currently is only used in tests
      */
-    public boolean remove(PixelsCacheKey cacheKey)
+    public boolean remove(long blockId, short rowGroupId, short columnId)
     {
-        checkArgument(cacheKey != null, "cache key is null");
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
