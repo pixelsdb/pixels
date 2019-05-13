@@ -31,17 +31,21 @@ public class ChunkSeq
 
     /**
      * Add chunk by the order of chunks' offset
-     * */
+     */
     public boolean addChunk(ChunkId chunk)
     {
-        if (length == 0) {
+        if (length == 0)
+        {
             chunks.add(chunk);
+            // TODO remove function calls by getting object attributes directly
             offset = chunk.getOffset();
             length += chunk.getLength();
             return true;
         }
-        else {
-            if (chunk.getOffset() - offset - length == 0) {
+        else
+        {
+            if (chunk.getOffset() - offset - length == 0)
+            {
                 chunks.add(chunk);
                 length += chunk.getLength();
                 return true;

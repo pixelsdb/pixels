@@ -25,11 +25,38 @@ public class CacheLogAnalyzer
     private String csvPath = "/Users/Jelly/Desktop/pixels/cache/csv/";
 
     @Test
-    private void analyze()
+    public void analyze()
             throws IOException
     {
         Files.list(Paths.get(logPath)).forEach(this::processLogFile);
         Files.list(Paths.get(csvPath)).forEach(this::summarize);
+    }
+
+    @Test
+    public void cleanLogFile()
+    {
+        String input = "/Users/Jelly/Desktop/pixels/cache/Mar17/pixels-cache.csv";
+        String output = "/Users/Jelly/Desktop/pixels/cache/Mar17/pixels-cache-clean.csv";
+        try
+        {
+            BufferedReader reader = new BufferedReader(new FileReader(input));
+            BufferedWriter writer = new BufferedWriter(new FileWriter(output));
+            String line;
+            while ((line = reader.readLine()) != null)
+            {
+                if (line.contains("[cache stat"))
+                {
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+            reader.close();
+            writer.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 
     private void processLogFile(Path path)

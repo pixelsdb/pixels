@@ -11,47 +11,73 @@
 
     <artifactId>pixels-tools</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.CacheConcurrentReadPerf</mainClass>
+        <mainClass>cn.edu.ruc.iir.pixels.test.CacheIndexPerf</mainClass>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-core</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-common</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-daemon</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>cn.edu.ruc.iir</groupId>
             <artifactId>pixels-cache</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-spi</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- grpc -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>

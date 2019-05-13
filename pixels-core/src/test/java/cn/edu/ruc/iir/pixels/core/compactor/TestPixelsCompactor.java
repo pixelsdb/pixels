@@ -28,7 +28,8 @@ public class TestPixelsCompactor
 {
     @SuppressWarnings("Duplicates")
     @Test
-    public void testBasicCompact () throws MetadataException, IOException
+    public void testBasicCompact()
+            throws MetadataException, IOException
     {
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
@@ -58,30 +59,30 @@ public class TestPixelsCompactor
 
         // compact
         int NO = 0;
-        for (int i = 0; i < statuses.length; i+=16)
+        for (int i = 0; i < statuses.length; i += 16)
         {
             List<Path> sourcePaths = new ArrayList<>();
             for (int j = 0; j < 16; ++j)
             {
                 //System.out.println(statuses[i+j].getPath().toString());
-                sourcePaths.add(statuses[i+j].getPath());
+                sourcePaths.add(statuses[i + j].getPath());
             }
             long start = System.currentTimeMillis();
 
             String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_compact/" +
-                              NO + "_" +
-                              DateUtil.getCurTime() +
-                              ".compact.pxl";
+                    NO + "_" +
+                    DateUtil.getCurTime() +
+                    ".compact.pxl";
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
-                            .setSourcePaths(sourcePaths)
-                            .setCompactLayout(compactLayout)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
-                            .setBlockSize(2L *1024*1024*1024)
-                            .setReplication((short) 2)
-                            .setBlockPadding(false)
-                            .build();
+                                   .setSourcePaths(sourcePaths)
+                                   .setCompactLayout(compactLayout)
+                                   .setFS(fs)
+                                   .setFilePath(new Path(filePath))
+                                   .setBlockSize(2L * 1024 * 1024 * 1024)
+                                   .setReplication((short) 2)
+                                   .setBlockPadding(false)
+                                   .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
 
@@ -93,7 +94,8 @@ public class TestPixelsCompactor
 
     @SuppressWarnings("Duplicates")
     @Test
-    public void testRealCompact () throws MetadataException, IOException
+    public void testRealCompact()
+            throws MetadataException, IOException
     {
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -120,13 +122,13 @@ public class TestPixelsCompactor
 
         // compact
         int NO = 0;
-        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.length; i+=compact.getNumRowGroupInBlock())
+        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.length; i += compact.getNumRowGroupInBlock())
         {
             List<Path> sourcePaths = new ArrayList<>();
             for (int j = 0; j < compact.getNumRowGroupInBlock(); ++j)
             {
                 //System.out.println(statuses[i+j].getPath().toString());
-                sourcePaths.add(statuses[i+j].getPath());
+                sourcePaths.add(statuses[i + j].getPath());
             }
 
             long start = System.currentTimeMillis();
@@ -137,14 +139,14 @@ public class TestPixelsCompactor
                     ".compact.pxl";
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
-                            .setSourcePaths(sourcePaths)
-                            .setCompactLayout(compactLayout)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
-                            .setBlockSize(2L *1024*1024*1024)
-                            .setReplication((short) 2)
-                            .setBlockPadding(false)
-                            .build();
+                                   .setSourcePaths(sourcePaths)
+                                   .setCompactLayout(compactLayout)
+                                   .setFS(fs)
+                                   .setFilePath(new Path(filePath))
+                                   .setBlockSize(2L * 1024 * 1024 * 1024)
+                                   .setReplication((short) 2)
+                                   .setBlockPadding(false)
+                                   .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
 
@@ -155,7 +157,8 @@ public class TestPixelsCompactor
     }
 
     @Test
-    public void testContent () throws IOException
+    public void testContent()
+            throws IOException
     {
         String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/compact.3.pxl";
         //String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
@@ -163,9 +166,9 @@ public class TestPixelsCompactor
         Configuration conf = new Configuration();
         FileSystem fs = FileSystem.get(URI.create(filePath), conf);
         PixelsReader reader = PixelsReaderImpl.newBuilder()
-                .setFS(fs)
-                .setPath(path)
-                .build();
+                                              .setFS(fs)
+                                              .setPath(path)
+                                              .build();
 
         PixelsReaderOption option = new PixelsReaderOption();
         String[] cols = {"Domain", "SamplePercent"};

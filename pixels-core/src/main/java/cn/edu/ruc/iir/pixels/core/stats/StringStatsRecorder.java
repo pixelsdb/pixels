@@ -20,19 +20,24 @@ public class StringStatsRecorder
     private String maximum = null;
     private long sum = 0L;
 
-    StringStatsRecorder() {}
+    StringStatsRecorder()
+    {
+    }
 
     StringStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         super(statistic);
         PixelsProto.StringStatistic strStat = statistic.getStringStatistics();
-        if (strStat.hasMaximum()) {
+        if (strStat.hasMaximum())
+        {
             minimum = strStat.getMinimum();
         }
-        if (strStat.hasMaximum()) {
+        if (strStat.hasMaximum())
+        {
             maximum = strStat.getMaximum();
         }
-        if (strStat.hasSum()) {
+        if (strStat.hasSum())
+        {
             sum = strStat.getSum();
         }
     }
@@ -49,14 +54,18 @@ public class StringStatsRecorder
     @Override
     public void updateString(String value, int repetitions)
     {
-        if (minimum == null) {
+        if (minimum == null)
+        {
             minimum = maximum = value;
         }
-        else {
-            if (value.compareTo(minimum) < 0) {
+        else
+        {
+            if (value.compareTo(minimum) < 0)
+            {
                 minimum = value;
             }
-            if (value.compareTo(maximum) > 0) {
+            if (value.compareTo(maximum) > 0)
+            {
                 maximum = value;
             }
         }
@@ -68,11 +77,13 @@ public class StringStatsRecorder
     public void updateString(byte[] value, int offset, int length, int repetitions)
     {
         ByteBuffer buffer = ByteBuffer.wrap(value, offset, length);
-        try {
+        try
+        {
             String str = EncodingUtils.decodeString(buffer, true);
             updateString(str, repetitions);
         }
-        catch (CharacterCodingException e) {
+        catch (CharacterCodingException e)
+        {
             buffer.clear();
         }
     }
@@ -80,28 +91,37 @@ public class StringStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof StringStatsRecorder) {
+        if (other instanceof StringStatsRecorder)
+        {
             StringStatsRecorder strStat = (StringStatsRecorder) other;
-            if (minimum == null) {
-                if (strStat.minimum != null) {
+            if (minimum == null)
+            {
+                if (strStat.minimum != null)
+                {
                     minimum = strStat.minimum;
                     maximum = strStat.maximum;
                 }
             }
-            else {
-                if (strStat.minimum != null) {
-                    if (strStat.minimum.compareTo(minimum) < 0) {
+            else
+            {
+                if (strStat.minimum != null)
+                {
+                    if (strStat.minimum.compareTo(minimum) < 0)
+                    {
                         minimum = strStat.minimum;
                     }
-                    if (strStat.maximum.compareTo(maximum) > 0) {
+                    if (strStat.maximum.compareTo(maximum) > 0)
+                    {
                         maximum = strStat.maximum;
                     }
                 }
             }
             sum += strStat.sum;
         }
-        else {
-            if (isStatsExists() && minimum != null) {
+        else
+        {
+            if (isStatsExists() && minimum != null)
+            {
                 throw new IllegalArgumentException("Incompatible merging of string column statistics");
             }
         }
@@ -149,9 +169,11 @@ public class StringStatsRecorder
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (getNumberOfValues() != 0) {
+        if (getNumberOfValues() != 0)
+        {
             buf.append(" min: ");
             buf.append(getMinimum());
             buf.append(" max: ");
@@ -165,30 +187,38 @@ public class StringStatsRecorder
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
             return true;
         }
-        if (!(o instanceof StringStatsRecorder)) {
+        if (!(o instanceof StringStatsRecorder))
+        {
             return false;
         }
-        if (!super.equals(o)) {
+        if (!super.equals(o))
+        {
             return false;
         }
 
         StringStatsRecorder that = (StringStatsRecorder) o;
 
-        if (sum != that.sum) {
+        if (sum != that.sum)
+        {
             return false;
         }
-        if (minimum != null ? !minimum.equals(that.minimum) : that.minimum != null) {
+        if (minimum != null ? !minimum.equals(that.minimum) : that.minimum != null)
+        {
             return false;
         }
-        if (maximum != null ? !maximum.equals(that.maximum) : that.maximum != null) {
+        if (maximum != null ? !maximum.equals(that.maximum) : that.maximum != null)
+        {
             return false;
         }
 
-        if (numberOfValues != that.numberOfValues) {
+        if (numberOfValues != that.numberOfValues)
+        {
             return false;
         }
 
@@ -196,7 +226,8 @@ public class StringStatsRecorder
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = super.hashCode();
         result = 31 * result + (minimum != null ? minimum.hashCode() : 0);
         result = 31 * result + (maximum != null ? maximum.hashCode() : 0);

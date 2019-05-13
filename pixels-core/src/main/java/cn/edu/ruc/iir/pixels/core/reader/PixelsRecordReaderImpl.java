@@ -1,9 +1,16 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
+import cn.edu.ruc.iir.pixels.cache.ColumnletId;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.*;
+import cn.edu.ruc.iir.pixels.core.ChunkId;
+import cn.edu.ruc.iir.pixels.core.ChunkSeq;
+import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
+import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -12,7 +19,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
 /**
  * pixels
@@ -84,10 +97,7 @@ public class PixelsRecordReaderImpl
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = physicalFSReader.getPath().getName();
-        long checkStartNano = System.nanoTime();
         checkBeforeRead();
-        long checkCost = System.nanoTime() - checkStartNano;
-        logger.debug("[check before read]" + checkCost);
     }
 
     private void checkBeforeRead()
@@ -132,6 +142,7 @@ public class PixelsRecordReaderImpl
             checkValid = true;
             return;
         }
+        // TODO optimize the initial size of ArrayList
         List<Integer> optionColsIndices = new ArrayList<>();
         this.includedColumns = new boolean[fileColTypes.size()];
         for (String col : optionIncludedCols)
@@ -207,7 +218,6 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
-        long readStartNano = System.nanoTime();
         everRead = true;
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
@@ -234,7 +244,7 @@ public class PixelsRecordReaderImpl
             for (int id : targetColumns)
             {
                 columnStatsMap.put(id,
-                        StatsRecorder.create(columnSchemas.get(id), fileColumnStatistics.get(id)));
+                                   StatsRecorder.create(columnSchemas.get(id), fileColumnStatistics.get(id)));
             }
             if (!predicate.matches(postScript.getNumberOfRows(), columnStatsMap))
             {
@@ -251,7 +261,7 @@ public class PixelsRecordReaderImpl
                 for (int id : targetColumns)
                 {
                     columnStatsMap.put(id,
-                            StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
+                                       StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
                 }
                 includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
             }
@@ -278,30 +288,29 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
-        long readRGFootersStartNano = System.nanoTime();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
             String rgCacheId = fileName + "-" + rgId;
-            // TODO: is it meaningful to cache footers? record reader is created to read a split and then released.
             PixelsProto.RowGroupFooter rowGroupFooter = pixelsFooterCache.getRGFooter(rgCacheId);
             // cache miss, read from disk and put it into cache
             if (rowGroupFooter == null)
             {
-                logger.debug("[rg cache miss]" + rgCacheId);
                 PixelsProto.RowGroupInformation rowGroupInformation =
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
                 byte[] footerBuffer = new byte[(int) footerLength];
-                try {
+                try
+                {
                     physicalFSReader.seek(footerOffset);
                     physicalFSReader.readFully(footerBuffer);
                     rowGroupFooters[i] =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
                     pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[i]);
                 }
-                catch (IOException e) {
+                catch (IOException e)
+                {
                     e.printStackTrace();
                     return false;
                 }
@@ -309,120 +318,139 @@ public class PixelsRecordReaderImpl
             // cache hit
             else
             {
-                logger.debug("[rg cache hit]" + rgCacheId);
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
-        long readRGFooterEndNano = System.nanoTime();
-        logger.debug("[read rg footers]" + fileName + "," + (readRGFooterEndNano - readRGFootersStartNano));
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
-        List<ChunkId> chunks = new ArrayList<>();
+        List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumns.length);
         // read cached data which are in need
-        if (enableCache) {
-            long cacheReadStartNano = System.nanoTime();
-            int cacheReadCount = 0;
+        if (enableCache)
+        {
             long cacheReadSize = 0L;
-            for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
-                int rgId = rgIdx + RGStart;
-                PixelsProto.RowGroupIndex rowGroupIndex =
-                        rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-                for (int colId : targetColumns) {
+            long blockId;
+            try
+            {
+                blockId = physicalFSReader.getCurrentBlockId();
+            }
+            catch (IOException | FSException e)
+            {
+                e.printStackTrace();
+                return false;
+            }
+            List<ColumnletId> cacheChunks = new ArrayList<>(targetRGNum * targetColumns.length);
+            // find cached chunks
+            for (int colId : targetColumns)
+            {
+                for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
+                {
+                    int rgId = rgIdx + RGStart;
                     String cacheIdentifier = "" + rgId + ":" + colId;
                     // if cached, read from cache files
-                    if (cacheOrder.contains(cacheIdentifier)) {
-                        long blockId = -1;
-                        try
-                        {
-                            blockId = physicalFSReader.getCurrentBlockId();
-                        } catch (Exception e)
-                        {
-                            logger.error(e);
-                            return false;
-                        }
-                        byte[] columnlet = cacheReader.get(blockId, (short) rgId, (short) colId);
-                        // if cache hit, read columnlet into buffer
-                        if (columnlet != null && columnlet.length > 0) {
-                            cacheReadCount++;
-                            cacheReadSize += columnlet.length;
-                            int bufferIdx = rgIdx * includedColumns.length + colId;
-                            chunkBuffers[bufferIdx] = columnlet;
-                        }
-                        // if cache miss, add chunkId to be read from disks
-                        else {
-                            PixelsProto.ColumnChunkIndex chunkIndex =
-                                    rowGroupIndex.getColumnChunkIndexEntries(colId);
-                            ChunkId chunk = new ChunkId(rgIdx, colId,
-                                                        chunkIndex.getChunkOffset(),
-                                                        chunkIndex.getChunkLength());
-                            chunks.add(chunk);
-                        }
+                    if (cacheOrder.contains(cacheIdentifier))
+                    {
+                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId);
+                        cacheChunks.add(chunkId);
                     }
-                    // else, read from disks
-                    else {
+                    // if cache miss, add chunkId to be read from disks
+                    else
+                    {
+                        PixelsProto.RowGroupIndex rowGroupIndex =
+                                rowGroupFooters[rgIdx].getRowGroupIndexEntry();
                         PixelsProto.ColumnChunkIndex chunkIndex =
                                 rowGroupIndex.getColumnChunkIndexEntries(colId);
                         ChunkId chunk = new ChunkId(rgIdx, colId,
                                                     chunkIndex.getChunkOffset(),
                                                     chunkIndex.getChunkLength());
-                        chunks.add(chunk);
+                        diskChunks.add(chunk);
                     }
                 }
             }
+            // read cached chunks
+            long cacheReadStartNano = System.nanoTime();
+            for (ColumnletId chunkId : cacheChunks)
+            {
+                short rgId = chunkId.rowGroupId;
+                short colId = chunkId.columnId;
+//                long getBegin = System.nanoTime();
+                byte[] columnlet = cacheReader.get(blockId, rgId, colId);
+//                long getEnd = System.nanoTime();
+//                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
+                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+            }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            logger.debug("[cache stat]" + fileName + "," + cacheReadCount + "," + cacheReadSize + "," + cacheReadCost);
+            // deal with null or empty cache chunk
+            for (ColumnletId chunkId : cacheChunks)
+            {
+                short rgId = chunkId.rowGroupId;
+                short colId = chunkId.columnId;
+                int rgIdx = rgId - RGStart;
+                int bufferIdx = rgIdx * includedColumns.length + colId;
+                if (chunkBuffers[bufferIdx] == null || chunkBuffers[bufferIdx].length == 0)
+                {
+                    PixelsProto.RowGroupIndex rowGroupIndex =
+                            rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupIndex.getColumnChunkIndexEntries(colId);
+                    ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
+                                                    chunkIndex.getChunkLength());
+                    diskChunks.add(diskChunk);
+                }
+                else
+                {
+                    cacheReadSize += chunkBuffers[bufferIdx].length;
+                }
+            }
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
         }
-        else {
-            for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++) {
+        else
+        {
+            for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
+            {
                 PixelsProto.RowGroupIndex rowGroupIndex =
                         rowGroupFooters[rgIdx].getRowGroupIndexEntry();
-                for (int colId : targetColumns) {
+                for (int colId : targetColumns)
+                {
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId chunk = new ChunkId(rgIdx, colId,
                                                 chunkIndex.getChunkOffset(),
                                                 chunkIndex.getChunkLength());
-                    chunks.add(chunk);
+                    diskChunks.add(chunk);
                 }
             }
         }
 
         // sort chunks by starting offset
-        chunks.sort(Comparator.comparingLong(ChunkId::getOffset));
+        diskChunks.sort(Comparator.comparingLong(ChunkId::getOffset));
 
         // get chunk blocks
-        List<ChunkSeq> chunkSeqs = new ArrayList<>();
-        ChunkSeq chunkSeq = new ChunkSeq();
-        for (ChunkId chunk : chunks)
+        List<ChunkSeq> diskChunkSeqs = new ArrayList<>(diskChunks.size());
+        ChunkSeq diskChunkSeq = new ChunkSeq();
+        for (ChunkId chunk : diskChunks)
         {
-            if (!chunkSeq.addChunk(chunk))
+            if (!diskChunkSeq.addChunk(chunk))
             {
-                chunkSeqs.add(chunkSeq);
-                chunkSeq = new ChunkSeq();
-                chunkSeq.addChunk(chunk);
+                diskChunkSeqs.add(diskChunkSeq);
+                diskChunkSeq = new ChunkSeq();
+                diskChunkSeq.addChunk(chunk);
             }
         }
-        chunkSeqs.add(chunkSeq);
+        diskChunkSeqs.add(diskChunkSeq);
 
         // read chunk blocks into buffers
         try
         {
-            long diskReadStartNano = System.nanoTime();
-            int diskReadCount = 0;
-            long diskReadSize = 0L;
-            long offsetBeforeSeek = 0;
-            for (ChunkSeq seq : chunkSeqs)
+            for (ChunkSeq seq : diskChunkSeqs)
             {
                 if (seq.getLength() == 0)
                 {
                     continue;
                 }
-                diskReadCount++;
                 int offset = (int) seq.getOffset();
                 int length = (int) seq.getLength();
-                diskReadSize += length;
                 completedBytes += length;
                 byte[] chunkBlockBuffer = new byte[length];
 //                if (enableMetrics)
@@ -446,8 +474,8 @@ public class PixelsRecordReaderImpl
 //                }
 //                else
 //                {
-                    physicalFSReader.seek(offset);
-                    physicalFSReader.readFully(chunkBlockBuffer);
+                physicalFSReader.seek(offset);
+                physicalFSReader.readFully(chunkBlockBuffer);
 //                }
                 List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
@@ -458,22 +486,17 @@ public class PixelsRecordReaderImpl
                     int colId = chunkId.getColumnId();
                     // TODO: do not copy, we should use a buffer slice wrapper instead of byte array.
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
-                            chunkSliceOffset, chunkSliceOffset + chunkLength);
+                                                           chunkSliceOffset, chunkSliceOffset + chunkLength);
                     chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBytes;
                     chunkSliceOffset += chunkLength;
                 }
             }
-            long diskReadEndNano = System.nanoTime();
-            long diskReadCost = diskReadEndNano - diskReadStartNano;
-            logger.debug("[disk stat]" + fileName + "," + diskReadCount + "," + diskReadSize + "," + diskReadCost);
         }
         catch (IOException e)
         {
-            logger.error(e);
+            e.printStackTrace();
             return false;
         }
-        long readEndNano = System.nanoTime();
-        logger.debug("[pixels read]" + fileName + "," + (readEndNano - readStartNano));
 
         return true;
     }
@@ -486,7 +509,8 @@ public class PixelsRecordReaderImpl
      * @throws java.io.IOException
      */
     @Override
-    public VectorizedRowBatch readBatch(int batchSize) throws IOException
+    public VectorizedRowBatch readBatch(int batchSize)
+            throws IOException
     {
         if (!checkValid)
         {
@@ -521,16 +545,6 @@ public class PixelsRecordReaderImpl
         // ensure size for result row batch
         resultRowBatch.ensureSize(batchSize);
 
-        /**
-         * TODO:
-         * Here, we immediately decode and copy data items from chunk buffers into resultRowBatch.cols.
-         * If the resultRowBatch is not immediately consumed by upper layers (such as a presto worker),
-         * the decoded column vectors will hold the memory, increasing risk of OOM and GC problems.
-         * We should put such decoding in a separate function, so that clients can make their choice of
-         * decoding lazily or not.
-         * And to support presto lazy block, we have to support decoding one column (in a batch) at a time.
-         */
-
         int rgRowCount = 0;
         int curBatchSize = 0;
         if (curRGIdx < targetRGNum)
@@ -556,19 +570,13 @@ public class PixelsRecordReaderImpl
                     PixelsProto.RowGroupFooter rowGroupFooter =
                             rowGroupFooters[curRGIdx];
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
-                            .getColumnChunkEncodings(resultColumns[i]);
+                                                                        .getColumnChunkEncodings(resultColumns[i]);
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                            .getColumnChunkIndexEntries(resultColumns[i]);
-                    /**
-                     * Chunk buffer is decoded in read, this produces more garbage in heap. We can consider using late decoding,
-                     * which only decodes a value from buffer when the value is needed, and the decoded value is stored in stack
-                     * instead of in heap, without increasing the burden of garbage collection.
-                     * But reading all items from chunk buffer to column vector in a single function may benefit from
-                     * vectorized execution. This is a trade-off.
-                     */
+                                                                            .getColumnChunkIndexEntries(
+                                                                                    resultColumns[i]);
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                                    postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
 
@@ -608,7 +616,8 @@ public class PixelsRecordReaderImpl
     }
 
     @Override
-    public VectorizedRowBatch readBatch() throws IOException
+    public VectorizedRowBatch readBatch()
+            throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }

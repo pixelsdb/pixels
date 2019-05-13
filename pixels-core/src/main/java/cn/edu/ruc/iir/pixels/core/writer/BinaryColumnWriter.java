@@ -20,7 +20,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
     }
 
     @Override
-    public int write(ColumnVector vector, int size) throws IOException
+    public int write(ColumnVector vector, int size)
+            throws IOException
     {
         BytesColumnVector columnVector = (BytesColumnVector) vector;
         byte[][] values = columnVector.vector;
@@ -28,7 +29,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
         int curPartOffset = 0;
         int nextPartLength = size;
 
-        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride) {
+        while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
+        {
             curPartLength = pixelStride - curPixelIsNullIndex;
             writeCurPartBinary(columnVector, values, curPartLength, curPartOffset);
             newPixel();
@@ -45,7 +47,8 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private void writeCurPartBinary(BytesColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
             throws IOException
     {
-        for (int i = 0; i < curPartLength; i++) {
+        for (int i = 0; i < curPartLength; i++)
+        {
             curPixelEleIndex++;
             if (columnVector.isNull[i + curPartOffset])
             {

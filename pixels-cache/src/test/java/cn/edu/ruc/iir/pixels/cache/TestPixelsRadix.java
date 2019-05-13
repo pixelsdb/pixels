@@ -46,12 +46,14 @@ public class TestPixelsRadix
     public void testLargeNum()
     {
         PixelsRadix radix = new PixelsRadix();
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             PixelsCacheKey cacheKey = new PixelsCacheKey(i, (short) i, (short) i);
             PixelsCacheIdx cacheIdx = new PixelsCacheIdx(i, i);
             radix.put(cacheKey, cacheIdx);
         }
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             PixelsCacheKey cacheKey = new PixelsCacheKey(i, (short) i, (short) i);
             PixelsCacheIdx expectedCacheIdx = new PixelsCacheIdx(i, i);
             PixelsCacheIdx cacheIdx = radix.get(cacheKey);

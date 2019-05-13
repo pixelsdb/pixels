@@ -15,12 +15,14 @@ public class TestDynamicArray
     public void testAdd()
     {
         DynamicArray<Integer> array = new DynamicArray<>();
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             array.add(i);
         }
         assert array.size() == TEST_NUM;
         System.out.println("Capacity: " + array.capacity());
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             assert i == array.get(i);
         }
     }
@@ -29,14 +31,17 @@ public class TestDynamicArray
     public void testSet()
     {
         DynamicArray<Integer> array = new DynamicArray<>();
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             array.add(i);
         }
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             array.set(i, i * 2);
         }
         assert array.size() == TEST_NUM;
-        for (int i = 0; i < TEST_NUM; i++) {
+        for (int i = 0; i < TEST_NUM; i++)
+        {
             assert i * 2 == array.get(i);
         }
     }

@@ -18,10 +18,11 @@ import java.util.List;
 
 /**
  * pixels
- *
+ * <p>
  * String path = "hdfs://dbiir01:9000/pixels/pixels/test_1187/v_1_compact/20190223144340_13.compact_copy_20190223153853_93.pxl";
- *
+ * <p>
  * java -jar xxx.jar path rowgroup_id col_id layout_version
+ *
  * @author guodong
  */
 public class CheckCacheContent
@@ -37,8 +38,10 @@ public class CheckCacheContent
         MemoryMappedFile cacheFile;
         MemoryMappedFile indexFile;
         ConfigFactory config = ConfigFactory.Instance();
-        cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
-        indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
+        cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
+                                         Long.parseLong(config.getProperty("cache.size")));
+        indexFile = new MemoryMappedFile(config.getProperty("index.location"),
+                                         Long.parseLong(config.getProperty("index.size")));
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -68,7 +71,8 @@ public class CheckCacheContent
         PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(rgId);
         PhysicalReader physicalReader =
                 PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), new Path(path));
-        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(colId);
+        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                                                                .getColumnChunkIndexEntries(colId);
         physicalReader.seek(chunkIndex.getChunkOffset());
         byte[] diskContent = new byte[(int) chunkIndex.getChunkLength()];
         physicalReader.readFully(diskContent);

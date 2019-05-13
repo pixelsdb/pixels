@@ -44,6 +44,11 @@ public final class FSFactory {
         return instance;
     }
 
+    public FSFactory(FileSystem fs)
+    {
+        this.fileSystem = fs;
+    }
+
     private FileSystem fileSystem;
     private Configuration hdfsConfig;
 

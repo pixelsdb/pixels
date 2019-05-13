@@ -14,7 +14,7 @@ import java.net.URI;
 
 /**
  * pixels
- *
+ * <p>
  * java -jar xxx.jar srcPath dstPath
  *
  * @author guodong
@@ -46,7 +46,8 @@ public class CopyFiles
         configuration.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
         configuration.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
-        try {
+        try
+        {
             FileSystem sourceFS = FileSystem.get(URI.create(srcPath), configuration);
             FileSystem destFS = FileSystem.get(URI.create(dstPath), configuration);
 
@@ -62,7 +63,8 @@ public class CopyFiles
                 outputStream.close();
             }
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

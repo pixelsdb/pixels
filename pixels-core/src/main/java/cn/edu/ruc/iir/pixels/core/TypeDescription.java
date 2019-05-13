@@ -16,11 +16,11 @@ import java.util.regex.Pattern;
 
 /**
  * TypeDescription from org.apache.orc
- *
+ * <p>
  * Schema description in a Pixels file.
  */
 public final class TypeDescription
-    implements Comparable<TypeDescription>, Serializable, Cloneable
+        implements Comparable<TypeDescription>, Serializable, Cloneable
 {
     private static final long serialVersionUID = 4270695889340023552L;
     private static final int MAX_PRECISION = 38;
@@ -31,25 +31,36 @@ public final class TypeDescription
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     @Override
-    public int compareTo(TypeDescription other) {
-        if (this == other) {
+    public int compareTo(TypeDescription other)
+    {
+        if (this == other)
+        {
             return 0;
-        } else if (other == null) {
+        }
+        else if (other == null)
+        {
             return -1;
-        } else {
+        }
+        else
+        {
             int result = category.compareTo(other.category);
-            if (result == 0) {
-                switch (category) {
+            if (result == 0)
+            {
+                switch (category)
+                {
                     case CHAR:
                     case VARCHAR:
                         return maxLength - other.maxLength;
                     case STRUCT:
-                        if (children.size() != other.children.size()) {
+                        if (children.size() != other.children.size())
+                        {
                             return children.size() - other.children.size();
                         }
-                        for(int c=0; result == 0 && c < children.size(); ++c) {
+                        for (int c = 0; result == 0 && c < children.size(); ++c)
+                        {
                             result = fieldNames.get(c).compareTo(other.fieldNames.get(c));
-                            if (result == 0) {
+                            if (result == 0)
+                            {
                                 result = children.get(c).compareTo(other.children.get(c));
                             }
                         }
@@ -62,7 +73,8 @@ public final class TypeDescription
         }
     }
 
-    public enum Category {
+    public enum Category
+    {
         BOOLEAN("boolean", true),
         BYTE("tinyint", true),
         SHORT("smallint", true),
@@ -78,7 +90,8 @@ public final class TypeDescription
         CHAR("char", true),
         STRUCT("struct", false);
 
-        Category(String name, boolean isPrimitive) {
+        Category(String name, boolean isPrimitive)
+        {
             this.name = name;
             this.isPrimitive = isPrimitive;
         }
@@ -86,63 +99,77 @@ public final class TypeDescription
         final boolean isPrimitive;
         final String name;
 
-        public boolean isPrimitive() {
+        public boolean isPrimitive()
+        {
             return isPrimitive;
         }
 
-        public String getName() {
+        public String getName()
+        {
             return name;
         }
     }
 
-    public static TypeDescription createBoolean() {
+    public static TypeDescription createBoolean()
+    {
         return new TypeDescription(Category.BOOLEAN);
     }
 
-    public static TypeDescription createByte() {
+    public static TypeDescription createByte()
+    {
         return new TypeDescription(Category.BYTE);
     }
 
-    public static TypeDescription createShort() {
+    public static TypeDescription createShort()
+    {
         return new TypeDescription(Category.SHORT);
     }
 
-    public static TypeDescription createInt() {
+    public static TypeDescription createInt()
+    {
         return new TypeDescription(Category.INT);
     }
 
-    public static TypeDescription createLong() {
+    public static TypeDescription createLong()
+    {
         return new TypeDescription(Category.LONG);
     }
 
-    public static TypeDescription createFloat() {
+    public static TypeDescription createFloat()
+    {
         return new TypeDescription(Category.FLOAT);
     }
 
-    public static TypeDescription createDouble() {
+    public static TypeDescription createDouble()
+    {
         return new TypeDescription(Category.DOUBLE);
     }
 
-    public static TypeDescription createString() {
+    public static TypeDescription createString()
+    {
         return new TypeDescription(Category.STRING);
     }
 
-    public static TypeDescription createDate() {
+    public static TypeDescription createDate()
+    {
         return new TypeDescription(Category.DATE);
     }
 
-    public static TypeDescription createTimestamp() {
+    public static TypeDescription createTimestamp()
+    {
         return new TypeDescription(Category.TIMESTAMP);
     }
 
-    public static TypeDescription createBinary() {
+    public static TypeDescription createBinary()
+    {
         return new TypeDescription(Category.BINARY);
     }
 
     public static TypeDescription createSchema(List<PixelsProto.Type> types)
     {
         TypeDescription schema = TypeDescription.createStruct();
-        for (PixelsProto.Type type : types) {
+        for (PixelsProto.Type type : types)
+        {
             String fieldName = type.getName();
             TypeDescription fieldType;
             switch (type.getKind())
@@ -188,26 +215,29 @@ public final class TypeDescription
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
-                            type.getKind());
+                                                               type.getKind());
             }
             schema.addField(fieldName, fieldType);
         }
         return schema;
     }
 
-    static class StringPosition {
+    static class StringPosition
+    {
         final String value;
         int position;
         final int length;
 
-        StringPosition(String value) {
+        StringPosition(String value)
+        {
             this.value = value;
             position = 0;
             length = value.length();
         }
 
         @Override
-        public String toString() {
+        public String toString()
+        {
             StringBuilder buffer = new StringBuilder();
             buffer.append('\'');
             buffer.append(value.substring(0, position));
@@ -218,19 +248,25 @@ public final class TypeDescription
         }
     }
 
-    private static Category parseCategory(StringPosition source) {
+    private static Category parseCategory(StringPosition source)
+    {
         int start = source.position;
-        while (source.position < source.length) {
+        while (source.position < source.length)
+        {
             char ch = source.value.charAt(source.position);
-            if (!Character.isLetter(ch)) {
+            if (!Character.isLetter(ch))
+            {
                 break;
             }
             source.position += 1;
         }
-        if (source.position != start) {
+        if (source.position != start)
+        {
             String word = source.value.substring(start, source.position).toLowerCase();
-            for (Category cat : Category.values()) {
-                if (cat.getName().equals(word)) {
+            for (Category cat : Category.values())
+            {
+                if (cat.getName().equals(word))
+                {
                     return cat;
                 }
             }
@@ -238,91 +274,119 @@ public final class TypeDescription
         throw new IllegalArgumentException("Can't parse category at " + source);
     }
 
-    private static int parseInt(StringPosition source) {
+    private static int parseInt(StringPosition source)
+    {
         int start = source.position;
         int result = 0;
-        while (source.position < source.length) {
+        while (source.position < source.length)
+        {
             char ch = source.value.charAt(source.position);
-            if (!Character.isDigit(ch)) {
+            if (!Character.isDigit(ch))
+            {
                 break;
             }
             result = result * 10 + (ch - '0');
             source.position += 1;
         }
-        if (source.position == start) {
+        if (source.position == start)
+        {
             throw new IllegalArgumentException("Missing integer at " + source);
         }
         return result;
     }
 
-    private static String parseName(StringPosition source) {
-        if (source.position == source.length) {
+    private static String parseName(StringPosition source)
+    {
+        if (source.position == source.length)
+        {
             throw new IllegalArgumentException("Missing name at " + source);
         }
         final int start = source.position;
-        if (source.value.charAt(source.position) == '`') {
+        if (source.value.charAt(source.position) == '`')
+        {
             source.position += 1;
             StringBuilder buffer = new StringBuilder();
             boolean closed = false;
-            while (source.position < source.length) {
+            while (source.position < source.length)
+            {
                 char ch = source.value.charAt(source.position);
                 source.position += 1;
-                if (ch == '`') {
+                if (ch == '`')
+                {
                     if (source.position < source.length &&
-                            source.value.charAt(source.position) == '`') {
+                            source.value.charAt(source.position) == '`')
+                    {
                         source.position += 1;
                         buffer.append('`');
-                    } else {
+                    }
+                    else
+                    {
                         closed = true;
                         break;
                     }
-                } else {
+                }
+                else
+                {
                     buffer.append(ch);
                 }
             }
-            if (!closed) {
+            if (!closed)
+            {
                 source.position = start;
                 throw new IllegalArgumentException("Unmatched quote at " + source);
-            } else if (buffer.length() == 0) {
+            }
+            else if (buffer.length() == 0)
+            {
                 throw new IllegalArgumentException("Empty quoted field name at " + source);
             }
             return buffer.toString();
-        } else {
-            while (source.position < source.length) {
+        }
+        else
+        {
+            while (source.position < source.length)
+            {
                 char ch = source.value.charAt(source.position);
-                if (!Character.isLetterOrDigit(ch) && ch != '.' && ch != '_') {
+                if (!Character.isLetterOrDigit(ch) && ch != '.' && ch != '_')
+                {
                     break;
                 }
                 source.position += 1;
             }
-            if (source.position == start) {
+            if (source.position == start)
+            {
                 throw new IllegalArgumentException("Missing name at " + source);
             }
             return source.value.substring(start, source.position);
         }
     }
 
-    private static void requireChar(StringPosition source, char required) {
+    private static void requireChar(StringPosition source, char required)
+    {
         if (source.position >= source.length ||
-                source.value.charAt(source.position) != required) {
+                source.value.charAt(source.position) != required)
+        {
             throw new IllegalArgumentException("Missing required char '" +
-                    required + "' at " + source);
+                                                       required + "' at " + source);
         }
         source.position += 1;
     }
 
-    private static boolean consumeChar(StringPosition source, char ch) {
+    private static boolean consumeChar(StringPosition source, char ch)
+    {
         boolean result = source.position < source.length &&
                 source.value.charAt(source.position) == ch;
-        if (result) {
+        if (result)
+        {
             source.position += 1;
         }
         return result;
     }
 
-    private static void parseStruct(TypeDescription type, StringPosition source) {
+    private static void parseStruct(TypeDescription type, StringPosition source)
+    {
         requireChar(source, '<');
-        do {
+        do
+        {
             String fieldName = parseName(source);
             requireChar(source, ':');
             type.addField(fieldName, parseType(source));
@@ -330,9 +394,11 @@ public final class TypeDescription
         requireChar(source, '>');
     }
 
-    private static TypeDescription parseType(StringPosition source) {
+    private static TypeDescription parseType(StringPosition source)
+    {
         TypeDescription result = new TypeDescription(parseCategory(source));
-        switch (result.getCategory()) {
+        switch (result.getCategory())
+        {
             case BINARY:
             case BOOLEAN:
             case BYTE:
@@ -356,7 +422,7 @@ public final class TypeDescription
                 break;
             default:
                 throw new IllegalArgumentException("Unknown type " +
-                        result.getCategory() + " at " + source);
+                                                           result.getCategory() + " at " + source);
         }
         return result;
     }
@@ -364,17 +430,21 @@ public final class TypeDescription
     /**
      * Parse TypeDescription from the Hive type names. This is the inverse
      * of TypeDescription.toString()
+     *
      * @param typeName the name of the type
      * @return a new TypeDescription or null if typeName was null
      * @throws IllegalArgumentException if the string is badly formed
      */
-    public static TypeDescription fromString(String typeName) {
-        if (typeName == null) {
+    public static TypeDescription fromString(String typeName)
+    {
+        if (typeName == null)
+        {
             return null;
         }
         StringPosition source = new StringPosition(typeName);
         TypeDescription result = parseType(source);
-        if (source.position != source.length) {
+        if (source.position != source.length)
+        {
             throw new IllegalArgumentException("Extra characters at " + source);
         }
         return result;
@@ -382,13 +452,16 @@ public final class TypeDescription
 
     /**
      * For decimal types, set the precision.
+     *
      * @param precision the new precision
      * @return this
      */
-    public TypeDescription withPrecision(int precision) {
-        if (precision < 1 || precision > MAX_PRECISION || scale > precision){
+    public TypeDescription withPrecision(int precision)
+    {
+        if (precision < 1 || precision > MAX_PRECISION || scale > precision)
+        {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of range 1 .. " + scale);
+                                                       " is out of range 1 .. " + scale);
         }
         this.precision = precision;
         return this;
@@ -396,53 +469,65 @@ public final class TypeDescription
 
     /**
      * For decimal types, set the scale.
+     *
      * @param scale the new scale
      * @return this
      */
-    public TypeDescription withScale(int scale) {
-        if (scale < 0 || scale > MAX_SCALE || scale > precision) {
+    public TypeDescription withScale(int scale)
+    {
+        if (scale < 0 || scale > MAX_SCALE || scale > precision)
+        {
             throw new IllegalArgumentException("scale is out of range at " + scale);
         }
         this.scale = scale;
         return this;
     }
 
-    public static TypeDescription createVarchar() {
+    public static TypeDescription createVarchar()
+    {
         return new TypeDescription(Category.VARCHAR);
     }
 
-    public static TypeDescription createChar() {
+    public static TypeDescription createChar()
+    {
         return new TypeDescription(Category.CHAR);
     }
 
     /**
      * Set the maximum length for char and varchar types.
+     *
      * @param maxLength the maximum value
      * @return this
      */
-    public TypeDescription withMaxLength(int maxLength) {
-        if (category != Category.VARCHAR && category != Category.CHAR) {
+    public TypeDescription withMaxLength(int maxLength)
+    {
+        if (category != Category.VARCHAR && category != Category.CHAR)
+        {
             throw new IllegalArgumentException("maxLength is only allowed on char" +
-                    " and varchar and not " + category.name);
+                                                       " and varchar and not " + category.name);
         }
         this.maxLength = maxLength;
         return this;
     }
 
-    public static TypeDescription createStruct() {
+    public static TypeDescription createStruct()
+    {
         return new TypeDescription(Category.STRUCT);
     }
 
     /**
      * Add a field to a struct type as it is built.
-     * @param field the field name
+     *
+     * @param field     the field name
      * @param fieldType the type of the field
      * @return the struct type
      */
-    public TypeDescription addField(String field, TypeDescription fieldType) {
-        if (category != Category.STRUCT) {
+    public TypeDescription addField(String field, TypeDescription fieldType)
+    {
+        if (category != Category.STRUCT)
+        {
             throw new IllegalArgumentException("Can only add fields to struct type" +
-                    " and not " + category);
+                                                       " and not " + category);
         }
         fieldNames.add(field);
         children.add(fieldType);
@@ -454,13 +539,17 @@ public final class TypeDescription
      * Get the id for this type.
      * The first call will cause all of the the ids in tree to be assigned, so
      * it should not be called before the type is completely built.
+     *
      * @return the sequential id
      */
-    public int getId() {
+    public int getId()
+    {
         // if the id hasn't been assigned, assign all of the ids from the root
-        if (id == -1) {
+        if (id == -1)
+        {
             TypeDescription root = this;
-            while (root.parent != null) {
+            while (root.parent != null)
+            {
                 root = root.parent;
             }
             root.assignIds(0);
@@ -468,16 +557,20 @@ public final class TypeDescription
         return id;
     }
 
-    public TypeDescription clone() {
+    public TypeDescription clone()
+    {
         TypeDescription result = new TypeDescription(category);
         result.maxLength = maxLength;
         result.precision = precision;
         result.scale = scale;
-        if (fieldNames != null) {
+        if (fieldNames != null)
+        {
             result.fieldNames.addAll(fieldNames);
         }
-        if (children != null) {
-            for(TypeDescription child: children) {
+        if (children != null)
+        {
+            for (TypeDescription child : children)
+            {
                 TypeDescription clone = child.clone();
                 clone.parent = result;
                 result.children.add(clone);
@@ -487,10 +580,13 @@ public final class TypeDescription
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         long result = category.ordinal() * 4241 + maxLength + precision * 13 + scale;
-        if (children != null) {
-            for(TypeDescription child: children) {
+        if (children != null)
+        {
+            for (TypeDescription child : children)
+            {
                 result = result * 6959 + child.hashCode();
             }
         }
@@ -498,33 +594,44 @@ public final class TypeDescription
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other == null || !(other instanceof TypeDescription)) {
+    public boolean equals(Object other)
+    {
+        if (other == null || !(other instanceof TypeDescription))
+        {
             return false;
         }
-        if (other == this) {
+        if (other == this)
+        {
             return true;
         }
         TypeDescription castOther = (TypeDescription) other;
         if (category != castOther.category ||
                 maxLength != castOther.maxLength ||
                 scale != castOther.scale ||
-                precision != castOther.precision) {
+                precision != castOther.precision)
+        {
             return false;
         }
-        if (children != null) {
-            if (children.size() != castOther.children.size()) {
+        if (children != null)
+        {
+            if (children.size() != castOther.children.size())
+            {
                 return false;
             }
-            for (int i = 0; i < children.size(); ++i) {
-                if (!children.get(i).equals(castOther.children.get(i))) {
+            for (int i = 0; i < children.size(); ++i)
+            {
+                if (!children.get(i).equals(castOther.children.get(i)))
+                {
                     return false;
                 }
             }
         }
-        if (category == Category.STRUCT) {
-            for(int i=0; i < fieldNames.size(); ++i) {
-                if (!fieldNames.get(i).equals(castOther.fieldNames.get(i))) {
+        if (category == Category.STRUCT)
+        {
+            for (int i = 0; i < fieldNames.size(); ++i)
+            {
+                if (!fieldNames.get(i).equals(castOther.fieldNames.get(i)))
+                {
                     return false;
                 }
             }
@@ -536,13 +643,17 @@ public final class TypeDescription
      * Get the maximum id assigned to this type or its children.
      * The first call will cause all of the the ids in tree to be assigned, so
      * it should not be called before the type is completely built.
+     *
      * @return the maximum id assigned under this type
      */
-    public int getMaximumId() {
+    public int getMaximumId()
+    {
         // if the id hasn't been assigned, assign all of the ids from the root
-        if (maxId == -1) {
+        if (maxId == -1)
+        {
             TypeDescription root = this;
-            while (root.parent != null) {
+            while (root.parent != null)
+            {
                 root = root.parent;
             }
             root.assignIds(0);
@@ -550,8 +661,10 @@ public final class TypeDescription
         return maxId;
     }
 
-    private ColumnVector createColumn(int maxSize) {
-        switch (category) {
+    private ColumnVector createColumn(int maxSize)
+    {
+        switch (category)
+        {
             case BOOLEAN:
             case BYTE:
             case SHORT:
@@ -569,38 +682,47 @@ public final class TypeDescription
             case CHAR:
             case VARCHAR:
                 return new BytesColumnVector(maxSize);
-            case STRUCT: {
+            case STRUCT:
+            {
                 ColumnVector[] fieldVector = new ColumnVector[children.size()];
-                for(int i=0; i < fieldVector.length; ++i) {
+                for (int i = 0; i < fieldVector.length; ++i)
+                {
                     fieldVector[i] = children.get(i).createColumn(maxSize);
                 }
                 return new StructColumnVector(maxSize,
-                        fieldVector);
+                                              fieldVector);
             }
             default:
                 throw new IllegalArgumentException("Unknown type " + category);
         }
     }
 
-    public VectorizedRowBatch createRowBatch(int maxSize) {
+    public VectorizedRowBatch createRowBatch(int maxSize)
+    {
         VectorizedRowBatch result;
-        if (category == Category.STRUCT) {
+        if (category == Category.STRUCT)
+        {
             result = new VectorizedRowBatch(children.size(), maxSize);
             List<String> columnNames = new ArrayList<>();
-            for(int i=0; i < result.cols.length; ++i) {
+            for (int i = 0; i < result.cols.length; ++i)
+            {
                 String fieldName = fieldNames.get(i);
                 ColumnVector cv = children.get(i).createColumn(maxSize);
                 int originId = columnNames.indexOf(fieldName);
-                if (originId >= 0) {
+                if (originId >= 0)
+                {
                     cv.duplicated = true;
                     cv.originVecId = originId;
                 }
-                else {
+                else
+                {
                     columnNames.add(fieldName);
                 }
                 result.cols[i] = cv;
             }
-        } else {
+        }
+        else
+        {
             result = new VectorizedRowBatch(1, maxSize);
             result.cols[0] = createColumn(maxSize);
         }
@@ -608,67 +730,84 @@ public final class TypeDescription
         return result;
     }
 
-    public VectorizedRowBatch createRowBatch() {
+    public VectorizedRowBatch createRowBatch()
+    {
         return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
     /**
      * Get the kind of this type.
+     *
      * @return get the category for this type.
      */
-    public Category getCategory() {
+    public Category getCategory()
+    {
         return category;
     }
 
     /**
      * Get the maximum length of the type. Only used for char and varchar types.
+     *
      * @return the maximum length of the string type
      */
-    public int getMaxLength() {
+    public int getMaxLength()
+    {
         return maxLength;
     }
 
     /**
      * Get the precision of the decimal type.
+     *
      * @return the number of digits for the precision.
      */
-    public int getPrecision() {
+    public int getPrecision()
+    {
         return precision;
     }
 
     /**
      * Get the scale of the decimal type.
+     *
      * @return the number of digits for the scale.
      */
-    public int getScale() {
+    public int getScale()
+    {
         return scale;
     }
 
     /**
      * For struct types, get the list of field names.
+     *
      * @return the list of field names.
      */
-    public List<String> getFieldNames() {
+    public List<String> getFieldNames()
+    {
         return Collections.unmodifiableList(fieldNames);
     }
 
     /**
      * Get the subtypes of this type.
+     *
      * @return the list of children types
      */
-    public List<TypeDescription> getChildren() {
+    public List<TypeDescription> getChildren()
+    {
         return children == null ? null : Collections.unmodifiableList(children);
     }
 
     /**
      * Assign ids to all of the nodes under this one.
+     *
      * @param startId the lowest id to assign
      * @return the next available id
      */
-    private int assignIds(int startId) {
+    private int assignIds(int startId)
+    {
         id = startId++;
-        if (children != null) {
-            for (TypeDescription child : children) {
+        if (children != null)
+        {
+            for (TypeDescription child : children)
+            {
                 startId = child.assignIds(startId);
             }
         }
@@ -676,16 +815,23 @@ public final class TypeDescription
         return startId;
     }
 
-    public TypeDescription(Category category) {
+    public TypeDescription(Category category)
+    {
         this.category = category;
-        if (category.isPrimitive) {
+        if (category.isPrimitive)
+        {
             children = null;
-        } else {
+        }
+        else
+        {
             children = new ArrayList<>();
         }
-        if (category == Category.STRUCT) {
+        if (category == Category.STRUCT)
+        {
             fieldNames = new ArrayList<>();
-        } else {
+        }
+        else
+        {
             fieldNames = null;
         }
     }
@@ -700,19 +846,25 @@ public final class TypeDescription
     private int precision = DEFAULT_PRECISION;
     private int scale = DEFAULT_SCALE;
 
-    static void printFieldName(StringBuilder buffer, String name) {
-        if (UNQUOTED_NAMES.matcher(name).matches()) {
+    static void printFieldName(StringBuilder buffer, String name)
+    {
+        if (UNQUOTED_NAMES.matcher(name).matches())
+        {
             buffer.append(name);
-        } else {
+        }
+        else
+        {
             buffer.append('`');
             buffer.append(name.replace("`", "``"));
             buffer.append('`');
         }
     }
 
-    public void printToBuffer(StringBuilder buffer) {
+    public void printToBuffer(StringBuilder buffer)
+    {
         buffer.append(category.name);
-        switch (category) {
+        switch (category)
+        {
             case CHAR:
             case VARCHAR:
                 buffer.append('(');
@@ -721,8 +873,10 @@ public final class TypeDescription
                 break;
             case STRUCT:
                 buffer.append('<');
-                for(int i=0; i < children.size(); ++i) {
-                    if (i != 0) {
+                for (int i = 0; i < children.size(); ++i)
+                {
+                    if (i != 0)
+                    {
                         buffer.append(',');
                     }
                     printFieldName(buffer, fieldNames.get(i));
@@ -736,15 +890,18 @@ public final class TypeDescription
         }
     }
 
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buffer = new StringBuilder();
         printToBuffer(buffer);
         return buffer.toString();
     }
 
     private void printJsonToBuffer(String prefix, StringBuilder buffer,
-                                   int indent) {
-        for(int i=0; i < indent; ++i) {
+                                   int indent)
+    {
+        for (int i = 0; i < indent; ++i)
+        {
             buffer.append(' ');
         }
         buffer.append(prefix);
@@ -754,7 +911,8 @@ public final class TypeDescription
         buffer.append(getId());
         buffer.append(", \"max\": ");
         buffer.append(maxId);
-        switch (category) {
+        switch (category)
+        {
             case CHAR:
             case VARCHAR:
                 buffer.append(", \"length\": ");
@@ -762,11 +920,13 @@ public final class TypeDescription
                 break;
             case STRUCT:
                 buffer.append(", \"fields\": [");
-                for(int i=0; i < children.size(); ++i) {
+                for (int i = 0; i < children.size(); ++i)
+                {
                     buffer.append('\n');
                     children.get(i).printJsonToBuffer("\"" + fieldNames.get(i) + "\": ",
-                            buffer, indent + 2);
-                    if (i != children.size() - 1) {
+                                                      buffer, indent + 2);
+                    if (i != children.size() - 1)
+                    {
                         buffer.append(',');
                     }
                 }
@@ -778,7 +938,8 @@ public final class TypeDescription
         buffer.append('}');
     }
 
-    public String toJson() {
+    public String toJson()
+    {
         StringBuilder buffer = new StringBuilder();
         printJsonToBuffer("", buffer, 0);
         return buffer.toString();
@@ -786,22 +947,30 @@ public final class TypeDescription
 
     /**
      * Locate a subtype by its id.
+     *
      * @param goal the column id to look for
      * @return the subtype
      */
-    public TypeDescription findSubtype(int goal) {
+    public TypeDescription findSubtype(int goal)
+    {
         // call getId method to make sure the ids are assigned
         int id = getId();
-        if (goal < id || goal > maxId) {
+        if (goal < id || goal > maxId)
+        {
             throw new IllegalArgumentException("Unknown type id " + id + " in " +
-                    toJson());
+                                                       toJson());
         }
-        if (goal == id) {
+        if (goal == id)
+        {
             return this;
-        } else {
+        }
+        else
+        {
             TypeDescription prev = null;
-            for(TypeDescription next: children) {
-                if (next.id > goal) {
+            for (TypeDescription next : children)
+            {
+                if (next.id > goal)
+                {
                     return prev.findSubtype(goal);
                 }
                 prev = next;

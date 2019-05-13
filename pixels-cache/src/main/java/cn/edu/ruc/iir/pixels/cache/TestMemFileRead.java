@@ -3,51 +3,90 @@ package cn.edu.ruc.iir.pixels.cache;
 import java.util.Iterator;
 import java.util.Random;
 
+/**
+ * <file> <file size> <access size> <parallelism> <round>
+ * java -jar pixels-cache-0.1.0-SNAPSHOT-full.jar /dev/shm/pixels.cache 17179869184 4096 20 100000
+ */
+
 public class TestMemFileRead
 {
     public static void main(String[] args)
     {
         String path = args[0];
-        long size = Long.parseLong(args[1]);
+        long fileSize = Long.parseLong(args[1]);
+        int acSize = Integer.parseInt(args[2]);
+        int parallelism = Integer.parseInt(args[3]);
+        int round = Integer.parseInt(args[4]);
 
-        int[] acSizes = {10, 100, 1024, 10240, 102400, 204800, 409600, 614400, 819200, 1048576, 2097152, 4194304, 6291456,8388608, 10485760};  // 10, 100, 1KB, 10KB, 100KB, 1MB, 10MB
-
-        try {
-            MemoryMappedFile mappedFile = new MemoryMappedFile(path, size);
-            Random random = new Random();
-            long[][] acTimeMatrix = new long[acSizes.length][1000];
-            for (int i = 0; i < acSizes.length; i++)
+        try
+        {
+            MemoryMappedFile mappedFile = new MemoryMappedFile(path, fileSize);
+            Thread[] readers = new Thread[parallelism];
+            long begin = System.nanoTime();
+            for (int i = 0; i < parallelism; i++)
             {
-                acTimeMatrix[i] = new long[1000];
-                int acSize = acSizes[i];
-                byte[] res = new byte[acSize];
-                Iterator<Long> offsetItr = random.longs(0, size - acSize).iterator();
-                for (int k = 0; k < 1000; k++)
-                {
-                    if (!offsetItr.hasNext()) {
-                        offsetItr = random.longs(0, size - acSize).iterator();
-                    }
-                    long offset = offsetItr.next();
-                    long startNano = System.nanoTime();
-                    mappedFile.getBytes(offset, res, 0, acSize);
-                    long endNano = System.nanoTime();
-                    acTimeMatrix[i][k] = endNano - startNano;
-                }
+                Reader reader = new Reader(mappedFile, i, fileSize, acSize, round);
+                Thread readerT = new Thread(reader);
+                readers[i] = readerT;
+                readerT.start();
             }
-            for (int i = 0; i < acSizes.length; i++)
+            for (int i = 0; i < parallelism; i++)
             {
-                int acSize = acSizes[i];
-                long acTimeTotal = 0L;
-                for (int k = 0; k < 1000; k++)
-                {
-                    acTimeTotal += acTimeMatrix[i][k];
-                }
-                double acTimeAvg = acTimeTotal * 1.0d / 1000.0d;
-                System.out.println("Average access time for size " + acSize + " bytes: " + acTimeAvg + "ns");
+                readers[i].join();
             }
+            long end = System.nanoTime();
+            long cost = end - begin;
+            System.out.println("Total op/ms " + (parallelism * round * 1.0d / (cost * 1.0d / 1000000.0d)));
+            System.out
+                    .println("Total MB/ms " + (parallelism * round / 1024.0d * acSize / 1024.0d / (cost / 1000000.0d)));
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
+        }
+    }
+
+    static class Reader
+            implements Runnable
+    {
+        MemoryMappedFile mappedFile;
+        int id;
+        long fileSize;
+        int acSize;
+        int round;
+
+        public Reader(MemoryMappedFile mappedFile, int id, long fileSize, int acSize, int round)
+        {
+            this.mappedFile = mappedFile;
+            this.id = id;
+            this.fileSize = fileSize;
+            this.acSize = acSize;
+            this.round = round;
+        }
+
+        @Override
+        public void run()
+        {
+            Random random = new Random(System.nanoTime());
+            Iterator<Long> offsetItr = random.longs(0, (fileSize / acSize) - 1).iterator();
+            long[] offsets = new long[round];
+            for (int i = 0; i < round; i++)
+            {
+                offsets[i] = offsetItr.next() * acSize;
+            }
+            int count = 0;
+            byte[] result = new byte[acSize];
+            long begin = System.nanoTime();
+            while (count < round)
+            {
+                mappedFile.getBytes(offsets[count], result, 0, acSize);
+                count++;
+            }
+            long end = System.nanoTime();
+            long cost = end - begin;
+            double readSize = round * 1.0d * acSize;
+            System.out.println("Thread " + id + " op/ms " + (round * 1.0d / (cost / 1000000.0d)));
+            System.out.println("Thread " + id + " MB/ms: " + readSize / 1024.0d / 1024.0d / (cost * 1.0d / 1000000.0d));
         }
     }
 }

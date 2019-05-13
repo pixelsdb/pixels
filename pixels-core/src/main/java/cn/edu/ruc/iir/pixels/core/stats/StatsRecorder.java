@@ -16,17 +16,22 @@ public class StatsRecorder
     long numberOfValues = 0L;
     private boolean hasNull = false;
 
-    StatsRecorder() {}
+    StatsRecorder()
+    {
+    }
 
     StatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
-        if (statistic.hasNumberOfValues()) {
+        if (statistic.hasNumberOfValues())
+        {
             numberOfValues = statistic.getNumberOfValues();
         }
-        if (statistic.hasHasNull()) {
+        if (statistic.hasHasNull())
+        {
             hasNull = statistic.getHasNull();
         }
-        else {
+        else
+        {
             hasNull = true;
         }
     }
@@ -114,16 +119,19 @@ public class StatsRecorder
         hasNull = false;
     }
 
-    public long getNumberOfValues() {
+    public long getNumberOfValues()
+    {
         return numberOfValues;
     }
 
-    public boolean hasNull() {
+    public boolean hasNull()
+    {
         return hasNull;
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "numberOfValues: " + numberOfValues + " hasNull: " + hasNull;
     }
 
