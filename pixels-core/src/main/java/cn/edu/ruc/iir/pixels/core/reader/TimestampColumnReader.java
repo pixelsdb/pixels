@@ -25,9 +25,9 @@ public class TimestampColumnReader
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
-    private byte[] isNull;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
+    private byte[] isNull = new byte[8];
 
     TimestampColumnReader(TypeDescription type)
     {
@@ -75,13 +75,13 @@ public class TimestampColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
@@ -110,13 +110,13 @@ public class TimestampColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)

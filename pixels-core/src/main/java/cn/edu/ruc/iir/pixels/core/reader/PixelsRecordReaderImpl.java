@@ -202,7 +202,7 @@ public class PixelsRecordReaderImpl
             resultTypes.add(fileColTypes.get(resultColumn));
         }
         TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
-        this.resultRowBatch = resultSchema.createRowBatch();
+        this.resultRowBatch = resultSchema.createRowBatch(0);
         // forbid selected array
         resultRowBatch.selectedInUse = false;
         resultRowBatch.selected = null;
@@ -401,6 +401,7 @@ public class PixelsRecordReaderImpl
                 else
                 {
                     cacheReadSize += chunkBuffers[bufferIdx].length;
+//                    completedBytes += chunkBuffers[bufferIdx].length;
                 }
             }
             logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
@@ -575,6 +576,7 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(
                                     resultColumns[i]);
+                    // TODO: read chunk buffer lazily
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
@@ -607,8 +609,9 @@ public class PixelsRecordReaderImpl
         {
             if (cv.duplicated)
             {
-                // TODO: why copy duplicated cvs?
-                cv.copyFrom(columnVectors[cv.originVecId]);
+                // copyFrom() is actually a shallow copy
+                // rename copyFrom() to duplicate(), so it is more readable
+                cv.duplicate(columnVectors[cv.originVecId]);
             }
         }
 

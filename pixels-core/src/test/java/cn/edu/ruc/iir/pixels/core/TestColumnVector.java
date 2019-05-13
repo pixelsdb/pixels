@@ -70,10 +70,10 @@ public class TestColumnVector
         }
 
         long begin = System.nanoTime();
-        dst0.copyFrom(src0);
-        dst1.copyFrom(src1);
-        dst2.copyFrom(src2);
-        dst3.copyFrom(src3);
+        dst0.duplicate(src0);
+        dst1.duplicate(src1);
+        dst2.duplicate(src2);
+        dst3.duplicate(src3);
         long end = System.nanoTime();
         System.out.println("Copy cost: " + (end - begin));
 

@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
  */
 public class PixelsCacheKeyUtil
 {
-    public static void getBytes(long blockId, short rowGroupId, short columnId, ByteBuffer keyBuffer)
+    public static void getBytes(ByteBuffer keyBuffer, long blockId, short rowGroupId, short columnId)
     {
         keyBuffer.clear();
         keyBuffer.putLong(blockId);

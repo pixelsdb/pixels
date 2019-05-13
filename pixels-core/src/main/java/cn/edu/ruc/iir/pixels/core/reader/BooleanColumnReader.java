@@ -6,6 +6,8 @@ import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
+import java.nio.ByteBuffer;
+
 /**
  * pixels
  *
@@ -14,9 +16,9 @@ import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 public class BooleanColumnReader
         extends ColumnReader
 {
-    private byte[] bits;
-    private byte[] isNull;
     private byte[] input;
+    private byte[] bits;
+    private byte[] isNull = new byte[8];
     private int bitsIndex = 0;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
@@ -42,8 +44,9 @@ public class BooleanColumnReader
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
+            bits = new byte[input.length * 8];
             // read content
-            bits = BitUtils.bitWiseDeCompact(input);
+            BitUtils.bitWiseDeCompact(bits, input);
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             this.input = input;
@@ -63,13 +66,13 @@ public class BooleanColumnReader
                 bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)

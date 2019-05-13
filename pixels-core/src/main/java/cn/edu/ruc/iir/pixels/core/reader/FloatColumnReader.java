@@ -7,6 +7,8 @@ import cn.edu.ruc.iir.pixels.core.utils.EncodingUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 
+import java.nio.ByteBuffer;
+
 /**
  * pixels
  *
@@ -17,7 +19,7 @@ public class FloatColumnReader
 {
     private final EncodingUtils encodingUtils;
     private byte[] input;
-    private byte[] isNull;
+    private byte[] isNull = new byte[8];
     private int inputIndex = 0;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
@@ -59,13 +61,13 @@ public class FloatColumnReader
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)
