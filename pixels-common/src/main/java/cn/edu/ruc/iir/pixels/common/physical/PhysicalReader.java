@@ -31,5 +31,5 @@ public interface PhysicalReader
 
     void close() throws IOException;
 
-    long getCurrentBlockId() throws FSException, IOException;
+    long getCurrentBlockId() throws IOException, FSException;
 }
