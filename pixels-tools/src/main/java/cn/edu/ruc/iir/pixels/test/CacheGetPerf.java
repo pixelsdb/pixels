@@ -11,6 +11,7 @@ import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import org.apache.hadoop.fs.Path;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -136,9 +137,9 @@ public class CacheGetPerf
             for (int i : idxes)
             {
                 PixelsCacheKey key = cacheKeys[i];
-                byte[] content = cacheReader
-                        .get(key.blockId, key.rowGroupId, key.columnId);
-                readSize += content.length;
+                ByteBuffer content = null;
+                cacheReader.get(content, key.blockId, key.rowGroupId, key.columnId);
+                readSize += content.capacity();
             }
             long readEnd = System.nanoTime();
             System.out.println(

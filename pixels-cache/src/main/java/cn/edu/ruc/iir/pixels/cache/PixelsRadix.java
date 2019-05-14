@@ -235,7 +235,6 @@ public class PixelsRadix
 //                    }
                     if (childNode == null)
                     {
-                        // todo fix exception, though this cannot happen due to the logical constraint
                         return false;
                     }
                     byte[] childNodeEdge = childNode.getEdge();

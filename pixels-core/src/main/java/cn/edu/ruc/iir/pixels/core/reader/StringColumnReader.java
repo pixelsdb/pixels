@@ -24,7 +24,7 @@ public class StringColumnReader
 {
     private int originsOffset;
     private int startsOffset;
-    private ByteBuf inputBuffer = null;
+    private ByteBuf inputBuffer = null; // TODO: change ByteBuf to java.nio.ByteBuffer
     private ByteBuf originsBuf = null;
     private int[] orders = null;
     private int[] starts = null;

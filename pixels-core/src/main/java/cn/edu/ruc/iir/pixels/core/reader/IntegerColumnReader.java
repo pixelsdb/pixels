@@ -55,7 +55,7 @@ public class IntegerColumnReader
                 inputStream.close();
             }
             inputBuffer = input;
-            inputStream = new ByteArrayInputStream(input.array());
+            inputStream = new ByteArrayInputStream(input.array(), input.arrayOffset(), input.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();

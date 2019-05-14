@@ -57,7 +57,7 @@ public class TimestampColumnReader
                 inputStream.close();
             }
             inputBuffer = input;
-            inputStream = new ByteArrayInputStream(input.array());
+            inputStream = new ByteArrayInputStream(input.array(), input.arrayOffset(), input.limit());
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;

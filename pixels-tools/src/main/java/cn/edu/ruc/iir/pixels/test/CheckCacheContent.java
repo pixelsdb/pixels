@@ -14,6 +14,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import org.apache.hadoop.fs.Path;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -57,8 +58,9 @@ public class CheckCacheContent
                 .setIndexFile(indexFile)
                 .build();
         long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
-        byte[] cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
-        System.out.println("Cache content length " + cacheContent.length);
+        ByteBuffer cacheContent = null;
+        cacheReader.get(cacheContent, blockId, (short) rgId, (short) colId);
+        System.out.println("Cache content length " + cacheContent.capacity());
 
         PixelsReader pixelsReader = PixelsReaderImpl
                 .newBuilder()
@@ -78,16 +80,16 @@ public class CheckCacheContent
         physicalReader.readFully(diskContent);
 
         System.out.println("Disk content length " + chunkIndex.getChunkLength());
-        if (cacheContent.length != diskContent.length)
+        if (cacheContent.capacity() != diskContent.length)
         {
             System.out.println("Length not match");
             return;
         }
-        for (int i = 0; i < cacheContent.length; i++)
+        for (int i = 0; i < cacheContent.capacity(); i++)
         {
-            if (cacheContent[i] != diskContent[i])
+            if (cacheContent.get(i) != diskContent[i])
             {
-                System.out.println("byte not match " + cacheContent[i] + ":" + diskContent[i]);
+                System.out.println("byte not match " + cacheContent.get(i) + ":" + diskContent[i]);
             }
         }
     }
