@@ -29,8 +29,7 @@ public class TestPixelsCacheReader
             {
                 for (short j = 0; j < 64; j++)
                 {
-                    ByteBuffer value = null;
-                    cacheReader.get(value, -1, i, j);
+                    ByteBuffer value = cacheReader.get(-1, i, j);
                     if (value != null)
                     {
                         assert value.getInt() == index;
