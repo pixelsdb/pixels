@@ -37,19 +37,19 @@ public class BooleanColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
-            bits = new byte[input.length * 8];
+            bits = new byte[input.limit() * 8];
             // read content
-            BitUtils.bitWiseDeCompact(bits, input);
+            BitUtils.bitWiseDeCompact(bits, input.array());
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            this.input = input;
+            this.input = input.array();
             // re-init
             bitsIndex = 0;
             hasNull = true;

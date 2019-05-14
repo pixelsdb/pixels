@@ -44,7 +44,7 @@ public class TimestampColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
@@ -56,8 +56,8 @@ public class TimestampColumnReader
             {
                 inputStream.close();
             }
-            inputBuffer = ByteBuffer.wrap(input);
-            inputStream = new ByteArrayInputStream(input);
+            inputBuffer = input;
+            inputStream = new ByteArrayInputStream(input.array());
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
