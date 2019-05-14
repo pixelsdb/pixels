@@ -377,10 +377,11 @@ public class PixelsRecordReaderImpl
                 short rgId = chunkId.rowGroupId;
                 short colId = chunkId.columnId;
 //                long getBegin = System.nanoTime();
-                byte[] columnlet = cacheReader.get(blockId, rgId, colId);
+                ByteBuffer columnlet = null;
+                cacheReader.get(columnlet, blockId, rgId, colId);
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
-                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = ByteBuffer.wrap(columnlet);
+                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
@@ -456,7 +457,7 @@ public class PixelsRecordReaderImpl
                 int offset = (int) seq.getOffset();
                 int length = (int) seq.getLength();
                 completedBytes += length;
-                byte[] chunkBlockBuffer = new byte[length];
+                ByteBuffer chunkBlockBuffer = ByteBuffer.allocate(length);
 //                if (enableMetrics)
 //                {
 //                    long seekStart = System.currentTimeMillis();
@@ -479,7 +480,7 @@ public class PixelsRecordReaderImpl
 //                else
 //                {
                 physicalFSReader.seek(offset);
-                physicalFSReader.readFully(chunkBlockBuffer);
+                physicalFSReader.readFully(chunkBlockBuffer.array());
 //                }
                 List<ChunkId> chunkIds = seq.getSortedChunks();
                 int chunkSliceOffset = 0;
@@ -488,10 +489,11 @@ public class PixelsRecordReaderImpl
                     int chunkLength = (int) chunkId.getLength();
                     int rgIdx = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
-                    // TODO: do not copy, we should use a buffer slice wrapper instead of byte array.
-                    byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
-                            chunkSliceOffset, chunkSliceOffset + chunkLength);
-                    chunkBuffers[rgIdx * includedColumns.length + colId] = ByteBuffer.wrap(chunkBytes);
+                    // TODO: test slice(), check position and limit
+                    chunkBlockBuffer.position(chunkSliceOffset);
+                    chunkBlockBuffer.limit(chunkSliceOffset + chunkLength);
+                    ByteBuffer chunkBuffer = chunkBlockBuffer.slice();
+                    chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBuffer;
                     chunkSliceOffset += chunkLength;
                 }
             }
