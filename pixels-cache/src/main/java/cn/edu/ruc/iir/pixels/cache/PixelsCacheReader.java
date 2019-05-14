@@ -80,10 +80,8 @@ public class PixelsCacheReader
      * @param columnId   column id
      * @return columnlet content
      */
-    public byte[] get(long blockId, short rowGroupId, short columnId)
+    public void get(ByteBuffer content, long blockId, short rowGroupId, short columnId)
     {
-        byte[] content = null;
-
         // search index file for columnlet id
         PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
@@ -97,15 +95,13 @@ public class PixelsCacheReader
         long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
-            content = new byte[cacheIdx.length];
+            content = ByteBuffer.allocate(cacheIdx.length);
             // read content
-            cacheFile.getBytes(cacheIdx.offset, content, 0, cacheIdx.length);
+            cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
         }
         long readEnd = System.nanoTime();
         cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
-
-        return content;
     }
 
     public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
