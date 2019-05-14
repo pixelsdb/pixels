@@ -63,7 +63,7 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
-            readContent(input.array(), encoding);
+            readContent(input.limit(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
@@ -160,14 +160,14 @@ public class StringColumnReader
         }
     }
 
-    private void readContent(byte[] input, PixelsProto.ColumnEncoding encoding)
+    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - 3 * Integer.BYTES);
+            inputBuffer.skipBytes(inputLength - 3 * Integer.BYTES);
             originsOffset = inputBuffer.readInt();
             startsOffset = inputBuffer.readInt();
             int ordersOffset = inputBuffer.readInt();
@@ -176,7 +176,7 @@ public class StringColumnReader
             contentBuf = inputBuffer.slice(0, originsOffset);
             originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
-            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, input.length - ordersOffset);
+            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
             int originNum = 0;
             DynamicIntArray startsArray = new DynamicIntArray();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
@@ -200,13 +200,13 @@ public class StringColumnReader
         {
             // read lens field offset
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - Integer.BYTES);
+            inputBuffer.skipBytes(inputLength - Integer.BYTES);
             int lensOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read strings
             contentBuf = inputBuffer.slice(0, lensOffset);
             // read lens field
-            ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - Integer.BYTES - lensOffset);
+            ByteBuf lensBuf = inputBuffer.slice(lensOffset, inputLength - Integer.BYTES - lensOffset);
             lensDecoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
         }
     }
