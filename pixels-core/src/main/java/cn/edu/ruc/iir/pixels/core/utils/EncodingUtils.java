@@ -31,6 +31,7 @@ public class EncodingUtils
         TWENTYEIGHT, THIRTY, THIRTYTWO, FORTY, FORTYEIGHT, FIFTYSIX, SIXTYFOUR;
     }
 
+    // TODO: avoid re-new byte array every time
     public EncodingUtils()
     {
         this.writeBuffer = new byte[BUFFER_SIZE];

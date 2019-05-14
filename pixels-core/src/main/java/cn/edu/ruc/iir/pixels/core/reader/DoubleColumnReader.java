@@ -39,14 +39,14 @@ public class DoubleColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
         {
-            this.input = input;
+            this.input = input.array();
             inputIndex = 0;
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();

@@ -19,6 +19,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -67,7 +68,7 @@ public class PixelsRecordReaderImpl
     private int curRowInRG = 0;          // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private byte[][] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private ByteBuffer[] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
     private long completedBytes = 0L;
@@ -211,6 +212,8 @@ public class PixelsRecordReaderImpl
         checkValid = true;
     }
 
+    // TODO: use ByteBuffer to wrap read byte array.
+    // TODO: try Direct ByteBuffer to ease GC pressure.
     private boolean read()
     {
         if (!checkValid)
@@ -323,7 +326,7 @@ public class PixelsRecordReaderImpl
         }
 
         // read chunk offset and length of each target column chunks
-        this.chunkBuffers = new byte[targetRGNum * includedColumns.length][];
+        this.chunkBuffers = new ByteBuffer[targetRGNum * includedColumns.length];
         List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumns.length);
         // read cached data which are in need
         if (enableCache)
@@ -377,7 +380,7 @@ public class PixelsRecordReaderImpl
                 byte[] columnlet = cacheReader.get(blockId, rgId, colId);
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
-                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = ByteBuffer.wrap(columnlet);
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
@@ -388,7 +391,7 @@ public class PixelsRecordReaderImpl
                 short colId = chunkId.columnId;
                 int rgIdx = rgId - RGStart;
                 int bufferIdx = rgIdx * includedColumns.length + colId;
-                if (chunkBuffers[bufferIdx] == null || chunkBuffers[bufferIdx].length == 0)
+                if (chunkBuffers[bufferIdx] == null || chunkBuffers[bufferIdx].capacity() == 0)
                 {
                     PixelsProto.RowGroupIndex rowGroupIndex =
                             rowGroupFooters[rgIdx].getRowGroupIndexEntry();
@@ -400,7 +403,7 @@ public class PixelsRecordReaderImpl
                 }
                 else
                 {
-                    cacheReadSize += chunkBuffers[bufferIdx].length;
+                    cacheReadSize += chunkBuffers[bufferIdx].capacity();
 //                    completedBytes += chunkBuffers[bufferIdx].length;
                 }
             }
@@ -488,7 +491,7 @@ public class PixelsRecordReaderImpl
                     // TODO: do not copy, we should use a buffer slice wrapper instead of byte array.
                     byte[] chunkBytes = Arrays.copyOfRange(chunkBlockBuffer,
                             chunkSliceOffset, chunkSliceOffset + chunkLength);
-                    chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBytes;
+                    chunkBuffers[rgIdx * includedColumns.length + colId] = ByteBuffer.wrap(chunkBytes);
                     chunkSliceOffset += chunkLength;
                 }
             }

@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * pixels column reader.
@@ -61,7 +62,7 @@ public abstract class ColumnReader
      * @param vector   vector to read into
      * @throws java.io.IOException
      */
-    public abstract void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public abstract void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                               int offset, int size, int pixelStride, final int vectorIndex,
                               ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException;
