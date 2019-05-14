@@ -511,8 +511,7 @@ public class CacheReaderPerfMulti
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                ByteBuffer content = null;
-                cacheReader.get(content, blockId, columnletId.rgId, columnletId.colId);
+                ByteBuffer content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
                 size += content.capacity();
             }
             long readEndNano = System.nanoTime();
