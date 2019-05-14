@@ -46,7 +46,7 @@ public class BooleanColumnReader
         {
             bits = new byte[input.limit() * 8];
             // read content
-            BitUtils.bitWiseDeCompact(bits, input.array());
+            BitUtils.bitWiseDeCompact(bits, input.array(), input.arrayOffset(), input.limit());
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             this.input = input.array();
