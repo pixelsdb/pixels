@@ -58,8 +58,7 @@ public class CheckCacheContent
                 .setIndexFile(indexFile)
                 .build();
         long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
-        ByteBuffer cacheContent = null;
-        cacheReader.get(cacheContent, blockId, (short) rgId, (short) colId);
+        ByteBuffer cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
         System.out.println("Cache content length " + cacheContent.capacity());
 
         PixelsReader pixelsReader = PixelsReaderImpl

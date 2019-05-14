@@ -80,28 +80,30 @@ public class PixelsCacheReader
      * @param columnId   column id
      * @return columnlet content
      */
-    public void get(ByteBuffer content, long blockId, short rowGroupId, short columnId)
+    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
     {
         // search index file for columnlet id
         PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
+        ByteBuffer content = null;
         // search cache key
-        long searchBegin = System.nanoTime();
+//        long searchBegin = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(keyBuffer);
-        long searchEnd = System.nanoTime();
-        cacheLogger.addSearchLatency(searchEnd - searchBegin);
+//        long searchEnd = System.nanoTime();
+//        cacheLogger.addSearchLatency(searchEnd - searchBegin);
 //        logger.debug("[cache search]: " + (searchEnd - searchBegin));
         // if found, read content from cache
-        long readBegin = System.nanoTime();
+//        long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
             content = ByteBuffer.allocate(cacheIdx.length);
             // read content
             cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
         }
-        long readEnd = System.nanoTime();
-        cacheLogger.addReadLatency(readEnd - readBegin);
+//        long readEnd = System.nanoTime();
+//        cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
+        return content;
     }
 
     public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
