@@ -137,8 +137,7 @@ public class CacheGetPerf
             for (int i : idxes)
             {
                 PixelsCacheKey key = cacheKeys[i];
-                ByteBuffer content = null;
-                cacheReader.get(content, key.blockId, key.rowGroupId, key.columnId);
+                ByteBuffer content = cacheReader.get(key.blockId, key.rowGroupId, key.columnId);
                 readSize += content.capacity();
             }
             long readEnd = System.nanoTime();
