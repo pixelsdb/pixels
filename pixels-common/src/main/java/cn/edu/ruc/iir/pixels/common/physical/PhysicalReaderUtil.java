@@ -30,7 +30,6 @@ public class PhysicalReaderUtil
         }
         catch (IOException e)
         {
-            // TODO: deal with this exception
             if (rawReader != null)
             {
                 try

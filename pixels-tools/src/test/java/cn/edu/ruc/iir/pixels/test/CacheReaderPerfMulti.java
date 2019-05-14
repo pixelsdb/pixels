@@ -21,6 +21,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -510,8 +511,9 @@ public class CacheReaderPerfMulti
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
-                size += content.length;
+                ByteBuffer content = null;
+                cacheReader.get(content, blockId, columnletId.rgId, columnletId.colId);
+                size += content.capacity();
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;

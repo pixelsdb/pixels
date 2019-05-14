@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -430,8 +431,9 @@ public class CacheReadStat
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
-                size += content.length;
+                ByteBuffer content = null;
+                cacheReader.get(content, blockId, columnletId.rgId, columnletId.colId);
+                size += content.capacity();
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;

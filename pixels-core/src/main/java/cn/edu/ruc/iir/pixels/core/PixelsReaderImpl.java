@@ -168,7 +168,6 @@ public class PixelsReaderImpl
                 throw new PixelsFileMagicInvalidException(fileMagic);
             }
 
-            // todo check file schema
             builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
 
             // check metrics file

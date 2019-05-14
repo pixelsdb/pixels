@@ -143,7 +143,6 @@ public class PixelsRecordReaderImpl
             checkValid = true;
             return;
         }
-        // TODO optimize the initial size of ArrayList
         List<Integer> optionColsIndices = new ArrayList<>();
         this.includedColumns = new boolean[fileColTypes.size()];
         for (String col : optionIncludedCols)
@@ -212,7 +211,6 @@ public class PixelsRecordReaderImpl
         checkValid = true;
     }
 
-    // TODO: use ByteBuffer to wrap read byte array.
     // TODO: try Direct ByteBuffer to ease GC pressure.
     private boolean read()
     {
@@ -489,7 +487,6 @@ public class PixelsRecordReaderImpl
                     int chunkLength = (int) chunkId.getLength();
                     int rgIdx = chunkId.getRowGroupId();
                     int colId = chunkId.getColumnId();
-                    // TODO: test slice(), check position and limit
                     chunkBlockBuffer.position(chunkSliceOffset);
                     chunkBlockBuffer.limit(chunkSliceOffset + chunkLength);
                     ByteBuffer chunkBuffer = chunkBlockBuffer.slice();
