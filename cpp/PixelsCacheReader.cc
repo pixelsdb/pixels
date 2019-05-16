@@ -1,5 +1,6 @@
 #include <iostream>
-#include "NativePixelsCacheReader.h"
+#include "PixelsCacheReader.h"
+#include "MemoryMappedFile.h"
 using namespace std;
 
 JNIEXPORT jbyteArray JNICALL Java_cn_edu_ruc_iir_pixels_cache_NativePixelsCacheReader_get
