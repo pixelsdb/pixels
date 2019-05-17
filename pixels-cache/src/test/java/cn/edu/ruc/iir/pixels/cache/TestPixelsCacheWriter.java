@@ -27,13 +27,13 @@ public class TestPixelsCacheWriter
             FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
-                                     .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                     .setCacheSize(1024 * 1024 * 64L)
-                                     .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                     .setIndexSize(1024 * 1024 * 64L)
-                                     .setOverwrite(true)
-                                     .setFS(fs)
-                                     .build();
+                            .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+                            .setCacheSize(1024 * 1024 * 64L)
+                            .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+                            .setIndexSize(1024 * 1024 * 64L)
+                            .setOverwrite(true)
+                            .setFS(fs)
+                            .build();
             String path = "/pixels/pixels/test_105/2121211211212.pxl";
             int index = 0;
             for (short i = 0; i < 1000; i++)

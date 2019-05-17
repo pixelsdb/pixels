@@ -28,7 +28,7 @@ public class ReadPerfHistogram
 
     private List<NamedCost> lambdaCosts = new ArrayList<>();
 
-    private static void addCost (Map<Long, List<Double>> costs, BytesMsCost cost)
+    private static void addCost(Map<Long, List<Double>> costs, BytesMsCost cost)
     {
         long length = cost.getBytes() / Interval * Interval;
         if (cost.getBytes() % Interval > Interval / 2)
@@ -47,22 +47,22 @@ public class ReadPerfHistogram
         }
     }
 
-    public void addSeqReadCost (BytesMsCost cost)
+    public void addSeqReadCost(BytesMsCost cost)
     {
         addCost(this.seqReadCosts, cost);
     }
 
-    public void addSeekCost (BytesMsCost cost)
+    public void addSeekCost(BytesMsCost cost)
     {
         addCost(this.seekCosts, cost);
     }
 
-    public void addLambdaCost (NamedCost cost)
+    public void addLambdaCost(NamedCost cost)
     {
         this.lambdaCosts.add(cost);
     }
 
-    public void addMetrics (ReadPerfMetrics metrics)
+    public void addMetrics(ReadPerfMetrics metrics)
     {
         for (BytesMsCost cost : metrics.getSeqRead())
         {
@@ -78,13 +78,13 @@ public class ReadPerfHistogram
         }
     }
 
-    public String toPromTextFormat () throws IOException
+    public String toPromTextFormat() throws IOException
     {
         Gauge seqRead = Gauge.build().help("pixels sequential read cost").name("pixels_seq_read_cost")
                 .labelNames("length").create();
         for (Map.Entry<Long, List<Double>> entry : this.seqReadCosts.entrySet())
         {
-            double sum  = 0;
+            double sum = 0;
             for (double cost : entry.getValue())
             {
                 sum += cost;
@@ -96,7 +96,7 @@ public class ReadPerfHistogram
                 .labelNames("distance").create();
         for (Map.Entry<Long, List<Double>> entry : this.seekCosts.entrySet())
         {
-            double sum  = 0;
+            double sum = 0;
             for (double cost : entry.getValue())
             {
                 sum += cost;

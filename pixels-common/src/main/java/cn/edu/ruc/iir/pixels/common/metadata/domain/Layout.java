@@ -26,9 +26,11 @@ public class Layout extends Base
     private Compact compactObj = null;
     private Splits splitsObj = null;
 
-    public Layout () { }
+    public Layout()
+    {
+    }
 
-    public Layout (MetadataProto.Layout layout)
+    public Layout(MetadataProto.Layout layout)
     {
         this.setId(layout.getId());
         this.version = layout.getVersion();
@@ -185,7 +187,8 @@ public class Layout extends Base
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "Layout{" +
                 "version=" + version +
                 ", createAt=" + createAt +

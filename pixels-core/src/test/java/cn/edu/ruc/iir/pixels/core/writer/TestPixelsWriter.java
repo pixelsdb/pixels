@@ -55,17 +55,17 @@ public class TestPixelsWriter
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
-                                    .setSchema(schema)
-                                    .setPixelStride(TestParams.pixelStride)
-                                    .setRowGroupSize(TestParams.rowGroupSize)
-                                    .setFS(fs)
-                                    .setFilePath(new Path(filePath))
-                                    .setBlockSize(TestParams.blockSize)
-                                    .setReplication(TestParams.blockReplication)
-                                    .setBlockPadding(TestParams.blockPadding)
-                                    .setEncoding(TestParams.encoding)
-                                    .setCompressionBlockSize(TestParams.compressionBlockSize)
-                                    .build();
+                            .setSchema(schema)
+                            .setPixelStride(TestParams.pixelStride)
+                            .setRowGroupSize(TestParams.rowGroupSize)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(TestParams.blockSize)
+                            .setReplication(TestParams.blockReplication)
+                            .setBlockPadding(TestParams.blockPadding)
+                            .setEncoding(TestParams.encoding)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
+                            .build();
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
@@ -145,17 +145,17 @@ public class TestPixelsWriter
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
-                                    .setSchema(schema)
-                                    .setPixelStride(TestParams.pixelStride)
-                                    .setRowGroupSize(TestParams.rowGroupSize)
-                                    .setFS(fs)
-                                    .setFilePath(new Path(filePath))
-                                    .setBlockSize(TestParams.blockSize)
-                                    .setReplication(TestParams.blockReplication)
-                                    .setBlockPadding(TestParams.blockPadding)
-                                    .setEncoding(TestParams.encoding)
-                                    .setCompressionBlockSize(TestParams.compressionBlockSize)
-                                    .build();
+                            .setSchema(schema)
+                            .setPixelStride(TestParams.pixelStride)
+                            .setRowGroupSize(TestParams.rowGroupSize)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(TestParams.blockSize)
+                            .setReplication(TestParams.blockReplication)
+                            .setBlockPadding(TestParams.blockPadding)
+                            .setEncoding(TestParams.encoding)
+                            .setCompressionBlockSize(TestParams.compressionBlockSize)
+                            .build();
 
             long curT = System.currentTimeMillis();
             Timestamp timestamp = new Timestamp(curT);
@@ -213,9 +213,9 @@ public class TestPixelsWriter
             FileSystem fs = FileSystem.get(URI.create(TestParams.filePath), conf);
             Path path = new Path(TestParams.filePath);
             pixelsReader = PixelsReaderImpl.newBuilder()
-                                           .setFS(fs)
-                                           .setPath(path)
-                                           .build();
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             rowBatch = recordReader.readBatch(5000);
             LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
@@ -244,13 +244,13 @@ public class TestPixelsWriter
             FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
-                                     .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
-                                     .setCacheSize(1024 * 1024 * 1024L)
-                                     .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
-                                     .setIndexSize(1024 * 1024 * 1024L)
-                                     .setOverwrite(true)
-                                     .setFS(fs)
-                                     .build();
+                            .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
+                            .setCacheSize(1024 * 1024 * 1024L)
+                            .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
+                            .setIndexSize(1024 * 1024 * 1024L)
+                            .setOverwrite(true)
+                            .setFS(fs)
+                            .build();
             String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_1_compact";
             long cacheLength = 0L;
             FileStatus[] fileStatuses = fs.listStatus(new Path(directory));

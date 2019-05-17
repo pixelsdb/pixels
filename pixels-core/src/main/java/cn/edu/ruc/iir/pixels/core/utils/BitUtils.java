@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.utils;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -75,10 +76,8 @@ public class BitUtils
      * @param input input byte array
      * @return result bits
      */
-    public static byte[] bitWiseDeCompact(byte[] input)
+    public static void bitWiseDeCompact(byte[] bits, byte[] input)
     {
-        byte[] result = new byte[input.length * 8];
-
         int bitsToRead = 1;
         int bitsLeft = 8;
         int current;
@@ -91,12 +90,11 @@ public class BitUtils
             {
                 bitsLeft -= bitsToRead;
                 current = mask & (b >> bitsLeft);
-                result[index] = (byte) current;
+                bits[index] = (byte) current;
                 index++;
             }
             bitsLeft = 8;
         }
-        return result;
     }
 
     /**
@@ -105,12 +103,10 @@ public class BitUtils
      * @param input  input byte array
      * @param offset starting offset of the input
      * @param length byte length of the input
-     * @return result bits
+     * @return isNull
      */
-    public static byte[] bitWiseDeCompact(byte[] input, int offset, int length)
+    public static void bitWiseDeCompact(byte[] isNull, byte[] input, int offset, int length)
     {
-        byte[] result = new byte[length * 8];
-
         int bitsToRead = 1;
         int bitsLeft = 8;
         int current;
@@ -123,11 +119,9 @@ public class BitUtils
             {
                 bitsLeft -= bitsToRead;
                 current = mask & (input[i] >> bitsLeft);
-                result[index] = (byte) current;
-                index++;
+                isNull[index++] = (byte) current;
             }
             bitsLeft = 8;
         }
-        return result;
     }
 }

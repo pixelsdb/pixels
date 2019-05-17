@@ -65,8 +65,8 @@ public final class DynamicIntArray
         if (index >= length)
         {
             throw new IndexOutOfBoundsException("Index " + index +
-                                                        " is outside of 0.." +
-                                                        (length - 1));
+                    " is outside of 0.." +
+                    (length - 1));
         }
         int i = index / chunkSize;
         int j = index % chunkSize;

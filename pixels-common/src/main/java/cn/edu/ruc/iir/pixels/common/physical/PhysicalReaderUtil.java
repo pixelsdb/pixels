@@ -14,12 +14,14 @@ import java.io.IOException;
 public class PhysicalReaderUtil
 {
     private PhysicalReaderUtil()
-    {}
+    {
+    }
 
     public static PhysicalFSReader newPhysicalFSReader(FileSystem fs, Path path)
     {
         FSDataInputStream rawReader = null;
-        try {
+        try
+        {
             rawReader = fs.open(path);
             if (rawReader != null)
             {
@@ -28,13 +30,13 @@ public class PhysicalReaderUtil
         }
         catch (IOException e)
         {
-            // TODO: deal with this exception
             if (rawReader != null)
             {
                 try
                 {
                     rawReader.close();
-                } catch (IOException e1)
+                }
+                catch (IOException e1)
                 {
                     e1.printStackTrace();
                 }

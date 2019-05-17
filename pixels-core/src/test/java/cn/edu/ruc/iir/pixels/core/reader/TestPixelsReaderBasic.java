@@ -51,9 +51,9 @@ public class TestPixelsReaderBasic
         {
             FileSystem fs = FileSystem.get(URI.create(fileName), conf);
             reader = PixelsReaderImpl.newBuilder()
-                                     .setFS(fs)
-                                     .setPath(path)
-                                     .build();
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
             List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getFooter().getRowGroupInfosList();
             System.out.println(reader.getRowGroupStats().size());
         }
@@ -248,34 +248,34 @@ public class TestPixelsReaderBasic
                     if (elementSize != acv.vector[i])
                     {
                         System.out.println("[a] size: " + elementSize
-                                                   + ", expected: " + elementSize + ", actual: " + acv.vector[i]);
+                                + ", expected: " + elementSize + ", actual: " + acv.vector[i]);
                     }
                     if (Float.compare(elementSize * 3.1415f, (float) bcv.vector[i]) != 0)
                     {
                         System.out.println("[b] size: " + elementSize
-                                                   + ", expected: " + elementSize * 3.1415f + ", actual: " + (float) bcv.vector[i]);
+                                + ", expected: " + elementSize * 3.1415f + ", actual: " + (float) bcv.vector[i]);
                     }
                     if (Math.abs(elementSize * 3.14159d - ccv.vector[i]) > 0.000001)
                     {
                         System.out.println("[c] size: " + elementSize
-                                                   + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
+                                + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
                     }
                     if (dcv.time[i] != time)
                     {
                         System.out.println("[d] size: " + elementSize
-                                                   + ", expected: " + time + ", actual: " + dcv.time[i]);
+                                + ", expected: " + time + ", actual: " + dcv.time[i]);
                     }
                     int expectedBool = elementSize > 25 ? 1 : 0;
                     if (expectedBool != ecv.vector[i])
                     {
                         System.out.println("[e] size: " + elementSize
-                                                   + ", expected: " + expectedBool + ", actual: " + ecv.vector[i]);
+                                + ", expected: " + expectedBool + ", actual: " + ecv.vector[i]);
                     }
                     String actualStr = new String(zcv.vector[i], zcv.start[i], zcv.lens[i]);
                     if (!String.valueOf(elementSize).equals(actualStr))
                     {
                         System.out.println("[z] size: " + elementSize
-                                                   + ", expected: " + String
+                                + ", expected: " + String
                                 .valueOf(elementSize) + ", actual: " + actualStr);
                     }
                 }
@@ -287,7 +287,7 @@ public class TestPixelsReaderBasic
                     assertEquals(time, dcv.time[i]);
                     assertEquals((elementSize > 25 ? 1 : 0), ecv.vector[i]);
                     assertEquals(String.valueOf(elementSize),
-                                 new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                            new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
                 }
             }
             elementSize++;
@@ -310,7 +310,7 @@ public class TestPixelsReaderBasic
                 if (elementSize != acv.vector[i])
                 {
                     System.out.println("[a] size: " + elementSize
-                                               + ", expected: " + elementSize + ", actual: " + acv.vector[i]);
+                            + ", expected: " + elementSize + ", actual: " + acv.vector[i]);
                 }
                 if (acv.isNull[i])
                 {
@@ -319,7 +319,7 @@ public class TestPixelsReaderBasic
                 if (Float.compare(elementSize * 3.1415f, (float) bcv.vector[i]) != 0)
                 {
                     System.out.println("[b] size: " + elementSize
-                                               + ", expected: " + elementSize * 3.1415f + ", actual: " + (float) bcv.vector[i]);
+                            + ", expected: " + elementSize * 3.1415f + ", actual: " + (float) bcv.vector[i]);
                 }
                 if (bcv.isNull[i])
                 {
@@ -328,7 +328,7 @@ public class TestPixelsReaderBasic
                 if (Math.abs(elementSize * 3.14159d - ccv.vector[i]) > 0.000001)
                 {
                     System.out.println("[c] size: " + elementSize
-                                               + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
+                            + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
                 }
                 if (ccv.isNull[i])
                 {
@@ -337,7 +337,7 @@ public class TestPixelsReaderBasic
                 if (dcv.time[i] != time)
                 {
                     System.out.println("[d] size: " + elementSize
-                                               + ", expected: " + time + ", actual: " + dcv.time[i]);
+                            + ", expected: " + time + ", actual: " + dcv.time[i]);
                 }
                 if (dcv.isNull[i])
                 {
@@ -347,7 +347,7 @@ public class TestPixelsReaderBasic
                 if (expectedBool != ecv.vector[i])
                 {
                     System.out.println("[e] size: " + elementSize
-                                               + ", expected: " + expectedBool + ", actual: " + ecv.vector[i]);
+                            + ", expected: " + expectedBool + ", actual: " + ecv.vector[i]);
                 }
                 if (ecv.isNull[i])
                 {
@@ -357,7 +357,7 @@ public class TestPixelsReaderBasic
                 if (!String.valueOf(elementSize).equals(actualStr))
                 {
                     System.out.println("[z] size: " + elementSize
-                                               + ", expected: " + String
+                            + ", expected: " + String
                             .valueOf(elementSize) + ", actual: " + actualStr);
                 }
                 if (zcv.isNull[i])
@@ -379,7 +379,7 @@ public class TestPixelsReaderBasic
                 assertEquals((elementSize > 25000 ? 1 : 0), ecv.vector[i]);
                 assertFalse(zcv.isNull[i]);
                 assertEquals(String.valueOf(elementSize),
-                             new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
+                        new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
             }
             elementSize++;
         }
@@ -398,9 +398,9 @@ public class TestPixelsReaderBasic
         {
             FileSystem fs = FileSystem.get(URI.create(filePath), conf);
             pixelsReader = PixelsReaderImpl.newBuilder()
-                                           .setFS(fs)
-                                           .setPath(path)
-                                           .build();
+                    .setFS(fs)
+                    .setPath(path)
+                    .build();
         }
         catch (IOException e)
         {

@@ -30,23 +30,23 @@ public class HttpUtil
      */
     public static String GetContentByPost(String baseUrl, Map<String, String> headers, Map<String, String> parameters) throws IOException
     {
-        try(CloseableHttpClient httpClient = HttpClients.createDefault())
+        try (CloseableHttpClient httpClient = HttpClients.createDefault())
         {
             HttpPost httpPost = new HttpPost(baseUrl);
 
-            for(Map.Entry<String, String> header : headers.entrySet())
+            for (Map.Entry<String, String> header : headers.entrySet())
             {
                 httpPost.setHeader(header.getKey(), header.getValue());
             }
 
             List<NameValuePair> nvps = new ArrayList<NameValuePair>();
-            for(Map.Entry<String, String> parameter : parameters.entrySet())
+            for (Map.Entry<String, String> parameter : parameters.entrySet())
             {
                 nvps.add(new BasicNameValuePair(parameter.getKey(), parameter.getValue()));
             }
 
             httpPost.setEntity(new UrlEncodedFormEntity(nvps, Consts.UTF_8));
-            try(CloseableHttpResponse response = httpClient.execute(httpPost))
+            try (CloseableHttpResponse response = httpClient.execute(httpPost))
             {
                 HttpEntity entity = response.getEntity();
                 return EntityUtils.toString(entity);
@@ -56,16 +56,17 @@ public class HttpUtil
 
     /**
      * get the content from url by get method.
+     *
      * @param url
      * @return
      * @throws IOException
      */
-    public static String GetContentByGet (String url) throws IOException
+    public static String GetContentByGet(String url) throws IOException
     {
-        try(CloseableHttpClient httpClient = HttpClients.createDefault())
+        try (CloseableHttpClient httpClient = HttpClients.createDefault())
         {
             HttpGet httpGet = new HttpGet(url);
-            try(CloseableHttpResponse response = httpClient.execute(httpGet))
+            try (CloseableHttpResponse response = httpClient.execute(httpGet))
             {
                 HttpEntity entity = response.getEntity();
                 return EntityUtils.toString(entity);
