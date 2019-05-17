@@ -245,11 +245,11 @@ public abstract class ColumnVector
                                     ColumnVector inputVector);
 
     /**
-     * Copy from input vector.
+     * Shallow copy from input vector.
      * This is used for duplicated reference column vector.
-     * This method does not guarantee deep clone of vector content.
+     * This method does not provide deep cloning of vector content.
      */
-    public abstract void copyFrom(ColumnVector inputVector);
+    public abstract void duplicate(ColumnVector inputVector);
 
     /**
      * Initialize the column vector. This method can be overridden by specific column vector types.

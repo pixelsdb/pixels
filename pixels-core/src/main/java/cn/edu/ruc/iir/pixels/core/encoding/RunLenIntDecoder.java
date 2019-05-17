@@ -72,7 +72,6 @@ public class RunLenIntDecoder
         int firstByte = inputStream.read();
         if (firstByte < 0)
         {
-            // todo deal with error
             LOGGER.error("error first byte is negative");
             used = numLiterals = 0;
             return;

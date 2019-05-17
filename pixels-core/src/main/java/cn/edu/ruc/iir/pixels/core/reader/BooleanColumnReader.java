@@ -6,6 +6,8 @@ import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
+import java.nio.ByteBuffer;
+
 /**
  * pixels
  *
@@ -14,9 +16,9 @@ import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 public class BooleanColumnReader
         extends ColumnReader
 {
-    private byte[] bits;
-    private byte[] isNull;
     private byte[] input;
+    private byte[] bits;
+    private byte[] isNull = new byte[8];
     private int bitsIndex = 0;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
@@ -35,18 +37,19 @@ public class BooleanColumnReader
      * @param vector   vector to read into
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         LongColumnVector columnVector = (LongColumnVector) vector;
         if (offset == 0)
         {
+            bits = new byte[input.limit() * 8];
             // read content
-            bits = BitUtils.bitWiseDeCompact(input);
+            BitUtils.bitWiseDeCompact(bits, input.array(), input.arrayOffset(), input.limit());
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            this.input = input;
+            this.input = input.array();
             // re-init
             bitsIndex = 0;
             hasNull = true;
@@ -63,13 +66,13 @@ public class BooleanColumnReader
                 bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                isNull = BitUtils.bitWiseDeCompact(this.input, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)

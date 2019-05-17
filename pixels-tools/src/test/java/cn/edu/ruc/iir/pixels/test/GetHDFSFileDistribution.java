@@ -28,7 +28,8 @@ public class GetHDFSFileDistribution
         Configuration configuration = new Configuration();
         configuration.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
         configuration.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        try {
+        try
+        {
             FileSystem fs = FileSystem.get(URI.create(configFactory.getProperty("pixels.warehouse.path")), configuration);
             FileStatus[] fileStatuses = fs.listStatus(new Path(dir));
             Map<String, Integer> hostBlockMap = new HashMap<>();
@@ -38,11 +39,14 @@ public class GetHDFSFileDistribution
                 for (BlockLocation blockLocation : blockLocations)
                 {
                     String[] hosts = blockLocation.getHosts();
-                    for (String host : hosts) {
-                        if (!hostBlockMap.containsKey(host)) {
+                    for (String host : hosts)
+                    {
+                        if (!hostBlockMap.containsKey(host))
+                        {
                             hostBlockMap.put(host, 1);
                         }
-                        else {
+                        else
+                        {
                             int originV = hostBlockMap.get(host);
                             hostBlockMap.put(host, originV + 1);
                         }
@@ -54,7 +58,8 @@ public class GetHDFSFileDistribution
                 System.out.println("" + host + ":" + hostBlockMap.get(host));
             }
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }

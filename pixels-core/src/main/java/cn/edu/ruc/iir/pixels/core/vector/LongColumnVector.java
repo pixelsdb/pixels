@@ -190,13 +190,11 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
-    public void copyFrom(ColumnVector inputVector)
+    public void duplicate(ColumnVector inputVector)
     {
         if (inputVector instanceof LongColumnVector)
         {
             LongColumnVector srcVector = (LongColumnVector) inputVector;
-//            System.arraycopy(srcVector.vector, 0, this.vector, 0, vector.length);
-//            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
             this.vector = srcVector.vector;
             this.isNull = srcVector.isNull;
             this.writeIndex = srcVector.writeIndex;

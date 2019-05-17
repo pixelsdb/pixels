@@ -21,6 +21,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -28,8 +29,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * pixels
- *
+ * <p>
  * java -jar pixels-test-0.1.0-SNAPSHOT-full.jar /home/iir/sbin/drop_caches.sh /home/iir/opt/pixels/logs/cache_perf_multi.csv /home/iir/opt/pixels/logs/cache_workload.txt
+ *
  * @author tao
  */
 public class CacheReaderPerfMulti
@@ -72,7 +74,8 @@ public class CacheReaderPerfMulti
         }
         System.out.println("Hostname: " + hostName);
 
-        try {
+        try
+        {
             long mapFileStartNano = System.nanoTime();
             cacheFile = new MemoryMappedFile(config.getProperty("cache.location"), Long.parseLong(config.getProperty("cache.size")));
             long mapFileEndNano = System.nanoTime();
@@ -286,20 +289,24 @@ public class CacheReaderPerfMulti
 
             writer.close();
         }
-        catch (Exception e) {
+        catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
 
-    private static long writeMetric(BlockingQueue<StatisticMetric> metricQueue, BufferedWriter writer, long id, String type) throws InterruptedException, IOException {
-        while(true)
+    private static long writeMetric(BlockingQueue<StatisticMetric> metricQueue, BufferedWriter writer, long id, String type) throws InterruptedException, IOException
+    {
+        while (true)
         {
             StatisticMetric metric = metricQueue.poll(2, TimeUnit.SECONDS);
-            if(metric != null){
+            if (metric != null)
+            {
                 writer.write("" + (id++) + "," + type + "," + metric.id + "," + metric.cost + "," + metric.size);
                 writer.newLine();
             }
-            else{
+            else
+            {
                 System.out.println(type + " is done");
                 break;
             }
@@ -339,7 +346,7 @@ public class CacheReaderPerfMulti
             {
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooters.get(columnletId.rgId).getRowGroupIndexEntry()
-                                       .getColumnChunkIndexEntries(columnletId.colId);
+                                .getColumnChunkIndexEntries(columnletId.colId);
                 chunkIndices.add(chunkIndex);
             }
             chunkIndices.sort(Comparator.comparingLong(PixelsProto.ColumnChunkIndex::getChunkOffset));
@@ -401,16 +408,21 @@ public class CacheReaderPerfMulti
 
         // multiple thread to read cache
         CacheReader[] readers = new CacheReader[files.size()];
-        for (int i = 0; i < files.size(); i++) {
+        for (int i = 0; i < files.size(); i++)
+        {
             readers[i] = new CacheReader(cacheReader, columnlets, files.get(i),
                     fsFactory.listLocatedBlocks(files.get(i)).get(0).getBlock().getBlockId(), metricQueue);
             readers[i].start();
 
         }
-        for (int i = 0; i < files.size(); i++) {
-            try {
+        for (int i = 0; i < files.size(); i++)
+        {
+            try
+            {
                 readers[i].join();
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }
@@ -464,14 +476,16 @@ public class CacheReaderPerfMulti
     }
 
 
-    class CacheReader extends Thread {
+    class CacheReader extends Thread
+    {
         PixelsCacheReader cacheReader;
         String[] columnlets;
         Path path;
         long blockId;
         BlockingQueue<StatisticMetric> metricQueue;
 
-        public CacheReader( PixelsCacheReader cacheReader, String[] columnlets, Path path, long blockId, BlockingQueue<StatisticMetric> metricQueue) {
+        public CacheReader(PixelsCacheReader cacheReader, String[] columnlets, Path path, long blockId, BlockingQueue<StatisticMetric> metricQueue)
+        {
             this.cacheReader = cacheReader;
             this.columnlets = columnlets;
             this.path = path;
@@ -480,7 +494,8 @@ public class CacheReaderPerfMulti
         }
 
         @Override
-        public void run() {
+        public void run()
+        {
             ColumnletId[] columnletIds = new ColumnletId[columnlets.length];
             for (int i = 0; i < columnlets.length; i++)
             {
@@ -496,20 +511,23 @@ public class CacheReaderPerfMulti
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
-                size += content.length;
+                ByteBuffer content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
+                size += content.capacity();
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;
             StatisticMetric metric = new StatisticMetric(path.getName(), cost, size);
 
             // write metrics
-            try {
-                if(!metricQueue.offer(metric, 2, TimeUnit.SECONDS))
+            try
+            {
+                if (!metricQueue.offer(metric, 2, TimeUnit.SECONDS))
                 {
                     System.err.println("Error adding metric " + path.toString());
                 }
-            } catch (InterruptedException e) {
+            }
+            catch (InterruptedException e)
+            {
                 e.printStackTrace();
             }
         }

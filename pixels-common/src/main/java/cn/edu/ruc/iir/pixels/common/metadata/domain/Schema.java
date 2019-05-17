@@ -11,9 +11,11 @@ public class Schema extends Base
     private String desc;
     private Set<Long> tableIds = new HashSet<>();
 
-    public Schema () { }
+    public Schema()
+    {
+    }
 
-    public Schema (MetadataProto.Schema schema)
+    public Schema(MetadataProto.Schema schema)
     {
         this.name = schema.getName();
         this.desc = schema.getDesc();
@@ -50,13 +52,14 @@ public class Schema extends Base
         this.tableIds = tableIds;
     }
 
-    public void addTableId (long tableId)
+    public void addTableId(long tableId)
     {
         this.tableIds.add(tableId);
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "Schema{" +
                 "name='" + name + '\'' +
                 ", desc='" + desc + '\'' +

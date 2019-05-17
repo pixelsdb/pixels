@@ -18,6 +18,7 @@ public class CacheLocationDistribution
 
     /**
      * currently, cache location is allocated by the simple hash function.
+     *
      * @param locations
      * @param size
      */

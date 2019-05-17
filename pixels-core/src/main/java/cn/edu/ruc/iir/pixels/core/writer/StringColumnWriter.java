@@ -110,7 +110,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 lensArray.add(vLens[curPartOffset + i]);
                 pixelStatRecorder
                         .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
-                                      1);
+                                1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -133,7 +133,7 @@ public class StringColumnWriter extends BaseColumnWriter
                         .add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 pixelStatRecorder
                         .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
-                                      1);
+                                1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
@@ -182,10 +182,10 @@ public class StringColumnWriter extends BaseColumnWriter
         if (currentUseDictionaryEncoding)
         {
             return PixelsProto.ColumnEncoding.newBuilder()
-                                             .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
+                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override

@@ -49,7 +49,8 @@ public class FileUtil
         {
             return org.apache.commons.io.FileUtils.
                     readFileToString(new File(fileName));
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             e.printStackTrace();
             return null;
@@ -70,7 +71,8 @@ public class FileUtil
         {
             printWriter.print(content);
             printWriter.flush();
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             log.error("error when writing file: " + fileName, e);
         }
@@ -87,7 +89,8 @@ public class FileUtil
         try
         {
             org.apache.commons.io.FileUtils.deleteDirectory(new File(dirName));
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             log.error("error when deleting dir: " + dirName, e);
         }

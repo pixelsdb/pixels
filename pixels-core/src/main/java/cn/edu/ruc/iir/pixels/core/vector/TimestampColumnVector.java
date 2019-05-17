@@ -265,14 +265,11 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
-    public void copyFrom(ColumnVector inputVector)
+    public void duplicate(ColumnVector inputVector)
     {
         if (inputVector instanceof TimestampColumnVector)
         {
             TimestampColumnVector srcVector = (TimestampColumnVector) inputVector;
-//            System.arraycopy(srcVector.time, 0, this.time, 0, time.length);
-//            System.arraycopy(srcVector.nanos, 0, this.nanos, 0, nanos.length);
-//            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
             this.time = srcVector.time;
             this.nanos = srcVector.nanos;
             this.isNull = srcVector.isNull;
