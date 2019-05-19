@@ -75,14 +75,14 @@ public class TestPixelsCompactor
                     ".compact.pxl";
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
-                                   .setSourcePaths(sourcePaths)
-                                   .setCompactLayout(compactLayout)
-                                   .setFS(fs)
-                                   .setFilePath(new Path(filePath))
-                                   .setBlockSize(2L * 1024 * 1024 * 1024)
-                                   .setReplication((short) 2)
-                                   .setBlockPadding(false)
-                                   .build();
+                            .setSourcePaths(sourcePaths)
+                            .setCompactLayout(compactLayout)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(2L * 1024 * 1024 * 1024)
+                            .setReplication((short) 2)
+                            .setBlockPadding(false)
+                            .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
 
@@ -139,14 +139,14 @@ public class TestPixelsCompactor
                     ".compact.pxl";
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
-                                   .setSourcePaths(sourcePaths)
-                                   .setCompactLayout(compactLayout)
-                                   .setFS(fs)
-                                   .setFilePath(new Path(filePath))
-                                   .setBlockSize(2L * 1024 * 1024 * 1024)
-                                   .setReplication((short) 2)
-                                   .setBlockPadding(false)
-                                   .build();
+                            .setSourcePaths(sourcePaths)
+                            .setCompactLayout(compactLayout)
+                            .setFS(fs)
+                            .setFilePath(new Path(filePath))
+                            .setBlockSize(2L * 1024 * 1024 * 1024)
+                            .setReplication((short) 2)
+                            .setBlockPadding(false)
+                            .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
 
@@ -166,9 +166,9 @@ public class TestPixelsCompactor
         Configuration conf = new Configuration();
         FileSystem fs = FileSystem.get(URI.create(filePath), conf);
         PixelsReader reader = PixelsReaderImpl.newBuilder()
-                                              .setFS(fs)
-                                              .setPath(path)
-                                              .build();
+                .setFS(fs)
+                .setPath(path)
+                .build();
 
         PixelsReaderOption option = new PixelsReaderOption();
         String[] cols = {"Domain", "SamplePercent"};

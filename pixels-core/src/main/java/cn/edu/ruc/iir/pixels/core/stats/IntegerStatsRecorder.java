@@ -189,7 +189,7 @@ public class IntegerStatsRecorder
             buf.append(sum);
         }
         buf.append(" numberOfValues: ")
-           .append(numberOfValues);
+                .append(numberOfValues);
         return buf.toString();
     }
 

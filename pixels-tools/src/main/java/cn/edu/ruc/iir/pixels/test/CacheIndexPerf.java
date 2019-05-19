@@ -46,7 +46,7 @@ public class CacheIndexPerf
             pixelsCacheKeys = new PixelsCacheKey[readCount];
 
             MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                                              Long.parseLong(config.getProperty("index.size")));
+                    Long.parseLong(config.getProperty("index.size")));
 //            MemoryMappedFile indexFile = new MemoryMappedFile("/home/guod/Desktop/pixels.index", 1024*1024*1024);
 
             int idx = 0;
@@ -56,8 +56,8 @@ public class CacheIndexPerf
                 {
                     String[] columnletIdSplits = cachedColumnlets.get(i).split(":");
                     PixelsCacheKey cacheKey = new PixelsCacheKey(-1,
-                                                                 Short.parseShort(columnletIdSplits[0]),
-                                                                 Short.parseShort(columnletIdSplits[1]));
+                            Short.parseShort(columnletIdSplits[0]),
+                            Short.parseShort(columnletIdSplits[1]));
                     pixelsCacheKeys[idx++] = cacheKey;
                 }
             }
@@ -149,9 +149,9 @@ public class CacheIndexPerf
         public void run()
         {
             PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
-                                                             .setCacheFile(null)
-                                                             .setIndexFile(indexFile)
-                                                             .build();
+                    .setCacheFile(null)
+                    .setIndexFile(indexFile)
+                    .build();
             int totalAcNum = 0;
             int totalLevel = 0;
             long searchStart = System.nanoTime();
@@ -159,13 +159,13 @@ public class CacheIndexPerf
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
                 PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
-                                                        cacheKey.rowGroupId,
-                                                        cacheKey.columnId);
+                        cacheKey.rowGroupId,
+                        cacheKey.columnId);
                 if (idx == null)
                 {
                     System.out.println("[error] cannot find " + cacheKey.blockId
-                                               + "-" + cacheKey.rowGroupId
-                                               + "-" + cacheKey.columnId);
+                            + "-" + cacheKey.rowGroupId
+                            + "-" + cacheKey.columnId);
                 }
                 else
                 {

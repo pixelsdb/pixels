@@ -12,7 +12,7 @@ import java.util.List;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-//    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+    //    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
     private static CacheLogger cacheLogger = new CacheLogger();
 
     private final MemoryMappedFile cacheFile;
@@ -22,7 +22,8 @@ public class PixelsCacheReader
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
-    static {
+    static
+    {
         new Thread(cacheLogger).start();
     }
 
@@ -79,32 +80,29 @@ public class PixelsCacheReader
      * @param columnId   column id
      * @return columnlet content
      */
-    public byte[] get(long blockId, short rowGroupId, short columnId)
+    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
     {
-        byte[] content = null;
-
         // search index file for columnlet id
-        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
+        ByteBuffer content = null;
         // search cache key
-        long searchBegin = System.nanoTime();
+//        long searchBegin = System.nanoTime();
         PixelsCacheIdx cacheIdx = search(keyBuffer);
-        long searchEnd = System.nanoTime();
-        cacheLogger.addSearchLatency(searchEnd - searchBegin);
+//        long searchEnd = System.nanoTime();
+//        cacheLogger.addSearchLatency(searchEnd - searchBegin);
 //        logger.debug("[cache search]: " + (searchEnd - searchBegin));
         // if found, read content from cache
-        long readBegin = System.nanoTime();
+//        long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
-            content = new byte[cacheIdx.length];
+            content = ByteBuffer.allocate(cacheIdx.length);
             // read content
-            cacheFile.getBytes(cacheIdx.offset, content, 0, cacheIdx.length);
+            cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
         }
-        long readEnd = System.nanoTime();
-        cacheLogger.addReadLatency(readEnd - readBegin);
+//        long readEnd = System.nanoTime();
+//        cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
-
         return content;
     }
 
@@ -119,8 +117,7 @@ public class PixelsCacheReader
      */
     public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
-        PixelsCacheKey cacheKey = new PixelsCacheKey(blockId, rowGroupId, columnId);
-        cacheKey.getBytes(keyBuffer);
+        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         return search(keyBuffer);
     }
@@ -184,7 +181,7 @@ public class PixelsCacheReader
             currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
             byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
             indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
-                               currentNodeEdge, 0, currentNodeEdgeSize);
+                    currentNodeEdge, 0, currentNodeEdgeSize);
             dramAccessCounter++;
             for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
@@ -204,7 +201,7 @@ public class PixelsCacheReader
             {
                 byte[] idx = new byte[12];
                 indexFile.getBytes(currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
-                                   idx, 0, 12);
+                        idx, 0, 12);
                 dramAccessCounter++;
                 PixelsCacheIdx cacheIdx = new PixelsCacheIdx(idx);
                 cacheIdx.dramAccessCount = dramAccessCounter;

@@ -47,9 +47,9 @@ public class CacheReadPerf
             int readCount = cachedColumnlets.size() * cachedPaths.size();
 
             MemoryMappedFile indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                                              Long.parseLong(config.getProperty("index.size")));
+                    Long.parseLong(config.getProperty("index.size")));
             MemoryMappedFile cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
-                                                              Long.parseLong(config.getProperty("cache.size")));
+                    Long.parseLong(config.getProperty("cache.size")));
             PixelsCacheReader cacheReader = PixelsCacheReader
                     .newBuilder()
                     .setIndexFile(indexFile)

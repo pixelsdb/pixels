@@ -222,7 +222,7 @@ public class PixelsWriterImpl
                     this.builderFS, this.builderFilePath, this.builderBlockSize, this.builderReplication,
                     this.builderBlockPadding);
             checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
-                          "schema is empty");
+                    "schema is empty");
 
             if (fsWriter == null)
             {
@@ -411,9 +411,9 @@ public class PixelsWriterImpl
         // put curRowGroupIndex into rowGroupFooter
         PixelsProto.RowGroupFooter rowGroupFooter =
                 PixelsProto.RowGroupFooter.newBuilder()
-                                          .setRowGroupIndexEntry(curRowGroupIndex.build())
-                                          .setRowGroupEncoding(curRowGroupEncoding.build())
-                                          .build();
+                        .setRowGroupIndexEntry(curRowGroupIndex.build())
+                        .setRowGroupEncoding(curRowGroupEncoding.build())
+                        .build();
 
         // write and flush row group footer
         try
@@ -468,24 +468,24 @@ public class PixelsWriterImpl
 
         // build PostScript
         postScript = PixelsProto.PostScript.newBuilder()
-                                           .setVersion(Constants.VERSION)
-                                           .setContentLength(fileContentLength)
-                                           .setNumberOfRows(fileRowNum)
-                                           .setCompression(compressionKind)
-                                           .setCompressionBlockSize(compressionBlockSize)
-                                           .setPixelStride(pixelStride)
-                                           .setWriterTimezone(timeZone.getDisplayName())
-                                           .setMagic(Constants.MAGIC)
-                                           .build();
+                .setVersion(Constants.VERSION)
+                .setContentLength(fileContentLength)
+                .setNumberOfRows(fileRowNum)
+                .setCompression(compressionKind)
+                .setCompressionBlockSize(compressionBlockSize)
+                .setPixelStride(pixelStride)
+                .setWriterTimezone(timeZone.getDisplayName())
+                .setMagic(Constants.MAGIC)
+                .build();
 
         // build FileTail
         PixelsProto.FileTail fileTail =
                 PixelsProto.FileTail.newBuilder()
-                                    .setFooter(footer)
-                                    .setPostscript(postScript)
-                                    .setFooterLength(footer.getSerializedSize())
-                                    .setPostscriptLength(postScript.getSerializedSize())
-                                    .build();
+                        .setFooter(footer)
+                        .setPostscript(postScript)
+                        .setFooterLength(footer.getSerializedSize())
+                        .setPostscriptLength(postScript.getSerializedSize())
+                        .build();
 
         // write and flush FileTail plus FileTail physical offset at the end of the file
         int fileTailLen = fileTail.getSerializedSize() + Long.BYTES;
@@ -552,7 +552,7 @@ public class PixelsWriterImpl
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
-                                                               schema.getCategory());
+                            schema.getCategory());
             }
             builder.addTypes(tmpType.build());
         }

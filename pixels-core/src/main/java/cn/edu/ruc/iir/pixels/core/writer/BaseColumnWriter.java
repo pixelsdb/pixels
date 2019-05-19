@@ -107,7 +107,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     public PixelsProto.ColumnEncoding.Builder getColumnChunkEncoding()
     {
         return PixelsProto.ColumnEncoding.newBuilder()
-                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override

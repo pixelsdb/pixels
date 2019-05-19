@@ -104,7 +104,7 @@ public class StringRedBlackTree extends RedBlackTree
             end = keyOffsets.get(position + 1);
         }
         return byteArray.compare(keyBytes, 0, keyLength,
-                                 start, end - start);
+                start, end - start);
     }
 
     /**

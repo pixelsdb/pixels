@@ -11,7 +11,7 @@ public class DBUtil
 {
     private static DBUtil INSTANCE = new DBUtil();
 
-    public static DBUtil Instance ()
+    public static DBUtil Instance()
     {
         return INSTANCE;
     }
@@ -25,7 +25,8 @@ public class DBUtil
 
     private DBUtil()
     {
-        try {
+        try
+        {
             ConfigFactory config = ConfigFactory.Instance();
             String driver = config.getProperty("metadata.db.driver");
             url = config.getProperty("metadata.db.url");
@@ -34,12 +35,14 @@ public class DBUtil
 
             Class.forName(driver);
             this.connection = DriverManager.getConnection(url, user, pass);
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             log.error("Connection error: " + e.getMessage());
         }
     }
 
-    public Connection getConnection ()
+    public Connection getConnection()
     {
         try
         {
@@ -48,14 +51,15 @@ public class DBUtil
                 this.connection = DriverManager.getConnection(url, user, pass);
             }
             return this.connection;
-        } catch (SQLException e)
+        }
+        catch (SQLException e)
         {
             log.error("Connection error: " + e.getMessage());
             return null;
         }
     }
 
-    public void close ()
+    public void close()
     {
         try
         {
@@ -63,7 +67,9 @@ public class DBUtil
             {
                 this.connection.close();
             }
-        } catch (SQLException e) {
+        }
+        catch (SQLException e)
+        {
             log.error("Close error: " + e.getMessage());
         }
     }

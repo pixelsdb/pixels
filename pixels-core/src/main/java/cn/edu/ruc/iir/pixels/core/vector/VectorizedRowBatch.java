@@ -211,7 +211,10 @@ public class VectorizedRowBatch
     {
         for (int i = 0; i < cols.length; ++i)
         {
-            cols[i].ensureSize(rows, false);
+            if (!cols[i].duplicated)
+            {
+                cols[i].ensureSize(rows, false);
+            }
         }
     }
 }

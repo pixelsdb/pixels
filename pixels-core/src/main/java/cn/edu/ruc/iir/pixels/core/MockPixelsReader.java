@@ -38,9 +38,9 @@ public class MockPixelsReader
         try
         {
             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                                                        .setFS(fs)
-                                                        .setPath(filePath)
-                                                        .build();
+                    .setFS(fs)
+                    .setPath(filePath)
+                    .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             VectorizedRowBatch rowBatch;
             int batchSize = 10000;
@@ -58,7 +58,7 @@ public class MockPixelsReader
             }
             long end = System.currentTimeMillis();
             System.out.println("[" + filePath.getName() + "] "
-                                       + start + " " + end + " " + num + ", cpu cost: " + (end - start));
+                    + start + " " + end + " " + num + ", cpu cost: " + (end - start));
             pixelsReader.close();
         }
         catch (IOException e)

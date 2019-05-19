@@ -32,7 +32,8 @@ public class CopyMetadata
 
         int srcTableId = 3;
 
-        try {
+        try
+        {
             Class.forName(driver);
             Connection srcConn = DriverManager.getConnection(srcURL, srcUser, srcPwd);
             Connection dstConn = DriverManager.getConnection(dstURL, dstUser, dstPwd);
@@ -109,8 +110,8 @@ public class CopyMetadata
             srcConnStatement = srcConn.createStatement();
             dstConnStatement = dstConn.createStatement();
             resultSet = srcConnStatement.executeQuery("SELECT LAYOUT_VERSION, LAYOUT_CREATE_AT, LAYOUT_PERMISSION, " +
-                                                      "LAYOUT_ORDER, LAYOUT_ORDER_PATH, LAYOUT_COMPACT, LAYOUT_COMPACT_PATH, " +
-                                                      "LAYOUT_SPLITS FROM LAYOUTS WHERE LAYOUT_PERMISSION=1 AND TBLS_TBL_ID=" + srcTableId);
+                    "LAYOUT_ORDER, LAYOUT_ORDER_PATH, LAYOUT_COMPACT, LAYOUT_COMPACT_PATH, " +
+                    "LAYOUT_SPLITS FROM LAYOUTS WHERE LAYOUT_PERMISSION=1 AND TBLS_TBL_ID=" + srcTableId);
             while (resultSet.next())
             {
                 String layout_version = resultSet.getString("LAYOUT_VERSION");
@@ -122,21 +123,23 @@ public class CopyMetadata
                 String layout_compact_path = resultSet.getString("LAYOUT_COMPACT_PATH");
                 String layout_splits = resultSet.getString("LAYOUT_SPLITS");
 
-                if (layout_permission.equalsIgnoreCase("1")) {
+                if (layout_permission.equalsIgnoreCase("1"))
+                {
                     dstConnStatement.executeUpdate(String.format("INSERT INTO LAYOUTS(LAYOUT_VERSION, LAYOUT_CREATE_AT, " +
-                                                                 "LAYOUT_PERMISSION, LAYOUT_ORDER, LAYOUT_ORDER_PATH, " +
-                                                                 "LAYOUT_COMPACT, LAYOUT_COMPACT_PATH, LAYOUT_SPLITS, TBLS_TBL_ID) " +
-                                                                 "VALUES(%s, %s, %s, '%s', '%s', '%s', '%s', '%s', %s)",
-                                                                 layout_version, layout_create_at, layout_permission,
-                                                                 layout_order, layout_order_path, layout_compact, layout_compact_path,
-                                                                 layout_splits, dstTableId));
+                                    "LAYOUT_PERMISSION, LAYOUT_ORDER, LAYOUT_ORDER_PATH, " +
+                                    "LAYOUT_COMPACT, LAYOUT_COMPACT_PATH, LAYOUT_SPLITS, TBLS_TBL_ID) " +
+                                    "VALUES(%s, %s, %s, '%s', '%s', '%s', '%s', '%s', %s)",
+                            layout_version, layout_create_at, layout_permission,
+                            layout_order, layout_order_path, layout_compact, layout_compact_path,
+                            layout_splits, dstTableId));
                 }
             }
             resultSet.close();
             srcConnStatement.close();
             dstConnStatement.close();
         }
-        catch (SQLException | ClassNotFoundException e) {
+        catch (SQLException | ClassNotFoundException e)
+        {
             e.printStackTrace();
         }
     }

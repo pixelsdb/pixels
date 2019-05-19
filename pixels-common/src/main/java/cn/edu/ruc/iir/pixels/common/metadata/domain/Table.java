@@ -12,9 +12,11 @@ public class Table extends Base
     private long schemaId;
     private List<Long> columnIds = new ArrayList<>();
 
-    public Table () { }
+    public Table()
+    {
+    }
 
-    public Table (MetadataProto.Table table)
+    public Table(MetadataProto.Table table)
     {
         this.name = table.getName();
         this.type = table.getType();
@@ -62,13 +64,14 @@ public class Table extends Base
         this.columnIds = columnIds;
     }
 
-    public void addColumnId (long columnId)
+    public void addColumnId(long columnId)
     {
         this.columnIds.add(columnId);
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "Table{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +

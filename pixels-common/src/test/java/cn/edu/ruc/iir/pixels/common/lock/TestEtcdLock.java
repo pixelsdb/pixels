@@ -11,7 +11,7 @@ import org.junit.Test;
 public class TestEtcdLock
 {
     @Test
-    public void delete ()
+    public void delete()
     {
         EtcdUtil etcdUtil = EtcdUtil.Instance();
         String basePath = "/read-write-lock";
@@ -19,7 +19,7 @@ public class TestEtcdLock
     }
 
     @Test
-    public void testReadLock () throws Exception
+    public void testReadLock() throws Exception
     {
         EtcdUtil etcdUtil = EtcdUtil.Instance();
         Client client = etcdUtil.getClient();
@@ -35,7 +35,7 @@ public class TestEtcdLock
     }
 
     @Test
-    public void testWriteLock () throws Exception
+    public void testWriteLock() throws Exception
     {
         EtcdUtil etcdUtil = EtcdUtil.Instance();
         Client client = etcdUtil.getClient();

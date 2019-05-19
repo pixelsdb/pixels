@@ -29,12 +29,15 @@ import org.apache.logging.log4j.Logger;
 import java.io.*;
 import java.util.*;
 
-public final class FSFactory {
+public final class FSFactory
+{
     private static Logger logger = LogManager.getLogger(FSFactory.class);
     private static Map<String, FSFactory> instances = new HashMap<>();
 
-    public static FSFactory Instance(String hdfsConfigDir) throws FSException {
-        if (instances.containsKey(hdfsConfigDir)) {
+    public static FSFactory Instance(String hdfsConfigDir) throws FSException
+    {
+        if (instances.containsKey(hdfsConfigDir))
+        {
             return instances.get(hdfsConfigDir);
         }
 
@@ -52,55 +55,72 @@ public final class FSFactory {
     private FileSystem fileSystem;
     private Configuration hdfsConfig;
 
-    private FSFactory(String hdfsConfigDir) throws FSException {
+    private FSFactory(String hdfsConfigDir) throws FSException
+    {
         hdfsConfig = new Configuration(false);
         File configDir = new File(hdfsConfigDir);
         hdfsConfig.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
         hdfsConfig.set("fs.file.impl", LocalFileSystem.class.getName());
-        try {
-            if (configDir.exists() && configDir.isDirectory()) {
+        try
+        {
+            if (configDir.exists() && configDir.isDirectory())
+            {
                 File[] hdfsConfigFiles = configDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
-                if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2) {
+                if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2)
+                {
                     hdfsConfig.addResource(hdfsConfigFiles[0].toURI().toURL());
                     hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
                     logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " + hdfsConfigFiles[1].toURI());
                 }
                 logger.debug("conf file not match");
-            } else {
+            }
+            else
+            {
                 logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
                 throw new FSException("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + hdfsConfigDir);
             }
             this.fileSystem = FileSystem.get(hdfsConfig);
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             e.printStackTrace();
             throw new FSException("I/O error occurs when reading HDFS config files.", e);
         }
     }
 
-    public Optional<FileSystem> getFileSystem() {
+    public Optional<FileSystem> getFileSystem()
+    {
         return Optional.of(this.fileSystem);
     }
 
-    public List<Path> listFiles(Path dirPath) throws FSException {
+    public List<Path> listFiles(Path dirPath) throws FSException
+    {
         List<Path> files = new ArrayList<>();
         FileStatus[] fileStatuses = null;
-        try {
+        try
+        {
             fileStatuses = this.fileSystem.listStatus(dirPath);
-            if (fileStatuses != null) {
-                for (FileStatus f : fileStatuses) {
-                    if (f.isFile()) {
+            if (fileStatuses != null)
+            {
+                for (FileStatus f : fileStatuses)
+                {
+                    if (f.isFile())
+                    {
                         files.add(f.getPath());
                     }
                 }
             }
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new FSException("error occurs when listing files.", e);
         }
 
         return files;
     }
 
-    public List<Path> listFiles(String dirPath) throws FSException {
+    public List<Path> listFiles(String dirPath) throws FSException
+    {
         return listFiles(new Path(dirPath));
     }
 
@@ -113,65 +133,86 @@ public final class FSFactory {
      * @return
      * @throws FSException
      */
-    public List<HostAddress> getBlockLocations(Path file, long start, long len) throws FSException {
+    public List<HostAddress> getBlockLocations(Path file, long start, long len) throws FSException
+    {
         Set<HostAddress> addresses = new HashSet<>();
         BlockLocation[] locations = new BlockLocation[0];
-        try {
+        try
+        {
             locations = this.fileSystem.getFileBlockLocations(file, start, len);
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new FSException("I/O error occurs when getting block locations", e);
         }
-        for (BlockLocation location : locations) {
-            try {
+        for (BlockLocation location : locations)
+        {
+            try
+            {
                 addresses.addAll(toHostAddress(location.getHosts()));
-            } catch (IOException e) {
+            }
+            catch (IOException e)
+            {
                 throw new FSException("I/O error occurs when get hosts from block locations.", e);
             }
         }
         return new ArrayList<>(addresses);
     }
 
-    public List<HostAddress> getBlockLocations(Path file, long start, long len, String node) throws FSException {
+    public List<HostAddress> getBlockLocations(Path file, long start, long len, String node) throws FSException
+    {
         if (node == null)
             return getBlockLocations(file, start, len);
-        else {
+        else
+        {
             ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
             builder.add(HostAddress.fromString(node));
             return builder.build();
         }
     }
 
-    private List<HostAddress> toHostAddress(String[] hosts) {
+    private List<HostAddress> toHostAddress(String[] hosts)
+    {
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-        for (String host : hosts) {
+        for (String host : hosts)
+        {
             builder.add(HostAddress.fromString(host));
             break;
         }
         return builder.build();
     }
 
-    public List<LocatedBlock> listLocatedBlocks(Path path) throws FSException {
+    public List<LocatedBlock> listLocatedBlocks(Path path) throws FSException
+    {
         FSDataInputStream in = null;
-        try {
+        try
+        {
             in = this.fileSystem.open(path);
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new FSException("I/O error occurs when opening file.", e);
         }
         HdfsDataInputStream hdis = (HdfsDataInputStream) in;
         List<LocatedBlock> allBlocks = null;
-        try {
+        try
+        {
             allBlocks = hdis.getAllBlocks();
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new FSException("I/O error occurs when getting blocks.", e);
         }
         return allBlocks;
     }
 
-    public List<LocatedBlock> listLocatedBlocks(String path) throws FSException {
+    public List<LocatedBlock> listLocatedBlocks(String path) throws FSException
+    {
         return listLocatedBlocks(new Path(path));
     }
 
-    public void createFile(String path, String content) throws IOException {
+    public void createFile(String path, String content) throws IOException
+    {
         FSDataOutputStream outputStream = fileSystem.create(new Path(path));
         outputStream.write(content.getBytes());
         outputStream.close();
@@ -179,7 +220,8 @@ public final class FSFactory {
 
     // write content, need to open the auth('append') in hdfs-site.xml
     public void appendContent(String hdfsPath, String content)
-            throws IOException {
+            throws IOException
+    {
         OutputStream out = fileSystem.append(new Path(hdfsPath));
         InputStream in = new ByteArrayInputStream(content.getBytes());
         IOUtils.copyBytes(in, out, hdfsConfig);
@@ -188,10 +230,12 @@ public final class FSFactory {
     }
 
     // file isExist
-    public boolean isTableExists(String metatable) throws IOException {
+    public boolean isTableExists(String metatable) throws IOException
+    {
         Path path = new Path(metatable);
         boolean exist = fileSystem.exists(path);
-        if (!exist) {
+        if (!exist)
+        {
             fileSystem.mkdirs(path);
         }
         return exist;

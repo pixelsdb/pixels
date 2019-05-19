@@ -9,9 +9,11 @@ public class Column extends Base
     private double size;
     private long tableId;
 
-    public Column () { }
+    public Column()
+    {
+    }
 
-    public Column (MetadataProto.Column column)
+    public Column(MetadataProto.Column column)
     {
         this.setId(column.getId());
         this.name = column.getName();
@@ -61,7 +63,8 @@ public class Column extends Base
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         return "Column{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +

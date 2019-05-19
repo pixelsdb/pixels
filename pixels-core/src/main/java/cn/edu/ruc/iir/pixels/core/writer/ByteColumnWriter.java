@@ -99,10 +99,10 @@ public class ByteColumnWriter extends BaseColumnWriter
         if (isEncoding)
         {
             return PixelsProto.ColumnEncoding.newBuilder()
-                                             .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+                    .setKind(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         }
         return PixelsProto.ColumnEncoding.newBuilder()
-                                         .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
+                .setKind(PixelsProto.ColumnEncoding.Kind.NONE);
     }
 
     @Override

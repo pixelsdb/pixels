@@ -12,6 +12,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -23,14 +24,14 @@ public class StringColumnReader
 {
     private int originsOffset;
     private int startsOffset;
-    private ByteBuf inputBuffer = null;
+    private ByteBuf inputBuffer = null; // TODO: change ByteBuf to java.nio.ByteBuffer
     private ByteBuf originsBuf = null;
     private int[] orders = null;
     private int[] starts = null;
+    private byte[] isNull = new byte[8];
     private ByteBuf contentBuf = null;
     private RunLenIntDecoder lensDecoder = null;
     private RunLenIntDecoder contentDecoder = null;
-    private byte[] isNull;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
 
@@ -49,7 +50,7 @@ public class StringColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
@@ -62,7 +63,7 @@ public class StringColumnReader
                 inputBuffer.release();
             }
             inputBuffer = Unpooled.wrappedBuffer(input);
-            readContent(input, encoding);
+            readContent(input.limit(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
@@ -80,13 +81,13 @@ public class StringColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
@@ -129,13 +130,13 @@ public class StringColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
@@ -159,14 +160,14 @@ public class StringColumnReader
         }
     }
 
-    private void readContent(byte[] input, PixelsProto.ColumnEncoding encoding)
+    private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - 3 * Integer.BYTES);
+            inputBuffer.skipBytes(inputLength - 3 * Integer.BYTES);
             originsOffset = inputBuffer.readInt();
             startsOffset = inputBuffer.readInt();
             int ordersOffset = inputBuffer.readInt();
@@ -175,7 +176,7 @@ public class StringColumnReader
             contentBuf = inputBuffer.slice(0, originsOffset);
             originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
-            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, input.length - ordersOffset);
+            ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
             int originNum = 0;
             DynamicIntArray startsArray = new DynamicIntArray();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
@@ -199,13 +200,13 @@ public class StringColumnReader
         {
             // read lens field offset
             inputBuffer.markReaderIndex();
-            inputBuffer.skipBytes(input.length - Integer.BYTES);
+            inputBuffer.skipBytes(inputLength - Integer.BYTES);
             int lensOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read strings
             contentBuf = inputBuffer.slice(0, lensOffset);
             // read lens field
-            ByteBuf lensBuf = inputBuffer.slice(lensOffset, input.length - Integer.BYTES - lensOffset);
+            ByteBuf lensBuf = inputBuffer.slice(lensOffset, inputLength - Integer.BYTES - lensOffset);
             lensDecoder = new RunLenIntDecoder(new ByteBufInputStream(lensBuf), false);
         }
     }

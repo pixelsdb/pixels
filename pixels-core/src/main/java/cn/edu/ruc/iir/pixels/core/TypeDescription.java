@@ -215,7 +215,7 @@ public final class TypeDescription
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
-                                                               type.getKind());
+                            type.getKind());
             }
             schema.addField(fieldName, fieldType);
         }
@@ -366,7 +366,7 @@ public final class TypeDescription
                 source.value.charAt(source.position) != required)
         {
             throw new IllegalArgumentException("Missing required char '" +
-                                                       required + "' at " + source);
+                    required + "' at " + source);
         }
         source.position += 1;
     }
@@ -422,7 +422,7 @@ public final class TypeDescription
                 break;
             default:
                 throw new IllegalArgumentException("Unknown type " +
-                                                           result.getCategory() + " at " + source);
+                        result.getCategory() + " at " + source);
         }
         return result;
     }
@@ -461,7 +461,7 @@ public final class TypeDescription
         if (precision < 1 || precision > MAX_PRECISION || scale > precision)
         {
             throw new IllegalArgumentException("precision " + precision +
-                                                       " is out of range 1 .. " + scale);
+                    " is out of range 1 .. " + scale);
         }
         this.precision = precision;
         return this;
@@ -504,7 +504,7 @@ public final class TypeDescription
         if (category != Category.VARCHAR && category != Category.CHAR)
         {
             throw new IllegalArgumentException("maxLength is only allowed on char" +
-                                                       " and varchar and not " + category.name);
+                    " and varchar and not " + category.name);
         }
         this.maxLength = maxLength;
         return this;
@@ -527,7 +527,7 @@ public final class TypeDescription
         if (category != Category.STRUCT)
         {
             throw new IllegalArgumentException("Can only add fields to struct type" +
-                                                       " and not " + category);
+                    " and not " + category);
         }
         fieldNames.add(field);
         children.add(fieldType);
@@ -690,7 +690,7 @@ public final class TypeDescription
                     fieldVector[i] = children.get(i).createColumn(maxSize);
                 }
                 return new StructColumnVector(maxSize,
-                                              fieldVector);
+                        fieldVector);
             }
             default:
                 throw new IllegalArgumentException("Unknown type " + category);
@@ -924,7 +924,7 @@ public final class TypeDescription
                 {
                     buffer.append('\n');
                     children.get(i).printJsonToBuffer("\"" + fieldNames.get(i) + "\": ",
-                                                      buffer, indent + 2);
+                            buffer, indent + 2);
                     if (i != children.size() - 1)
                     {
                         buffer.append(',');
@@ -958,7 +958,7 @@ public final class TypeDescription
         if (goal < id || goal > maxId)
         {
             throw new IllegalArgumentException("Unknown type id " + id + " in " +
-                                                       toJson());
+                    toJson());
         }
         if (goal == id)
         {

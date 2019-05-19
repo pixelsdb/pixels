@@ -169,7 +169,7 @@ public class RunLenIntEncoder
         if (isFixedDelta)
         {
             checkArgument(currDelta == initialDelta,
-                          "currDelta should be equal to initalDelta for fixed delta encoding");
+                    "currDelta should be equal to initalDelta for fixed delta encoding");
             encodingType = EncodingType.DELTA;
             fixedDelta = currDelta;
             return;
