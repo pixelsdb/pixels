@@ -2,6 +2,11 @@
 #define MemoryMappedFile_H
 
 #include <string>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -10,40 +15,44 @@ typedef char byte;
 class MemoryMappedFile
 {
 private:
-    //Unsafe unsafe;
-    //private static final Method mmap;
-    //Method unmmap;
+
     static int BYTE_ARRAY_OFFSET;
 
-    long addr, size;
-    string loc;
+    int _fd;
+    struct stat _st;
+    char *_mapped;
+    long _size;
+    string _location;
 
-    static long roundTo4096(long i)
+    static inline long roundTo4096(long i)
     {
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    void mapAndSetOffset()
-    {
-    }
+    void mapAndSetOffset();
+
+    
 
 public:
     /**
      * Constructs a new memory mapped file.
      *
-     * @param loc the file name
-     * @param len the file length
-     * @throws Exception in case there was an error creating the memory mapped file
+     * @param location the file name
+     * @param size the file length
      */
-    MemoryMappedFile(string &loc, long len)
+    MemoryMappedFile(string &location, long size) : _location(location), _size(roundTo4096(size))
     {
-        loc = loc;
-        size = roundTo4096(len);
         mapAndSetOffset();
+    }
+
+    ~MemoryMappedFile()
+    {
+        unmap();
     }
 
     void unmap()
     {
+        munmap(_mapped, _st.st_size);
     }
 
     /**
@@ -236,7 +245,7 @@ public:
 
     long getSize()
     {
-        return size;
+        return _size;
     }
 };
 
