@@ -32,9 +32,9 @@ public class TestFileMetadata
             for (FileStatus fileStatus : fileStatuses)
             {
                 pixelsReader = PixelsReaderImpl.newBuilder()
-                                               .setFS(fs)
-                                               .setPath(fileStatus.getPath())
-                                               .build();
+                        .setFS(fs)
+                        .setPath(fileStatus.getPath())
+                        .build();
 //                System.out.println(pixelsReader.getRowGroupNum());
                 if (pixelsReader.getFooter().getRowGroupStatsList().size() != 1)
                 {

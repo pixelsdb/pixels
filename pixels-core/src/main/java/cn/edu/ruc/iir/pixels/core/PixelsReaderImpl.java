@@ -168,7 +168,6 @@ public class PixelsReaderImpl
                 throw new PixelsFileMagicInvalidException(fileMagic);
             }
 
-            // todo check file schema
             builderSchema = TypeDescription.createSchema(fileTail.getFooter().getTypesList());
 
             // check metrics file
@@ -188,8 +187,8 @@ public class PixelsReaderImpl
 
             // create a default PixelsReader
             return new PixelsReaderImpl(builderSchema, fsReader, fileTail, metricsDir, metricCollectProb,
-                                        builderEnableCache, builderCacheOrder, builderPixelsCacheReader,
-                                        builderPixelsFooterCache);
+                    builderEnableCache, builderCacheOrder, builderPixelsCacheReader,
+                    builderPixelsFooterCache);
         }
     }
 
@@ -225,8 +224,8 @@ public class PixelsReaderImpl
         }
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
-                                                                     enableMetrics, metricsDir, enableCache, cacheOrder,
-                                                                     pixelsCacheReader, pixelsFooterCache);
+                enableMetrics, metricsDir, enableCache, cacheOrder,
+                pixelsCacheReader, pixelsFooterCache);
         recordReaders.add(recordReader);
         return recordReader;
     }

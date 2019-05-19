@@ -291,7 +291,7 @@ public class PixelsCompactor
             }
 
             fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(builderFS, builderFilePath, builderBlockSize,
-                                                              builderReplication, builderBlockPadding);
+                    builderReplication, builderBlockPadding);
 
             return new PixelsCompactor(
                     schema,
@@ -333,7 +333,7 @@ public class PixelsCompactor
             int columnId = index.getColumnId();
             PixelsProto.ColumnChunkIndex.Builder columnChunkIndexBuilder =
                     this.rowGroupFooterBuilderList.get(rowGroupId).getRowGroupIndexEntryBuilder()
-                                                  .getColumnChunkIndexEntriesBuilder(columnId);
+                            .getColumnChunkIndexEntriesBuilder(columnId);
             long columnChunkOffset = columnChunkIndexBuilder.getChunkOffset();
             long columnChunkLength = columnChunkIndexBuilder.getChunkLength();
             Path path = this.rowGroupPaths.get(rowGroupId);
@@ -398,11 +398,11 @@ public class PixelsCompactor
 
         PixelsProto.FileTail fileTail =
                 PixelsProto.FileTail.newBuilder()
-                                    .setFooter(footer)
-                                    .setPostscript(postScript)
-                                    .setFooterLength(footer.getSerializedSize())
-                                    .setPostscriptLength(postScript.getSerializedSize())
-                                    .build();
+                        .setFooter(footer)
+                        .setPostscript(postScript)
+                        .setFooterLength(footer.getSerializedSize())
+                        .setPostscriptLength(postScript.getSerializedSize())
+                        .build();
 
         try
         {
@@ -447,15 +447,15 @@ public class PixelsCompactor
     private PixelsProto.PostScript writePostScript()
     {
         return PixelsProto.PostScript.newBuilder()
-                                     .setVersion(Constants.VERSION)
-                                     .setContentLength(fileContentLength)
-                                     .setNumberOfRows(fileRowNum)
-                                     .setCompression(compressionKind)
-                                     .setCompressionBlockSize(compressionBlockSize)
-                                     .setPixelStride(pixelStride)
-                                     .setWriterTimezone(timeZone.getDisplayName())
-                                     .setMagic(Constants.MAGIC)
-                                     .build();
+                .setVersion(Constants.VERSION)
+                .setContentLength(fileContentLength)
+                .setNumberOfRows(fileRowNum)
+                .setCompression(compressionKind)
+                .setCompressionBlockSize(compressionBlockSize)
+                .setPixelStride(pixelStride)
+                .setWriterTimezone(timeZone.getDisplayName())
+                .setMagic(Constants.MAGIC)
+                .build();
     }
 
     /**

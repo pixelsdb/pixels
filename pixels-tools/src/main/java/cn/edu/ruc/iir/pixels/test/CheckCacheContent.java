@@ -14,6 +14,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
 import org.apache.hadoop.fs.Path;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
@@ -39,9 +40,9 @@ public class CheckCacheContent
         MemoryMappedFile indexFile;
         ConfigFactory config = ConfigFactory.Instance();
         cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
-                                         Long.parseLong(config.getProperty("cache.size")));
+                Long.parseLong(config.getProperty("cache.size")));
         indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                         Long.parseLong(config.getProperty("index.size")));
+                Long.parseLong(config.getProperty("index.size")));
         FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -57,8 +58,8 @@ public class CheckCacheContent
                 .setIndexFile(indexFile)
                 .build();
         long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
-        byte[] cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
-        System.out.println("Cache content length " + cacheContent.length);
+        ByteBuffer cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
+        System.out.println("Cache content length " + cacheContent.capacity());
 
         PixelsReader pixelsReader = PixelsReaderImpl
                 .newBuilder()
@@ -72,22 +73,22 @@ public class CheckCacheContent
         PhysicalReader physicalReader =
                 PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), new Path(path));
         PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                                                                .getColumnChunkIndexEntries(colId);
+                .getColumnChunkIndexEntries(colId);
         physicalReader.seek(chunkIndex.getChunkOffset());
         byte[] diskContent = new byte[(int) chunkIndex.getChunkLength()];
         physicalReader.readFully(diskContent);
 
         System.out.println("Disk content length " + chunkIndex.getChunkLength());
-        if (cacheContent.length != diskContent.length)
+        if (cacheContent.capacity() != diskContent.length)
         {
             System.out.println("Length not match");
             return;
         }
-        for (int i = 0; i < cacheContent.length; i++)
+        for (int i = 0; i < cacheContent.capacity(); i++)
         {
-            if (cacheContent[i] != diskContent[i])
+            if (cacheContent.get(i) != diskContent[i])
             {
-                System.out.println("byte not match " + cacheContent[i] + ":" + diskContent[i]);
+                System.out.println("byte not match " + cacheContent.get(i) + ":" + diskContent[i]);
             }
         }
     }

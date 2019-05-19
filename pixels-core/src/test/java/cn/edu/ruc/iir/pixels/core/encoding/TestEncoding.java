@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Random;
 
 import static junit.framework.TestCase.assertEquals;
@@ -89,6 +90,7 @@ public class TestEncoding
     @Test
     public void bitWistCompactTest()
     {
+        TestParams.rowNum = 300;
         boolean[] exp = new boolean[TestParams.rowNum];
         long[] cur = new long[TestParams.rowNum];
         for (int i = 0; i < TestParams.rowNum; i++)
@@ -99,7 +101,8 @@ public class TestEncoding
         byte[] input = BitUtils.bitWiseCompact(cur, TestParams.rowNum);
 
         boolean[] res = new boolean[TestParams.rowNum];
-        byte[] bytesRes = BitUtils.bitWiseDeCompact(input);
+        byte[] bytesRes = new byte[input.length * 8];
+        BitUtils.bitWiseDeCompact(bytesRes, input);
         for (int i = 0; i < TestParams.rowNum; i++)
         {
             res[i] = bytesRes[i] == 1;
@@ -108,7 +111,8 @@ public class TestEncoding
 
         int offset = 20;
         int size = 9;
-        byte[] result = BitUtils.bitWiseDeCompact(input, offset, size);
+        byte[] result = new byte[size * 8];
+        BitUtils.bitWiseDeCompact(result, input, offset, size);
         for (int i = 0; i < 6; i++)
         {
             assertEquals(0, result[i]);
@@ -127,7 +131,8 @@ public class TestEncoding
                 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 1, 1, 1, 1, 1, 1};
         byte[] mid = BitUtils.bitWiseCompact(input, 32);
-        byte[] result = BitUtils.bitWiseDeCompact(mid);
+        byte[] result = new byte[mid.length * 8];
+        BitUtils.bitWiseDeCompact(result, mid);
         System.out.println(result);
     }
 }

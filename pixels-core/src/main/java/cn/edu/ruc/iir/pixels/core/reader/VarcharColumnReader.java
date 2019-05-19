@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -29,7 +30,7 @@ public class VarcharColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException

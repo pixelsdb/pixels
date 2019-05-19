@@ -25,9 +25,9 @@ public class TimestampColumnReader
     private ByteBuffer inputBuffer = null;
     private InputStream inputStream = null;
     private RunLenIntDecoder decoder = null;
-    private byte[] isNull;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
+    private byte[] isNull = new byte[8];
 
     TimestampColumnReader(TypeDescription type)
     {
@@ -44,7 +44,7 @@ public class TimestampColumnReader
      * @throws IOException
      */
     @Override
-    public void read(byte[] input, PixelsProto.ColumnEncoding encoding,
+    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
@@ -56,8 +56,8 @@ public class TimestampColumnReader
             {
                 inputStream.close();
             }
-            inputBuffer = ByteBuffer.wrap(input);
-            inputStream = new ByteArrayInputStream(input);
+            inputBuffer = input;
+            inputStream = new ByteArrayInputStream(input.array(), input.arrayOffset(), input.limit());
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
@@ -75,13 +75,13 @@ public class TimestampColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)
@@ -110,13 +110,13 @@ public class TimestampColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    isNull = BitUtils.bitWiseDeCompact(inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 if (hasNull && isNull[isNullBitIndex] == 1)

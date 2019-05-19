@@ -325,7 +325,7 @@ public class BytesColumnVector extends ColumnVector
                     if (newLength < 0)
                     {
                         throw new RuntimeException("Overflow of newLength. smallBuffer.length="
-                                                           + smallBuffer.length + ", nextElemLength=" + nextElemLength);
+                                + smallBuffer.length + ", nextElemLength=" + nextElemLength);
                     }
                     newLength *= 2;
                 }
@@ -470,7 +470,7 @@ public class BytesColumnVector extends ColumnVector
             isNull[outElementNum] = false;
             BytesColumnVector in = (BytesColumnVector) inputVector;
             setVal(outElementNum, in.vector[inputElementNum],
-                   in.start[inputElementNum], in.lens[inputElementNum]);
+                    in.start[inputElementNum], in.lens[inputElementNum]);
         }
         else
         {
@@ -480,7 +480,7 @@ public class BytesColumnVector extends ColumnVector
     }
 
     @Override
-    public void copyFrom(ColumnVector inputVector)
+    public void duplicate(ColumnVector inputVector)
     {
         if (inputVector instanceof BytesColumnVector)
         {
@@ -492,9 +492,12 @@ public class BytesColumnVector extends ColumnVector
                     this.vector[i] = srcVector.vector[i];
                 }
             }
-            System.arraycopy(srcVector.start, 0, this.start, 0, start.length);
-            System.arraycopy(srcVector.lens, 0, this.lens, 0, lens.length);
-            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
+//            System.arraycopy(srcVector.start, 0, this.start, 0, start.length);
+//            System.arraycopy(srcVector.lens, 0, this.lens, 0, lens.length);
+//            System.arraycopy(srcVector.isNull, 0, this.isNull, 0, isNull.length);
+            this.start = srcVector.start;
+            this.lens = srcVector.lens;
+            this.isNull = srcVector.isNull;
             this.buffer = null;
             this.smallBuffer = null;
             this.nextFree = srcVector.nextFree;

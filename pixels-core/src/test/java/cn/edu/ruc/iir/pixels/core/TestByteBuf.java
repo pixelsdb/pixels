@@ -16,6 +16,44 @@ import java.nio.ByteBuffer;
 public class TestByteBuf
 {
     @Test
+    public void testByteReference()
+    {
+        byte[] content = new byte[2];
+        content[0] = 5;
+        content[1] = 8;
+        process(content);
+        System.out.println(content[0]);
+    }
+
+    public void process(byte[] content)
+    {
+        int index = 0;
+        for (byte c : content)
+        {
+            content[index++] = (byte) (c + 1);
+        }
+    }
+
+    @Test
+    public void testByteBufferSlice()
+    {
+        ByteBuffer origin = ByteBuffer.allocate(100);
+        for (int i = 0; i < 100; i++)
+        {
+            origin.put((byte) i);
+        }
+        origin.position(10);
+        origin.limit(19);
+        ByteBuffer slice = origin.slice();
+        System.out.println(slice.arrayOffset());
+        for (int i = 0; i < slice.capacity(); i++)
+        {
+            System.out.println(slice.get());
+        }
+        System.out.println(slice.position());
+    }
+
+    @Test
     public void testAllocation()
     {
         long start = System.currentTimeMillis();

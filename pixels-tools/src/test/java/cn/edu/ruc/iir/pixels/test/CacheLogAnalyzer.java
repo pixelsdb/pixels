@@ -70,14 +70,16 @@ public class CacheLogAnalyzer
         String fileName = path.getFileName().toString().split("\\.")[0];
         int lineWindow = 100;
 
-        try {
+        try
+        {
             BufferedReader reader = new BufferedReader(new FileReader(path.toFile()));
             String line;
             long lineNum = 0L;
             while ((line = reader.readLine()) != null)
             {
                 lineNum++;
-                if (line.contains("[DEBUG]")) {
+                if (line.contains("[DEBUG]"))
+                {
                     continue;
                 }
                 Timestamp timestamp = Timestamp.valueOf(line.substring(0, 19));
@@ -219,7 +221,8 @@ public class CacheLogAnalyzer
             writer.close();
             System.out.println("Done processing file " + fileName);
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -235,7 +238,8 @@ public class CacheLogAnalyzer
         List<Integer> rTimes = new ArrayList<>();
 
         String line;
-        try {
+        try
+        {
             BufferedReader reader = new BufferedReader(new FileReader(path.toFile()));
             reader.readLine();
             while ((line = reader.readLine()) != null)
@@ -252,14 +256,14 @@ public class CacheLogAnalyzer
             System.out.println(path.getFileName().toString().split("\\.")[0]);
             int size = acTimes.size();
             System.out.println("ac min: " + acTimes.get(0));
-            System.out.println("ac max: " + acTimes.get(size -1));
+            System.out.println("ac max: " + acTimes.get(size - 1));
             if (size / 2 == 0)
             {
-                System.out.println("ac med: " + acTimes.get(size/2) + acTimes.get(size/2+1)/2);
+                System.out.println("ac med: " + acTimes.get(size / 2) + acTimes.get(size / 2 + 1) / 2);
             }
             else
             {
-                System.out.println("ac med: " + acTimes.get(size/2));
+                System.out.println("ac med: " + acTimes.get(size / 2));
             }
             long acSum = 0;
             for (int t : acTimes)
@@ -272,14 +276,14 @@ public class CacheLogAnalyzer
             System.out.println("ac 90p: " + acTimes.get(Math.round(size * 0.90f)));
 
             System.out.println("sr min: " + srTimes.get(0));
-            System.out.println("sr max: " + srTimes.get(size -1));
+            System.out.println("sr max: " + srTimes.get(size - 1));
             if (size / 2 == 0)
             {
-                System.out.println("sr med: " + srTimes.get(size/2) + srTimes.get(size/2+1)/2);
+                System.out.println("sr med: " + srTimes.get(size / 2) + srTimes.get(size / 2 + 1) / 2);
             }
             else
             {
-                System.out.println("sr med: " + srTimes.get(size/2));
+                System.out.println("sr med: " + srTimes.get(size / 2));
             }
             long srSum = 0;
             for (int t : srTimes)
@@ -292,14 +296,14 @@ public class CacheLogAnalyzer
             System.out.println("sr 90p: " + srTimes.get(Math.round(size * 0.90f)));
 
             System.out.println("r min: " + rTimes.get(0));
-            System.out.println("r max: " + rTimes.get(size -1));
+            System.out.println("r max: " + rTimes.get(size - 1));
             if (size / 2 == 0)
             {
-                System.out.println("r med: " + rTimes.get(size/2) + rTimes.get(size/2+1)/2);
+                System.out.println("r med: " + rTimes.get(size / 2) + rTimes.get(size / 2 + 1) / 2);
             }
             else
             {
-                System.out.println("r med: " + rTimes.get(size/2));
+                System.out.println("r med: " + rTimes.get(size / 2));
             }
             long rSum = 0;
             for (int t : rTimes)
@@ -311,7 +315,8 @@ public class CacheLogAnalyzer
             System.out.println("r 95p: " + rTimes.get(Math.round(size * 0.95f)));
             System.out.println("r 90p: " + rTimes.get(Math.round(size * 0.90f)));
         }
-        catch (IOException e) {
+        catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
@@ -415,15 +420,15 @@ public class CacheLogAnalyzer
         {
             StringBuilder sb = new StringBuilder();
             sb.append(cacheId).append(",")
-              .append(acTime).append(",")
-              .append(searchTime).append(",")
-              .append(readTime).append(",")
-              .append(acHit).append(",")
-              .append(acSize).append(",")
-              .append(timestamp.toString()).append(",")
-              .append(acLineNum).append(",")
-              .append(searchLineNum).append(",")
-              .append(readLineNum);
+                    .append(acTime).append(",")
+                    .append(searchTime).append(",")
+                    .append(readTime).append(",")
+                    .append(acHit).append(",")
+                    .append(acSize).append(",")
+                    .append(timestamp.toString()).append(",")
+                    .append(acLineNum).append(",")
+                    .append(searchLineNum).append(",")
+                    .append(readLineNum);
             return sb.toString();
         }
     }

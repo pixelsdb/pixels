@@ -15,6 +15,6 @@ public class PixelsFileVersionInvalidException
     public PixelsFileVersionInvalidException(int version)
     {
         super(String.format("This is not a valid file version %d for current reader %d",
-                            version, PixelsVersion.currentVersion().getVersion()));
+                version, PixelsVersion.currentVersion().getVersion()));
     }
 }

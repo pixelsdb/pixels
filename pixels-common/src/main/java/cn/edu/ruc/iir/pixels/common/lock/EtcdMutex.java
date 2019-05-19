@@ -13,7 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author: tao
  * @date: Create in 2018-10-27 14:33
  **/
-public class EtcdMutex implements InterProcessLock {
+public class EtcdMutex implements InterProcessLock
+{
     private final LockInternals internals;
     private final String basePath;
 
@@ -25,7 +26,8 @@ public class EtcdMutex implements InterProcessLock {
      * @param client client
      * @param path   the path to lock
      */
-    public EtcdMutex(Client client, String path) {
+    public EtcdMutex(Client client, String path)
+    {
         this(client, path, LOCK_NAME);
     }
 
@@ -34,7 +36,8 @@ public class EtcdMutex implements InterProcessLock {
      * @param path     the path to lock
      * @param lockName the lockName to lock
      */
-    EtcdMutex(Client client, String path, String lockName) {
+    EtcdMutex(Client client, String path, String lockName)
+    {
         this.threadData = Maps.newConcurrentMap();
         this.basePath = PathUtils.validatePath(path);
         internals = new LockInternals(client, path, lockName);
@@ -47,27 +50,36 @@ public class EtcdMutex implements InterProcessLock {
      *
      * @throws Exception errors, connection interruptions
      */
-    public void acquire() throws Exception {
-        if (!this.internalLock(-1L, (TimeUnit) null)) {
+    public void acquire() throws Exception
+    {
+        if (!this.internalLock(-1L, (TimeUnit) null))
+        {
             throw new IOException("Lost connection while trying to acquire lock: " + this.basePath);
         }
 
     }
 
-    private boolean internalLock(long time, TimeUnit unit) throws Exception {
+    private boolean internalLock(long time, TimeUnit unit) throws Exception
+    {
         Thread currentThread = Thread.currentThread();
         EtcdMutex.LockData lockData = (EtcdMutex.LockData) this.threadData.get(currentThread);
-        if (lockData != null) {
+        if (lockData != null)
+        {
             lockData.lockCount.incrementAndGet();
             return true;
-        } else {
+        }
+        else
+        {
             String lockPath = internals.attemptLock(time, unit);
             System.out.println("[attemptLock]: end, " + lockPath);
-            if (lockPath != null) {
+            if (lockPath != null)
+            {
                 EtcdMutex.LockData newLockData = new EtcdMutex.LockData(currentThread, lockPath);
                 this.threadData.put(currentThread, newLockData);
                 return true;
-            } else {
+            }
+            else
+            {
                 return false;
             }
         }
@@ -83,7 +95,8 @@ public class EtcdMutex implements InterProcessLock {
      * @return true if the mutex was acquired, false if not
      * @throws Exception errors, connection interruptions
      */
-    public boolean acquire(long time, TimeUnit unit) throws Exception {
+    public boolean acquire(long time, TimeUnit unit) throws Exception
+    {
         return this.internalLock(time, unit);
     }
 
@@ -92,7 +105,8 @@ public class EtcdMutex implements InterProcessLock {
      *
      * @return true/false
      */
-    public boolean isAcquiredInThisProcess() {
+    public boolean isAcquiredInThisProcess()
+    {
         return this.threadData.size() > 0;
     }
 
@@ -102,33 +116,42 @@ public class EtcdMutex implements InterProcessLock {
      *
      * @throws Exception errors, interruptions, current thread does not own the lock
      */
-    public void release() throws Exception {
+    public void release() throws Exception
+    {
         Thread currentThread = Thread.currentThread();
         LockData lockData = threadData.get(currentThread);
-        if (lockData == null) {
+        if (lockData == null)
+        {
             throw new IllegalMonitorStateException("You do not own the lock: " + basePath);
         }
 
         int newLockCount = lockData.lockCount.decrementAndGet();
-        if (newLockCount > 0) {
+        if (newLockCount > 0)
+        {
             return;
         }
-        if (newLockCount < 0) {
+        if (newLockCount < 0)
+        {
             throw new IllegalMonitorStateException("Lock count has gone negative for lock: " + basePath);
         }
-        try {
+        try
+        {
             internals.releaseLock(lockData.lockPath);
-        } finally {
+        }
+        finally
+        {
             threadData.remove(currentThread);
         }
     }
 
-    private static class LockData {
+    private static class LockData
+    {
         final Thread owningThread;
         final String lockPath;
         final AtomicInteger lockCount;
 
-        private LockData(Thread owningThread, String lockPath) {
+        private LockData(Thread owningThread, String lockPath)
+        {
             this.lockCount = new AtomicInteger(1);
             this.owningThread = owningThread;
             this.lockPath = lockPath;

@@ -32,7 +32,8 @@ public class UpdateCacheLayout
         final String schemaName = "pixels";
         final String tableName = "test_1187";
 
-        try {
+        try
+        {
             MetadataService metadataService = new MetadataService(metaHost, metaPort);
             Layout layoutv1 = metadataService.getLayout(schemaName, tableName, 1);
 
@@ -87,19 +88,20 @@ public class UpdateCacheLayout
 
             LayoutDao layoutDao = new LayoutDao();
             MetadataProto.Layout layoutv2 = MetadataProto.Layout.newBuilder()
-            .setId(21)
-            .setPermission(MetadataProto.Layout.Permission.READ_WRITE)
-            .setVersion(2)
-            .setCreateAt(System.currentTimeMillis())
-            .setOrder(layoutv1.getOrder())
-            .setOrderPath(layoutv1.getOrderPath())
-            .setCompact(JSON.toJSONString(compactv2))
-            .setCompactPath(layoutv1.getCompactPath())
-            .setSplits(layoutv1.getSplits())
-            .setTableId(layoutv1.getTableId()).build();
+                    .setId(21)
+                    .setPermission(MetadataProto.Layout.Permission.READ_WRITE)
+                    .setVersion(2)
+                    .setCreateAt(System.currentTimeMillis())
+                    .setOrder(layoutv1.getOrder())
+                    .setOrderPath(layoutv1.getOrderPath())
+                    .setCompact(JSON.toJSONString(compactv2))
+                    .setCompactPath(layoutv1.getCompactPath())
+                    .setSplits(layoutv1.getSplits())
+                    .setTableId(layoutv1.getTableId()).build();
             layoutDao.save(layoutv2);
         }
-        catch (MetadataException | IOException e) {
+        catch (MetadataException | IOException e)
+        {
             e.printStackTrace();
         }
     }

@@ -2,7 +2,8 @@ package cn.edu.ruc.iir.pixels.common.lock;
 
 import java.util.concurrent.TimeUnit;
 
-public interface InterProcessLock {
+public interface InterProcessLock
+{
 
     /**
      * Acquire the mutex - blocking until it's available. Each call to acquire must be balanced by a call

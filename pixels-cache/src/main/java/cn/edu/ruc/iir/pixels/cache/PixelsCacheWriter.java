@@ -179,11 +179,7 @@ public class PixelsCacheWriter
             String[] files = fileStr.split(";");
             return internalUpdate(version, layout, files);
         }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-            return -1;
-        } catch (FSException e)
+        catch (IOException | FSException e)
         {
             e.printStackTrace();
             return -1;
@@ -199,7 +195,7 @@ public class PixelsCacheWriter
         PixelsCacheIdx cacheIdx = new PixelsCacheIdx(cacheOffset, value.length);
         cacheFile.putBytes(cacheOffset, value);
         cacheOffset += value.length;
-        radix.put(key, cacheIdx);
+        radix.put(key.blockId, key.rowGroupId, key.columnId, cacheIdx);
     }
 
     /**
@@ -249,8 +245,8 @@ public class PixelsCacheWriter
                 }
                 else
                 {
-                    radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
-                              new PixelsCacheIdx(cacheOffset, physicalLen));
+                    radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
+                            new PixelsCacheIdx(cacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                     cacheFile.putBytes(cacheOffset, columnlet);
                     logger.debug(

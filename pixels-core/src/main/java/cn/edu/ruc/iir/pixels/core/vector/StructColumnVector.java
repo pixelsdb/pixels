@@ -66,14 +66,14 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
-    public void copyFrom(ColumnVector inputVector)
+    public void duplicate(ColumnVector inputVector)
     {
         if (inputVector instanceof StructColumnVector)
         {
             StructColumnVector srcVector = (StructColumnVector) inputVector;
             for (int i = 0; i < fields.length; i++)
             {
-                fields[i].copyFrom(srcVector.fields[i]);
+                fields[i].duplicate(srcVector.fields[i]);
             }
         }
     }

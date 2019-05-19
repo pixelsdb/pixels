@@ -90,7 +90,7 @@ public class BinaryStatsRecorder
             buf.append(sum);
         }
         buf.append(" numberOfValues: ")
-           .append(numberOfValues);
+                .append(numberOfValues);
         return buf.toString();
     }
 

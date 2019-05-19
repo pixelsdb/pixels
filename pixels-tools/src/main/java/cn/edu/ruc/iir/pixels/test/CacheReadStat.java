@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -80,12 +81,12 @@ public class CacheReadStat
         {
             long mapFileStartNano = System.nanoTime();
             cacheFile = new MemoryMappedFile(config.getProperty("cache.location"),
-                                             Long.parseLong(config.getProperty("cache.size")));
+                    Long.parseLong(config.getProperty("cache.size")));
             long mapFileEndNano = System.nanoTime();
             long cacheMemInitCost = mapFileEndNano - mapFileStartNano;
             mapFileStartNano = System.nanoTime();
             indexFile = new MemoryMappedFile(config.getProperty("index.location"),
-                                             Long.parseLong(config.getProperty("index.size")));
+                    Long.parseLong(config.getProperty("index.size")));
             mapFileEndNano = System.nanoTime();
             long indexMemInitCost = mapFileEndNano - mapFileStartNano;
             fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
@@ -106,7 +107,7 @@ public class CacheReadStat
             for (Path path : paths)
             {
                 if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText()
-                             .equalsIgnoreCase(hostName))
+                        .equalsIgnoreCase(hostName))
                 {
                     localFiles.add(path);
                 }
@@ -353,7 +354,7 @@ public class CacheReadStat
             {
                 PixelsProto.ColumnChunkIndex chunkIndex =
                         rowGroupFooters.get(columnletId.rgId).getRowGroupIndexEntry()
-                                       .getColumnChunkIndexEntries(columnletId.colId);
+                                .getColumnChunkIndexEntries(columnletId.colId);
                 chunkIndices.add(chunkIndex);
             }
             chunkIndices.sort(Comparator.comparingLong(PixelsProto.ColumnChunkIndex::getChunkOffset));
@@ -430,8 +431,8 @@ public class CacheReadStat
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
-                byte[] content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
-                size += content.length;
+                ByteBuffer content = cacheReader.get(blockId, columnletId.rgId, columnletId.colId);
+                size += content.capacity();
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;

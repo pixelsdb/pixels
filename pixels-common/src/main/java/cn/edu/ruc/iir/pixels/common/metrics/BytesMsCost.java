@@ -5,7 +5,9 @@ public class BytesMsCost
     private long bytes;
     private double ms;
 
-    public BytesMsCost() {}
+    public BytesMsCost()
+    {
+    }
 
     public BytesMsCost(long bytes, double ms)
     {
