@@ -310,7 +310,7 @@ public class CacheCoordinator
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
         for (String host : hosts) {
             builder.add(HostAddress.fromString(host));
-            break;
+//            break;
         }
         return builder.build();
     }
