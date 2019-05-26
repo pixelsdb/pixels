@@ -59,8 +59,6 @@ class PixelsPageSource implements ConnectorPageSource
     private int numColumnToRead;
     private int batchId;
     private VectorizedRowBatch rowBatch;
-    private volatile long nanoStart = 0L;
-    private volatile long nanoEnd;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory,
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
@@ -149,7 +147,7 @@ class PixelsPageSource implements ConnectorPageSource
     @Override
     public long getReadTimeNanos()
     {
-        return ((this.nanoStart > 0L) ? ((this.nanoEnd == 0L) ? System.nanoTime() : this.nanoEnd) - this.nanoStart : 0L);
+        return recordReader.getReadTimeNanos();
     }
 
     @Override
@@ -161,13 +159,10 @@ class PixelsPageSource implements ConnectorPageSource
     @Override
     public Page getNextPage()
     {
-        if (this.nanoStart == 0L)
-        {
-            this.nanoStart = System.nanoTime();
-        }
         try
         {
             this.batchId++;
+            // TODO: readBatch read data from file.
             this.rowBatch = this.recordReader.readBatch(BATCH_SIZE);
             int batchSize = this.rowBatch.size;
             if (batchSize <= 0 || (endOfFile && batchId > 1))
@@ -315,7 +310,6 @@ class PixelsPageSource implements ConnectorPageSource
                 pixelsReader.close();
             }
             rowBatch = null;
-            nanoEnd = System.nanoTime();
         } catch (Exception e)
         {
             logger.error("close error: " + e.getMessage());
