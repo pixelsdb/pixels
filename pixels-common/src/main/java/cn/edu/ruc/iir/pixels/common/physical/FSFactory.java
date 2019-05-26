@@ -72,7 +72,10 @@ public final class FSFactory
                     hdfsConfig.addResource(hdfsConfigFiles[1].toURI().toURL());
                     logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " + hdfsConfigFiles[1].toURI());
                 }
-                logger.debug("conf file not match");
+                else
+                {
+                    logger.debug("conf file not match");
+                }
             }
             else
             {

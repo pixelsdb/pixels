@@ -44,6 +44,7 @@ public class PixelsRecordReaderImpl
 
     private TypeDescription fileSchema;
     private boolean checkValid = false;
+    private boolean everPrepared = false;
     private boolean everRead = false;
     private long rowIndex = 0L;
     private boolean[] includedColumns;   // columns included by reader option; if included, set true
@@ -60,7 +61,8 @@ public class PixelsRecordReaderImpl
     private ByteBuffer[] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
-    private long completedBytes = 0L;
+    private long diskReadBytes = 0L;
+    private long cacheReadBytes = 0L;
     private long readTimeNanos = 0L;
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
@@ -201,15 +203,14 @@ public class PixelsRecordReaderImpl
         checkValid = true;
     }
 
-    // TODO: try Direct ByteBuffer to ease GC pressure.
-    private boolean read()
+    private boolean prepareRead()
     {
         if (!checkValid)
         {
             return false;
         }
 
-        everRead = true;
+        everPrepared = true;
 
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
                 = footer.getRowGroupStatsList();
@@ -312,6 +313,26 @@ public class PixelsRecordReaderImpl
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
+        return true;
+    }
+
+    // TODO: try Direct ByteBuffer to ease GC pressure.
+    private boolean read()
+    {
+        if (!checkValid)
+        {
+            return false;
+        }
+
+        if (!everPrepared)
+        {
+            if (prepareRead() == false)
+            {
+                return false;
+            }
+        }
+
+        everRead = true;
 
         // read chunk offset and length of each target column chunks
         this.chunkBuffers = new ByteBuffer[targetRGNum * includedColumns.length];
@@ -319,7 +340,6 @@ public class PixelsRecordReaderImpl
         // read cached data which are in need
         if (enableCache)
         {
-            long cacheReadSize = 0L;
             long blockId;
             try
             {
@@ -337,14 +357,16 @@ public class PixelsRecordReaderImpl
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     int rgId = rgIdx + RGStart;
-                    String cacheIdentifier = "" + rgId + ":" + colId;
+                    // TODO: not only columnlets in cacheOrder are cached.
+                    //String cacheIdentifier = rgId + ":" + colId;
                     // if cached, read from cache files
-                    if (cacheOrder.contains(cacheIdentifier))
-                    {
+                    //if (cacheOrder.contains(cacheIdentifier))
+                    //{
                         ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId);
                         cacheChunks.add(chunkId);
-                    }
+                    //}
                     // if cache miss, add chunkId to be read from disks
+                    /*
                     else
                     {
                         PixelsProto.RowGroupIndex rowGroupIndex =
@@ -356,6 +378,7 @@ public class PixelsRecordReaderImpl
                                 chunkIndex.getChunkLength());
                         diskChunks.add(chunk);
                     }
+                    */
                 }
             }
             // read cached chunks
@@ -369,7 +392,6 @@ public class PixelsRecordReaderImpl
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
-                completedBytes += columnlet.capacity();
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
@@ -392,11 +414,10 @@ public class PixelsRecordReaderImpl
                 }
                 else
                 {
-                    cacheReadSize += chunkBuffers[bufferIdx].capacity();
-//                    completedBytes += chunkBuffers[bufferIdx].length;
+                    this.cacheReadBytes += chunkBuffers[bufferIdx].capacity();
                 }
             }
-            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadSize + "," + cacheReadCost + "," + cacheReadSize * 1.0 / cacheReadCost);
+            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadBytes + "," + cacheReadCost + "," + cacheReadBytes * 1.0 / cacheReadCost);
         }
         else
         {
@@ -444,7 +465,7 @@ public class PixelsRecordReaderImpl
                 }
                 int offset = (int) seq.getOffset();
                 int length = (int) seq.getLength();
-                completedBytes += length;
+                diskReadBytes += length;
                 ByteBuffer chunkBlockBuffer = ByteBuffer.allocate(length);
 //                if (enableMetrics)
 //                {
@@ -492,6 +513,36 @@ public class PixelsRecordReaderImpl
         }
 
         return true;
+    }
+
+    /**
+     * Prepare for the next row batch.
+     *
+     * @param batchSize the willing batch size
+     * @return the real batch size
+     */
+    @Override
+    public int prepareBatch(int batchSize) throws IOException
+    {
+        if (!everPrepared)
+        {
+            if (prepareRead() == false)
+            {
+                throw new IOException("Failed to prepare for read.");
+            }
+        }
+        int curBatchSize = -curRowInRG;
+        for (int rgIdx = curRGIdx; rgIdx < targetRGNum; ++rgIdx)
+        {
+            int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
+            curBatchSize += rgRowCount;
+            if (curBatchSize >= batchSize)
+            {
+                curBatchSize = batchSize;
+                break;
+            }
+        }
+        return curBatchSize;
     }
 
     /**
@@ -570,7 +621,7 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(
                                     resultColumns[i]);
-                    // TODO: read chunk buffer lazily
+                    // TODO: read chunk buffer lazily when a column block is road by PixelsPageSource.
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
@@ -657,7 +708,7 @@ public class PixelsRecordReaderImpl
     @Override
     public long getCompletedBytes()
     {
-        return completedBytes;
+        return diskReadBytes + cacheReadBytes;
     }
 
     @Override
@@ -672,7 +723,8 @@ public class PixelsRecordReaderImpl
     @Override
     public void close()
     {
-        completedBytes = 0;
+        diskReadBytes = 0L;
+        cacheReadBytes = 0L;
         // release chunk buffer
         if (chunkBuffers != null)
         {
