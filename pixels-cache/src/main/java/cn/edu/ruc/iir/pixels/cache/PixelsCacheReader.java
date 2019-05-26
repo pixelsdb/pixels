@@ -24,7 +24,7 @@ public class PixelsCacheReader
 
     static
     {
-        new Thread(cacheLogger).start();
+        // new Thread(cacheLogger).start();
     }
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
