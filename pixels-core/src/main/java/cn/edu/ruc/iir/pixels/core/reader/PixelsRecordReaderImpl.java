@@ -5,12 +5,7 @@ import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.ChunkId;
-import cn.edu.ruc.iir.pixels.core.ChunkSeq;
-import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
-import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
-import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -20,13 +15,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * pixels
@@ -72,6 +61,7 @@ public class PixelsRecordReaderImpl
     private ColumnReader[] readers;      // column readers for each target columns
 
     private long completedBytes = 0L;
+    private long readTimeNanos = 0L;
 
     public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
                                   PixelsProto.PostScript postScript,
@@ -379,6 +369,7 @@ public class PixelsRecordReaderImpl
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+                completedBytes += columnlet.capacity();
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
@@ -537,11 +528,13 @@ public class PixelsRecordReaderImpl
 
         if (!everRead)
         {
+            long start = System.nanoTime();
             if (!read())
             {
                 resultRowBatch.endOfFile = true;
                 return resultRowBatch;
             }
+            readTimeNanos += System.nanoTime() - start;
         }
 
         // ensure size for result row batch
@@ -665,6 +658,12 @@ public class PixelsRecordReaderImpl
     public long getCompletedBytes()
     {
         return completedBytes;
+    }
+
+    @Override
+    public long getReadTimeNanos()
+    {
+        return readTimeNanos;
     }
 
     /**

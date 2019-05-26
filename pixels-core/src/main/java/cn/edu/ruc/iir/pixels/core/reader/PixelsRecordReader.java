@@ -62,6 +62,8 @@ public interface PixelsRecordReader
 
     long getCompletedBytes();
 
+    long getReadTimeNanos();
+
     /**
      * Cleanup and release resources
      *
