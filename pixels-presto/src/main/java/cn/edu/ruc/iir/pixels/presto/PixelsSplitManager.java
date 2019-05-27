@@ -166,7 +166,6 @@ public class PixelsSplitManager
                 int cacheBorder = compact.getCacheBorder();
                 List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
                 String cacheVersion;
-                // TODO: for experiments, make a cache for these.
                 EtcdUtil etcdUtil = EtcdUtil.Instance();
                 KeyValue keyValue = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
                 if(keyValue != null)
