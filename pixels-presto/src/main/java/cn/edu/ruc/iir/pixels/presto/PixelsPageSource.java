@@ -145,7 +145,6 @@ class PixelsPageSource implements ConnectorPageSource
     public Page getNextPage()
     {
         this.batchId++;
-        // TODO: readBatch read data from file.
         int batchSize = 0;
         try
         {
@@ -255,7 +254,7 @@ class PixelsPageSource implements ConnectorPageSource
                 try
                 {
                     // TODO: not read all the columns at a time.
-                    rowBatch = recordReader.readBatch(BATCH_SIZE);
+                    rowBatch = recordReader.readBatch(batchSize);
                 } catch (IOException e)
                 {
                     closeWithSuppression(e);
