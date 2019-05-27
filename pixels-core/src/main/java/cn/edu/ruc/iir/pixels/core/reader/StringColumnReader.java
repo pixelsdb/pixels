@@ -109,7 +109,8 @@ public class StringColumnReader
                     }
                     byte[] tmpBytes = new byte[tmpLen];
                     originsBuf.getBytes(starts[originId], tmpBytes);
-                    columnVector.setVal(i + vectorIndex, tmpBytes);
+                    // use setRef instead of setVal to reduce memory copy.
+                    columnVector.setRef(i + vectorIndex, tmpBytes, 0, tmpLen);
                 }
                 if (hasNull)
                 {
@@ -149,7 +150,8 @@ public class StringColumnReader
                     int len = (int) lensDecoder.next();
                     byte[] tmpBytes = new byte[len];
                     contentBuf.readBytes(tmpBytes);
-                    columnVector.setVal(i + vectorIndex, tmpBytes);
+                    // use setRef instead of setVal to reduce memory copy.
+                    columnVector.setRef(i + vectorIndex, tmpBytes, 0, len);
                 }
                 if (hasNull)
                 {
