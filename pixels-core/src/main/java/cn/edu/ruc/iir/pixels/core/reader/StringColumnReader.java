@@ -73,6 +73,9 @@ public class StringColumnReader
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read original bytes
+            // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
+            byte[] buffer = new byte[originsBuf.capacity()];
+            originsBuf.getBytes(0, buffer);
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -107,10 +110,8 @@ public class StringColumnReader
                     {
                         tmpLen = startsOffset - originsOffset - starts[originId];
                     }
-                    byte[] tmpBytes = new byte[tmpLen];
-                    originsBuf.getBytes(starts[originId], tmpBytes);
                     // use setRef instead of setVal to reduce memory copy.
-                    columnVector.setRef(i + vectorIndex, tmpBytes, 0, tmpLen);
+                    columnVector.setRef(i + vectorIndex, buffer, starts[originId], tmpLen);
                 }
                 if (hasNull)
                 {
@@ -123,6 +124,10 @@ public class StringColumnReader
         else
         {
             // read values
+            // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
+            byte[] buffer = new byte[contentBuf.capacity()];
+            contentBuf.getBytes(0, buffer);
+            int index = 0;
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -148,10 +153,9 @@ public class StringColumnReader
                 else
                 {
                     int len = (int) lensDecoder.next();
-                    byte[] tmpBytes = new byte[len];
-                    contentBuf.readBytes(tmpBytes);
                     // use setRef instead of setVal to reduce memory copy.
-                    columnVector.setRef(i + vectorIndex, tmpBytes, 0, len);
+                    columnVector.setRef(i + vectorIndex, buffer, index, len);
+                    index += len;
                 }
                 if (hasNull)
                 {

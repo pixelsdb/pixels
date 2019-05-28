@@ -315,19 +315,20 @@ class PixelsPageSource implements ConnectorPageSource
                 case "string":
                     BytesColumnVector scv = (BytesColumnVector) cv;
                     int vectorContentLen = 0;
+                    byte[] vectorContent = null;
+                    int[] vectorOffsets = new int[rowBatch.size + 1];
+                    int curVectorOffset = 0;
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
                         vectorContentLen += scv.lens[i];
                     }
-                    byte[] vectorContent = new byte[vectorContentLen];
-                    int[] vectorOffsets = new int[rowBatch.size + 1];
-                    int curVectorOffset = 0;
+                    vectorContent = new byte[vectorContentLen];
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
                         int elementLen = scv.lens[i];
                         if (!scv.isNull[i])
                         {
-                            // TODO: try to eliminate this memory copy.
+                            // TODO: remove this memory copy by implementing new Block and BlockBuilder.
                             System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
                         }
                         vectorOffsets[i] = curVectorOffset;
