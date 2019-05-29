@@ -145,7 +145,6 @@ class PixelsPageSource implements ConnectorPageSource
     public Page getNextPage()
     {
         this.batchId++;
-        // TODO: readBatch read data from file.
         int batchSize = 0;
         try
         {
@@ -254,8 +253,8 @@ class PixelsPageSource implements ConnectorPageSource
             {
                 try
                 {
-                    // TODO: not read all the columns at a time.
-                    rowBatch = recordReader.readBatch(BATCH_SIZE);
+                    // TODO: to reduce GC pressure, not read all the columns at a time.
+                    rowBatch = recordReader.readBatch(batchSize);
                 } catch (IOException e)
                 {
                     closeWithSuppression(e);
@@ -273,7 +272,6 @@ class PixelsPageSource implements ConnectorPageSource
 
             String typeName = type.getDisplayName();
             int projIndex = rowBatch.projectedColumns[columnIndex];
-            // TODO: read column lazily.
             ColumnVector cv = rowBatch.cols[projIndex];
             BlockBuilder blockBuilder = type.createBlockBuilder(
                     new BlockBuilderStatus(), rowBatch.size);
@@ -285,20 +283,20 @@ class PixelsPageSource implements ConnectorPageSource
                 case "long":
                 case "int":
                     LongColumnVector lcv = (LongColumnVector) cv;
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        if (lcv.isNull[i])
-                        {
-                            blockBuilder.appendNull();
-                        } else
-                        {
-                            type.writeLong(blockBuilder, lcv.vector[i]);
-                        }
-                    }
-                    block = blockBuilder.build();
+                    block = new LongArrayBlock(rowBatch.size, lcv.isNull, lcv.vector);
                     break;
                 case "double":
                 case "float":
+                    /**
+                     * According to cn.edu.ruc.iir.pixels.core.TypeDescription.createColumn(),
+                     * both float and double type use DoubleColumnVector, while they use
+                     * FloatColumnReader and DoubleColumnReader respectively according to
+                     * cn.edu.ruc.iir.pixels.reader.ColumnReader.newColumnReader().
+                     * TODO: these two column should also support reading to LongColumnVector,
+                     * without conversions like longBitsToDouble, so that we can directly create
+                     * LongArrayBlock here without writeDouble (in which double is converted to long).
+                     * With this optimization, CPU and GC pressure can be greatly reduced.
+                     */
                     DoubleColumnVector dcv = (DoubleColumnVector) cv;
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
@@ -307,6 +305,7 @@ class PixelsPageSource implements ConnectorPageSource
                             blockBuilder.appendNull();
                         } else
                         {
+                            // type is DoubleType for double, not sure for float.
                             type.writeDouble(blockBuilder, dcv.vector[i]);
                         }
                     }
@@ -316,19 +315,20 @@ class PixelsPageSource implements ConnectorPageSource
                 case "string":
                     BytesColumnVector scv = (BytesColumnVector) cv;
                     int vectorContentLen = 0;
+                    byte[] vectorContent;
+                    int[] vectorOffsets = new int[rowBatch.size + 1];
+                    int curVectorOffset = 0;
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
                         vectorContentLen += scv.lens[i];
                     }
-                    byte[] vectorContent = new byte[vectorContentLen];
-                    int[] vectorOffsets = new int[rowBatch.size + 1];
-                    int curVectorOffset = 0;
+                    vectorContent = new byte[vectorContentLen];
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
                         int elementLen = scv.lens[i];
                         if (!scv.isNull[i])
                         {
-                            // TODO: try to eliminate this memory copy.
+                            // TODO: remove this memory copy by implementing user defined Block and BlockBuilder.
                             System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
                         }
                         vectorOffsets[i] = curVectorOffset;
@@ -341,6 +341,7 @@ class PixelsPageSource implements ConnectorPageSource
                             scv.isNull);
                     break;
                 case "boolean":
+                    // TODO: optimization needed for boolean.
                     LongColumnVector bcv = (LongColumnVector) cv;
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
@@ -355,6 +356,7 @@ class PixelsPageSource implements ConnectorPageSource
                     block = blockBuilder.build();
                     break;
                 case "timestamp":
+                    // TODO: optimization needed for timestamp
                     TimestampColumnVector tcv = (TimestampColumnVector) cv;
                     for (int i = 0; i < rowBatch.size; ++i)
                     {
