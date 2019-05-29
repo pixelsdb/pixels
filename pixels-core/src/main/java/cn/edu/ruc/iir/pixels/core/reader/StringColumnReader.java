@@ -74,8 +74,10 @@ public class StringColumnReader
         {
             // read original bytes
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
-            byte[] buffer = new byte[originsBuf.capacity()];
-            originsBuf.getBytes(0, buffer);
+            byte[] buffer = originsBuf.array();
+            // The available first byte in buffer should start from originsOffset.
+            // TODO: check if this is always true.
+            int bufferStart = originsOffset;
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -111,7 +113,7 @@ public class StringColumnReader
                         tmpLen = startsOffset - originsOffset - starts[originId];
                     }
                     // use setRef instead of setVal to reduce memory copy.
-                    columnVector.setRef(i + vectorIndex, buffer, starts[originId], tmpLen);
+                    columnVector.setRef(i + vectorIndex, buffer, bufferStart + starts[originId], tmpLen);
                 }
                 if (hasNull)
                 {
@@ -125,8 +127,7 @@ public class StringColumnReader
         {
             // read values
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
-            byte[] buffer = new byte[contentBuf.capacity()];
-            contentBuf.getBytes(0, buffer);
+            byte[] buffer = contentBuf.array();
             int index = 0;
             for (int i = 0; i < size; i++)
             {
