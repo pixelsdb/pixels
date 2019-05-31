@@ -7,6 +7,7 @@ import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.*;
+import cn.edu.ruc.iir.pixels.presto.block.VarcharArrayBlock;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
@@ -14,7 +15,6 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slices;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
@@ -314,6 +314,7 @@ class PixelsPageSource implements ConnectorPageSource
                 case "varchar":
                 case "string":
                     BytesColumnVector scv = (BytesColumnVector) cv;
+                    /*
                     int vectorContentLen = 0;
                     byte[] vectorContent;
                     int[] vectorOffsets = new int[rowBatch.size + 1];
@@ -339,6 +340,8 @@ class PixelsPageSource implements ConnectorPageSource
                             Slices.wrappedBuffer(vectorContent, 0, vectorContentLen),
                             vectorOffsets,
                             scv.isNull);
+                            */
+                    block = new VarcharArrayBlock(rowBatch.size, scv.vector, scv.start, scv.lens, scv.isNull);
                     break;
                 case "boolean":
                     // TODO: optimization needed for boolean.
