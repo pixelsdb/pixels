@@ -13,18 +13,22 @@
  */
 package cn.edu.ruc.iir.pixels.presto.block;
 
-import com.facebook.presto.spi.block.AbstractVariableWidthBlock;
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockEncoding;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.airlift.slice.XxHash64;
 import org.openjdk.jol.info.ClassLayout;
+import sun.misc.Unsafe;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
-import static cn.edu.ruc.iir.pixels.presto.block.BlockUtil.checkArrayRange;
-import static cn.edu.ruc.iir.pixels.presto.block.BlockUtil.checkValidRegion;
+import static cn.edu.ruc.iir.pixels.presto.block.BlockUtil.*;
 import static io.airlift.slice.SizeOf.sizeOf;
+import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 /**
  * This class refers to com.facebook.presto.spi.block.VariableWidthBlock and AbstractVariableWidthBlock.
@@ -37,26 +41,51 @@ import static io.airlift.slice.SizeOf.sizeOf;
  * Created at: 19-5-31
  * Author: hank
  */
-public class VarcharArrayBlock extends AbstractVariableWidthBlock
+public class VarcharArrayBlock implements Block
 {
+    static final Unsafe unsafe;
+    static final long address;
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VarcharArrayBlock.class).instanceSize();
 
     private final int arrayOffset;
     private final int positionCount;
     private final byte[][] values;
-    private final int[] starts;
+    private final int[] offsets;
     private final int[] lengths;
     private final boolean[] valueIsNull;
 
     private final long retainedSizeInBytes;
     private final long sizeInBytes;
 
-    public VarcharArrayBlock(int positionCount, byte[][] values, int[] starts, int[] lengths, boolean[] valueIsNull)
+    static
     {
-        this(0, positionCount, values, starts, lengths, valueIsNull);
+        try
+        {
+            /**
+             * refer to io.airlift.slice.JvmUtils
+             */
+            // fetch theUnsafe object
+            Field field = Unsafe.class.getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            unsafe = (Unsafe) field.get(null);
+            if (unsafe == null)
+            {
+                throw new RuntimeException("Unsafe access not available");
+            }
+            address = ARRAY_BYTE_BASE_OFFSET;
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
-    VarcharArrayBlock(int arrayOffset, int positionCount, byte[][] values, int[] starts, int[] lengths, boolean[] valueIsNull)
+    public VarcharArrayBlock(int positionCount, byte[][] values, int[] offsets, int[] lengths, boolean[] valueIsNull)
+    {
+        this(0, positionCount, values, offsets, lengths, valueIsNull);
+    }
+
+    VarcharArrayBlock(int arrayOffset, int positionCount, byte[][] values, int[] offsets, int[] lengths, boolean[] valueIsNull)
     {
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
@@ -72,10 +101,10 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
         }
         this.values = values;
 
-        if (starts == null || starts.length - arrayOffset < (positionCount)) {
-            throw new IllegalArgumentException("starts is null or its length is less than positionCount");
+        if (offsets == null || offsets.length - arrayOffset < (positionCount)) {
+            throw new IllegalArgumentException("offsets is null or its length is less than positionCount");
         }
-        this.starts = starts;
+        this.offsets = offsets;
 
         if (lengths == null || lengths.length - arrayOffset < (positionCount)) {
             throw new IllegalArgumentException("lengths is null or its length is less than positionCount");
@@ -94,16 +123,15 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
             retainedSize += valueIsNull[arrayOffset + i] ? 0L : values[arrayOffset + i].length;
         }
         sizeInBytes = size;
-        retainedSizeInBytes = INSTANCE_SIZE + retainedSize + sizeOf(valueIsNull) + sizeOf(starts) + sizeOf(lengths);
+        retainedSizeInBytes = INSTANCE_SIZE + retainedSize + sizeOf(valueIsNull) + sizeOf(offsets) + sizeOf(lengths);
     }
 
     /**
      * Gets the start offset of the value at the {@code position}.
      */
-    @Override
     protected final int getPositionOffset(int position)
     {
-        return starts[position + arrayOffset];
+        return offsets[position + arrayOffset];
     }
 
     /**
@@ -115,12 +143,6 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
     {
         checkReadablePosition(position);
         return lengths[position + arrayOffset];
-    }
-
-    @Override
-    protected boolean isEntryNull(int position)
-    {
-        return valueIsNull[position + arrayOffset];
     }
 
     @Override
@@ -178,7 +200,7 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
             retainedSize += valueIsNull[arrayOffset + i] ? 0L : values[arrayOffset + i].length;
         }
         consumer.accept(values, retainedSize);
-        consumer.accept(starts, sizeOf(starts));
+        consumer.accept(offsets, sizeOf(offsets));
         consumer.accept(lengths, sizeOf(lengths));
         consumer.accept(valueIsNull, sizeOf(valueIsNull));
         consumer.accept(this, (long) INSTANCE_SIZE);
@@ -208,21 +230,26 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
             }
             else {
                 // we only copy the valid part of each value.
+                int from  = offsets[position + arrayOffset];
                 newLengths[i] = lengths[position + arrayOffset];
                 newValues[i] = Arrays.copyOfRange(values[position + arrayOffset],
-                        starts[position + arrayOffset], newLengths[i]);
+                        from, from + newLengths[i]);
                 // newStarts is 0.
             }
         }
         return new VarcharArrayBlock(length, newValues, newStarts, newLengths, newValueIsNull);
     }
 
-    @Override
     protected Slice getRawSlice(int position)
     {
         // do not specify the offset and length for wrappedBuffer,
         // a raw slice should contain the whole bytes of value at the position.
         return Slices.wrappedBuffer(values[position + arrayOffset]);
+    }
+
+    protected byte[] getRawValue(int position)
+    {
+        return values[position + arrayOffset];
     }
 
     /**
@@ -239,7 +266,7 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        return new VarcharArrayBlock(positionOffset + arrayOffset, length, values, starts, lengths, valueIsNull);
+        return new VarcharArrayBlock(positionOffset + arrayOffset, length, values, offsets, lengths, valueIsNull);
     }
 
     /**
@@ -254,15 +281,16 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
     @Override
     public Block getSingleValueBlock(int position)
     {
+        checkReadablePosition(position);
         byte[][] copy = new byte[1][];
         if (isNull(position)) {
             return new VarcharArrayBlock(1, copy, new int[] {0}, new int[] {0}, new boolean[] {true});
         }
 
-        int offset = getPositionOffset(position);
-        int entrySize = getSliceLength(position);
+        int offset = offsets[position + arrayOffset];
+        int entrySize = lengths[position + arrayOffset];
         copy[0] = Arrays.copyOfRange(values[position + arrayOffset],
-                offset, entrySize);
+                offset, offset + entrySize);
 
         return new VarcharArrayBlock(1, copy, new int[] {0}, new int[] {entrySize}, new boolean[] {false});
     }
@@ -296,11 +324,120 @@ public class VarcharArrayBlock extends AbstractVariableWidthBlock
                 // we only copy the valid part of each value.
                 newLengths[i] = lengths[positionOffset + i];
                 newValues[i] = Arrays.copyOfRange(values[positionOffset + i],
-                        starts[positionOffset + i], newLengths[i]);
+                        offsets[positionOffset + i], offsets[positionOffset + i] + newLengths[i]);
                 // newStarts is 0.
             }
         }
         return new VarcharArrayBlock(length, newValues, newStarts, newLengths, newValueIsNull);
+    }
+
+    @Override
+    public BlockEncoding getEncoding()
+    {
+        return new VarcharArrayBlockEncoding();
+    }
+
+    @Override
+    public byte getByte(int position, int offset)
+    {
+        checkReadablePosition(position);
+        return unsafe.getByte(getRawValue(position), address + getPositionOffset(position) + offset);
+    }
+
+    @Override
+    public short getShort(int position, int offset)
+    {
+        checkReadablePosition(position);
+        return unsafe.getShort(getRawValue(position), address + getPositionOffset(position) + offset);
+    }
+
+    @Override
+    public int getInt(int position, int offset)
+    {
+        checkReadablePosition(position);
+        return unsafe.getInt(getRawValue(position), address + getPositionOffset(position) + offset);
+    }
+
+    @Override
+    public long getLong(int position, int offset)
+    {
+        checkReadablePosition(position);
+        return unsafe.getLong(getRawValue(position), address + getPositionOffset(position) + offset);
+    }
+
+    @Override
+    public Slice getSlice(int position, int offset, int length)
+    {
+        checkReadablePosition(position);
+        return getRawSlice(position).slice(getPositionOffset(position) + offset, length);
+    }
+
+    @Override
+    public boolean equals(int position, int offset, Block otherBlock, int otherPosition, int otherOffset, int length)
+    {
+        checkReadablePosition(position);
+        Slice rawSlice = getRawSlice(position);
+        if (getSliceLength(position) < length) {
+            return false;
+        }
+        return otherBlock.bytesEqual(otherPosition, otherOffset, rawSlice, getPositionOffset(position) + offset, length);
+    }
+
+    @Override
+    public boolean bytesEqual(int position, int offset, Slice otherSlice, int otherOffset, int length)
+    {
+        checkReadablePosition(position);
+        return getRawSlice(position).equals(getPositionOffset(position) + offset, length, otherSlice, otherOffset, length);
+    }
+
+    @Override
+    public long hash(int position, int offset, int length)
+    {
+        checkReadablePosition(position);
+        return XxHash64.hash(getRawSlice(position), getPositionOffset(position) + offset, length);
+    }
+
+    @Override
+    public int compareTo(int position, int offset, int length, Block otherBlock, int otherPosition, int otherOffset, int otherLength)
+    {
+        checkReadablePosition(position);
+        Slice rawSlice = getRawSlice(position);
+        if (getSliceLength(position) < length) {
+            throw new IllegalArgumentException("Length longer than value length");
+        }
+        return -otherBlock.bytesCompare(otherPosition, otherOffset, otherLength, rawSlice, getPositionOffset(position) + offset, length);
+    }
+
+    @Override
+    public int bytesCompare(int position, int offset, int length, Slice otherSlice, int otherOffset, int otherLength)
+    {
+        checkReadablePosition(position);
+        return getRawSlice(position).compareTo(getPositionOffset(position) + offset, length, otherSlice, otherOffset, otherLength);
+    }
+
+    @Override
+    public boolean isNull(int position)
+    {
+        checkReadablePosition(position);
+        return valueIsNull[position + arrayOffset];
+    }
+
+    protected void checkReadablePosition(int position)
+    {
+        checkValidPosition(position, getPositionCount());
+    }
+
+    @Override
+    public void writeBytesTo(int position, int offset, int length, BlockBuilder blockBuilder)
+    {
+        checkReadablePosition(position);
+        blockBuilder.writeBytes(getRawSlice(position), getPositionOffset(position) + offset, length);
+    }
+
+    @Override
+    public void writePositionTo(int position, BlockBuilder blockBuilder)
+    {
+        writeBytesTo(position, 0, getSliceLength(position), blockBuilder);
     }
 
     @Override
