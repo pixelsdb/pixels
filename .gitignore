@@ -23,4 +23,5 @@ test30G_pixels/
 *.csv
 resources/*.xml
 *.so
+*.o
 .vscode

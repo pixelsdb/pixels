@@ -13,6 +13,14 @@ public interface PixelsRecordReader
         extends AutoCloseable
 {
     /**
+     * Prepare for the next row batch.
+     *
+     * @param batchSize the willing batch size
+     * @return the real batch size
+     */
+    int prepareBatch(int batchSize) throws IOException;
+
+    /**
      * Read the next row batch.
      *
      * @param batchSize the row batch size
@@ -61,6 +69,8 @@ public interface PixelsRecordReader
             throws IOException;
 
     long getCompletedBytes();
+
+    long getReadTimeNanos();
 
     /**
      * Cleanup and release resources
