@@ -8,6 +8,7 @@ import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.presto.block.VarcharArrayBlock;
+import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
@@ -30,8 +31,7 @@ import static java.util.Objects.requireNonNull;
 class PixelsPageSource implements ConnectorPageSource
 {
     private static Logger logger = Logger.get(PixelsPageSource.class);
-    // TODO: make this parameter configurable.
-    private static final int BATCH_SIZE = 10000;
+    private final int BatchSize;
     private List<PixelsColumnHandle> columns;
     private FSFactory fsFactory;
     private boolean closed;
@@ -61,6 +61,7 @@ class PixelsPageSource implements ConnectorPageSource
         getPixelsReaderBySchema(split, pixelsCacheReader, pixelsFooterCache);
 
         this.recordReader = this.pixelsReader.read(this.option);
+        this.BatchSize = PixelsPrestoConfig.getBatchSize();
     }
 
     private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader, PixelsFooterCache pixelsFooterCache)
@@ -148,7 +149,7 @@ class PixelsPageSource implements ConnectorPageSource
         int batchSize = 0;
         try
         {
-            batchSize = this.recordReader.prepareBatch(BATCH_SIZE);
+            batchSize = this.recordReader.prepareBatch(BatchSize);
         } catch (IOException e)
         {
             closeWithSuppression(e);
