@@ -157,7 +157,7 @@ public class PixelsSplitManager
                 // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestPattern.getSplitSize();
             }
-            log.info("using split size: " + splitSize);
+            log.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
             if(this.cacheEnabled)
@@ -172,7 +172,7 @@ public class PixelsSplitManager
                 {
                     // 1. get version
                     cacheVersion = keyValue.getValue().toStringUtf8();
-                    log.info("cache version: " + cacheVersion);
+                    log.debug("cache version: " + cacheVersion);
                     // 2. get files of each node
                     List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
                     if(nodeFiles.size() > 0)
@@ -206,7 +206,7 @@ public class PixelsSplitManager
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         path.toString(), 0, 1,
                                         false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
-                                log.info("Split in orderPath: " + pixelsSplit.toString());
+                                log.debug("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
                             // 4. add splits in compactPath
@@ -224,7 +224,7 @@ public class PixelsSplitManager
                                                                               hdfsFile, curFileRGIdx, splitSize,
                                                                               true, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
                                     pixelsSplits.add(pixelsSplit);
-                                    log.info("Split in compactPath" + pixelsSplit.toString());
+                                    log.debug("Split in compactPath" + pixelsSplit.toString());
                                     curFileRGIdx += splitSize;
                                 }
                             }
@@ -247,7 +247,7 @@ public class PixelsSplitManager
             }
             else
             {
-                log.info("cache is not enabled");
+                log.debug("cache is disabled");
                 List<Path> orderedPaths;
 //                Balancer orderedBalancer = new Balancer();
                 List<Path> compactPaths;
@@ -311,8 +311,8 @@ public class PixelsSplitManager
             }
         }
 
-        log.info("=====shuffle splits====");
-        log.info("number of total splits: " + pixelsSplits.size());
+        log.debug("=====shuffle splits====");
+        log.debug("number of total splits: " + pixelsSplits.size());
 
         Collections.shuffle(pixelsSplits);
 
@@ -326,7 +326,7 @@ public class PixelsSplitManager
             index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
-            log.info("getInverted error: " + e.getMessage());
+            log.error("getInverted error: " + e.getMessage());
             throw new PrestoException(PIXELS_INVERTED_INDEX_ERROR, e);
         }
         return index;
