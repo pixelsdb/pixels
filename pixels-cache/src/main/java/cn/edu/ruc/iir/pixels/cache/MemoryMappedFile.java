@@ -28,7 +28,7 @@ import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 
 /**
- * Comment added by Pixels author:
+ * By Pixels author:
  * This class has been tested.
  * It can read and write memory mapped file which is larger than 2GB.
  * When the backing file is located under /dev/shm/, it works as a shared memory.
