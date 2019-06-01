@@ -1,6 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto.impl;
 
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Schema;
@@ -10,7 +11,6 @@ import cn.edu.ruc.iir.pixels.presto.PixelsColumnHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTable;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableHandle;
 import cn.edu.ruc.iir.pixels.presto.PixelsTableLayoutHandle;
-import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -21,12 +21,7 @@ import io.airlift.log.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
-import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
-import static com.facebook.presto.spi.type.IntegerType.INTEGER;
-import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static cn.edu.ruc.iir.pixels.presto.PixelsTypeManager.getColumnType;
 
 /**
  * Created by hank on 18-6-18.
@@ -82,22 +77,12 @@ public class PixelsMetadataProxy
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
-            Type columnType = null;
-            String name = c.getName();
-            String type = c.getType().toLowerCase();
-            if (type.equals("int")) {
-                columnType = INTEGER;
-            } else if (type.equals("bigint") || type.equals("long")) {
-                columnType = BIGINT;
-            } else if (type.equals("double")|| type.equals("float")) {
-                columnType = DOUBLE;
-            } else if (type.equals("varchar") || type.equals("string")) {
-                columnType = VARCHAR;
-            } else if (type.equals("boolean")) {
-                columnType = BOOLEAN;
-            } else if (type.equals("timestamp")) {
-                columnType = TIMESTAMP;
+            Type columnType = getColumnType(c);
+            if (columnType == null)
+            {
+                log.error("columnType is not defined.");
             }
+            String name = c.getName();
             ColumnMetadata columnMetadata = new ColumnMetadata(name, columnType);
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
 
@@ -114,24 +99,12 @@ public class PixelsMetadataProxy
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
-            Type columnType = null;
-            String name = c.getName();
-            String type = c.getType().toLowerCase();
-            if (type.equals("integer") || type.equals("int")) {
-                columnType = INTEGER;
-            } else if (type.equals("bigint") || type.equals("long")) {
-                columnType = BIGINT;
-            } else if (type.equals("double")|| type.equals("float")) {
-                columnType = DOUBLE;
-            } else if (type.equals("varchar") || type.equals("string")) {
-                columnType = VARCHAR;
-            } else if (type.equals("boolean")) {
-                columnType = BOOLEAN;
-            } else if (type.equals("timestamp")) {
-                columnType = TIMESTAMP;
-            } else {
+            Type columnType = getColumnType(c);
+            if (columnType == null)
+            {
                 log.error("columnType is not defined.");
             }
+            String name = c.getName();
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
             columns.add(pixelsColumnHandle);
         }

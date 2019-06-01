@@ -280,13 +280,11 @@ class PixelsPageSource implements ConnectorPageSource
             {
                 case "integer":
                 case "bigint":
-                case "long":
-                case "int":
                     LongColumnVector lcv = (LongColumnVector) cv;
                     block = new LongArrayBlock(rowBatch.size, lcv.isNull, lcv.vector);
                     break;
                 case "double":
-                case "float":
+                case "real":
                     /**
                      * According to cn.edu.ruc.iir.pixels.core.TypeDescription.createColumn(),
                      * both float and double type use DoubleColumnVector, while they use
@@ -312,7 +310,6 @@ class PixelsPageSource implements ConnectorPageSource
                     block = blockBuilder.build();
                     break;
                 case "varchar":
-                case "string":
                     BytesColumnVector scv = (BytesColumnVector) cv;
                     /*
                     int vectorContentLen = 0;
