@@ -5,7 +5,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntDecoder;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
 import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -55,7 +55,7 @@ public class StringColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
-        BytesColumnVector columnVector = (BytesColumnVector) vector;
+        BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         if (offset == 0)
         {
             if (inputBuffer != null)

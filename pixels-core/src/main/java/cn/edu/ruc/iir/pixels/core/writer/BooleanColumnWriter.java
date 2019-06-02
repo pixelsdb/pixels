@@ -2,6 +2,7 @@ package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
+import cn.edu.ruc.iir.pixels.core.vector.ByteColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -15,7 +16,7 @@ import java.io.IOException;
  */
 public class BooleanColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];
+    private final byte[] curPixelVector = new byte[pixelStride];
 
     public BooleanColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -26,8 +27,8 @@ public class BooleanColumnWriter extends BaseColumnWriter
     public int write(ColumnVector vector, int size)
             throws IOException
     {
-        LongColumnVector columnVector = (LongColumnVector) vector;
-        long[] values = columnVector.vector;
+        ByteColumnVector columnVector = (ByteColumnVector) vector;
+        byte[] values = columnVector.vector;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -47,7 +48,7 @@ public class BooleanColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurBoolean(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurBoolean(ByteColumnVector columnVector, byte[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {

@@ -77,7 +77,7 @@ public class FloatColumnReader
             }
             else
             {
-                columnVector.vector[i + vectorIndex] = encodingUtils.readFloat(this.input, inputIndex);
+                columnVector.vector[i + vectorIndex] = encodingUtils.readIntLE(this.input, inputIndex);
                 inputIndex += 4;
             }
             if (hasNull)

@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
@@ -52,19 +52,19 @@ public class TestColumnVector
         VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
         LongColumnVector src0 = (LongColumnVector) srcRowBatch.cols[0];
         DoubleColumnVector src1 = (DoubleColumnVector) srcRowBatch.cols[1];
-        BytesColumnVector src2 = (BytesColumnVector) srcRowBatch.cols[2];
+        BinaryColumnVector src2 = (BinaryColumnVector) srcRowBatch.cols[2];
         TimestampColumnVector src3 = (TimestampColumnVector) srcRowBatch.cols[3];
 
         VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
         LongColumnVector dst0 = (LongColumnVector) dstRowBatch.cols[0];
         DoubleColumnVector dst1 = (DoubleColumnVector) dstRowBatch.cols[1];
-        BytesColumnVector dst2 = (BytesColumnVector) dstRowBatch.cols[2];
+        BinaryColumnVector dst2 = (BinaryColumnVector) dstRowBatch.cols[2];
         TimestampColumnVector dst3 = (TimestampColumnVector) dstRowBatch.cols[3];
 
         for (int i = 0; i < testNum; i++)
         {
             src0.vector[i] = i;
-            src1.vector[i] = i * 1.0d;
+            src1.vector[i] = i;
             src2.setVal(i, String.valueOf(i).getBytes());
             src3.set(i, Timestamp.valueOf("2018-05-07 20:39:20"));
         }
@@ -111,7 +111,7 @@ public class TestColumnVector
     @Test
     public void testBytesColumnVector()
     {
-        BytesColumnVector cv = new BytesColumnVector();
+        BinaryColumnVector cv = new BinaryColumnVector();
         cv.init();
         cv.ensureSize(1000, false);
         for (int i = 0; i < 10000; i++)
