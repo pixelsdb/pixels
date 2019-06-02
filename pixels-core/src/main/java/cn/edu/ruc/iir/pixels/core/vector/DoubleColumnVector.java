@@ -11,13 +11,18 @@ import java.util.Arrays;
  * During copy-in/copy-out, smaller types (i.e. float) will be converted as needed. This will
  * reduce the amount of code that needs to be generated and also will run fast since the
  * machine operates with 64-bit words.
+ *
+ * Double values in this ColumnVector are stored int a long array by default.
+ * Call <code>toDoubleValues()</code> to fill <code>dValues</code> array before reading double values.
+ *
  * <p>
  * The vector[] field is public by design for high-performance access in the inner
  * loop of query execution.
  */
 public class DoubleColumnVector extends ColumnVector
 {
-    public double[] vector;
+    public double[] dValues;
+    public long[] vector;
     public static final double NULL_VALUE = Double.NaN;
 
     /**
@@ -37,7 +42,7 @@ public class DoubleColumnVector extends ColumnVector
     public DoubleColumnVector(int len)
     {
         super(len);
-        vector = new double[len];
+        vector = new long[len];
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
@@ -97,7 +102,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        vector[0] = value;
+        vector[0] = Double.doubleToLongBits(value);
     }
 
     // Fill the column vector with nulls
@@ -105,7 +110,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         noNulls = false;
         isRepeating = true;
-        vector[0] = NULL_VALUE;
+        vector[0] = Double.doubleToLongBits(NULL_VALUE);
         isNull[0] = true;
     }
 
@@ -118,7 +123,7 @@ public class DoubleColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            double repeatVal = vector[0];
+            long repeatVal = vector[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
@@ -156,7 +161,7 @@ public class DoubleColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        vector[writeIndex++] = value;
+        vector[writeIndex++] = Double.doubleToLongBits(value);
     }
 
     @Override
@@ -216,8 +221,8 @@ public class DoubleColumnVector extends ColumnVector
         super.ensureSize(size, preserveData);
         if (size > vector.length)
         {
-            double[] oldArray = vector;
-            vector = new double[size];
+            long[] oldArray = vector;
+            vector = new long[size];
             length = size;
             if (preserveData)
             {
@@ -230,6 +235,15 @@ public class DoubleColumnVector extends ColumnVector
                     System.arraycopy(oldArray, 0, vector, 0, oldArray.length);
                 }
             }
+        }
+    }
+
+    public void toDoubleValues()
+    {
+        this.dValues = new double[writeIndex];
+        for (int i = 0; i < writeIndex; i++)
+        {
+            dValues[i] = Double.longBitsToDouble(vector[i]);
         }
     }
 }

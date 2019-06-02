@@ -3,6 +3,7 @@ package cn.edu.ruc.iir.pixels.core.reader;
 import cn.edu.ruc.iir.pixels.core.PixelsProto;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.utils.BitUtils;
+import cn.edu.ruc.iir.pixels.core.vector.ByteColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 
@@ -41,7 +42,7 @@ public class BooleanColumnReader
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
-        LongColumnVector columnVector = (LongColumnVector) vector;
+        ByteColumnVector columnVector = (ByteColumnVector) vector;
         if (offset == 0)
         {
             bits = new byte[input.limit() * 8];

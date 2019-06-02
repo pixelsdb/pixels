@@ -76,18 +76,18 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     }
 
     static void setDoubleValue(ColumnVector vector, int row, double value) {
-        ((DoubleColumnVector) vector).vector[row] = value;
+        ((DoubleColumnVector) vector).vector[row] = Double.doubleToLongBits(value);
     }
 
     static void setBinaryValue(ColumnVector vector, int row,
                                BinaryComparable value) {
-        ((BytesColumnVector) vector).setVal(row, value.getBytes(), 0,
+        ((BinaryColumnVector) vector).setVal(row, value.getBytes(), 0,
                 value.getLength());
     }
 
     static void setBinaryValue(ColumnVector vector, int row,
                                BinaryComparable value, int maxLength) {
-        ((BytesColumnVector) vector).setVal(row, value.getBytes(), 0,
+        ((BinaryColumnVector) vector).setVal(row, value.getBytes(), 0,
                 Math.min(maxLength, value.getLength()));
     }
 
@@ -101,7 +101,7 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
                 }
             };
 
-    static void setCharValue(BytesColumnVector vector,
+    static void setCharValue(BinaryColumnVector vector,
                              int row,
                              Text value,
                              int length) {
@@ -165,7 +165,7 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
                     setBinaryValue(vector, row, (Text) value);
                     break;
                 case CHAR:
-                    setCharValue((BytesColumnVector) vector, row, (Text) value,
+                    setCharValue((BinaryColumnVector) vector, row, (Text) value,
                             schema.getMaxLength());
                     break;
                 case VARCHAR:
@@ -227,38 +227,38 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
                         case FLOAT: {
                             DoubleColumnVector vector = (DoubleColumnVector) column;
                             vector.vector[rowId] =
-                                    ((FloatObjectInspector) inspector).get(obj);
+                                    Float.floatToIntBits(((FloatObjectInspector) inspector).get(obj));
                             break;
                         }
                         case DOUBLE: {
                             DoubleColumnVector vector = (DoubleColumnVector) column;
                             vector.vector[rowId] =
-                                    ((DoubleObjectInspector) inspector).get(obj);
+                                    Double.doubleToLongBits(((DoubleObjectInspector) inspector).get(obj));
                             break;
                         }
                         case BINARY: {
-                            BytesColumnVector vector = (BytesColumnVector) column;
+                            BinaryColumnVector vector = (BinaryColumnVector) column;
                             BytesWritable blob = ((BinaryObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj);
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
                         case STRING: {
-                            BytesColumnVector vector = (BytesColumnVector) column;
+                            BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((StringObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj);
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
                         case VARCHAR: {
-                            BytesColumnVector vector = (BytesColumnVector) column;
+                            BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((HiveVarcharObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj).getTextValue();
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
                         case CHAR: {
-                            BytesColumnVector vector = (BytesColumnVector) column;
+                            BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((HiveCharObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj).getTextValue();
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());

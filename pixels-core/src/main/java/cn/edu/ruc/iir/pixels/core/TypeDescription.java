@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
@@ -681,7 +681,7 @@ public final class TypeDescription
             case BINARY:
             case CHAR:
             case VARCHAR:
-                return new BytesColumnVector(maxSize);
+                return new BinaryColumnVector(maxSize);
             case STRUCT:
             {
                 ColumnVector[] fieldVector = new ColumnVector[children.size()];
