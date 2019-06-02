@@ -233,26 +233,45 @@ public class EncodingUtils
                 + ((long) (inputBytes[7 + offset] & 0xff) << 56));
     }
 
-    public void writeFloat(OutputStream output, float value)
+    public void writeIntLE(OutputStream output, int value)
             throws IOException
     {
-        int ser = Float.floatToIntBits(value);
-        writeBuffer[0] = (byte) ((ser) & 0xff);
-        writeBuffer[1] = (byte) ((ser >> 8) & 0xff);
-        writeBuffer[2] = (byte) ((ser >> 16) & 0xff);
-        writeBuffer[3] = (byte) ((ser >> 24) & 0xff);
+        writeBuffer[0] = (byte) ((value) & 0xff);
+        writeBuffer[1] = (byte) ((value >> 8) & 0xff);
+        writeBuffer[2] = (byte) ((value >> 16) & 0xff);
+        writeBuffer[3] = (byte) ((value >> 24) & 0xff);
         output.write(writeBuffer, 0, 4);
     }
 
-    public float readFloat(byte[] inputBytes, int offset)
+    public int readIntLE(byte[] inputBytes, int offset)
     {
-        int value = (((inputBytes[offset] & 0xff))
+        return (((inputBytes[offset] & 0xff))
                 + ((inputBytes[1 + offset] & 0xff) << 8)
                 + ((inputBytes[2 + offset] & 0xff) << 16)
                 + ((inputBytes[3 + offset] & 0xff) << 24)
         );
-        return Float.intBitsToFloat(value);
     }
+
+//    public void writeFloat(OutputStream output, float value)
+//            throws IOException
+//    {
+//        int ser = Float.floatToIntBits(value);
+//        writeBuffer[0] = (byte) ((ser) & 0xff);
+//        writeBuffer[1] = (byte) ((ser >> 8) & 0xff);
+//        writeBuffer[2] = (byte) ((ser >> 16) & 0xff);
+//        writeBuffer[3] = (byte) ((ser >> 24) & 0xff);
+//        output.write(writeBuffer, 0, 4);
+//    }
+
+//    public float readFloat(byte[] inputBytes, int offset)
+//    {
+//        int value = (((inputBytes[offset] & 0xff))
+//                + ((inputBytes[1 + offset] & 0xff) << 8)
+//                + ((inputBytes[2 + offset] & 0xff) << 16)
+//                + ((inputBytes[3 + offset] & 0xff) << 24)
+//        );
+//        return Float.intBitsToFloat(value);
+//    }
 
     private void readFully(final InputStream in, final byte[] buffer, final int off, final int len)
             throws IOException

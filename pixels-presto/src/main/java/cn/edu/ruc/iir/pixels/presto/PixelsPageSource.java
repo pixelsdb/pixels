@@ -297,21 +297,22 @@ class PixelsPageSource implements ConnectorPageSource
                      * With this optimization, CPU and GC pressure can be greatly reduced.
                      */
                     DoubleColumnVector dcv = (DoubleColumnVector) cv;
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        if (dcv.isNull[i])
-                        {
-                            blockBuilder.appendNull();
-                        } else
-                        {
-                            // type is DoubleType for double, not sure for float.
-                            type.writeDouble(blockBuilder, dcv.vector[i]);
-                        }
-                    }
-                    block = blockBuilder.build();
+//                    for (int i = 0; i < rowBatch.size; ++i)
+//                    {
+//                        if (dcv.isNull[i])
+//                        {
+//                            blockBuilder.appendNull();
+//                        } else
+//                        {
+//                            // type is DoubleType for double, not sure for float.
+//                            type.writeDouble(blockBuilder, dcv.vector[i]);
+//                        }
+//                    }
+//                    block = blockBuilder.build();
+                    block = new LongArrayBlock(rowBatch.size, dcv.isNull, dcv.vector);
                     break;
                 case "varchar":
-                    BytesColumnVector scv = (BytesColumnVector) cv;
+                    BinaryColumnVector scv = (BinaryColumnVector) cv;
                     /*
                     int vectorContentLen = 0;
                     byte[] vectorContent;
@@ -327,7 +328,6 @@ class PixelsPageSource implements ConnectorPageSource
                         int elementLen = scv.lens[i];
                         if (!scv.isNull[i])
                         {
-                            // TODO: remove this memory copy by implementing user defined Block and BlockBuilder.
                             System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
                         }
                         vectorOffsets[i] = curVectorOffset;
@@ -342,19 +342,19 @@ class PixelsPageSource implements ConnectorPageSource
                     block = new VarcharArrayBlock(rowBatch.size, scv.vector, scv.start, scv.lens, scv.isNull);
                     break;
                 case "boolean":
-                    // TODO: optimization needed for boolean.
-                    LongColumnVector bcv = (LongColumnVector) cv;
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        if (bcv.isNull[i])
-                        {
-                            blockBuilder.appendNull();
-                        } else
-                        {
-                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
-                        }
-                    }
-                    block = blockBuilder.build();
+                    ByteColumnVector bcv = (ByteColumnVector) cv;
+//                    for (int i = 0; i < rowBatch.size; ++i)
+//                    {
+//                        if (bcv.isNull[i])
+//                        {
+//                            blockBuilder.appendNull();
+//                        } else
+//                        {
+//                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
+//                        }
+//                    }
+//                    block = blockBuilder.build();
+                    block = new ByteArrayBlock(rowBatch.size, bcv.isNull, bcv.vector);
                     break;
                 case "timestamp":
                     // TODO: optimization needed for timestamp

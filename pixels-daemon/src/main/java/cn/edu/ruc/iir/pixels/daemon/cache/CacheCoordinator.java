@@ -16,6 +16,7 @@ import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -272,6 +273,7 @@ public class CacheCoordinator
             nodesCacheStats.put(nodes[i].toString(), 0);
         }
 
+        // locality-based balancing
         for (String path : paths)
         {
             // get a set of nodes where the blocks of the file is located (location_set)
@@ -303,6 +305,8 @@ public class CacheCoordinator
             }
         }
 
+        // TODO: if remote caching is enabled, balance cache locations further.
+
         return locationDistribution;
     }
 
@@ -310,7 +314,7 @@ public class CacheCoordinator
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
         for (String host : hosts) {
             builder.add(HostAddress.fromString(host));
-            break;
+//            break;
         }
         return builder.build();
     }

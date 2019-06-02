@@ -51,7 +51,7 @@ public class TestPixelsWriter
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
             LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
-            BytesColumnVector z = (BytesColumnVector) rowBatch.cols[5];            // string
+            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -92,9 +92,9 @@ public class TestPixelsWriter
                 {
                     a.vector[row] = i;
                     a.isNull[row] = false;
-                    b.vector[row] = i * 3.1415f;
+                    b.vector[row] = Float.floatToIntBits(i * 3.1415f);
                     b.isNull[row] = false;
-                    c.vector[row] = i * 3.14159d;
+                    c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
                     c.isNull[row] = false;
                     d.set(row, timestamp);
                     d.isNull[row] = false;
@@ -141,7 +141,7 @@ public class TestPixelsWriter
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
             LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
-            BytesColumnVector z = (BytesColumnVector) rowBatch.cols[5];            // string
+            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -164,9 +164,9 @@ public class TestPixelsWriter
                 int row = rowBatch.size++;
                 a.vector[row] = i;
                 a.isNull[row] = false;
-                b.vector[row] = i * 3.1415f;
+                b.vector[row] = Float.floatToIntBits(i * 3.1415f);
                 b.isNull[row] = false;
-                c.vector[row] = i * 3.14159d;
+                c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
                 c.isNull[row] = false;
                 d.set(row, timestamp);
                 d.isNull[row] = false;
@@ -223,7 +223,7 @@ public class TestPixelsWriter
             DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
             TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
             LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
-            BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
+            BinaryColumnVector zcv = (BinaryColumnVector) rowBatch.cols[5];
         }
         catch (IOException e)
         {
@@ -392,12 +392,12 @@ public class TestPixelsWriter
 //
 //            PixelsRecordReader pixelsRecordReaderWithCache = pixelsReaderWithCache.read(option);
 //            VectorizedRowBatch rowBatchWithCache = pixelsRecordReaderWithCache.readBatch();
-//            BytesColumnVector cache_c0 = (BytesColumnVector) rowBatchWithCache.cols[0];
-//            BytesColumnVector cache_c1 = (BytesColumnVector) rowBatchWithCache.cols[1];
+//            BinaryColumnVector cache_c0 = (BinaryColumnVector) rowBatchWithCache.cols[0];
+//            BinaryColumnVector cache_c1 = (BinaryColumnVector) rowBatchWithCache.cols[1];
 //            LongColumnVector cache_c2 = (LongColumnVector) rowBatchWithCache.cols[2];
 //            LongColumnVector cache_c3 = (LongColumnVector) rowBatchWithCache.cols[3];
-//            BytesColumnVector cache_c4 = (BytesColumnVector) rowBatchWithCache.cols[4];
-//            BytesColumnVector cache_c5 = (BytesColumnVector) rowBatchWithCache.cols[5];
+//            BinaryColumnVector cache_c4 = (BinaryColumnVector) rowBatchWithCache.cols[4];
+//            BinaryColumnVector cache_c5 = (BinaryColumnVector) rowBatchWithCache.cols[5];
 //
 //            // turn off caching
 //            PixelsReader pixelsReaderWithoutCache = PixelsReaderImpl
@@ -409,12 +409,12 @@ public class TestPixelsWriter
 //                    .build();
 //            PixelsRecordReader pixelsRecordReaderWithoutCache = pixelsReaderWithoutCache.read(option);
 //            VectorizedRowBatch rowBatchWithoutCache = pixelsRecordReaderWithoutCache.readBatch();
-//            BytesColumnVector c0 = (BytesColumnVector) rowBatchWithoutCache.cols[0];
-//            BytesColumnVector c1 = (BytesColumnVector) rowBatchWithoutCache.cols[1];
+//            BinaryColumnVector c0 = (BinaryColumnVector) rowBatchWithoutCache.cols[0];
+//            BinaryColumnVector c1 = (BinaryColumnVector) rowBatchWithoutCache.cols[1];
 //            LongColumnVector c2 = (LongColumnVector) rowBatchWithoutCache.cols[2];
 //            LongColumnVector c3 = (LongColumnVector) rowBatchWithoutCache.cols[3];
-//            BytesColumnVector c4 = (BytesColumnVector) rowBatchWithoutCache.cols[4];
-//            BytesColumnVector c5 = (BytesColumnVector) rowBatchWithoutCache.cols[5];
+//            BinaryColumnVector c4 = (BinaryColumnVector) rowBatchWithoutCache.cols[4];
+//            BinaryColumnVector c5 = (BinaryColumnVector) rowBatchWithoutCache.cols[5];
 //
 //            // validate
 //            assert rowBatchWithCache.size == rowBatchWithoutCache.size;

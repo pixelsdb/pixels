@@ -64,7 +64,7 @@ public class PixelsCoreTest {
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
             LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
-            BytesColumnVector z = (BytesColumnVector) rowBatch.cols[5];            // string
+            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -86,9 +86,9 @@ public class PixelsCoreTest {
                 int row = rowBatch.size++;
                 a.vector[row] = i;
                 a.isNull[row] = false;
-                b.vector[row] = i * 3.1415f;
+                b.vector[row] = Float.floatToIntBits(i * 3.1415f);
                 b.isNull[row] = false;
-                c.vector[row] = i * 3.14159d;
+                c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
                 c.isNull[row] = false;
                 d.set(row, timestamp);
                 d.isNull[row] = false;

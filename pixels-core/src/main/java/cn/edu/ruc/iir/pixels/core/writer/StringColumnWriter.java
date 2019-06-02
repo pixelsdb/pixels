@@ -6,7 +6,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.encoding.RunLenIntEncoder;
 import cn.edu.ruc.iir.pixels.core.utils.DynamicIntArray;
 import cn.edu.ruc.iir.pixels.core.utils.StringRedBlackTree;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
@@ -54,7 +54,7 @@ public class StringColumnWriter extends BaseColumnWriter
             throws IOException
     {
         currentUseDictionaryEncoding = futureUseDictionaryEncoding;
-        BytesColumnVector columnVector = (BytesColumnVector) vector;
+        BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
         int[] vLens = columnVector.lens;
         int[] vOffsets = columnVector.start;
@@ -94,7 +94,7 @@ public class StringColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartWithoutDict(BytesColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    private void writeCurPartWithoutDict(BinaryColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -117,7 +117,7 @@ public class StringColumnWriter extends BaseColumnWriter
         curPixelIsNullIndex += curPartLength;
     }
 
-    private void writeCurPartWithDict(BytesColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    private void writeCurPartWithDict(BinaryColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {

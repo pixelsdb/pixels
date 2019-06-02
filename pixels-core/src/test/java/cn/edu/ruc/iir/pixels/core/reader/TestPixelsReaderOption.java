@@ -2,7 +2,7 @@ package cn.edu.ruc.iir.pixels.core.reader;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.PixelsReaderImpl;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.DoubleColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.LongColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.TimestampColumnVector;
@@ -136,7 +136,7 @@ public class TestPixelsReaderOption
         DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
         TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
         LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
-        BytesColumnVector zcv = (BytesColumnVector) rowBatch.cols[5];
+        BinaryColumnVector zcv = (BinaryColumnVector) rowBatch.cols[5];
         for (int i = 0; i < rowBatch.size; i++)
         {
             int rowId = elementSize + start;

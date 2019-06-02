@@ -27,7 +27,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
             throws IOException
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
-        double[] values = columnVector.vector;
+        long[] values = columnVector.vector;
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = vector.isNull[i];
@@ -39,9 +39,8 @@ public class DoubleColumnWriter extends BaseColumnWriter
             }
             else
             {
-                double value = values[i];
-                encodingUtils.writeLongLE(outputStream, Double.doubleToLongBits(value));
-                pixelStatRecorder.updateDouble(value);
+                encodingUtils.writeLongLE(outputStream, values[i]);
+                pixelStatRecorder.updateDouble(Double.longBitsToDouble(values[i]));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)
