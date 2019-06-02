@@ -36,7 +36,7 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * Modifies:
  * 1. we use a byte[][] instead of Slice as the backing storage
  * and replaced the implementation of each methods;
- * 2. reimplemented getSingleValueBlock here.
+ * 2. add some other methods.
  *
  * Created at: 19-5-31
  * Author: hank

@@ -76,7 +76,12 @@ public class StringColumnReader
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
             byte[] buffer = originsBuf.array();
             // The available first byte in buffer should start from originsOffset.
-            int bufferStart = originsOffset;
+            // bufferStart is the first byte within buffer.
+            // DO NOT use originsOffset as bufferStart, as multiple input byte buffer read
+            // from disk (not from pixels cache) may share the same backing array, each of them starts
+            // from a different offset. originsOffset equals to originsBuf.arrayOffset() only when a
+            // input buffer starts from the first byte of backing array.
+            int bufferStart = originsBuf.arrayOffset();
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -127,7 +132,7 @@ public class StringColumnReader
             // read values
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
             byte[] buffer = contentBuf.array();
-            int index = 0;
+            int bufferOffset = contentBuf.arrayOffset();
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -154,8 +159,8 @@ public class StringColumnReader
                 {
                     int len = (int) lensDecoder.next();
                     // use setRef instead of setVal to reduce memory copy.
-                    columnVector.setRef(i + vectorIndex, buffer, index, len);
-                    index += len;
+                    columnVector.setRef(i + vectorIndex, buffer, bufferOffset, len);
+                    bufferOffset += len;
                 }
                 if (hasNull)
                 {

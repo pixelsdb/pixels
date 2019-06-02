@@ -26,6 +26,13 @@ public class PixelsPrestoConfig
     private ConfigFactory configFactory = null;
     private FSFactory fsFactory = null;
 
+    private static int BatchSize = 1000;
+
+    public static int getBatchSize()
+    {
+        return BatchSize;
+    }
+
     private String pixelsHome = null;
 
     @Config("pixels.home")
@@ -41,10 +48,10 @@ public class PixelsPrestoConfig
                 String defaultPixelsHome = ConfigFactory.Instance().getProperty("pixels.home");
                 if (defaultPixelsHome == null)
                 {
-                    logger.info("use pixels.properties insided in jar.");
+                    logger.info("using pixels.properties insided in jar.");
                 } else
                 {
-                    logger.info("use pixels.properties under default pixels.home: " + defaultPixelsHome);
+                    logger.info("using pixels.properties under default pixels.home: " + defaultPixelsHome);
                 }
             } else
             {
@@ -56,7 +63,7 @@ public class PixelsPrestoConfig
                 {
                     ConfigFactory.Instance().loadProperties(pixelsHome + "pixels.properties");
                     ConfigFactory.Instance().addProperty("pixels.home", pixelsHome);
-                    logger.info("use pixels.properties under connector specified pixels.home: " + pixelsHome);
+                    logger.info("using pixels.properties under connector specified pixels.home: " + pixelsHome);
 
                 } catch (IOException e)
                 {
@@ -70,11 +77,23 @@ public class PixelsPrestoConfig
             try
             {
                 this.fsFactory = FSFactory.Instance(this.configFactory.getProperty("hdfs.config.dir"));
+
             } catch (FSException e)
             {
                 throw new PrestoException(PIXELS_CONFIG_ERROR, e);
             }
-
+            try
+            {
+                int batchSize = Integer.parseInt(this.configFactory.getProperty("row.batch.size"));
+                if (batchSize > 0)
+                {
+                    BatchSize = batchSize;
+                    logger.info("using pixels row.batch.size: " + BatchSize);
+                }
+            } catch (NumberFormatException e)
+            {
+                throw new PrestoException(PIXELS_CONFIG_ERROR, e);
+            }
         }
         return this;
     }
