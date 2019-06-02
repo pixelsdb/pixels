@@ -27,7 +27,7 @@ public class FloatColumnWriter extends BaseColumnWriter
             throws IOException
     {
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
-        double[] values = columnVector.vector;
+        long[] values = columnVector.vector;
         for (int i = 0; i < length; i++)
         {
             isNull[curPixelIsNullIndex++] = columnVector.isNull[i];
@@ -39,9 +39,9 @@ public class FloatColumnWriter extends BaseColumnWriter
             }
             else
             {
-                float value = (float) values[i];
-                encodingUtils.writeFloat(outputStream, value);
-                pixelStatRecorder.updateFloat(value);
+                int v = (int) values[i];
+                encodingUtils.writeIntLE(outputStream, v);
+                pixelStatRecorder.updateFloat(Float.intBitsToFloat(v));
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)

@@ -89,6 +89,11 @@ public abstract class ColumnVector
         throw new UnsupportedOperationException("Adding boolean is not supported");
     }
 
+    public void add(byte value)
+    {
+        throw new UnsupportedOperationException("Adding byte is not supported");
+    }
+
     public void add(byte[] value)
     {
         throw new UnsupportedOperationException("Adding bytes is not supported");

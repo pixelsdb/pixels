@@ -13,7 +13,7 @@ public class PixelsCacheReader
         implements AutoCloseable
 {
     //    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
-    private static CacheLogger cacheLogger = new CacheLogger();
+//    private static CacheLogger cacheLogger = new CacheLogger();
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
@@ -22,10 +22,10 @@ public class PixelsCacheReader
     private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
-    static
-    {
-        // new Thread(cacheLogger).start();
-    }
+//    static
+//    {
+//        new Thread(cacheLogger).start();
+//    }
 
     private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
     {

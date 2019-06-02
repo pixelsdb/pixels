@@ -289,7 +289,7 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
             } else {
                 result = (Text) previous;
             }
-            BytesColumnVector bytes = (BytesColumnVector) vector;
+            BinaryColumnVector bytes = (BinaryColumnVector) vector;
 
             result.set(bytes.vector[row], bytes.start[row], bytes.lens[row]);
             return result;
@@ -311,7 +311,7 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
             } else {
                 result = (BytesWritable) previous;
             }
-            BytesColumnVector bytes = (BytesColumnVector) vector;
+            BinaryColumnVector bytes = (BinaryColumnVector) vector;
             result.set(bytes.vector[row], bytes.start[row], bytes.lens[row]);
             return result;
         } else {

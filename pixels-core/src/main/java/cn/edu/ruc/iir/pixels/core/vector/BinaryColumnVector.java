@@ -3,7 +3,7 @@ package cn.edu.ruc.iir.pixels.core.vector;
 import java.nio.charset.StandardCharsets;
 
 /**
- * BytesColumnVector from org.apache.hadoop.hive.ql.exec.vector.
+ * BinaryColumnVector from org.apache.hadoop.hive.ql.exec.vector.
  * <p>
  * This class supports string and binary data by value reference -- i.e. each field is
  * explicitly present, as opposed to provided by a dictionary reference.
@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
  * You can mix "by value" and "by reference" in the same column vector,
  * though that use is probably not typical.
  */
-public class BytesColumnVector extends ColumnVector
+public class BinaryColumnVector extends ColumnVector
 {
     public byte[][] vector;
     public int[] start;          // start offset of each field
@@ -54,7 +54,7 @@ public class BytesColumnVector extends ColumnVector
      * Use this constructor for normal operation.
      * All column vectors should be the default size normally.
      */
-    public BytesColumnVector()
+    public BinaryColumnVector()
     {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
@@ -64,7 +64,7 @@ public class BytesColumnVector extends ColumnVector
      *
      * @param size number of elements in the column vector
      */
-    public BytesColumnVector(int size)
+    public BinaryColumnVector(int size)
     {
         super(size);
         vector = new byte[size][];
@@ -73,7 +73,7 @@ public class BytesColumnVector extends ColumnVector
     }
 
     /**
-     * Additional reset work for BytesColumnVector (releasing scratch bytes for by value strings).
+     * Additional reset work for BinaryColumnVector (releasing scratch bytes for by value strings).
      */
     @Override
     public void reset()
@@ -344,7 +344,7 @@ public class BytesColumnVector extends ColumnVector
      * as indicated by selectedInUse and the sel array.
      */
     public void copySelected(
-            boolean selectedInUse, int[] sel, int size, BytesColumnVector output)
+            boolean selectedInUse, int[] sel, int size, BinaryColumnVector output)
     {
 
         // Output has nulls if and only if input has nulls.
@@ -468,7 +468,7 @@ public class BytesColumnVector extends ColumnVector
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
             isNull[outElementNum] = false;
-            BytesColumnVector in = (BytesColumnVector) inputVector;
+            BinaryColumnVector in = (BinaryColumnVector) inputVector;
             setVal(outElementNum, in.vector[inputElementNum],
                     in.start[inputElementNum], in.lens[inputElementNum]);
         }
@@ -482,9 +482,9 @@ public class BytesColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof BytesColumnVector)
+        if (inputVector instanceof BinaryColumnVector)
         {
-            BytesColumnVector srcVector = (BytesColumnVector) inputVector;
+            BinaryColumnVector srcVector = (BinaryColumnVector) inputVector;
             for (int i = 0; i < vector.length; i++)
             {
                 if (srcVector.vector[i] != null)

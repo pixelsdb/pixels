@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.vector.BytesColumnVector;
+import cn.edu.ruc.iir.pixels.core.vector.BinaryColumnVector;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
@@ -23,7 +23,7 @@ public class BinaryColumnWriter extends BaseColumnWriter
     public int write(ColumnVector vector, int size)
             throws IOException
     {
-        BytesColumnVector columnVector = (BytesColumnVector) vector;
+        BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         byte[][] values = columnVector.vector;
         int curPartLength;
         int curPartOffset = 0;
@@ -44,7 +44,7 @@ public class BinaryColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartBinary(BytesColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
+    private void writeCurPartBinary(BinaryColumnVector columnVector, byte[][] values, int curPartLength, int curPartOffset)
             throws IOException
     {
         for (int i = 0; i < curPartLength; i++)

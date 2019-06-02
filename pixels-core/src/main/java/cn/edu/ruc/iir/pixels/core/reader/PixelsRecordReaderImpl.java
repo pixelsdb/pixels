@@ -5,7 +5,12 @@ import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
-import cn.edu.ruc.iir.pixels.core.*;
+import cn.edu.ruc.iir.pixels.core.ChunkId;
+import cn.edu.ruc.iir.pixels.core.ChunkSeq;
+import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
+import cn.edu.ruc.iir.pixels.core.PixelsPredicate;
+import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.stats.ColumnStats;
 import cn.edu.ruc.iir.pixels.core.stats.StatsRecorder;
 import cn.edu.ruc.iir.pixels.core.vector.ColumnVector;
@@ -15,7 +20,12 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
 /**
  * pixels
@@ -358,15 +368,15 @@ public class PixelsRecordReaderImpl
                 {
                     int rgId = rgIdx + RGStart;
                     // TODO: not only columnlets in cacheOrder are cached.
-                    //String cacheIdentifier = rgId + ":" + colId;
+                    String cacheIdentifier = rgId + ":" + colId;
                     // if cached, read from cache files
-                    //if (cacheOrder.contains(cacheIdentifier))
-                    //{
+                    if (cacheOrder.contains(cacheIdentifier))
+                    {
                         ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId);
                         cacheChunks.add(chunkId);
-                    //}
+                    }
                     // if cache miss, add chunkId to be read from disks
-                    /*
+//                    /*
                     else
                     {
                         PixelsProto.RowGroupIndex rowGroupIndex =
@@ -378,7 +388,7 @@ public class PixelsRecordReaderImpl
                                 chunkIndex.getChunkLength());
                         diskChunks.add(chunk);
                     }
-                    */
+//                    */
                 }
             }
             // read cached chunks
@@ -417,7 +427,7 @@ public class PixelsRecordReaderImpl
                     this.cacheReadBytes += chunkBuffers[bufferIdx].capacity();
                 }
             }
-            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadBytes + "," + cacheReadCost + "," + cacheReadBytes * 1.0 / cacheReadCost);
+//            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadBytes + "," + cacheReadCost + "," + cacheReadBytes * 1.0 / cacheReadCost);
         }
         else
         {
