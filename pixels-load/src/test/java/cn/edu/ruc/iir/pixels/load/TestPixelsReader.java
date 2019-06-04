@@ -18,7 +18,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-public class TestReader {
+public class TestPixelsReader
+{
     String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_1_order/20190111212837_0.pxl";
 
     @Test
