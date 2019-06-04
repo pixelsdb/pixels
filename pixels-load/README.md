@@ -73,5 +73,5 @@ show tables;
 ./bin/presto --server localhost:8080 --catalog hive --schema default
 ```
 
-## 查看Logs
+## Logs
 Go to path `/home/iir/opt/presto-server-0.192/data/var/log/server.log` 
