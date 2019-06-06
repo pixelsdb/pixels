@@ -92,12 +92,12 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <artifactSet>
+                            <!--<artifactSet>
                                 <excludes>
                                     <exclude>org.apache.hive:*</exclude>
                                     <exclude>org.apache.hadoop:*</exclude>
                                 </excludes>
-                            </artifactSet>
+                            </artifactSet>-->
                             <finalName>pixels-hive</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-hive/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>

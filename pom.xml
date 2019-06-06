@@ -57,9 +57,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
         <dep.hadoop.version>2.7.3</dep.hadoop.version>
-        <dep.hive.version>2.3.0</dep.hive.version>
+        <dep.hive.version>2.3.5</dep.hive.version>
         <dep.hive.storage.api.version>2.4.0</dep.hive.storage.api.version>
-        <dep.orc.version>1.4.3</dep.orc.version>
+        <dep.orc.version>1.3.4</dep.orc.version>
         <dep.presto.version>0.192</dep.presto.version>
         <dep.zookeeper.version>3.4.6</dep.zookeeper.version>
         <dep.airlift.version>0.161</dep.airlift.version>
