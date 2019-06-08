@@ -19,7 +19,7 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
-import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
+import cn.edu.ruc.iir.pixels.hive.PixelsFile;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
 import org.apache.logging.log4j.LogManager;

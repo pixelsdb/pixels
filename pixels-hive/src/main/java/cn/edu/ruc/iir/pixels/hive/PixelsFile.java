@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive.core;
+package cn.edu.ruc.iir.pixels.hive;
 
 import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
@@ -139,6 +139,8 @@ public class PixelsFile {
         return PixelsReaderImpl.newBuilder()
                 .setFS(fs)
                 .setPath(path)
+                .setEnableCache(false)
+                .setPixelsFooterCache(new PixelsFooterCache())
                 .build();
     }
 
