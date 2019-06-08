@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.hive.util;
+package cn.edu.ruc.iir.pixels.hive;
 
 import java.sql.*;
 
