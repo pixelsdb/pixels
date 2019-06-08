@@ -1,6 +1,5 @@
-package cn.edu.ruc.iir.orc.core.writer;
+package cn.edu.ruc.iir.pixels.load;
 
-import cn.edu.ruc.iir.pixels.core.TestParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.*;

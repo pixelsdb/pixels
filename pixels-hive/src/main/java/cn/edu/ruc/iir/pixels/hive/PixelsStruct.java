@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @Description: refer: [PixelsStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/PixelsStruct.java)
+ * @Description: refer: [PixelsStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcStruct.java)
  * @author: tao
  * @date: Create in 2018-12-12 22:35
  **/

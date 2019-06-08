@@ -1,6 +1,5 @@
 package cn.edu.ruc.iir.pixels.hive;
 
-import cn.edu.ruc.iir.pixels.hive.util.HiveClient;
 import org.junit.Test;
 
 import java.sql.ResultSet;

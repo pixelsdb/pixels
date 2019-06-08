@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive.core;
+package cn.edu.ruc.iir.pixels.hive;
 
 import org.apache.hadoop.conf.Configuration;
 
