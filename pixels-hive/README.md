@@ -25,7 +25,9 @@ You can also put `pixels-hive-0.1.0-SNAPSHOT-full.jar` in the path `apache-hive-
 
 ## FAQ
 1. Q: "FAILED: SemanticException [Error 10055]: Output Format must implement HiveOutputFormat, otherwise it should be either IgnoreKeyTextOutputFormat or SequenceFileOutputFormat"
-   A: Add `cn.edu.ruc.iir.pixels.hive.PixelsNewOutputFormat`.
+   
+   A: `cn.edu.ruc.iir.pixels.hive.mapred.PixelsOutputFormat` should implements `HiveOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow>`.
    
 2. Q: Wrong FS in hdfs
+   
    A: Add `core-site.xml` and `hdfs-site.xml` to `resources`.

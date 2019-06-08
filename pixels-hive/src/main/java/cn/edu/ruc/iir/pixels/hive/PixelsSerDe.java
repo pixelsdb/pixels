@@ -82,9 +82,9 @@ public class PixelsSerDe extends AbstractSerDe {
                 TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
         StructTypeInfo rootType = new StructTypeInfo();
         // The source column names for PIXELS serde that will be used in the schema.
-        rootType.setAllStructFieldNames(new ArrayList<>());
-        rootType.setAllStructFieldTypeInfos(new ArrayList<>());
-        log.info("setAllStructFieldNames:" + columnNames.toString());
+        rootType.setAllStructFieldNames(columnNames);
+        rootType.setAllStructFieldTypeInfos(fieldTypes);
+        //log.info("setAllStructFieldNames:" + columnNames.toString());
 //        log.info("setAllStructFieldTypeInfos:" + fieldTypes.toString());
         inspector = PixelsStruct.createObjectInspector(rootType);
     }

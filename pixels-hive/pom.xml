@@ -47,12 +47,6 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- hadoop -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -98,6 +92,12 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.apache.hive:*</exclude>
+                                    <exclude>org.apache.hadoop:*</exclude>
+                                </excludes>
+                            </artifactSet>
                             <finalName>pixels-hive</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-hive/target</outputDirectory>
                             <shadedArtifactAttached>true</shadedArtifactAttached>

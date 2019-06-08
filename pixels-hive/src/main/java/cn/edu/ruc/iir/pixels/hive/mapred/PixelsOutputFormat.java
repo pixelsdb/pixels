@@ -19,14 +19,14 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.hive.PixelsNewOutputFormat;
+import cn.edu.ruc.iir.pixels.hive.PixelsConf;
+import cn.edu.ruc.iir.pixels.hive.PixelsFile;
 import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
-import cn.edu.ruc.iir.pixels.hive.core.PixelsConf;
-import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileOutputFormat;
@@ -42,7 +42,8 @@ import java.util.Properties;
  * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
  */
 public class PixelsOutputFormat
-        extends FileOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> implements PixelsNewOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> {
+        extends FileOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> implements HiveOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow>
+{
 
     /**
      * This function builds the options for the PIXELS Writer based on the JobConf.

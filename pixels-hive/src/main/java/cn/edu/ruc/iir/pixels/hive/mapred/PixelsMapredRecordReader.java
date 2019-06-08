@@ -22,7 +22,7 @@ import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
-import cn.edu.ruc.iir.pixels.hive.core.PixelsFile;
+import cn.edu.ruc.iir.pixels.hive.PixelsFile;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
@@ -149,7 +149,7 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
             } else {
                 result = (BooleanWritable) previous;
             }
-            result.set(((LongColumnVector) vector).vector[row] != 0);
+            result.set(((ByteColumnVector) vector).vector[row] != 0);
             return result;
         } else {
             return null;
