@@ -18,8 +18,7 @@
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
-import cn.edu.ruc.iir.pixels.hive.core.PixelsConf;
+import cn.edu.ruc.iir.pixels.hive.PixelsConf;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
