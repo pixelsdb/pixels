@@ -51,10 +51,6 @@ public class PixelsFile {
         private long offset = 0L;
         private long length = 9223372036854775807L;
 
-        // TODO: We can generalize FileMetada interface. Make OrcTail implement FileMetadata interface
-        // and remove this class altogether. Both footer caching and llap caching just needs OrcTail.
-        // For now keeping this around to avoid complex surgery
-
         public ReaderOptions(Configuration conf, FileSplit split) {
             this.conf = conf;
             try {

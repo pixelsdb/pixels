@@ -18,12 +18,12 @@
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import cn.edu.ruc.iir.pixels.hive.PixelsFile;
+import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -32,8 +32,26 @@ import java.io.IOException;
  * refer: [OrcInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcInputFormat.java)
  */
 public class PixelsInputFormat
-        extends FileInputFormat<NullWritable, PixelsStruct> {
-    private static Logger log = LogManager.getLogger(PixelsInputFormat.class);
+        extends FileInputFormat<NullWritable, PixelsStruct>
+{
+    private static Logger log = LoggerFactory.getLogger(PixelsInputFormat.class);
+
+    /**
+     * Splits files returned by {@link #listStatus(JobConf)} when
+     * they're too big. set
+     * hive.input.format=cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat
+     * in hive to use this method.
+     *
+     * @param job
+     * @param numSplits
+     */
+    @Override
+    public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException
+    {
+        InputSplit[] splits = super.getSplits(job, numSplits);
+        log.info("number of splits for pixels: " + splits.length);
+        return splits;
+    }
 
     @Override
     public RecordReader<NullWritable, PixelsStruct>
