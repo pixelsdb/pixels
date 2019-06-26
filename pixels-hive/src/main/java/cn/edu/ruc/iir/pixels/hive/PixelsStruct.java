@@ -40,24 +40,29 @@ import java.util.Map;
  * @author: tao
  * @date: Create in 2018-12-12 22:35
  **/
-final public class PixelsStruct implements Writable {
+final public class PixelsStruct implements Writable
+{
     private static Logger log = LogManager.getLogger(PixelsStruct.class);
 
     private Object[] fields;
 
-    public PixelsStruct(int children) {
+    public PixelsStruct(int children)
+    {
         fields = new Object[children];
     }
 
-    public Object getFieldValue(int fieldIndex) {
+    public Object getFieldValue(int fieldIndex)
+    {
         return fields[fieldIndex];
     }
 
-    public void setFieldValue(int fieldIndex, Object value) {
+    public void setFieldValue(int fieldIndex, Object value)
+    {
         fields[fieldIndex] = value;
     }
 
-    public int getNumFields() {
+    public int getNumFields()
+    {
         return fields.length;
     }
 
@@ -67,8 +72,10 @@ final public class PixelsStruct implements Writable {
      *
      * @param numFields the new number of fields
      */
-    public void setNumFields(int numFields) {
-        if (fields.length != numFields) {
+    public void setNumFields(int numFields)
+    {
+        if (fields.length != numFields)
+        {
             Object[] oldFields = fields;
             fields = new Object[numFields];
             System.arraycopy(oldFields, 0, fields, 0,
@@ -81,36 +88,48 @@ final public class PixelsStruct implements Writable {
      *
      * @param other the value to point to
      */
-    void linkFields(PixelsStruct other) {
+    void linkFields(PixelsStruct other)
+    {
         fields = other.fields;
     }
 
     @Override
-    public void write(DataOutput dataOutput) throws IOException {
+    public void write(DataOutput dataOutput) throws IOException
+    {
         throw new UnsupportedOperationException("write unsupported");
     }
 
     @Override
-    public void readFields(DataInput dataInput) throws IOException {
+    public void readFields(DataInput dataInput) throws IOException
+    {
         throw new UnsupportedOperationException("readFields unsupported");
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (other == null || other.getClass() != PixelsStruct.class) {
+    public boolean equals(Object other)
+    {
+        if (other == null || other.getClass() != PixelsStruct.class)
+        {
             return false;
-        } else {
+        } else
+        {
             PixelsStruct oth = (PixelsStruct) other;
-            if (fields.length != oth.fields.length) {
+            if (fields.length != oth.fields.length)
+            {
                 return false;
             }
-            for (int i = 0; i < fields.length; ++i) {
-                if (fields[i] == null) {
-                    if (oth.fields[i] != null) {
+            for (int i = 0; i < fields.length; ++i)
+            {
+                if (fields[i] == null)
+                {
+                    if (oth.fields[i] != null)
+                    {
                         return false;
                     }
-                } else {
-                    if (!fields[i].equals(oth.fields[i])) {
+                } else
+                {
+                    if (!fields[i].equals(oth.fields[i]))
+                    {
                         return false;
                     }
                 }
@@ -120,10 +139,13 @@ final public class PixelsStruct implements Writable {
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         int result = fields.length;
-        for (Object field : fields) {
-            if (field != null) {
+        for (Object field : fields)
+        {
+            if (field != null)
+            {
                 result ^= field.hashCode();
             }
         }
@@ -131,11 +153,14 @@ final public class PixelsStruct implements Writable {
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder buffer = new StringBuilder();
         buffer.append("{");
-        for (int i = 0; i < fields.length; ++i) {
-            if (i != 0) {
+        for (int i = 0; i < fields.length; ++i)
+        {
+            if (i != 0)
+            {
                 buffer.append(", ");
             }
             buffer.append(fields[i]);
@@ -147,8 +172,10 @@ final public class PixelsStruct implements Writable {
     
   /* Routines for stubbing into Writables */
 
-    public static Object createValue(TypeDescription type, int[] colIndexs) {
-        switch (type.getCategory()) {
+    public static Object createValue(TypeDescription type, int[] colIndexs)
+    {
+        switch (type.getCategory())
+        {
             case BOOLEAN:
                 return new BooleanWritable();
             case BYTE:
@@ -171,7 +198,8 @@ final public class PixelsStruct implements Writable {
                 return new Text();
             case DATE:
                 return new DateWritable();
-            case STRUCT: {
+            case STRUCT:
+            {
                 PixelsStruct result = new PixelsStruct(colIndexs.length);
                 int c = 0;
                 List<TypeDescription> child = type.getChildren();
@@ -181,7 +209,6 @@ final public class PixelsStruct implements Writable {
 //                for (TypeDescription child : type.getChildren()) {
 //                    result.setFieldValue(c++, createValue(child, colIndexs));
 //                }
-                log.info("result:" + result);
                 return result;
             }
             default:
@@ -189,64 +216,77 @@ final public class PixelsStruct implements Writable {
         }
     }
 
-    static class Field implements StructField {
+    static class Field implements StructField
+    {
         private final String name;
         private final ObjectInspector inspector;
         private final int offset;
 
-        Field(String name, ObjectInspector inspector, int offset) {
+        Field(String name, ObjectInspector inspector, int offset)
+        {
             this.name = name;
             this.inspector = inspector;
             this.offset = offset;
         }
 
         @Override
-        public String getFieldName() {
+        public String getFieldName()
+        {
             return name;
         }
 
         @Override
-        public ObjectInspector getFieldObjectInspector() {
+        public ObjectInspector getFieldObjectInspector()
+        {
             return inspector;
         }
 
         @Override
-        public int getFieldID() {
+        public int getFieldID()
+        {
             return offset;
         }
 
         @Override
-        public String getFieldComment() {
+        public String getFieldComment()
+        {
             return null;
         }
     }
 
-    static class PixelsStructInspector extends SettableStructObjectInspector {
+    static class PixelsStructInspector extends SettableStructObjectInspector
+    {
         private List<StructField> fields;
 
-        protected PixelsStructInspector() {
+        protected PixelsStructInspector()
+        {
             super();
         }
 
-        PixelsStructInspector(List<StructField> fields) {
+        PixelsStructInspector(List<StructField> fields)
+        {
             this.fields = fields;
         }
 
-        PixelsStructInspector(StructTypeInfo info) {
+        PixelsStructInspector(StructTypeInfo info)
+        {
             ArrayList<String> fieldNames = info.getAllStructFieldNames();
             ArrayList<TypeInfo> fieldTypes = info.getAllStructFieldTypeInfos();
-            fields = new ArrayList<StructField>(fieldNames.size());
-            for (int i = 0; i < fieldNames.size(); ++i) {
+            fields = new ArrayList<>(fieldNames.size());
+            for (int i = 0; i < fieldNames.size(); ++i)
+            {
                 fields.add(new Field(fieldNames.get(i),
                         createObjectInspector(fieldTypes.get(i)), i));
             }
         }
 
-        PixelsStructInspector(int columnId, List<PixelsProto.Type> types) {
+        PixelsStructInspector(int columnId, List<PixelsProto.Type> types)
+        {
             PixelsProto.Type type = types.get(columnId);
             int fieldCount = type.getSubtypesCount();
-            fields = new ArrayList<StructField>(fieldCount);
-            for (int i = 0; i < fieldCount; ++i) {
+            fields = new ArrayList<>(fieldCount);
+            for (int i = 0; i < fieldCount; ++i)
+            {
                 int fieldType = type.getSubtypes(i);
                 fields.add(new Field(type.getName(),
                         createObjectInspector(fieldType, types), i));
@@ -254,14 +294,18 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public List<StructField> getAllStructFieldRefs() {
+        public List<StructField> getAllStructFieldRefs()
+        {
             return fields;
         }
 
         @Override
-        public StructField getStructFieldRef(String s) {
-            for (StructField field : fields) {
-                if (field.getFieldName().equalsIgnoreCase(s)) {
+        public StructField getStructFieldRef(String s)
+        {
+            for (StructField field : fields)
+            {
+                if (field.getFieldName().equalsIgnoreCase(s))
+                {
                     return field;
                 }
             }
@@ -269,13 +313,16 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public Object getStructFieldData(Object object, StructField field) {
-            if (object == null) {
+        public Object getStructFieldData(Object object, StructField field)
+        {
+            if (object == null)
+            {
                 return null;
             }
             int offset = ((Field) field).offset;
             PixelsStruct struct = (PixelsStruct) object;
-            if (offset >= struct.fields.length) {
+            if (offset >= struct.fields.length)
+            {
                 return null;
             }
 
@@ -283,25 +330,31 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public List<Object> getStructFieldsDataAsList(Object object) {
-            if (object == null) {
+        public List<Object> getStructFieldsDataAsList(Object object)
+        {
+            if (object == null)
+            {
                 return null;
             }
             PixelsStruct struct = (PixelsStruct) object;
-            List<Object> result = new ArrayList<Object>(struct.fields.length);
-            for (Object child : struct.fields) {
+            List<Object> result = new ArrayList<>(struct.fields.length);
+            for (Object child : struct.fields)
+            {
                 result.add(child);
             }
             return result;
         }
 
         @Override
-        public String getTypeName() {
+        public String getTypeName()
+        {
             StringBuilder buffer = new StringBuilder();
             buffer.append("struct<");
-            for (int i = 0; i < fields.size(); ++i) {
+            for (int i = 0; i < fields.size(); ++i)
+            {
                 StructField field = fields.get(i);
-                if (i != 0) {
+                if (i != 0)
+                {
                     buffer.append(",");
                 }
                 buffer.append(field.getFieldName());
@@ -313,22 +366,26 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public ObjectInspector.Category getCategory() {
+        public ObjectInspector.Category getCategory()
+        {
             return ObjectInspector.Category.STRUCT;
         }
 
         @Override
-        public Object create() {
+        public Object create()
+        {
             return new PixelsStruct(0);
         }
 
         @Override
         public Object setStructFieldData(Object struct, StructField field,
-                                         Object fieldValue) {
+                                         Object fieldValue)
+        {
             PixelsStruct pixelsStruct = (PixelsStruct) struct;
             int offset = ((Field) field).offset;
             // if the offset is bigger than our current number of fields, grow it
-            if (pixelsStruct.getNumFields() <= offset) {
+            if (pixelsStruct.getNumFields() <= offset)
+            {
                 pixelsStruct.setNumFields(offset + 1);
             }
             pixelsStruct.setFieldValue(offset, fieldValue);
@@ -336,22 +393,29 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public boolean equals(Object o) {
-            if (o == null || o.getClass() != getClass()) {
+        public boolean equals(Object o)
+        {
+            if (o == null || o.getClass() != getClass())
+            {
                 return false;
-            } else if (o == this) {
+            } else if (o == this)
+            {
                 return true;
-            } else {
+            } else
+            {
                 List<StructField> other = ((PixelsStructInspector) o).fields;
-                if (other.size() != fields.size()) {
+                if (other.size() != fields.size())
+                {
                     return false;
                 }
-                for (int i = 0; i < fields.size(); ++i) {
+                for (int i = 0; i < fields.size(); ++i)
+                {
                     StructField left = other.get(i);
                     StructField right = fields.get(i);
                     if (!(left.getFieldName().equalsIgnoreCase(right.getFieldName()) &&
                             left.getFieldObjectInspector().equals
-                                    (right.getFieldObjectInspector()))) {
+                                    (right.getFieldObjectInspector())))
+                    {
                         return false;
                     }
                 }
@@ -361,97 +425,118 @@ final public class PixelsStruct implements Writable {
     }
 
     static class PixelsMapObjectInspector
-            implements MapObjectInspector, SettableMapObjectInspector {
+            implements MapObjectInspector, SettableMapObjectInspector
+    {
         private ObjectInspector key;
         private ObjectInspector value;
 
-        private PixelsMapObjectInspector() {
+        private PixelsMapObjectInspector()
+        {
             super();
         }
 
-        PixelsMapObjectInspector(MapTypeInfo info) {
+        PixelsMapObjectInspector(MapTypeInfo info)
+        {
             key = createObjectInspector(info.getMapKeyTypeInfo());
             value = createObjectInspector(info.getMapValueTypeInfo());
         }
 
-        PixelsMapObjectInspector(int columnId, List<PixelsProto.Type> types) {
+        PixelsMapObjectInspector(int columnId, List<PixelsProto.Type> types)
+        {
             PixelsProto.Type type = types.get(columnId);
             key = createObjectInspector(type.getSubtypes(0), types);
             value = createObjectInspector(type.getSubtypes(1), types);
         }
 
         @Override
-        public ObjectInspector getMapKeyObjectInspector() {
+        public ObjectInspector getMapKeyObjectInspector()
+        {
             return key;
         }
 
         @Override
-        public ObjectInspector getMapValueObjectInspector() {
+        public ObjectInspector getMapValueObjectInspector()
+        {
             return value;
         }
 
         @Override
-        public Object getMapValueElement(Object map, Object key) {
+        public Object getMapValueElement(Object map, Object key)
+        {
             return ((map == null || key == null) ? null : ((Map) map).get(key));
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        public Map<Object, Object> getMap(Object map) {
-            if (map == null) {
+        public Map<Object, Object> getMap(Object map)
+        {
+            if (map == null)
+            {
                 return null;
             }
             return (Map) map;
         }
 
         @Override
-        public int getMapSize(Object map) {
-            if (map == null) {
+        public int getMapSize(Object map)
+        {
+            if (map == null)
+            {
                 return -1;
             }
             return ((Map) map).size();
         }
 
         @Override
-        public String getTypeName() {
+        public String getTypeName()
+        {
             return "map<" + key.getTypeName() + "," + value.getTypeName() + ">";
         }
 
         @Override
-        public Category getCategory() {
+        public Category getCategory()
+        {
             return Category.MAP;
         }
 
         @Override
-        public Object create() {
+        public Object create()
+        {
             return new LinkedHashMap<Object, Object>();
         }
 
         @Override
-        public Object put(Object map, Object key, Object value) {
+        public Object put(Object map, Object key, Object value)
+        {
             ((Map) map).put(key, value);
             return map;
         }
 
         @Override
-        public Object remove(Object map, Object key) {
+        public Object remove(Object map, Object key)
+        {
             ((Map) map).remove(key);
             return map;
         }
 
         @Override
-        public Object clear(Object map) {
+        public Object clear(Object map)
+        {
             ((Map) map).clear();
             return map;
         }
 
         @Override
-        public boolean equals(Object o) {
-            if (o == null || o.getClass() != getClass()) {
+        public boolean equals(Object o)
+        {
+            if (o == null || o.getClass() != getClass())
+            {
                 return false;
-            } else if (o == this) {
+            } else if (o == this)
+            {
                 return true;
-            } else {
+            } else
+            {
                 PixelsMapObjectInspector other = (PixelsMapObjectInspector) o;
                 return other.key.equals(key) && other.value.equals(value);
             }
@@ -459,38 +544,47 @@ final public class PixelsStruct implements Writable {
     }
 
     static class PixelsListObjectInspector
-            implements ListObjectInspector, SettableListObjectInspector {
+            implements ListObjectInspector, SettableListObjectInspector
+    {
         private ObjectInspector child;
 
-        private PixelsListObjectInspector() {
+        private PixelsListObjectInspector()
+        {
             super();
         }
 
-        PixelsListObjectInspector(ListTypeInfo info) {
+        PixelsListObjectInspector(ListTypeInfo info)
+        {
             child = createObjectInspector(info.getListElementTypeInfo());
         }
 
-        PixelsListObjectInspector(int columnId, List<PixelsProto.Type> types) {
+        PixelsListObjectInspector(int columnId, List<PixelsProto.Type> types)
+        {
             PixelsProto.Type type = types.get(columnId);
             child = createObjectInspector(type.getSubtypes(0), types);
         }
 
         @Override
-        public ObjectInspector getListElementObjectInspector() {
+        public ObjectInspector getListElementObjectInspector()
+        {
             return child;
         }
 
         @Override
-        public Object getListElement(Object list, int i) {
-            if (list == null || i < 0 || i >= getListLength(list)) {
+        public Object getListElement(Object list, int i)
+        {
+            if (list == null || i < 0 || i >= getListLength(list))
+            {
                 return null;
             }
             return ((List) list).get(i);
         }
 
         @Override
-        public int getListLength(Object list) {
-            if (list == null) {
+        public int getListLength(Object list)
+        {
+            if (list == null)
+            {
                 return -1;
             }
             return ((List) list).size();
@@ -498,36 +592,44 @@ final public class PixelsStruct implements Writable {
 
         @Override
         @SuppressWarnings("unchecked")
-        public List<?> getList(Object list) {
-            if (list == null) {
+        public List<?> getList(Object list)
+        {
+            if (list == null)
+            {
                 return null;
             }
             return (List) list;
         }
 
         @Override
-        public String getTypeName() {
+        public String getTypeName()
+        {
             return "array<" + child.getTypeName() + ">";
         }
 
         @Override
-        public ObjectInspector.Category getCategory() {
+        public ObjectInspector.Category getCategory()
+        {
             return ObjectInspector.Category.LIST;
         }
 
         @Override
-        public Object create(int size) {
+        public Object create(int size)
+        {
             ArrayList<Object> result = new ArrayList<Object>(size);
-            for (int i = 0; i < size; ++i) {
+            for (int i = 0; i < size; ++i)
+            {
                 result.add(null);
             }
             return result;
         }
 
         @Override
-        public Object set(Object list, int index, Object element) {
+        public Object set(Object list, int index, Object element)
+        {
             List l = (List) list;
-            for (int i = l.size(); i < index + 1; ++i) {
+            for (int i = l.size(); i < index + 1; ++i)
+            {
                 l.add(null);
             }
             l.set(index, element);
@@ -535,28 +637,36 @@ final public class PixelsStruct implements Writable {
         }
 
         @Override
-        public Object resize(Object list, int newSize) {
+        public Object resize(Object list, int newSize)
+        {
             ((ArrayList) list).ensureCapacity(newSize);
             return list;
         }
 
         @Override
-        public boolean equals(Object o) {
-            if (o == null || o.getClass() != getClass()) {
+        public boolean equals(Object o)
+        {
+            if (o == null || o.getClass() != getClass())
+            {
                 return false;
-            } else if (o == this) {
+            } else if (o == this)
+            {
                 return true;
-            } else {
+            } else
+            {
                 ObjectInspector other = ((PixelsListObjectInspector) o).child;
                 return other.equals(child);
             }
         }
     }
 
-    static public ObjectInspector createObjectInspector(TypeInfo info) {
-        switch (info.getCategory()) {
+    static public ObjectInspector createObjectInspector(TypeInfo info)
+    {
+        switch (info.getCategory())
+        {
             case PRIMITIVE:
-                switch (((PrimitiveTypeInfo) info).getPrimitiveCategory()) {
+                switch (((PrimitiveTypeInfo) info).getPrimitiveCategory())
+                {
                     case FLOAT:
                         return PrimitiveObjectInspectorFactory.writableFloatObjectInspector;
                     case DOUBLE:
@@ -605,9 +715,11 @@ final public class PixelsStruct implements Writable {
     }
 
     public static ObjectInspector createObjectInspector(int columnId,
-                                                        List<PixelsProto.Type> types) {
+                                                        List<PixelsProto.Type> types)
+    {
         PixelsProto.Type type = types.get(columnId);
-        switch (type.getKind()) {
+        switch (type.getKind())
+        {
             case FLOAT:
                 return PrimitiveObjectInspectorFactory.writableFloatObjectInspector;
             case DOUBLE:
@@ -627,14 +739,16 @@ final public class PixelsStruct implements Writable {
             case STRING:
                 return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
             case CHAR:
-                if (!type.hasMaximumLength()) {
+                if (!type.hasMaximumLength())
+                {
                     throw new UnsupportedOperationException(
                             "Illegal use of char type without length in PIXELS type definition.");
                 }
                 return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
                         TypeInfoFactory.getCharTypeInfo(type.getMaximumLength()));
             case VARCHAR:
-                if (!type.hasMaximumLength()) {
+                if (!type.hasMaximumLength())
+                {
                     throw new UnsupportedOperationException(
                             "Illegal use of varchar type without length in PIXELS type definition.");
                 }

@@ -57,7 +57,8 @@ public class PixelsInputFormat
     public RecordReader<NullWritable, PixelsStruct>
     getRecordReader(InputSplit inputSplit,
                     JobConf conf,
-                    Reporter reporter) throws IOException {
+                    Reporter reporter) throws IOException
+    {
         FileSplit split = (FileSplit) inputSplit;
         PixelsFile.ReaderOptions option = PixelsFile.readerOptions(conf, split);
         log.info(split.toString());

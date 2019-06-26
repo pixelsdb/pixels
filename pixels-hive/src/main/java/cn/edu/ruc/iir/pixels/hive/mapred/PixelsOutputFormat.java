@@ -51,7 +51,8 @@ public class PixelsOutputFormat
      * @param conf the job configuration
      * @return a new options object
      */
-    public static PixelsFile.WriterOptions buildOptions(Configuration conf) {
+    public static PixelsFile.WriterOptions buildOptions(Configuration conf)
+    {
         return PixelsFile.writerOptions(conf)
                 .setSchema(TypeDescription.fromString(PixelsConf.MAPRED_OUTPUT_SCHEMA
                         .getString(conf)))
@@ -68,7 +69,8 @@ public class PixelsOutputFormat
                                                                                   JobConf conf,
                                                                                   String name,
                                                                                   Progressable progressable
-    ) throws IOException {
+    ) throws IOException
+    {
         Path path = getTaskOutputPath(conf, name);
         PixelsWriter writer = PixelsFile.createWriter(path,
                 buildOptions(conf).fileSystem(fileSystem));
@@ -76,7 +78,8 @@ public class PixelsOutputFormat
     }
 
     @Override
-    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class<? extends Writable> aClass, boolean b, Properties properties, Progressable progressable) throws IOException {
+    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class<? extends Writable> aClass, boolean b, Properties properties, Progressable progressable) throws IOException
+    {
         return null;
     }
 }

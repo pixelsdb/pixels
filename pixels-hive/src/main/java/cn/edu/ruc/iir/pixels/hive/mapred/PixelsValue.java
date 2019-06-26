@@ -36,31 +36,38 @@ import java.io.IOException;
  * string of the type.
  * refer: [OrcValue](https://github.com/apache/orc/blob/master/java/mapreduce/src/java/org/apache/orc/mapred/OrcValue.java)
  */
-public final class PixelsValue implements Writable, JobConfigurable {
+public final class PixelsValue implements Writable, JobConfigurable
+{
 
     public WritableComparable value;
 
-    public PixelsValue(WritableComparable value) {
+    public PixelsValue(WritableComparable value)
+    {
         this.value = value;
     }
 
-    public PixelsValue() {
+    public PixelsValue()
+    {
         value = null;
     }
 
     @Override
-    public void write(DataOutput dataOutput) throws IOException {
+    public void write(DataOutput dataOutput) throws IOException
+    {
         value.write(dataOutput);
     }
 
     @Override
-    public void readFields(DataInput dataInput) throws IOException {
+    public void readFields(DataInput dataInput) throws IOException
+    {
         value.readFields(dataInput);
     }
 
     @Override
-    public void configure(JobConf conf) {
-        if (value == null) {
+    public void configure(JobConf conf)
+    {
+        if (value == null)
+        {
             TypeDescription schema =
                     TypeDescription.fromString(PixelsConf.MAPRED_SHUFFLE_VALUE_SCHEMA
                             .getString(conf));
