@@ -181,7 +181,6 @@ final public class PixelsStruct implements Writable {
 //                for (TypeDescription child : type.getChildren()) {
 //                    result.setFieldValue(c++, createValue(child, colIndexs));
 //                }
-                log.info("result:" + result);
                 return result;
             }
             default:
@@ -235,7 +234,7 @@ final public class PixelsStruct implements Writable {
         PixelsStructInspector(StructTypeInfo info) {
             ArrayList<String> fieldNames = info.getAllStructFieldNames();
             ArrayList<TypeInfo> fieldTypes = info.getAllStructFieldTypeInfos();
-            fields = new ArrayList<StructField>(fieldNames.size());
+            fields = new ArrayList<>(fieldNames.size());
             for (int i = 0; i < fieldNames.size(); ++i) {
                 fields.add(new Field(fieldNames.get(i),
                         createObjectInspector(fieldTypes.get(i)), i));
@@ -245,7 +244,7 @@ final public class PixelsStruct implements Writable {
         PixelsStructInspector(int columnId, List<PixelsProto.Type> types) {
             PixelsProto.Type type = types.get(columnId);
             int fieldCount = type.getSubtypesCount();
-            fields = new ArrayList<StructField>(fieldCount);
+            fields = new ArrayList<>(fieldCount);
             for (int i = 0; i < fieldCount; ++i) {
                 int fieldType = type.getSubtypes(i);
                 fields.add(new Field(type.getName(),
@@ -288,7 +287,7 @@ final public class PixelsStruct implements Writable {
                 return null;
             }
             PixelsStruct struct = (PixelsStruct) object;
-            List<Object> result = new ArrayList<Object>(struct.fields.length);
+            List<Object> result = new ArrayList<>(struct.fields.length);
             for (Object child : struct.fields) {
                 result.add(child);
             }

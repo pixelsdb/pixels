@@ -49,6 +49,8 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     private VectorizedRowBatch batch;
     private int rowInBatch;
     private List<Integer> included;
+    private List<TypeDescription> columnTypes;
+    private int numColumn;
     private final SerDeStats stats;
     private final PixelsReader file;
 
@@ -57,6 +59,10 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
         this.file = fileReader;
         this.batchReader = fileReader.read(options.getOption());
         this.schema = fileReader.getFileSchema();
+        // schema should be of struct type.
+        assert schema.getCategory() == TypeDescription.Category.STRUCT;
+        this.columnTypes = schema.getChildren();
+        this.numColumn = columnTypes.size();
         this.batch = batchReader.readBatch(BATCH_SIZE);
         this.rowInBatch = 0;
         this.included = options.getIncluded();
@@ -82,30 +88,24 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
 
     @Override
     public boolean next(NullWritable key, PixelsStruct value) throws IOException {
+        // value is created by createValue, is should not be null.
+        assert value != null;
+
         if (!ensureBatch()) {
             return false;
         }
-        // get the length of IncludedColumns
+
         if (this.included.size() == 0) {
             rowInBatch += 1;
             return true;
         }
-        if (schema.getCategory() == TypeDescription.Category.STRUCT) {
-            List<TypeDescription> children = schema.getChildren();
-            int numberOfChildren = this.included.size();
-            PixelsStruct result;
-            if (value == null) {
-                result = new PixelsStruct(numberOfChildren);
-            } else {
-                result = value;
-            }
-            for (int i = 0; i < numberOfChildren; ++i) {
-                result.setFieldValue(i, nextValue(batch.cols[i], rowInBatch,
-                        children.get(included.get(i)), result.getFieldValue(i)));
-            }
-        } else {
-            nextValue(batch.cols[0], rowInBatch, schema, value);
+
+        int numberOfIncluded = this.included.size();
+        for (int i = 0; i < numberOfIncluded; ++i) {
+            value.setFieldValue(included.get(i), nextValue(batch.cols[i], rowInBatch,
+                    columnTypes.get(included.get(i)), value.getFieldValue(included.get(i))));
         }
+
         rowInBatch += 1;
         return true;
     }
@@ -117,7 +117,7 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
 
     @Override
     public PixelsStruct createValue() {
-        return new PixelsStruct(this.included.size());
+        return new PixelsStruct(this.numColumn);
     }
 
     @Override

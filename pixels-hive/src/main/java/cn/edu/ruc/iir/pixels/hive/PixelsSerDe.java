@@ -66,7 +66,8 @@ public class PixelsSerDe extends AbstractSerDe {
         if (columnNameProperty != null && columnNameProperty.length() > 0) {
             Collections.addAll(columnNames, columnNameProperty.split(columnNameDelimiter));
         }
-        if (columnTypeProperty != null) {
+
+        if (columnTypeProperty == null) {
             // Default type: all string
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < columnNames.size(); i++) {
