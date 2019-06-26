@@ -36,31 +36,38 @@ import java.io.IOException;
  * refer: [OrcKey](https://github.com/apache/orc/blob/master/java/mapreduce/src/java/org/apache/orc/mapred/OrcKey.java)
  */
 public final class PixelsKey
-        implements WritableComparable<PixelsKey>, JobConfigurable {
+        implements WritableComparable<PixelsKey>, JobConfigurable
+{
 
     public WritableComparable key;
 
-    public PixelsKey(WritableComparable key) {
+    public PixelsKey(WritableComparable key)
+    {
         this.key = key;
     }
 
-    public PixelsKey() {
+    public PixelsKey()
+    {
         key = null;
     }
 
     @Override
-    public void write(DataOutput dataOutput) throws IOException {
+    public void write(DataOutput dataOutput) throws IOException
+    {
         key.write(dataOutput);
     }
 
     @Override
-    public void readFields(DataInput dataInput) throws IOException {
+    public void readFields(DataInput dataInput) throws IOException
+    {
         key.readFields(dataInput);
     }
 
     @Override
-    public void configure(JobConf conf) {
-        if (key == null) {
+    public void configure(JobConf conf)
+    {
+        if (key == null)
+        {
             TypeDescription schema =
                     TypeDescription.fromString(PixelsConf.MAPRED_SHUFFLE_KEY_SCHEMA
                             .getString(conf));
@@ -69,23 +76,29 @@ public final class PixelsKey
     }
 
     @Override
-    public int compareTo(PixelsKey o) {
+    public int compareTo(PixelsKey o)
+    {
         return key.compareTo(o.key);
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (o == null || key == null) {
+    public boolean equals(Object o)
+    {
+        if (o == null || key == null)
+        {
             return false;
-        } else if (o.getClass() != getClass()) {
+        } else if (o.getClass() != getClass())
+        {
             return false;
-        } else {
+        } else
+        {
             return key.equals(((PixelsKey) o).key);
         }
     }
 
     @Override
-    public int hashCode() {
+    public int hashCode()
+    {
         return key.hashCode();
     }
 }

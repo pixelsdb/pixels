@@ -37,13 +37,16 @@ import java.util.Properties;
  * Contains factory methods to read or write PIXELS files.
  * refer: [OrcFile](https://github.com/apache/orc/blob/master/java/core/src/java/org/apache/orc/OrcFile.java)
  */
-public class PixelsFile {
+public class PixelsFile
+{
     private static Logger log = LogManager.getLogger(PixelsFile.class);
 
-    protected PixelsFile() {
+    protected PixelsFile()
+    {
     }
 
-    public static class ReaderOptions {
+    public static class ReaderOptions
+    {
         private final Configuration conf;
         private FileSystem filesystem;
         private PixelsReaderOption option;
@@ -51,11 +54,14 @@ public class PixelsFile {
         private long offset = 0L;
         private long length = 9223372036854775807L;
 
-        public ReaderOptions(Configuration conf, FileSplit split) {
+        public ReaderOptions(Configuration conf, FileSplit split)
+        {
             this.conf = conf;
-            try {
+            try
+            {
                 this.filesystem = FileSystem.get(conf);
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 e.printStackTrace();
             }
             this.option = new PixelsReaderOption();
@@ -66,28 +72,35 @@ public class PixelsFile {
 //            this.option.includeCols(new String[]{});
         }
 
-        public ReaderOptions filesystem(FileSystem fs) {
+        public ReaderOptions filesystem(FileSystem fs)
+        {
             this.filesystem = fs;
             return this;
         }
 
-        public Configuration getConfiguration() {
+        public Configuration getConfiguration()
+        {
             return conf;
         }
 
-        public FileSystem getFilesystem() {
+        public FileSystem getFilesystem()
+        {
             return filesystem;
         }
 
-        public PixelsReaderOption getOption() {
+        public PixelsReaderOption getOption()
+        {
             return option;
         }
 
-        public ReaderOptions setOption(TypeDescription schema) {
-            if (!ColumnProjectionUtils.isReadAllColumns(conf)) {
+        public ReaderOptions setOption(TypeDescription schema)
+        {
+            if (!ColumnProjectionUtils.isReadAllColumns(conf))
+            {
                 included = ColumnProjectionUtils.getReadColumnIDs(conf);
                 log.info("genIncludedColumns:" + included.toString());
-            } else {
+            } else
+            {
                 log.info("genIncludedColumns:null");
             }
 
@@ -99,38 +112,46 @@ public class PixelsFile {
             return this;
         }
 
-        public ReaderOptions filesystem(JobConf conf) {
-            try {
+        public ReaderOptions filesystem(JobConf conf)
+        {
+            try
+            {
                 this.filesystem = FileSystem.get(conf);
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 e.printStackTrace();
             }
             return this;
         }
 
-        public ReaderOptions include(List<Integer> included) {
+        public ReaderOptions include(List<Integer> included)
+        {
             this.included = included;
             return this;
         }
 
-        public ReaderOptions range(long offset, long length) {
+        public ReaderOptions range(long offset, long length)
+        {
             this.offset = offset;
             this.length = length;
             return this;
         }
-        
-        public List<Integer> getIncluded() {
+
+        public List<Integer> getIncluded()
+        {
             return included;
         }
 
     }
 
-    public static ReaderOptions readerOptions(Configuration conf, FileSplit split) {
+    public static ReaderOptions readerOptions(Configuration conf, FileSplit split)
+    {
         return new ReaderOptions(conf, split);
     }
 
     public static PixelsReader createReader(Path path,
-                                            ReaderOptions options) throws IOException {
+                                            ReaderOptions options) throws IOException
+    {
         FileSystem fs = options.getFilesystem();
         return PixelsReaderImpl.newBuilder()
                 .setFS(fs)
@@ -143,7 +164,8 @@ public class PixelsFile {
     /**
      * Options for creating PIXELS file writers.
      */
-    public static class WriterOptions implements Cloneable {
+    public static class WriterOptions implements Cloneable
+    {
         private final Configuration configuration;
         private FileSystem fileSystemValue = null;
         private TypeDescription schema = null;
@@ -155,7 +177,8 @@ public class PixelsFile {
         private boolean encodingStrategy;
         private int compressionStrategy;
 
-        protected WriterOptions(Properties tableProperties, Configuration conf) {
+        protected WriterOptions(Properties tableProperties, Configuration conf)
+        {
             configuration = conf;
             stripeSizeValue = PixelsConf.STRIPE_SIZE.getLong(tableProperties, conf);
             blockSizeValue = PixelsConf.BLOCK_SIZE.getLong(tableProperties, conf);
@@ -173,10 +196,13 @@ public class PixelsFile {
         /**
          * @return a SHALLOW clone
          */
-        public WriterOptions clone() {
-            try {
+        public WriterOptions clone()
+        {
+            try
+            {
                 return (WriterOptions) super.clone();
-            } catch (CloneNotSupportedException ex) {
+            } catch (CloneNotSupportedException ex)
+            {
                 throw new AssertionError("Expected super.clone() to work");
             }
         }
@@ -185,7 +211,8 @@ public class PixelsFile {
          * Provide the filesystem for the path, if the client has it available.
          * If it is not provided, it will be found from the path.
          */
-        public WriterOptions fileSystem(FileSystem value) {
+        public WriterOptions fileSystem(FileSystem value)
+        {
             fileSystemValue = value;
             return this;
         }
@@ -195,7 +222,8 @@ public class PixelsFile {
          * stripe in memory until this memory limit is reached and the stripe
          * is flushed to the HDFS file and the next stripe started.
          */
-        public WriterOptions stripeSize(long value) {
+        public WriterOptions stripeSize(long value)
+        {
             stripeSizeValue = value;
             return this;
         }
@@ -204,7 +232,8 @@ public class PixelsFile {
          * Set the file system block size for the file. For optimal performance,
          * set the block size to be multiple factors of stripe size.
          */
-        public WriterOptions blockSize(long value) {
+        public WriterOptions blockSize(long value)
+        {
             blockSizeValue = value;
             return this;
         }
@@ -214,7 +243,8 @@ public class PixelsFile {
          * 1000 to prevent the index from overwhelming the data. If the stride is
          * set to 0, no indexes will be included in the file.
          */
-        public WriterOptions rowIndexStride(int value) {
+        public WriterOptions rowIndexStride(int value)
+        {
             rowIndexStrideValue = value;
             return this;
         }
@@ -226,7 +256,8 @@ public class PixelsFile {
          * writing and memory utilization. To enforce writer to use the requested
          * buffer size use enforceBufferSize().
          */
-        public WriterOptions blockReplication(short value) {
+        public WriterOptions blockReplication(short value)
+        {
             blockReplication = value;
             return this;
         }
@@ -236,7 +267,8 @@ public class PixelsFile {
          * straddling blocks. Padding improves locality and thus the speed of
          * reading, but costs space.
          */
-        public WriterOptions blockPadding(boolean value) {
+        public WriterOptions blockPadding(boolean value)
+        {
             blockPaddingValue = value;
             return this;
         }
@@ -244,12 +276,14 @@ public class PixelsFile {
         /**
          * Sets the encoding strategy that is used to encode the data.
          */
-        public WriterOptions encodingStrategy(boolean strategy) {
+        public WriterOptions encodingStrategy(boolean strategy)
+        {
             encodingStrategy = strategy;
             return this;
         }
 
-        public WriterOptions compressionStrategy(int strategy) {
+        public WriterOptions compressionStrategy(int strategy)
+        {
             compressionStrategy = strategy;
             return this;
         }
@@ -260,48 +294,59 @@ public class PixelsFile {
          * @param schema the schema for the file.
          * @return this
          */
-        public WriterOptions setSchema(TypeDescription schema) {
+        public WriterOptions setSchema(TypeDescription schema)
+        {
             this.schema = schema;
             return this;
         }
 
-        public boolean getBlockPadding() {
+        public boolean getBlockPadding()
+        {
             return blockPaddingValue;
         }
 
-        public long getBlockSize() {
+        public long getBlockSize()
+        {
             return blockSizeValue;
         }
 
-        public FileSystem getFileSystem() {
+        public FileSystem getFileSystem()
+        {
             return fileSystemValue;
         }
 
-        public Configuration getConfiguration() {
+        public Configuration getConfiguration()
+        {
             return configuration;
         }
 
-        public TypeDescription getSchema() {
+        public TypeDescription getSchema()
+        {
             return schema;
         }
 
-        public long getStripeSize() {
+        public long getStripeSize()
+        {
             return stripeSizeValue;
         }
 
-        public short getBlockReplication() {
+        public short getBlockReplication()
+        {
             return blockReplication;
         }
 
-        public int getRowIndexStride() {
+        public int getRowIndexStride()
+        {
             return rowIndexStrideValue;
         }
 
-        public int getCompressionStrategy() {
+        public int getCompressionStrategy()
+        {
             return compressionStrategy;
         }
 
-        public boolean getEncodingStrategy() {
+        public boolean getEncodingStrategy()
+        {
             return encodingStrategy;
         }
 
@@ -313,7 +358,8 @@ public class PixelsFile {
      * @param conf the configuration to use for values
      * @return A WriterOptions object that can be modified
      */
-    public static WriterOptions writerOptions(Configuration conf) {
+    public static WriterOptions writerOptions(Configuration conf)
+    {
         return new WriterOptions(null, conf);
     }
 
@@ -326,7 +372,8 @@ public class PixelsFile {
      * @return a WriterOptions object that can be modified
      */
     public static WriterOptions writerOptions(Properties tableProperties,
-                                              Configuration conf) {
+                                              Configuration conf)
+    {
         return new WriterOptions(tableProperties, conf);
     }
 
@@ -341,7 +388,8 @@ public class PixelsFile {
      */
     public static PixelsWriter createWriter(Path path,
                                             WriterOptions opts
-    ) throws IOException {
+    ) throws IOException
+    {
         FileSystem fs = opts.getFileSystem() == null ?
                 path.getFileSystem(opts.getConfiguration()) : opts.getFileSystem();
         return

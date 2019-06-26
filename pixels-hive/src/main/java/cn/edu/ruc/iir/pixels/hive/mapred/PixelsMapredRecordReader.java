@@ -40,7 +40,8 @@ import java.util.List;
  * @param <V> the root type of the file
  */
 public class PixelsMapredRecordReader<V extends WritableComparable>
-        implements org.apache.hadoop.mapred.RecordReader<NullWritable, PixelsStruct>, StatsProvidingRecordReader {
+        implements org.apache.hadoop.mapred.RecordReader<NullWritable, PixelsStruct>, StatsProvidingRecordReader
+{
     private static Logger log = LogManager.getLogger(PixelsMapredRecordReader.class);
     private static final int BATCH_SIZE = 10000;
 
@@ -55,7 +56,8 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     private final PixelsReader file;
 
     public PixelsMapredRecordReader(PixelsReader fileReader,
-                                    PixelsFile.ReaderOptions options) throws IOException {
+                                    PixelsFile.ReaderOptions options) throws IOException
+    {
         this.file = fileReader;
         this.batchReader = fileReader.read(options.getOption());
         this.schema = fileReader.getFileSchema();
@@ -75,11 +77,14 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
      * @return true if we have rows available.
      * @throws IOException
      */
-    boolean ensureBatch() throws IOException {
-        if (rowInBatch >= batch.size) {
+    boolean ensureBatch() throws IOException
+    {
+        if (rowInBatch >= batch.size)
+        {
             rowInBatch = 0;
             batch = batchReader.readBatch(BATCH_SIZE);
-            if (this.batch.size <= 0 || this.batch.endOfFile) {
+            if (this.batch.size <= 0 || this.batch.endOfFile)
+            {
                 return false;
             }
         }
@@ -87,21 +92,25 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     }
 
     @Override
-    public boolean next(NullWritable key, PixelsStruct value) throws IOException {
+    public boolean next(NullWritable key, PixelsStruct value) throws IOException
+    {
         // value is created by createValue, is should not be null.
         assert value != null;
 
-        if (!ensureBatch()) {
+        if (!ensureBatch())
+        {
             return false;
         }
 
-        if (this.included.size() == 0) {
+        if (this.included.size() == 0)
+        {
             rowInBatch += 1;
             return true;
         }
 
         int numberOfIncluded = this.included.size();
-        for (int i = 0; i < numberOfIncluded; ++i) {
+        for (int i = 0; i < numberOfIncluded; ++i)
+        {
             value.setFieldValue(included.get(i), nextValue(batch.cols[i], rowInBatch,
                     columnTypes.get(included.get(i)), value.getFieldValue(included.get(i))));
         }
@@ -111,231 +120,296 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     }
 
     @Override
-    public NullWritable createKey() {
+    public NullWritable createKey()
+    {
         return NullWritable.get();
     }
 
     @Override
-    public PixelsStruct createValue() {
+    public PixelsStruct createValue()
+    {
         return new PixelsStruct(this.numColumn);
     }
 
     @Override
-    public long getPos() throws IOException {
+    public long getPos() throws IOException
+    {
         return 0;
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() throws IOException
+    {
         batchReader.close();
     }
 
     // todo get progress
     @Override
-    public float getProgress() throws IOException {
+    public float getProgress() throws IOException
+    {
         return 0;
     }
 
     static BooleanWritable nextBoolean(ColumnVector vector,
                                        int row,
-                                       Object previous) {
-        if (vector.isRepeating) {
+                                       Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             BooleanWritable result;
-            if (previous == null || previous.getClass() != BooleanWritable.class) {
+            if (previous == null || previous.getClass() != BooleanWritable.class)
+            {
                 result = new BooleanWritable();
-            } else {
+            } else
+            {
                 result = (BooleanWritable) previous;
             }
             result.set(((ByteColumnVector) vector).vector[row] != 0);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static ByteWritable nextByte(ColumnVector vector,
                                  int row,
-                                 Object previous) {
-        if (vector.isRepeating) {
+                                 Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             ByteWritable result;
-            if (previous == null || previous.getClass() != ByteWritable.class) {
+            if (previous == null || previous.getClass() != ByteWritable.class)
+            {
                 result = new ByteWritable();
-            } else {
+            } else
+            {
                 result = (ByteWritable) previous;
             }
             result.set((byte) ((LongColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static ShortWritable nextShort(ColumnVector vector,
                                    int row,
-                                   Object previous) {
-        if (vector.isRepeating) {
+                                   Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             ShortWritable result;
-            if (previous == null || previous.getClass() != ShortWritable.class) {
+            if (previous == null || previous.getClass() != ShortWritable.class)
+            {
                 result = new ShortWritable();
-            } else {
+            } else
+            {
                 result = (ShortWritable) previous;
             }
             result.set((short) ((LongColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static IntWritable nextInt(ColumnVector vector,
                                int row,
-                               Object previous) {
-        if (vector.isRepeating) {
+                               Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             IntWritable result;
-            if (previous == null || previous.getClass() != IntWritable.class) {
+            if (previous == null || previous.getClass() != IntWritable.class)
+            {
                 result = new IntWritable();
-            } else {
+            } else
+            {
                 result = (IntWritable) previous;
             }
             result.set((int) ((LongColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static LongWritable nextLong(ColumnVector vector,
                                  int row,
-                                 Object previous) {
-        if (vector.isRepeating) {
+                                 Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             LongWritable result;
-            if (previous == null || previous.getClass() != LongWritable.class) {
+            if (previous == null || previous.getClass() != LongWritable.class)
+            {
                 result = new LongWritable();
-            } else {
+            } else
+            {
                 result = (LongWritable) previous;
             }
             result.set(((LongColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static FloatWritable nextFloat(ColumnVector vector,
                                    int row,
-                                   Object previous) {
-        if (vector.isRepeating) {
+                                   Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             FloatWritable result;
-            if (previous == null || previous.getClass() != FloatWritable.class) {
+            if (previous == null || previous.getClass() != FloatWritable.class)
+            {
                 result = new FloatWritable();
-            } else {
+            } else
+            {
                 result = (FloatWritable) previous;
             }
             result.set((float) ((DoubleColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static DoubleWritable nextDouble(ColumnVector vector,
                                      int row,
-                                     Object previous) {
-        if (vector.isRepeating) {
+                                     Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             DoubleWritable result;
-            if (previous == null || previous.getClass() != DoubleWritable.class) {
+            if (previous == null || previous.getClass() != DoubleWritable.class)
+            {
                 result = new DoubleWritable();
-            } else {
+            } else
+            {
                 result = (DoubleWritable) previous;
             }
             result.set(((DoubleColumnVector) vector).vector[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static Text nextString(ColumnVector vector,
                            int row,
-                           Object previous) {
-        if (vector.isRepeating) {
+                           Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             Text result;
-            if (previous == null || previous.getClass() != Text.class) {
+            if (previous == null || previous.getClass() != Text.class)
+            {
                 result = new Text();
-            } else {
+            } else
+            {
                 result = (Text) previous;
             }
             BinaryColumnVector bytes = (BinaryColumnVector) vector;
 
             result.set(bytes.vector[row], bytes.start[row], bytes.lens[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static BytesWritable nextBinary(ColumnVector vector,
                                     int row,
-                                    Object previous) {
-        if (vector.isRepeating) {
+                                    Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             BytesWritable result;
-            if (previous == null || previous.getClass() != BytesWritable.class) {
+            if (previous == null || previous.getClass() != BytesWritable.class)
+            {
                 result = new BytesWritable();
-            } else {
+            } else
+            {
                 result = (BytesWritable) previous;
             }
             BinaryColumnVector bytes = (BinaryColumnVector) vector;
             result.set(bytes.vector[row], bytes.start[row], bytes.lens[row]);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
     static DateWritable nextDate(ColumnVector vector,
                                  int row,
-                                 Object previous) {
-        if (vector.isRepeating) {
+                                 Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             DateWritable result;
-            if (previous == null || previous.getClass() != DateWritable.class) {
+            if (previous == null || previous.getClass() != DateWritable.class)
+            {
                 result = new DateWritable();
-            } else {
+            } else
+            {
                 result = (DateWritable) previous;
             }
             int date = (int) ((LongColumnVector) vector).vector[row];
             result.set(date);
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
@@ -343,26 +417,33 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     PixelsStruct nextStruct(ColumnVector vector,
                             int row,
                             TypeDescription schema,
-                            Object previous) {
-        if (vector.isRepeating) {
+                            Object previous)
+    {
+        if (vector.isRepeating)
+        {
             row = 0;
         }
-        if (vector.noNulls || !vector.isNull[row]) {
+        if (vector.noNulls || !vector.isNull[row])
+        {
             PixelsStruct result;
             List<TypeDescription> childrenTypes = schema.getChildren();
             int numChildren = childrenTypes.size();
-            if (previous == null || previous.getClass() != PixelsStruct.class) {
+            if (previous == null || previous.getClass() != PixelsStruct.class)
+            {
                 result = new PixelsStruct(numChildren);
-            } else {
+            } else
+            {
                 result = (PixelsStruct) previous;
             }
             StructColumnVector struct = (StructColumnVector) vector;
-            for (int f = 0; f < numChildren; ++f) {
+            for (int f = 0; f < numChildren; ++f)
+            {
                 result.setFieldValue(f, nextValue(struct.fields[f], row,
                         childrenTypes.get(f), result.getFieldValue(f)));
             }
             return result;
-        } else {
+        } else
+        {
             return null;
         }
     }
@@ -370,8 +451,10 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     public Object nextValue(ColumnVector vector,
                             int row,
                             TypeDescription schema,
-                            Object previous) {
-        switch (schema.getCategory()) {
+                            Object previous)
+    {
+        switch (schema.getCategory())
+        {
             case BOOLEAN:
                 return nextBoolean(vector, row, previous);
             case BYTE:
@@ -402,7 +485,8 @@ public class PixelsMapredRecordReader<V extends WritableComparable>
     }
 
     @Override
-    public SerDeStats getStats() {
+    public SerDeStats getStats()
+    {
         stats.setRawDataSize(file.getCompressionBlockSize());
         stats.setRowCount(file.getNumberOfRows());
         return stats;

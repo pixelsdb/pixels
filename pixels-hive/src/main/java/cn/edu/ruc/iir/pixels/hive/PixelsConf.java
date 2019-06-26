@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,7 +25,8 @@ import java.util.Properties;
  * Define the configuration properties that Pixels understands.
  * refer: [OrcConf](https://github.com/apache/orc/blob/master/java/core/src/java/org/apache/orc/OrcConf.java)
  */
-public enum PixelsConf {
+public enum PixelsConf
+{
     ROW_INDEX_STRIDE("pixels.row.index.stride",
             "hive.exec.pixels.default.row.index.stride", 10000,
             "Define the default Pixels index stride in number of rows. (Stride is the\n" +
@@ -73,101 +74,125 @@ public enum PixelsConf {
     PixelsConf(String attribute,
                String hiveConfName,
                Object defaultValue,
-               String description) {
+               String description)
+    {
         this.attribute = attribute;
         this.hiveConfName = hiveConfName;
         this.defaultValue = defaultValue;
         this.description = description;
     }
 
-    public String getAttribute() {
+    public String getAttribute()
+    {
         return attribute;
     }
 
-    public String getHiveConfName() {
+    public String getHiveConfName()
+    {
         return hiveConfName;
     }
 
-    public Object getDefaultValue() {
+    public Object getDefaultValue()
+    {
         return defaultValue;
     }
 
-    public String getDescription() {
+    public String getDescription()
+    {
         return description;
     }
 
-    private String lookupValue(Properties tbl, Configuration conf) {
+    private String lookupValue(Properties tbl, Configuration conf)
+    {
         String result = null;
-        if (tbl != null) {
+        if (tbl != null)
+        {
             result = tbl.getProperty(attribute);
         }
-        if (result == null && conf != null) {
+        if (result == null && conf != null)
+        {
             result = conf.get(attribute);
-            if (result == null && hiveConfName != null) {
+            if (result == null && hiveConfName != null)
+            {
                 result = conf.get(hiveConfName);
             }
         }
         return result;
     }
 
-    public long getLong(Properties tbl, Configuration conf) {
+    public long getLong(Properties tbl, Configuration conf)
+    {
         String value = lookupValue(tbl, conf);
-        if (value != null) {
+        if (value != null)
+        {
             return Long.parseLong(value);
         }
         return ((Number) defaultValue).longValue();
     }
 
-    public long getLong(Configuration conf) {
+    public long getLong(Configuration conf)
+    {
         return getLong(null, conf);
     }
 
-    public void setLong(Configuration conf, long value) {
+    public void setLong(Configuration conf, long value)
+    {
         conf.setLong(attribute, value);
     }
 
-    public String getString(Properties tbl, Configuration conf) {
+    public String getString(Properties tbl, Configuration conf)
+    {
         String value = lookupValue(tbl, conf);
         return value == null ? (String) defaultValue : value;
     }
 
-    public String getString(Configuration conf) {
+    public String getString(Configuration conf)
+    {
         return getString(null, conf);
     }
 
-    public void setString(Configuration conf, String value) {
+    public void setString(Configuration conf, String value)
+    {
         conf.set(attribute, value);
     }
 
-    public boolean getBoolean(Properties tbl, Configuration conf) {
+    public boolean getBoolean(Properties tbl, Configuration conf)
+    {
         String value = lookupValue(tbl, conf);
-        if (value != null) {
+        if (value != null)
+        {
             return Boolean.parseBoolean(value);
         }
         return (Boolean) defaultValue;
     }
 
-    public boolean getBoolean(Configuration conf) {
+    public boolean getBoolean(Configuration conf)
+    {
         return getBoolean(null, conf);
     }
 
-    public void setBoolean(Configuration conf, boolean value) {
+    public void setBoolean(Configuration conf, boolean value)
+    {
         conf.setBoolean(attribute, value);
     }
 
-    public double getDouble(Properties tbl, Configuration conf) {
+    public double getDouble(Properties tbl, Configuration conf)
+    {
         String value = lookupValue(tbl, conf);
-        if (value != null) {
+        if (value != null)
+        {
             return Double.parseDouble(value);
         }
         return ((Number) defaultValue).doubleValue();
     }
 
-    public double getDouble(Configuration conf) {
+    public double getDouble(Configuration conf)
+    {
         return getDouble(null, conf);
     }
 
-    public void setDouble(Configuration conf, double value) {
+    public void setDouble(Configuration conf, double value)
+    {
         conf.setDouble(attribute, value);
     }
 }
