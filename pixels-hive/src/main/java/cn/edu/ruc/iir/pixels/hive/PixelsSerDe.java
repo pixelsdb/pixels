@@ -54,7 +54,7 @@ public class PixelsSerDe extends AbstractSerDe
     public void initialize(@Nullable Configuration configuration, Properties table) throws SerDeException
     {
         List<Integer> included = ColumnProjectionUtils.getReadColumnIDs(configuration);
-        log.info("configuration:" + included.toString());
+        log.info("included columns: " + included.toString());
 
         // Read the configuration parameters
         String columnNameProperty = table.getProperty(serdeConstants.LIST_COLUMNS);
@@ -91,8 +91,6 @@ public class PixelsSerDe extends AbstractSerDe
         // The source column names for PIXELS serde that will be used in the schema.
         rootType.setAllStructFieldNames(columnNames);
         rootType.setAllStructFieldTypeInfos(fieldTypes);
-        //log.info("setAllStructFieldNames:" + columnNames.toString());
-//        log.info("setAllStructFieldTypeInfos:" + fieldTypes.toString());
         inspector = PixelsStruct.createObjectInspector(rootType);
     }
 
@@ -119,7 +117,6 @@ public class PixelsSerDe extends AbstractSerDe
     @Override
     public Object deserialize(Writable writable) throws SerDeException
     {
-//        log.info("deserialize");
         return writable;
     }
 
@@ -156,6 +153,4 @@ public class PixelsSerDe extends AbstractSerDe
             return realRow;
         }
     }
-
-
 }

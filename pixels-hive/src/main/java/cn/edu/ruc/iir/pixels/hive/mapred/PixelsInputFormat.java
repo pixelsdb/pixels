@@ -22,8 +22,8 @@ import cn.edu.ruc.iir.pixels.hive.PixelsFile;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 
@@ -34,7 +34,7 @@ import java.io.IOException;
 public class PixelsInputFormat
         extends FileInputFormat<NullWritable, PixelsStruct>
 {
-    private static Logger log = LoggerFactory.getLogger(PixelsInputFormat.class);
+    private static Logger log = LogManager.getLogger(PixelsInputFormat.class);
 
     /**
      * Splits files returned by {@link #listStatus(JobConf)} when
