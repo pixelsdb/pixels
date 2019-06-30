@@ -42,7 +42,7 @@ import java.util.Properties;
  * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcSerde}
  *
  * <p>
- * @author: tao
+ * @author: tao, hank
  * @date: Create in 2018-12-11 15:29
  * </p>
  **/

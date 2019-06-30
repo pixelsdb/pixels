@@ -30,7 +30,6 @@ import java.io.IOException;
 
 /**
  * An old mapred InputFormat for Pixels files.
- * Column cache and dynamic splitting are not supported.
  * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcInputFormat}
  *
  * <P>

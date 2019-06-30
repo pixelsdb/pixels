@@ -32,6 +32,7 @@ public class PixelsInputFormat extends FileInputFormat<NullWritable, PixelsStruc
     @Override
     public List<InputSplit> getSplits(JobContext job) throws IOException
     {
+        // TODO: implement dynamic splitting.
         return super.getSplits(job);
     }
 

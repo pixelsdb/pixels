@@ -38,8 +38,8 @@ import java.util.Properties;
  * refers to {@link org.apache.orc.OrcFile}
  *
  * <p>
- * Created at: 19-6-30
- * Author: hank
+ * Created at: 2018-12-12
+ * Author: hank, tao
  */
 public class PixelsRW
 {
