@@ -46,7 +46,6 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
 
     public PixelsSplit()
     {
-        super();
     }
 
     /**
