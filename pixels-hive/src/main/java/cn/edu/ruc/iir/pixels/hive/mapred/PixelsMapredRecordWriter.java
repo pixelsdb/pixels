@@ -21,7 +21,7 @@ import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
 import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;

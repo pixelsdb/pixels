@@ -149,6 +149,13 @@ public class MetadataService
         return true;
     }
 
+    /**
+     * Get the readable layouts of a table.
+     * @param schemaName
+     * @param tableName
+     * @return
+     * @throws MetadataException
+     */
     public List<Layout> getLayouts(String schemaName, String tableName) throws MetadataException
     {
         List<Layout> layouts = new ArrayList<>();
@@ -174,7 +181,7 @@ public class MetadataService
         {
             throw new MetadataException("failed to get layouts from metadata", e);
         }
-        return layouts != null ? layouts : new ArrayList<>();
+        return layouts;
     }
 
     public Layout getLayout(String schemaName, String tableName, int version) throws MetadataException

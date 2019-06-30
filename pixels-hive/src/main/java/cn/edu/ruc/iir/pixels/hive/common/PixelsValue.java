@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.hive.common;
 
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
@@ -278,9 +278,9 @@ public class PixelsValue
     }
 
     private static PixelsStruct nextStruct(ColumnVector vector,
-                            int row,
-                            TypeDescription schema,
-                            Object previous)
+                                           int row,
+                                           TypeDescription schema,
+                                           Object previous)
     {
         if (vector.isRepeating)
         {

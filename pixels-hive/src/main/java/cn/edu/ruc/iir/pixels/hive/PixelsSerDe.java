@@ -17,6 +17,7 @@
  */
 package cn.edu.ruc.iir.pixels.hive;
 
+import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.*;

@@ -27,6 +27,11 @@
             <artifactId>pixels-cache</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-daemon</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- hive -->
         <dependency>
@@ -63,6 +68,28 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>com.coreos</groupId>
+            <artifactId>jetcd-core</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-codec-http2</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler-proxy</artifactId>
+                </exclusion>
+            </exclusions>
+            <optional>true</optional>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -89,6 +116,12 @@
                                     <include>cn.edu.ruc.iir:*</include>
                                     <include>org.apache.logging.log4j:*</include>
                                     <include>com.google.protobuf:*</include>
+                                    <include>com.alibaba:fastjson</include>
+                                    <include>com.coreos:jetcd-core</include>
+                                    <include>io.grpc:*</include>
+                                    <include>io.netty:*</include>
+                                    <include>io.opencensus:*</include>
+                                    <include>com.google.errorprone:*</include>
                                 </includes>
                             </artifactSet>
                             <finalName>pixels-hive</finalName>

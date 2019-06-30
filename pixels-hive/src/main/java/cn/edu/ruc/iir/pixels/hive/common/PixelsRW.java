@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.hive.common;
 
 import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
@@ -84,7 +84,7 @@ public class PixelsRW
                 log.info("read all columns.");
             }
             String[] columns = ColumnProjectionUtils.getReadColumnNames(conf);
-            log.info("columns included: " + columns.toString());
+            // log.info("columns included: " + columns.toString());
             this.option.includeCols(columns);
 
             // if cache is enabled, create cache reader.
@@ -159,7 +159,7 @@ public class PixelsRW
                 .setEnableCache(isCacheEnabled)
                 .setCacheOrder(isCacheEnabled ? options.getCacheOrder() : null)
                 .setPixelsCacheReader(isCacheEnabled ? cacheReader : null)
-                // TODO: support footer cache in hive.
+                // currently, the footerCache lifetime is hive-cli session wide.
                 .setPixelsFooterCache(footerCache)
                 .build();
     }

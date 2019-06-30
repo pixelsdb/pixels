@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.hive.common;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -46,6 +46,7 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
 
     public PixelsSplit()
     {
+        super();
     }
 
     /**

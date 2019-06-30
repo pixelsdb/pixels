@@ -47,13 +47,13 @@ public final class FSFactory
         return instance;
     }
 
+    private FileSystem fileSystem;
+    private Configuration hdfsConfig;
+
     public FSFactory(FileSystem fs)
     {
         this.fileSystem = fs;
     }
-
-    private FileSystem fileSystem;
-    private Configuration hdfsConfig;
 
     private FSFactory(String hdfsConfigDir) throws FSException
     {
@@ -99,7 +99,7 @@ public final class FSFactory
     public List<Path> listFiles(Path dirPath) throws FSException
     {
         List<Path> files = new ArrayList<>();
-        FileStatus[] fileStatuses = null;
+        FileStatus[] fileStatuses;
         try
         {
             fileStatuses = this.fileSystem.listStatus(dirPath);
@@ -127,6 +127,15 @@ public final class FSFactory
         return listFiles(new Path(dirPath));
     }
 
+    public long getFileLength (Path path) throws IOException
+    {
+        if (fileSystem.isFile(path))
+        {
+            return fileSystem.getFileStatus(path).getLen();
+        }
+        return -1;
+    }
+
     /**
      * we assume that a file contains only one block.
      *
@@ -139,7 +148,7 @@ public final class FSFactory
     public List<HostAddress> getBlockLocations(Path file, long start, long len) throws FSException
     {
         Set<HostAddress> addresses = new HashSet<>();
-        BlockLocation[] locations = new BlockLocation[0];
+        BlockLocation[] locations;
         try
         {
             locations = this.fileSystem.getFileBlockLocations(file, start, len);
@@ -160,6 +169,31 @@ public final class FSFactory
             }
         }
         return new ArrayList<>(addresses);
+    }
+
+    public String[] getBlockHosts(Path file, long start, long len) throws FSException
+    {
+        BlockLocation[] locations;
+        try
+        {
+            locations = this.fileSystem.getFileBlockLocations(file, start, len);
+        }
+        catch (IOException e)
+        {
+            throw new FSException("I/O error occurs when getting block locations", e);
+        }
+        List<String> hosts = new ArrayList<>(locations.length);
+        for (BlockLocation location : locations)
+        {
+            try
+            {
+                hosts.addAll(Arrays.asList(location.getHosts()));
+            } catch (IOException e)
+            {
+                throw new FSException("I/O error occurs when get hosts from block locations.", e);
+            }
+        }
+        return hosts.toArray(new String[hosts.size()]);
     }
 
     public List<HostAddress> getBlockLocations(Path file, long start, long len, String node) throws FSException
@@ -232,10 +266,9 @@ public final class FSFactory
         IOUtils.closeStream(out);
     }
 
-    // file isExist
-    public boolean isTableExists(String metatable) throws IOException
+    public boolean isExists(String file) throws IOException
     {
-        Path path = new Path(metatable);
+        Path path = new Path(file);
         boolean exist = fileSystem.exists(path);
         if (!exist)
         {

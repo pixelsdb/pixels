@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.hive.mapreduce;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import cn.edu.ruc.iir.pixels.hive.PixelsRW;
-import cn.edu.ruc.iir.pixels.hive.PixelsSplit;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsSplit;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.NullWritable;

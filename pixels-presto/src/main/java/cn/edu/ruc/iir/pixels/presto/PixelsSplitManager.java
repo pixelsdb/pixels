@@ -26,11 +26,11 @@ import cn.edu.ruc.iir.pixels.presto.exception.BalancerException;
 import cn.edu.ruc.iir.pixels.presto.exception.CacheException;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsMetadataProxy;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;
-import cn.edu.ruc.iir.pixels.presto.split.AccessPattern;
-import cn.edu.ruc.iir.pixels.presto.split.ColumnSet;
-import cn.edu.ruc.iir.pixels.presto.split.IndexEntry;
-import cn.edu.ruc.iir.pixels.presto.split.IndexFactory;
-import cn.edu.ruc.iir.pixels.presto.split.Inverted;
+import cn.edu.ruc.iir.pixels.common.split.AccessPattern;
+import cn.edu.ruc.iir.pixels.common.split.ColumnSet;
+import cn.edu.ruc.iir.pixels.common.split.IndexEntry;
+import cn.edu.ruc.iir.pixels.common.split.IndexFactory;
+import cn.edu.ruc.iir.pixels.common.split.Inverted;
 import com.alibaba.fastjson.JSON;
 import com.coreos.jetcd.data.KeyValue;
 import com.facebook.presto.spi.ConnectorSession;
@@ -68,6 +68,7 @@ import static java.util.stream.Collectors.toSet;
  * @author: tao
  * @date: Create in 2018-01-20 19:16
  **/
+@SuppressWarnings("Duplicates")
 public class PixelsSplitManager
         implements ConnectorSplitManager {
     private final Logger log = Logger.get(PixelsSplitManager.class);
@@ -141,14 +142,14 @@ public class PixelsSplitManager
                 Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
                 if (index == null)
                 {
-                    log.info("index not exist in factory, building index...");
+                    log.debug("index not exist in factory, building index...");
                     index = getInverted(order, splits, indexEntry);
                 }
                 else
                 {
                     int indexVersion = index.getVersion();
                     if (indexVersion < version) {
-                        log.info("index version is not up to date, updating index...");
+                        log.debug("index version is not up to date, updating index...");
                         index = getInverted(order, splits, indexEntry);
                     }
                 }
@@ -206,7 +207,7 @@ public class PixelsSplitManager
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         path.toString(), 0, 1,
                                         false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
-                                log.debug("Split in orderPath: " + pixelsSplit.toString());
+                                // log.debug("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
                             // 4. add splits in compactPath
@@ -224,7 +225,7 @@ public class PixelsSplitManager
                                                                               hdfsFile, curFileRGIdx, splitSize,
                                                                               true, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
                                     pixelsSplits.add(pixelsSplit);
-                                    log.debug("Split in compactPath" + pixelsSplit.toString());
+                                    // log.debug("Split in compactPath" + pixelsSplit.toString());
                                     curFileRGIdx += splitSize;
                                 }
                             }
@@ -310,9 +311,6 @@ public class PixelsSplitManager
                 }
             }
         }
-
-        log.debug("=====shuffle splits====");
-        log.debug("number of total splits: " + pixelsSplits.size());
 
         Collections.shuffle(pixelsSplits);
 

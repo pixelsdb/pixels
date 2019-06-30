@@ -19,8 +19,8 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.hive.PixelsConf;
-import cn.edu.ruc.iir.pixels.hive.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsConf;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
 import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
