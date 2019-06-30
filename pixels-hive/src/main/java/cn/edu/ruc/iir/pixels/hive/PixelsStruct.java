@@ -36,9 +36,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @Description: refer: [PixelsStruct](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcStruct.java)
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcStruct}
+ *
+ * <p>
  * @author: tao
  * @date: Create in 2018-12-12 22:35
+ * </p>
  **/
 final public class PixelsStruct implements Writable
 {

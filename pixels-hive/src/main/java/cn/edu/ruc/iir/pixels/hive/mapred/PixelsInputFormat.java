@@ -18,7 +18,8 @@
 package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
-import cn.edu.ruc.iir.pixels.hive.PixelsFile;
+import cn.edu.ruc.iir.pixels.hive.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.PixelsSplit;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
@@ -28,8 +29,14 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 
 /**
- * A MapReduce/Hive input format for PIXELS files.
- * refer: [OrcInputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcInputFormat.java)
+ * An old mapred InputFormat for Pixels files.
+ * Column cache and dynamic splitting are not supported.
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcInputFormat}
+ *
+ * <P>
+ * Created at: 19-6-15
+ * Author: hank
+ * </P>
  */
 public class PixelsInputFormat
         extends FileInputFormat<NullWritable, PixelsStruct>
@@ -59,12 +66,22 @@ public class PixelsInputFormat
                     JobConf conf,
                     Reporter reporter) throws IOException
     {
-        FileSplit split = (FileSplit) inputSplit;
-        PixelsFile.ReaderOptions option = PixelsFile.readerOptions(conf, split);
-        log.info(split.toString());
-        PixelsReader reader = PixelsFile.createReader(split.getPath(), option);
-        return new PixelsMapredRecordReader<>(reader,
-                option.setOption(reader.getFileSchema()));
+        PixelsSplit split;
+        if (inputSplit instanceof PixelsSplit)
+        {
+            split = (PixelsSplit) inputSplit;
+        }
+        else if (inputSplit instanceof FileSplit)
+        {
+            split = new PixelsSplit((FileSplit) inputSplit);
+        }
+        else
+        {
+            throw new IOException("inputSplit must be PixelsSplit or FileSplit");
+        }
+        PixelsRW.ReaderOptions options = PixelsRW.readerOptions(conf, split);
+        PixelsReader reader = PixelsRW.createReader(split.getPath(), options);
+        return new PixelsMapredRecordReader(reader, options);
     }
 
 }

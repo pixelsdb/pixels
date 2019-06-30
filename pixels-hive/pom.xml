@@ -22,6 +22,11 @@
             <artifactId>pixels-core</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>cn.edu.ruc.iir</groupId>
+            <artifactId>pixels-cache</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- hive -->
         <dependency>

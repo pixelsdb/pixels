@@ -1,5 +1,8 @@
 package cn.edu.ruc.iir.pixels.hive.mapreduce;
 
+import cn.edu.ruc.iir.pixels.core.PixelsReader;
+import cn.edu.ruc.iir.pixels.hive.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.PixelsSplit;
 import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.shims.ShimLoader;
@@ -14,6 +17,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
+ * Pixels nput format for new mapreduce InputFormat API.
  * Created at: 19-6-15
  * Author: hank
  */
@@ -47,6 +51,9 @@ public class PixelsInputFormat extends FileInputFormat<NullWritable, PixelsStruc
     {
         Configuration conf = ShimLoader.getHadoopShims()
                 .getConfiguration(context);
-        return null;
+        PixelsSplit pixelsSplit = (PixelsSplit) split;
+        PixelsRW.ReaderOptions options = PixelsRW.readerOptions(conf, pixelsSplit);
+        PixelsReader reader = PixelsRW.createReader(pixelsSplit.getPath(), options);
+        return new PixelsMapReduceRecordReader(reader, options);
     }
 }

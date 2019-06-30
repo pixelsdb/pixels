@@ -39,15 +39,18 @@ import java.util.Properties;
 
 /**
  * @Description: A serde class for PIXELS. It transparently passes the object to/from the PIXELS file reader/writer.
- * refer: [OrcSerde](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcSerde.java)
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcSerde}
+ *
+ * <p>
  * @author: tao
  * @date: Create in 2018-12-11 15:29
+ * </p>
  **/
 public class PixelsSerDe extends AbstractSerDe
 {
     private static Logger log = LogManager.getLogger(PixelsSerDe.class);
 
-    private final PixelsSerdeRow row = new PixelsSerdeRow();
+    private final PixelsRow row = new PixelsRow();
     private ObjectInspector inspector = null;
 
     @Override
@@ -97,7 +100,7 @@ public class PixelsSerDe extends AbstractSerDe
     @Override
     public Class<? extends Writable> getSerializedClass()
     {
-        return PixelsSerdeRow.class;
+        return PixelsRow.class;
     }
 
     @Override
@@ -126,7 +129,7 @@ public class PixelsSerDe extends AbstractSerDe
         return inspector;
     }
 
-    public class PixelsSerdeRow implements Writable
+    public class PixelsRow implements Writable
     {
         Object realRow;
         ObjectInspector inspector;

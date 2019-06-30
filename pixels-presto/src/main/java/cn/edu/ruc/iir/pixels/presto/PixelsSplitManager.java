@@ -281,7 +281,7 @@ public class PixelsSplitManager
                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                             tableHandle.getSchemaName(), tableHandle.getTableName(),
                             path.toString(), 0, 1,
-                            false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE) ,order.getColumnOrder(), new ArrayList<>(0), constraint);
+                            false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
                     pixelsSplits.add(pixelsSplit);
                 }
                 // add splits in compactPath

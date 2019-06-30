@@ -23,7 +23,7 @@ import java.util.Properties;
 
 /**
  * Define the configuration properties that Pixels understands.
- * refer: [OrcConf](https://github.com/apache/orc/blob/master/java/core/src/java/org/apache/orc/OrcConf.java)
+ * refers to {@link org.apache.orc.OrcConf}
  */
 public enum PixelsConf
 {

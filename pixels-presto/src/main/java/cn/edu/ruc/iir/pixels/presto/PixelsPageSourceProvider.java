@@ -40,6 +40,8 @@ public class PixelsPageSourceProvider
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
+            // NOTICE: creating a MemoryMappedFile is efficient, usually cost tens of us.
+            // TODO: is it necessary to create memory mapped files in top layer and share them here?
             this.cacheFile = new MemoryMappedFile(
                     config.getConfigFactory().getProperty("cache.location"),
                     Long.parseLong(config.getConfigFactory().getProperty("cache.size")));

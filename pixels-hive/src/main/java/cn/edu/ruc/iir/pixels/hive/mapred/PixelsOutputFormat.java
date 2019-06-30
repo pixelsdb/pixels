@@ -20,8 +20,8 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.hive.PixelsConf;
-import cn.edu.ruc.iir.pixels.hive.PixelsFile;
-import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
+import cn.edu.ruc.iir.pixels.hive.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -39,10 +39,13 @@ import java.util.Properties;
 
 /**
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
- * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
+ *
+ * This class is not finished.
+ *
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat}
  */
 public class PixelsOutputFormat
-        extends FileOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> implements HiveOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow>
+        extends FileOutputFormat<NullWritable, PixelsRow> implements HiveOutputFormat<NullWritable, PixelsRow>
 {
 
     /**
@@ -51,9 +54,9 @@ public class PixelsOutputFormat
      * @param conf the job configuration
      * @return a new options object
      */
-    public static PixelsFile.WriterOptions buildOptions(Configuration conf)
+    public static PixelsRW.WriterOptions buildOptions(Configuration conf)
     {
-        return PixelsFile.writerOptions(conf)
+        return PixelsRW.writerOptions(conf)
                 .setSchema(TypeDescription.fromString(PixelsConf.MAPRED_OUTPUT_SCHEMA
                         .getString(conf)))
                 .rowIndexStride((int) PixelsConf.ROW_INDEX_STRIDE.getLong(conf))
@@ -65,16 +68,16 @@ public class PixelsOutputFormat
     }
 
     @Override
-    public RecordWriter<NullWritable, PixelsSerDe.PixelsSerdeRow> getRecordWriter(FileSystem fileSystem,
+    public RecordWriter<NullWritable, PixelsRow> getRecordWriter(FileSystem fileSystem,
                                                                                   JobConf conf,
                                                                                   String name,
                                                                                   Progressable progressable
     ) throws IOException
     {
         Path path = getTaskOutputPath(conf, name);
-        PixelsWriter writer = PixelsFile.createWriter(path,
+        PixelsWriter writer = PixelsRW.createWriter(path,
                 buildOptions(conf).fileSystem(fileSystem));
-        return new PixelsMapredRecordWriter<>(writer);
+        return new PixelsMapredRecordWriter(writer);
     }
 
     @Override
