@@ -88,12 +88,16 @@ public class PixelsRW
             if (!readAllColumns)
             {
                 List<String> columnOrder = split.getOrder();
-                Set<String> columnSet = new HashSet<>(Arrays.asList(columns));
+                Map<String, Integer> nameToOrder = new HashMap<>();
                 for (int i = 0; i < columnOrder.size(); ++i)
                 {
-                    if (columnSet.contains(columnOrder.get(i)))
+                    nameToOrder.put(columnOrder.get(i), i);
+                }
+                for (int i = 0; i < columns.length; ++i)
+                {
+                    if (nameToOrder.containsKey(columns[i]))
                     {
-                        this.pixelsIncluded.add(i);
+                        this.pixelsIncluded.add(nameToOrder.get(columns[i]));
                     }
                 }
             }
