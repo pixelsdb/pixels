@@ -20,7 +20,10 @@ package cn.edu.ruc.iir.pixels.hive;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde.serdeConstants;
-import org.apache.hadoop.hive.serde2.*;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
+import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
@@ -35,7 +38,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 
 /**
@@ -55,11 +57,8 @@ public class PixelsSerDe extends AbstractSerDe
     private ObjectInspector inspector = null;
 
     @Override
-    public void initialize(@Nullable Configuration configuration, Properties table) throws SerDeException
+    public void initialize(@Nullable Configuration conf, Properties table) throws SerDeException
     {
-        List<Integer> included = ColumnProjectionUtils.getReadColumnIDs(configuration);
-        log.info("included columns: " + included.toString());
-
         // Read the configuration parameters
         String columnNameProperty = table.getProperty(serdeConstants.LIST_COLUMNS);
         // NOTE: if "columns.types" is missing, all columns will be of String type

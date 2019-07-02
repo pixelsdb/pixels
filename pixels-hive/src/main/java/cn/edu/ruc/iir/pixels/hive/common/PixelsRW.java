@@ -30,8 +30,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Contains factory methods to read or write PIXELS files.
@@ -56,9 +55,11 @@ public class PixelsRW
     {
         private FileSystem fileSystem;
         private PixelsReaderOption option;
-        private List<Integer> included;
         private PixelsSplit split;
         private int batchSize;
+        private List<Integer> pixelsIncluded;
+        private List<Integer> hiveIncluded;
+        private boolean readAllColumns;
 
         private ReaderOptions(Configuration conf, PixelsSplit split)
         {
@@ -72,20 +73,30 @@ public class PixelsRW
                 log.error("failed to get file system.", e);
             }
             this.batchSize = Integer.parseInt(pixelsConf.getProperty("row.batch.size"));
+            this.readAllColumns = ColumnProjectionUtils.isReadAllColumns(conf);
             this.option = new PixelsReaderOption();
             this.option.skipCorruptRecords(true);
             this.option.tolerantSchemaEvolution(true);
             this.option.rgRange(split.getRgStart(), split.getRgLen());
-            if (!ColumnProjectionUtils.isReadAllColumns(conf))
-            {
-                included = ColumnProjectionUtils.getReadColumnIDs(conf);
-            } else
-            {
-                log.info("read all columns.");
-            }
             String[] columns = ColumnProjectionUtils.getReadColumnNames(conf);
-            // log.info("columns included: " + columns.toString());
             this.option.includeCols(columns);
+
+            this.hiveIncluded =  ColumnProjectionUtils.getReadColumnIDs(conf);
+            // The column order in hive is not the same as the column order in pixels files.
+            // So we have to generate pixelsIncluded from the pixels column order.
+            this.pixelsIncluded = new ArrayList<>();
+            if (!readAllColumns)
+            {
+                List<String> columnOrder = split.getOrder();
+                Set<String> columnSet = new HashSet<>(Arrays.asList(columns));
+                for (int i = 0; i < columnOrder.size(); ++i)
+                {
+                    if (columnSet.contains(columnOrder.get(i)))
+                    {
+                        this.pixelsIncluded.add(i);
+                    }
+                }
+            }
 
             // if cache is enabled, create cache reader.
             if (split.isCacheEnabled() && cacheReader == null)
@@ -130,9 +141,14 @@ public class PixelsRW
             return option;
         }
 
-        public List<Integer> getIncluded()
+        public List<Integer> getPixelsIncluded()
         {
-            return included;
+            return pixelsIncluded;
+        }
+
+        public List<Integer> getHiveIncluded()
+        {
+            return hiveIncluded;
         }
 
         public boolean isCacheEnabled() { return split.isCacheEnabled(); }
@@ -140,6 +156,11 @@ public class PixelsRW
         public List<String> getCacheOrder() { return split.getCacheOrder(); }
 
         public List<String> getOrder() { return split.getOrder(); }
+
+        public boolean isReadAllColumns()
+        {
+            return readAllColumns;
+        }
 
         public int getBatchSize() { return batchSize; }
     }
@@ -157,7 +178,8 @@ public class PixelsRW
                 .setFS(options.getFileSystem())
                 .setPath(path)
                 .setEnableCache(isCacheEnabled)
-                .setCacheOrder(isCacheEnabled ? options.getCacheOrder() : null)
+                // cache order should not be null.
+                .setCacheOrder(isCacheEnabled ? options.getCacheOrder() : new ArrayList<>(0))
                 .setPixelsCacheReader(isCacheEnabled ? cacheReader : null)
                 // currently, the footerCache lifetime is hive-cli session wide.
                 .setPixelsFooterCache(footerCache)

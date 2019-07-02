@@ -19,8 +19,10 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
+import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
+import cn.edu.ruc.iir.pixels.hive.common.HDFSLog;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsValue;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
@@ -32,6 +34,7 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.List;
 
@@ -50,34 +53,36 @@ public class PixelsMapredRecordReader
 {
     private static Logger log = LogManager.getLogger(PixelsMapredRecordReader.class);
 
+    private final PixelsRW.ReaderOptions options;
     private final int batchSize;
     private final TypeDescription schema;
     private final PixelsRecordReader batchReader;
     private VectorizedRowBatch batch;
     private int rowIdInBatch;
-    private List<Integer> included;
+    private List<Integer> pixelsIncluded;
+    private List<Integer> hiveIncluded;
     private List<TypeDescription> columnTypes;
     private int numColumns;
     private final SerDeStats stats;
-    private final PixelsReader fileReader;
     private final NullWritable currentKey;
     private PixelsStruct currentValue;
 
     public PixelsMapredRecordReader(PixelsReader fileReader,
                                     PixelsRW.ReaderOptions options) throws IOException
     {
+        this.options = options;
         this.schema = fileReader.getFileSchema();
         // schema should be of struct type.
         assert schema.getCategory() == TypeDescription.Category.STRUCT;
 
-        this.fileReader = fileReader;
         this.batchReader = fileReader.read(options.getReaderOption());
         this.columnTypes = schema.getChildren();
         this.numColumns = columnTypes.size();
         this.batchSize = options.getBatchSize();
         this.batch = null; // the first batch will be read in next.
         this.rowIdInBatch = 0;
-        this.included = options.getIncluded();
+        this.pixelsIncluded = options.getPixelsIncluded();
+        this.hiveIncluded = options.getHiveIncluded();
         this.stats = new SerDeStats();
         stats.setRawDataSize(fileReader.getCompressionBlockSize());
         stats.setRowCount(fileReader.getNumberOfRows());
@@ -114,20 +119,26 @@ public class PixelsMapredRecordReader
 
         if (!ensureBatch())
         {
+            try (BufferedWriter writer = HDFSLog.getLogWriter(options.getFileSystem(), "tmp/log/batch_"+System.nanoTime()))
+            {
+                PixelsReaderOption option = options.getReaderOption();
+                writer.write("failed to read batch: " + option.getRGStart() + ", " + option.getRGLen()
+                + ", " + option.getIncludedCols().length);
+            }
             return false;
         }
 
-        if (this.included.size() == 0)
+        if (this.pixelsIncluded.size() == 0)
         {
             rowIdInBatch += 1;
             return true;
         }
 
-        int numberOfIncluded = this.included.size();
+        int numberOfIncluded = this.pixelsIncluded.size();
         for (int i = 0; i < numberOfIncluded; ++i)
         {
-            value.setFieldValue(included.get(i), PixelsValue.nextValue(batch.cols[i], rowIdInBatch,
-                    columnTypes.get(included.get(i)), value.getFieldValue(included.get(i))));
+            value.setFieldValue(hiveIncluded.get(i), PixelsValue.nextValue(batch.cols[i], rowIdInBatch,
+                    columnTypes.get(pixelsIncluded.get(i)), value.getFieldValue(hiveIncluded.get(i))));
         }
 
         rowIdInBatch += 1;

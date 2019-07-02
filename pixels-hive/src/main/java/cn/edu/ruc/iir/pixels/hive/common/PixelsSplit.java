@@ -4,7 +4,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplitWithLocationInfo;
 import org.apache.hadoop.mapred.SplitLocationInfo;
 import org.apache.hadoop.mapreduce.InputFormat;
@@ -15,6 +14,7 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -37,10 +37,11 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
     private Path file;
     private int rgStart;
     private int rgLen;
+    private long length;
     private boolean cacheEnabled;
     private List<String> cacheOrder;
     private List<String> order;
-    private long length;
+    // the following two do not need to be serialized.
     private String[] hosts;
     private SplitLocationInfo[] hostInfos;
 
@@ -59,6 +60,7 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
     public PixelsSplit(Path file, int rgStart, int rgLen, boolean cacheEnabled,
                        List<String> cacheOrder, List<String> order, long length, String[] hosts)
     {
+        assert file != null && cacheOrder != null && order != null;
         this.file = file;
         this.rgStart = rgStart;
         this.rgLen = rgLen;
@@ -67,19 +69,6 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
         this.order = order;
         this.length = length;
         this.hosts = hosts;
-    }
-
-    public PixelsSplit(FileSplit fileSplit) throws IOException
-    {
-        this.file = fileSplit.getPath();
-        this.rgStart = 0;
-        this.rgLen = Short.MAX_VALUE; // max row groups in a file.
-        this.cacheEnabled = false;
-        this.cacheOrder = null;
-        this.order = null;
-        this.length = fileSplit.getLength();
-        this.hosts = fileSplit.getLocations();
-        this.hostInfos = fileSplit.getLocationInfo();
     }
 
     /**
@@ -182,6 +171,17 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
         out.writeInt(rgStart);
         out.writeInt(rgLen);
         out.writeLong(length);
+        out.writeBoolean(cacheEnabled);
+        out.writeInt(cacheOrder.size());
+        for (String columnlet : cacheOrder)
+        {
+            Text.writeString(out, columnlet);
+        }
+        out.writeInt(order.size());
+        for (String column : order)
+        {
+            Text.writeString(out, column);
+        }
     }
 
     @Override
@@ -191,7 +191,21 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
         rgStart = in.readInt();
         rgLen = in.readInt();
         length = in.readLong();
+        cacheEnabled = in.readBoolean();
+        int cacheOrderSize = in.readInt();
+        this.cacheOrder = new ArrayList<>(cacheOrderSize);
+        for (int i = 0; i < cacheOrderSize; ++i)
+        {
+            this.cacheOrder.add(Text.readString(in));
+        }
+        int orderSize = in.readInt();
+        this.order = new ArrayList<>(orderSize);
+        for (int i = 0; i < orderSize; ++i)
+        {
+            this.order.add(Text.readString(in));
+        }
         hosts = null;
+        hostInfos = null;
     }
 
     @Override

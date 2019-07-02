@@ -40,6 +40,12 @@ import com.alibaba.fastjson.JSON;
 import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.spark.SparkDynamicPartitionPruner;
+import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.*;
@@ -54,6 +60,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.*;
+
 /**
  * An old mapred InputFormat for Pixels files.
  * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcInputFormat}
@@ -64,9 +72,11 @@ import java.util.concurrent.TimeUnit;
  * </P>
  */
 public class PixelsInputFormat
-        extends FileInputFormat<NullWritable, PixelsStruct>
+        implements InputFormat<NullWritable, PixelsStruct>
 {
     private static Logger log = LogManager.getLogger(PixelsInputFormat.class);
+
+    private MapWork mapWork;
 
     /**
      * Get the {@link RecordReader} for the given {@link InputSplit}.
@@ -90,22 +100,20 @@ public class PixelsInputFormat
         {
             split = (PixelsSplit) inputSplit;
         }
-        else if (inputSplit instanceof FileSplit)
-        {
-            split = new PixelsSplit((FileSplit) inputSplit);
-        }
         else
         {
-            throw new IOException("inputSplit must be PixelsSplit or FileSplit");
+            throw new IOException("Illegal inputSplit type: " + inputSplit.getClass().getName() +
+                    ", must be PixelsSplit. " +
+                    "set hive.input.format=cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat");
         }
+
         PixelsRW.ReaderOptions options = PixelsRW.readerOptions(conf, split);
         PixelsReader reader = PixelsRW.createReader(split.getPath(), options);
         return new PixelsMapredRecordReader(reader, options);
     }
 
     /**
-     * Splits files returned by {@link #listStatus(JobConf)} when
-     * they're too big.
+     * Make splits according to layouts in pixels-metadata.
      * set hive.input.format=cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat
      * in hive to use this method.
      *
@@ -117,8 +125,8 @@ public class PixelsInputFormat
     {
         StopWatch sw = new StopWatch().start();
 
-        Path[] inputPaths = getInputPaths(job);
-        assert inputPaths != null && inputPaths.length > 0;
+        init(job);
+
         FSFactory fsFactory = new FSFactory(FileSystem.get(job));
         SchemaTableName st = getSchemaTableName(job);
         String[] includedColumns = ColumnProjectionUtils.getReadColumnNames(job);
@@ -213,7 +221,7 @@ public class PixelsInputFormat
                                 String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
                                 PixelsSplit pixelsSplit = new PixelsSplit(
                                         path, 0, 1, false,
-                                        null, order.getColumnOrder(), fileLength, hosts);
+                                        new ArrayList<>(0), order.getColumnOrder(), fileLength, hosts);
                                 pixelsSplits.add(pixelsSplit);
                             }
                             // 4. add splits in compactPath
@@ -267,7 +275,7 @@ public class PixelsInputFormat
                     {
                         String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
                         PixelsSplit pixelsSplit = new PixelsSplit(path, 0, 1,
-                                false, null, order.getColumnOrder(), fsFactory.getFileLength(path), hosts);
+                                false, new ArrayList<>(0), order.getColumnOrder(), fsFactory.getFileLength(path), hosts);
                         pixelsSplits.add(pixelsSplit);
                     }
                     // add splits in compactPath
@@ -279,7 +287,7 @@ public class PixelsInputFormat
                         {
                             String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
                             PixelsSplit pixelsSplit = new PixelsSplit(path, curFileRGIdx, splitSize,
-                                    false, null, order.getColumnOrder(), splitSize, hosts);
+                                    false, new ArrayList<>(0), order.getColumnOrder(), splitSize, hosts);
                             pixelsSplits.add(pixelsSplit);
                             curFileRGIdx += splitSize;
                         }
@@ -360,5 +368,100 @@ public class PixelsInputFormat
         List<Layout> res = new ArrayList<>();
         layouts.forEach(layout -> res.add(new Layout(layout)));
         return res;
+    }
+
+    /**
+     * This method is copied from HiveInputFormat.
+     * @param job
+     */
+    protected void init(JobConf job) throws IOException
+    {
+        // init mapWork.
+        if (mapWork == null)
+        {
+            if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez"))
+            {
+                mapWork = (MapWork) Utilities.getMergeWork(job);
+                if (mapWork == null)
+                {
+                    mapWork = Utilities.getMapWork(job);
+                }
+            } else
+            {
+                mapWork = Utilities.getMapWork(job);
+            }
+
+            // Prune partitions
+            if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("spark")
+                    && HiveConf.getBoolVar(job, HiveConf.ConfVars.SPARK_DYNAMIC_PARTITION_PRUNING))
+            {
+                SparkDynamicPartitionPruner pruner = new SparkDynamicPartitionPruner();
+                try
+                {
+                    pruner.prune(mapWork, job);
+                } catch (Exception e)
+                {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        // init included column ids and names.
+        List<String> aliases = mapWork.getAliases();
+        mapWork.getBaseSrc();
+        if (aliases != null && aliases.size() == 1)
+        {
+            Operator op = mapWork.getAliasToWork().get(aliases.get(0));
+            if ((op != null) && (op instanceof TableScanOperator))
+            {
+                TableScanOperator tableScan = (TableScanOperator) op;
+                List<String> columns = tableScan.getNeededColumns();
+                List<Integer> columnsIds = tableScan.getNeededColumnIDs();
+                log.error("cols: " + columns);
+                log.error("colIds: " + columnsIds);
+                StringBuilder colsBuilder = new StringBuilder("");
+                StringBuilder colIdsBuilder = new StringBuilder("");
+                if (columns != null && columnsIds != null &&
+                        columns.size() > 0 && columnsIds.size() > 0)
+                {
+                    job.set(READ_ALL_COLUMNS, "false");
+                    boolean first = true;
+                    for (String col : columns)
+                    {
+                        if (first)
+                        {
+                            first = false;
+                        } else
+                        {
+                            colsBuilder.append(',');
+                        }
+                        colsBuilder.append(col);
+                    }
+                    job.set(READ_COLUMN_NAMES_CONF_STR, colsBuilder.toString());
+
+                    first = true;
+                    for (int colId : columnsIds)
+                    {
+                        if (first)
+                        {
+                            first = false;
+                        } else
+                        {
+                            colIdsBuilder.append(',');
+                        }
+                        colIdsBuilder.append(colId);
+                    }
+                    job.set(READ_COLUMN_IDS_CONF_STR, colIdsBuilder.toString());
+                }
+                else
+                {
+                    job.set(READ_ALL_COLUMNS, "true");
+                }
+            }
+        }
+        else
+        {
+            throw new IOException("find none or multiple aliases:" + aliases);
+        }
     }
 }

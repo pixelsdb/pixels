@@ -32,7 +32,8 @@ public class PixelsMapReduceRecordReader extends RecordReader<NullWritable, Pixe
     private final PixelsRecordReader batchReader;
     private VectorizedRowBatch batch;
     private int rowIdInBatch;
-    private List<Integer> included;
+    private List<Integer> pixelsIncluded;
+    private List<Integer> hiveIncluded;
     private List<TypeDescription> columnTypes;
     private int numColumns;
     private final PixelsReader fileReader;
@@ -53,7 +54,8 @@ public class PixelsMapReduceRecordReader extends RecordReader<NullWritable, Pixe
         this.batchSize = options.getBatchSize();
         this.batch = null; // the first batch will be read in initialize.
         this.rowIdInBatch = 0;
-        this.included = options.getIncluded();
+        this.pixelsIncluded = options.getPixelsIncluded();
+        this.hiveIncluded = options.getHiveIncluded();
         this.currentKey = NullWritable.get();
         this.currentValue = new PixelsStruct(this.numColumns);
     }
@@ -108,17 +110,17 @@ public class PixelsMapReduceRecordReader extends RecordReader<NullWritable, Pixe
             return false;
         }
 
-        if (this.included.size() == 0)
+        if (this.pixelsIncluded.size() == 0)
         {
             rowIdInBatch += 1;
             return true;
         }
 
-        int numberOfIncluded = this.included.size();
+        int numberOfIncluded = this.pixelsIncluded.size();
         for (int i = 0; i < numberOfIncluded; ++i)
         {
-            currentValue.setFieldValue(included.get(i), PixelsValue.nextValue(batch.cols[i], rowIdInBatch,
-                    columnTypes.get(included.get(i)), currentValue.getFieldValue(included.get(i))));
+            currentValue.setFieldValue(hiveIncluded.get(i), PixelsValue.nextValue(batch.cols[i], rowIdInBatch,
+                    columnTypes.get(pixelsIncluded.get(i)), currentValue.getFieldValue(hiveIncluded.get(i))));
         }
 
         rowIdInBatch += 1;
