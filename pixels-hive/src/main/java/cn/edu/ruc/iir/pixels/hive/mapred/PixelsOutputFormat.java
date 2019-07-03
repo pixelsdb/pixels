@@ -40,7 +40,7 @@ import java.util.Properties;
 /**
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
  *
- * This class is not finished.
+ * This class is not finished, so that write is not supported by pixels-hive.
  *
  * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat}
  */
@@ -80,9 +80,44 @@ public class PixelsOutputFormat
         return new PixelsMapredRecordWriter(writer);
     }
 
+    /**
+     * create the final out file and get some specific settings.
+     * In case of empty table location, this method is called, so that it should not
+     * return null.
+     *
+     * @param jobConf
+     *          the job configuration file
+     * @param finalOutPath
+     *          the final output file to be created
+     * @param valueClass
+     *          the value class used for create
+     * @param isCompressed
+     *          whether the content is compressed or not
+     * @param tableProperties
+     *          the table properties of this file's corresponding table
+     * @param progress
+     *          progress used for status report
+     * @return the RecordWriter for the output file
+     */
     @Override
-    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class<? extends Writable> aClass, boolean b, Properties properties, Progressable progressable) throws IOException
+    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path finalOutPath,
+                                                             Class<? extends Writable> valueClass,
+                                                             boolean isCompressed, Properties tableProperties,
+                                                             Progressable progress) throws IOException
     {
-        return null;
+        return new FileSinkOperator.RecordWriter()
+        {
+            @Override
+            public void write(Writable w) throws IOException
+            {
+
+            }
+
+            @Override
+            public void close(boolean abort) throws IOException
+            {
+
+            }
+        };
     }
 }

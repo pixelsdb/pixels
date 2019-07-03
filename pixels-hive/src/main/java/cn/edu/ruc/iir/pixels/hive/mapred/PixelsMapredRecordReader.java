@@ -19,13 +19,11 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsReader;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsRecordReader;
 import cn.edu.ruc.iir.pixels.core.vector.VectorizedRowBatch;
-import cn.edu.ruc.iir.pixels.hive.common.HDFSLog;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import cn.edu.ruc.iir.pixels.hive.common.PixelsValue;
-import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.io.NullWritable;
@@ -34,7 +32,6 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.util.List;
 
@@ -119,12 +116,6 @@ public class PixelsMapredRecordReader
 
         if (!ensureBatch())
         {
-            try (BufferedWriter writer = HDFSLog.getLogWriter(options.getFileSystem(), "tmp/log/batch_"+System.nanoTime()))
-            {
-                PixelsReaderOption option = options.getReaderOption();
-                writer.write("failed to read batch: " + option.getRGStart() + ", " + option.getRGLen()
-                + ", " + option.getIncludedCols().length);
-            }
             return false;
         }
 

@@ -55,7 +55,7 @@ public class PixelsMapredRecordWriter
     public PixelsMapredRecordWriter(PixelsWriter writer)
     {
         this.writer = writer;
-        schema = writer.getSchema();
+        this.schema = writer.getSchema();
         this.inspector = null;
         this.batch = schema.createRowBatch();
         this.fields = initializeFieldsFromOi(inspector);
@@ -369,11 +369,14 @@ public class PixelsMapredRecordWriter
     @Override
     public void close(Reporter reporter) throws IOException
     {
-        if (batch.size != 0)
+        if (batch != null && batch.size != 0)
         {
             writer.addRowBatch(batch);
             batch.reset();
         }
-        writer.close();
+        if (writer != null)
+        {
+            writer.close();
+        }
     }
 }

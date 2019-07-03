@@ -30,5 +30,13 @@ public class DBTableNameTest
         {
             System.out.println(s);
         }
+
+        String str = "pixels.test_105";
+        tokens = str.split("\\.");
+        for (String s : tokens)
+        {
+            System.out.println(s);
+        }
+
     }
 }

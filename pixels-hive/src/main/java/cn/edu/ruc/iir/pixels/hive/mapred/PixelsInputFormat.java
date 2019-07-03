@@ -55,18 +55,16 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.*;
 
 /**
  * An old mapred InputFormat for Pixels files.
- * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcInputFormat}
- *
+ * This is compatible with hive 2.x.
+ * set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat
+ * to enable the dynamic splitting feature of this PixelsInputFormat.
  * <P>
  * Created at: 19-6-15
  * Author: hank
@@ -78,6 +76,7 @@ public class PixelsInputFormat
     private static Logger log = LogManager.getLogger(PixelsInputFormat.class);
 
     private MapWork mapWork;
+    private SchemaTableName st;
 
     /**
      * Get the {@link RecordReader} for the given {@link InputSplit}.
@@ -118,8 +117,10 @@ public class PixelsInputFormat
 
     /**
      * Make splits according to layouts in pixels-metadata.
-     * set hive.input.format=cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat
-     * in hive to use this method.
+     * <p>
+     * set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat
+     * </p>
+     * in hive. HiveInputFormat will call this method to generate splits for pixels.
      *
      * @param job
      * @param numSplits
@@ -129,10 +130,11 @@ public class PixelsInputFormat
     {
         StopWatch sw = new StopWatch().start();
 
-        //init(job);
+        // set the necessary parameters (including pixels schema and table name)
+        // before anything is done.
+        init(job);
 
         FSFactory fsFactory = new FSFactory(FileSystem.get(job));
-        SchemaTableName st = getSchemaTableName(job);
         String[] includedColumns = ColumnProjectionUtils.getReadColumnNames(job);
         ConfigFactory config = ConfigFactory.Instance();
         boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
@@ -317,30 +319,6 @@ public class PixelsInputFormat
         return pixelsSplits.toArray(new PixelsSplit[pixelsSplits.size()]);
     }
 
-    /**
-     * Get schema and table names from job. The input path of the job should be
-     * /pixels/db_name/table_name/...
-     * @param job
-     * @return.
-     */
-    private SchemaTableName getSchemaTableName(JobConf job)
-    {
-        String dirs = job.get(org.apache.hadoop.mapreduce.lib.input.
-                FileInputFormat.INPUT_DIR, "");
-        assert dirs != null && dirs.length() > 0;
-        dirs = dirs.split(",")[0];
-        if (dirs.startsWith("hdfs://"))
-        {
-            dirs = dirs.substring(7);
-        } else if(dirs.startsWith("file://"))
-        {
-            dirs = dirs.substring(6);
-        }
-        dirs = dirs.substring(dirs.indexOf('/'));
-        String[] tokens = dirs.split("/");
-        return new SchemaTableName(tokens[2], tokens[3]);
-    }
-
     private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
         List<String> columnOrder = order.getColumnOrder();
         Inverted index = null;
@@ -375,12 +353,12 @@ public class PixelsInputFormat
     }
 
     /**
-     * This method is copied from HiveInputFormat.
+     *
      * @param job
      */
     protected void init(JobConf job) throws IOException
     {
-        // init mapWork.
+        // init mapWork. Copied from HiveInputFormat.init().
         if (mapWork == null)
         {
             if (HiveConf.getVar(job, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez"))
@@ -410,7 +388,22 @@ public class PixelsInputFormat
             }
         }
 
+        String bindTable = job.get("bind.pixels.table");
+        if (bindTable == null)
+        {
+            throw new IOException("bind.pixels.table property is not found.");
+        }
+        String[] tokens = bindTable.split("\\.");
+        if (tokens.length != 2)
+        {
+            throw new IOException("bind.pixles.table=" + bindTable + " is illegal.");
+        }
+        this.st = new SchemaTableName(tokens[0], tokens[1]);
+
         // init included column ids and names.
+        // This is not necessary if hive.input.format is set as HiveInputFormat.
+        // because READ_ALL_COLUMNS, READ_COLUMN_NAMES_CONF_STR and READ_COLUMN_IDS_CONF_STR
+        // are set in HiveInputFormat.
         List<String> aliases = mapWork.getAliases();
         mapWork.getBaseSrc();
         if (aliases != null && aliases.size() == 1)
@@ -421,8 +414,8 @@ public class PixelsInputFormat
                 TableScanOperator tableScan = (TableScanOperator) op;
                 List<String> columns = tableScan.getNeededColumns();
                 List<Integer> columnsIds = tableScan.getNeededColumnIDs();
-                log.error("cols: " + columns);
-                log.error("colIds: " + columnsIds);
+                // log.error("cols: " + columns);
+                // log.error("colIds: " + columnsIds);
                 StringBuilder colsBuilder = new StringBuilder("");
                 StringBuilder colIdsBuilder = new StringBuilder("");
                 if (columns != null && columnsIds != null &&
