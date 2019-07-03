@@ -4,7 +4,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.InputSplitWithLocationInfo;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.SplitLocationInfo;
 import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -32,7 +32,7 @@ import java.util.List;
  **/
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class PixelsSplit extends InputSplit implements InputSplitWithLocationInfo
+public class PixelsSplit extends FileSplit
 {
     private Path file;
     private int rgStart;
@@ -145,11 +145,9 @@ public class PixelsSplit extends InputSplit implements InputSplitWithLocationInf
      * Get the size of the split, so that the input splits can be sorted by size.
      *
      * @return the number of bytes in the split
-     * @throws IOException
-     * @throws InterruptedException
      */
     @Override
-    public long getLength() throws IOException
+    public long getLength()
     {
         return length;
     }

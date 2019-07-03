@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.spark.SparkDynamicPartitionPruner;
+import org.apache.hadoop.hive.ql.io.HiveInputFormat;
 import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.io.NullWritable;
@@ -96,7 +97,10 @@ public class PixelsInputFormat
                     Reporter reporter) throws IOException
     {
         PixelsSplit split;
-        if (inputSplit instanceof PixelsSplit)
+        if (inputSplit instanceof HiveInputFormat.HiveInputSplit)
+        {
+          split = (PixelsSplit) ((HiveInputFormat.HiveInputSplit) inputSplit).getInputSplit();
+        } else if (inputSplit instanceof PixelsSplit)
         {
             split = (PixelsSplit) inputSplit;
         }
@@ -125,7 +129,7 @@ public class PixelsInputFormat
     {
         StopWatch sw = new StopWatch().start();
 
-        init(job);
+        //init(job);
 
         FSFactory fsFactory = new FSFactory(FileSystem.get(job));
         SchemaTableName st = getSchemaTableName(job);
