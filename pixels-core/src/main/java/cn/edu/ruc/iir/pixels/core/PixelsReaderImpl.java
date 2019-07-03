@@ -99,9 +99,14 @@ public class PixelsReaderImpl
             return this;
         }
 
+        /**
+         *
+         * @param cacheOrder should not be null.
+         * @return
+         */
         public Builder setCacheOrder(List<String> cacheOrder)
         {
-            this.builderCacheOrder = cacheOrder;
+            this.builderCacheOrder = requireNonNull(cacheOrder);
             return this;
         }
 

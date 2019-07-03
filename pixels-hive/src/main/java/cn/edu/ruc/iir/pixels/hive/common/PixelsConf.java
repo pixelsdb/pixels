@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.hive.common;
 
 import org.apache.hadoop.conf.Configuration;
 
@@ -23,7 +23,7 @@ import java.util.Properties;
 
 /**
  * Define the configuration properties that Pixels understands.
- * refer: [OrcConf](https://github.com/apache/orc/blob/master/java/core/src/java/org/apache/orc/OrcConf.java)
+ * refers to {@link org.apache.orc.OrcConf}
  */
 public enum PixelsConf
 {

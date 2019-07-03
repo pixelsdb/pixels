@@ -20,8 +20,8 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -38,13 +38,13 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * This record writer implements the org.apache.hadoop.mapred API.
- * refer: [WriterImpl](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/WriterImpl.java)
+ * This class is currently not finished, so that write is not supported by pixels-hive.
  *
- * @param <V> the root type of the file
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.WriterImpl}
+ *
  */
-public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
-        implements RecordWriter<NullWritable, PixelsSerDe.PixelsSerdeRow>
+public class PixelsMapredRecordWriter
+        implements RecordWriter<NullWritable, PixelsRow>
 {
     private final PixelsWriter writer;
     private final VectorizedRowBatch batch;
@@ -55,7 +55,7 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     public PixelsMapredRecordWriter(PixelsWriter writer)
     {
         this.writer = writer;
-        schema = writer.getSchema();
+        this.schema = writer.getSchema();
         this.inspector = null;
         this.batch = schema.createRowBatch();
         this.fields = initializeFieldsFromOi(inspector);
@@ -339,7 +339,7 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     }
 
     @Override
-    public void write(NullWritable nullWritable, PixelsSerDe.PixelsSerdeRow row) throws IOException
+    public void write(NullWritable nullWritable, PixelsRow row) throws IOException
     {
         // if the batch is full, write it out.
         if (batch.size == batch.getMaxSize())
@@ -369,11 +369,14 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     @Override
     public void close(Reporter reporter) throws IOException
     {
-        if (batch.size != 0)
+        if (batch != null && batch.size != 0)
         {
             writer.addRowBatch(batch);
             batch.reset();
         }
-        writer.close();
+        if (writer != null)
+        {
+            writer.close();
+        }
     }
 }

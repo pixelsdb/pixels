@@ -1,4 +1,4 @@
-package cn.edu.ruc.iir.pixels.presto.split;
+package cn.edu.ruc.iir.pixels.common.split;
 
 
 import cn.edu.ruc.iir.pixels.common.metadata.domain.SplitPattern;

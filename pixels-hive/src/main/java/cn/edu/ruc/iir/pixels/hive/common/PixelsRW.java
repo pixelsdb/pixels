@@ -15,136 +15,161 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package cn.edu.ruc.iir.pixels.hive;
+package cn.edu.ruc.iir.pixels.hive.common;
 
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
-import org.apache.hadoop.mapred.FileSplit;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Contains factory methods to read or write PIXELS files.
- * refer: [OrcFile](https://github.com/apache/orc/blob/master/java/core/src/java/org/apache/orc/OrcFile.java)
+ * refers to {@link org.apache.orc.OrcFile}
+ *
+ * <p>
+ * Created at: 2018-12-12
+ * Author: hank, tao
  */
-public class PixelsFile
+public class PixelsRW
 {
-    private static Logger log = LogManager.getLogger(PixelsFile.class);
+    private static Logger log = LogManager.getLogger(PixelsRW.class);
+    private static ConfigFactory pixelsConf = ConfigFactory.Instance();
+    private static PixelsCacheReader cacheReader = null;
+    private static PixelsFooterCache footerCache = new PixelsFooterCache();
 
-    protected PixelsFile()
+    protected PixelsRW()
     {
     }
 
     public static class ReaderOptions
     {
-        private final Configuration conf;
-        private FileSystem filesystem;
+        private FileSystem fileSystem;
         private PixelsReaderOption option;
-        private List<Integer> included;
-        private long offset = 0L;
-        private long length = 9223372036854775807L;
+        private PixelsSplit split;
+        private int batchSize;
+        private List<Integer> pixelsIncluded;
+        private List<Integer> hiveIncluded;
+        private boolean readAllColumns;
 
-        public ReaderOptions(Configuration conf, FileSplit split)
+        private ReaderOptions(Configuration conf, PixelsSplit split)
         {
-            this.conf = conf;
+            this.split = split;
             try
             {
-                this.filesystem = FileSystem.get(conf);
+                this.fileSystem = FileSystem.get(conf);
             } catch (IOException e)
             {
-                e.printStackTrace();
+                this.fileSystem = null;
+                log.error("failed to get file system.", e);
             }
+            this.batchSize = Integer.parseInt(pixelsConf.getProperty("row.batch.size"));
+            this.readAllColumns = ColumnProjectionUtils.isReadAllColumns(conf);
             this.option = new PixelsReaderOption();
             this.option.skipCorruptRecords(true);
             this.option.tolerantSchemaEvolution(true);
-//            this.option.rgRange((int) split.getStart(), (int) split.getLength());
-            // todo 'includeCols' be a method
-//            this.option.includeCols(new String[]{});
+            this.option.rgRange(split.getRgStart(), split.getRgLen());
+            String[] columns = ColumnProjectionUtils.getReadColumnNames(conf);
+            this.option.includeCols(columns);
+
+            this.hiveIncluded =  ColumnProjectionUtils.getReadColumnIDs(conf);
+            // The column order in hive is not the same as the column order in pixels files.
+            // So we have to generate pixelsIncluded from the pixels column order.
+            this.pixelsIncluded = new ArrayList<>();
+            if (!readAllColumns)
+            {
+                List<String> columnOrder = split.getOrder();
+                Map<String, Integer> nameToOrder = new HashMap<>();
+                for (int i = 0; i < columnOrder.size(); ++i)
+                {
+                    nameToOrder.put(columnOrder.get(i), i);
+                }
+                for (int i = 0; i < columns.length; ++i)
+                {
+                    if (nameToOrder.containsKey(columns[i]))
+                    {
+                        this.pixelsIncluded.add(nameToOrder.get(columns[i]));
+                    }
+                }
+            }
+
+            // if cache is enabled, create cache reader.
+            if (split.isCacheEnabled() && cacheReader == null)
+            {
+                MemoryMappedFile cacheFile;
+                MemoryMappedFile indexFile;
+                try
+                {
+                    cacheFile = new MemoryMappedFile(
+                            pixelsConf.getProperty("cache.location"),
+                            Long.parseLong(pixelsConf.getProperty("cache.size")));
+                } catch (Exception e)
+                {
+                    cacheFile = null;
+                    log.error("failed to open pixels cache file.", e);
+                }
+                try
+                {
+                    indexFile = new MemoryMappedFile(
+                            pixelsConf.getProperty("index.location"),
+                            Long.parseLong(pixelsConf.getProperty("index.size")));
+                } catch (Exception e)
+                {
+                    indexFile = null;
+                    log.error("failed to open pixels cache index.", e);
+                }
+                cacheReader = PixelsCacheReader
+                        .newBuilder()
+                        .setCacheFile(cacheFile)
+                        .setIndexFile(indexFile)
+                        .build();
+            }
         }
 
-        public ReaderOptions filesystem(FileSystem fs)
+        public FileSystem getFileSystem()
         {
-            this.filesystem = fs;
-            return this;
+            return fileSystem;
         }
 
-        public Configuration getConfiguration()
-        {
-            return conf;
-        }
-
-        public FileSystem getFilesystem()
-        {
-            return filesystem;
-        }
-
-        public PixelsReaderOption getOption()
+        public PixelsReaderOption getReaderOption()
         {
             return option;
         }
 
-        public ReaderOptions setOption(TypeDescription schema)
+        public List<Integer> getPixelsIncluded()
         {
-            if (!ColumnProjectionUtils.isReadAllColumns(conf))
-            {
-                included = ColumnProjectionUtils.getReadColumnIDs(conf);
-                log.info("genIncludedColumns:" + included.toString());
-            } else
-            {
-                log.info("genIncludedColumns:null");
-            }
-
-            String[] columns = ColumnProjectionUtils.getReadColumnNames(conf);
-            System.out.println("Result:" + Arrays.toString(columns));
-            System.out.println("ResultIndex:" + included.toString());
-
-            this.option.includeCols(columns);
-            return this;
+            return pixelsIncluded;
         }
 
-        public ReaderOptions filesystem(JobConf conf)
+        public List<Integer> getHiveIncluded()
         {
-            try
-            {
-                this.filesystem = FileSystem.get(conf);
-            } catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-            return this;
+            return hiveIncluded;
         }
 
-        public ReaderOptions include(List<Integer> included)
+        public boolean isCacheEnabled() { return split.isCacheEnabled(); }
+
+        public List<String> getCacheOrder() { return split.getCacheOrder(); }
+
+        public List<String> getOrder() { return split.getOrder(); }
+
+        public boolean isReadAllColumns()
         {
-            this.included = included;
-            return this;
+            return readAllColumns;
         }
 
-        public ReaderOptions range(long offset, long length)
-        {
-            this.offset = offset;
-            this.length = length;
-            return this;
-        }
-
-        public List<Integer> getIncluded()
-        {
-            return included;
-        }
-
+        public int getBatchSize() { return batchSize; }
     }
 
-    public static ReaderOptions readerOptions(Configuration conf, FileSplit split)
+    public static ReaderOptions readerOptions(Configuration conf, PixelsSplit split)
     {
         return new ReaderOptions(conf, split);
     }
@@ -152,12 +177,16 @@ public class PixelsFile
     public static PixelsReader createReader(Path path,
                                             ReaderOptions options) throws IOException
     {
-        FileSystem fs = options.getFilesystem();
+        boolean isCacheEnabled = options.isCacheEnabled();
         return PixelsReaderImpl.newBuilder()
-                .setFS(fs)
+                .setFS(options.getFileSystem())
                 .setPath(path)
-                .setEnableCache(false)
-                .setPixelsFooterCache(new PixelsFooterCache())
+                .setEnableCache(isCacheEnabled)
+                // cache order should not be null.
+                .setCacheOrder(isCacheEnabled ? options.getCacheOrder() : new ArrayList<>(0))
+                .setPixelsCacheReader(isCacheEnabled ? cacheReader : null)
+                // currently, the footerCache lifetime is hive-cli session wide.
+                .setPixelsFooterCache(footerCache)
                 .build();
     }
 
