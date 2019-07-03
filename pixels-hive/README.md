@@ -28,16 +28,16 @@ STORED AS INPUTFORMAT
   'cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat'
 OUTPUTFORMAT
   'cn.edu.ruc.iir.pixels.hive.mapred.PixelsOutputFormat'
-LOCATION '/pixels/'
+LOCATION '/any_empty_dir/'
 TBLPROPERTIES ("bind.pixels.table"="schema_name.table_name");
 ```
 `LOCATION` is current necessary, but it does not have a meaning
-and can to set to anything you like. `bind.pixels.table` specifies
+and can to set to any empty dir you like. `bind.pixels.table` specifies
 which table in pixels to bind this hive table. Replace `schema_name`
 and `table_name` with the right schema and table name in pixels.
 
-**BUT** be careful: DO use EXTERNAL table, internal table will delete data
-when the table is dropped.
+**BUT** be careful: It is a good idea to create an EXTERNAL table, internal table will delete data
+when the table is dropped. If there is data in the location, you will lost it.
 
 3. Load data by pixels-load and then execute queries in hive. 
 Currently, we have only implemented `PixelsInputFormat` for hive,
