@@ -14,64 +14,50 @@ java -jar rainbow-benchmark-0.1.0-SNAPSHOT-full.jar --data_size=30720 --thread_n
 
 `/text` is the directory in HDFS
 
-## How to use pixels-load
+## Build
 different `LOAD` command, the same `DDL` command
 - single thread
 `pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.single.Main'
 - multiple thread
 `pom.xml` change **mainClass** with 'cn.edu.ruc.iir.pixels.load.multi.Main'
 
-## Pixels consumer command line tool
-1> Start `pixels-metadata` thread
+## How to Use Pixels Load
+- Start `pixels-metadata` thread
 ```
 java -jar -Dio.netty.leakDetection.level=advanced -Drole=main pixels-damon-0.1.0-SNAPSHOT-full.jar metadata
 ```
-2> Start `pixels-load` thread
+- Start `pixels-load` thread
 ```
 java -jar pixels-load-0.1.0-SNAPSHOT-full.jar
 ```
-`Note` use `DDL -h` or `LOAD -h`, you can see the usages of the command
-- DDL Command
-```
-DDL -s {schema_file} -d {db_name}
-```
-- LOAD Command *single thread*
-```
-LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex}
+Use `LOAD -h`, you can see the usages of the command
+- Create table
 
-pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t
-```
-- LOAD Command *multiple thread*
-```
-LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex} -c {consumer_thread_num} -p {producer}
-
-pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4 -p false
-pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4
-
-{producer} is optional, default false.
-
-```
-
-## Presto Command
-- execute query
+Create table in presto:
 ```
 cd /home/iir/opt/presto-server-0.192
 ./bin/presto --server localhost:8080 --catalog pixels-presto --schema pixels
-show tables;
+create table ...;
 ```
 
-## Orc
-- Use `hive` to create tables such as text,  and insert data from text(like the following *.sql)
-    - text_ddl.sql, orc_ddl.sql
-    - load_ddl.sql
+- LOAD *(single thread)*
 ```
-./bin/hive
+LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex}
 ```
+Example:
+```
+pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t
+```
+- LOAD *(multiple thread)*
+```
+LOAD -f {format} -o {original_data_path} -d {db_name} -t {table_name} -n {row_num} -r {row_regex} -c {consumer_thread_num} -p {producer}
+```
+Example:
+```
+pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4 -p false
+pixels> LOAD -f pixels -o hdfs://dbiir01:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 300000 -r \t -c 4
+```
+`producer` is optional, default false.
 
-- presto
-```
-./bin/presto --server localhost:8080 --catalog hive --schema default
-```
-
-## Logs
+## Where is the Log
 Go to path `/home/iir/opt/presto-server-0.192/data/var/log/server.log` 
