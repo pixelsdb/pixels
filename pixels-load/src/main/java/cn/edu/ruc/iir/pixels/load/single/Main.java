@@ -112,7 +112,7 @@ public class Main
                     }
                 }
 
-                if (!command.equals("DDL") && !command.equals("LOAD"))
+                if (!command.equals("LOAD"))
                 {
                     System.out.println("Command error");
                 }

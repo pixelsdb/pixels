@@ -39,6 +39,12 @@ public class ByteColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(String value)
+    {
+        add(Byte.parseByte(value));
+    }
+
+    @Override
     public void flatten(boolean selectedInUse, int[] sel, int size)
     {
         flattenPush();

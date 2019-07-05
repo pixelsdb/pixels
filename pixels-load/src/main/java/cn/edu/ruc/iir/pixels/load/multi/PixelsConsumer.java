@@ -72,6 +72,8 @@ public class PixelsConsumer extends Consumer
             conf.set("fs.file.impl", LocalFileSystem.class.getName());
             FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
             TypeDescription schema = TypeDescription.fromString(schemaStr);
+            System.out.println(schemaStr);
+            System.out.println(loadingDataPath);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             ColumnVector[] columnVectors = rowBatch.cols;
 

@@ -40,7 +40,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * -p false [optional, default false]
  * </p>
  * <p>
- * LOAD -f orc -o hdfs://dbiir10:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 150000 -r \t -c 16
+ * LOAD -f orc -o hdfs://dbiir10:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 220000 -r \t -c 16
  * -l hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order_orc/
  * </p>
  * [-l] is optimal, assign a path not the 'OrderPath' in db(Defined in Config.java)
@@ -148,7 +148,7 @@ public class Main
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
-                    BlockingQueue<Path> fileQueue = null;
+                    BlockingQueue<Path> fileQueue;
                     ConfigFactory configFactory = ConfigFactory.Instance();
                     FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
 
