@@ -31,11 +31,11 @@ STORED AS INPUTFORMAT
   'cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat'
 OUTPUTFORMAT
   'cn.edu.ruc.iir.pixels.hive.mapred.PixelsOutputFormat'
-LOCATION '/any_empty_dir/'
+LOCATION '/...'
 TBLPROPERTIES ("bind.pixels.table"="schema_name.table_name");
 ```
-`LOCATION` is current necessary, but it does not have a meaning
-and can to set to any empty dir you like. `bind.pixels.table` specifies
+`LOCATION` is current necessary, and it should be synchronized with the orderPath
+and compactPath in pixels metadata. `bind.pixels.table` specifies
 which table in pixels to bind this hive table. Replace `schema_name`
 and `table_name` with the right schema and table name in pixels.
 
