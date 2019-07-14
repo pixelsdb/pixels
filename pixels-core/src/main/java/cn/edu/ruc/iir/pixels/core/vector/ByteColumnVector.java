@@ -41,7 +41,16 @@ public class ByteColumnVector extends ColumnVector
     @Override
     public void add(String value)
     {
-        add(Byte.parseByte(value));
+        assert value != null && value.length() > 0;
+        char c = value.charAt(0);
+        if (c == '0' || c == '1')
+        {
+            add(Byte.parseByte(value));
+        }
+        else
+        {
+            add(Boolean.parseBoolean(value));
+        }
     }
 
     @Override

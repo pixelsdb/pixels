@@ -1,35 +1,17 @@
-# Presto-Connector Configuration
+# Presto-Connector
 
-## Note
-All the following commands are done in the master node `presto00`
 
-## Upload
-Upload the following files to the catalog of `presto-server-0.192`
-- pixels.properties
-- pixels-daemon-0.1.0-SNAPSHOT-full.jar
-- pixels-load-0.1.0-SNAPSHOT.jar
-
-## Run ETL Tool
-- See`cn.edu.ruc.iir.pixels.load.single.Loader`
-- DDL
-
-`DDL -s schema_file -d db_name`
-```
-DDL -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/DDL.txt -d pixels
-```
-- LOAD
-
-`LOAD -p data_path -s schema_file -f hdfs_file`
-```
-LOAD -p /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/data/ -s /home/tao/software/station/bitbucket/pixels/pixels-load/src/main/resources/Test.sql -f hdfs://presto00:9000/po_compare/test.pxl
-```
+## Installation
+Copy `pixels-presto.properties` to the catalog directory of Presto
+Build Pixels by `mvn package`, copy and unzip `pixels-presto-0.1.0-SNAPSHOT.zip`
+to the plugin directory of Presto
 
 ## Run Metadata Server
 Run the server, we need to use the `Root` command
 ```sh
 java -Dio.netty.leakDetection.level=advanced -Drole=main -jar pixels-daemon-0.1.0-SNAPSHOT-full.jar metadata
 ```
-```IDEA
+```sh
 VM option: -Dio.netty.leakDetection.level=advanced -Drole=main 
 Program arguements: metadata
 ```

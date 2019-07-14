@@ -9,7 +9,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.IOException;
 
 /**
- * Pixels output format for new mapreduce OutputFormat API.
+ * Pixels output format for new MapReduce OutputFormat API.
  * This class is not finished.
  * Created at: 19-6-30
  * Author: hank

@@ -17,7 +17,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Pixels nput format for new mapreduce InputFormat API.
+ * Pixels input format for new MapReduce InputFormat API.
  * Created at: 19-6-15
  * Author: hank
  */
