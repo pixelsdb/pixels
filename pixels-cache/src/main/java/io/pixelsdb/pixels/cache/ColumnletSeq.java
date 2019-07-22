@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.cache;
+package cn.edu.ruc.iir.pixels.cache;
 
 import java.util.ArrayList;
 import java.util.Comparator;

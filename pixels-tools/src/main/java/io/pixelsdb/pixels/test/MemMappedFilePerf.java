@@ -1,6 +1,6 @@
-package io.pixelsdb.pixels.test;
+package cn.edu.ruc.iir.pixels.test;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
 
 public class MemMappedFilePerf
 {

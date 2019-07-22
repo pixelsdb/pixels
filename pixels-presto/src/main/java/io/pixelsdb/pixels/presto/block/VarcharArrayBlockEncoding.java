@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.pixelsdb.pixels.presto.block;
+package cn.edu.ruc.iir.pixels.presto.block;
 
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockEncoding;
@@ -22,6 +22,8 @@ import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 
+import static cn.edu.ruc.iir.pixels.presto.block.EncoderUtil.decodeNullBits;
+import static cn.edu.ruc.iir.pixels.presto.block.EncoderUtil.encodeNullsAsBits;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 
 /**
@@ -61,7 +63,7 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
         }
 
         // isNull
-        EncoderUtil.encodeNullsAsBits(sliceOutput, varcharArrayBlock);
+        encodeNullsAsBits(sliceOutput, varcharArrayBlock);
 
         // values
         // sliceOutput.appendInt((int) varcharArrayBlock.getSizeInBytes());
@@ -81,7 +83,7 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
         int[] lengths = new int[positionCount];
         sliceInput.readBytes(Slices.wrappedIntArray(lengths), SIZE_OF_INT, positionCount * SIZE_OF_INT);
 
-        boolean[] valueIsNull = EncoderUtil.decodeNullBits(sliceInput, positionCount);
+        boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount);
 
         // int blockSize = sliceInput.readInt();
         byte[][] values = new byte[positionCount][];

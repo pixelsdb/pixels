@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.pixelsdb.pixels.presto.block;
+package cn.edu.ruc.iir.pixels.presto.block;
 
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
+import static cn.edu.ruc.iir.pixels.presto.block.BlockUtil.*;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
@@ -163,7 +164,7 @@ public class VarcharArrayBlock implements Block
     @Override
     public long getRegionSizeInBytes(int position, int length)
     {
-        BlockUtil.checkValidRegion(getPositionCount(), position, length);
+        checkValidRegion(getPositionCount(), position, length);
         long size = 0L;
         for (int i = 0; i < length; ++i)
         {
@@ -216,7 +217,7 @@ public class VarcharArrayBlock implements Block
     @Override
     public Block copyPositions(int[] positions, int offset, int length)
     {
-        BlockUtil.checkArrayRange(positions, offset, length);
+        checkArrayRange(positions, offset, length);
         byte[][] newValues = new byte[length][];
         int[] newStarts = new int[length];
         int[] newLengths = new int[length];
@@ -263,7 +264,7 @@ public class VarcharArrayBlock implements Block
     @Override
     public Block getRegion(int positionOffset, int length)
     {
-        BlockUtil.checkValidRegion(getPositionCount(), positionOffset, length);
+        checkValidRegion(getPositionCount(), positionOffset, length);
 
         return new VarcharArrayBlock(positionOffset + arrayOffset, length, values, offsets, lengths, valueIsNull);
     }
@@ -307,7 +308,7 @@ public class VarcharArrayBlock implements Block
     @Override
     public Block copyRegion(int positionOffset, int length)
     {
-        BlockUtil.checkValidRegion(getPositionCount(), positionOffset, length);
+        checkValidRegion(getPositionCount(), positionOffset, length);
         positionOffset += arrayOffset;
 
         byte[][] newValues = new byte[length][];
@@ -423,7 +424,7 @@ public class VarcharArrayBlock implements Block
 
     protected void checkReadablePosition(int position)
     {
-        BlockUtil.checkValidPosition(position, getPositionCount());
+        checkValidPosition(position, getPositionCount());
     }
 
     @Override

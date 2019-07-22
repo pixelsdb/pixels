@@ -1,14 +1,14 @@
-package io.pixelsdb.pixels.test;
+package cn.edu.ruc.iir.pixels.test;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
-import io.pixelsdb.pixels.cache.PixelsCacheIdx;
-import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheIdx;
+import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import cn.edu.ruc.iir.pixels.common.exception.FSException;
+import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
+import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
+import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
+import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
 import org.apache.hadoop.fs.Path;
 
 import java.util.ArrayList;

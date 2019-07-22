@@ -12,9 +12,9 @@
  * limitations under the License.
  */
 
-package io.pixelsdb.pixels.presto;
+package cn.edu.ruc.iir.pixels.presto;
 
-import io.pixelsdb.pixels.common.metadata.domain.Column;
+import cn.edu.ruc.iir.pixels.common.metadata.domain.Column;
 import com.facebook.presto.spi.function.OperatorType;
 import com.facebook.presto.spi.type.*;
 import com.google.common.collect.ImmutableList;

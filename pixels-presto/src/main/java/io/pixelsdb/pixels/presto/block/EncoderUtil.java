@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.pixelsdb.pixels.presto.block;
+package cn.edu.ruc.iir.pixels.presto.block;
 
 import com.facebook.presto.spi.block.Block;
 import io.airlift.slice.SliceInput;

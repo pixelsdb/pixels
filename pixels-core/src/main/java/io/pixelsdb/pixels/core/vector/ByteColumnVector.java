@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.core.vector;
+package cn.edu.ruc.iir.pixels.core.vector;
 
 import java.util.Arrays;
 

@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.cache;
+package cn.edu.ruc.iir.pixels.cache;
 
 import org.junit.Test;
 
