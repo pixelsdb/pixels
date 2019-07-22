@@ -3,7 +3,7 @@
 echo "Stop Pixels Coordinator."
 
 base_dir=$(dirname $0)
-MAIN_CLASS="cn.edu.ruc.iir.pixels.daemon.DaemonMain"
+MAIN_CLASS="io.pixelsdb.pixels.daemon.DaemonMain"
 
 if [ "xPIXELS_HOME" = "x" ]; then
   export PIXELS_HOME="${base_dir}/../"

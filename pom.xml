@@ -15,7 +15,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>cn.edu.ruc.iir</groupId>
+    <groupId>io.pixelsdb</groupId>
     <artifactId>pixels</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 
@@ -92,27 +92,27 @@
         <dependencies>
             <!-- pixels -->
             <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-daemon</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-cache</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>cn.edu.ruc.iir</groupId>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-presto</artifactId>
                 <version>${project.version}</version>
             </dependency>

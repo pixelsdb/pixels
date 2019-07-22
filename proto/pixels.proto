@@ -22,7 +22,7 @@ syntax = "proto2";
 
 package pixels.proto;
 
-option java_package = "cn.edu.ruc.iir.pixels.core";
+option java_package = "io.pixelsdb.pixels.core";
 option java_outer_classname = "PixelsProto";
 
 // Row Group: A logical horizontal partitioning of the data into rows. There is no physical
