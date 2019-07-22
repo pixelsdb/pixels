@@ -47,30 +47,32 @@ public class PixelsRadix
      * |root| -> |te|
      * -> |am|
      * -> |st|
+     * <p>
      * 1. If we put <test, new_value> into the original tree, it's a EXACT_MATCH with the |st| node.
      * Then we add the new_value into the node or replace the node.
-     * <p>
+     * </p><p>
      * 2. If we put <tea, new_value> into the original tree, it's a KEY_ENDS_AT_MID_EDGE with the |am| node.
      * Then we split the |am| node into two.
      * |root| -> |te|
      * -> |a|
      * -> |m|
      * -> |st|
-     * <p>
+     * </p><p>
      * 3. If we put <teak, new_value> into the original tree, it's a MATCH_END_AT_MID_EDGE with the |am| node.
      * Then we split the |am| node into three.
      * |root| -> |te|
      * -> |a|
-     * -> |m|
-     * -> |k|
+     *   -> |m|
+     *   -> |k|
      * -> |st|
-     * <p>
+     * </p><p>
      * 4. If we put <teamster, new_value> into the original tree, it's a MATCH_END_AT_END_EDGE with the |am| node.
      * Then we add a new node containing the trailing bytes from the key, and append it to the |am| node.
      * |root| -> |te|
      * -> |am|
-     * -> |ster|
+     *   -> |ster|
      * -> |st|
+     * </p>
      */
     private void putInternal(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheIdx, boolean overwrite)
     {

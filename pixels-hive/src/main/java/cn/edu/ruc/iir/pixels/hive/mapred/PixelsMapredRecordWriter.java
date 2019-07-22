@@ -20,8 +20,8 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
 import cn.edu.ruc.iir.pixels.core.vector.*;
-import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
-import cn.edu.ruc.iir.pixels.hive.PixelsStruct;
+import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsStruct;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -38,63 +38,74 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * This record writer implements the org.apache.hadoop.mapred API.
- * refer: [WriterImpl](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/WriterImpl.java)
+ * This class is currently not finished, so that write is not supported by pixels-hive.
  *
- * @param <V> the root type of the file
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.WriterImpl}
+ *
  */
-public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
-        implements RecordWriter<NullWritable, PixelsSerDe.PixelsSerdeRow> {
+public class PixelsMapredRecordWriter
+        implements RecordWriter<NullWritable, PixelsRow>
+{
     private final PixelsWriter writer;
     private final VectorizedRowBatch batch;
     private final TypeDescription schema;
     private final ObjectInspector inspector;
     private final StructField[] fields;
 
-    public PixelsMapredRecordWriter(PixelsWriter writer) {
+    public PixelsMapredRecordWriter(PixelsWriter writer)
+    {
         this.writer = writer;
-        schema = writer.getSchema();
+        this.schema = writer.getSchema();
         this.inspector = null;
         this.batch = schema.createRowBatch();
         this.fields = initializeFieldsFromOi(inspector);
     }
 
-    private static StructField[] initializeFieldsFromOi(ObjectInspector inspector) {
-        if (inspector instanceof StructObjectInspector) {
+    private static StructField[] initializeFieldsFromOi(ObjectInspector inspector)
+    {
+        if (inspector instanceof StructObjectInspector)
+        {
             List<? extends StructField> fieldList =
                     ((StructObjectInspector) inspector).getAllStructFieldRefs();
             StructField[] fields = new StructField[fieldList.size()];
             fieldList.toArray(fields);
             return fields;
-        } else {
+        } else
+        {
             return null;
         }
     }
 
-    static void setLongValue(ColumnVector vector, int row, long value) {
+    static void setLongValue(ColumnVector vector, int row, long value)
+    {
         ((LongColumnVector) vector).vector[row] = value;
     }
 
-    static void setDoubleValue(ColumnVector vector, int row, double value) {
+    static void setDoubleValue(ColumnVector vector, int row, double value)
+    {
         ((DoubleColumnVector) vector).vector[row] = Double.doubleToLongBits(value);
     }
 
     static void setBinaryValue(ColumnVector vector, int row,
-                               BinaryComparable value) {
+                               BinaryComparable value)
+    {
         ((BinaryColumnVector) vector).setVal(row, value.getBytes(), 0,
                 value.getLength());
     }
 
     static void setBinaryValue(ColumnVector vector, int row,
-                               BinaryComparable value, int maxLength) {
+                               BinaryComparable value, int maxLength)
+    {
         ((BinaryColumnVector) vector).setVal(row, value.getBytes(), 0,
                 Math.min(maxLength, value.getLength()));
     }
 
     private static final ThreadLocal<byte[]> SPACE_BUFFER =
-            new ThreadLocal<byte[]>() {
+            new ThreadLocal<byte[]>()
+            {
                 @Override
-                protected byte[] initialValue() {
+                protected byte[] initialValue()
+                {
                     byte[] result = new byte[100];
                     Arrays.fill(result, (byte) ' ');
                     return result;
@@ -104,14 +115,18 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     static void setCharValue(BinaryColumnVector vector,
                              int row,
                              Text value,
-                             int length) {
+                             int length)
+    {
         // we need to trim or pad the string with spaces to required length
         int actualLength = value.getLength();
-        if (actualLength >= length) {
+        if (actualLength >= length)
+        {
             setBinaryValue(vector, row, value, length);
-        } else {
+        } else
+        {
             byte[] spaces = SPACE_BUFFER.get();
-            if (length - actualLength > spaces.length) {
+            if (length - actualLength > spaces.length)
+            {
                 spaces = new byte[length - actualLength];
                 Arrays.fill(spaces, (byte) ' ');
                 SPACE_BUFFER.set(spaces);
@@ -124,9 +139,11 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     static void setStructValue(TypeDescription schema,
                                StructColumnVector vector,
                                int row,
-                               PixelsStruct value) {
+                               PixelsStruct value)
+    {
         List<TypeDescription> children = schema.getChildren();
-        for (int c = 0; c < value.getNumFields(); ++c) {
+        for (int c = 0; c < value.getNumFields(); ++c)
+        {
             setColumn(children.get(c), vector.fields[c], row, value.getFieldValue(c));
         }
     }
@@ -134,12 +151,16 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     public static void setColumn(TypeDescription schema,
                                  ColumnVector vector,
                                  int row,
-                                 Object value) {
-        if (value == null) {
+                                 Object value)
+    {
+        if (value == null)
+        {
             vector.noNulls = false;
             vector.isNull[row] = true;
-        } else {
-            switch (schema.getCategory()) {
+        } else
+        {
+            switch (schema.getCategory())
+            {
                 case BOOLEAN:
                     setLongValue(vector, row, ((BooleanWritable) value).get() ? 1 : 0);
                     break;
@@ -188,90 +209,108 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     }
 
     static void setColumn(int rowId, ColumnVector column,
-                          ObjectInspector inspector, Object obj) {
-        if (obj == null) {
+                          ObjectInspector inspector, Object obj)
+    {
+        if (obj == null)
+        {
             column.noNulls = false;
             column.isNull[rowId] = true;
-        } else {
-            switch (inspector.getCategory()) {
+        } else
+        {
+            switch (inspector.getCategory())
+            {
                 case PRIMITIVE:
                     switch (((PrimitiveObjectInspector) inspector)
-                            .getPrimitiveCategory()) {
-                        case BOOLEAN: {
+                            .getPrimitiveCategory())
+                    {
+                        case BOOLEAN:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] =
                                     ((BooleanObjectInspector) inspector).get(obj) ? 1 : 0;
                             break;
                         }
-                        case BYTE: {
+                        case BYTE:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] = ((ByteObjectInspector) inspector).get(obj);
                             break;
                         }
-                        case SHORT: {
+                        case SHORT:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] =
                                     ((ShortObjectInspector) inspector).get(obj);
                             break;
                         }
-                        case INT: {
+                        case INT:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] = ((IntObjectInspector) inspector).get(obj);
                             break;
                         }
-                        case LONG: {
+                        case LONG:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] = ((LongObjectInspector) inspector).get(obj);
                             break;
                         }
-                        case FLOAT: {
+                        case FLOAT:
+                        {
                             DoubleColumnVector vector = (DoubleColumnVector) column;
                             vector.vector[rowId] =
                                     Float.floatToIntBits(((FloatObjectInspector) inspector).get(obj));
                             break;
                         }
-                        case DOUBLE: {
+                        case DOUBLE:
+                        {
                             DoubleColumnVector vector = (DoubleColumnVector) column;
                             vector.vector[rowId] =
                                     Double.doubleToLongBits(((DoubleObjectInspector) inspector).get(obj));
                             break;
                         }
-                        case BINARY: {
+                        case BINARY:
+                        {
                             BinaryColumnVector vector = (BinaryColumnVector) column;
                             BytesWritable blob = ((BinaryObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj);
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
-                        case STRING: {
+                        case STRING:
+                        {
                             BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((StringObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj);
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
-                        case VARCHAR: {
+                        case VARCHAR:
+                        {
                             BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((HiveVarcharObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj).getTextValue();
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
-                        case CHAR: {
+                        case CHAR:
+                        {
                             BinaryColumnVector vector = (BinaryColumnVector) column;
                             Text blob = ((HiveCharObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj).getTextValue();
                             vector.setVal(rowId, blob.getBytes(), 0, blob.getLength());
                             break;
                         }
-                        case TIMESTAMP: {
+                        case TIMESTAMP:
+                        {
                             TimestampColumnVector vector = (TimestampColumnVector) column;
                             Timestamp ts = ((TimestampObjectInspector) inspector)
                                     .getPrimitiveJavaObject(obj);
                             vector.set(rowId, ts);
                             break;
                         }
-                        case DATE: {
+                        case DATE:
+                        {
                             LongColumnVector vector = (LongColumnVector) column;
                             vector.vector[rowId] = ((DateObjectInspector) inspector)
                                     .getPrimitiveWritableObject(obj).getDays();
@@ -279,11 +318,13 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
                         }
                     }
                     break;
-                case STRUCT: {
+                case STRUCT:
+                {
                     StructColumnVector vector = (StructColumnVector) column;
                     StructObjectInspector oi = (StructObjectInspector) inspector;
                     List<? extends StructField> fields = oi.getAllStructFieldRefs();
-                    for (int c = 0; c < vector.fields.length; ++c) {
+                    for (int c = 0; c < vector.fields.length; ++c)
+                    {
                         StructField field = fields.get(c);
                         setColumn(rowId, vector.fields[c], field.getFieldObjectInspector(),
                                 oi.getStructFieldData(obj, field));
@@ -298,9 +339,11 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
     }
 
     @Override
-    public void write(NullWritable nullWritable, PixelsSerDe.PixelsSerdeRow row) throws IOException {
+    public void write(NullWritable nullWritable, PixelsRow row) throws IOException
+    {
         // if the batch is full, write it out.
-        if (batch.size == batch.getMaxSize()) {
+        if (batch.size == batch.getMaxSize())
+        {
             writer.addRowBatch(batch);
             batch.reset();
         }
@@ -308,24 +351,32 @@ public class PixelsMapredRecordWriter<V extends PixelsSerDe.PixelsSerdeRow>
         // add the new row
         int rowId = batch.size++;
         // skip over the PixelsKey or PixelsValue
-        if (fields != null) {
+        if (fields != null)
+        {
             StructObjectInspector soi = (StructObjectInspector) inspector;
-            for (int i = 0; i < fields.length; ++i) {
+            for (int i = 0; i < fields.length; ++i)
+            {
                 setColumn(rowId, batch.cols[i],
                         fields[i].getFieldObjectInspector(),
                         soi.getStructFieldData(row, fields[i]));
             }
-        } else {
+        } else
+        {
             setColumn(rowId, batch.cols[0], inspector, row);
         }
     }
 
     @Override
-    public void close(Reporter reporter) throws IOException {
-        if (batch.size != 0) {
+    public void close(Reporter reporter) throws IOException
+    {
+        if (batch != null && batch.size != 0)
+        {
             writer.addRowBatch(batch);
             batch.reset();
         }
-        writer.close();
+        if (writer != null)
+        {
+            writer.close();
+        }
     }
 }

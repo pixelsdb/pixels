@@ -19,9 +19,9 @@ package cn.edu.ruc.iir.pixels.hive.mapred;
 
 import cn.edu.ruc.iir.pixels.core.PixelsWriter;
 import cn.edu.ruc.iir.pixels.core.TypeDescription;
-import cn.edu.ruc.iir.pixels.hive.PixelsConf;
-import cn.edu.ruc.iir.pixels.hive.PixelsFile;
-import cn.edu.ruc.iir.pixels.hive.PixelsSerDe;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsConf;
+import cn.edu.ruc.iir.pixels.hive.common.PixelsRW;
+import cn.edu.ruc.iir.pixels.hive.PixelsSerDe.PixelsRow;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -39,10 +39,13 @@ import java.util.Properties;
 
 /**
  * An PIXELS output format that satisfies the org.apache.hadoop.mapred API.
- * refer: [OrcOutputFormat](https://github.com/apache/hive/blob/master/ql/src/java/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.java)
+ *
+ * This class is not finished, so that write is not supported by pixels-hive.
+ *
+ * refers to {@link org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat}
  */
 public class PixelsOutputFormat
-        extends FileOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow> implements HiveOutputFormat<NullWritable, PixelsSerDe.PixelsSerdeRow>
+        extends FileOutputFormat<NullWritable, PixelsRow> implements HiveOutputFormat<NullWritable, PixelsRow>
 {
 
     /**
@@ -51,8 +54,9 @@ public class PixelsOutputFormat
      * @param conf the job configuration
      * @return a new options object
      */
-    public static PixelsFile.WriterOptions buildOptions(Configuration conf) {
-        return PixelsFile.writerOptions(conf)
+    public static PixelsRW.WriterOptions buildOptions(Configuration conf)
+    {
+        return PixelsRW.writerOptions(conf)
                 .setSchema(TypeDescription.fromString(PixelsConf.MAPRED_OUTPUT_SCHEMA
                         .getString(conf)))
                 .rowIndexStride((int) PixelsConf.ROW_INDEX_STRIDE.getLong(conf))
@@ -64,19 +68,56 @@ public class PixelsOutputFormat
     }
 
     @Override
-    public RecordWriter<NullWritable, PixelsSerDe.PixelsSerdeRow> getRecordWriter(FileSystem fileSystem,
+    public RecordWriter<NullWritable, PixelsRow> getRecordWriter(FileSystem fileSystem,
                                                                                   JobConf conf,
                                                                                   String name,
                                                                                   Progressable progressable
-    ) throws IOException {
+    ) throws IOException
+    {
         Path path = getTaskOutputPath(conf, name);
-        PixelsWriter writer = PixelsFile.createWriter(path,
+        PixelsWriter writer = PixelsRW.createWriter(path,
                 buildOptions(conf).fileSystem(fileSystem));
-        return new PixelsMapredRecordWriter<>(writer);
+        return new PixelsMapredRecordWriter(writer);
     }
 
+    /**
+     * create the final out file and get some specific settings.
+     * In case of empty table location, this method is called, so that it should not
+     * return null.
+     *
+     * @param jobConf
+     *          the job configuration file
+     * @param finalOutPath
+     *          the final output file to be created
+     * @param valueClass
+     *          the value class used for create
+     * @param isCompressed
+     *          whether the content is compressed or not
+     * @param tableProperties
+     *          the table properties of this file's corresponding table
+     * @param progress
+     *          progress used for status report
+     * @return the RecordWriter for the output file
+     */
     @Override
-    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path path, Class<? extends Writable> aClass, boolean b, Properties properties, Progressable progressable) throws IOException {
-        return null;
+    public FileSinkOperator.RecordWriter getHiveRecordWriter(JobConf jobConf, Path finalOutPath,
+                                                             Class<? extends Writable> valueClass,
+                                                             boolean isCompressed, Properties tableProperties,
+                                                             Progressable progress) throws IOException
+    {
+        return new FileSinkOperator.RecordWriter()
+        {
+            @Override
+            public void write(Writable w) throws IOException
+            {
+
+            }
+
+            @Override
+            public void close(boolean abort) throws IOException
+            {
+
+            }
+        };
     }
 }

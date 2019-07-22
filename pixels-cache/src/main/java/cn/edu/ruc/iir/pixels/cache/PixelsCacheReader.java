@@ -137,6 +137,7 @@ public class PixelsCacheReader
         int bytesMatchedInNodeFound = 0;
 
         // get root
+        // TODO: does root node have an edge?
         int currentNodeHeader = indexFile.getInt(currentNodeOffset);
         dramAccessCounter++;
         int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
@@ -179,10 +180,13 @@ public class PixelsCacheReader
             dramAccessCounter++;
             currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
             currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
+            // TODO: does max length of edge = 12? can we move currentNodeEdge allocation out before this loop?
             byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
+            // TODO: can we get header, edge and children of a node in one memory access?
             indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
                     currentNodeEdge, 0, currentNodeEdgeSize);
             dramAccessCounter++;
+            // TODO: numEdgeBytes seems redundant.
             for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
             {
                 if (currentNodeEdge[i] != keyBuffer.get(bytesMatched))

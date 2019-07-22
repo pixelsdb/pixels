@@ -5,6 +5,7 @@ import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Order;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Splits;
+import cn.edu.ruc.iir.pixels.common.split.*;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.spi.PrestoException;
 import org.junit.Test;
