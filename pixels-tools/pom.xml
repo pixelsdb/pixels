@@ -4,34 +4,34 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>pixels</artifactId>
-        <groupId>cn.edu.ruc.iir</groupId>
+        <groupId>io.pixelsdb</groupId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>pixels-tools</artifactId>
     <properties>
-        <mainClass>cn.edu.ruc.iir.pixels.test.CacheIndexPerf</mainClass>
+        <mainClass>CacheIndexPerf</mainClass>
     </properties>
 
     <dependencies>
         <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-core</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-daemon</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>cn.edu.ruc.iir</groupId>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-cache</artifactId>
             <optional>true</optional>
         </dependency>
