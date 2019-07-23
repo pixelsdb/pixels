@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.daemon.cache;
 
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheUtil;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheWriter;
+import io.pixelsdb.pixels.cache.PixelsCacheConfig;
+import io.pixelsdb.pixels.cache.PixelsCacheUtil;
+import io.pixelsdb.pixels.cache.PixelsCacheWriter;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;

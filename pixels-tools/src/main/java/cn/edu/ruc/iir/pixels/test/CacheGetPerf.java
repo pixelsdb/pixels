@@ -1,8 +1,8 @@
 package cn.edu.ruc.iir.pixels.test;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheKey;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.PixelsCacheKey;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;

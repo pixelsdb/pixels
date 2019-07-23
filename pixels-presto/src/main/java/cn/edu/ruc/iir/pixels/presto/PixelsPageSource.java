@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.core.*;
 import cn.edu.ruc.iir.pixels.core.reader.PixelsReaderOption;

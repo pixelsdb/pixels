@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.cache.CacheLocationDistribution;
+import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;
 import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
 import com.coreos.jetcd.data.KeyValue;

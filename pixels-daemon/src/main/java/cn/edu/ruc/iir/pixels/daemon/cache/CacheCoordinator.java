@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.daemon.cache;
 
-import cn.edu.ruc.iir.pixels.cache.CacheLocationDistribution;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
+import io.pixelsdb.pixels.cache.CacheLocationDistribution;
+import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import cn.edu.ruc.iir.pixels.common.exception.MetadataException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
@@ -16,7 +16,6 @@ import com.coreos.jetcd.options.WatchOption;
 import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;

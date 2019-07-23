@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.core;
 
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
 import cn.edu.ruc.iir.pixels.common.utils.Constants;

@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.test;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
 
 import java.util.Iterator;
 import java.util.Random;

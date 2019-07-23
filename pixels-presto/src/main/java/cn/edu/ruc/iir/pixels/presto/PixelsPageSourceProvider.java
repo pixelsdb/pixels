@@ -1,6 +1,6 @@
 package cn.edu.ruc.iir.pixels.presto;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import cn.edu.ruc.iir.pixels.common.physical.FSFactory;
 import cn.edu.ruc.iir.pixels.core.PixelsFooterCache;
 import cn.edu.ruc.iir.pixels.presto.impl.PixelsPrestoConfig;

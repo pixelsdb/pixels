@@ -1,9 +1,9 @@
 package cn.edu.ruc.iir.pixels.core.writer;
 
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheConfig;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheKey;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheWriter;
-import cn.edu.ruc.iir.pixels.cache.PixelsPhysicalReader;
+import io.pixelsdb.pixels.cache.PixelsCacheConfig;
+import io.pixelsdb.pixels.cache.PixelsCacheKey;
+import io.pixelsdb.pixels.cache.PixelsCacheWriter;
+import io.pixelsdb.pixels.cache.PixelsPhysicalReader;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;

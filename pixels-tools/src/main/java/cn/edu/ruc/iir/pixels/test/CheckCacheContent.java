@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.test;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;

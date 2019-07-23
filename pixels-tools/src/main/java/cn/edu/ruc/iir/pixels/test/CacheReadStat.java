@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.test;
 
-import cn.edu.ruc.iir.pixels.cache.MemoryMappedFile;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metadata.MetadataService;
 import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
@@ -19,7 +19,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;

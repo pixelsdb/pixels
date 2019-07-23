@@ -1,7 +1,7 @@
 package cn.edu.ruc.iir.pixels.core.reader;
 
-import cn.edu.ruc.iir.pixels.cache.ColumnletId;
-import cn.edu.ruc.iir.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.cache.ColumnletId;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import cn.edu.ruc.iir.pixels.common.exception.FSException;
 import cn.edu.ruc.iir.pixels.common.metrics.ReadPerfMetrics;
 import cn.edu.ruc.iir.pixels.common.physical.PhysicalFSReader;
