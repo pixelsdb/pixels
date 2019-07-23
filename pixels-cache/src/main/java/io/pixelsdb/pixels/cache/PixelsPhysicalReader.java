@@ -1,9 +1,9 @@
 package io.pixelsdb.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.exception.FSException;
-import cn.edu.ruc.iir.pixels.common.physical.PhysicalReader;
-import cn.edu.ruc.iir.pixels.common.physical.PhysicalReaderUtil;
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.common.exception.FSException;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.core.PixelsProto;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 

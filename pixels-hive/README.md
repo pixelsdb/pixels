@@ -26,15 +26,8 @@ You can also put `pixels-hive-0.1.0-SNAPSHOT-full.jar` in the path `apache-hive-
 [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-Create/Drop/Alter/UseDatabase).
 But use the following `ROW FORMAT` and `TABLEPROPERTY`:
 ```SQL
-ROW FORMAT SERDE 'cn.edu.ruc.iir.pixels.hive.PixelsSerDe'
-STORED AS INPUTFORMAT
-  'cn.edu.ruc.iir.pixels.hive.mapred.PixelsInputFormat'
-OUTPUTFORMAT
-  'cn.edu.ruc.iir.pixels.hive.mapred.PixelsOutputFormat'
-LOCATION '/...'
-TBLPROPERTIES ("bind.pixels.table"="schema_name.table_name");
-```
-`LOCATION` is current necessary, and it should be synchronized with the orderPath
+ROW FORMAT SERDE PPixelsSerDeelsInputFormat
+OUTPUTFORMATPixelsInputFormat ("bind.pixels.tabPixelsOutputFormatrent necessary, and it should be synchronized with the orderPath
 and compactPath in pixels metadata. `bind.pixels.table` specifies
 which table in pixels to bind this hive table. Replace `schema_name`
 and `table_name` with the right schema and table name in pixels.

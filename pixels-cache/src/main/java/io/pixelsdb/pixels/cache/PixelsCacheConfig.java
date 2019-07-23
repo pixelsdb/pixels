@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
  * pixels

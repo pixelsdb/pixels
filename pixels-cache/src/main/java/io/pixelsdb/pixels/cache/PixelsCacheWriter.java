@@ -1,11 +1,11 @@
 package io.pixelsdb.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.exception.FSException;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Compact;
-import cn.edu.ruc.iir.pixels.common.metadata.domain.Layout;
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
-import cn.edu.ruc.iir.pixels.common.utils.EtcdUtil;
-import cn.edu.ruc.iir.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.common.exception.FSException;
+import io.pixelsdb.pixels.common.metadata.domain.Compact;
+import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.core.PixelsProto;
 import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

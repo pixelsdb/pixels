@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.cache;
 
-import cn.edu.ruc.iir.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.directory.api.util.Strings;
 
 import java.nio.charset.StandardCharsets;
