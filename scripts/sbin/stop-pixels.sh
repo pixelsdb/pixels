@@ -17,6 +17,7 @@ do
     echo "stop datanode on "$prefix$i
     ssh $prefix$i "export PIXELS_HOME='$PIXELS_HOME' && $PIXELS_HOME/bin/stop-datanode.sh"
   fi
+  echo "------"
 done
 
 # stop oodrinator

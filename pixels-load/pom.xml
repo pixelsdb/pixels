@@ -11,6 +11,12 @@
 
     <artifactId>pixels-load</artifactId>
 
+    <properties>
+        <jdk.version>1.8</jdk.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <mainClass>io.pixelsdb.pixels.load.multi.Main</mainClass>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.pixelsdb</groupId>
@@ -147,7 +153,7 @@
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>Main</mainClass>
+                                    <mainClass>${mainClass}</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

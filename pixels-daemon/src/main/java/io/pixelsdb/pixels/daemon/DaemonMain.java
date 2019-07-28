@@ -21,6 +21,9 @@ import java.util.concurrent.TimeUnit;
 public class DaemonMain
 {
     private static Logger log = LogManager.getLogger(DaemonMain.class);
+    private static final String GuardScript = "bin/start-guard.sh";
+    private static final String CoordinatorScript = "bin/start-coordinator.sh";
+    private static final String DataNodeScript = "bin/start-datanode.sh";
 
     public static void main(String[] args)
     {
@@ -30,16 +33,16 @@ public class DaemonMain
         {
             String mainFile = ConfigFactory.Instance().getProperty("file.lock.main");
             String guardFile = ConfigFactory.Instance().getProperty("file.lock.guard");
-            String jarName = ConfigFactory.Instance().getProperty("daemon.jar");
-            String daemonJarPath = ConfigFactory.Instance().getProperty("pixels.home") + jarName;
+            String pixelsHome = ConfigFactory.Instance().getProperty("pixels.home");
 
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
-                    (args[0].equalsIgnoreCase("coordinator") || args[0].equalsIgnoreCase("datanode")))
+                    (args[0].equalsIgnoreCase("coordinator") ||
+                            args[0].equalsIgnoreCase("datanode")))
             {
                 // this is the main daemon.
                 System.out.println("starting main daemon...");
                 Daemon mainDaemon = new Daemon();
-                String[] guardCmd = {"java", "-Drole=guard", "-jar", daemonJarPath, args[0]};
+                String[] guardCmd = {pixelsHome + GuardScript, "-daemon", args[0]};
                 mainDaemon.setup(mainFile, guardFile, guardCmd);
                 // the main daemon logic will be running in a thread,
                 // and it will start the gard daemon process to protect each other.
@@ -149,7 +152,15 @@ public class DaemonMain
                 // this is the guard daemon
                 System.out.println("starting guard daemon...");
                 Daemon guardDaemon = new Daemon();
-                String[] mainCmd = {"java", "-Drole=main", "-jar", daemonJarPath, args[0]};
+                String script;
+                if (args[0].equalsIgnoreCase("coordinator"))
+                {
+                    script = CoordinatorScript;
+                } else
+                {
+                    script = DataNodeScript;
+                }
+                String[] mainCmd = {pixelsHome + script, "-daemon"};
                 // start the guard daemon, and guard daemon and the main daemon protect each other.
                 guardDaemon.setup(guardFile, mainFile, mainCmd);
                 // run() contains an endless loop().
@@ -170,7 +181,9 @@ public class DaemonMain
                         {
                             continue;
                         }
-                        if (splits[1].contains(jarName) || splits[1].contains(DaemonMain.class.getName()))
+                        if (splits[1].contains(PixelsCoordinator.class.getName()) ||
+                                splits[1].contains(PixelsDataNode.class.getName()) ||
+                                splits[1].contains(PixelsGuard.class.getName()))
                         {
                             String roleName = null;
                             // get the role name of the target daemon (to be killing).

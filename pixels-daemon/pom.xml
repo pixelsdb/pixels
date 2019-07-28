@@ -14,7 +14,7 @@
     <properties>
         <jdk.version>1.8</jdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>DaemonMain</mainClass>
+        <mainClass>io.pixelsdb.pixels.daemon.DaemonMain</mainClass>
     </properties>
 
     <dependencies>

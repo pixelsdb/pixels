@@ -13,6 +13,13 @@
  */
 package io.pixelsdb.pixels.presto;
 
+import com.alibaba.fastjson.JSON;
+import com.coreos.jetcd.data.KeyValue;
+import com.facebook.presto.spi.*;
+import com.facebook.presto.spi.connector.ConnectorSplitManager;
+import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.predicate.TupleDomain;
+import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
@@ -20,41 +27,18 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.split.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.presto.exception.BalancerException;
 import io.pixelsdb.pixels.presto.exception.CacheException;
+import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
-import io.pixelsdb.pixels.common.split.AccessPattern;
-import io.pixelsdb.pixels.common.split.ColumnSet;
-import io.pixelsdb.pixels.common.split.IndexEntry;
-import io.pixelsdb.pixels.common.split.IndexFactory;
-import io.pixelsdb.pixels.common.split.Inverted;
-import com.alibaba.fastjson.JSON;
-import com.coreos.jetcd.data.KeyValue;
-import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.ConnectorSplit;
-import com.facebook.presto.spi.ConnectorSplitSource;
-import com.facebook.presto.spi.ConnectorTableLayoutHandle;
-import com.facebook.presto.spi.FixedSplitSource;
-import com.facebook.presto.spi.HostAddress;
-import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.connector.ConnectorSplitManager;
-import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import com.facebook.presto.spi.predicate.TupleDomain;
-import io.airlift.log.Logger;
-import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import org.apache.hadoop.fs.Path;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
@@ -323,162 +307,5 @@ public class PixelsSplitManager
             throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
         }
         return index;
-    }
-
-    public static class Balancer
-    {
-        private int totalCount = 0;
-        private Map<HostAddress, Integer> nodeCounters = new HashMap<>();
-        private Map<Path, HostAddress> pathToAddress = new HashMap<>();
-
-        public void put (HostAddress address, Path path)
-        {
-            if (this.nodeCounters.containsKey(address))
-            {
-                this.nodeCounters.put(address, this.nodeCounters.get(address)+1);
-            }
-            else
-            {
-                this.nodeCounters.put(address, 1);
-            }
-            this.pathToAddress.put(path, address);
-            this.totalCount++;
-        }
-
-        public HostAddress get (Path path)
-        {
-            return this.pathToAddress.get(path);
-        }
-
-        public void balance ()
-        {
-            //int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
-            int floor = (int) Math.floor((double)this.totalCount / (double)this.nodeCounters.size());
-            int ceil = floor + 1;
-
-            List<HostAddress> peak = new ArrayList<>();
-            List<HostAddress> valley = new ArrayList<>();
-
-            for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
-            {
-                if (entry.getValue() >= ceil)
-                {
-                    peak.add(entry.getKey());
-                }
-
-                if (entry.getValue() < floor)
-                {
-                    valley.add(entry.getKey());
-                }
-            }
-
-            boolean balanced = false;
-
-            while (balanced == false)
-            {
-                // we try to move elements from peaks to valleys.
-                if (peak.isEmpty() || valley.isEmpty())
-                {
-                    break;
-                }
-                HostAddress peakAddress = peak.get(0);
-                HostAddress valleyAddress = valley.get(0);
-                if (this.nodeCounters.get(peakAddress) < ceil)
-                {
-                    // by this.nodeCounters.get(peakAddress) < ceil,
-                    // we try the best to empty the peaks.
-                    peak.remove(peakAddress);
-                    continue;
-                }
-                if (this.nodeCounters.get(valleyAddress) >= floor)
-                {
-                    valley.remove(valleyAddress);
-                    continue;
-                }
-                this.nodeCounters.put(peakAddress, this.nodeCounters.get(peakAddress)-1);
-                this.nodeCounters.put(valleyAddress, this.nodeCounters.get(valleyAddress)+1);
-
-                for (Map.Entry<Path, HostAddress> entry : this.pathToAddress.entrySet())
-                {
-                    if (entry.getValue().equals(peakAddress))
-                    {
-                        this.pathToAddress.put(entry.getKey(), valleyAddress);
-                        break;
-                    }
-                }
-
-                balanced = this.isBalanced();
-            }
-
-            if (peak.isEmpty() == false && balanced == false)
-            {
-                if (valley.isEmpty() == false)
-                {
-                    throw new PrestoException(PixelsErrorCode.PIXELS_SPLIT_BALANCER_ERROR,
-                            new BalancerException("vally is not empty in the final balancing stage."));
-                }
-
-                for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
-                {
-                    if (entry.getValue() <= floor)
-                    {
-                        valley.add(entry.getKey());
-                    }
-                }
-
-                while (balanced == false)
-                {
-                    // we try to move elements from peaks to valleys.
-                    if (peak.isEmpty() || valley.isEmpty())
-                    {
-                        break;
-                    }
-                    HostAddress peakAddress = peak.get(0);
-                    HostAddress valleyAddress = valley.get(0);
-                    if (this.nodeCounters.get(peakAddress) < ceil)
-                    {
-                        // by this.nodeCounters.get(peakAddress) < ceil,
-                        // we try the best to empty the peaks.
-                        peak.remove(peakAddress);
-                        continue;
-                    }
-                    if (this.nodeCounters.get(valleyAddress) > floor)
-                    {
-                        valley.remove(valleyAddress);
-                        continue;
-                    }
-                    this.nodeCounters.put(peakAddress, this.nodeCounters.get(peakAddress)-1);
-                    this.nodeCounters.put(valleyAddress, this.nodeCounters.get(valleyAddress)+1);
-
-                    for (Map.Entry<Path, HostAddress> entry : this.pathToAddress.entrySet())
-                    {
-                        if (entry.getValue().equals(peakAddress))
-                        {
-                            this.pathToAddress.put(entry.getKey(), valleyAddress);
-                            break;
-                        }
-                    }
-
-                    balanced = this.isBalanced();
-                }
-            }
-        }
-
-        public boolean isBalanced ()
-        {
-            int ceil = (int) Math.ceil((double)this.totalCount / (double)this.nodeCounters.size());
-            int floor = (int) Math.floor((double)this.totalCount / (double)this.nodeCounters.size());
-
-            boolean balanced = true;
-            for (Map.Entry<HostAddress, Integer> entry : this.nodeCounters.entrySet())
-            {
-                if (entry.getValue() > ceil || entry.getValue() < floor)
-                {
-                    balanced = false;
-                }
-            }
-
-            return balanced;
-        }
     }
 }

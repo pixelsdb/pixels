@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "Start Pixels Datanode."
+echo "Start Pixels DataNode."
 
 base_dir=$(dirname $0)
-MAIN_CLASS="io.pixelsdb.pixels.daemon.DaemonMain"
+MAIN_CLASS="io.pixelsdb.pixels.daemon.PixelsDataNode"
 
 if [ "xPIXELS_HOME" = "x" ]; then
   export PIXELS_HOME="${base_dir}/../"
@@ -21,4 +21,4 @@ case ${COMMAND} in
     ;;
 esac
 
-exec ${base_dir}/run-class.sh ${EXTRA_ARGS} ${MAIN_CLASS} $OPTS
+exec ${base_dir}/run-class.sh ${EXTRA_ARGS} ${MAIN_CLASS} ${OPTS}
