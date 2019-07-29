@@ -9,6 +9,7 @@ import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.Server;
@@ -297,21 +298,35 @@ public class CacheCoordinator
             replicaBalancer.balance();
             if (replicaBalancer.isBalanced())
             {
-                Balancer absoluteBalancer = new AbsoluteBalancer();
-                replicaBalancer.cascade(absoluteBalancer);
-                absoluteBalancer.balance();
-                if (absoluteBalancer.isBalanced())
+                boolean enableAbsolute = Boolean.parseBoolean(
+                        ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                if (enableAbsolute)
                 {
-                    Map<String, HostAddress> balanced = absoluteBalancer.getAll();
+                    Balancer absoluteBalancer = new AbsoluteBalancer();
+                    replicaBalancer.cascade(absoluteBalancer);
+                    absoluteBalancer.balance();
+                    if (absoluteBalancer.isBalanced())
+                    {
+                        Map<String, HostAddress> balanced = absoluteBalancer.getAll();
+                        for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
+                        {
+                            String host = entry.getValue().toString();
+                            String path = entry.getKey();
+                            locationDistribution.addCacheLocation(host, path);
+                        }
+                    } else
+                    {
+                        throw new BalancerException("absolute balancer failed to balance paths.");
+                    }
+                } else
+                {
+                    Map<String, HostAddress> balanced = replicaBalancer.getAll();
                     for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
                     {
                         String host = entry.getValue().toString();
                         String path = entry.getKey();
                         locationDistribution.addCacheLocation(host, path);
                     }
-                } else
-                {
-                    throw new BalancerException("absolute balancer failed to balance paths.");
                 }
             } else
             {

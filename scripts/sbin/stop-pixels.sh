@@ -22,5 +22,5 @@ done
 
 # stop oodrinator
 echo "stop coordinator"
-$PIXELS_HOME/bin/stop-coordinator.sh
 
+$PIXELS_HOME/bin/stop-coordinator.sh
