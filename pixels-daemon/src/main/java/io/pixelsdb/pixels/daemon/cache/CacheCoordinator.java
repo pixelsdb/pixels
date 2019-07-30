@@ -2,9 +2,14 @@ package io.pixelsdb.pixels.daemon.cache;
 
 import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
+import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
+import io.pixelsdb.pixels.common.balance.Balancer;
+import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
+import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.Server;
@@ -267,12 +272,12 @@ public class CacheCoordinator
     {
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
-        Map<String, Integer> nodesCacheStats = new HashMap<>();
+        List<HostAddress> cacheNodes = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            nodesCacheStats.put(nodes[i].toString(), 0);
+            cacheNodes.add(nodes[i]);
         }
 
-        // locality-based balancing
+        Balancer replicaBalancer = new ReplicaBalancer(cacheNodes);
         for (String path : paths)
         {
             // get a set of nodes where the blocks of the file is located (location_set)
@@ -282,29 +287,56 @@ public class CacheCoordinator
             {
                 locations.addAll(toHostAddress(blockLocation.getHosts()));
             }
-            if (locations.size() == 0) {
+            if (locations.size() == 0)
+            {
                 continue;
             }
-            int leastCounter = Integer.MAX_VALUE;
-            HostAddress chosenLocation = null;
-            // find a node in the location_set with the least number of caching files
-            for (HostAddress location : locations)
+            replicaBalancer.put(path, locations);
+        }
+        try
+        {
+            replicaBalancer.balance();
+            if (replicaBalancer.isBalanced())
             {
-                if (nodesCacheStats.get(location.toString()) != null) {
-                    int count = nodesCacheStats.get(location.toString());
-                    if (count < leastCounter) {
-                        leastCounter = count;
-                        chosenLocation = location;
+                boolean enableAbsolute = Boolean.parseBoolean(
+                        ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+                if (enableAbsolute)
+                {
+                    Balancer absoluteBalancer = new AbsoluteBalancer();
+                    replicaBalancer.cascade(absoluteBalancer);
+                    absoluteBalancer.balance();
+                    if (absoluteBalancer.isBalanced())
+                    {
+                        Map<String, HostAddress> balanced = absoluteBalancer.getAll();
+                        for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
+                        {
+                            String host = entry.getValue().toString();
+                            String path = entry.getKey();
+                            locationDistribution.addCacheLocation(host, path);
+                        }
+                    } else
+                    {
+                        throw new BalancerException("absolute balancer failed to balance paths.");
+                    }
+                } else
+                {
+                    Map<String, HostAddress> balanced = replicaBalancer.getAll();
+                    for (Map.Entry<String, HostAddress> entry : balanced.entrySet())
+                    {
+                        String host = entry.getValue().toString();
+                        String path = entry.getKey();
+                        locationDistribution.addCacheLocation(host, path);
                     }
                 }
+            } else
+            {
+                throw new BalancerException("replica balancer failed to balance paths.");
             }
-            if (chosenLocation != null) {
-                nodesCacheStats.put(chosenLocation.toString(), leastCounter+1);
-                locationDistribution.addCacheLocation(chosenLocation.toString(), path);
-            }
+        } catch (BalancerException e)
+        {
+            logger.error(e.getMessage());
+            e.printStackTrace();
         }
-
-        // TODO: if remote caching is enabled, balance cache locations further.
 
         return locationDistribution;
     }

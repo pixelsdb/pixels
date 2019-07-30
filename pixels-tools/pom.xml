@@ -11,7 +11,7 @@
 
     <artifactId>pixels-tools</artifactId>
     <properties>
-        <mainClass>CacheIndexPerf</mainClass>
+        <mainClass>io.pixelsdb.pixels.test.CacheIndexPerf</mainClass>
     </properties>
 
     <dependencies>

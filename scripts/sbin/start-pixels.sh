@@ -9,6 +9,7 @@ PIXELS_HOME="/home/iir/opt/pixels/"
 # start coodrinator
 echo "start coordinator"
 $PIXELS_HOME/bin/start-coordinator.sh -daemon
+echo "------"
 
 sleep 5
 
@@ -23,5 +24,6 @@ do
     echo "start datanode on "$prefix$i
     ssh $prefix$i "export PIXELS_HOME='$PIXELS_HOME' && $PIXELS_HOME/bin/start-datanode.sh -daemon"
   fi
+  echo "------"
 done
 
