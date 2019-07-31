@@ -1,12 +1,14 @@
 package io.pixelsdb.pixels.cache;
 
+import com.coreos.jetcd.data.KeyValue;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.physical.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.PixelsProto;
-import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
@@ -220,9 +222,17 @@ public class PixelsCacheWriter
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
+        boolean enableAbsoluteBalancer = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
         outer_loop:
         for (String file : files)
         {
+            if (enableAbsoluteBalancer)
+            {
+                // this is used for experimental purpose only.
+                // may be removed later.
+                file = ensureLocality(file);
+            }
             PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
             int physicalLen;
             long physicalOffset;
@@ -264,6 +274,91 @@ public class PixelsCacheWriter
         // set rwFlag as readable
         PixelsCacheUtil.setIndexRW(indexFile, READABLE);
         return status;
+    }
+
+    /**
+     * This method is currently used for experimental purpose.
+     * @param path
+     * @return
+     */
+    private String ensureLocality (String path)
+    {
+        String newPath = path.substring(0, path.indexOf(".pxl")) + "_" + host + ".pxl";
+        String configDir = ConfigFactory.Instance().getProperty("hdfs.config.dir");
+        try
+        {
+            FSFactory fsFactory = FSFactory.Instance(configDir);
+            Path dfsPath = new Path(path);
+            Path newDfsPath = new Path(newPath);
+            String[] dataNodes = fsFactory.getBlockHosts(dfsPath, 0, Long.MAX_VALUE);
+            boolean isLocal = false;
+            for (String dataNode : dataNodes)
+            {
+                if (dataNode.equals(host))
+                {
+                    isLocal = true;
+                    break;
+                }
+            }
+            if (isLocal == false)
+            {
+                // file is not local, move it to local.
+                FileSystem fs = fsFactory.getFileSystem().get();
+                PhysicalReader reader = PhysicalReaderUtil.newPhysicalFSReader(fs, dfsPath);
+                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalFSWriter(fs, newDfsPath,
+                        2048l*1024l*1024l, (short) 1, true);
+                byte[] buffer = new byte[1024*1024*32]; // 32MB buffer for copy.
+                long copiedBytes = 0l, fileLength = reader.getFileLength();
+                boolean success = true;
+                try
+                {
+                    while (copiedBytes < fileLength)
+                    {
+                        int bytesToCopy = 0;
+                        if (copiedBytes + buffer.length <= fileLength)
+                        {
+                            bytesToCopy = buffer.length;
+                        } else
+                        {
+                            bytesToCopy = (int) (fileLength - copiedBytes);
+                        }
+                        reader.readFully(buffer, 0, bytesToCopy);
+                        writer.prepare(bytesToCopy);
+                        writer.append(buffer, 0, bytesToCopy);
+                        copiedBytes += bytesToCopy;
+                    }
+                    reader.close();
+                    writer.flush();
+                    writer.close();
+                } catch (IOException e)
+                {
+                    logger.error("failed to copy file", e);
+                    success = false;
+                }
+                if (success)
+                {
+                    fs.delete(dfsPath, false);
+                    return newPath;
+                }
+                else
+                {
+                    fs.delete(newDfsPath, false);
+                    return path;
+                }
+
+            } else
+            {
+                return path;
+            }
+        } catch (FSException e)
+        {
+            logger.error("failed to instance FSFactory", e);
+        } catch (IOException e)
+        {
+            logger.error("failed to delete file", e);
+        }
+
+        return null;
     }
 
     /**
