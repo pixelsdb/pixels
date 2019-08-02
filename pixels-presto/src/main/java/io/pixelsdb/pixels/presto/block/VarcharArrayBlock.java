@@ -32,7 +32,7 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 /**
  * This class refers to com.facebook.presto.spi.block.VariableWidthBlock and AbstractVariableWidthBlock.
  *
- * Modifies:
+ * Modifications:
  * 1. we use a byte[][] instead of Slice as the backing storage
  * and replaced the implementation of each methods;
  * 2. add some other methods.
