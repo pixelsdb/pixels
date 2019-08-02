@@ -83,10 +83,15 @@ fi
 
 echo "PIXELS OPTS: "$PIXELS_OPTS
 
+NUMA_INTERLEAVE=""
+if type numactl >/dev/null 2>&1; then
+  NUMA_INTERLEAVE="numactl --interleave=all"
+fi
+
 # Launch mode
 if [ "x$DAEMON_MODE" = "xtrue" ]; then
   echo "$DAEMON_NAME running in the daemon mode."
-  nohup ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@" > ${CONSOLE_OUTPUT_FILE} 2>&1 < /dev/null &
+  nohup ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@" > ${CONSOLE_OUTPUT_FILE} 2>&1 < /dev/null &
 else
-  exec ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@"
+  exec ${NUMA_INTERLEAVE} ${JAVA} ${PIXELS_HEAP_OPTS} ${PIXELS_JVM_PERFORMANCE_OPTS} -cp ${CLASSPATH} ${PIXELS_OPTS} "$@"
 fi
