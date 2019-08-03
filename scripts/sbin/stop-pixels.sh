@@ -20,7 +20,7 @@ do
   echo "------"
 done
 
-# stop oodrinator
+# stop coodrinator
 echo "stop coordinator"
 
 $PIXELS_HOME/bin/stop-coordinator.sh
