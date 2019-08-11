@@ -46,5 +46,3 @@ etcdctl --endpoints=$ENDPOINTS put layout_version 0
 etcdctl --endpoints=$ENDPOINTS del coordinator
 etcdctl --endpoints=$ENDPOINTS del --prefix node_
 etcdctl --endpoints=$ENDPOINTS del --prefix location_
-
-

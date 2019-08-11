@@ -7,6 +7,7 @@ end=9
 PIXELS_HOME="/home/iir/opt/pixels/"
 
 # stop data nodes
+echo "stop datanodes..."
 for ((i=$start; i<=$end; i++))
 do
   if [ $i -lt 10 ]
@@ -21,6 +22,6 @@ do
 done
 
 # stop coodrinator
-echo "stop coordinator"
-
+echo "stop coordinator..."
 $PIXELS_HOME/bin/stop-coordinator.sh
+echo "------"
