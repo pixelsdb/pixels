@@ -65,7 +65,6 @@
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
-        <dep.mysql.version>5.1.38</dep.mysql.version>
         <dep.netty.version>4.1.25.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
         <dep.guava.version>21.0</dep.guava.version>
@@ -261,13 +260,6 @@
                 <groupId>io.airlift</groupId>
                 <artifactId>units</artifactId>
                 <version>${dep.airlift.units.version}</version>
-            </dependency>
-
-            <!-- mysql -->
-            <dependency>
-                <groupId>mysql</groupId>
-                <artifactId>mysql-connector-java</artifactId>
-                <version>${dep.mysql.version}</version>
             </dependency>
 
             <!-- validation -->

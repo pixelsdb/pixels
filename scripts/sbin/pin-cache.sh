@@ -19,5 +19,3 @@ do
     ssh $prefix$i "export PIXELS_HOME='$PIXELS_HOME' && $PIXELS_HOME/bin/start-vmtouch.sh"
   fi
 done
-
-
