@@ -70,7 +70,7 @@
         <dep.protobuf.version>3.6.1</dep.protobuf.version>
         <dep.kryo.version>4.0.2</dep.kryo.version>
         <dep.kryo-serializers.version>0.42</dep.kryo-serializers.version>
-        <dep.jackson.version>2.9.9.2</dep.jackson.version>
+        <dep.jackson.version>2.8.1</dep.jackson.version>
         <dep.google.inject.version>4.0</dep.google.inject.version>
         <dep.google.jrs305.version>3.0.0</dep.google.jrs305.version>
         <dep.javax.inject.version>1</dep.javax.inject.version>
