@@ -1,21 +1,31 @@
 /*
- * Copyright 2015 Caplogic AB.
+ * Copyright 2018 PixelsDB.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This file is part of Pixels.
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Foobar.  If not, see
+ * <https://www.gnu.org/licenses/>.
  */
 
 /*
- * This class was inspired from an entry in Bryce Nyeggen's blog
+ * This file is derived from MappedBus, with the attribution notice:
+ *
+ *   Copyright 2015 Caplogic AB.
+ *   Licensed under the Apache License, Version 2.0.
+ *   This class was inspired from an entry in Bryce Nyeggen's blog.
+ *
+ * We changed the visibility of some methods from protect to public.
  */
 package io.pixelsdb.pixels.cache;
 
@@ -28,14 +38,11 @@ import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 
 /**
- * By Pixels author:
+ * By hank:
  * This class has been tested.
- * It can read and write memory mapped file which is larger than 2GB.
- * When the backing file is located under /dev/shm/, it works as a shared memory.
- * The random read/write latency is sub-nanosecond.
- * <p>
- * Other modifications:
- * change the visibility of some methods from protect to public
+ * It can read and write memory mapped file larger than 2GB.
+ * When the backing file is located under /dev/shm/, it works as a shared memory,
+ * and the random read/write latency is around 100ns.
  */
 
 @SuppressWarnings("restriction")

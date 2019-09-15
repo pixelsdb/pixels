@@ -1,18 +1,24 @@
+/*
+ * Copyright 2018-2019 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Foobar.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
-import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.core.*;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsPredicate;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.TupleDomainPixelsPredicate;
-import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
-import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.presto.block.VarcharArrayBlock;
-import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
@@ -20,14 +26,16 @@ import com.facebook.presto.spi.block.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
-import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.ByteColumnVector;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.vector.*;
+import io.pixelsdb.pixels.presto.block.VarcharArrayBlock;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
+import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
@@ -39,6 +47,11 @@ import java.util.Map;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * @author hank
+ * @author guodong
+ * @author tao
+ */
 class PixelsPageSource implements ConnectorPageSource
 {
     private static Logger logger = Logger.get(PixelsPageSource.class);
