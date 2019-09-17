@@ -14,7 +14,7 @@
  * Affero GNU General Public License for more details.
  *
  * You should have received a copy of the Affero GNU General Public
- * License along with Foobar.  If not, see
+ * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
 package io.pixelsdb.pixels.daemon.metric;
