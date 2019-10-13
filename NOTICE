@@ -20,7 +20,7 @@ Column vectors and TypeDescription in pixels-core refer to corresponding impleme
 3. Apache Hive
 Licensed under the Apache License, Version 2.0.
 
-A part classes in pixels-hive refer to OrcSerde in Apache Hive.
+A part of classes in pixels-hive refer to OrcSerde in Apache Hive.
 
 
 4. Facebook Presto

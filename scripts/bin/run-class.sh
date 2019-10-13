@@ -21,6 +21,13 @@ do
   CLASSPATH="$CLASSPATH":"$file"
 done
 
+# add external jars under PIXELS_HOME/lib/
+# please put libraries such as mysql_connector in this directory.
+for file in "$base_dir"/lib/*.jar
+do
+  CLASSPATH="$CLASSPATH":"$file"
+done
+
 # Generic jvm settings
 if [ -z "$PIXELS_OPTS" ]; then
   PIXELS_OPTS=""
