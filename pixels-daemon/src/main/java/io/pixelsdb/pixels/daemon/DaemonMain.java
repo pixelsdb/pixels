@@ -31,9 +31,20 @@ public class DaemonMain
 
         if (role != null)
         {
-            String mainFile = ConfigFactory.Instance().getProperty("file.lock.main");
-            String guardFile = ConfigFactory.Instance().getProperty("file.lock.guard");
+            String varDir = ConfigFactory.Instance().getProperty("pixels.var.dir");
             String pixelsHome = ConfigFactory.Instance().getProperty("pixels.home");
+            String mainFile = null;
+            String guardFile = null;
+
+            if (args.length == 1)
+            {
+                if (!varDir.endsWith("/") && !varDir.endsWith("\\"))
+                {
+                    varDir += "/";
+                }
+                mainFile = varDir + "pixels." + args[0].toLowerCase() + ".main.lock";
+                guardFile = varDir + "pixels." + args[0].toLowerCase() + ".guard.lock";
+            }
 
             if (role.equalsIgnoreCase("main") && args.length == 1 &&
                     (args[0].equalsIgnoreCase("coordinator") ||
