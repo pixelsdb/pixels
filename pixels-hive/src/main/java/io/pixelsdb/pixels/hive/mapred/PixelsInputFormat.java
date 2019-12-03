@@ -19,22 +19,21 @@
  */
 package io.pixelsdb.pixels.hive.mapred;
 
+import com.alibaba.fastjson.JSON;
+import com.coreos.jetcd.data.KeyValue;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.common.split.AccessPattern;
-import io.pixelsdb.pixels.common.split.ColumnSet;
-import io.pixelsdb.pixels.common.split.IndexEntry;
-import io.pixelsdb.pixels.common.split.IndexFactory;
-import io.pixelsdb.pixels.common.split.Inverted;
+import io.pixelsdb.pixels.common.split.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.daemon.MetadataProto;
+import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
 import io.pixelsdb.pixels.daemon.metadata.dao.SchemaDao;
 import io.pixelsdb.pixels.daemon.metadata.dao.TableDao;
@@ -42,8 +41,6 @@ import io.pixelsdb.pixels.hive.common.PixelsRW;
 import io.pixelsdb.pixels.hive.common.PixelsSplit;
 import io.pixelsdb.pixels.hive.common.PixelsStruct;
 import io.pixelsdb.pixels.hive.common.SchemaTableName;
-import com.alibaba.fastjson.JSON;
-import com.coreos.jetcd.data.KeyValue;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -61,7 +58,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.*;
@@ -347,9 +347,9 @@ public class PixelsInputFormat
      */
     private List<Layout> getLayouts(SchemaTableName st)
     {
-        SchemaDao schemaDao = new SchemaDao();
-        TableDao tableDao = new TableDao();
-        LayoutDao layoutDao = new LayoutDao();
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
+        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
         MetadataProto.Schema schema = schemaDao.getByName(st.getSchemaName());
         MetadataProto.Table table = tableDao.getByNameAndSchema(st.getTableName(), schema);
         List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, -1,

@@ -19,15 +19,16 @@
  */
 package io.pixelsdb.pixels.test;
 
+import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.daemon.MetadataProto;
-import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
-import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
+import io.pixelsdb.pixels.daemon.MetadataProto;
+import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
+import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
 import org.junit.Test;
 
 import java.io.*;
@@ -108,7 +109,7 @@ public class UpdateCacheLayout
                 }
             }
 
-            LayoutDao layoutDao = new LayoutDao();
+            LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
             MetadataProto.Layout layoutv2 = MetadataProto.Layout.newBuilder()
                     .setId(21)
                     .setPermission(MetadataProto.Layout.Permission.READ_WRITE)
