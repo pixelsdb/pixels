@@ -20,12 +20,23 @@
 package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.Plugin;
+import com.facebook.presto.spi.block.BlockEncodingFactory;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.connector.ConnectorFactory;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.presto.block.VarcharArrayBlockEncoding;
 
 public class PixelsPlugin
         implements Plugin
 {
+    @Override
+    public Iterable<BlockEncodingFactory<?>> getBlockEncodingFactories(BlockEncodingSerde serde)
+    {
+        // register VarcharArrayBlockEncoding to presto BlockEncodingManager.
+        // see com.facebook.presto.server.PluginManager.installPlugin for details.
+        return ImmutableList.of(VarcharArrayBlockEncoding.FACTORY);
+    }
+
     @Override
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
