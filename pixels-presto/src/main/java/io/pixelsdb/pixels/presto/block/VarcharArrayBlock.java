@@ -37,12 +37,12 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 /**
  * This class is derived from com.facebook.presto.spi.block.VariableWidthBlock and AbstractVariableWidthBlock.
- *
+ * <p>
  * Our main modifications:
  * 1. we use a byte[][] instead of Slice as the backing storage
  * and replaced the implementation of each methods;
  * 2. add some other methods.
- *
+ * <p>
  * Created at: 19-5-31
  * Author: hank
  */
@@ -52,12 +52,13 @@ public class VarcharArrayBlock implements Block
     static final long address;
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VarcharArrayBlock.class).instanceSize();
 
-    private final int arrayOffset;
-    private final int positionCount;
-    private final byte[][] values;
-    private final int[] offsets;
-    private final int[] lengths;
-    private final boolean[] valueIsNull;
+    private final int arrayOffset; // start index of the valid items in offsets and length, usually 0.
+    private final int positionCount; // number of items in this block.
+    private final byte[][] values; // values of the items/
+    private final int[] offsets; // start byte offset of the item in each value, \
+    // always 0 if this block is deserialized by VarcharArrayBlockEncoding.readBlock.
+    private final int[] lengths; // byte length of each item.
+    private final boolean[] valueIsNull; // isNull flag of each item.
 
     private final long retainedSizeInBytes;
     private final long sizeInBytes;
@@ -78,8 +79,7 @@ public class VarcharArrayBlock implements Block
                 throw new RuntimeException("Unsafe access not available");
             }
             address = ARRAY_BYTE_BASE_OFFSET;
-        }
-        catch (Exception e)
+        } catch (Exception e)
         {
             throw new RuntimeException(e);
         }
@@ -92,31 +92,37 @@ public class VarcharArrayBlock implements Block
 
     VarcharArrayBlock(int arrayOffset, int positionCount, byte[][] values, int[] offsets, int[] lengths, boolean[] valueIsNull)
     {
-        if (arrayOffset < 0) {
+        if (arrayOffset < 0)
+        {
             throw new IllegalArgumentException("arrayOffset is negative");
         }
         this.arrayOffset = arrayOffset;
-        if (positionCount < 0) {
+        if (positionCount < 0)
+        {
             throw new IllegalArgumentException("positionCount is negative");
         }
         this.positionCount = positionCount;
 
-        if (values == null || values.length - arrayOffset < (positionCount)) {
+        if (values == null || values.length - arrayOffset < (positionCount))
+        {
             throw new IllegalArgumentException("values is null or its length is less than positionCount");
         }
         this.values = values;
 
-        if (offsets == null || offsets.length - arrayOffset < (positionCount)) {
+        if (offsets == null || offsets.length - arrayOffset < (positionCount))
+        {
             throw new IllegalArgumentException("offsets is null or its length is less than positionCount");
         }
         this.offsets = offsets;
 
-        if (lengths == null || lengths.length - arrayOffset < (positionCount)) {
+        if (lengths == null || lengths.length - arrayOffset < (positionCount))
+        {
             throw new IllegalArgumentException("lengths is null or its length is less than positionCount");
         }
         this.lengths = lengths;
 
-        if (valueIsNull == null || valueIsNull.length - arrayOffset < positionCount) {
+        if (valueIsNull == null || valueIsNull.length - arrayOffset < positionCount)
+        {
             throw new IllegalArgumentException("valueIsNull is null or its length is less than positionCount");
         }
         this.valueIsNull = valueIsNull;
@@ -228,14 +234,16 @@ public class VarcharArrayBlock implements Block
         int[] newLengths = new int[length];
         boolean[] newValueIsNull = new boolean[length];
 
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             int position = positions[offset + i];
-            if (valueIsNull[position + arrayOffset]) {
+            if (valueIsNull[position + arrayOffset])
+            {
                 newValueIsNull[i] = true;
-            }
-            else {
+            } else
+            {
                 // we only copy the valid part of each value.
-                int from  = offsets[position + arrayOffset];
+                int from = offsets[position + arrayOffset];
                 newLengths[i] = lengths[position + arrayOffset];
                 newValues[i] = Arrays.copyOfRange(values[position + arrayOffset],
                         from, from + newLengths[i]);
@@ -288,8 +296,9 @@ public class VarcharArrayBlock implements Block
     {
         checkReadablePosition(position);
         byte[][] copy = new byte[1][];
-        if (isNull(position)) {
-            return new VarcharArrayBlock(1, copy, new int[] {0}, new int[] {0}, new boolean[] {true});
+        if (isNull(position))
+        {
+            return new VarcharArrayBlock(1, copy, new int[]{0}, new int[]{0}, new boolean[]{true});
         }
 
         int offset = offsets[position + arrayOffset];
@@ -297,7 +306,7 @@ public class VarcharArrayBlock implements Block
         copy[0] = Arrays.copyOfRange(values[position + arrayOffset],
                 offset, offset + entrySize);
 
-        return new VarcharArrayBlock(1, copy, new int[] {0}, new int[] {entrySize}, new boolean[] {false});
+        return new VarcharArrayBlock(1, copy, new int[]{0}, new int[]{entrySize}, new boolean[]{false});
     }
 
     /**
@@ -321,11 +330,13 @@ public class VarcharArrayBlock implements Block
         int[] newLengths = new int[length];
         boolean[] newValueIsNull = new boolean[length];
 
-        for (int i = 0; i < length; i++) {
-            if (valueIsNull[positionOffset + i]) {
+        for (int i = 0; i < length; i++)
+        {
+            if (valueIsNull[positionOffset + i])
+            {
                 newValueIsNull[i] = true;
-            }
-            else {
+            } else
+            {
                 // we only copy the valid part of each value.
                 newLengths[i] = lengths[positionOffset + i];
                 newValues[i] = Arrays.copyOfRange(values[positionOffset + i],
@@ -382,7 +393,8 @@ public class VarcharArrayBlock implements Block
     {
         checkReadablePosition(position);
         Slice rawSlice = getRawSlice(position);
-        if (getSliceLength(position) < length) {
+        if (getSliceLength(position) < length)
+        {
             return false;
         }
         return otherBlock.bytesEqual(otherPosition, otherOffset, rawSlice, getPositionOffset(position) + offset, length);
@@ -407,7 +419,8 @@ public class VarcharArrayBlock implements Block
     {
         checkReadablePosition(position);
         Slice rawSlice = getRawSlice(position);
-        if (getSliceLength(position) < length) {
+        if (getSliceLength(position) < length)
+        {
             throw new IllegalArgumentException("Length longer than value length");
         }
         return -otherBlock.bytesCompare(otherPosition, otherOffset, otherLength, rawSlice, getPositionOffset(position) + offset, length);
