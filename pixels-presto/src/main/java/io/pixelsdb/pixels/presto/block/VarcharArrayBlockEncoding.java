@@ -87,7 +87,11 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
 
         int[] offsets = new int[positionCount];
         int[] lengths = new int[positionCount];
-        sliceInput.readBytes(Slices.wrappedIntArray(lengths), SIZE_OF_INT, positionCount * SIZE_OF_INT);
+
+        // offsets should be 0, do not read them from sliceInput.
+
+        // destinationIndex should be 0, because we do not need 0 the be the first item in lengths.
+        sliceInput.readBytes(Slices.wrappedIntArray(lengths), 0, positionCount * SIZE_OF_INT);
 
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount);
 

@@ -41,7 +41,8 @@ public class EncoderUtil
     public static void encodeNullsAsBits(SliceOutput sliceOutput, Block block)
     {
         int positionCount = block.getPositionCount();
-        for (int position = 0; position < (positionCount & ~0b111); position += 8) {
+        for (int position = 0; position < (positionCount & ~0b111); position += 8)
+        {
             byte value = 0;
             value |= block.isNull(position) ? 0b1000_0000 : 0;
             value |= block.isNull(position + 1) ? 0b0100_0000 : 0;
@@ -55,10 +56,12 @@ public class EncoderUtil
         }
 
         // write last null bits
-        if ((positionCount & 0b111) > 0) {
+        if ((positionCount & 0b111) > 0)
+        {
             byte value = 0;
             int mask = 0b1000_0000;
-            for (int position = positionCount & ~0b111; position < positionCount; position++) {
+            for (int position = positionCount & ~0b111; position < positionCount; position++)
+            {
                 value |= block.isNull(position) ? mask : 0;
                 mask >>>= 1;
             }
@@ -73,7 +76,8 @@ public class EncoderUtil
     {
         // read null bits 8 at a time
         boolean[] valueIsNull = new boolean[positionCount];
-        for (int position = 0; position < (positionCount & ~0b111); position += 8) {
+        for (int position = 0; position < (positionCount & ~0b111); position += 8)
+        {
             byte value = sliceInput.readByte();
             valueIsNull[position] = ((value & 0b1000_0000) != 0);
             valueIsNull[position + 1] = ((value & 0b0100_0000) != 0);
@@ -86,10 +90,12 @@ public class EncoderUtil
         }
 
         // read last null bits
-        if ((positionCount & 0b111) > 0) {
+        if ((positionCount & 0b111) > 0)
+        {
             byte value = sliceInput.readByte();
             int mask = 0b1000_0000;
-            for (int position = positionCount & ~0b111; position < positionCount; position++) {
+            for (int position = positionCount & ~0b111; position < positionCount; position++)
+            {
                 valueIsNull[position] = ((value & mask) != 0);
                 mask >>>= 1;
             }
