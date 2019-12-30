@@ -105,7 +105,11 @@ public class MemMappedFilePerf
             {
                 //mappedFile.getBytes(offsets[count], result, 0, acSize);
                 ByteBuffer byteBuffer = mappedFile.getDirectByteBuffer(offsets[count], acSize);
-                //byteBuffer.get(result,0, acSize);
+                /*for (int i = 0; i < acSize; ++i)
+                {
+                    byteBuffer.get(i);
+                }*/
+                byteBuffer.get(result);
                 count++;
             }
             long end = System.nanoTime();

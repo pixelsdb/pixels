@@ -381,8 +381,8 @@ public class PixelsRecordReaderImpl
             // find cached chunks
             for (int colId : targetColumns)
             {
-                // do not use direct byte buffer for string column in cache.
-                boolean direct = fileSchema.getChildren().get(colId).getCategory() !=
+                // only use direct byte buffer for string columns.
+                boolean direct = fileSchema.getChildren().get(colId).getCategory() ==
                         TypeDescription.Category.STRING;
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
