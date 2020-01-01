@@ -23,10 +23,10 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
+import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -71,17 +71,8 @@ public class IntegerColumnReader
             {
                 inputStream.close();
             }
-            if (input.isDirect())
-            {
-                // TODO: reduce memory copy.
-                this.inputBuffer = ByteBuffer.allocate(input.limit());
-                input.get(this.inputBuffer.array());
-            }
-            else
-            {
-                this.inputBuffer = input;
-            }
-            inputStream = new ByteArrayInputStream(inputBuffer.array(), inputBuffer.arrayOffset(), inputBuffer.limit());
+            this.inputBuffer = input;
+            inputStream = new ByteBufferInputStream(inputBuffer, 0, inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
@@ -102,14 +93,14 @@ public class IntegerColumnReader
                     hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                     if (hasNull && isNullBitIndex > 0)
                     {
-                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                 }
                 // if we're done with the current byte, move to the next one
                 if (hasNull && isNullBitIndex >= 8)
                 {
-                    BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
                 // check if current offset is null
@@ -145,13 +136,13 @@ public class IntegerColumnReader
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                         if (hasNull && isNullBitIndex > 0)
                         {
-                            BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                            BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                             isNullBitIndex = 0;
                         }
                     }
                     if (hasNull && isNullBitIndex >= 8)
                     {
-                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                     if (hasNull && isNull[isNullBitIndex] == 1)
@@ -181,13 +172,13 @@ public class IntegerColumnReader
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                         if (hasNull && isNullBitIndex > 0)
                         {
-                            BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                            BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                             isNullBitIndex = 0;
                         }
                     }
                     if (hasNull && isNullBitIndex >= 8)
                     {
-                        BitUtils.bitWiseDeCompact(isNull, inputBuffer.array(), isNullOffset++, 1);
+                        BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                         isNullBitIndex = 0;
                     }
                     if (hasNull && isNull[isNullBitIndex] == 1)

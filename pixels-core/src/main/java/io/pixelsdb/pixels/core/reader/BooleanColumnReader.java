@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 public class BooleanColumnReader
         extends ColumnReader
 {
-    private byte[] input;
+    private ByteBuffer inputBuffer;
     private byte[] bits;
     private byte[] isNull = new byte[8];
     private int bitsIndex = 0;
@@ -63,23 +63,10 @@ public class BooleanColumnReader
         {
             bits = new byte[input.limit() * 8];
             // read content
-            byte[] array;
-            int arrayOffset = 0;
-            if (input.isDirect())
-            {
-                // TODO: reduce memory copy.
-                array = new byte[input.limit()];
-                input.get(array);
-            }
-            else
-            {
-                array = input.array();
-                arrayOffset = input.arrayOffset();
-            }
-            BitUtils.bitWiseDeCompact(bits, array, arrayOffset, input.limit());
+            this.inputBuffer = input;
+            BitUtils.bitWiseDeCompact(bits, input, 0, input.limit());
             // read isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
-            this.input = array;
             // re-init
             bitsIndex = 0;
             hasNull = true;
@@ -96,13 +83,13 @@ public class BooleanColumnReader
                 bitsIndex = (int) Math.ceil((double) bitsIndex / 8.0d) * 8;
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)

@@ -203,6 +203,7 @@ public class StringColumnReader
     private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
+        // TODO: reduce memory copy in this method.
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets
