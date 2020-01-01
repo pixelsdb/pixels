@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.ChunkId;
 import io.pixelsdb.pixels.core.ChunkSeq;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
@@ -343,7 +344,7 @@ public class PixelsRecordReaderImpl
         return true;
     }
 
-    // TODO: try Direct ByteBuffer to ease GC pressure.
+    // TODO: try Direct ByteBuffer to reduce GC pressure.
     private boolean read()
     {
         if (!checkValid)
@@ -381,9 +382,9 @@ public class PixelsRecordReaderImpl
             // find cached chunks
             for (int colId : targetColumns)
             {
-                // only use direct byte buffer for string columns.
-                boolean direct = fileSchema.getChildren().get(colId).getCategory() ==
-                        TypeDescription.Category.STRING;
+                // direct cache read is just for debug, so we just get this parameter here for simplicity.
+                // TODO: remove this line when debug is finished.
+                boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     int rgId = rgIdx + RGStart;

@@ -63,7 +63,16 @@ public class DoubleColumnReader
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
         {
-            this.input = input.array();
+            if (input.isDirect())
+            {
+                // TODO: reduce memory copy.
+                this.input = new byte[input.limit()];
+                input.get(this.input);
+            }
+            else
+            {
+                this.input = input.array();
+            }
             inputIndex = 0;
             // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();

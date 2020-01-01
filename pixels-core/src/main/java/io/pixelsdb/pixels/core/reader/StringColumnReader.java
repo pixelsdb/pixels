@@ -83,6 +83,7 @@ public class StringColumnReader
             }
             if (input.isDirect())
             {
+                // TODO: reduce memory copy.
                 byte[] bytes = new byte[input.limit()];
                 input.get(bytes);
                 inputBuffer = Unpooled.wrappedBuffer(bytes);
