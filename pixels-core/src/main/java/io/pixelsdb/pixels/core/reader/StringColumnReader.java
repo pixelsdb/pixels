@@ -83,6 +83,7 @@ public class StringColumnReader
             }
             if (input.isDirect())
             {
+                // TODO: reduce memory copy.
                 byte[] bytes = new byte[input.limit()];
                 input.get(bytes);
                 inputBuffer = Unpooled.wrappedBuffer(bytes);
@@ -202,6 +203,7 @@ public class StringColumnReader
     private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
+        // TODO: reduce memory copy in this method.
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets

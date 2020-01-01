@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.utils;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
 /**
  * pixels
@@ -120,7 +121,7 @@ public class BitUtils
      * Bit de-compaction
      *
      * @param input input byte array
-     * @return result bits
+     * @return de-compacted bits
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input)
     {
@@ -149,9 +150,9 @@ public class BitUtils
      * @param input  input byte array
      * @param offset starting offset of the input
      * @param length byte length of the input
-     * @return isNull
+     * @return de-compacted bits
      */
-    public static void bitWiseDeCompact(byte[] isNull, byte[] input, int offset, int length)
+    public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length)
     {
         int bitsToRead = 1;
         int bitsLeft = 8;
@@ -165,7 +166,39 @@ public class BitUtils
             {
                 bitsLeft -= bitsToRead;
                 current = mask & (input[i] >> bitsLeft);
-                isNull[index++] = (byte) current;
+                bits[index++] = (byte) current;
+            }
+            bitsLeft = 8;
+        }
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     *
+     * @param input input byte buffer, which can be direct.
+     * @param offset starting offset of the input
+     * @param length byte length of the input
+     * @return de-compacted bits
+     */
+    public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length)
+    {
+        int bitsToRead = 1;
+        int bitsLeft = 8;
+        int current;
+        byte mask = 0x01;
+
+        int index = 0;
+        byte b;
+        while (offset < length)
+        {
+            b = input.get(offset);
+            offset++;
+            while (bitsLeft > 0)
+            {
+                bitsLeft -= bitsToRead;
+                current = mask & (b >> bitsLeft);
+                bits[index] = (byte) current;
+                index++;
             }
             bitsLeft = 8;
         }

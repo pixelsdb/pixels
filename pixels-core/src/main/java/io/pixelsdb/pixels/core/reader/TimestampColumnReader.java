@@ -75,8 +75,17 @@ public class TimestampColumnReader
             {
                 inputStream.close();
             }
-            inputBuffer = input;
-            inputStream = new ByteArrayInputStream(input.array(), input.arrayOffset(), input.limit());
+            if (input.isDirect())
+            {
+                // TODO: reduce memory copy.
+                this.inputBuffer = ByteBuffer.allocate(input.limit());
+                input.get(this.inputBuffer.array());
+            }
+            else
+            {
+                this.inputBuffer = input;
+            }
+            inputStream = new ByteArrayInputStream(inputBuffer.array(), inputBuffer.arrayOffset(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, false);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
