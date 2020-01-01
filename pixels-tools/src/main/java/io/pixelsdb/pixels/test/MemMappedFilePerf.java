@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.test;
 
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Random;
 
@@ -102,7 +103,13 @@ public class MemMappedFilePerf
             long begin = System.nanoTime();
             while (count < round)
             {
-                mappedFile.getBytes(offsets[count], result, 0, acSize);
+                //mappedFile.getBytes(offsets[count], result, 0, acSize);
+                ByteBuffer byteBuffer = mappedFile.getDirectByteBuffer(offsets[count], acSize);
+                /*for (int i = 0; i < acSize; ++i)
+                {
+                    byteBuffer.get(i);
+                }*/
+                byteBuffer.get(result);
                 count++;
             }
             long end = System.nanoTime();

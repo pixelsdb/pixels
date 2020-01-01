@@ -73,6 +73,7 @@ public class StringColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
+
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         if (offset == 0)
         {
@@ -80,7 +81,16 @@ public class StringColumnReader
             {
                 inputBuffer.release();
             }
-            inputBuffer = Unpooled.wrappedBuffer(input);
+            if (input.isDirect())
+            {
+                byte[] bytes = new byte[input.limit()];
+                input.get(bytes);
+                inputBuffer = Unpooled.wrappedBuffer(bytes);
+            }
+            else
+            {
+                inputBuffer = Unpooled.wrappedBuffer(input);
+            }
             readContent(input.limit(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;

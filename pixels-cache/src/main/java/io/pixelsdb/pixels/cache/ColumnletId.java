@@ -35,13 +35,15 @@ public class ColumnletId
     public long blockId;
     public short rowGroupId;
     public short columnId;
+    public boolean direct;
     long cacheOffset;
     int cacheLength;
 
-    public ColumnletId(short rowGroupId, short columnId)
+    public ColumnletId(short rowGroupId, short columnId, boolean direct)
     {
         this.rowGroupId = rowGroupId;
         this.columnId = columnId;
+        this.direct = direct;
     }
 
     public ColumnletId()

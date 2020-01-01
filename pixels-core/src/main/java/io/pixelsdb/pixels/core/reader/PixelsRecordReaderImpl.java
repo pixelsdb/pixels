@@ -381,6 +381,9 @@ public class PixelsRecordReaderImpl
             // find cached chunks
             for (int colId : targetColumns)
             {
+                // only use direct byte buffer for string columns.
+                boolean direct = fileSchema.getChildren().get(colId).getCategory() ==
+                        TypeDescription.Category.STRING;
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     int rgId = rgIdx + RGStart;
@@ -389,7 +392,7 @@ public class PixelsRecordReaderImpl
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId);
+                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId, direct);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
@@ -415,7 +418,7 @@ public class PixelsRecordReaderImpl
                 short rgId = chunkId.rowGroupId;
                 short colId = chunkId.columnId;
 //                long getBegin = System.nanoTime();
-                ByteBuffer columnlet = cacheReader.get(blockId, rgId, colId);
+                ByteBuffer columnlet = cacheReader.get(blockId, rgId, colId, chunkId.direct);
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
@@ -648,7 +651,7 @@ public class PixelsRecordReaderImpl
                     PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                             .getColumnChunkIndexEntries(
                                     resultColumns[i]);
-                    // TODO: read chunk buffer lazily when a column block is road by PixelsPageSource.
+                    // TODO: read chunk buffer lazily when a column block is read by PixelsPageSource.
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }

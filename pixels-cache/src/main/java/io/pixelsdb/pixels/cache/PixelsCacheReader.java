@@ -89,6 +89,11 @@ public class PixelsCacheReader
         return new PixelsCacheReader.Builder();
     }
 
+    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
+    {
+        return this.get(blockId, rowGroupId, columnId, true);
+    }
+
     /**
      * Read specified columnlet from cache.
      * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
@@ -98,9 +103,10 @@ public class PixelsCacheReader
      * @param blockId    block id
      * @param rowGroupId row group id
      * @param columnId   column id
+     * @param direct get direct byte buffer if true
      * @return columnlet content
      */
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
+    public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
         // search index file for columnlet id
         PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
@@ -116,9 +122,17 @@ public class PixelsCacheReader
 //        long readBegin = System.nanoTime();
         if (cacheIdx != null)
         {
-            content = ByteBuffer.allocate(cacheIdx.length);
-            // read content
-            cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
+            if (direct)
+            {
+                // read content
+                content = cacheFile.getDirectByteBuffer(cacheIdx.offset, cacheIdx.length);
+            }
+            else
+            {
+                content = ByteBuffer.allocate(cacheIdx.length);
+                // read content
+                cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
+            }
         }
 //        long readEnd = System.nanoTime();
 //        cacheLogger.addReadLatency(readEnd - readBegin);
