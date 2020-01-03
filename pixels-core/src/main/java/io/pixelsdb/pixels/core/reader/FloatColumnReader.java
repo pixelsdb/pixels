@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * @author guodong
@@ -35,7 +36,7 @@ public class FloatColumnReader
         extends ColumnReader
 {
     private final EncodingUtils encodingUtils;
-    private byte[] input;
+    private ByteBuffer inputBuffer;
     private byte[] isNull = new byte[8];
     private int inputIndex = 0;
     private int isNullOffset = 0;
@@ -63,16 +64,9 @@ public class FloatColumnReader
         DoubleColumnVector columnVector = (DoubleColumnVector) vector;
         if (offset == 0)
         {
-            if (input.isDirect())
-            {
-                // TODO: reduce memory copy.
-                this.input = new byte[input.limit()];
-                input.get(this.input);
-            }
-            else
-            {
-                this.input = input.array();
-            }
+            this.inputBuffer = input;
+            // using little endian, for that float is encoded into int by little endian
+            this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
             inputIndex = 0;
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
@@ -87,13 +81,13 @@ public class FloatColumnReader
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                BitUtils.bitWiseDeCompact(this.isNull, this.input, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)
@@ -103,7 +97,8 @@ public class FloatColumnReader
             }
             else
             {
-                columnVector.vector[i + vectorIndex] = encodingUtils.readIntLE(this.input, inputIndex);
+                // columnVector.vector[i + vectorIndex] = encodingUtils.readIntLE(this.input, inputIndex);
+                columnVector.vector[i + vectorIndex] = this.inputBuffer.getInt(inputIndex);
                 inputIndex += 4;
             }
             if (hasNull)
