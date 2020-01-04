@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core.utils;
 
+import io.netty.buffer.ByteBuf;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 
@@ -192,6 +194,38 @@ public class BitUtils
         while (offset < length)
         {
             b = input.get(offset);
+            offset++;
+            while (bitsLeft > 0)
+            {
+                bitsLeft -= bitsToRead;
+                current = mask & (b >> bitsLeft);
+                bits[index] = (byte) current;
+                index++;
+            }
+            bitsLeft = 8;
+        }
+    }
+
+    /**
+     * Bit de-compaction, this method does not modify the current position in input byte buffer.
+     *
+     * @param input input byte buffer, which can be direct.
+     * @param offset starting offset of the input
+     * @param length byte length of the input
+     * @return de-compacted bits
+     */
+    public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length)
+    {
+        int bitsToRead = 1;
+        int bitsLeft = 8;
+        int current;
+        byte mask = 0x01;
+
+        int index = 0;
+        byte b;
+        while (offset < length)
+        {
+            b = input.getByte(offset);
             offset++;
             while (bitsLeft > 0)
             {
