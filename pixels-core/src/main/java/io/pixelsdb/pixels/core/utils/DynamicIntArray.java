@@ -38,7 +38,7 @@ package io.pixelsdb.pixels.core.utils;
 public final class DynamicIntArray
 {
     static final int DEFAULT_CHUNKSIZE = 8 * 1024;
-    static final int INIT_CHUNKS = 128;
+    static final int INIT_CHUNKS = 256;
 
     private final int chunkSize;       // our allocation size
     private int[][] data;              // the real data
@@ -157,5 +157,34 @@ public final class DynamicIntArray
         sb.append('}');
 
         return sb.toString();
+    }
+
+    /**
+     * Convert this to an integer array. The returned array's length
+     * is >= this.length, so that *DO NOT* use the length of the returned array.
+     * If there are only one chunk used, no memory copy is performed.
+     * @return
+     */
+    public int[] toArray()
+    {
+        if (initializedChunks == 1)
+        {
+            return data[0];
+        }
+        else
+        {
+            int[] array = new int[length];
+            int i;
+            for (i = 0; i < initializedChunks-1; i++)
+            {
+                System.arraycopy(data[i], 0, array, i*chunkSize, chunkSize);
+            }
+            int tail = length % chunkSize;
+            for (int j = 0, k = i*chunkSize; j < tail; ++j, ++k)
+            {
+                array[k] = data[i][j];
+            }
+            return array;
+        }
     }
 }
