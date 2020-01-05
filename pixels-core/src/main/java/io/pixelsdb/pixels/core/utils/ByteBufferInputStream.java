@@ -85,9 +85,10 @@ public class ByteBufferInputStream extends InputStream
         if (isDirect)
         {
             // ByteBuffer is not thread safe by itself, so I think it does not matter.
-            byteBuffer.mark();
+            // Do not use mark as it has side effects for position().
+            int p = byteBuffer.position();
             byteBuffer.get(b, off, len);
-            byteBuffer.reset();
+            byteBuffer.position(p);
             position += len;
         }
         else
