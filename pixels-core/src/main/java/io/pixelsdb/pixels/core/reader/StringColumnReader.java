@@ -247,14 +247,13 @@ public class StringColumnReader
             // read starts and orders
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
-            this.originNum = 0;
-            DynamicIntArray startsArray = new DynamicIntArray();
+            DynamicIntArray startsArray = new DynamicIntArray(1024);
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
             while (startsDecoder.hasNext())
             {
                 startsArray.add((int) startsDecoder.next());
-                this.originNum++;
             }
+            this.originNum = startsArray.size();
             RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
             starts = startsArray.toArray();
             orders = new int[originNum];

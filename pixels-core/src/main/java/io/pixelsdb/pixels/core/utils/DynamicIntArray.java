@@ -38,7 +38,7 @@ package io.pixelsdb.pixels.core.utils;
 public final class DynamicIntArray
 {
     static final int DEFAULT_CHUNKSIZE = 8 * 1024;
-    static final int INIT_CHUNKS = 128;
+    static final int INIT_CHUNKS = 256;
 
     private final int chunkSize;       // our allocation size
     private int[][] data;              // the real data
