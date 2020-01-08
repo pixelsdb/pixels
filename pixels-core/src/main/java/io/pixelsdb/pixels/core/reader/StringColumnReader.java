@@ -239,10 +239,15 @@ public class StringColumnReader
             inputBuffer.resetReaderIndex();
             // read buffers
             contentBuf = inputBuffer.slice(0, originsOffset);
+            if (this.inputBuffer.isDirect())
             {
                 byte[] bytes = new byte[startsOffset - originsOffset];
                 inputBuffer.getBytes(originsOffset, bytes, 0, startsOffset - originsOffset);
                 originsBuf = Unpooled.wrappedBuffer(bytes);
+            }
+            else
+            {
+                originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             }
             // read starts and orders
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
@@ -271,10 +276,15 @@ public class StringColumnReader
             int lensOffset = inputBuffer.readInt();
             inputBuffer.resetReaderIndex();
             // read strings
+            if (this.inputBuffer.isDirect())
             {
                 byte[] bytes = new byte[lensOffset];
                 inputBuffer.getBytes(0, bytes, 0, lensOffset);
                 contentBuf = Unpooled.wrappedBuffer(bytes);
+            }
+            else
+            {
+                contentBuf = inputBuffer.slice(0, lensOffset);
             }
             // read lens field
             ByteBuf lensBuf = inputBuffer.slice(lensOffset, inputLength - Integer.BYTES - lensOffset);

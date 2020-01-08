@@ -42,7 +42,7 @@ public final class DynamicIntArray
 
     private final int chunkSize;       // our allocation size
     private int[][] data;              // the real data
-    private int length;                // max set element index +1
+    private int length = 0;                // max set element index +1
     private int initializedChunks = 0; // the number of created chunks
 
     public DynamicIntArray()
@@ -175,15 +175,18 @@ public final class DynamicIntArray
         {
             int[] array = new int[length];
             int i;
-            for (i = 0; i < initializedChunks-1; i++)
+            int numChunks = length / chunkSize;
+            for (i = 0; i < numChunks; i++)
             {
                 System.arraycopy(data[i], 0, array, i*chunkSize, chunkSize);
             }
+
             int tail = length % chunkSize;
-            for (int j = 0, k = i*chunkSize; j < tail; ++j, ++k)
+            if (tail > 0)
             {
-                array[k] = data[i][j];
+                System.arraycopy(data[i], 0, array, i*chunkSize, tail);
             }
+
             return array;
         }
     }
