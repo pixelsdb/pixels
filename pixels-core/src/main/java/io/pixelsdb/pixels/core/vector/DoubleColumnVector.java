@@ -235,6 +235,14 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
+    public void close()
+    {
+        super.close();
+        this.dValues = null;
+        this.vector = null;
+    }
+
+    @Override
     public void ensureSize(int size, boolean preserveData)
     {
         super.ensureSize(size, preserveData);

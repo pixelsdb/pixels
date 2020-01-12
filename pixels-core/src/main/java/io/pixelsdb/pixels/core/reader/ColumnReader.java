@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -30,9 +31,9 @@ import java.nio.ByteBuffer;
  * pixels column reader.
  * Read from file, and decode column values
  *
- * @author guodong
+ * @author guodong, hank
  */
-public abstract class ColumnReader
+public abstract class ColumnReader implements Closeable
 {
     private final TypeDescription type;
 
@@ -95,4 +96,20 @@ public abstract class ColumnReader
     {
         return type;
     }
+
+    /**
+     * Closes this column reader and releases any resources associated
+     * with it. If the column reader is already closed then invoking this
+     * method has no effect.
+     * <p>
+     * <p> As noted in {@link AutoCloseable#close()}, cases where the
+     * close may fail require careful attention. It is strongly advised
+     * to relinquish the underlying resources and to internally
+     * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+     * the {@code IOException}.
+     *
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    abstract public void close() throws IOException;
 }

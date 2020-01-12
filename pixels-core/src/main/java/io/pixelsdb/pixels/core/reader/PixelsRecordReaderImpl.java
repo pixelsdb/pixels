@@ -752,7 +752,7 @@ public class PixelsRecordReaderImpl
      * Cleanup and release resources
      */
     @Override
-    public void close()
+    public void close() throws IOException
     {
         diskReadBytes = 0L;
         cacheReadBytes = 0L;
@@ -762,6 +762,38 @@ public class PixelsRecordReaderImpl
             for (int i = 0; i < chunkBuffers.length; i++)
             {
                 chunkBuffers[i] = null;
+            }
+        }
+        if (readers != null)
+        {
+            for (int i = 0; i < readers.length; ++i)
+            {
+                try
+                {
+                    if (readers[i] != null)
+                    {
+                        readers[i].close();
+                    }
+                } catch (IOException e)
+                {
+                    logger.error("Failed to close column reader.", e);
+                    throw e;
+                } finally
+                {
+                    readers[i] = null;
+                }
+            }
+        }
+        if (resultRowBatch != null)
+        {
+            resultRowBatch.close();
+            resultRowBatch = null;
+        }
+        if (rowGroupFooters != null)
+        {
+            for (int i = 0; i < rowGroupFooters.length; ++i)
+            {
+                rowGroupFooters[i] = null;
             }
         }
         // write out read performance metrics

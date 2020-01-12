@@ -149,6 +149,13 @@ public class ByteColumnVector extends ColumnVector
     }
 
     @Override
+    public void close()
+    {
+        super.close();
+        this.vector = null;
+    }
+
+    @Override
     public void ensureSize(int size, boolean preserveData)
     {
         super.ensureSize(size, preserveData);

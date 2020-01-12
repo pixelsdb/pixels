@@ -28,7 +28,7 @@ package io.pixelsdb.pixels.core.vector;
  * The major fields are public by design to allow fast and convenient
  * access by the vectorized query execution code.
  */
-public class VectorizedRowBatch
+public class VectorizedRowBatch implements AutoCloseable
 {
     public int numCols;           // number of columns
     public ColumnVector[] cols;   // a vector for each column
@@ -234,6 +234,27 @@ public class VectorizedRowBatch
             {
                 cols[i].ensureSize(rows, false);
             }
+        }
+    }
+
+    @Override
+    public void close()
+    {
+        selectedInUse = false;
+        size = 0;
+        endOfFile = false;
+        this.projectedColumns = null;
+        this.selected = null;
+        if (this.cols != null)
+        {
+            for (ColumnVector vc : cols)
+            {
+                if (vc != null)
+                {
+                    vc.close();
+                }
+            }
+            this.cols = null;
         }
     }
 }

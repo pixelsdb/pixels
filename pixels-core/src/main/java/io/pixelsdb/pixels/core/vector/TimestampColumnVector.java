@@ -493,4 +493,12 @@ public class TimestampColumnVector extends ColumnVector
             }
         }
     }
+
+    @Override
+    public void close()
+    {
+        super.close();
+        this.nanos = null;
+        this.time = null;
+    }
 }

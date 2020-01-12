@@ -261,4 +261,11 @@ public class LongColumnVector extends ColumnVector
             }
         }
     }
+
+    @Override
+    public void close()
+    {
+        super.close();
+        this.vector = null;
+    }
 }
