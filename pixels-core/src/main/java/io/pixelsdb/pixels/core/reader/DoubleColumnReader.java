@@ -22,10 +22,10 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
-import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -35,7 +35,7 @@ import java.nio.ByteOrder;
 public class DoubleColumnReader
         extends ColumnReader
 {
-    private final EncodingUtils encodingUtils;
+    // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
     private byte[] isNull = new byte[8];
     private int isNullOffset = 0;
@@ -45,7 +45,27 @@ public class DoubleColumnReader
     DoubleColumnReader(TypeDescription type)
     {
         super(type);
-        this.encodingUtils = new EncodingUtils();
+        // this.encodingUtils = new EncodingUtils();
+    }
+
+    /**
+     * Closes this column reader and releases any resources associated
+     * with it. If the column reader is already closed then invoking this
+     * method has no effect.
+     * <p>
+     * <p> As noted in {@link AutoCloseable#close()}, cases where the
+     * close may fail require careful attention. It is strongly advised
+     * to relinquish the underlying resources and to internally
+     * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+     * the {@code IOException}.
+     *
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public void close() throws IOException
+    {
+        this.inputBuffer = null;
+        this.isNull = null;
     }
 
     /**

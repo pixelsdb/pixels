@@ -599,4 +599,22 @@ public class BinaryColumnVector extends ColumnVector
             }
         }
     }
+
+    @Override
+    public void close()
+    {
+        super.close();
+        this.start = null;
+        this.lens = null;
+        this.buffer = null;
+        this.smallBuffer = null;
+        if (this.vector != null)
+        {
+            for (int i = 0; i < this.vector.length; ++i)
+            {
+                this.vector[i] = null;
+            }
+            this.vector = null;
+        }
+    }
 }

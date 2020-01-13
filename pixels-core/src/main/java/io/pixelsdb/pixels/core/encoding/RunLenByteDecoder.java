@@ -34,6 +34,11 @@ public class RunLenByteDecoder
         return false;
     }
 
+    @Override
+    public void close()
+    {
+    }
+
     public byte next()
     {
         return (byte) 1;

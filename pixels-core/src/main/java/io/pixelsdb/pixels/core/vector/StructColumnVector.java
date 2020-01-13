@@ -144,6 +144,20 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
+    public void close()
+    {
+        super.close();
+        if (this.fields != null)
+        {
+            for (ColumnVector field : fields)
+            {
+                field.close();
+            }
+            this.fields = null;
+        }
+    }
+
+    @Override
     public void init()
     {
         super.init();

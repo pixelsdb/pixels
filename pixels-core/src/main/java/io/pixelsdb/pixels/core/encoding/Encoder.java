@@ -26,7 +26,7 @@ import java.io.IOException;
 /**
  * @author guodong
  */
-public abstract class Encoder
+public abstract class Encoder implements AutoCloseable
 {
     public byte[] encode(boolean[] values)
     {
@@ -92,8 +92,6 @@ public abstract class Encoder
         throw new PixelsEncodingException("Encoding double values is not supported");
     }
 
-    public void close()
-            throws IOException
-    {
-    }
+    abstract public void close()
+            throws IOException;
 }

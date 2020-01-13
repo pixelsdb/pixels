@@ -81,6 +81,15 @@ public class RunLenIntDecoder
         return used != numLiterals || inputStream.available() > 0;
     }
 
+    @Override
+    public void close() throws IOException
+    {
+        if (inputStream != null)
+        {
+            inputStream.close();
+        }
+    }
+
     private void readValues()
             throws IOException
     {

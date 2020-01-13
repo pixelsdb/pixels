@@ -34,7 +34,7 @@ import java.util.Arrays;
  * The fields are public by design since this is a performance-critical
  * structure that is used in the inner loop of query execution.
  */
-public abstract class ColumnVector
+public abstract class ColumnVector implements AutoCloseable
 {
     int length;
     int writeIndex = 0;
@@ -321,4 +321,14 @@ public abstract class ColumnVector
      */
     public abstract void stringifyValue(StringBuilder buffer,
                                         int row);
+    @Override
+    public void close()
+    {
+        isNull = null;
+        noNulls = true;
+        isRepeating = false;
+        preFlattenNoNulls = true;
+        preFlattenIsRepeating = false;
+        writeIndex = 0;
+    }
 }

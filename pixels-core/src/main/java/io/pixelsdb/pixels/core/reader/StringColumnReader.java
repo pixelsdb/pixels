@@ -92,6 +92,40 @@ public class StringColumnReader
     }
 
     /**
+     * Closes this column reader and releases any resources associated
+     * with it. If the column reader is already closed then invoking this
+     * method has no effect.
+     * <p>
+     * <p> As noted in {@link AutoCloseable#close()}, cases where the
+     * close may fail require careful attention. It is strongly advised
+     * to relinquish the underlying resources and to internally
+     * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+     * the {@code IOException}.
+     *
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public void close() throws IOException
+    {
+        this.contentBuf = null;
+        this.inputBuffer = null;
+        this.originsBuf = null;
+        this.orders = null;
+        this.starts = null;
+        this.isNull = null;
+        if (this.contentDecoder != null)
+        {
+            this.contentDecoder.close();
+            this.contentDecoder = null;
+        }
+        if (this.lensDecoder != null)
+        {
+            this.lensDecoder.close();
+            this.lensDecoder = null;
+        }
+    }
+
+    /**
      * Read values from input buffer.
      *
      * @param input    input buffer

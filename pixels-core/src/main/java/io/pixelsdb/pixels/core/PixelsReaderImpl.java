@@ -449,5 +449,9 @@ public class PixelsReaderImpl
             recordReader.close();
         }
         this.physicalFSReader.close();
+        /* no need to close the pixelsCacheReader, because it usually maintained
+           as a global singleton instance and shared across different PixelsReaders.
+         */
+
     }
 }

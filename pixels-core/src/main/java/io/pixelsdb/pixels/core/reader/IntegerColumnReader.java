@@ -50,6 +50,32 @@ public class IntegerColumnReader
     }
 
     /**
+     * Closes this column reader and releases any resources associated
+     * with it. If the column reader is already closed then invoking this
+     * method has no effect.
+     * <p>
+     * <p> As noted in {@link AutoCloseable#close()}, cases where the
+     * close may fail require careful attention. It is strongly advised
+     * to relinquish the underlying resources and to internally
+     * <em>mark</em> the {@code Closeable} as closed, prior to throwing
+     * the {@code IOException}.
+     *
+     * @throws IOException if an I/O error occurs
+     */
+    @Override
+    public void close() throws IOException
+    {
+        if (this.decoder != null)
+        {
+            // inputStream is closed inside decoder.close();
+            this.decoder.close();
+            this.decoder = null;
+        }
+        this.inputBuffer = null;
+        this.isNull = null;
+    }
+
+    /**
      * Read input buffer.
      *
      * @param input    input buffer
