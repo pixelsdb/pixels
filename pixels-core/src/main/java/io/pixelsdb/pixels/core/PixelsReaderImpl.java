@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
@@ -67,6 +68,14 @@ public class PixelsReaderImpl
     private final PixelsCacheReader pixelsCacheReader;
     private final PixelsFooterCache pixelsFooterCache;
     private final Random random;
+
+    private static final double GCThreshold;
+
+    static
+    {
+        String thresholdStr = ConfigFactory.Instance().getProperty("pixels.gc.threshold");
+        GCThreshold = Double.parseDouble(thresholdStr);
+    }
 
     private PixelsReaderImpl(TypeDescription fileSchema,
                              PhysicalFSReader physicalFSReader,
@@ -449,6 +458,15 @@ public class PixelsReaderImpl
             recordReader.close();
         }
         this.physicalFSReader.close();
+        double free = Runtime.getRuntime().freeMemory();
+        double total = Runtime.getRuntime().totalMemory();
+        if (free / total < GCThreshold)
+        {
+            /* By calling gc(), we try to do gc on time when the query is finished.
+               It would be very expensive to do gc when executing small queries.
+            */
+            Runtime.getRuntime().gc();
+        }
         /* no need to close the pixelsCacheReader, because it usually maintained
            as a global singleton instance and shared across different PixelsReaders.
          */
