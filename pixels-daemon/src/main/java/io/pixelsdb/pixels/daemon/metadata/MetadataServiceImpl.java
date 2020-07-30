@@ -19,31 +19,16 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
-import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.SchemaDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.TableDao;
-import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.daemon.metadata.dao.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_ADD_COUMNS_FAILED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_ADD_LAYOUT_FAILED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_COLUMN_NOT_FOUND;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_DELETE_SCHEMA_FAILED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_DELETE_TABLE_FAILED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_DUPLICATED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_SCHEMA_EXIST;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_SCHEMA_NOT_FOUND;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_TABLE_EXIST;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_TABLE_NOT_FOUND;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_UPDATE_COUMN_FAILED;
-import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_UPDATE_LAYOUT_FAILED;
+import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
 /**
  * Created at: 19-4-16
@@ -53,10 +38,10 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 {
     private static Logger log = LogManager.getLogger(MetadataServiceImpl.class);
 
-    private SchemaDao schemaDao = new SchemaDao();
-    private TableDao tableDao = new TableDao();
-    private LayoutDao layoutDao = new LayoutDao();
-    private ColumnDao columnDao = new ColumnDao();
+    private SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
+    private TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
+    private ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
+    private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
 
     public MetadataServiceImpl () { }
 
