@@ -142,6 +142,25 @@ public class EtcdUtil
     }
 
     /**
+     * put key-value into etcd.
+     *
+     * @param key
+     * @param value
+     */
+    public void putKeyValue(String key, byte[] value)
+    {
+        CompletableFuture<PutResponse> future = client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromBytes(value));
+        try
+        {
+            future.get();
+        }
+        catch (InterruptedException | ExecutionException e)
+        {
+            logger.error("error when put key-value into etcd.", e);
+        }
+    }
+
+    /**
      * put key-value into etcd with an expire time (by etcd lease).
      *
      * @param key

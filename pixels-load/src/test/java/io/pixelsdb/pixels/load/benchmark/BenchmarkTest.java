@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.utils.FileUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.ColumnDao;
+import io.pixelsdb.pixels.daemon.metadata.dao.DaoFactory;
 import io.pixelsdb.pixels.daemon.metadata.dao.LayoutDao;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -195,10 +196,10 @@ public class BenchmarkTest
     public void testGetSchemaByOrder()
     {
         MetadataProto.Table table = MetadataProto.Table.newBuilder().setId(6).build();
-        ColumnDao columnDao = new ColumnDao();
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
         List<MetadataProto.Column> columnList = columnDao.getByTable(table);
         System.out.println(columnList.size());
-        LayoutDao layoutDao = new LayoutDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
         MetadataProto.Layout layout = layoutDao.getById(9);
         System.out.println(layout.getOrder());
         Order columnOrder = JSON.parseObject(layout.getOrder(), Order.class);
@@ -257,13 +258,13 @@ public class BenchmarkTest
     {
         String tableName = "test_105";
         String oldPath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
-        ColumnDao columnDao = new ColumnDao();
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
         MetadataProto.Table table = MetadataProto.Table.newBuilder().setId(6).build();
 
         Order columnOrder = columnDao.getOrderByTable(table);
         String order = JSON.toJSONString(columnOrder);
 
-        LayoutDao layoutDao = new LayoutDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
         MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
                 .setOrderPath(oldPath)
                 .setOrder(order)

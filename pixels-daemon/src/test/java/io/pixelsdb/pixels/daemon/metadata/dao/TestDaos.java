@@ -34,7 +34,7 @@ public class TestDaos
     @Test
     public void testSchema ()
     {
-        SchemaDao schemaDao = new SchemaDao();
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
         MetadataProto.Schema schema = schemaDao.getByName("pixels");
         System.out.println(schema.getId() + ", " + schema.getName() + ", " + schema.getDesc());
     }
@@ -42,7 +42,7 @@ public class TestDaos
     @Test
     public void testTable ()
     {
-        TableDao tableDao = new TableDao();
+        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
         List<MetadataProto.Table> tables = tableDao.getByName("test_105");
         for (MetadataProto.Table table : tables)
         {
@@ -56,10 +56,10 @@ public class TestDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        SchemaDao schemaDao = new SchemaDao();
-        TableDao tableDao = new TableDao();
-        ColumnDao columnDao = new ColumnDao();
-        LayoutDao layoutDao = new LayoutDao();
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
+        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -83,10 +83,10 @@ public class TestDaos
         String schemaName = "pixels";
         String tableName = "test_1187";
 
-        SchemaDao schemaDao = new SchemaDao();
-        TableDao tableDao = new TableDao();
-        ColumnDao columnDao = new ColumnDao();
-        LayoutDao layoutDao = new LayoutDao();
+        SchemaDao schemaDao = DaoFactory.Instance().getSchemaDao("rdb");
+        TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
+        ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
@@ -128,7 +128,7 @@ public class TestDaos
             throws IOException
     {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/Users/Jelly/Desktop/dbiir10-splits")));
-        LayoutDao layoutDao = new LayoutDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
         Layout layout = new Layout(layoutDao.getById(21));
         Order order = layout.getOrderObject();
         List<String> columnOrder = order.getColumnOrder();
@@ -147,7 +147,7 @@ public class TestDaos
     {
         BufferedReader reader = new BufferedReader(new FileReader(new File("/Users/Jelly/Desktop/splits")));
         String splits = reader.readLine();
-        LayoutDao layoutDao = new LayoutDao();
+        LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
         layoutDao.update(layoutDao.getById(10).toBuilder().setSplits(splits).build());
         reader.close();
     }
