@@ -81,7 +81,7 @@
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
         <dep.apache-httpclient.version>4.5.3</dep.apache-httpclient.version>
         <dep.grpc.version>1.9.1</dep.grpc.version>
-        <dep.log4j.version>2.11.1</dep.log4j.version>
+        <dep.log4j.version>2.13.3</dep.log4j.version>
         <dep.junit.version>4.12</dep.junit.version>
         <dep.junit.platform.version>1.0.0-M6</dep.junit.platform.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
