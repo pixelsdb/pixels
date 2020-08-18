@@ -38,6 +38,21 @@ public class TestMemFile
     String path = "/dev/shm/pixels.cache";
 
     @Test
+    public void testEndian () throws Exception
+    {
+        write(ByteOrder.BIG_ENDIAN, 0xf0ff00008fff0000L);
+        MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
+        byte[] bytes = new byte[8];
+        mem.getBytes(0, bytes, 0, 8);
+        for (int i = 0; i < 8; ++i)
+        {
+            System.out.println(bytes[i]);
+        }
+        long v = mem.getLongVolatile(0);
+        System.out.println(v);
+    }
+
+    @Test
     public void testOpenMemFile() throws Exception
     {
         long start = System.nanoTime();
@@ -110,23 +125,24 @@ public class TestMemFile
     public void test()
             throws Exception
     {
-        write();
+        write(ByteOrder.BIG_ENDIAN, 0xffff0000ffff0000L);
         read();
     }
 
-    public void write()
+    public void write(ByteOrder byteOrder, long repeatLong)
             throws Exception
     {
         new File(path);
 
         MemoryMappedFile mem = new MemoryMappedFile(path, 1024L * 1024L * 10L);
 
-        ByteBuffer buffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
-        buffer.putLong(1);
+        ByteBuffer buffer = ByteBuffer.allocate(8).order(byteOrder);
+        buffer.putLong(repeatLong);
         byte[] bytes = buffer.array();
         for (int i = 0; i < 1024; ++i)
         {
-            mem.putBytes(8 * i, new byte[1]);
+            //mem.putBytes(8 * i, bytes);
+            mem.putLong(8 * i, repeatLong);
         }
     }
 

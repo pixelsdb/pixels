@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.cache;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.directory.api.util.Strings;
 
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -37,23 +38,38 @@ import java.nio.charset.StandardCharsets;
  */
 public class PixelsCacheUtil
 {
-    public static final int MAX_READER_COUNT = 2 ^ 31 - 1;
+    public static final int MAX_READER_COUNT = 2 ^ 15 - 1;
+
+    public static final int RW_MASK;
+    public static final int READER_COUNT_MASK;
+    public static final int READER_COUNT_INC;
+    /**
+     * We only use the first 12 bytes in the index, but we start radix tree
+     * from offset 16 for memory alignment.
+     */
     public static final int INDEX_RADIX_OFFSET = 16;
 
-    public enum RWFlag
+    static
     {
-        READ((short) 0), WRITE((short) 1);
-
-        private final short id;
-
-        RWFlag(short id)
+        if (MemoryMappedFile.getOrder() == ByteOrder.LITTLE_ENDIAN)
         {
-            this.id = id;
+            /**
+             * If the index file is in little-endian, rw flag is in the lowest
+             * two bytes of v, while reader count is in the highest two bytes.
+             */
+            RW_MASK = 0x0000ffff;
+            READER_COUNT_MASK = 0xffff0000;
+            READER_COUNT_INC = 0x00010000;
         }
-
-        public short getId()
+        else
         {
-            return id;
+            /**
+             * If the index file is in big-endian, rw flag is in the highest
+             * two bytes of v, while reader count is in the lowest two bytes.
+             */
+            RW_MASK = 0xffff0000;
+            READER_COUNT_MASK = 0x0000ffff;
+            READER_COUNT_INC = 0x00000001;
         }
     }
 
@@ -78,9 +94,8 @@ public class PixelsCacheUtil
     {
         // init index
         setMagic(indexFile);
-        setIndexRW(indexFile, RWFlag.READ.getId());
+        clearIndexRWAndCount(indexFile);
         setIndexVersion(indexFile, 0);
-        setIndexReaderCount(indexFile, 0);
         // init cache
         setMagic(cacheFile);
         setCacheStatus(cacheFile, CacheStatus.EMPTY.getId());
@@ -105,54 +120,93 @@ public class PixelsCacheUtil
         return magic.equalsIgnoreCase(Constants.MAGIC);
     }
 
-    public static void setIndexRW(MemoryMappedFile indexFile, short rwFlag)
+    private static void clearIndexRWAndCount(MemoryMappedFile indexFile)
     {
-        indexFile.putShortVolatile(6, rwFlag);
+        indexFile.putIntVolatile(6, 0);
     }
 
-    public static short getIndexRW(MemoryMappedFile indexFile)
+    public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
-        return indexFile.getShortVolatile(6);
+        // Set the rw flag.
+        indexFile.putShortVolatile(6, (short) 1);
+        final int maxWaitMs = 10000; //  wait for the reader for 10s.
+        final int sleepMs = 10;
+        int waitMs = 0;
+        while (indexFile.getShortVolatile(8) > 0)
+        {
+            /**
+             * Wait for the existing readers to finish.
+             * As rw flag has been set, there will be no new readers,
+             * the existing readers should finished cache reading in
+             * 10s (10000ms). If the reader can not finish cache reading
+             * in 10s, it is considered as failed.
+             */
+            Thread.sleep(sleepMs);
+            waitMs += sleepMs;
+            if (waitMs >= maxWaitMs)
+            {
+                // clear reader count to continue writing.
+                indexFile.putShortVolatile(8, (short) 0);
+                break;
+            }
+        }
+    }
+
+    public static void endIndexWrite(MemoryMappedFile indexFile)
+    {
+        indexFile.putShortVolatile(6, (short) 0);
+    }
+
+    public static void beginIndexRead(MemoryMappedFile indexFile) throws InterruptedException
+    {
+        int v = indexFile.getIntVolatile(6);
+        short readerCount = indexFile.getShortVolatile(8);
+        if (readerCount >= MAX_READER_COUNT)
+        {
+            throw new InterruptedException("Reaches the max concurrent read count.");
+        }
+        while ((v & RW_MASK) > 0 ||
+        // cas ensures that reading rw flag and increasing reader count is atomic.
+        indexFile.compareAndSwapInt(6, v, v+READER_COUNT_INC) == false)
+        {
+            // We failed to get read lock or increase reader count.
+            if ((v & RW_MASK) > 0)
+            {
+                // if there is an existing writer, sleep for 10ms.
+                Thread.sleep(10);
+            }
+            v = indexFile.getIntVolatile(6);
+            readerCount = indexFile.getShortVolatile(8);
+            if (readerCount >= MAX_READER_COUNT)
+            {
+                throw new InterruptedException("Reaches the max concurrent read count.");
+            }
+        }
+    }
+
+    public static void endIndexRead(MemoryMappedFile indexFile)
+    {
+        int v = indexFile.getIntVolatile(6);
+        // if reader count is already <= 0, nothing will be done.
+        while ((v & READER_COUNT_MASK) > 0)
+        {
+            if (indexFile.compareAndSwapInt(6, v, v-READER_COUNT_INC))
+            {
+                // if v is not changed and the reader count is successfully decreased, break.
+                break;
+            }
+            v = indexFile.getIntVolatile(6);
+        }
     }
 
     public static void setIndexVersion(MemoryMappedFile indexFile, int version)
     {
-        indexFile.putIntVolatile(8, version);
+        indexFile.putIntVolatile(10, version);
     }
 
     public static int getIndexVersion(MemoryMappedFile indexFile)
     {
-        return indexFile.getIntVolatile(8);
-    }
-
-    public static void setIndexReaderCount(MemoryMappedFile indexFile, int readerCount)
-    {
-        indexFile.putIntVolatile(12, readerCount);
-    }
-
-    public static int getIndexReaderCount(MemoryMappedFile indexFile)
-    {
-        return indexFile.getIntVolatile(12);
-    }
-
-    public static boolean indexReaderCountIncrement(MemoryMappedFile indexFile)
-    {
-        int count = getIndexReaderCount(indexFile) + 1;
-        if (count <= MAX_READER_COUNT)
-        {
-            return indexFile.compareAndSwapInt(12, count - 1, count);
-        }
-        return false;
-    }
-
-    public static boolean indexReaderCountDecrement(MemoryMappedFile indexFile)
-    {
-        int count = getIndexReaderCount(indexFile) - 1;
-        if (count >= 0)
-        {
-            return indexFile.compareAndSwapInt(12, count + 1, count);
-        }
-        return false;
+        return indexFile.getIntVolatile(10);
     }
 
     public static PixelsRadix getIndexRadix(MemoryMappedFile indexFile)

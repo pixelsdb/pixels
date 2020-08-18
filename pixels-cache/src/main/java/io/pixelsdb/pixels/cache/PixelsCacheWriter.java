@@ -48,7 +48,6 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PixelsCacheWriter
 {
-    private final static short READABLE = 0;
     private final static Logger logger = LogManager.getLogger(PixelsCacheWriter.class);
 
     private final MemoryMappedFile cacheFile;
@@ -238,7 +237,14 @@ public class PixelsCacheWriter
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
         logger.debug("Set index rwFlag as write");
-        PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
+        try
+        {
+            PixelsCacheUtil.beginIndexWrite(indexFile);
+        } catch (InterruptedException e)
+        {
+            logger.error("Failed to get write permission on index.", e);
+        }
+        // TODO: before updating the cache content, we have to wait for the readCount to be set to zero.
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
@@ -292,7 +298,7 @@ public class PixelsCacheWriter
         flushIndex();
         logger.debug("Cache index ends at offset: " + currentIndexOffset);
         // set rwFlag as readable
-        PixelsCacheUtil.setIndexRW(indexFile, READABLE);
+        PixelsCacheUtil.endIndexWrite(indexFile);
         return status;
     }
 

@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -32,8 +35,8 @@ import java.util.List;
 public class PixelsCacheReader
         implements AutoCloseable
 {
-    //    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
-//    private static CacheLogger cacheLogger = new CacheLogger();
+    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+    // private static CacheLogger cacheLogger = new CacheLogger();
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
@@ -111,6 +114,15 @@ public class PixelsCacheReader
         // search index file for columnlet id
         PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
+        // check the rwFlag and increase readCount.
+        try
+        {
+            PixelsCacheUtil.beginIndexRead(indexFile);
+        } catch (InterruptedException e)
+        {
+            logger.error("Failed to get read permission on index.", e);
+        }
+
         ByteBuffer content = null;
         // search cache key
 //        long searchBegin = System.nanoTime();
@@ -134,6 +146,9 @@ public class PixelsCacheReader
                 cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
             }
         }
+
+        PixelsCacheUtil.endIndexRead(indexFile);
+
 //        long readEnd = System.nanoTime();
 //        cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
