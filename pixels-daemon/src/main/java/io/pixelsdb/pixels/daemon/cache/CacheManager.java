@@ -146,7 +146,7 @@ public class CacheManager
                 // if cache file exists already. we need check local cache version with global cache version stored in etcd
                 if (localCacheVersion < globalCacheVersion) {
                     // if global version is not consistent with the local one. update local cache.
-                    update(globalCacheVersion);
+                    bulkLoad(globalCacheVersion);
                 }
             }
             // register a datanode
@@ -165,7 +165,7 @@ public class CacheManager
         }
     }
 
-    private void update(int version)
+    private void bulkLoad(int version)
             throws MetadataException
     {
         Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
@@ -205,7 +205,8 @@ public class CacheManager
                         logger.debug("Cache version update detected, new global version is " + version);
                         if (version > localCacheVersion) {
                             logger.debug("New global version is greater than the local version, update the local cache");
-                            update(version);
+                            // TODO: here, we should use a two-phrase cache update protocol, but not the bulk load.
+                            bulkLoad(version);
                         }
                     }
                     else if (event.getEventType() == WatchEvent.EventType.DELETE){
