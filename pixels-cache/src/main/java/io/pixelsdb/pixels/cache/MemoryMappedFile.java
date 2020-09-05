@@ -39,6 +39,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
 /**
@@ -55,6 +56,7 @@ public class MemoryMappedFile
     private static final Unsafe unsafe;
     private static final Method mmap;
     private static final Method unmmap;
+    private static final ByteOrder order;
     // this is from sun.nio.ch.Util
     private static volatile Constructor<?> directByteBufferRConstructor = null;
     private static final int BYTE_ARRAY_OFFSET;
@@ -72,6 +74,7 @@ public class MemoryMappedFile
             mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
             unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
+            order = ByteOrder.nativeOrder();
         }
         catch (Exception e)
         {
@@ -156,6 +159,11 @@ public class MemoryMappedFile
             throws Exception
     {
         unmmap.invoke(null, addr, this.size);
+    }
+
+    public static ByteOrder getOrder()
+    {
+        return order;
     }
 
     /**
@@ -372,6 +380,11 @@ public class MemoryMappedFile
     public long getAndAddLong(long pos, long delta)
     {
         return unsafe.getAndAddLong(null, pos + addr, delta);
+    }
+
+    public long getAndAddInt(long pos, int delta)
+    {
+        return unsafe.getAndAddInt(null, pos + addr, delta);
     }
 
     public long getSize()

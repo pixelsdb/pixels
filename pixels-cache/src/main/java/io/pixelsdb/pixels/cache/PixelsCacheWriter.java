@@ -48,7 +48,6 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PixelsCacheWriter
 {
-    private final static short READABLE = 0;
     private final static Logger logger = LogManager.getLogger(PixelsCacheWriter.class);
 
     private final MemoryMappedFile cacheFile;
@@ -180,6 +179,10 @@ public class PixelsCacheWriter
     }
 
     /**
+     * <p>
+     * This function is only used to bulk load all the cache content at one time.
+     * Readers will be blocked until this function is funished.
+     * </p>
      * Return code:
      * -1: update failed.
      * 0: no updates are needed or update successfully.
@@ -199,7 +202,7 @@ public class PixelsCacheWriter
             }
             String fileStr = keyValue.getValue().toStringUtf8();
             String[] files = fileStr.split(";");
-            return internalUpdate(version, layout, files);
+            return internalUpdateAll(version, layout, files);
         }
         catch (IOException | FSException e)
         {
@@ -228,7 +231,7 @@ public class PixelsCacheWriter
         flushIndex();
     }
 
-    private int internalUpdate(int version, Layout layout, String[] files)
+    private int internalUpdateAll(int version, Layout layout, String[] files)
             throws IOException, FSException
     {
         int status = 0;
@@ -238,7 +241,19 @@ public class PixelsCacheWriter
         List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
         // set rwFlag as write
         logger.debug("Set index rwFlag as write");
-        PixelsCacheUtil.setIndexRW(indexFile, PixelsCacheUtil.RWFlag.WRITE.getId());
+        try
+        {
+            /**
+             * Before updating the cache content, in beginIndexWrite:
+             * 1. Set rwFlag to block subsequent readers.
+             * 1. Wait for the existing readers to finish, i.e.
+             *    wait for the readCount to be cleared (become zero).
+             */
+            PixelsCacheUtil.beginIndexWrite(indexFile);
+        } catch (InterruptedException e)
+        {
+            logger.error("Failed to get write permission on index.", e);
+        }
         // update cache content
         radix.removeAll();
         long cacheOffset = 0L;
@@ -292,7 +307,7 @@ public class PixelsCacheWriter
         flushIndex();
         logger.debug("Cache index ends at offset: " + currentIndexOffset);
         // set rwFlag as readable
-        PixelsCacheUtil.setIndexRW(indexFile, READABLE);
+        PixelsCacheUtil.endIndexWrite(indexFile);
         return status;
     }
 
