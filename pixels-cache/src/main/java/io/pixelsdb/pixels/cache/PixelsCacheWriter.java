@@ -376,6 +376,15 @@ public class PixelsCacheWriter
         return status;
     }
 
+    /**
+     * This method needs further tests.
+     * @param version
+     * @param layout
+     * @param files
+     * @return
+     * @throws IOException
+     * @throws FSException
+     */
     private int internalUpdateIncremental(int version, Layout layout, String[] files)
             throws IOException, FSException
     {
