@@ -215,6 +215,7 @@ public class CacheManager
                         logger.debug("Cache version update detected, new global version is " + version);
                         if (version > localCacheVersion) {
                             logger.debug("New global version is greater than the local version, update the local cache");
+                            // TODO: here, we should use a two-phrase cache update protocol, but not the bulk load.
                             update(version);
                         }
                     }
