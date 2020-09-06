@@ -305,6 +305,7 @@ public class PixelsCacheWriter
             logger.error("Failed to get write permission on index.", e);
             return status;
         }
+
         // update cache content
         if (cachedColumnlets == null)
         {
