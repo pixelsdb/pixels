@@ -31,6 +31,7 @@ import javax.annotation.concurrent.NotThreadSafe;
  * the array will shrink its capacity automatically.
  *
  * @author guodong
+ * @author hank
  */
 
 @NotThreadSafe
@@ -165,6 +166,13 @@ public class DynamicArray<T>
      */
     public void remove(int index)
     {
+    }
+
+    public void removeAll ()
+    {
+        this.size = 0;
+        this.chunkNum = DEFAULT_CHUNK_NUM;
+        this.content = new Object[chunkNum][];
     }
 
     /**

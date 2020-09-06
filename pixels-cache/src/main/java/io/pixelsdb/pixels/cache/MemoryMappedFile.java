@@ -48,6 +48,8 @@ import java.nio.channels.FileChannel;
  * It can read and write memory mapped file larger than 2GB.
  * When the backing file is located under /dev/shm/, it works as a shared memory,
  * and the random read/write latency is around 100ns.
+ *
+ * @author hank
  */
 
 @SuppressWarnings("restriction")
@@ -365,6 +367,11 @@ public class MemoryMappedFile
     public void setBytes(long pos, byte[] data, int offset, int length)
     {
         unsafe.copyMemory(data, BYTE_ARRAY_OFFSET + offset, null, pos + addr, length);
+    }
+
+    public void copyMemory(long srcPos, long destPos, long length)
+    {
+        unsafe.copyMemory(srcPos, destPos, length);
     }
 
     public boolean compareAndSwapInt(long pos, int expected, int value)
