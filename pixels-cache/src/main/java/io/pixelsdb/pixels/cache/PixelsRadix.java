@@ -31,6 +31,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * a radix tree implementation
  *
  * @author guodong
+ * @author hank
  */
 public class PixelsRadix
 {
@@ -334,7 +335,13 @@ public class PixelsRadix
 
     public void removeAll()
     {
-        // todo remove all
+        if (this.nodes.size() > 0 && this.getRoot().getSize() > 0)
+        {
+            this.nodes.removeAll();
+            RadixNode root = new RadixNode();
+            root.setEdge(new byte[0]);
+            nodes.add(root);                 // add root node
+        }
     }
 
     private SearchResult searchInternal(ByteBuffer keyBuffer)

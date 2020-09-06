@@ -137,16 +137,18 @@ public class CacheManager
                                      .setHostName(hostName)
                                      .build();
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+            // If the cache is new created using start-vm.sh script, localCacheVersion would be zero.
             localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
             logger.debug("Local cache version: " + localCacheVersion);
+            // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
             if (null != globalCacheVersionKV) {
                 int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toStringUtf8());
                 logger.debug("Current global cache version: " + globalCacheVersion);
                 // if cache file exists already. we need check local cache version with global cache version stored in etcd
-                if (localCacheVersion < globalCacheVersion) {
-                    // if global version is not consistent with the local one. update local cache.
-                    bulkLoad(globalCacheVersion);
+                if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion) {
+                    // If global version is ahead the local one, update local cache.
+                    update(globalCacheVersion);
                 }
             }
             // register a datanode
@@ -165,7 +167,7 @@ public class CacheManager
         }
     }
 
-    private void bulkLoad(int version)
+    private void update(int version)
             throws MetadataException
     {
         Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
@@ -174,7 +176,15 @@ public class CacheManager
             cacheStatus.set(CacheNodeStatus.UPDATING.statusCode);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             // update cache content
-            int status = cacheWriter.updateAll(version, matchedLayout);
+            int status = 0;
+            if (cacheWriter.isCacheEmpty() == true)
+            {
+                status = cacheWriter.updateAll(version, matchedLayout);
+            }
+            else
+            {
+                status = cacheWriter.updateIncremental(version, matchedLayout);
+            }
             cacheStatus.set(status);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             localCacheVersion = version;
@@ -205,8 +215,7 @@ public class CacheManager
                         logger.debug("Cache version update detected, new global version is " + version);
                         if (version > localCacheVersion) {
                             logger.debug("New global version is greater than the local version, update the local cache");
-                            // TODO: here, we should use a two-phrase cache update protocol, but not the bulk load.
-                            bulkLoad(version);
+                            update(version);
                         }
                     }
                     else if (event.getEventType() == WatchEvent.EventType.DELETE){

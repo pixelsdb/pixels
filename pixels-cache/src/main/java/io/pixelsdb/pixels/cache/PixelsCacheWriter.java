@@ -36,7 +36,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.List;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -53,14 +53,18 @@ public class PixelsCacheWriter
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final FileSystem fs;
-    private final PixelsRadix radix;
     private final EtcdUtil etcdUtil;
     private final String host;
+    /**
+     * Call beginIndexWrite() before changing radix, which is shared by all threads.
+     */
+    private PixelsRadix radix;
     private long currentIndexOffset;
     private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
     private long cacheOffset = 0L;  // this is used in the write() method.
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
+    private Set<String> cachedColumnlets = null;
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -181,7 +185,7 @@ public class PixelsCacheWriter
     /**
      * <p>
      * This function is only used to bulk load all the cache content at one time.
-     * Readers will be blocked until this function is funished.
+     * Readers will be blocked until this function is finished.
      * </p>
      * Return code:
      * -1: update failed.
@@ -203,6 +207,51 @@ public class PixelsCacheWriter
             String fileStr = keyValue.getValue().toStringUtf8();
             String[] files = fileStr.split(";");
             return internalUpdateAll(version, layout, files);
+        }
+        catch (IOException | FSException e)
+        {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    public boolean isCacheEmpty ()
+    {
+        /**
+         * There will be not concurrent update on cache,
+         * thus we don't have to synchronize the access to cachedColumnlets.
+         */
+        return cachedColumnlets == null || cachedColumnlets.isEmpty();
+    }
+
+    /**
+     * <p>
+     * This function is used to update the cache content incrementally,
+     * using the three-phase update protocol. Which means readers are only
+     * blocked during the first (compaction) and the third (accomplishing)
+     * phase. While in the second (loading) also most expensive phase, readers
+     * are not blocked.
+     * </p>
+     * Return code:
+     * -1: update failed.
+     * 0: no updates are needed or update successfully.
+     * 2: update size exceeds the limit.
+     */
+    public int updateIncremental (int version, Layout layout)
+    {
+        try
+        {
+            // get the caching file list
+            String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
+            KeyValue keyValue = etcdUtil.getKeyValue(key);
+            if (keyValue == null)
+            {
+                logger.debug("Found no allocated files. No updates are needed. " + key);
+                return 0;
+            }
+            String fileStr = keyValue.getValue().toStringUtf8();
+            String[] files = fileStr.split(";");
+            return internalUpdateIncremental(version, layout, files);
         }
         catch (IOException | FSException e)
         {
@@ -246,17 +295,28 @@ public class PixelsCacheWriter
             /**
              * Before updating the cache content, in beginIndexWrite:
              * 1. Set rwFlag to block subsequent readers.
-             * 1. Wait for the existing readers to finish, i.e.
+             * 2. Wait for the existing readers to finish, i.e.
              *    wait for the readCount to be cleared (become zero).
              */
             PixelsCacheUtil.beginIndexWrite(indexFile);
         } catch (InterruptedException e)
         {
+            status = -1;
             logger.error("Failed to get write permission on index.", e);
+            return status;
         }
+
         // update cache content
+        if (cachedColumnlets == null)
+        {
+            cachedColumnlets = new HashSet<>(cacheColumnletOrders.size());
+        }
+        else
+        {
+            cachedColumnlets.clear();
+        }
         radix.removeAll();
-        long cacheOffset = 0L;
+        long currCacheOffset = 0L;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
         outer_loop:
@@ -282,32 +342,232 @@ public class PixelsCacheWriter
                         rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
                 physicalLen = (int) chunkIndex.getChunkLength();
                 physicalOffset = chunkIndex.getChunkOffset();
-                if (cacheOffset + physicalLen >= cacheFile.getSize())
+                if (currCacheOffset + physicalLen >= cacheFile.getSize())
                 {
-                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + cacheOffset);
+                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
                     status = 2;
                     break outer_loop;
                 }
                 else
                 {
                     radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
-                            new PixelsCacheIdx(cacheOffset, physicalLen));
+                            new PixelsCacheIdx(currCacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.putBytes(cacheOffset, columnlet);
+                    cacheFile.putBytes(currCacheOffset, columnlet);
                     logger.debug(
-                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + cacheOffset + ", length: " + columnlet.length);
+                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                     cacheOffset += physicalLen;
                 }
             }
         }
-        logger.debug("Cache writer ends at offset: " + cacheOffset);
-        // update cache version
-        PixelsCacheUtil.setIndexVersion(indexFile, version);
+        for (String cachedColumnlet : cacheColumnletOrders)
+        {
+            cachedColumnlets.add(cachedColumnlet);
+        }
+        logger.debug("Cache writer ends at offset: " + currCacheOffset);
         // flush index
         flushIndex();
-        logger.debug("Cache index ends at offset: " + currentIndexOffset);
+        // update cache version
+        PixelsCacheUtil.setIndexVersion(indexFile, version);
         // set rwFlag as readable
         PixelsCacheUtil.endIndexWrite(indexFile);
+        logger.debug("Cache index ends at offset: " + currentIndexOffset);
+
+        return status;
+    }
+
+    /**
+     * This method needs further tests.
+     * @param version
+     * @param layout
+     * @param files
+     * @return
+     * @throws IOException
+     * @throws FSException
+     */
+    private int internalUpdateIncremental(int version, Layout layout, String[] files)
+            throws IOException, FSException
+    {
+        int status = 0;
+        /**
+         * Get the new caching layout.
+         */
+        Compact compact = layout.getCompactObject();
+        int cacheBorder = compact.getCacheBorder();
+        List<String> nextVersionCached = compact.getColumnletOrder().subList(0, cacheBorder);
+        /**
+         * Prepare structures for the survived and new coming cache elements.
+         */
+        List<String> survivedColumnlets = new ArrayList<>();
+        List<String> newCachedColumnlets = new ArrayList<>();
+        for (String columnlet : nextVersionCached)
+        {
+            if (this.cachedColumnlets.contains(columnlet))
+            {
+                survivedColumnlets.add(columnlet);
+            }
+            else
+            {
+                newCachedColumnlets.add(columnlet);
+            }
+        }
+        this.cachedColumnlets.clear();
+        PixelsRadix oldRadix = radix;
+        List<PixelsCacheKeyIdx> survivedIdxes = new ArrayList<>(survivedColumnlets.size()*files.length);
+        for (String file : files)
+        {
+            PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            // TODO: in case of block id was changed, the survived columnlets in this block can not survive in the cache update.
+            // This problem only affects the efficiency, but it is better to resolve it.
+            long blockId = physicalReader.getCurrentBlockId();
+            for (String survivedColumnlet : survivedColumnlets)
+            {
+                String[] columnletIdStr = survivedColumnlet.split(":");
+                short rowGroupId = Short.parseShort(columnletIdStr[0]);
+                short columnId = Short.parseShort(columnletIdStr[1]);
+                PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
+                survivedIdxes.add(
+                        new PixelsCacheKeyIdx(curCacheIdx,
+                                physicalReader.getCurrentBlockId(), rowGroupId, columnId));
+            }
+        }
+        // ascending order according to the offset in cache file.
+        Collections.sort(survivedIdxes);
+
+        /**
+         * Start phase 1: compact the survived cache elements.
+         */
+        logger.debug("Start cache compaction...");
+        long newCacheOffset = 0L;
+        PixelsRadix newRadix = new PixelsRadix();
+        // set rwFlag as write
+        try
+        {
+            /**
+             * Before updating the cache content, in beginIndexWrite:
+             * 1. Set rwFlag to block subsequent readers.
+             * 2. Wait for the existing readers to finish, i.e.
+             *    wait for the readCount to be cleared (become zero).
+             */
+            PixelsCacheUtil.beginIndexWrite(indexFile);
+        } catch (InterruptedException e)
+        {
+            status = -1;
+            logger.error("Failed to get write permission on index.", e);
+            return status;
+        }
+        for (PixelsCacheKeyIdx survivedIdx : survivedIdxes)
+        {
+            cacheFile.copyMemory(survivedIdx.idx.offset, newCacheOffset, survivedIdx.idx.length);
+            newRadix.put(survivedIdx.blockId, survivedIdx.rowGroupId, survivedIdx.columnId,
+                    new PixelsCacheIdx(newCacheOffset, survivedIdx.idx.length));
+            newCacheOffset += survivedIdx.idx.length;
+        }
+        this.radix = newRadix;
+        // flush index
+        flushIndex();
+        // set rwFlag as readable
+        PixelsCacheUtil.endIndexWrite(indexFile);
+        oldRadix.removeAll();
+        // save the survived columnlets into cachedColumnlets.
+        for (String survivedColumnlet : survivedColumnlets)
+        {
+            this.cachedColumnlets.add(survivedColumnlet);
+        }
+        logger.debug("Cache compaction finished, index ends at offset: " + currentIndexOffset);
+
+        /**
+         * Start phase 2: load and append new cache elements to the cache file.
+         */
+        logger.debug("Start cache append...");
+        List<PixelsCacheKeyIdx> newIdxes = new ArrayList<>();
+        boolean enableAbsoluteBalancer = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
+        outer_loop:
+        for (String file : files)
+        {
+            if (enableAbsoluteBalancer)
+            {
+                // this is used for experimental purpose only.
+                // may be removed later.
+                file = ensureLocality(file);
+            }
+            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            int physicalLen;
+            long physicalOffset;
+            // update radix and cache content
+            for (int i = 0; i < newCachedColumnlets.size(); i++)
+            {
+                String[] columnletIdStr = newCachedColumnlets.get(i).split(":");
+                short rowGroupId = Short.parseShort(columnletIdStr[0]);
+                short columnId = Short.parseShort(columnletIdStr[1]);
+                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+                PixelsProto.ColumnChunkIndex chunkIndex =
+                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+                physicalLen = (int) chunkIndex.getChunkLength();
+                physicalOffset = chunkIndex.getChunkOffset();
+                if (newCacheOffset + physicalLen >= cacheFile.getSize())
+                {
+                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + newCacheOffset);
+                    status = 2;
+                    break outer_loop;
+                }
+                else
+                {
+                    newIdxes.add(new PixelsCacheKeyIdx(new PixelsCacheIdx(newCacheOffset, physicalLen),
+                            pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId));
+                    // Do not put into radix, because it is using by other concurrent readers.
+                    //radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
+                    //        new PixelsCacheIdx(newCacheOffset, physicalLen));
+                    byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+                    cacheFile.putBytes(newCacheOffset, columnlet);
+                    logger.debug(
+                            "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnlet.length);
+                    cacheOffset += physicalLen;
+                }
+            }
+        }
+        logger.debug("Cache append finished, cache writer ends at offset: " + newCacheOffset);
+
+        /**
+         * Start phase 3: activate new cache elements.
+         */
+        logger.debug("Start activating new cache elements...");
+        // set rwFlag as write
+        try
+        {
+            /**
+             * Before updating the cache content, in beginIndexWrite:
+             * 1. Set rwFlag to block subsequent readers.
+             * 2. Wait for the existing readers to finish, i.e.
+             *    wait for the readCount to be cleared (become zero).
+             */
+            PixelsCacheUtil.beginIndexWrite(indexFile);
+        } catch (InterruptedException e)
+        {
+            status = -1;
+            logger.error("Failed to get write permission on index.", e);
+            // TODO: recovery needed here.
+            return status;
+        }
+        // TODO: add new elements into radix.
+        for (PixelsCacheKeyIdx newIdx : newIdxes)
+        {
+            radix.put(newIdx.blockId, newIdx.rowGroupId, newIdx.columnId, newIdx.idx);
+        }
+        // flush index
+        flushIndex();
+        // save the new cached columnlets into cachedColumnlets.
+        for (String newColumnlet : newCachedColumnlets)
+        {
+            this.cachedColumnlets.add(newColumnlet);
+        }
+        // update cache version
+        PixelsCacheUtil.setIndexVersion(indexFile, version);
+        // set rwFlag as readable
+        PixelsCacheUtil.endIndexWrite(indexFile);
+        logger.debug("Cache index ends at offset: " + currentIndexOffset);
+
         return status;
     }
 

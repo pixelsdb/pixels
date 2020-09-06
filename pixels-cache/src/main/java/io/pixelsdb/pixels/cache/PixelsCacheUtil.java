@@ -211,7 +211,7 @@ public class PixelsCacheUtil
 
     public static PixelsRadix getIndexRadix(MemoryMappedFile indexFile)
     {
-        // todo read radix from index file
+        // TODO: read radix from index file.
         return new PixelsRadix();
     }
 
