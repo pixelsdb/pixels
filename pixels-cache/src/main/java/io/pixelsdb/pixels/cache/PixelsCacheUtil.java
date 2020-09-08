@@ -44,10 +44,15 @@ public class PixelsCacheUtil
     public static final int READER_COUNT_MASK;
     public static final int READER_COUNT_INC;
     /**
-     * We only use the first 12 bytes in the index, but we start radix tree
-     * from offset 16 for memory alignment.
+     * We only use the first 14 bytes in the index {magic(6)+rwflag(2)+readcount(2)+version(4)}
+     * for metadata header, but we start radix tree from offset 16 for memory alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
+    /**
+     * We use the first 16 bytes in the cache file {magic(6)+status(2)+size(8)} for
+     * metadata header.
+     */
+    public static final int CACHE_DATA_OFFSET = 16;
 
     static
     {

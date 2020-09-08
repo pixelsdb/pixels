@@ -109,9 +109,9 @@ public class CacheManager
      *      if not, existing cache is out of date, goto step #2.
      * 2. else, update caches with latest layout in etcd/mysql.
      * 3. update the status of CacheManager in etcd
-     * 4. start a scheduled thread to update node(CacheManager) status
+     * 4. start a scheduled thread to update node (CacheManager) status
      * 5. add a watcher to listen to changes of the cache version in etcd.
-     *    if there is a new version, we need update caches according to new layouts.
+     *    if there is a new version, we need to update caches according to new layouts.
      * */
     private void initialize()
     {
@@ -128,15 +128,18 @@ public class CacheManager
             FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             this.cacheWriter =
                     PixelsCacheWriter.newBuilder()
-                                     .setCacheLocation(cacheConfig.getCacheLocation())
-                                     .setCacheSize(cacheConfig.getCacheSize())
-                                     .setIndexLocation(cacheConfig.getIndexLocation())
-                                     .setIndexSize(cacheConfig.getIndexSize())
-                                     .setOverwrite(false)
-                                     .setFS(fs)
-                                     .setHostName(hostName)
-                                     .build();
+                            .setCacheLocation(cacheConfig.getCacheLocation())
+                            .setCacheSize(cacheConfig.getCacheSize())
+                            .setIndexLocation(cacheConfig.getIndexLocation())
+                            .setIndexSize(cacheConfig.getIndexSize())
+                            .setOverwrite(false)
+                            .setFS(fs)
+                            .setHostName(hostName)
+                            .setCacheConfig(cacheConfig)
+                            .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+
+            // Update cache if necessary.
             // If the cache is new created using start-vm.sh script, localCacheVersion would be zero.
             localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
             logger.debug("Local cache version: " + localCacheVersion);

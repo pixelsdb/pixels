@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.cache;
 
 import com.coreos.jetcd.data.KeyValue;
 import io.pixelsdb.pixels.common.exception.FSException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.*;
@@ -61,15 +62,16 @@ public class PixelsCacheWriter
     private PixelsRadix radix;
     private long currentIndexOffset;
     private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-    private long cacheOffset = 0L;  // this is used in the write() method.
+    private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
     private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
-    private Set<String> cachedColumnlets = null;
+    private Set<String> cachedColumnlets = new HashSet<>();
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
                               FileSystem fs,
                               PixelsRadix radix,
+                              Set<String> cachedColumnlets,
                               EtcdUtil etcdUtil,
                               String host)
     {
@@ -80,6 +82,10 @@ public class PixelsCacheWriter
         this.etcdUtil = etcdUtil;
         this.host = host;
         this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
+        if (cachedColumnlets != null && cachedColumnlets.isEmpty() == false)
+        {
+            cachedColumnlets.addAll(cachedColumnlets);
+        }
     }
 
     public static class Builder
@@ -91,6 +97,7 @@ public class PixelsCacheWriter
         private FileSystem builderFS;
         private boolean builderOverwrite = true;
         private String builderHostName = null;
+        private PixelsCacheConfig cacheConfig = null;
 
         private Builder()
         {
@@ -148,6 +155,12 @@ public class PixelsCacheWriter
             return this;
         }
 
+        public PixelsCacheWriter.Builder setCacheConfig(PixelsCacheConfig cacheConfig)
+        {
+            this.cacheConfig = cacheConfig;
+            return this;
+        }
+
         public PixelsCacheWriter build()
                 throws Exception
         {
@@ -155,10 +168,21 @@ public class PixelsCacheWriter
             MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize);
             PixelsRadix radix;
             // check if cache and index exists.
-            //   if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
+            Set<String> cachedColumnlets = new HashSet<>();
+            // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
+                // cache exists in local cache file and index, reload the index.
                 radix = PixelsCacheUtil.getIndexRadix(indexFile);
+                // build cachedColumnlets for PixelsCacheWriter.
+                int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
+                MetadataService metadataService = new MetadataService(
+                        cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                Layout cachedLayout = metadataService.getLayout(
+                        cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
+                Compact compact = cachedLayout.getCompactObject();
+                int cacheBorder = compact.getCacheBorder();
+                cachedColumnlets.addAll(compact.getColumnletOrder().subList(0, cacheBorder));
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else
@@ -168,7 +192,8 @@ public class PixelsCacheWriter
             }
             EtcdUtil etcdUtil = EtcdUtil.Instance();
 
-            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix, etcdUtil, builderHostName);
+            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix,
+                    cachedColumnlets, etcdUtil, builderHostName);
         }
     }
 
@@ -221,7 +246,9 @@ public class PixelsCacheWriter
          * There will be not concurrent update on cache,
          * thus we don't have to synchronize the access to cachedColumnlets.
          */
-        return cachedColumnlets == null || cachedColumnlets.isEmpty();
+        return PixelsCacheUtil.getCacheStatus(this.cacheFile) == PixelsCacheUtil.CacheStatus.EMPTY.getId() &&
+                PixelsCacheUtil.getCacheSize(this.cacheFile) == 0;
+        // return cachedColumnlets == null || cachedColumnlets.isEmpty();
     }
 
     /**
@@ -307,7 +334,7 @@ public class PixelsCacheWriter
         }
 
         // update cache content
-        if (cachedColumnlets == null)
+        if (cachedColumnlets == null || cachedColumnlets.isEmpty())
         {
             cachedColumnlets = new HashSet<>(cacheColumnletOrders.size());
         }
@@ -316,7 +343,7 @@ public class PixelsCacheWriter
             cachedColumnlets.clear();
         }
         radix.removeAll();
-        long currCacheOffset = 0L;
+        long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
         outer_loop:
@@ -356,7 +383,7 @@ public class PixelsCacheWriter
                     cacheFile.putBytes(currCacheOffset, columnlet);
                     logger.debug(
                             "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
-                    cacheOffset += physicalLen;
+                    currCacheOffset += physicalLen;
                 }
             }
         }
@@ -369,6 +396,8 @@ public class PixelsCacheWriter
         flushIndex();
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
+        PixelsCacheUtil.setCacheStatus(cacheFile, PixelsCacheUtil.CacheStatus.OK.getId());
+        PixelsCacheUtil.setCacheSize(cacheFile, currCacheOffset);
         // set rwFlag as readable
         PixelsCacheUtil.endIndexWrite(indexFile);
         logger.debug("Cache index ends at offset: " + currentIndexOffset);
@@ -438,7 +467,7 @@ public class PixelsCacheWriter
          * Start phase 1: compact the survived cache elements.
          */
         logger.debug("Start cache compaction...");
-        long newCacheOffset = 0L;
+        long newCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
         PixelsRadix newRadix = new PixelsRadix();
         // set rwFlag as write
         try
@@ -469,6 +498,8 @@ public class PixelsCacheWriter
         // set rwFlag as readable
         PixelsCacheUtil.endIndexWrite(indexFile);
         oldRadix.removeAll();
+        PixelsCacheUtil.setCacheStatus(cacheFile, PixelsCacheUtil.CacheStatus.OK.getId());
+        PixelsCacheUtil.setCacheSize(cacheFile, newCacheOffset);
         // save the survived columnlets into cachedColumnlets.
         for (String survivedColumnlet : survivedColumnlets)
         {
@@ -523,7 +554,7 @@ public class PixelsCacheWriter
                     cacheFile.putBytes(newCacheOffset, columnlet);
                     logger.debug(
                             "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnlet.length);
-                    cacheOffset += physicalLen;
+                    newCacheOffset += physicalLen;
                 }
             }
         }
@@ -550,7 +581,6 @@ public class PixelsCacheWriter
             // TODO: recovery needed here.
             return status;
         }
-        // TODO: add new elements into radix.
         for (PixelsCacheKeyIdx newIdx : newIdxes)
         {
             radix.put(newIdx.blockId, newIdx.rowGroupId, newIdx.columnId, newIdx.idx);
@@ -564,6 +594,8 @@ public class PixelsCacheWriter
         }
         // update cache version
         PixelsCacheUtil.setIndexVersion(indexFile, version);
+        PixelsCacheUtil.setCacheStatus(cacheFile, PixelsCacheUtil.CacheStatus.OK.getId());
+        PixelsCacheUtil.setCacheSize(cacheFile, newCacheOffset);
         // set rwFlag as readable
         PixelsCacheUtil.endIndexWrite(indexFile);
         logger.debug("Cache index ends at offset: " + currentIndexOffset);
