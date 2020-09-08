@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * pixels cache manager.
  *
  * @author guodong
+ * @author hank
  */
 public class CacheManager
         implements Server
