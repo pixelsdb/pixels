@@ -46,6 +46,20 @@ public class PixelsRadix
         nodes.add(root);                 // add root node
     }
 
+    private PixelsRadix(DynamicArray<RadixNode> nodes)
+    {
+        this.nodes = nodes;
+    }
+
+    public static PixelsRadix wrap(DynamicArray<RadixNode> nodes)
+    {
+        if (nodes != null && nodes.size() > 0)
+        {
+            return new PixelsRadix(nodes);
+        }
+        return null;
+    }
+
     public RadixNode getRoot()
     {
         return nodes.get(0);
