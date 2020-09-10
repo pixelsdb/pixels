@@ -49,6 +49,7 @@ import static java.util.Objects.requireNonNull;
  * Pixels file reader default implementation
  *
  * @author guodong
+ * @author hank
  */
 @NotThreadSafe
 public class PixelsReaderImpl

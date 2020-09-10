@@ -23,6 +23,7 @@ import java.io.IOException;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class RunLenByteDecoder
         extends Decoder
