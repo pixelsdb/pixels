@@ -173,7 +173,7 @@ public class PixelsCacheWriter
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
                 // cache exists in local cache file and index, reload the index.
-                radix = PixelsCacheUtil.getIndexRadix(indexFile);
+                radix = PixelsCacheUtil.loadRadixIndex(indexFile);
                 // build cachedColumnlets for PixelsCacheWriter.
                 int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
                 MetadataService metadataService = new MetadataService(
@@ -205,6 +205,15 @@ public class PixelsCacheWriter
     public MemoryMappedFile getIndexFile()
     {
         return indexFile;
+    }
+
+    /**
+     * DO NOT USE THIS METHOD. Only for unit test.
+     * @return
+     */
+    public PixelsRadix getRadix()
+    {
+        return this.radix;
     }
 
     /**
@@ -747,7 +756,7 @@ public class PixelsCacheWriter
         nodeBuffer.clear();
         if (currentIndexOffset >= indexFile.getSize())
         {
-            logger.debug("Index file have exceeded cache size. Break. Current size: " + currentIndexOffset);
+            logger.debug("Offset exceeds index size. Break. Current size: " + currentIndexOffset);
             return false;
         }
         if (node.offset == 0)
@@ -786,7 +795,7 @@ public class PixelsCacheWriter
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
         nodeBuffer.flip();
         nodeBuffer.get(nodeBytes);
-        indexFile.putBytes(currentIndexOffset, nodeBytes);
+        indexFile.putBytes(currentIndexOffset, nodeBytes); // children
         currentIndexOffset += nodeBytes.length;
         indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
@@ -806,6 +815,7 @@ public class PixelsCacheWriter
     {
         // set index content offset, skip the index header.
         currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+        allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         // if root contains nodes, which means the tree is not empty,then write nodes.
         if (radix.getRoot().getSize() != 0)
         {
