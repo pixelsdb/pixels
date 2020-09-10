@@ -28,6 +28,7 @@ import java.util.List;
 
 /**
  * pixels cache reader.
+ * It is not thread safe.
  *
  * @author guodong
  * @author hank

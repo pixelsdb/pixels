@@ -208,6 +208,15 @@ public class PixelsCacheWriter
     }
 
     /**
+     * DO NOT USE THIS METHOD. Only for unit test.
+     * @return
+     */
+    public PixelsRadix getRadix()
+    {
+        return this.radix;
+    }
+
+    /**
      * <p>
      * This function is only used to bulk load all the cache content at one time.
      * Readers will be blocked until this function is finished.
@@ -747,7 +756,7 @@ public class PixelsCacheWriter
         nodeBuffer.clear();
         if (currentIndexOffset >= indexFile.getSize())
         {
-            logger.debug("Index file have exceeded cache size. Break. Current size: " + currentIndexOffset);
+            logger.debug("Offset exceeds index size. Break. Current size: " + currentIndexOffset);
             return false;
         }
         if (node.offset == 0)
