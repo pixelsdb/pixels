@@ -41,8 +41,27 @@ public class PixelsCacheReader
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
 
-    private byte[] children = new byte[256 * 8];
-    private ByteBuffer childrenBuffer = ByteBuffer.wrap(children);
+    /**
+     * <p>
+     *     A node can have no more than 256 children, plus an edge (a segment of
+     *     lookup key). Each child is 8 bytes.
+     * </p>
+     * <p>
+     *     In pixels, where will be one PixelsCacheReader on each split. And each
+     *     split is supposed to be processed by one single thread. There are
+     *     typically 10 - 200 concurrent threads (splits) on a machine. So that it
+     *     is not a problem to allocate nodeEdge in each PixelsCacheReader instance.
+     *     By this, we can avoid frequent memory allocation in the search() method.
+     * </p>
+     * <p>
+     *     Although PixelsRadix can support 1MB edge length, but in Pixels, we only
+     *     use 12 byte path (PixelsCacheKey). That means no edges can exceeds 12 bytes.
+     *     So that 16 bytes here is more than enough.
+     * </p>
+     */
+    private byte[] nodeData = new byte[256 * 8 + 16];
+    private ByteBuffer childrenBuffer = ByteBuffer.wrap(nodeData);
+
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
 //    static
@@ -186,7 +205,7 @@ public class PixelsCacheReader
         int bytesMatchedInNodeFound = 0;
 
         // get root
-        // TODO: does root node have an edge?
+        // TODO: root currently does not have edge, which is not efficient in some cases.
         int currentNodeHeader = indexFile.getInt(currentNodeOffset);
         dramAccessCounter++;
         int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
@@ -195,17 +214,16 @@ public class PixelsCacheReader
         {
             return null;
         }
+        indexFile.getBytes(currentNodeOffset + 4, this.nodeData, 0, currentNodeChildrenNum * 8);
+        dramAccessCounter++;
         radixLevel++;
 
         // search
         outer_loop:
         while (bytesMatched < keyLen)
         {
-            radixLevel++;
             // search each child for the matching node
             long matchingChildOffset = 0L;
-            indexFile.getBytes(currentNodeOffset + 4, children, 0, currentNodeChildrenNum * 8);
-            dramAccessCounter++;
             childrenBuffer.position(0);
             childrenBuffer.limit(currentNodeChildrenNum * 8);
             for (int i = 0; i < currentNodeChildrenNum; i++)
@@ -229,27 +247,35 @@ public class PixelsCacheReader
             dramAccessCounter++;
             currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
             currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >>> 9;
-            // TODO: does max length of edge = 12? can we move currentNodeEdge allocation out before this loop?
-            byte[] currentNodeEdge = new byte[currentNodeEdgeSize];
-            // TODO: can we get header, edge and children of a node in one memory access?
-            indexFile.getBytes(currentNodeOffset + 4 + currentNodeChildrenNum * 8,
-                    currentNodeEdge, 0, currentNodeEdgeSize);
+            // read the children and edge in one memory access.
+            indexFile.getBytes(currentNodeOffset + 4,
+                    this.nodeData, 0, currentNodeChildrenNum * 8 + currentNodeEdgeSize);
             dramAccessCounter++;
-            // TODO: numEdgeBytes seems redundant.
-            for (int i = 0, numEdgeBytes = currentNodeEdgeSize; i < numEdgeBytes && bytesMatched < keyLen; i++)
+            int edgeEndOffset = currentNodeChildrenNum * 8 + currentNodeEdgeSize;
+            /**
+             * The first byte is matched in the child leader of the parent node,
+             * therefore we start the matching from the second byte in edge.
+             */
+            bytesMatched++;
+            bytesMatchedInNodeFound++;
+            for (int i = currentNodeChildrenNum * 8 + 1; i < edgeEndOffset && bytesMatched < keyLen; i++)
             {
-                if (currentNodeEdge[i] != keyBuffer.get(bytesMatched))
+                if (this.nodeData[i] != keyBuffer.get(bytesMatched))
                 {
                     break outer_loop;
                 }
                 bytesMatched++;
                 bytesMatchedInNodeFound++;
             }
+
+            // only increase level when a child is really matched.
+            radixLevel++;
         }
 
-        // if matches, node found
+        // if matches, node found.
         if (bytesMatched == keyLen && bytesMatchedInNodeFound == currentNodeEdgeSize)
         {
+            // if the current node is leaf node.
             if (((currentNodeHeader >>> 31) & 1) > 0)
             {
                 byte[] idx = new byte[12];

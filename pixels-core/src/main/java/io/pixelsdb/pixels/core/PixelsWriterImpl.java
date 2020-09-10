@@ -61,6 +61,7 @@ import static java.util.Objects.requireNonNull;
  * This writer is NOT thread safe!
  *
  * @author guodong
+ * @author hank
  */
 @NotThreadSafe
 public class PixelsWriterImpl

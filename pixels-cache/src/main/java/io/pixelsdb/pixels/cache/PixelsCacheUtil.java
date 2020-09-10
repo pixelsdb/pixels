@@ -35,6 +35,7 @@ import java.nio.charset.StandardCharsets;
  * - CONTENT
  *
  * @author guodong
+ * @author hank
  */
 public class PixelsCacheUtil
 {

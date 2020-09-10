@@ -25,6 +25,7 @@ import java.io.IOException;
 
 /**
  * @author guodong
+ * @author hank
  */
 public abstract class Encoder implements AutoCloseable
 {

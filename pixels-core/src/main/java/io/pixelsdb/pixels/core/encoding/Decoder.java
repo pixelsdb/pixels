@@ -23,6 +23,7 @@ import java.io.IOException;
 
 /**
  * @author guodong
+ * @author hank
  */
 public abstract class Decoder implements AutoCloseable
 {

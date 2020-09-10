@@ -33,6 +33,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class RunLenIntDecoder
         extends IntDecoder
