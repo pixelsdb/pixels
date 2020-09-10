@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * pixels cache header
  * index:
- * - HEADER: MAGIC(6 bytes), RW(2 bytes), VERSION(4 bytes), READER_COUNT(4 bytes)
+ * - HEADER: MAGIC(6 bytes), RW(2 bytes), READER_COUNT(2 bytes), VERSION(4 bytes)
  * - RADIX
  * cache:
  * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
@@ -226,7 +226,7 @@ public class PixelsCacheUtil
      * @param indexFile the index file to be read.
      * @return the radix tree read from index file.
      */
-    public static PixelsRadix getIndexRadix(MemoryMappedFile indexFile) throws CacheException
+    public static PixelsRadix loadRadixIndex(MemoryMappedFile indexFile) throws CacheException
     {
         PixelsRadix radix = new PixelsRadix();
         readRadix(indexFile, PixelsCacheUtil.INDEX_RADIX_OFFSET, radix.getRoot(), 1);

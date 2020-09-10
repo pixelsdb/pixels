@@ -173,7 +173,7 @@ public class PixelsCacheWriter
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
                 // cache exists in local cache file and index, reload the index.
-                radix = PixelsCacheUtil.getIndexRadix(indexFile);
+                radix = PixelsCacheUtil.loadRadixIndex(indexFile);
                 // build cachedColumnlets for PixelsCacheWriter.
                 int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
                 MetadataService metadataService = new MetadataService(

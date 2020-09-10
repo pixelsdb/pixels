@@ -68,7 +68,7 @@ public class TestPixelsCacheWriter
             PixelsRadix radix = cacheWriter.getRadix();
             radix.printStats();
 
-            PixelsRadix radix1 = PixelsCacheUtil.getIndexRadix(cacheWriter.getIndexFile());
+            PixelsRadix radix1 = PixelsCacheUtil.loadRadixIndex(cacheWriter.getIndexFile());
             radix1.printStats();
         }
         catch (Exception e)
