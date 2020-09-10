@@ -786,7 +786,7 @@ public class PixelsCacheWriter
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
         nodeBuffer.flip();
         nodeBuffer.get(nodeBytes);
-        indexFile.putBytes(currentIndexOffset, nodeBytes);
+        indexFile.putBytes(currentIndexOffset, nodeBytes); // children
         currentIndexOffset += nodeBytes.length;
         indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
@@ -806,6 +806,7 @@ public class PixelsCacheWriter
     {
         // set index content offset, skip the index header.
         currentIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
+        allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
         // if root contains nodes, which means the tree is not empty,then write nodes.
         if (radix.getRoot().getSize() != 0)
         {

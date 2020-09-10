@@ -43,20 +43,20 @@ public class PixelsCacheReader
 
     /**
      * <p>
-     *     A node can have no more than 256 children, plus an edge (a segment of
+     *     A node can have at most 256 children, plus an edge (a segment of
      *     lookup key). Each child is 8 bytes.
      * </p>
      * <p>
      *     In pixels, where will be one PixelsCacheReader on each split. And each
      *     split is supposed to be processed by one single thread. There are
      *     typically 10 - 200 concurrent threads (splits) on a machine. So that it
-     *     is not a problem to allocate nodeEdge in each PixelsCacheReader instance.
+     *     is not a problem to allocate nodeData in each PixelsCacheReader instance.
      *     By this, we can avoid frequent memory allocation in the search() method.
      * </p>
      * <p>
-     *     Although PixelsRadix can support 1MB edge length, but in Pixels, we only
+     *     For the edge, although PixelsRadix can support 1MB edge length, we only
      *     use 12 byte path (PixelsCacheKey). That means no edges can exceeds 12 bytes.
-     *     So that 16 bytes here is more than enough.
+     *     So that 16 bytes is more than enough.
      * </p>
      */
     private byte[] nodeData = new byte[256 * 8 + 16];
