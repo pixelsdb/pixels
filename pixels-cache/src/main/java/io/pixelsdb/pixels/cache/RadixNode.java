@@ -24,7 +24,6 @@ import java.util.Map;
 
 /**
  * @author guodong
- * @author hank
  */
 public class RadixNode
 {
@@ -77,16 +76,8 @@ public class RadixNode
         {
             return;
         }
-        if (children.put(firstByte, child) == null)
-        {
-            /**
-             * Issue #72:
-             * size was increased no matter firstByte exists or not,
-             * so that size could become larger than exact children number.
-             * Fix it in this issue.
-             */
-            size++;
-        }
+        children.put(firstByte, child);
+        size++;
     }
 
     public void removeChild(RadixNode child)
@@ -136,12 +127,7 @@ public class RadixNode
     public int getLengthInBytes()
     {
         int len = 4 + edge.length;  // header
-        /**
-         * Issue #72:
-         * leader is already contained in the highest 8 bits in each children (id),
-         * no needed to allocate memory space for leaders.
-         */
-        // len += 1 * children.size(); // leaders
+        len += 1 * children.size(); // leaders
         len += 8 * children.size(); // offsets
         // value
         if (isKey)

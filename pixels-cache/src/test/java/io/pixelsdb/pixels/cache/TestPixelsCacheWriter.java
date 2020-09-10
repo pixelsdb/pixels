@@ -44,9 +44,9 @@ public class TestPixelsCacheWriter
             FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
-                            .setCacheLocation("/home/hank/Desktop/pixels.cache")
+                            .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
                             .setCacheSize(1024 * 1024 * 64L)
-                            .setIndexLocation("/home/hank/Desktop/pixels.index")
+                            .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
                             .setIndexSize(1024 * 1024 * 64L)
                             .setOverwrite(true)
                             .setFS(fs)
@@ -65,11 +65,6 @@ public class TestPixelsCacheWriter
                 }
             }
             cacheWriter.flush();
-            PixelsRadix radix = cacheWriter.getRadix();
-            radix.printStats();
-
-            PixelsRadix radix1 = PixelsCacheUtil.loadRadixIndex(cacheWriter.getIndexFile());
-            radix1.printStats();
         }
         catch (Exception e)
         {
