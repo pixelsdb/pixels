@@ -135,9 +135,10 @@ public class PixelsCacheReader
         PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         // check the rwFlag and increase readCount.
+        long lease = 0;
         try
         {
-            PixelsCacheUtil.beginIndexRead(indexFile);
+            lease = PixelsCacheUtil.beginIndexRead(indexFile);
         } catch (InterruptedException e)
         {
             logger.error("Failed to get read permission on index.", e);
@@ -167,12 +168,16 @@ public class PixelsCacheReader
             }
         }
 
-        PixelsCacheUtil.endIndexRead(indexFile);
+        boolean cacheReadSuccess = PixelsCacheUtil.endIndexRead(indexFile, lease);
 
 //        long readEnd = System.nanoTime();
 //        cacheLogger.addReadLatency(readEnd - readBegin);
 //        logger.debug("[cache read]: " + (readEnd - readBegin));
-        return content;
+        if (cacheReadSuccess)
+        {
+            return content;
+        }
+        return null;
     }
 
     public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
