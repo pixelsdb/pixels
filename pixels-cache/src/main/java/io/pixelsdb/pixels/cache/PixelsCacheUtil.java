@@ -61,6 +61,11 @@ public class PixelsCacheUtil
      */
     public static final int CACHE_DATA_OFFSET = 16;
 
+    /**
+     * The length of cache read lease in millis.
+     */
+    public static final int CACHE_READ_LEASE_MS = 1000;
+
     static
     {
         if (MemoryMappedFile.getOrder() == ByteOrder.LITTLE_ENDIAN)
@@ -141,7 +146,6 @@ public class PixelsCacheUtil
     {
         // Set the rw flag.
         indexFile.putShortVolatile(6, (short) 1);
-        final int maxWaitMs = 10000; //  wait for the reader for 10s.
         final int sleepMs = 10;
         int waitMs = 0;
         while (indexFile.getShortVolatile(8) > 0)
@@ -155,7 +159,7 @@ public class PixelsCacheUtil
              */
             Thread.sleep(sleepMs);
             waitMs += sleepMs;
-            if (waitMs >= maxWaitMs)
+            if (waitMs > CACHE_READ_LEASE_MS)
             {
                 // clear reader count to continue writing.
                 indexFile.putShortVolatile(8, (short) 0);
@@ -169,7 +173,13 @@ public class PixelsCacheUtil
         indexFile.putShortVolatile(6, (short) 0);
     }
 
-    public static void beginIndexRead(MemoryMappedFile indexFile) throws InterruptedException
+    /**
+     * Begin index read. This method will wait for the writer to finish.
+     * @param indexFile
+     * @return the time in millis as the lease of this index read.
+     * @throws InterruptedException
+     */
+    public static long beginIndexRead(MemoryMappedFile indexFile) throws InterruptedException
     {
         int v = indexFile.getIntVolatile(6);
         short readerCount = indexFile.getShortVolatile(8);
@@ -194,10 +204,16 @@ public class PixelsCacheUtil
                 throw new InterruptedException("Reaches the max concurrent read count.");
             }
         }
+        // return lease
+        return System.currentTimeMillis();
     }
 
-    public static void endIndexRead(MemoryMappedFile indexFile)
+    public static boolean endIndexRead(MemoryMappedFile indexFile, long lease)
     {
+        if (System.currentTimeMillis() - lease >= CACHE_READ_LEASE_MS)
+        {
+            return false;
+        }
         int v = indexFile.getIntVolatile(6);
         // if reader count is already <= 0, nothing will be done.
         while ((v & READER_COUNT_MASK) > 0)
@@ -209,6 +225,7 @@ public class PixelsCacheUtil
             }
             v = indexFile.getIntVolatile(6);
         }
+        return true;
     }
 
     public static void setIndexVersion(MemoryMappedFile indexFile, int version)

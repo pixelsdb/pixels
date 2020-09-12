@@ -396,7 +396,7 @@ public class PixelsRadix
 
     public void printStats()
     {
-        // todo print stats of the radix, including the depth, number of nodes, etc.
+        // TODO: print stats of the radix, including the depth, number of nodes, etc.
     }
 
     static class SearchResult

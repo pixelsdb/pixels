@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -56,17 +55,16 @@ public class ChunkSeq
         if (length == 0)
         {
             chunks.add(chunk);
-            // TODO remove function calls by getting object attributes directly
-            offset = chunk.getOffset();
-            length += chunk.getLength();
+            offset = chunk.offset;
+            length += chunk.length;
             return true;
         }
         else
         {
-            if (chunk.getOffset() - offset - length == 0)
+            if (chunk.offset - offset - length == 0)
             {
                 chunks.add(chunk);
-                length += chunk.getLength();
+                length += chunk.length;
                 return true;
             }
         }
@@ -88,9 +86,17 @@ public class ChunkSeq
         return chunks;
     }
 
+    /**
+     * <p>Legacy code.</p>
+     * This method should be the same as getChunks(),
+     * because chunks are ordered before being added into ChunkSeq.
+     * @return
+     */
     public List<ChunkId> getSortedChunks()
     {
-        chunks.sort(Comparator.comparingLong(ChunkId::getOffset));
+        chunks.sort((o1, o2) -> (
+                o1.offset < o2.offset ? -1 :
+                        (o1.offset > o2.offset ? 1 : 0)));
         return chunks;
     }
 
