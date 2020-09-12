@@ -25,12 +25,7 @@ import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.ChunkId;
-import io.pixelsdb.pixels.core.ChunkSeq;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsPredicate;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
@@ -40,12 +35,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author guodong
@@ -423,10 +413,33 @@ public class PixelsRecordReaderImpl
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
                 chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+                if (columnlet == null || columnlet.capacity() == 0)
+                {
+                    /**
+                     * Issue #67 (patch):
+                     * Deal with null or empty cache chunk.
+                     * If cache read failed (e.g. cache read timeout), columnlet will be null.
+                     * In this condition, we have to read the columnlet from disk.
+                     */
+                    int rgIdx = rgId - RGStart;
+                    PixelsProto.RowGroupIndex rowGroupIndex =
+                            rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                    PixelsProto.ColumnChunkIndex chunkIndex =
+                            rowGroupIndex.getColumnChunkIndexEntries(colId);
+                    ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
+                            chunkIndex.getChunkLength());
+                    diskChunks.add(diskChunk);
+                }
+                else
+                {
+                    this.cacheReadBytes += columnlet.capacity();
+                }
             }
             long cacheReadEndNano = System.nanoTime();
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
-            // deal with null or empty cache chunk
+            /*
+            // We used deal with null or empty cache chunk here to get more accurate cacheReadCost.
+            // In Issue #67 (patch), we move the logic into the above loop for better performance.
             for (ColumnletId chunkId : cacheChunks)
             {
                 short rgId = chunkId.rowGroupId;
@@ -448,6 +461,7 @@ public class PixelsRecordReaderImpl
                     this.cacheReadBytes += chunkBuffers[bufferIdx].capacity();
                 }
             }
+            */
 //            logger.debug("[cache stat]: " + cacheChunks.size() + "," + cacheReadBytes + "," + cacheReadCost + "," + cacheReadBytes * 1.0 / cacheReadCost);
         }
         else
@@ -468,36 +482,49 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        // sort chunks by starting offset
-        diskChunks.sort(Comparator.comparingLong(ChunkId::getOffset));
-
-        // get chunk blocks
-        List<ChunkSeq> diskChunkSeqs = new ArrayList<>(diskChunks.size());
-        ChunkSeq diskChunkSeq = new ChunkSeq();
-        for (ChunkId chunk : diskChunks)
+        if (diskChunks.isEmpty() == false)
         {
-            if (!diskChunkSeq.addChunk(chunk))
-            {
-                diskChunkSeqs.add(diskChunkSeq);
-                diskChunkSeq = new ChunkSeq();
-                diskChunkSeq.addChunk(chunk);
-            }
-        }
-        diskChunkSeqs.add(diskChunkSeq);
+            /**
+             * Comments added in Issue #67 (path):
+             * By ordering disk chunks (ascending) according to the start offset and
+             * group continuous disk chunks into one group, we can read the continuous
+             * disk chunks in only one disk read, this would significantly improve I/O
+             * performance. In presto.orc (io.prestosql.orc.AbstractOrcDataSource),
+             * similar strategy is called disk range merging.
+             */
 
-        // read chunk blocks into buffers
-        try
-        {
-            for (ChunkSeq seq : diskChunkSeqs)
+            // sort chunks by starting offset
+            diskChunks.sort((o1, o2) -> (
+                    o1.offset < o2.offset ? -1 :
+                            (o1.offset > o2.offset ? 1 : 0)));
+
+            // get chunk blocks. In best case, diskChunkSeqs.size() == targetRGNum.
+            List<ChunkSeq> diskChunkSeqs = new ArrayList<>(this.targetRGNum);
+            ChunkSeq diskChunkSeq = new ChunkSeq();
+            for (ChunkId chunk : diskChunks)
             {
-                if (seq.getLength() == 0)
+                if (!diskChunkSeq.addChunk(chunk))
                 {
-                    continue;
+                    diskChunkSeqs.add(diskChunkSeq);
+                    diskChunkSeq = new ChunkSeq();
+                    diskChunkSeq.addChunk(chunk);
                 }
-                int offset = (int) seq.getOffset();
-                int length = (int) seq.getLength();
-                diskReadBytes += length;
-                ByteBuffer chunkBlockBuffer = ByteBuffer.allocate(length);
+            }
+            diskChunkSeqs.add(diskChunkSeq);
+
+            // read chunk blocks into buffers
+            try
+            {
+                for (ChunkSeq seq : diskChunkSeqs)
+                {
+                    if (seq.getLength() == 0)
+                    {
+                        continue;
+                    }
+                    int offset = (int) seq.getOffset();
+                    int length = (int) seq.getLength();
+                    diskReadBytes += length;
+                    ByteBuffer chunkBlockBuffer = ByteBuffer.allocate(length);
 //                if (enableMetrics)
 //                {
 //                    long seekStart = System.currentTimeMillis();
@@ -519,28 +546,28 @@ public class PixelsRecordReaderImpl
 //                }
 //                else
 //                {
-                physicalFSReader.seek(offset);
-                physicalFSReader.readFully(chunkBlockBuffer.array());
+                    physicalFSReader.seek(offset);
+                    physicalFSReader.readFully(chunkBlockBuffer.array());
 //                }
-                List<ChunkId> chunkIds = seq.getSortedChunks();
-                int chunkSliceOffset = 0;
-                for (ChunkId chunkId : chunkIds)
-                {
-                    int chunkLength = (int) chunkId.getLength();
-                    int rgIdx = chunkId.getRowGroupId();
-                    int colId = chunkId.getColumnId();
-                    chunkBlockBuffer.position(chunkSliceOffset);
-                    chunkBlockBuffer.limit(chunkSliceOffset + chunkLength);
-                    ByteBuffer chunkBuffer = chunkBlockBuffer.slice();
-                    chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBuffer;
-                    chunkSliceOffset += chunkLength;
+                    List<ChunkId> chunkIds = seq.getChunks();
+                    int chunkSliceOffset = 0;
+                    for (ChunkId chunkId : chunkIds)
+                    {
+                        int chunkLength = (int) chunkId.length;
+                        int rgIdx = chunkId.rowGroupId;
+                        int colId = chunkId.columnId;
+                        chunkBlockBuffer.position(chunkSliceOffset);
+                        chunkBlockBuffer.limit(chunkSliceOffset + chunkLength);
+                        ByteBuffer chunkBuffer = chunkBlockBuffer.slice();
+                        chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBuffer;
+                        chunkSliceOffset += chunkLength;
+                    }
                 }
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+                return false;
             }
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-            return false;
         }
 
         return true;
