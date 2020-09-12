@@ -146,6 +146,23 @@ public class PixelsInputFormat
         boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
         int fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
 
+        /**
+         * Issue #78:
+         * Only try to use cache for the cached table.
+         * cacheSchema and cacheTable are not null if cacheEnabled == true.
+         */
+        String cacheSchema = config.getProperty("cache.schema");
+        String cacheTable = config.getProperty("cache.table");
+        boolean usingCache = false;
+        if (cacheEnabled)
+        {
+            if (st.getSchemaName().equalsIgnoreCase(cacheSchema) &&
+                    st.getTableName().equalsIgnoreCase(cacheTable))
+            {
+                usingCache = true;
+            }
+        }
+
         List<Layout> layouts = getLayouts(st);
 
         numSplits = numSplits == 0 ? 1 : numSplits;
@@ -196,7 +213,7 @@ public class PixelsInputFormat
             log.error("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
-            if(cacheEnabled)
+            if(usingCache)
             {
                 Compact compact = layout.getCompactObject();
                 int cacheBorder = compact.getCacheBorder();
