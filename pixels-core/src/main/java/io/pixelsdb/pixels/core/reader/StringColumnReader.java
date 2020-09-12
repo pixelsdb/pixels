@@ -258,10 +258,12 @@ public class StringColumnReader
         }
     }
 
+    /**
+     * In this method, we have reduced most of significant memory copies.
+     */
     private void readContent(int inputLength, PixelsProto.ColumnEncoding encoding)
             throws IOException
     {
-        // TODO: reduce memory copy in this method.
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.DICTIONARY))
         {
             // read offsets

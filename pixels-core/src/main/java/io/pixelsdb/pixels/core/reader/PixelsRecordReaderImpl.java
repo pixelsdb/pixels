@@ -334,7 +334,17 @@ public class PixelsRecordReaderImpl
         return true;
     }
 
-    // TODO: try Direct ByteBuffer to reduce GC pressure.
+    /**
+     * Comments added in Issue #67 (patch):
+     * In this method, if the cache is enabled, we can support reading
+     * the cache using Direct ByteBuffer, without memory copies and thus also
+     * reduces the GC pressure.
+     *
+     * By optimizations in this method in Issue #67 (patch), end-to-end query
+     * performance on full cache is improved by about 5% - 10%.
+     *
+     * @return if the row groups are read successfully.
+     */
     private boolean read()
     {
         if (!checkValid)
@@ -491,6 +501,8 @@ public class PixelsRecordReaderImpl
              * disk chunks in only one disk read, this would significantly improve I/O
              * performance. In presto.orc (io.prestosql.orc.AbstractOrcDataSource),
              * similar strategy is called disk range merging.
+             *
+             * diskChunks.sort and ChunkSeq are also optimized in Issue #67 (path).
              */
 
             // sort chunks by starting offset
