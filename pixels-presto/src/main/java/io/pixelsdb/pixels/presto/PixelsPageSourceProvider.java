@@ -19,10 +19,6 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorSession;
@@ -30,8 +26,10 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.inject.Inject;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import java.util.List;
 
@@ -45,7 +43,6 @@ import static java.util.stream.Collectors.toList;
 public class PixelsPageSourceProvider
         implements ConnectorPageSourceProvider
 {
-    private static final Logger logger = LogManager.getLogger(PixelsPageSourceProvider.class);
     private final String connectorId;
     private final FSFactory fsFactory;
     private final MemoryMappedFile cacheFile;

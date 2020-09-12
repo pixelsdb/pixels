@@ -26,7 +26,6 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.airlift.log.Logger;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,7 +38,6 @@ import static java.util.Objects.requireNonNull;
  **/
 public class PixelsSplit
         implements ConnectorSplit {
-    private final Logger log = Logger.get(PixelsSplit.class);
     private final String connectorId;
     private final String schemaName;
     private final String tableName;

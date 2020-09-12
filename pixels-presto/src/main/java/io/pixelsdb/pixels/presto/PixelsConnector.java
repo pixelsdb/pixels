@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 
 public class PixelsConnector
         implements Connector {
-    private static final Logger log = Logger.get(PixelsConnector.class);
+    private static final Logger logger = Logger.get(PixelsConnector.class);
 
     private final LifeCycleManager lifeCycleManager;
     private final PixelsMetadata metadata;
@@ -79,7 +79,7 @@ public class PixelsConnector
         try {
             lifeCycleManager.stop();
         } catch (Exception e) {
-            log.error(e, "Error shutting down connector");
+            logger.error(e, "error in shutting down connector");
             throw new PrestoException(PixelsErrorCode.PIXELS_CONNECTOR_ERROR, e);
         }
     }

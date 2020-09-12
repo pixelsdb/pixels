@@ -58,11 +58,13 @@ import static java.util.stream.Collectors.toSet;
 @SuppressWarnings("Duplicates")
 public class PixelsSplitManager
         implements ConnectorSplitManager {
-    private final Logger log = Logger.get(PixelsSplitManager.class);
+    private static final Logger logger = Logger.get(PixelsSplitManager.class);
     private final String connectorId;
     private final FSFactory fsFactory;
     private final PixelsMetadataProxy metadataProxy;
     private final boolean cacheEnabled;
+    private final String cacheSchema;
+    private final String cacheTable;
     private final int fixedSplitSize;
 
     @Inject
@@ -73,6 +75,8 @@ public class PixelsSplitManager
         String enabled = config.getConfigFactory().getProperty("cache.enabled");
         this.fixedSplitSize = Integer.parseInt(config.getConfigFactory().getProperty("fixed.split.size"));
         this.cacheEnabled = Boolean.parseBoolean(enabled);
+        this.cacheSchema = config.getConfigFactory().getProperty("cache.schema");
+        this.cacheTable = config.getConfigFactory().getProperty("cache.table");
     }
 
     @Override
@@ -98,6 +102,23 @@ public class PixelsSplitManager
         catch (MetadataException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+
+        /**
+         * Issue #78:
+         * Only try to use cache for the cached table.
+         * By avoiding cache probing for uncached tables, query performance on
+         * uncached tables is improved significantly (10%-20%).
+         * this.cacheSchema and this.cacheTable are not null if this.cacheEnabled == true.
+         */
+        boolean usingCache = false;
+        if (this.cacheEnabled)
+        {
+            if (schemaName.equalsIgnoreCase(this.cacheSchema) &&
+                    tableName.equalsIgnoreCase(this.cacheTable))
+            {
+                usingCache = true;
+            }
         }
 
         List<ConnectorSplit> pixelsSplits = new ArrayList<>();
@@ -129,14 +150,14 @@ public class PixelsSplitManager
                 Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
                 if (index == null)
                 {
-                    log.debug("index not exist in factory, building index...");
+                    logger.debug("index not exist in factory, building index...");
                     index = getInverted(order, splits, indexEntry);
                 }
                 else
                 {
                     int indexVersion = index.getVersion();
                     if (indexVersion < version) {
-                        log.debug("index version is not up to date, updating index...");
+                        logger.debug("index version is not up to date, updating index...");
                         index = getInverted(order, splits, indexEntry);
                     }
                 }
@@ -145,10 +166,10 @@ public class PixelsSplitManager
                 // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestPattern.getSplitSize();
             }
-            log.debug("using split size: " + splitSize);
+            logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
 
-            if(this.cacheEnabled)
+            if(usingCache)
             {
                 Compact compact = layout.getCompactObject();
                 int cacheBorder = compact.getCacheBorder();
@@ -160,7 +181,7 @@ public class PixelsSplitManager
                 {
                     // 1. get version
                     cacheVersion = keyValue.getValue().toStringUtf8();
-                    log.debug("cache version: " + cacheVersion);
+                    logger.debug("cache version: " + cacheVersion);
                     // 2. get files of each node
                     List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
                     if(nodeFiles.size() > 0)
@@ -224,7 +245,7 @@ public class PixelsSplitManager
                     }
                     else
                     {
-                        log.error("Get caching files error when version is " + cacheVersion);
+                        logger.error("Get caching files error when version is " + cacheVersion);
                         throw new PrestoException(PixelsErrorCode.PIXELS_CACHE_NODE_FILE_ERROR, new CacheException());
                     }
                 }
@@ -235,7 +256,7 @@ public class PixelsSplitManager
             }
             else
             {
-                log.debug("cache is disabled");
+                logger.debug("cache is disabled or no cache available on this table");
                 List<Path> orderedPaths;
 //                Balancer orderedBalancer = new Balancer();
                 List<Path> compactPaths;
@@ -311,7 +332,7 @@ public class PixelsSplitManager
             index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
             IndexFactory.Instance().cacheIndex(indexEntry, index);
         } catch (IOException e) {
-            log.error("getInverted error: " + e.getMessage());
+            logger.error("getInverted error: " + e.getMessage());
             throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
         }
         return index;
