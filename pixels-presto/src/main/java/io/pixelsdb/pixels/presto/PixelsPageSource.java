@@ -54,7 +54,7 @@ import static java.util.Objects.requireNonNull;
  */
 class PixelsPageSource implements ConnectorPageSource
 {
-    private static Logger logger = Logger.get(PixelsPageSource.class);
+    private static final Logger logger = Logger.get(PixelsPageSource.class);
     private final int BatchSize;
     private List<PixelsColumnHandle> columns;
     private FSFactory fsFactory;

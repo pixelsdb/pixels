@@ -46,7 +46,7 @@ import static java.util.stream.Collectors.toList;
 public class PixelsMetadata
         implements ConnectorMetadata
 {
-    private static Logger logger = Logger.get(PixelsMetadata.class);
+    private static final Logger logger = Logger.get(PixelsMetadata.class);
     private final String connectorId;
 
     private final PixelsMetadataProxy pixelsMetadataProxy;
