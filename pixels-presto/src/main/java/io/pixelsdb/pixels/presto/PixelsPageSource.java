@@ -28,6 +28,7 @@ import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.FSFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -56,13 +57,18 @@ class PixelsPageSource implements ConnectorPageSource
 {
     private static final Logger logger = Logger.get(PixelsPageSource.class);
     private final int BatchSize;
+    private PixelsSplit split;
     private List<PixelsColumnHandle> columns;
     private FSFactory fsFactory;
     private boolean closed;
     private boolean endOfFile;
     private PixelsReader pixelsReader;
     private PixelsRecordReader recordReader;
+    private PixelsCacheReader cacheReader;
+    private PixelsFooterCache footerCache;
     private long sizeOfData = 0L;
+    private long completedBytes = 0L;
+    private long readTimeNanos = 0L;
     private PixelsReaderOption option;
     private int numColumnToRead;
     private int batchId;
@@ -73,16 +79,19 @@ class PixelsPageSource implements ConnectorPageSource
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
                             String connectorId)
     {
+        this.split = split;
         this.fsFactory = fsFactory;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
+        this.footerCache = pixelsFooterCache;
+        this.batchId = 0;
 
-        PixelsCacheReader pixelsCacheReader = PixelsCacheReader
+        this.cacheReader = PixelsCacheReader
                 .newBuilder()
                 .setCacheFile(cacheFile)
                 .setIndexFile(indexFile)
                 .build();
-        getPixelsReaderBySchema(split, pixelsCacheReader, pixelsFooterCache);
+        getPixelsReaderBySchema(split, cacheReader, pixelsFooterCache);
 
         this.recordReader = this.pixelsReader.read(this.option);
         this.BatchSize = PixelsPrestoConfig.getBatchSize();
@@ -148,16 +157,60 @@ class PixelsPageSource implements ConnectorPageSource
         }
     }
 
+    private boolean readNextPath ()
+    {
+        try
+        {
+            if (this.split.nextPath())
+            {
+                if (this.fsFactory.getFileSystem().isPresent())
+                {
+                    this.pixelsReader = PixelsReaderImpl
+                            .newBuilder()
+                            .setFS(this.fsFactory.getFileSystem().get())
+                            .setPath(new Path(split.getPath()))
+                            .setEnableCache(split.getCached())
+                            .setCacheOrder(split.getCacheOrder())
+                            .setPixelsCacheReader(this.cacheReader)
+                            .setPixelsFooterCache(this.footerCache)
+                            .build();
+                    this.recordReader = this.pixelsReader.read(this.option);
+                } else
+                {
+                    logger.error("pixelsReader error: getFileSystem() returns null");
+                    throw new FSException("pixelsReader error: getFileSystem() returns null");
+                }
+                return true;
+            } else
+            {
+                return false;
+            }
+        } catch (Exception e)
+        {
+            logger.error("pixelsReader error: " + e.getMessage());
+            closeWithSuppression(e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+        }
+    }
+
     @Override
     public long getCompletedBytes()
     {
-        return recordReader.getCompletedBytes();
+        if (closed)
+        {
+            return this.completedBytes;
+        }
+        return this.completedBytes + recordReader.getCompletedBytes();
     }
 
     @Override
     public long getReadTimeNanos()
     {
-        return recordReader.getReadTimeNanos();
+        if (closed)
+        {
+            return readTimeNanos;
+        }
+        return this.readTimeNanos + recordReader.getReadTimeNanos();
     }
 
     @Override
@@ -184,7 +237,17 @@ class PixelsPageSource implements ConnectorPageSource
         if (batchSize <= 0 || (endOfFile && batchId > 1))
         {
             close();
-            return null;
+            if (readNextPath())
+            {
+                closed = false;
+                endOfFile = false;
+                batchId = 0;
+                return getNextPage();
+            }
+            else
+            {
+                return null;
+            }
         }
         Block[] blocks = new Block[this.numColumnToRead];
 
@@ -211,6 +274,8 @@ class PixelsPageSource implements ConnectorPageSource
         {
             if (pixelsReader != null)
             {
+                this.completedBytes += recordReader.getCompletedBytes();
+                this.readTimeNanos += recordReader.getReadTimeNanos();
                 pixelsReader.close();
             }
             rowBatch = null;

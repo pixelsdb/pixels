@@ -63,6 +63,7 @@ public class PixelsSplitManager
     private final FSFactory fsFactory;
     private final PixelsMetadataProxy metadataProxy;
     private final boolean cacheEnabled;
+    private final boolean multiSplitForOrdered;
     private final String cacheSchema;
     private final String cacheTable;
     private final int fixedSplitSize;
@@ -73,8 +74,10 @@ public class PixelsSplitManager
         this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
         String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        String multiSplit = config.getConfigFactory().getProperty("multi.split.for.ordered");
         this.fixedSplitSize = Integer.parseInt(config.getConfigFactory().getProperty("fixed.split.size"));
         this.cacheEnabled = Boolean.parseBoolean(enabled);
+        this.multiSplitForOrdered = Boolean.parseBoolean(multiSplit);
         this.cacheSchema = config.getConfigFactory().getProperty("cache.schema");
         this.cacheTable = config.getConfigFactory().getProperty("cache.table");
     }
@@ -207,14 +210,31 @@ public class PixelsSplitManager
 //                                orderedBalancer.put(hostAddresses.get(0), path);
 //                            }
 //                            orderedBalancer.balance();
-                            for (Path path : orderedPaths)
+
+                            int numPath = orderedPaths.size();
+                            for (int i = 0; i < numPath; ++i)
                             {
-//                                ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                                builder.add(orderedBalancer.get(path));
+                                int firstPath = i;
+                                List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
+                                if (this.multiSplitForOrdered)
+                                {
+                                    for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                                    {
+                                        Path path = orderedPaths.get(i);
+                                        paths.add(path.toString());
+                                    }
+                                }
+                                else
+                                {
+                                    paths.add(orderedPaths.get(i).toString());
+                                }
+//                              ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                              builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                        path.toString(), 0, 1,
-                                        false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                        paths, 0, 1, false,
+                                        fsFactory.getBlockLocations(orderedPaths.get(firstPath), 0, Long.MAX_VALUE),
+                                        order.getColumnOrder(), new ArrayList<>(0), constraint);
                                 // log.debug("Split in orderPath: " + pixelsSplit.toString());
                                 pixelsSplits.add(pixelsSplit);
                             }
@@ -230,8 +250,9 @@ public class PixelsSplitManager
                                     List<HostAddress> hostAddresses  = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE, node);
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                                                               tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                                                              hdfsFile, curFileRGIdx, splitSize,
-                                                                              true, hostAddresses, order.getColumnOrder(), cacheColumnletOrders, constraint);
+                                                                              Arrays.asList(hdfsFile), curFileRGIdx, splitSize,
+                                                                              true, hostAddresses, order.getColumnOrder(),
+                                                                              cacheColumnletOrders, constraint);
                                     pixelsSplits.add(pixelsSplit);
                                     // log.debug("Split in compactPath" + pixelsSplit.toString());
                                     curFileRGIdx += splitSize;
@@ -282,36 +303,53 @@ public class PixelsSplitManager
 //                    log.info("compact files balanced=" + compactBalancer.isBalanced());
 
 
-                // add splits in orderedPath
-                for (Path path : orderedPaths)
-                {
-//                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                    builder.add(orderedBalancer.get(path));
-                    PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                            tableHandle.getSchemaName(), tableHandle.getTableName(),
-                            path.toString(), 0, 1,
-                            false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
-                    pixelsSplits.add(pixelsSplit);
-                }
-                // add splits in compactPath
-                int curFileRGIdx;
-                for (Path path : compactPaths)
-                {
-//                    ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                    builder.add(compactBalancer.get(path));
-                    // log.info("balanced path:" + compactBalancer.get(path).toString());
-//                    List<HostAddress> hostAddresses = builder.build();
-                    curFileRGIdx = 0;
-                    while (curFileRGIdx < rowGroupNum)
+                    // add splits in orderedPath
+                    int numPath = orderedPaths.size();
+                    for (int i = 0; i < numPath; ++i)
                     {
+                        int firstPath = i;
+                        List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
+                        if (this.multiSplitForOrdered)
+                        {
+                            for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                            {
+                                Path path = orderedPaths.get(i);
+                                paths.add(path.toString());
+                            }
+                        }
+                        else
+                        {
+                            paths.add(orderedPaths.get(i).toString());
+                        }
+//                              ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                              builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                path.toString(), curFileRGIdx, splitSize,
-                                false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                paths, 0, 1, false,
+                                fsFactory.getBlockLocations(orderedPaths.get(firstPath), 0, Long.MAX_VALUE),
+                                order.getColumnOrder(), new ArrayList<>(0), constraint);
+                        // log.debug("Split in orderPath: " + pixelsSplit.toString());
                         pixelsSplits.add(pixelsSplit);
-                        curFileRGIdx += splitSize;
                     }
-                }
+                    // add splits in compactPath
+                    int curFileRGIdx;
+                    for (Path path : compactPaths)
+                    {
+//                      ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+//                      builder.add(compactBalancer.get(path));
+                        // log.info("balanced path:" + compactBalancer.get(path).toString());
+//                      List<HostAddress> hostAddresses = builder.build();
+                        curFileRGIdx = 0;
+                        while (curFileRGIdx < rowGroupNum)
+                        {
+                            PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                    tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                    Arrays.asList(path.toString()), curFileRGIdx, splitSize,
+                                    false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                            pixelsSplits.add(pixelsSplit);
+                            curFileRGIdx += splitSize;
+                        }
+                    }
                 }
                 catch (FSException e)
                 {
