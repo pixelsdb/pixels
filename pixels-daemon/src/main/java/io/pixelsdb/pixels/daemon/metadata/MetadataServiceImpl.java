@@ -89,10 +89,14 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         if(schema != null)
         {
             tables = tableDao.getBySchema(schema);
-            if (tables == null || tables.isEmpty())
+            /**
+             * Issue #85:
+             *  tables.isEmpty() is normal for empty schema.
+             */
+            if (tables == null)
             {
                 header = headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND)
-                        .setErrorMsg("table not found").build();
+                        .setErrorMsg("metadata server failed to get tables").build();
                 response = MetadataProto.GetTablesResponse.newBuilder()
                         .setHeader(header).build();
             }
