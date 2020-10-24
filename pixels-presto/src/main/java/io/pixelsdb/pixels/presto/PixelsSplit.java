@@ -33,7 +33,7 @@ import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @author: tao
+ * @author: tao, hank
  * @date: Create in 2018-01-20 19:15
  **/
 public class PixelsSplit
@@ -41,9 +41,10 @@ public class PixelsSplit
     private final String connectorId;
     private final String schemaName;
     private final String tableName;
-    private final String path;
+    private final List<String> paths;
     private final int start;
     private final int len;
+    private int pathIndex;
     private boolean cached;
     private final List<HostAddress> addresses;
     private final List<String> order;
@@ -55,7 +56,7 @@ public class PixelsSplit
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("path") String path,
+            @JsonProperty("paths") List<String> paths,
             @JsonProperty("start") int start,
             @JsonProperty("len") int len,
             @JsonProperty("cached") boolean cached,
@@ -66,7 +67,12 @@ public class PixelsSplit
         this.schemaName = requireNonNull(schemaName, "schema name is null");
         this.connectorId = requireNonNull(connectorId, "connector id is null");
         this.tableName = requireNonNull(tableName, "table name is null");
-        this.path = requireNonNull(path, "path is null");
+        this.paths = requireNonNull(paths, "paths is null");
+        if (paths.isEmpty())
+        {
+            throw new NullPointerException("paths is empty");
+        }
+        this.pathIndex = 0;
         this.start = start;
         this.len = len;
         this.cached = cached;
@@ -101,8 +107,8 @@ public class PixelsSplit
     }
 
     @JsonProperty
-    public String getPath() {
-        return path;
+    public List<String> getPaths() {
+        return paths;
     }
 
     @JsonProperty
@@ -122,8 +128,27 @@ public class PixelsSplit
     }
 
     @Override
-    public boolean isRemotelyAccessible() {
+    public boolean isRemotelyAccessible()
+    {
         return false;
+    }
+
+    public boolean nextPath()
+    {
+        if (this.pathIndex+1 < this.paths.size())
+        {
+            this.pathIndex++;
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    public String getPath()
+    {
+        return this.paths.get(this.pathIndex);
     }
 
     @JsonProperty
@@ -159,7 +184,7 @@ public class PixelsSplit
         return Objects.equals(this.connectorId, that.connectorId) &&
                 Objects.equals(this.schemaName, that.schemaName) &&
                 Objects.equals(this.tableName, that.tableName) &&
-                Objects.equals(this.path, that.path) &&
+                Objects.equals(this.paths, that.paths) &&
                 Objects.equals(this.start, that.start) &&
                 Objects.equals(this.len, that.len) &&
                 Objects.equals(this.addresses, that.addresses) &&
@@ -169,16 +194,26 @@ public class PixelsSplit
 
     @Override
     public int hashCode() {
-        return Objects.hash(connectorId, schemaName, tableName, path, start, len, addresses, cached, constraint);
+        return Objects.hash(connectorId, schemaName, tableName, paths, start, len, addresses, cached, constraint);
     }
 
     @Override
     public String toString() {
+        StringBuilder pathBuilder = new StringBuilder("{");
+        if (paths.isEmpty() == false)
+        {
+            pathBuilder.append(paths.get(0));
+            for (int i = 1; i < paths.size(); ++i)
+            {
+                pathBuilder.append(",").append(paths.get(i));
+            }
+        }
+        pathBuilder.append("}");
         return "PixelsSplit{" +
                 "connectorId=" + connectorId +
                 ", schemaName='" + schemaName + '\'' +
                 ", tableName='" + tableName + '\'' +
-                ", path='" + path + '\'' +
+                ", paths=" + pathBuilder.toString() +
                 ", start=" + start +
                 ", len=" + len +
                 ", isCached=" + cached +
