@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.listener;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.common.utils.HttpUtil;
 import io.pixelsdb.pixels.listener.exception.ListenerExecption;
@@ -44,7 +45,7 @@ import static io.pixelsdb.pixels.listener.exception.ListenerErrorCode.PIXELS_EVE
  */
 public class PixelsEventListener implements EventListener
 {
-    private Logger logger = Logger.get(PixelsEventListener.class);
+    private static Logger logger = Logger.get(PixelsEventListener.class);
 
     private final String logDir;
     private final boolean enabled;
@@ -52,10 +53,18 @@ public class PixelsEventListener implements EventListener
     private final String schema;
     private final String queryType;
     private static BufferedWriter LogWriter = null;
+    private static final double GCThreshold;
 
     static
     {
         ParserConfig.getGlobalInstance().setAutoTypeSupport(true);
+        /**
+         * Issue #87:
+         * Get the gc threshold here.
+         */
+        String thresholdStr = ConfigFactory.Instance().getProperty("pixels.gc.threshold");
+        GCThreshold = Double.parseDouble(thresholdStr);
+        logger.info("Using pixels.gc.threshold (" + GCThreshold + ")...");
     }
 
     public PixelsEventListener (String logDir, boolean enabled,
@@ -75,7 +84,7 @@ public class PixelsEventListener implements EventListener
                 LogWriter = new BufferedWriter(new FileWriter(
                                 this.logDir + "pixels_query_" +
                                         DateUtil.getCurTime() + ".log", true));
-                LogWriter.write("\"query id\",\"user\",\"elapsed (ms)\",\"execution (ms)\",\"read throughput (MB)\"");
+                LogWriter.write("\"query id\",\"user\",\"elapsed (ms)\",\"execution (ms)\",\"read throughput (MB)\",gc time (ms)");
                 LogWriter.newLine();
                 LogWriter.flush();
             }
@@ -97,6 +106,26 @@ public class PixelsEventListener implements EventListener
         if (this.enabled == false)
         {
             return;
+        }
+
+        double free = Runtime.getRuntime().freeMemory();
+        double total = Runtime.getRuntime().totalMemory();
+
+        /**
+         * Issue #87:
+         * Do explicit gc here, instead of in PixelsReaderImpl.close().
+         */
+        long gcms = -1;
+        if (free / total < GCThreshold)
+        {
+            /**
+             * By calling gc(), we try to do gc on time when the query is finished.
+             * It would be very expensive to do gc when executing small queries.
+             */
+            long start = System.currentTimeMillis();
+            Runtime.getRuntime().gc();
+            gcms = (System.currentTimeMillis() - start);
+            logger.info("GC time after query: " + gcms + " ms.");
         }
 
         String queryId = queryCompletedEvent.getMetadata().getQueryId();
@@ -135,7 +164,7 @@ public class PixelsEventListener implements EventListener
                         }
                         double execution = elapsed - queued - analysis - planning - finishing;
                         double throughput = inputDataSize / execution * 1000;
-                        LogWriter.write(queryId + "," + user + "," + elapsed + "," + execution + "," + throughput);
+                        LogWriter.write(queryId + "," + user + "," + elapsed + "," + execution + "," + throughput + "," + (gcms>=0 ? gcms : "na"));
                         LogWriter.newLine();
                         LogWriter.flush();
                     }
