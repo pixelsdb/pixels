@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * pixels cache header
  * index:
- * - HEADER: MAGIC(6 bytes), RW(2 bytes), READER_COUNT(2 bytes), VERSION(4 bytes)
+ * - HEADER: MAGIC(6 bytes), RW_FLAG(2 bytes), READER_COUNT(2 bytes), VERSION(4 bytes)
  * - RADIX
  * cache:
  * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
@@ -45,14 +45,22 @@ public class PixelsCacheUtil
 {
     private final static Logger logger = LogManager.getLogger(PixelsCacheUtil.class);
 
-    public static final int MAX_READER_COUNT = 2 ^ 15 - 1;
+    /**
+     * Issue #88:
+     * Do not use 2 ^ n - 1, it is not latex :)
+     */
+    public static final int MAX_READER_COUNT = Short.MAX_VALUE;
 
+    /**
+     * The masks and inc are initialized according to the native endianness.
+     * The cache index is also read and write using native endianness.
+     */
     public static final int RW_MASK;
     public static final int READER_COUNT_MASK;
     public static final int READER_COUNT_INC;
     /**
-     * We only use the first 14 bytes in the index {magic(6)+rwflag(2)+readcount(2)+version(4)}
-     * for metadata header, but we start radix tree from offset 16 for memory alignment.
+     * We only use the first 14 bytes in the index {magic(6)+rwflag(2)+reader_count(2)+version(4)}
+     * for metadata header, but we start radix tree from offset 16 for word alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
     /**
