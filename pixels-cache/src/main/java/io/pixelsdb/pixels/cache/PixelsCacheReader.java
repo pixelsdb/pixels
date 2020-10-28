@@ -127,7 +127,7 @@ public class PixelsCacheReader
      * @param rowGroupId row group id
      * @param columnId   column id
      * @param direct get direct byte buffer if true
-     * @return columnlet content
+     * @return columnlet content, null if failed to read cache.
      */
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
@@ -142,6 +142,13 @@ public class PixelsCacheReader
         } catch (InterruptedException e)
         {
             logger.error("Failed to get read permission on index.", e);
+            /**
+             * Issue #88:
+             * In case of failure (e.g. reaches max cache reader count),
+             * return null here to stop reading cache, then the content
+             * will be read from disk.
+             */
+            return null;
         }
 
         ByteBuffer content = null;
