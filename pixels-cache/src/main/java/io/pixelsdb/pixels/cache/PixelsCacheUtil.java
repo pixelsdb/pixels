@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * pixels cache header
  * index:
- * - HEADER: MAGIC(6 bytes), RW_FLAG(2 bytes), READER_COUNT(2 bytes), VERSION(4 bytes)
+ * - HEADER: MAGIC(6 bytes), RW_FLAG(1 byte), READER_COUNT(3 bytes), VERSION(4 bytes)
  * - RADIX
  * cache:
  * - HEADER: MAGIC(6 bytes), STATUS(2 bytes), SIZE(8 bytes)
@@ -48,18 +48,24 @@ public class PixelsCacheUtil
     /**
      * Issue #88:
      * Do not use 2 ^ n - 1, it is not latex :)
+     *
+     * Issue #91:
+     * Use three bytes, instead of two bytes, for reader count.
+     * The following masks and const numbers are also changed accordingly.
      */
-    public static final int MAX_READER_COUNT = Short.MAX_VALUE;
+    public static final int MAX_READER_COUNT = 0x007FFFFF;
 
     /**
-     * The masks and inc are initialized according to the native endianness.
+     * The masks and const numbers are initialized according to the native endianness.
      * The cache index is also read and write using native endianness.
      */
     public static final int RW_MASK;
     public static final int READER_COUNT_MASK;
     public static final int READER_COUNT_INC;
+    public static final int ZERO_READER_COUNT_WITH_RW_FLAG;
+    public static final int READER_COUNT_RIGHT_SHIFT_BITS;
     /**
-     * We only use the first 14 bytes in the index {magic(6)+rwflag(2)+reader_count(2)+version(4)}
+     * We only use the first 14 bytes in the index {magic(6)+rw_flag(1)+reader_count(3)+version(4)}
      * for metadata header, but we start radix tree from offset 16 for word alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
@@ -80,21 +86,25 @@ public class PixelsCacheUtil
         {
             /**
              * If the index file is in little-endian, rw flag is in the lowest
-             * two bytes of v, while reader count is in the highest two bytes.
+             * byte of v, while reader count is in the highest three bytes.
              */
-            RW_MASK = 0x0000ffff;
-            READER_COUNT_MASK = 0xffff0000;
-            READER_COUNT_INC = 0x00010000;
+            RW_MASK = 0x000000FF;
+            READER_COUNT_MASK = 0xFFFFFF00;
+            READER_COUNT_INC = 0x00000100;
+            ZERO_READER_COUNT_WITH_RW_FLAG = 0x00000001;
+            READER_COUNT_RIGHT_SHIFT_BITS = 8;
         }
         else
         {
             /**
              * If the index file is in big-endian, rw flag is in the highest
-             * two bytes of v, while reader count is in the lowest two bytes.
+             * bytes of v, while reader count is in the lowest three bytes.
              */
-            RW_MASK = 0xffff0000;
-            READER_COUNT_MASK = 0x0000ffff;
+            RW_MASK = 0xFF000000;
+            READER_COUNT_MASK = 0x00FFFFFF;
             READER_COUNT_INC = 0x00000001;
+            ZERO_READER_COUNT_WITH_RW_FLAG = 0x01000000;
+            READER_COUNT_RIGHT_SHIFT_BITS = 0;
         }
     }
 
@@ -153,10 +163,10 @@ public class PixelsCacheUtil
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
-        indexFile.putShortVolatile(6, (short) 1);
+        indexFile.putByteVolatile(6, (byte) 1);
         final int sleepMs = 10;
         int waitMs = 0;
-        while (indexFile.getShortVolatile(8) > 0)
+        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0)
         {
             /**
              * Wait for the existing readers to finish.
@@ -170,7 +180,7 @@ public class PixelsCacheUtil
             if (waitMs > CACHE_READ_LEASE_MS)
             {
                 // clear reader count to continue writing.
-                indexFile.putShortVolatile(8, (short) 0);
+                indexFile.putIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
                 break;
             }
         }
@@ -178,7 +188,7 @@ public class PixelsCacheUtil
 
     public static void endIndexWrite(MemoryMappedFile indexFile)
     {
-        indexFile.putShortVolatile(6, (short) 0);
+        indexFile.putByteVolatile(6, (byte) 0);
     }
 
     /**
@@ -190,7 +200,7 @@ public class PixelsCacheUtil
     public static long beginIndexRead(MemoryMappedFile indexFile) throws InterruptedException
     {
         int v = indexFile.getIntVolatile(6);
-        short readerCount = indexFile.getShortVolatile(8);
+        int readerCount = (v & READER_COUNT_MASK) >> READER_COUNT_RIGHT_SHIFT_BITS;
         if (readerCount >= MAX_READER_COUNT)
         {
             throw new InterruptedException("Reaches the max concurrent read count.");
@@ -206,7 +216,7 @@ public class PixelsCacheUtil
                 Thread.sleep(10);
             }
             v = indexFile.getIntVolatile(6);
-            readerCount = indexFile.getShortVolatile(8);
+            readerCount = (v & READER_COUNT_MASK) >> READER_COUNT_RIGHT_SHIFT_BITS;
             if (readerCount >= MAX_READER_COUNT)
             {
                 throw new InterruptedException("Reaches the max concurrent read count.");
