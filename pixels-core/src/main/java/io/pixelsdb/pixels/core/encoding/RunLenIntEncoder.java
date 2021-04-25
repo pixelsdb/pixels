@@ -34,6 +34,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * More details can be found at https://orc.apache.org/docs/run-length.html
  *
  * @author guodong
+ * @author hank
  */
 public class RunLenIntEncoder
         extends Encoder
@@ -87,12 +88,27 @@ public class RunLenIntEncoder
         clear();
     }
 
-    public byte[] encode(long[] values, long offset, long length)
+    @Override
+    public byte[] encode(long[] values, int offset, int length)
             throws IOException
     {
         for (int i = 0; i < length; i++)
         {
-            this.write(values[i]);
+            this.write(values[i+offset]);
+        }
+        flush();
+        byte[] result = outputStream.toByteArray();
+        outputStream.reset();
+        return result;
+    }
+
+    @Override
+    public byte[] encode(int[] values, int offset, int length)
+            throws IOException
+    {
+        for (int i = 0; i < length; i++)
+        {
+            this.write(values[i+offset]);
         }
         flush();
         byte[] result = outputStream.toByteArray();
@@ -102,6 +118,13 @@ public class RunLenIntEncoder
 
     @Override
     public byte[] encode(long[] values)
+            throws IOException
+    {
+        return encode(values, 0, values.length);
+    }
+
+    @Override
+    public byte[] encode(int[] values)
             throws IOException
     {
         return encode(values, 0, values.length);

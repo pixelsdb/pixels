@@ -23,26 +23,26 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
+import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * Timestamp column writer.
- * All timestamp values are converted to standard UTC time before they are stored as long values.
- * Currently not support nanos
+ * Time column writer.
+ * All time values are converted to standard UTC time before they are stored as int values.
  *
- * @author guodong
+ * 2021-04-25
+ * @author hank
  */
-public class TimestampColumnWriter extends BaseColumnWriter
+public class TimeColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];
+    private final int[] curPixelVector = new int[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public TimeColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
-        // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
+        // time is likely to be negative according to different time zone.
         encoder = new RunLenIntEncoder(true, true);
     }
 
@@ -50,8 +50,8 @@ public class TimestampColumnWriter extends BaseColumnWriter
     public int write(ColumnVector vector, int size)
             throws IOException
     {
-        TimestampColumnVector columnVector = (TimestampColumnVector) vector;
-        long[] times = columnVector.time;
+        TimeColumnVector columnVector = (TimeColumnVector) vector;
+        int[] times = columnVector.time;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -71,7 +71,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartTime(TimestampColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartTime(TimeColumnVector columnVector, int[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -96,22 +96,22 @@ public class TimestampColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
-            pixelStatRecorder.updateTimestamp(curPixelVector[i]);
+            pixelStatRecorder.updateTime(curPixelVector[i]);
         }
 
         if (isEncoding)
         {
-            long[] values = new long[curPixelVectorIndex];
+            int[] values = new int[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
         }
         else
         {
             ByteBuffer curVecPartitionBuffer =
-                    ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+                    ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
-                curVecPartitionBuffer.putLong(curPixelVector[i]);
+                curVecPartitionBuffer.putInt(curPixelVector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
         }

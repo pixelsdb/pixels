@@ -23,26 +23,26 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
+import io.pixelsdb.pixels.core.vector.DateColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * Timestamp column writer.
- * All timestamp values are converted to standard UTC time before they are stored as long values.
- * Currently not support nanos
+ * Date column writer.
+ * All date values are converted to standard UTC time before they are stored as long values.
  *
- * @author guodong
+ * 2021-04-25
+ * @author hank
  */
-public class TimestampColumnWriter extends BaseColumnWriter
+public class DateColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public DateColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
         super(schema, pixelStride, isEncoding);
-        // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
+        // Issue #94: Date.getTime() can be negative if the date is before 1970-1-1.
         encoder = new RunLenIntEncoder(true, true);
     }
 
@@ -50,7 +50,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     public int write(ColumnVector vector, int size)
             throws IOException
     {
-        TimestampColumnVector columnVector = (TimestampColumnVector) vector;
+        DateColumnVector columnVector = (DateColumnVector) vector;
         long[] times = columnVector.time;
         int curPartLength;
         int curPartOffset = 0;
@@ -71,7 +71,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartTime(TimestampColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartTime(DateColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -96,7 +96,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
     {
         for (int i = 0; i < curPixelVectorIndex; i++)
         {
-            pixelStatRecorder.updateTimestamp(curPixelVector[i]);
+            pixelStatRecorder.updateDate(curPixelVector[i]);
         }
 
         if (isEncoding)

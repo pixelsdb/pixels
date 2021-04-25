@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.core.stats;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 
+import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 
 /**
@@ -106,9 +108,24 @@ public class StatsRecorder
         throw new UnsupportedOperationException("Can't update binary");
     }
 
-    public void updateDate(int value)
+    public void updateDate(Date value)
     {
         throw new UnsupportedOperationException("Can't update date");
+    }
+
+    public void updateDate(long value)
+    {
+        throw new UnsupportedOperationException("Can't update date");
+    }
+
+    public void updateTime(Time value)
+    {
+        throw new UnsupportedOperationException("Can't update time");
+    }
+
+    public void updateTime(int value)
+    {
+        throw new UnsupportedOperationException("Can't update time");
     }
 
     public void updateTimestamp(Timestamp value)
