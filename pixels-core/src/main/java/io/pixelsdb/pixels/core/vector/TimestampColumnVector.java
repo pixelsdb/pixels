@@ -44,6 +44,7 @@ public class TimestampColumnVector extends ColumnVector
     public long[] time;
     // The values from Timestamp.getTime().
 
+    // TODO: fully support or remove nanos. And it can be int[].
     public long[] nanos;
     // The values from Timestamp.getNanos().
 

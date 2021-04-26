@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.core.vector;
 import java.sql.Date;
 import java.util.Arrays;
 
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
+
 /**
  * DateColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
  * <p>
@@ -43,8 +45,10 @@ public class DateColumnVector extends ColumnVector
 {
     /*
      * The storage arrays for this column vector corresponds to the storage of a Date:
+     * They are the days from 1970-1-1. This is consistent with date type's internal
+     * representation in Presto.
      */
-    public long[] time;
+    public int[] time;
     // The values from Date.getTime().
 
     /*
@@ -70,7 +74,7 @@ public class DateColumnVector extends ColumnVector
     {
         super(len);
 
-        time = new long[len];
+        time = new int[len];
 
         scratchDate = new Date(0);
     }
@@ -90,9 +94,9 @@ public class DateColumnVector extends ColumnVector
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
-     * @return
+     * @return the days from 1970-1-1.
      */
-    public long getTime(int elementNum)
+    public int getTime(int elementNum)
     {
         return time[elementNum];
     }
@@ -106,7 +110,8 @@ public class DateColumnVector extends ColumnVector
      */
     public void dateUpdate(Date date, int elementNum)
     {
-        date.setTime(time[elementNum]);
+
+        date.setTime(dayToMillis(time[elementNum]));
     }
 
     /**
@@ -118,7 +123,7 @@ public class DateColumnVector extends ColumnVector
      */
     public Date asScratchDate(int elementNum)
     {
-        scratchDate.setTime(time[elementNum]);
+        scratchDate.setTime(dayToMillis(time[elementNum]));
         return scratchDate;
     }
 
@@ -140,7 +145,7 @@ public class DateColumnVector extends ColumnVector
      */
     public long getDateAsLong(int elementNum)
     {
-        scratchDate.setTime(time[elementNum]);
+        scratchDate.setTime(dayToMillis(time[elementNum]));
         return getDateAsLong(scratchDate);
     }
 
@@ -265,7 +270,7 @@ public class DateColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatFastTime = time[0];
+            int repeatFastTime = time[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
@@ -305,7 +310,7 @@ public class DateColumnVector extends ColumnVector
         }
         else
         {
-            this.time[elementNum] = date.getTime();
+            this.time[elementNum] = millisToDay(date.getTime());
         }
     }
 
@@ -316,7 +321,7 @@ public class DateColumnVector extends ColumnVector
      */
     public void setFromScratchDate(int elementNum)
     {
-        this.time[elementNum] = scratchDate.getTime();
+        this.time[elementNum] = millisToDay(scratchDate.getTime());
     }
 
     /**
@@ -391,7 +396,7 @@ public class DateColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = date.getTime();
+        time[0] = millisToDay(date.getTime());
     }
 
     @Override
@@ -403,7 +408,7 @@ public class DateColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchDate.setTime(time[row]);
+            scratchDate.setTime(dayToMillis(time[row]));
             buffer.append(scratchDate.toString());
         }
         else
@@ -420,8 +425,8 @@ public class DateColumnVector extends ColumnVector
         {
             return;
         }
-        long[] oldTime = time;
-        time = new long[size];
+        int[] oldTime = time;
+        time = new int[size];
         length = size;
         if (preserveData)
         {

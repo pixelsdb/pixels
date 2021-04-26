@@ -30,14 +30,15 @@ import java.nio.ByteBuffer;
 
 /**
  * Date column writer.
- * All date values are converted to standard UTC time before they are stored as long values.
+ * All date values are converted to the number of days from
+ * UTC 1970-1-1 0:0：0 before they are stored as int values.
  *
  * 2021-04-25
  * @author hank
  */
 public class DateColumnWriter extends BaseColumnWriter
 {
-    private final long[] curPixelVector = new long[pixelStride];
+    private final int[] curPixelVector = new int[pixelStride];
 
     public DateColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
     {
@@ -51,7 +52,7 @@ public class DateColumnWriter extends BaseColumnWriter
             throws IOException
     {
         DateColumnVector columnVector = (DateColumnVector) vector;
-        long[] times = columnVector.time;
+        int[] times = columnVector.time;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -71,7 +72,7 @@ public class DateColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartTime(DateColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartTime(DateColumnVector columnVector, int[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -101,17 +102,17 @@ public class DateColumnWriter extends BaseColumnWriter
 
         if (isEncoding)
         {
-            long[] values = new long[curPixelVectorIndex];
+            int[] values = new int[curPixelVectorIndex];
             System.arraycopy(curPixelVector, 0, values, 0, curPixelVectorIndex);
             outputStream.write(encoder.encode(values));
         }
         else
         {
             ByteBuffer curVecPartitionBuffer =
-                    ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES);
+                    ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES);
             for (int i = 0; i < curPixelVectorIndex; i++)
             {
-                curVecPartitionBuffer.putLong(curPixelVector[i]);
+                curVecPartitionBuffer.putInt(curPixelVector[i]);
             }
             outputStream.write(curVecPartitionBuffer.array());
         }

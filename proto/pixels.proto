@@ -164,8 +164,8 @@ message TimestampStatistic {
 
 message DateStatistic {
     // min,max values saved as milliseconds since epoch
-    optional sint64 minimum = 1;
-    optional sint64 maximum = 2;
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
 }
 
 message TimeStatistic {

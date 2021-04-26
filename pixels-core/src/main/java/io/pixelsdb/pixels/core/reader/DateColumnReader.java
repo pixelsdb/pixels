@@ -164,7 +164,7 @@ public class DateColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Date(inputBuffer.getLong()));
+                    columnVector.set(i + vectorIndex, new Date(inputBuffer.getInt()));
                 }
                 if (hasNull)
                 {

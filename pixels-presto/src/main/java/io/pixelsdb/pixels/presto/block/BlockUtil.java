@@ -12,6 +12,11 @@ import static java.lang.Math.ceil;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * This class is derived from com.facebook.presto.spi.block.BlockUtil.
+ * Created at: 19-6-1
+ * Author: hank
+ */
 final class BlockUtil
 {
     private static final double BLOCK_RESET_SKEW = 1.25;

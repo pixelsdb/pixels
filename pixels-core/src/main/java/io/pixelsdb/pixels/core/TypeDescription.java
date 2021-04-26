@@ -104,6 +104,7 @@ public final class TypeDescription
         DOUBLE("double", true),
         STRING("string", true),
         DATE("date", true),
+        TIME("time", true),
         TIMESTAMP("timestamp", true),
         BINARY("binary", true),
         VARCHAR("varchar", true),

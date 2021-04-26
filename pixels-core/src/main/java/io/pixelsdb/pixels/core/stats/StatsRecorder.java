@@ -113,7 +113,7 @@ public class StatsRecorder
         throw new UnsupportedOperationException("Can't update date");
     }
 
-    public void updateDate(long value)
+    public void updateDate(int value)
     {
         throw new UnsupportedOperationException("Can't update date");
     }
@@ -198,6 +198,10 @@ public class StatsRecorder
             case CHAR:
             case VARCHAR:
                 return new StringStatsRecorder();
+            case DATE:
+                return new DateStatsRecorder();
+            case TIME:
+                return new TimeStatsRecorder();
             case TIMESTAMP:
                 return new TimestampStatsRecorder();
             case BINARY:
@@ -225,6 +229,10 @@ public class StatsRecorder
             case CHAR:
             case VARCHAR:
                 return new StringStatsRecorder(statistic);
+            case DATE:
+                return new DateStatsRecorder(statistic);
+            case TIME:
+                return new TimeStatsRecorder(statistic);
             case TIMESTAMP:
                 return new TimestampStatsRecorder(statistic);
             case BINARY:
