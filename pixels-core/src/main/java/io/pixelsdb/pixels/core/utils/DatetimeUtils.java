@@ -8,6 +8,7 @@ import java.util.Calendar;
  */
 public class DatetimeUtils
 {
+    // TODO: currently we assume there are 86400000 millis in a day, without dealing with leap second.
     private static final int TIMEZONE_OFFSET;
 
     static
@@ -25,5 +26,10 @@ public class DatetimeUtils
     public static int millisToDay (long millis)
     {
         return (int)((millis-TIMEZONE_OFFSET)/86400000);
+    }
+
+    public static int roundSqlTime (long millis)
+    {
+        return (int)(millis%86400000);
     }
 }

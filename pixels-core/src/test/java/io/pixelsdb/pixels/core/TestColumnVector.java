@@ -73,6 +73,10 @@ public class TestColumnVector
         System.out.println((int)time.getTime());
         Timestamp timestamp = Timestamp.valueOf("2018-05-07 20:39:20");
         System.out.println(timestamp.getNanos());
+        date = new Date(System.currentTimeMillis());
+        System.out.println(date.toString());
+        time = new Time(System.currentTimeMillis());
+        System.out.println(time.toString());
     }
 
     @Test

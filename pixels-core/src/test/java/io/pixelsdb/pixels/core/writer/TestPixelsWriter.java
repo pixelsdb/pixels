@@ -40,7 +40,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -69,8 +72,10 @@ public class TestPixelsWriter
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
-            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
+            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];              // boolean
+            DateColumnVector f = (DateColumnVector) rowBatch.cols[5];              // date
+            TimeColumnVector g = (TimeColumnVector) rowBatch.cols[6];              // time
+            BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7];          // string
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -104,8 +109,12 @@ public class TestPixelsWriter
                     d.nanos[row] = 0;
                     e.isNull[row] = true;
                     e.vector[row] = 0;
-                    z.isNull[row] = true;
-                    z.vector[row] = new byte[0];
+                    f.isNull[row] = true;
+                    f.time[row] = 0;
+                    g.isNull[row] = true;
+                    g.time[row] = 0;
+                    h.isNull[row] = true;
+                    h.vector[row] = new byte[0];
                 }
                 else
                 {
@@ -117,10 +126,14 @@ public class TestPixelsWriter
                     c.isNull[row] = false;
                     d.set(row, timestamp);
                     d.isNull[row] = false;
-                    e.vector[row] = i > 25 ? 1 : 0;
+                    e.vector[row] = (byte) (i % 100 > 25 ? 1 : 0);
                     e.isNull[row] = false;
-                    z.setVal(row, String.valueOf(i).getBytes());
-                    z.isNull[row] = false;
+                    f.set(row, new Date(System.currentTimeMillis()));
+                    f.isNull[row] = false;
+                    g.set(row, new Time(System.currentTimeMillis()));
+                    g.isNull[row] = false;
+                    h.setVal(row, String.valueOf(i).getBytes());
+                    h.isNull[row] = false;
                 }
                 if (rowBatch.size == rowBatch.getMaxSize())
                 {
@@ -216,10 +229,11 @@ public class TestPixelsWriter
     public void testRead()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "c", "d", "e", "z"};
+        String[] cols = {"a", "b", "c", "d", "e", "f", "g", "h"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
+        option.rgRange(0, 1);
 
         VectorizedRowBatch rowBatch;
         PixelsReader pixelsReader;
@@ -234,15 +248,25 @@ public class TestPixelsWriter
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setFS(fs)
                     .setPath(path)
+                    .setEnableCache(false)
+                    .setCacheOrder(new ArrayList<>())
+                    .setPixelsCacheReader(null)
+                    .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
-            rowBatch = recordReader.readBatch(5000);
+            rowBatch = recordReader.readBatch();
             LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
             DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
             DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
             TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];
-            LongColumnVector ecv = (LongColumnVector) rowBatch.cols[4];
-            BinaryColumnVector zcv = (BinaryColumnVector) rowBatch.cols[5];
+            ByteColumnVector ecv = (ByteColumnVector) rowBatch.cols[4];
+            DateColumnVector fcv = (DateColumnVector) rowBatch.cols[5];
+            TimeColumnVector gcv = (TimeColumnVector) rowBatch.cols[6];
+            BinaryColumnVector hcv = (BinaryColumnVector) rowBatch.cols[7];
+            for (int i = 0; i < fcv.getLength(); ++i)
+            {
+                System.out.println(fcv.asScratchDate(i) + ", " + fcv.isNull[i]);
+            }
         }
         catch (IOException e)
         {

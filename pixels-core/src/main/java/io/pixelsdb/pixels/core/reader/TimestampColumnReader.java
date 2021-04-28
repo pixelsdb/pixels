@@ -96,7 +96,7 @@ public class TimestampColumnReader
             }
             this.inputBuffer = input;
             inputStream = new ByteBufferInputStream(inputBuffer, 0, inputBuffer.limit());
-            decoder = new RunLenIntDecoder(inputStream, false);
+            decoder = new RunLenIntDecoder(inputStream, true);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;

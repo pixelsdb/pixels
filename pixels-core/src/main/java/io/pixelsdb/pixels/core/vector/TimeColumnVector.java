@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.core.vector;
 import java.sql.Time;
 import java.util.Arrays;
 
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.roundSqlTime;
+
 /**
  * TimeColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
  * <p>
@@ -86,7 +88,7 @@ public class TimeColumnVector extends ColumnVector
     }
 
     /**
-     * Return a row's Time.getTime() value.
+     * Return a row's value, which is the millis in a day.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
@@ -305,8 +307,20 @@ public class TimeColumnVector extends ColumnVector
         }
         else
         {
-            this.time[elementNum] = (int)t.getTime();
+            this.time[elementNum] = roundSqlTime(t.getTime());
         }
+    }
+
+    /**
+     * Set a row from a value, which is the millis in the day.
+     * We assume the entry has already been isRepeated adjusted.
+     *
+     * @param elementNum
+     * @param millis
+     */
+    public void set(int elementNum, int millis)
+    {
+        this.time[elementNum] = millis;
     }
 
     /**
@@ -316,7 +330,8 @@ public class TimeColumnVector extends ColumnVector
      */
     public void setFromScratchTime(int elementNum)
     {
-        this.time[elementNum] = (int)scratchTime.getTime();
+        // scratchTime may be changed outside this class, so we also mod it by millis in a day.
+        this.time[elementNum] = roundSqlTime(scratchTime.getTime());
     }
 
     /**
@@ -391,7 +406,7 @@ public class TimeColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = (int)t.getTime();
+        time[0] = roundSqlTime(t.getTime());
     }
 
     @Override

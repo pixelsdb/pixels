@@ -560,6 +560,12 @@ public class PixelsWriterImpl
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
                     break;
+                case DATE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DATE);
+                    break;
+                case TIME:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIME);
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
                             schema.getCategory());

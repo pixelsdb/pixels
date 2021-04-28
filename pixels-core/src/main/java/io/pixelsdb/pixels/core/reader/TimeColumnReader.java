@@ -30,7 +30,6 @@ import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.sql.Time;
 
 /**
  * pixels time column reader
@@ -96,7 +95,7 @@ public class TimeColumnReader
             }
             this.inputBuffer = input;
             inputStream = new ByteBufferInputStream(inputBuffer, 0, inputBuffer.limit());
-            decoder = new RunLenIntDecoder(inputStream, false);
+            decoder = new RunLenIntDecoder(inputStream, true);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
@@ -129,7 +128,7 @@ public class TimeColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Time(decoder.next()));
+                    columnVector.set(i + vectorIndex, (int)decoder.next());
                 }
                 if (hasNull)
                 {
@@ -165,7 +164,7 @@ public class TimeColumnReader
                 else
                 {
                     // If time column is not encoded, it is written as integers instead of longs.
-                    columnVector.set(i + vectorIndex, new Time(inputBuffer.getInt()));
+                    columnVector.set(i + vectorIndex, inputBuffer.getInt());
                 }
                 if (hasNull)
                 {

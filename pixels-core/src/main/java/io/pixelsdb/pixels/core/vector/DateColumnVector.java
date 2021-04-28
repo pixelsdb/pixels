@@ -49,7 +49,6 @@ public class DateColumnVector extends ColumnVector
      * representation in Presto.
      */
     public int[] time;
-    // The values from Date.getTime().
 
     /*
      * Scratch objects.
@@ -90,7 +89,7 @@ public class DateColumnVector extends ColumnVector
     }
 
     /**
-     * Return a row's Date.getTime() value.
+     * Return a row's value, which is the days from epoch (1970-1-1 0:0:0 UTC).
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
@@ -312,6 +311,18 @@ public class DateColumnVector extends ColumnVector
         {
             this.time[elementNum] = millisToDay(date.getTime());
         }
+    }
+
+    /**
+     * Set a row from a value, which is the days from 1970-1-1 UTC.
+     * We assume the entry has already been isRepeated adjusted.
+     *
+     * @param elementNum
+     * @param days
+     */
+    public void set(int elementNum, int days)
+    {
+        this.time[elementNum] = days;
     }
 
     /**
