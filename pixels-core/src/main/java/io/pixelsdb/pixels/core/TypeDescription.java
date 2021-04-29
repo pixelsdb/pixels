@@ -19,14 +19,7 @@
  */
 package io.pixelsdb.pixels.core;
 
-import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.ByteColumnVector;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.StructColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -104,6 +97,7 @@ public final class TypeDescription
         DOUBLE("double", true),
         STRING("string", true),
         DATE("date", true),
+        TIME("time", true),
         TIMESTAMP("timestamp", true),
         BINARY("binary", true),
         VARCHAR("varchar", true),
@@ -175,6 +169,11 @@ public final class TypeDescription
         return new TypeDescription(Category.DATE);
     }
 
+    public static TypeDescription createTime()
+    {
+        return new TypeDescription(Category.TIME);
+    }
+
     public static TypeDescription createTimestamp()
     {
         return new TypeDescription(Category.TIMESTAMP);
@@ -205,6 +204,9 @@ public final class TypeDescription
                     break;
                 case DATE:
                     fieldType = TypeDescription.createDate();
+                    break;
+                case TIME:
+                    fieldType = TypeDescription.createTime();
                     break;
                 case LONG:
                     fieldType = TypeDescription.createLong();
@@ -423,6 +425,7 @@ public final class TypeDescription
             case BOOLEAN:
             case BYTE:
             case DATE:
+            case TIME:
             case DOUBLE:
             case FLOAT:
             case INT:
@@ -433,6 +436,7 @@ public final class TypeDescription
                 break;
             case CHAR:
             case VARCHAR:
+                // TODO: fix varchar
                 requireChar(source, '(');
                 result.withMaxLength(parseInt(source));
                 requireChar(source, ')');
@@ -691,8 +695,11 @@ public final class TypeDescription
             case SHORT:
             case INT:
             case LONG:
-            case DATE:
                 return new LongColumnVector(maxSize);
+            case DATE:
+                return new DateColumnVector(maxSize);
+            case TIME:
+                return new TimeColumnVector(maxSize);
             case TIMESTAMP:
                 return new TimestampColumnVector(maxSize);
             case FLOAT:

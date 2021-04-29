@@ -29,17 +29,7 @@ import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.core.writer.BinaryColumnWriter;
-import io.pixelsdb.pixels.core.writer.BooleanColumnWriter;
-import io.pixelsdb.pixels.core.writer.ByteColumnWriter;
-import io.pixelsdb.pixels.core.writer.CharColumnWriter;
-import io.pixelsdb.pixels.core.writer.ColumnWriter;
-import io.pixelsdb.pixels.core.writer.DoubleColumnWriter;
-import io.pixelsdb.pixels.core.writer.FloatColumnWriter;
-import io.pixelsdb.pixels.core.writer.IntegerColumnWriter;
-import io.pixelsdb.pixels.core.writer.StringColumnWriter;
-import io.pixelsdb.pixels.core.writer.TimestampColumnWriter;
-import io.pixelsdb.pixels.core.writer.VarcharColumnWriter;
+import io.pixelsdb.pixels.core.writer.*;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
@@ -570,6 +560,12 @@ public class PixelsWriterImpl
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
                     break;
+                case DATE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DATE);
+                    break;
+                case TIME:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIME);
+                    break;
                 default:
                     throw new IllegalArgumentException("Unknown category: " +
                             schema.getCategory());
@@ -602,6 +598,10 @@ public class PixelsWriterImpl
                 return new VarcharColumnWriter(schema, pixelStride, isEncoding);
             case BINARY:
                 return new BinaryColumnWriter(schema, pixelStride, isEncoding);
+            case DATE:
+                return new DateColumnWriter(schema, pixelStride, isEncoding);
+            case TIME:
+                return new TimeColumnWriter(schema, pixelStride, isEncoding);
             case TIMESTAMP:
                 return new TimestampColumnWriter(schema, pixelStride, isEncoding);
             default:

@@ -159,6 +159,7 @@ public class Config
             {
                 type = "string";
             }
+            // TODO: support varchar(n).
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }

@@ -62,6 +62,10 @@ public abstract class ColumnReader implements Closeable
                 return new FloatColumnReader(type);
             case STRING:
                 return new StringColumnReader(type);
+            case DATE:
+                return new DateColumnReader(type);
+            case TIME:
+                return new TimeColumnReader(type);
             case TIMESTAMP:
                 return new TimestampColumnReader(type);
             case VARCHAR:

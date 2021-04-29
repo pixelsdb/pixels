@@ -21,37 +21,39 @@ package io.pixelsdb.pixels.core.stats;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 
-import java.sql.Timestamp;
+import java.sql.Date;
+
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 
 /**
  * pixels
  *
- * @author guodong
+ * 2021-04-25
+ * @author hank
  */
-public class TimestampStatsRecorder
-        extends StatsRecorder implements TimestampColumnStats
+public class DateStatsRecorder
+        extends StatsRecorder implements DateColumnStats
 {
-    // Issue #94: change hasMinimum to hasMinMax according to its semantic.
     private boolean hasMinMax = false;
-    private long minimum = Long.MAX_VALUE;
-    private long maximum = Long.MIN_VALUE;
+    private int minimum = Integer.MAX_VALUE;
+    private int maximum = Integer.MIN_VALUE;
 
-    TimestampStatsRecorder()
+    DateStatsRecorder()
     {
     }
 
-    TimestampStatsRecorder(PixelsProto.ColumnStatistic statistic)
+    DateStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
         super(statistic);
-        PixelsProto.TimestampStatistic tsState = statistic.getTimestampStatistics();
-        if (tsState.hasMinimum())
+        PixelsProto.DateStatistic dateState = statistic.getDateStatistics();
+        if (dateState.hasMinimum())
         {
-            minimum = tsState.getMinimum();
+            minimum = dateState.getMinimum();
             hasMinMax = true;
         }
-        if (tsState.hasMaximum())
+        if (dateState.hasMaximum())
         {
-            maximum = tsState.getMaximum();
+            maximum = dateState.getMaximum();
             hasMinMax = true;
         }
     }
@@ -61,12 +63,12 @@ public class TimestampStatsRecorder
     {
         super.reset();
         hasMinMax = false;
-        minimum = Long.MIN_VALUE;
-        maximum = Long.MAX_VALUE;
+        minimum = Integer.MIN_VALUE;
+        maximum = Integer.MAX_VALUE;
     }
 
     @Override
-    public void updateTimestamp(long value)
+    public void updateDate(int value)
     {
         if (hasMinMax)
         {
@@ -88,22 +90,23 @@ public class TimestampStatsRecorder
     }
 
     @Override
-    public void updateTimestamp(Timestamp value)
+    public void updateDate(Date value)
     {
         if (hasMinMax)
         {
+            int v = millisToDay(value.getTime());
             if (value.getTime() < minimum)
             {
-                minimum = value.getTime();
+                minimum = v;
             }
             if (value.getTime() > maximum)
             {
-                maximum = value.getTime();
+                maximum = v;
             }
         }
         else
         {
-            minimum = maximum = value.getTime();
+            minimum = maximum = millisToDay(value.getTime());
             hasMinMax = true;
         }
         numberOfValues++;
@@ -112,31 +115,31 @@ public class TimestampStatsRecorder
     @Override
     public void merge(StatsRecorder other)
     {
-        if (other instanceof TimestampColumnStats)
+        if (other instanceof DateColumnStats)
         {
-            TimestampStatsRecorder tsStat = (TimestampStatsRecorder) other;
+            DateStatsRecorder dateStat = (DateStatsRecorder) other;
             if (hasMinMax)
             {
-                if (tsStat.getMinimum() < minimum)
+                if (dateStat.getMinimum() < minimum)
                 {
-                    minimum = tsStat.getMinimum();
+                    minimum = dateStat.getMinimum();
                 }
-                if (tsStat.getMaximum() > maximum)
+                if (dateStat.getMaximum() > maximum)
                 {
-                    maximum = tsStat.getMaximum();
+                    maximum = dateStat.getMaximum();
                 }
             }
             else
             {
-                minimum = tsStat.getMinimum();
-                maximum = tsStat.getMaximum();
+                minimum = dateStat.getMinimum();
+                maximum = dateStat.getMaximum();
             }
         }
         else
         {
             if (isStatsExists() && hasMinMax)
             {
-                throw new IllegalArgumentException("Incompatible merging of timestamp column statistics");
+                throw new IllegalArgumentException("Incompatible merging of date column statistics");
             }
         }
         super.merge(other);
@@ -146,23 +149,23 @@ public class TimestampStatsRecorder
     public PixelsProto.ColumnStatistic.Builder serialize()
     {
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
-        PixelsProto.TimestampStatistic.Builder tsBuilder =
-                PixelsProto.TimestampStatistic.newBuilder();
-        tsBuilder.setMinimum(minimum);
-        tsBuilder.setMaximum(maximum);
-        builder.setTimestampStatistics(tsBuilder);
+        PixelsProto.DateStatistic.Builder dateBuilder =
+                PixelsProto.DateStatistic.newBuilder();
+        dateBuilder.setMinimum(minimum);
+        dateBuilder.setMaximum(maximum);
+        builder.setDateStatistics(dateBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
     @Override
-    public Long getMinimum()
+    public Integer getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public Long getMaximum()
+    public Integer getMaximum()
     {
         return maximum;
     }
@@ -190,7 +193,7 @@ public class TimestampStatsRecorder
         {
             return true;
         }
-        if (!(o instanceof TimestampStatsRecorder))
+        if (!(o instanceof DateStatsRecorder))
         {
             return false;
         }
@@ -199,7 +202,7 @@ public class TimestampStatsRecorder
             return false;
         }
 
-        TimestampStatsRecorder that = (TimestampStatsRecorder) o;
+        DateStatsRecorder that = (DateStatsRecorder) o;
 
         if (hasMinMax ? !(minimum == that.minimum) : that.hasMinMax)
         {
@@ -222,8 +225,8 @@ public class TimestampStatsRecorder
     public int hashCode()
     {
         int result = super.hashCode();
-        result = 31 * result + (int) (minimum ^ (minimum >>> 32));
-        result = 31 * result + (int) (maximum ^ (maximum >>> 32));
+        result = 15 * result + (minimum ^ (minimum >>> 16));
+        result = 15 * result + (maximum ^ (maximum >>> 16));
         return result;
     }
 }

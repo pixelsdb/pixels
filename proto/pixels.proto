@@ -103,6 +103,7 @@ message Type {
         DATE = 15;
         VARCHAR = 16;
         CHAR = 17;
+        TIME = 18;
     }
     optional Kind kind = 1;
     optional string name = 2;
@@ -161,6 +162,18 @@ message TimestampStatistic {
     optional sint64 maximum = 2;
 }
 
+message DateStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
+}
+
+message TimeStatistic {
+    // min,max values saved as milliseconds since epoch
+    optional sint32 minimum = 1;
+    optional sint32 maximum = 2;
+}
+
 message BinaryStatistic {
     // sum will store the total binary blob length in a stripe
     optional sint64 sum = 1;
@@ -174,6 +187,10 @@ message ColumnStatistic {
     optional BucketStatistic bucketStatistics = 5;
     optional BinaryStatistic binaryStatistics = 6;
     optional TimestampStatistic timestampStatistics = 7;
+    // Date and Time types are added in Issue #94,
+    // use field number 9 and 10 for compatibility.
+    optional DateStatistic dateStatistics = 9;
+    optional TimeStatistic timeStatistics = 10;
     optional bool hasNull = 8;
 }
 

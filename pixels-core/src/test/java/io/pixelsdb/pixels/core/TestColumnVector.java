@@ -27,6 +27,8 @@ import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
+import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 
 import static org.junit.Assert.assertEquals;
@@ -60,6 +62,21 @@ public class TestColumnVector
             sb.append("\n");
         }
         System.out.println(sb.toString());
+    }
+
+    @Test
+    public void testDateTimeTypes()
+    {
+        Date date = Date.valueOf("1900-12-31");
+        System.out.println(date.getTime());
+        Time time = Time.valueOf("23:59:59");
+        System.out.println((int)time.getTime());
+        Timestamp timestamp = Timestamp.valueOf("2018-05-07 20:39:20");
+        System.out.println(timestamp.getNanos());
+        date = new Date(System.currentTimeMillis());
+        System.out.println(date.toString());
+        time = new Time(System.currentTimeMillis());
+        System.out.println(time.toString());
     }
 
     @Test

@@ -26,6 +26,8 @@ import java.io.IOException;
  * A encoder for a sequence of bytes.
  * A control byte is written before each run with positive values 0 to 127 meaning 2 to 129 repetitions.
  * If the bytes is -1 to -128, 1 to 128 literal byte values follow.
+ *
+ * @author guodong
  */
 public class RunLenByteEncoder
         extends Encoder
@@ -60,12 +62,12 @@ public class RunLenByteEncoder
     }
 
     @Override
-    public byte[] encode(byte[] values, long offset, long length)
+    public byte[] encode(byte[] values, int offset, int length)
             throws IOException
     {
         for (int i = 0; i < length; i++)
         {
-            write(values[i + (int) offset]);
+            write(values[i + offset]);
         }
         flush();
         byte[] result = output.toByteArray();

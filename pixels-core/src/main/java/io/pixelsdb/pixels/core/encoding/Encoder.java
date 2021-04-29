@@ -44,7 +44,7 @@ public abstract class Encoder implements AutoCloseable
         throw new PixelsEncodingException("Encoding char values is not supported");
     }
 
-    public byte[] encode(char[] values, long offset, long length)
+    public byte[] encode(char[] values, int offset, int length)
     {
         throw new PixelsEncodingException("Encoding char values is not supported");
     }
@@ -55,7 +55,7 @@ public abstract class Encoder implements AutoCloseable
         throw new PixelsEncodingException("Encoding byte values is not supported");
     }
 
-    public byte[] encode(byte[] values, long offset, long length)
+    public byte[] encode(byte[] values, int offset, int length)
             throws IOException
     {
         throw new PixelsEncodingException("Encoding byte values is not supported");
@@ -67,13 +67,20 @@ public abstract class Encoder implements AutoCloseable
         throw new PixelsEncodingException("Encoding long values is not supported");
     }
 
-    public byte[] encode(long[] values, long offset, long length)
+    public byte[] encode(long[] values, int offset, int length)
             throws IOException
     {
         throw new PixelsEncodingException("Encoding long values is not supported");
     }
 
     public byte[] encode(int[] values)
+            throws IOException
+    {
+        throw new PixelsEncodingException("Encoding int values is not supported");
+    }
+
+    public byte[] encode(int[] values, int offset, int length)
+            throws IOException
     {
         throw new PixelsEncodingException("Encoding int values is not supported");
     }

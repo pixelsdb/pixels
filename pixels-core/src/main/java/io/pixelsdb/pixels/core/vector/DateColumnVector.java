@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,45 +19,48 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
-import java.sql.Timestamp;
+import java.sql.Date;
 import java.util.Arrays;
 
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
+
 /**
- * TimestampColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
+ * DateColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
  * <p>
- * This class represents a nullable timestamp column vector capable of handing a wide range of
- * timestamp values.
+ * This class represents a nullable date column vector capable of handing a wide range of
+ * date values.
  * <p>
- * We store the 2 (value) fields of a Timestamp class in primitive arrays.
+ * We store the value field of a Date class in primitive arrays.
  * <p>
- * We do this to avoid an array of Java Timestamp objects which would have poor storage
+ * We do this to avoid an array of Java Date objects which would have poor storage
  * and memory access characteristics.
  * <p>
- * Generally, the caller will fill in a scratch timestamp object with values from a row, work
- * using the scratch timestamp, and then perhaps update the column vector row with a result.
+ * Generally, the caller will fill in a scratch date object with values from a row, work
+ * using the scratch date, and then perhaps update the column vector row with a result.
+ *
+ * 2021-04-24
+ * @author hank
  */
-public class TimestampColumnVector extends ColumnVector
+public class DateColumnVector extends ColumnVector
 {
     /*
-     * The storage arrays for this column vector corresponds to the storage of a Timestamp:
+     * The storage arrays for this column vector corresponds to the storage of a Date:
+     * They are the days from 1970-1-1. This is consistent with date type's internal
+     * representation in Presto.
      */
-    public long[] time;
-    // The values from Timestamp.getTime().
-
-    // TODO: fully support or remove nanos. And it can be int[].
-    public long[] nanos;
-    // The values from Timestamp.getNanos().
+    public int[] time;
 
     /*
      * Scratch objects.
      */
-    private final Timestamp scratchTimestamp;
+    private final Date scratchDate;
 
     /**
      * Use this constructor by default. All column vectors
      * should normally be the default size.
      */
-    public TimestampColumnVector()
+    public DateColumnVector()
     {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
@@ -67,14 +70,13 @@ public class TimestampColumnVector extends ColumnVector
      *
      * @param len the number of rows
      */
-    public TimestampColumnVector(int len)
+    public DateColumnVector(int len)
     {
         super(len);
 
-        time = new long[len];
-        nanos = new long[len];
+        time = new int[len];
 
-        scratchTimestamp = new Timestamp(0);
+        scratchDate = new Date(0);
     }
 
     /**
@@ -88,88 +90,74 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     /**
-     * Return a row's Timestamp.getTime() value.
+     * Return a row's value, which is the days from epoch (1970-1-1 0:0:0 UTC).
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
-     * @return
+     * @return the days from 1970-1-1.
      */
-    public long getTime(int elementNum)
+    public int getTime(int elementNum)
     {
         return time[elementNum];
     }
 
     /**
-     * Return a row's Timestamp.getNanos() value.
+     * Set a Date object from a row of the column.
+     * We assume the entry has already been NULL checked and isRepeated adjusted.
+     *
+     * @param date
+     * @param elementNum
+     */
+    public void dateUpdate(Date date, int elementNum)
+    {
+
+        date.setTime(dayToMillis(time[elementNum]));
+    }
+
+    /**
+     * Return the scratch Date object set from a row.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
      * @return
      */
-    public int getNanos(int elementNum)
+    public Date asScratchDate(int elementNum)
     {
-        return (int) nanos[elementNum];
+        scratchDate.setTime(dayToMillis(time[elementNum]));
+        return scratchDate;
     }
 
     /**
-     * Set a Timestamp object from a row of the column.
-     * We assume the entry has already been NULL checked and isRepeated adjusted.
+     * Return the scratch date (contents undefined).
      *
-     * @param timestamp
-     * @param elementNum
+     * @return
      */
-    public void timestampUpdate(Timestamp timestamp, int elementNum)
+    public Date getScratchDate()
     {
-        timestamp.setTime(time[elementNum]);
-        timestamp.setNanos((int) nanos[elementNum]);
+        return scratchDate;
     }
 
     /**
-     * Return the scratch Timestamp object set from a row.
-     * We assume the entry has already been NULL checked and isRepeated adjusted.
+     * Return a long representation of a date.
      *
      * @param elementNum
      * @return
      */
-    public Timestamp asScratchTimestamp(int elementNum)
+    public long getDateAsLong(int elementNum)
     {
-        scratchTimestamp.setTime(time[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
-        return scratchTimestamp;
+        scratchDate.setTime(dayToMillis(time[elementNum]));
+        return getDateAsLong(scratchDate);
     }
 
     /**
-     * Return the scratch timestamp (contents undefined).
+     * Return a long representation of a Date.
      *
+     * @param date
      * @return
      */
-    public Timestamp getScratchTimestamp()
+    public static long getDateAsLong(Date date)
     {
-        return scratchTimestamp;
-    }
-
-    /**
-     * Return a long representation of a Timestamp.
-     *
-     * @param elementNum
-     * @return
-     */
-    public long getTimestampAsLong(int elementNum)
-    {
-        scratchTimestamp.setTime(time[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
-        return getTimestampAsLong(scratchTimestamp);
-    }
-
-    /**
-     * Return a long representation of a Timestamp.
-     *
-     * @param timestamp
-     * @return
-     */
-    public static long getTimestampAsLong(Timestamp timestamp)
-    {
-        return millisToSeconds(timestamp.getTime());
+        return millisToSeconds(date.getTime());
     }
 
     // Copy of TimestampWritable.millisToSeconds
@@ -191,107 +179,76 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     /**
-     * Return a double representation of a Timestamp.
-     *
-     * @param elementNum
-     * @return
-     */
-    public double getDouble(int elementNum)
-    {
-        scratchTimestamp.setTime(time[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
-        return getDouble(scratchTimestamp);
-    }
-
-    /**
-     * Return a double representation of a Timestamp.
-     *
-     * @param timestamp
-     * @return
-     */
-    public static double getDouble(Timestamp timestamp)
-    {
-        // Same algorithm as TimestampWritable (not currently import-able here).
-        double seconds, nanos;
-        seconds = millisToSeconds(timestamp.getTime());
-        nanos = timestamp.getNanos();
-        return seconds + nanos / 1000000000;
-    }
-
-    /**
-     * Compare row to Timestamp.
+     * Compare row to Date.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
-     * @param timestamp
+     * @param date
      * @return -1, 0, 1 standard compareTo values.
      */
-    public int compareTo(int elementNum, Timestamp timestamp)
+    public int compareTo(int elementNum, Date date)
     {
-        return asScratchTimestamp(elementNum).compareTo(timestamp);
+        return asScratchDate(elementNum).compareTo(date);
     }
 
     /**
-     * Compare Timestamp to row.
+     * Compare Date to row.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
-     * @param timestamp
+     * @param date
      * @param elementNum
      * @return -1, 0, 1 standard compareTo values.
      */
-    public int compareTo(Timestamp timestamp, int elementNum)
+    public int compareTo(Date date, int elementNum)
     {
-        return timestamp.compareTo(asScratchTimestamp(elementNum));
+        return date.compareTo(asScratchDate(elementNum));
     }
 
     /**
-     * Compare a row to another TimestampColumnVector's row.
+     * Compare a row to another DateColumnVector's row.
      *
      * @param elementNum1
-     * @param timestampColVector2
+     * @param dateColVector2
      * @param elementNum2
      * @return
      */
-    public int compareTo(int elementNum1, TimestampColumnVector timestampColVector2,
+    public int compareTo(int elementNum1, DateColumnVector dateColVector2,
                          int elementNum2)
     {
-        return asScratchTimestamp(elementNum1).compareTo(
-                timestampColVector2.asScratchTimestamp(elementNum2));
+        return asScratchDate(elementNum1).compareTo(
+                dateColVector2.asScratchDate(elementNum2));
     }
 
     /**
-     * Compare another TimestampColumnVector's row to a row.
+     * Compare another DateColumnVector's row to a row.
      *
-     * @param timestampColVector1
+     * @param dateColVector1
      * @param elementNum1
      * @param elementNum2
      * @return
      */
-    public int compareTo(TimestampColumnVector timestampColVector1, int elementNum1,
+    public int compareTo(DateColumnVector dateColVector1, int elementNum1,
                          int elementNum2)
     {
-        return timestampColVector1.asScratchTimestamp(elementNum1).compareTo(
-                asScratchTimestamp(elementNum2));
+        return dateColVector1.asScratchDate(elementNum1).compareTo(
+                asScratchDate(elementNum2));
     }
 
     @Override
     public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
     {
+        DateColumnVector dateColVector = (DateColumnVector) inputVector;
 
-        TimestampColumnVector timestampColVector = (TimestampColumnVector) inputVector;
-
-        time[outElementNum] = timestampColVector.time[inputElementNum];
-        nanos[outElementNum] = timestampColVector.nanos[inputElementNum];
+        time[outElementNum] = dateColVector.time[inputElementNum];
     }
 
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof TimestampColumnVector)
+        if (inputVector instanceof DateColumnVector)
         {
-            TimestampColumnVector srcVector = (TimestampColumnVector) inputVector;
+            DateColumnVector srcVector = (DateColumnVector) inputVector;
             this.time = srcVector.time;
-            this.nanos = srcVector.nanos;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
@@ -299,30 +256,32 @@ public class TimestampColumnVector extends ColumnVector
         }
     }
 
-    // Simplify vector by brute-force flattening noNulls and isRepeating
-    // This can be used to reduce combinatorial explosion of code paths in VectorExpressions
-    // with many arguments.
+    /**
+     * Simplify vector by brute-force flattening noNulls and isRepeating
+     * This can be used to reduce combinatorial explosion of code paths in VectorExpressions
+     * with many arguments.
+     * @param selectedInUse whether use the selected indexes in sel or not.
+     * @param sel the selected indexes.
+     * @param size the size of sel or the number of values to flatten.
+     */
     public void flatten(boolean selectedInUse, int[] sel, int size)
     {
         flattenPush();
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatFastTime = time[0];
-            int repeatNanos = (int) nanos[0];
+            int repeatFastTime = time[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
                     time[i] = repeatFastTime;
-                    nanos[i] = repeatNanos;
                 }
             }
             else
             {
                 Arrays.fill(time, 0, size, repeatFastTime);
-                Arrays.fill(nanos, 0, size, repeatNanos);
             }
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
@@ -330,41 +289,57 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
-    public void add(Timestamp value)
+    public void add(Date value)
     {
         set(writeIndex++, value);
     }
 
+    @Override
+    public void add(String value)
+    {
+        set(writeIndex++, Date.valueOf(value));
+    }
+
     /**
-     * Set a row from a timestamp.
+     * Set a row from a date.
      * We assume the entry has already been isRepeated adjusted.
      *
      * @param elementNum
-     * @param timestamp
+     * @param date
      */
-    public void set(int elementNum, Timestamp timestamp)
+    public void set(int elementNum, Date date)
     {
-        if (timestamp == null)
+        if (date == null)
         {
             this.noNulls = false;
             this.isNull[elementNum] = true;
         }
         else
         {
-            this.time[elementNum] = timestamp.getTime();
-            this.nanos[elementNum] = timestamp.getNanos();
+            this.time[elementNum] = millisToDay(date.getTime());
         }
     }
 
     /**
-     * Set a row from the current value in the scratch timestamp.
+     * Set a row from a value, which is the days from 1970-1-1 UTC.
+     * We assume the entry has already been isRepeated adjusted.
+     *
+     * @param elementNum
+     * @param days
+     */
+    public void set(int elementNum, int days)
+    {
+        this.time[elementNum] = days;
+    }
+
+    /**
+     * Set a row from the current value in the scratch date.
      *
      * @param elementNum
      */
-    public void setFromScratchTimestamp(int elementNum)
+    public void setFromScratchDate(int elementNum)
     {
-        this.time[elementNum] = scratchTimestamp.getTime();
-        this.nanos[elementNum] = scratchTimestamp.getNanos();
+        this.time[elementNum] = millisToDay(scratchDate.getTime());
     }
 
     /**
@@ -376,15 +351,13 @@ public class TimestampColumnVector extends ColumnVector
     public void setNullValue(int elementNum)
     {
         time[elementNum] = 0;
-        nanos[elementNum] = 1;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
     // as indicated by selectedInUse and the sel array.
     public void copySelected(
-            boolean selectedInUse, int[] sel, int size, TimestampColumnVector output)
+            boolean selectedInUse, int[] sel, int size, DateColumnVector output)
     {
-
         // Output has nulls if and only if input has nulls.
         output.noNulls = noNulls;
         output.isRepeating = false;
@@ -393,7 +366,6 @@ public class TimestampColumnVector extends ColumnVector
         if (isRepeating)
         {
             output.time[0] = time[0];
-            output.nanos[0] = nanos[0];
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
             return;
@@ -408,13 +380,11 @@ public class TimestampColumnVector extends ColumnVector
             {
                 int i = sel[j];
                 output.time[i] = time[i];
-                output.nanos[i] = nanos[i];
             }
         }
         else
         {
             System.arraycopy(time, 0, output.time, 0, size);
-            System.arraycopy(nanos, 0, output.nanos, 0, size);
         }
 
         // Copy nulls over if needed
@@ -436,16 +406,15 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     /**
-     * Fill all the vector entries with a timestamp.
+     * Fill all the vector entries with a date.
      *
-     * @param timestamp
+     * @param date
      */
-    public void fill(Timestamp timestamp)
+    public void fill(Date date)
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = timestamp.getTime();
-        nanos[0] = timestamp.getNanos();
+        time[0] = millisToDay(date.getTime());
     }
 
     @Override
@@ -457,9 +426,8 @@ public class TimestampColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchTimestamp.setTime(time[row]);
-            scratchTimestamp.setNanos((int) nanos[row]);
-            buffer.append(scratchTimestamp.toString());
+            scratchDate.setTime(dayToMillis(time[row]));
+            buffer.append(scratchDate.toString());
         }
         else
         {
@@ -475,22 +443,18 @@ public class TimestampColumnVector extends ColumnVector
         {
             return;
         }
-        long[] oldTime = time;
-        long[] oldNanos = nanos;
-        time = new long[size];
-        nanos = new long[size];
+        int[] oldTime = time;
+        time = new int[size];
         length = size;
         if (preserveData)
         {
             if (isRepeating)
             {
                 time[0] = oldTime[0];
-                nanos[0] = oldNanos[0];
             }
             else
             {
                 System.arraycopy(oldTime, 0, time, 0, oldTime.length);
-                System.arraycopy(oldNanos, 0, nanos, 0, oldNanos.length);
             }
         }
     }
@@ -499,7 +463,6 @@ public class TimestampColumnVector extends ColumnVector
     public void close()
     {
         super.close();
-        this.nanos = null;
         this.time = null;
     }
 }

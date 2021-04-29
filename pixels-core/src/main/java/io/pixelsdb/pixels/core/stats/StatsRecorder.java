@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.core.stats;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 
+import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 
 /**
@@ -106,9 +108,24 @@ public class StatsRecorder
         throw new UnsupportedOperationException("Can't update binary");
     }
 
+    public void updateDate(Date value)
+    {
+        throw new UnsupportedOperationException("Can't update date");
+    }
+
     public void updateDate(int value)
     {
         throw new UnsupportedOperationException("Can't update date");
+    }
+
+    public void updateTime(Time value)
+    {
+        throw new UnsupportedOperationException("Can't update time");
+    }
+
+    public void updateTime(int value)
+    {
+        throw new UnsupportedOperationException("Can't update time");
     }
 
     public void updateTimestamp(Timestamp value)
@@ -181,6 +198,10 @@ public class StatsRecorder
             case CHAR:
             case VARCHAR:
                 return new StringStatsRecorder();
+            case DATE:
+                return new DateStatsRecorder();
+            case TIME:
+                return new TimeStatsRecorder();
             case TIMESTAMP:
                 return new TimestampStatsRecorder();
             case BINARY:
@@ -208,6 +229,10 @@ public class StatsRecorder
             case CHAR:
             case VARCHAR:
                 return new StringStatsRecorder(statistic);
+            case DATE:
+                return new DateStatsRecorder(statistic);
+            case TIME:
+                return new TimeStatsRecorder(statistic);
             case TIMESTAMP:
                 return new TimestampStatsRecorder(statistic);
             case BINARY:

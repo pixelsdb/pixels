@@ -25,20 +25,19 @@ import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
+import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.sql.Timestamp;
 
 /**
- * pixels timestamp column reader
- * All timestamp values are translated to the specified time zone after read from file.
+ * pixels time column reader
+ * All time values are translated to the specified time zone after read from file.
  *
- * @author guodong
+ * @author hank
  */
-public class TimestampColumnReader
+public class TimeColumnReader
         extends ColumnReader
 {
     private ByteBuffer inputBuffer = null;
@@ -48,7 +47,7 @@ public class TimestampColumnReader
     private int isNullBitIndex = 0;
     private byte[] isNull = new byte[8];
 
-    TimestampColumnReader(TypeDescription type)
+    TimeColumnReader(TypeDescription type)
     {
         super(type);
     }
@@ -87,7 +86,7 @@ public class TimestampColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
-        TimestampColumnVector columnVector = (TimestampColumnVector) vector;
+        TimeColumnVector columnVector = (TimeColumnVector) vector;
         if (offset == 0)
         {
             if (inputStream != null)
@@ -129,7 +128,7 @@ public class TimestampColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Timestamp(decoder.next()));
+                    columnVector.set(i + vectorIndex, (int)decoder.next());
                 }
                 if (hasNull)
                 {
@@ -164,7 +163,8 @@ public class TimestampColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Timestamp(inputBuffer.getLong()));
+                    // If time column is not encoded, it is written as integers instead of longs.
+                    columnVector.set(i + vectorIndex, inputBuffer.getInt());
                 }
                 if (hasNull)
                 {

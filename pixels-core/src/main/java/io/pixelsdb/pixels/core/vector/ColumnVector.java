@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Arrays;
 
@@ -136,6 +138,16 @@ public abstract class ColumnVector implements AutoCloseable
     public void add(String value)
     {
         throw new UnsupportedOperationException("Adding string is not supported");
+    }
+
+    public void add(Date value)
+    {
+        throw new UnsupportedOperationException("Adding date is not supported");
+    }
+
+    public void add(Time value)
+    {
+        throw new UnsupportedOperationException("Adding time is not supported");
     }
 
     public void add(Timestamp value)
