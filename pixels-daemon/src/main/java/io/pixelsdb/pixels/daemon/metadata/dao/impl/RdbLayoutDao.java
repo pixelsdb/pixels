@@ -189,7 +189,7 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
             pst.setLong(9, layout.getTableId());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbLayoutDao", e);
@@ -222,7 +222,7 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
             pst.setLong(9, layout.getId());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbLayoutDao", e);

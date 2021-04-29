@@ -39,5 +39,6 @@ public class ErrorCode
     public static final int METADATA_UPDATE_COUMN_FAILED = 10010;
     public static final int METADATA_UPDATE_LAYOUT_FAILED = 10010;
     public static final int METADATA_ADD_LAYOUT_FAILED = 10010;
+    public static final int METADATA_ADD_SCHEMA_FAILED = 10011;
     // end error code for metadata rpc
 }
