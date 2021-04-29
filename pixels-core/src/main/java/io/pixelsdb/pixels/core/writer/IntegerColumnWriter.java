@@ -82,7 +82,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
             if (columnVector.isNull[i + curPartOffset])
             {
                 hasNull = true;
-                pixelStatRecorder.increment(); // TODO: check if it is correct.
+                pixelStatRecorder.increment();
             }
             else
             {

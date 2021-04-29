@@ -50,6 +50,7 @@ import java.util.List;
  * pixels
  *
  * @author guodong
+ * @author hank
  */
 public class TestPixelsWriter
 {

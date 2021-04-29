@@ -436,6 +436,7 @@ public final class TypeDescription
                 break;
             case CHAR:
             case VARCHAR:
+                // TODO: fix varchar
                 requireChar(source, '(');
                 result.withMaxLength(parseInt(source));
                 requireChar(source, ')');

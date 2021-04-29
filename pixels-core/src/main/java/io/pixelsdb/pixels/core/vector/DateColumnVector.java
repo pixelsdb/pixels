@@ -22,7 +22,8 @@ package io.pixelsdb.pixels.core.vector;
 import java.sql.Date;
 import java.util.Arrays;
 
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 
 /**
  * DateColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
@@ -291,6 +292,12 @@ public class DateColumnVector extends ColumnVector
     public void add(Date value)
     {
         set(writeIndex++, value);
+    }
+
+    @Override
+    public void add(String value)
+    {
+        set(writeIndex++, Date.valueOf(value));
     }
 
     /**

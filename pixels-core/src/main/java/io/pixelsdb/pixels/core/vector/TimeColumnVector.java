@@ -286,9 +286,15 @@ public class TimeColumnVector extends ColumnVector
     }
 
     @Override
-    public void add(Time t)
+    public void add(Time value)
     {
-        set(writeIndex++, t);
+        set(writeIndex++, value);
+    }
+
+    @Override
+    public void add(String value)
+    {
+        set(writeIndex++, Time.valueOf(value));
     }
 
     /**

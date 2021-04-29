@@ -29,9 +29,11 @@ import java.util.*;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -75,7 +77,7 @@ public class PixelsTypeManager
         // TODO: support more data types.
         // TODO: map presto data type to pixels data type more gracefully.
         // currently we do this by hard code in PixelsPageSource
-        supportedTypes = ImmutableList.of(BOOLEAN, INTEGER, BIGINT, DOUBLE, REAL, VARCHAR, TIMESTAMP);
+        supportedTypes = ImmutableList.of(BOOLEAN, INTEGER, BIGINT, DOUBLE, REAL, VARCHAR, TIMESTAMP, DATE, TIME);
         signatureToType = new HashMap<>();
         for (Type type : supportedTypes)
         {
