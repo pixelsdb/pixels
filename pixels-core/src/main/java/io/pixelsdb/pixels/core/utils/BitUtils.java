@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
  * pixels
  *
  * @author guodong
+ * @author hank
  */
 public class BitUtils
 {
@@ -38,14 +39,15 @@ public class BitUtils
     public static byte[] bitWiseCompact(boolean[] values, int length)
     {
         ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
-        int bitsToWrite = 1;
+        // Issue #99: remove to improve performance.
+        // int bitsToWrite = 1;
         int bitsLeft = 8;
         byte current = 0;
 
         for (int i = 0; i < length; i++)
         {
             byte v = values[i] ? (byte) 1 : (byte) 0;
-            bitsLeft -= bitsToWrite;
+            bitsLeft --; // -= bitsToWrite;
             current |= v << bitsLeft;
             if (bitsLeft == 0)
             {
@@ -94,14 +96,15 @@ public class BitUtils
     public static byte[] bitWiseCompact(byte[] values, int length)
     {
         ByteArrayOutputStream bitWiseOutput = new ByteArrayOutputStream();
-        int bitsToWrite = 1;
+        // Issue #99: remove to improve performance.
+        // int bitsToWrite = 1;
         int bitsLeft = 8;
         byte current = 0;
 
         for (int i = 0; i < length; i++)
         {
             byte v = values[i];
-            bitsLeft -= bitsToWrite;
+            bitsLeft --; // -= bitsToWrite;
             current |= v << bitsLeft;
             if (bitsLeft == 0)
             {
@@ -127,20 +130,19 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input)
     {
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current;
-        byte mask = 0x01;
-
-        int index = 0;
+        /**
+         * Issue #99:
+         * Use as least as variables as possible to reduce stack footprint
+         * and thus improve performance.
+         */
+         byte bitsLeft = 8;
+         int index = 0;
         for (byte b : input)
         {
             while (bitsLeft > 0)
             {
-                bitsLeft -= bitsToRead;
-                current = mask & (b >> bitsLeft);
-                bits[index] = (byte) current;
-                index++;
+                bitsLeft --;
+                bits[index++] = (byte) (0x01 & (b >> bitsLeft));
             }
             bitsLeft = 8;
         }
@@ -156,19 +158,19 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, byte[] input, int offset, int length)
     {
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current;
-        byte mask = 0x01;
-
+        /**
+         * Issue #99:
+         * Use as least as variables as possible to reduce stack footprint
+         * and thus improve performance.
+         */
+        byte bitsLeft = 8;
         int index = 0;
         for (int i = offset; i < offset + length; i++)
         {
             while (bitsLeft > 0)
             {
-                bitsLeft -= bitsToRead;
-                current = mask & (input[i] >> bitsLeft);
-                bits[index++] = (byte) current;
+                bitsLeft --;
+                bits[index++] = (byte)(0x01 & (input[i] >> bitsLeft));
             }
             bitsLeft = 8;
         }
@@ -184,23 +186,21 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuffer input, int offset, int length)
     {
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current;
-        byte mask = 0x01;
-
+        /**
+         * Issue #99:
+         * Use as least as variables as possible to reduce stack footprint
+         * and thus improve performance.
+         */
+        byte bitsLeft = 8, b;
         int index = 0;
-        byte b;
-        while (offset < length)
+        // loop condition fixed in Issue #99.
+        for (int i = offset; i < offset + length; ++i)
         {
-            b = input.get(offset);
-            offset++;
+            b = input.get(i);
             while (bitsLeft > 0)
             {
-                bitsLeft -= bitsToRead;
-                current = mask & (b >> bitsLeft);
-                bits[index] = (byte) current;
-                index++;
+                bitsLeft --;
+                bits[index++] = (byte) (0x01 & (b >> bitsLeft));
             }
             bitsLeft = 8;
         }
@@ -216,23 +216,21 @@ public class BitUtils
      */
     public static void bitWiseDeCompact(byte[] bits, ByteBuf input, int offset, int length)
     {
-        int bitsToRead = 1;
-        int bitsLeft = 8;
-        int current;
-        byte mask = 0x01;
-
+        /**
+         * Issue #99:
+         * Use as least as variables as possible to reduce stack footprint
+         * and thus improve performance.
+         */
+        byte bitsLeft = 8, b;
         int index = 0;
-        byte b;
-        while (offset < length)
+        // loop condition fixed in Issue #99.
+        for (int i = offset; i < offset + length; ++i)
         {
-            b = input.getByte(offset);
-            offset++;
+            b = input.getByte(i);
             while (bitsLeft > 0)
             {
-                bitsLeft -= bitsToRead;
-                current = mask & (b >> bitsLeft);
-                bits[index] = (byte) current;
-                index++;
+                bitsLeft --;
+                bits[index++] = (byte) (0x01 & (b >> bitsLeft));
             }
             bitsLeft = 8;
         }
