@@ -184,19 +184,28 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
-                        request.getPermissionRange());
-                if (layouts == null || layouts.isEmpty())
+                if (request.getVersion() < 0)
                 {
-                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");
-                }
-                else if (layouts.size() != 1)
-                {
-                    headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicate layouts");
+                    layout = layoutDao.getLatestByTable(table, request.getPermissionRange());
+                    if (layout == null)
+                    {
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout exists");
+                    }
                 }
                 else
                 {
-                    layout = layouts.get(0);
+                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
+                            request.getPermissionRange());
+                    if (layouts == null || layouts.isEmpty())
+                    {
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout version not found");
+                    } else if (layouts.size() != 1)
+                    {
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicate layouts found");
+                    } else
+                    {
+                        layout = layouts.get(0);
+                    }
                 }
             }
             else
@@ -231,9 +240,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        boolean res = layoutDao.save(request.getLayout());
-
-        if (res)
+        if (layoutDao.save(request.getLayout()))
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
         }
@@ -254,9 +261,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        boolean res = layoutDao.update(request.getLayout());
-
-        if (res)
+        if (layoutDao.update(request.getLayout()))
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
         }
@@ -360,8 +365,14 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            schemaDao.insert(schema);
-            headerBuilder.setErrorCode(0).setErrorMsg("");
+            if (schemaDao.insert(schema))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_ADD_SCHEMA_FAILED).setErrorMsg("failed to add schema");
+            }
         }
         MetadataProto.CreateSchemaResponse response = MetadataProto.CreateSchemaResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
@@ -416,11 +427,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            tableDao.insert(table);
+            boolean res = tableDao.insert(table);
             List<MetadataProto.Column> columns = request.getColumnsList();
             // to get table id from database.
             table = tableDao.getByNameAndSchema(table.getName(), schema);
-            if (columns.size() == columnDao.insertBatch(table, columns))
+            if (res && columns.size() == columnDao.insertBatch(table, columns))
             {
                 headerBuilder.setErrorCode(0).setErrorMsg("");
             }

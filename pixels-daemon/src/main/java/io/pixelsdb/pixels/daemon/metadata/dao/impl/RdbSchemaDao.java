@@ -141,7 +141,7 @@ public class RdbSchemaDao extends SchemaDao
         {
             pst.setString(1, schema.getName());
             pst.setString(2, schema.getDesc());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbSchemaDao", e);
@@ -162,7 +162,7 @@ public class RdbSchemaDao extends SchemaDao
             pst.setString(1, schema.getName());
             pst.setString(2, schema.getDesc());
             pst.setLong(3, schema.getId());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbSchemaDao", e);

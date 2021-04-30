@@ -137,7 +137,7 @@ public class RdbColumnDao extends ColumnDao
             pst.setDouble(3, column.getSize());
             pst.setLong(4, column.getId());
 
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("getByTable in RdbColumnDao", e);
@@ -174,7 +174,7 @@ public class RdbColumnDao extends ColumnDao
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setLong(1, table.getId());
-            return pst.execute();
+            return pst.executeUpdate() > 0;
         } catch (SQLException e)
         {
             log.error("delete in RdbColumnDao", e);

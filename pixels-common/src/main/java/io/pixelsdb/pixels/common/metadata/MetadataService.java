@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
+
 /**
  * Created by hank on 18-6-17.
  * Adapt to GRPC in April 2019.
@@ -232,12 +234,21 @@ public class MetadataService
 
     private Layout internalGetLayout(MetadataProto.GetLayoutRequest request) throws MetadataException
     {
-        Layout layout = null;
+        Layout layout;
         try
         {
             MetadataProto.GetLayoutResponse response = this.stub.getLayout(request);
             if (response.getHeader().getErrorCode() != 0)
             {
+                if (response.getHeader().getErrorCode() == METADATA_LAYOUT_NOT_FOUND)
+                {
+                    /**
+                     * Issue #98:
+                     * return null if layout is not found, this is useful for clients
+                     * as they can hardly deal with error code.
+                     */
+                    return null;
+                }
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }

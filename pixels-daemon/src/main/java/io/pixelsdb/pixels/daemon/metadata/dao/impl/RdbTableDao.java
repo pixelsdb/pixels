@@ -193,8 +193,7 @@ public class RdbTableDao extends TableDao
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
             pst.setLong(3, table.getSchemaId());
-            int flag = pst.executeUpdate();
-            return flag > 0;
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbTableDao", e);
@@ -215,7 +214,7 @@ public class RdbTableDao extends TableDao
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
             pst.setLong(3, table.getId());
-            return pst.execute();
+            return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
             log.error("insert in RdbTableDao", e);
