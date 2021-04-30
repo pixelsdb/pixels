@@ -264,9 +264,16 @@ public class TestPixelsWriter
             DateColumnVector fcv = (DateColumnVector) rowBatch.cols[5];
             TimeColumnVector gcv = (TimeColumnVector) rowBatch.cols[6];
             BinaryColumnVector hcv = (BinaryColumnVector) rowBatch.cols[7];
-            for (int i = 0; i < fcv.getLength(); ++i)
+            for (int i = 0, j = 0; i < rowBatch.size; ++i)
             {
-                System.out.println(fcv.asScratchDate(i) + ", " + fcv.isNull[i]);
+                if (fcv.isNull[i])
+                {
+                    System.out.println("null");
+                }
+                else
+                {
+                    System.out.println(fcv.asScratchDate(j++));
+                }
             }
         }
         catch (IOException e)
