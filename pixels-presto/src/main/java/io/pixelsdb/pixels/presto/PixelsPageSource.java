@@ -94,7 +94,16 @@ class PixelsPageSource implements ConnectorPageSource
                 .build();
         getPixelsReaderBySchema(split, cacheReader, pixelsFooterCache);
 
-        this.recordReader = this.pixelsReader.read(this.option);
+        try
+        {
+            this.recordReader = this.pixelsReader.read(this.option);
+        }
+        catch (IOException e)
+        {
+            logger.error("create record reader error: " + e.getMessage());
+            closeWithSuppression(e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+        }
         this.BatchSize = PixelsPrestoConfig.getBatchSize();
     }
 
@@ -275,8 +284,11 @@ class PixelsPageSource implements ConnectorPageSource
         {
             if (pixelsReader != null)
             {
-                this.completedBytes += recordReader.getCompletedBytes();
-                this.readTimeNanos += recordReader.getReadTimeNanos();
+                if (recordReader != null)
+                {
+                    this.completedBytes += recordReader.getCompletedBytes();
+                    this.readTimeNanos += recordReader.getReadTimeNanos();
+                }
                 pixelsReader.close();
             }
             rowBatch = null;

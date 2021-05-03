@@ -377,7 +377,7 @@ public class PixelsInputFormat
     }
 
     /**
-     * TODO: reload input paths so that LOCACTION in a hive table can be empty or any path.
+     * TODO: reload input paths so that LOCATION in a hive table can be empty or any path.
      * @param job
      */
     protected void init(JobConf job) throws IOException

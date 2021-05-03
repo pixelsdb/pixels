@@ -345,7 +345,8 @@ public class PixelsSplitManager
                             PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                     tableHandle.getSchemaName(), tableHandle.getTableName(),
                                     Arrays.asList(path.toString()), curFileRGIdx, splitSize,
-                                    false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE), order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                    false, fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE),
+                                    order.getColumnOrder(), new ArrayList<>(0), constraint);
                             pixelsSplits.add(pixelsSplit);
                             curFileRGIdx += splitSize;
                         }

@@ -42,7 +42,7 @@ public interface PixelsReader
      *
      * @return record reader
      */
-    PixelsRecordReader read(PixelsReaderOption option);
+    PixelsRecordReader read(PixelsReaderOption option) throws IOException;
 
     /**
      * Get version of the Pixels file

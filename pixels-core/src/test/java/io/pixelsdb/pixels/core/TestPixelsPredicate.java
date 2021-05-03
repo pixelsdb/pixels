@@ -58,9 +58,11 @@ public class TestPixelsPredicate
     {
         Domain testingColumnDomain = Domain.singleValue(BIGINT, TEST_INT);
         TupleDomain.ColumnDomain<String> cola = new TupleDomain.ColumnDomain<>(COLUMN_A_NAME, testingColumnDomain);
-
         TupleDomain<String> effectivePredicate = TupleDomain.fromColumnDomains(Optional.of(ImmutableList.of(cola)));
-        TupleDomain<String> emptyEffectivePredicate = TupleDomain.all();
+
+        Domain emptyColumnDomain = Domain.onlyNull(testingColumnDomain.getType());
+        TupleDomain.ColumnDomain<String> colEmpty = new TupleDomain.ColumnDomain<>(COLUMN_A_NAME, emptyColumnDomain);
+        TupleDomain<String> emptyEffectivePredicate = TupleDomain.fromColumnDomains(Optional.of(ImmutableList.of(colEmpty)));
 
         List<TupleDomainPixelsPredicate.ColumnReference<String>> columnReferences = ImmutableList.<TupleDomainPixelsPredicate.ColumnReference<String>>builder()
                 .add(new TupleDomainPixelsPredicate.ColumnReference<>(COLUMN_A_NAME, COLUMN_A_ORDINAL, BIGINT))
@@ -80,8 +82,12 @@ public class TestPixelsPredicate
         statsRecorder.updateInteger(100L, 1);
         Map<Integer, ColumnStats> unMatchingStatsMap = ImmutableMap.of(0, statsRecorder);
 
+        System.out.println(predicate);
+        System.out.println(emptyPredicate);
+
         assertTrue(predicate.matches(1L, matchingStatsMap));
-        assertTrue(emptyPredicate.matches(1L, matchingStatsMap));
+        assertTrue(emptyPredicate.matches(2L, matchingStatsMap));
+        assertFalse(emptyPredicate.matches(1L, matchingStatsMap));
         assertFalse(predicate.matches(1L, unMatchingStatsMap));
     }
 

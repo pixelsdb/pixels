@@ -63,9 +63,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  * LOAD -f orc -o hdfs://dbiir10:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 220000 -r \t -c 16
  * -l hdfs://dbiir10:9000/pixels/pixels/test_105/v_0_order_orc/
  * </p>
- * [-l] is optimal, assign a path not the 'OrderPath' in db(Defined in Config.java)
+ * [-l] is optional, assign a path not the 'OrderPath' in db(Defined in Config.java)
  *
- * <br>This shall be run under root user to execute cache cleaning commands
+ * <br>This should be run under root user to execute cache cleaning commands
  * <p>
  * QUERY -t pixels -w /home/iir/opt/pixels/1187_dedup_query.txt -l /home/iir/opt/pixels/pixels_duration_1187_v_1_compact_cache_2020.01.10-2.csv -c /home/iir/opt/presto-server/sbin/drop-caches.sh
  * </p>
