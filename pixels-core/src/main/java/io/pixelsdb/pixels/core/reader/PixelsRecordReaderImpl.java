@@ -310,8 +310,7 @@ public class PixelsRecordReaderImpl
                     /**
                      * Issue #103:
                      * 1. matches() is fixed in this issue, but it is not sure if there is
-                     * any further problems with it.
-                     * TODO: pay attention to the correctness of matches().
+                     * any further problems with it, as the related domain APIs in presto spi is mysterious.
                      *
                      * 2. Whenever predicate does not match any column statistics, we should be return
                      * false. Instead, we must make sure that includedRGs will be filled with false values.
@@ -327,7 +326,6 @@ public class PixelsRecordReaderImpl
                 }
                 else
                 {
-                    // Issue #103: put this part in the else block.
                     // columnStatsMap.clear();
                     // second, get row group statistics, if not matches, skip the row group
                     for (int i = 0; i < RGLen; i++)

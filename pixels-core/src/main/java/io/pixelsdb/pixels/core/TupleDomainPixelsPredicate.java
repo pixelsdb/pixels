@@ -60,8 +60,10 @@ public class TupleDomainPixelsPredicate<C>
 
     /**
      * Check if predicate matches column statistics.
-     * Note that on the same column, onlyNull ('is null') predicate will match hasNull statistics
+     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
      * and vice versa.
+     *
+     * TODO: pay attention to the correctness of this method.
      *
      * @param numberOfRows            number of rows in the corresponding horizontal data unit
      *                                (pixel, row group, file, etc.) where the statistics come from.
@@ -71,6 +73,23 @@ public class TupleDomainPixelsPredicate<C>
     @Override
     public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)
     {
+        /**
+         * Issue #103:
+         * We firstly check if this predicate matches all column statistics.
+         * Because according to the implementation of TupleDomain in Presto-0.192,
+         * even if matchesAll(), e.i TupleDomain.isAll() returns true, the domains
+         * in the predicate can be empty, and thus we have no way to call
+         * domainMatches and turn true.
+         */
+        if (this.matchesAll())
+        {
+            return true;
+        }
+        if (this.matchesNone())
+        {
+            return false;
+        }
+
         Optional<Map<C, Domain>> optionalDomains = predicate.getDomains();
         if (!optionalDomains.isPresent())
         {
@@ -111,19 +130,22 @@ public class TupleDomainPixelsPredicate<C>
 
     /**
      * Added in Issue #103.
-     *
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
      * @return true if this predicate will never match any values.
      */
     @Override
     public boolean matchesNone()
     {
-        predicate.getDomains();
         return predicate.isNone();
     }
 
     /**
      * Added in Issue #103.
-     *
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
      * @return true if this predicate will match any values.
      */
     @Override
@@ -135,7 +157,7 @@ public class TupleDomainPixelsPredicate<C>
     /**
      * With query's predicate domain and statistics on the given column, get column domain from the
      * statistics and check if it matches the predicate domain.
-     * Note that on the same column, onlyNull ('is null') predicate will match hasNull statistics
+     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
      * and vice versa.
      * @param columnReference the given column.
      * @param predicateDomain the predicate domain on the column.
