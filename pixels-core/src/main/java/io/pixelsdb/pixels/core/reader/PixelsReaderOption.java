@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
-import io.pixelsdb.pixels.core.PixelsPredicate;
+import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 
 import java.util.Optional;
 

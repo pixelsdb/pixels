@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.core.predicate;
 
 import com.facebook.presto.spi.type.*;
 import io.pixelsdb.pixels.core.exception.PixelsReaderException;
