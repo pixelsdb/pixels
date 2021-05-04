@@ -270,6 +270,17 @@ class PixelsPageSource implements ConnectorPageSource
         }
         sizeOfData += batchSize;
 
+        /**
+         * Issue #105:
+         * For select count(*) from t, EOF is set here.
+         * Because this.numColumnToRead is 0 and blocks is empty, thus
+         * this.recordReader.readBatch will never be called to get the row batch.
+         */
+        if (this.recordReader.isEndOfFile())
+        {
+            this.endOfFile = true;
+        }
+
         return new Page(batchSize, blocks);
     }
 

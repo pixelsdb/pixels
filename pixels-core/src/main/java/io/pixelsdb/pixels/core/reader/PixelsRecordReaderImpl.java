@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
-import io.pixelsdb.pixels.core.exception.PixelsReaderException;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
@@ -157,7 +156,7 @@ public class PixelsRecordReaderImpl
             resultRowBatch.selected = null;
             resultRowBatch.projectionSize = 0;
             checkValid = true;
-            // Issue #103: set the following members to null.
+            // Issue #103: init the following members as null.
             this.includedColumns = null;
             this.resultColumns = null;
             this.targetColumns = null;
@@ -263,6 +262,11 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
+        /**
+         * Issue #105:
+         * As we use int32 for NumberOfRows in postScript, we also use int here.
+         */
+        int includedRowNum = 0;
         // read row group statistics and find target row groups
         if (option.getPredicate().isPresent())
         {
@@ -280,6 +284,7 @@ public class PixelsRecordReaderImpl
                     {
                         includedRGs[i] = true;
                     }
+                    includedRowNum = postScript.getNumberOfRows();
                 }
                 else if (predicate.matchesNone())
                 {
@@ -290,7 +295,7 @@ public class PixelsRecordReaderImpl
                 }
                 else
                 {
-                    throw new PixelsReaderException(
+                    throw new IOException(
                             "predicate does not match none or all while included columns is empty. predicate=" +
                             predicate.toString());
                 }
@@ -343,6 +348,10 @@ public class PixelsRecordReaderImpl
                                     StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
                         }
                         includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
+                        if (includedRGs[i] == true)
+                        {
+                            includedRowNum += footer.getRowGroupInfos(i).getNumberOfRows();
+                        }
                     }
                 }
             }
@@ -353,7 +362,25 @@ public class PixelsRecordReaderImpl
             {
                 includedRGs[i] = true;
             }
+            includedRowNum = postScript.getNumberOfRows();
         }
+
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.projectionSize should only be set in checkBeforeRead().
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            resultRowBatch.size = includedRowNum;
+            resultRowBatch.endOfFile = true;
+            // init the following members as null or 0.
+            targetRGs = null;
+            targetRGNum = 0;
+            rowGroupFooters = null;
+            return true;
+        }
+
         targetRGs = new int[includedRGs.length];
         int targetRGIdx = 0;
         for (int i = 0; i < RGLen; i++)
@@ -434,14 +461,30 @@ public class PixelsRecordReaderImpl
 
         everRead = true;
 
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.size and resultRowBatch.endOfFile have been set
+         * in prepareRead();
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            return true;
+        }
+
         if (targetRGNum == 0)
         {
             /**
-             * Issue #103:
-             * No row groups to read, return false, and then resultRowBatch.endOfFile
-             * will be set in readBatch().
+             * Issue #105:
+             * No row groups to read, set EOF and return. EOF will be checked in readBatch().
              */
-            return false;
+            resultRowBatch.size = 0;
+            resultRowBatch.endOfFile = true;
+            return true;
         }
 
         // read chunk offset and length of each target column chunks
@@ -703,6 +746,22 @@ public class PixelsRecordReaderImpl
                 throw new IOException("Failed to prepare for read.");
             }
         }
+
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.size and resultRowBatch.endOfFile have been set
+         * in prepareRead();
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            return resultRowBatch.size;
+        }
+
         // curBatchSize is the available size of the next batch.
         int curBatchSize = -curRowInRG;
         for (int rgIdx = curRGIdx; rgIdx < targetRGNum; ++rgIdx)
@@ -740,14 +799,6 @@ public class PixelsRecordReaderImpl
             return resultRowBatch;
         }
 
-        // project nothing, must be count(*)
-        if (resultRowBatch.projectionSize == 0)
-        {
-            resultRowBatch.size = postScript.getNumberOfRows();
-            resultRowBatch.endOfFile = true;
-            return resultRowBatch;
-        }
-
         resultRowBatch.reset();
 
         if (!everRead)
@@ -755,11 +806,23 @@ public class PixelsRecordReaderImpl
             long start = System.nanoTime();
             if (!read())
             {
-                resultRowBatch.size = 0; // added in Issue #103.
-                resultRowBatch.endOfFile = true;
-                return resultRowBatch;
+                throw new IOException("failed to read file.");
             }
             readTimeNanos += System.nanoTime() - start;
+        }
+
+        // project nothing, must be count(*)
+        if (resultRowBatch.projectionSize == 0)
+        {
+            /**
+             * Issue #105:
+             * EOF and batch size have been set in prepareRead() and checked in read().
+             */
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            return resultRowBatch;
         }
 
         // ensure size for result row batch
@@ -842,6 +905,21 @@ public class PixelsRecordReaderImpl
             throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
+    }
+
+    /**
+     * This method is valid after calling prepareBatch or readBatch.
+     * Before that, it will always return false.
+     * @return true if reach EOF.
+     */
+    public boolean isEndOfFile ()
+    {
+        if (this.resultRowBatch != null)
+        {
+            // no need to check checkValid, everPrepared, and everRead.
+            return this.resultRowBatch.endOfFile;
+        }
+        return false;
     }
 
     /**
