@@ -239,7 +239,7 @@ public class PixelsReaderImpl
      * @return record reader
      */
     @Override
-    public PixelsRecordReader read(PixelsReaderOption option)
+    public PixelsRecordReader read(PixelsReaderOption option) throws IOException
     {
         float diceValue = random.nextFloat();
         boolean enableMetrics = false;

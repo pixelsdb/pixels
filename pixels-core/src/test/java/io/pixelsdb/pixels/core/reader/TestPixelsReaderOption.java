@@ -206,4 +206,15 @@ public class TestPixelsReaderOption
 
         return pixelsReader;
     }
+
+    int[] a;
+    @Test
+    public void testArrayDefinition()
+    {
+
+        for (int i = 0; i < a.length; ++i)
+        {
+            System.out.println(a[i]);
+        }
+    }
 }

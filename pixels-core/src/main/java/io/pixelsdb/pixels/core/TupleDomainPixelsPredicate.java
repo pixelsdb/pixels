@@ -19,21 +19,13 @@
  */
 package io.pixelsdb.pixels.core;
 
-import io.pixelsdb.pixels.core.stats.BooleanColumnStats;
-import io.pixelsdb.pixels.core.stats.ColumnStats;
-import io.pixelsdb.pixels.core.stats.DoubleColumnStats;
-import io.pixelsdb.pixels.core.stats.IntegerColumnStats;
-import io.pixelsdb.pixels.core.stats.RangeStats;
-import io.pixelsdb.pixels.core.stats.StringColumnStats;
-import io.pixelsdb.pixels.core.stats.TimestampColumnStats;
+import com.facebook.presto.spi.type.*;
+import io.pixelsdb.pixels.core.exception.PixelsReaderException;
+import io.pixelsdb.pixels.core.stats.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
-import com.facebook.presto.spi.type.CharType;
-import com.facebook.presto.spi.type.TimestampType;
-import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Collection;
@@ -52,6 +44,7 @@ import static java.util.Objects.requireNonNull;
  * pixels
  *
  * @author guodong
+ * @author hank
  */
 public class TupleDomainPixelsPredicate<C>
         implements PixelsPredicate
@@ -66,15 +59,37 @@ public class TupleDomainPixelsPredicate<C>
     }
 
     /**
-     * Check if predicate matches statistics
+     * Check if predicate matches column statistics.
+     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
+     * and vice versa.
      *
-     * @param numberOfRows            number of rows
+     * TODO: pay attention to the correctness of this method.
+     *
+     * @param numberOfRows            number of rows in the corresponding horizontal data unit
+     *                                (pixel, row group, file, etc.) where the statistics come from.
      * @param statisticsByColumnIndex statistics map. key: column index in user specified schema,
      *                                value: column statistic
      */
     @Override
     public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)
     {
+        /**
+         * Issue #103:
+         * We firstly check if this predicate matches all column statistics.
+         * Because according to the implementation of TupleDomain in Presto-0.192,
+         * even if matchesAll(), e.i TupleDomain.isAll() returns true, the domains
+         * in the predicate can be empty, and thus we have no way to call
+         * domainMatches and turn true.
+         */
+        if (this.matchesAll())
+        {
+            return true;
+        }
+        if (this.matchesNone())
+        {
+            return false;
+        }
+
         Optional<Map<C, Domain>> optionalDomains = predicate.getDomains();
         if (!optionalDomains.isPresent())
         {
@@ -83,6 +98,12 @@ public class TupleDomainPixelsPredicate<C>
         }
         Map<C, Domain> domains = optionalDomains.get();
 
+        /**
+         * Issue #103:
+         * bugs fixed:
+         * 1. return true if there is a match (origin: return false if there is a mismatch).
+         * 2. finally return false by default (origin: turn true).
+         */
         for (ColumnReference<C> columnReference : columnReferences)
         {
             Domain predicateDomain = domains.get(columnReference.getColumn());
@@ -98,38 +119,99 @@ public class TupleDomainPixelsPredicate<C>
                 continue;
             }
 
-            if (!domainOverlaps(columnReference, predicateDomain, numberOfRows, columnStats))
+            if (domainMatches(columnReference, predicateDomain, numberOfRows, columnStats))
             {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
-    private boolean domainOverlaps(ColumnReference<C> columnReference, Domain predicateDomain,
+    /**
+     * Added in Issue #103.
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
+     * @return true if this predicate will never match any values.
+     */
+    @Override
+    public boolean matchesNone()
+    {
+        return predicate.isNone();
+    }
+
+    /**
+     * Added in Issue #103.
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
+     * @return true if this predicate will match any values.
+     */
+    @Override
+    public boolean matchesAll()
+    {
+        return predicate.isAll();
+    }
+
+    /**
+     * With query's predicate domain and statistics on the given column, get column domain from the
+     * statistics and check if it matches the predicate domain.
+     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
+     * and vice versa.
+     * @param columnReference the given column.
+     * @param predicateDomain the predicate domain on the column.
+     * @param numberOfRows the total number of rows in this horizontal unit (file, row group, or pixel).
+     * @param columnStats the statistics on the column.
+     * @return
+     */
+    private boolean domainMatches(ColumnReference<C> columnReference, Domain predicateDomain,
                                    long numberOfRows, ColumnStats columnStats)
     {
         Domain columnDomain = getDomain(columnReference.getType(), numberOfRows, columnStats);
         if (!columnDomain.overlaps(predicateDomain))
         {
+            /**
+             * Issue #103:
+             * Even if column domain and predicate domain do not overlap,
+             * they can match if either of them is onlyNull while the other
+             * one is nullAllowed.
+             */
+            if (predicateDomain.isNullAllowed() && columnDomain.isNullAllowed())
+            {
+                return true;
+            }
             return false;
         }
 
-        if (predicateDomain.isNullAllowed() && columnDomain.isNullAllowed())
-        {
-            return true;
-        }
-
-        Optional<Collection<Object>> discreteValues = getDiscreteValues(predicateDomain.getValues());
-        if (!discreteValues.isPresent())
-        {
-            return true;
-        }
+        /**
+         * Issue #103:
+         * 1. No need to process discrete values. Discrete values and ranges will not coexist. However either
+         * of them has been considered in the Domain.overlaps() method above.
+         *
+         * 2. Predicate domain and column domain will always be compatible, i.e. their values are all of the
+         * EquatableValue or SortedRangeSet type.
+         *
+         * Reference: the implementation of com.facebook.presto.spi.predicate.ValueSet.
+         * of and rangesOf method will create the domain values according to the data type.
+         * If predicate domain and the column domain are from the same column, they should have the
+         * same type of values.
+         */
+        // Optional<Collection<Object>> discreteValues = getDiscreteValues(predicateDomain.getValues());
+        // if (!discreteValues.isPresent())
+        // {
+        //     return true;
+        // }
 
         return true;
     }
 
+    /**
+     * Get all the discrete values, including single values from the ordered ranges
+     * and the unordered discrete values.
+     * @param valueSet
+     * @return
+     */
     private Optional<Collection<Object>> getDiscreteValues(ValueSet valueSet)
     {
         return valueSet.getValuesProcessor().transform(
@@ -149,6 +231,14 @@ public class TupleDomainPixelsPredicate<C>
                 allOrNone -> allOrNone.isAll() ? Optional.empty() : Optional.of(ImmutableList.of()));
     }
 
+    /**
+     * Get domain object from column statistics.
+     * @param type the type of this column.
+     * @param rowCount the number of rows in the corresponding horizontal data unit
+     *                 (pixel, row group, file, etc.).
+     * @param columnStats the statistics of this column in the horizontal data unit.
+     * @return
+     */
     private Domain getDomain(Type type, long rowCount, ColumnStats columnStats)
     {
         if (rowCount == 0)
@@ -158,7 +248,9 @@ public class TupleDomainPixelsPredicate<C>
 
         if (columnStats == null)
         {
-            return Domain.all(type);
+            // Issue #103: we have avoided columnStat == null in upper layers of call stack.
+            // return Domain.all(type);
+            throw new PixelsReaderException("column statistic is null");
         }
 
         if (columnStats.getNumberOfValues() == 0)
@@ -166,7 +258,7 @@ public class TupleDomainPixelsPredicate<C>
             return Domain.onlyNull(type);
         }
 
-        boolean hasNullValue = columnStats.getNumberOfValues() != rowCount;
+        boolean hasNullValue = columnStats.getNumberOfValues() != rowCount || columnStats.hasNull();
 
         if (type.getJavaType() == boolean.class)
         {
@@ -198,6 +290,20 @@ public class TupleDomainPixelsPredicate<C>
         {
             return createDomain(type, hasNullValue, (TimestampColumnStats) columnStats);
         }
+        else if (type instanceof DateType)
+        {
+            /**
+             * Issue #103: add Date type predicate.
+             */
+            return createDomain(type, hasNullValue, (DateColumnStats) columnStats);
+        }
+        else if (type instanceof  TimeType)
+        {
+            /**
+             * Issue #103: add Time type predicate.
+             */
+            return createDomain(type, hasNullValue, (TimeColumnStats) columnStats);
+        }
         else if (type.getJavaType() == long.class)
         {
             return createDomain(type, hasNullValue, (IntegerColumnStats) columnStats);
@@ -206,17 +312,50 @@ public class TupleDomainPixelsPredicate<C>
         {
             return createDomain(type, hasNullValue, (DoubleColumnStats) columnStats);
         }
-        return Domain.create(ValueSet.all(type), hasNullValue);
+        /**
+         * Issue #103:
+         * Type unmatched, we should through an exception here instead of returning
+         * a domain that can match any predicate.
+         */
+        // return Domain.create(ValueSet.all(type), hasNullValue);
+        throw new PixelsReaderException("unsupported type, display name=" + type.getDisplayName() +
+                ", java type=" + type.getJavaType().getName());
     }
 
     private <T extends Comparable<T>> Domain createDomain(Type type, boolean hasNullValue,
                                                           RangeStats<T> rangeStats)
     {
-        if (type instanceof VarcharType || type instanceof CharType)
+        // Issue #103: what's the purpose of this if branch?
+        //if (type instanceof VarcharType || type instanceof CharType)
+        //{
+        //    return createDomain(type, hasNullValue, rangeStats, value -> value);
+        //}
+        // return createDomain(type, hasNullValue, rangeStats, value -> value);
+        // Issue #103: avoid additional function call.
+        T min = rangeStats.getMinimum();
+        T max = rangeStats.getMaximum();
+
+        if (min != null && max != null)
         {
-            return createDomain(type, hasNullValue, rangeStats, value -> value);
+            return Domain.create(
+                    ValueSet.ofRanges(
+                            Range.range(type, min, true, max, true)),
+                    hasNullValue);
         }
-        return createDomain(type, hasNullValue, rangeStats, value -> value);
+        if (max != null)
+        {
+            return Domain.create(ValueSet.ofRanges(Range.lessThanOrEqual(type, max)), hasNullValue);
+        }
+        if (min != null)
+        {
+            return Domain.create(ValueSet.ofRanges(Range.greaterThanOrEqual(type, min)), hasNullValue);
+        }
+
+        /**
+         * Comments added in Issue #103:
+         * If no min nor max is defined, we create a column domain to accepted any predicate.
+         */
+        return Domain.create(ValueSet.all(type), hasNullValue);
     }
 
     private <F, T extends Comparable<T>> Domain createDomain(Type type, boolean hasNullValue,
@@ -273,5 +412,43 @@ public class TupleDomainPixelsPredicate<C>
         {
             return type;
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder builder = new StringBuilder("TupleDomainPixelsPredicate{isNone=")
+                .append(predicate.isNone() + ", isAll=")
+                .append(predicate.isAll() + ", ")
+                .append("columnPredicates=[");
+        boolean deleteLast = false;
+        for (TupleDomain.ColumnDomain cd : predicate.getColumnDomains().get())
+        {
+            builder.append("{column=" + cd.getColumn() + ",nullable=" + cd.getDomain().isNullAllowed())
+                    .append(",isSingleValue=" + cd.getDomain().isNullableSingleValue())
+                    .append(",isNone=" + cd.getDomain().getValues().isNone())
+                    .append(",isAll=" + cd.getDomain().getValues().isAll())
+                    .append("},");
+            deleteLast = true;
+        }
+        if (deleteLast)
+        {
+            builder.deleteCharAt(builder.length()-1);
+            deleteLast = false;
+        }
+        builder.append("], columnReferences=[");
+        for (ColumnReference cr : columnReferences)
+        {
+            builder.append("{columnName=" + cr.getColumn())
+                    .append(", columnType=" + cr.getType().getDisplayName())
+                    .append("},");
+            deleteLast = true;
+        }
+        if (deleteLast)
+        {
+            builder.deleteCharAt(builder.length()-1);
+        }
+        builder.append("]}");
+        return builder.toString();
     }
 }

@@ -30,16 +30,67 @@ import java.util.Map;
  */
 public interface PixelsPredicate
 {
-    PixelsPredicate TRUE_PREDICATE = (numberOfRows, statisticsByColumnIndex) -> true;
+    PixelsPredicate TRUE_PREDICATE = new PixelsPredicate()
+    {
+        @Override
+        public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)
+        {
+            return true;
+        }
 
-    PixelsPredicate FALSE_PREDICATE = ((numberOfRows, statisticsByColumnIndex) -> false);
+        @Override
+        public boolean matchesNone()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean matchesAll()
+        {
+            return true;
+        }
+    };
+
+    PixelsPredicate FALSE_PREDICATE = new PixelsPredicate()
+    {
+        @Override
+        public boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex)
+        {
+            return false;
+        }
+
+        @Override
+        public boolean matchesNone()
+        {
+            return true;
+        }
+
+        @Override
+        public boolean matchesAll()
+        {
+            return false;
+        }
+    };
 
     /**
      * Check if predicate matches statistics
      *
-     * @param numberOfRows            number of rows
+     * @param numberOfRows            number of rows in the corresponding data unit where
+     *                                the statistics come from.
      * @param statisticsByColumnIndex statistics map. key: column index in user specified schema,
      *                                value: column statistic
      */
     boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex);
+
+    /**
+     * Added in Issue #103.
+     * @return true if no value would ever satisfy this predicate.
+     */
+    boolean matchesNone();
+
+    /**
+     * Added in Issue #103.
+     * @return true if any value could satisfy this predicate.
+     */
+    boolean matchesAll();
 }
