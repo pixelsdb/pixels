@@ -290,7 +290,8 @@ public class PixelsRecordReaderImpl
                 else
                 {
                     throw new PixelsReaderException(
-                            "predicate does not match none or all while included columns is empty.");
+                            "predicate does not match none or all while included columns is empty. predicate=" +
+                            predicate.toString());
                 }
             }
             else
@@ -390,8 +391,8 @@ public class PixelsRecordReaderImpl
                 }
                 catch (IOException e)
                 {
-                    e.printStackTrace();
-                    return false;
+                    logger.error("failed to read file footer.", e);
+                    throw new IOException("failed to read file footer.", e);
                 }
             }
             // cache hit
@@ -426,7 +427,7 @@ public class PixelsRecordReaderImpl
         {
             if (prepareRead() == false)
             {
-                return false;
+                throw new IOException("failed to prepare for read.");
             }
         }
 
@@ -455,7 +456,7 @@ public class PixelsRecordReaderImpl
             }
             catch (IOException | FSException e)
             {
-                logger.error(e);
+                logger.error("failed to get block id.", e);
                 throw new IOException("failed to get block id.", e);
                 //return false;
             }
@@ -676,7 +677,7 @@ public class PixelsRecordReaderImpl
                 }
             } catch (IOException e)
             {
-                logger.error(e);
+                logger.error("failed to read chunks block into buffers.", e);
                 throw new IOException("failed to read chunks block into buffers.", e);
                 // return false;
             }
@@ -918,7 +919,7 @@ public class PixelsRecordReaderImpl
                 } catch (IOException e)
                 {
                     logger.error("Failed to close column reader.", e);
-                    throw e;
+                    throw new IOException("Failed to close column reader.", e);
                 } finally
                 {
                     readers[i] = null;
