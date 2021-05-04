@@ -57,6 +57,13 @@ public interface PixelsRecordReader
             throws IOException;
 
     /**
+     * This method is valid after calling prepareBatch or readBatch.
+     * Before that, it will always return false.
+     * @return true if reach EOF.
+     */
+    boolean isEndOfFile ();
+
+    /**
      * Get current row number
      *
      * @return number of the row currently being read

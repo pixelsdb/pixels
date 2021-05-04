@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
-import io.pixelsdb.pixels.core.exception.PixelsReaderException;
+import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
@@ -156,7 +156,7 @@ public class PixelsRecordReaderImpl
             resultRowBatch.selected = null;
             resultRowBatch.projectionSize = 0;
             checkValid = true;
-            // Issue #103: set the following members to null.
+            // Issue #103: init the following members as null.
             this.includedColumns = null;
             this.resultColumns = null;
             this.targetColumns = null;
@@ -262,6 +262,11 @@ public class PixelsRecordReaderImpl
             return false;
         }
 
+        /**
+         * Issue #105:
+         * As we use int32 for NumberOfRows in postScript, we also use int here.
+         */
+        int includedRowNum = 0;
         // read row group statistics and find target row groups
         if (option.getPredicate().isPresent())
         {
@@ -279,6 +284,7 @@ public class PixelsRecordReaderImpl
                     {
                         includedRGs[i] = true;
                     }
+                    includedRowNum = postScript.getNumberOfRows();
                 }
                 else if (predicate.matchesNone())
                 {
@@ -289,8 +295,9 @@ public class PixelsRecordReaderImpl
                 }
                 else
                 {
-                    throw new PixelsReaderException(
-                            "predicate does not match none or all while included columns is empty.");
+                    throw new IOException(
+                            "predicate does not match none or all while included columns is empty. predicate=" +
+                            predicate.toString());
                 }
             }
             else
@@ -341,6 +348,10 @@ public class PixelsRecordReaderImpl
                                     StatsRecorder.create(columnSchemas.get(id), rgColumnStatistics.get(id)));
                         }
                         includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
+                        if (includedRGs[i] == true)
+                        {
+                            includedRowNum += footer.getRowGroupInfos(i).getNumberOfRows();
+                        }
                     }
                 }
             }
@@ -351,7 +362,25 @@ public class PixelsRecordReaderImpl
             {
                 includedRGs[i] = true;
             }
+            includedRowNum = postScript.getNumberOfRows();
         }
+
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.projectionSize should only be set in checkBeforeRead().
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            resultRowBatch.size = includedRowNum;
+            resultRowBatch.endOfFile = true;
+            // init the following members as null or 0.
+            targetRGs = null;
+            targetRGNum = 0;
+            rowGroupFooters = null;
+            return true;
+        }
+
         targetRGs = new int[includedRGs.length];
         int targetRGIdx = 0;
         for (int i = 0; i < RGLen; i++)
@@ -390,8 +419,8 @@ public class PixelsRecordReaderImpl
                 }
                 catch (IOException e)
                 {
-                    e.printStackTrace();
-                    return false;
+                    logger.error("failed to read file footer.", e);
+                    throw new IOException("failed to read file footer.", e);
                 }
             }
             // cache hit
@@ -426,20 +455,36 @@ public class PixelsRecordReaderImpl
         {
             if (prepareRead() == false)
             {
-                return false;
+                throw new IOException("failed to prepare for read.");
             }
         }
 
         everRead = true;
 
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.size and resultRowBatch.endOfFile have been set
+         * in prepareRead();
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            return true;
+        }
+
         if (targetRGNum == 0)
         {
             /**
-             * Issue #103:
-             * No row groups to read, return false, and then resultRowBatch.endOfFile
-             * will be set in readBatch().
+             * Issue #105:
+             * No row groups to read, set EOF and return. EOF will be checked in readBatch().
              */
-            return false;
+            resultRowBatch.size = 0;
+            resultRowBatch.endOfFile = true;
+            return true;
         }
 
         // read chunk offset and length of each target column chunks
@@ -455,7 +500,7 @@ public class PixelsRecordReaderImpl
             }
             catch (IOException | FSException e)
             {
-                logger.error(e);
+                logger.error("failed to get block id.", e);
                 throw new IOException("failed to get block id.", e);
                 //return false;
             }
@@ -676,7 +721,7 @@ public class PixelsRecordReaderImpl
                 }
             } catch (IOException e)
             {
-                logger.error(e);
+                logger.error("failed to read chunks block into buffers.", e);
                 throw new IOException("failed to read chunks block into buffers.", e);
                 // return false;
             }
@@ -684,6 +729,27 @@ public class PixelsRecordReaderImpl
 
         return true;
     }
+
+    /**
+     * Issue #105:
+     * We use preRowInRG instead of curRowInRG to deal with queries like:
+     * <b>select ... from t where f = null</b>
+     * Such query is invalid but Presto does not reject it. For such query,
+     * Presto will call PageSource.getNextPage() but will not call load() on
+     * the lazy blocks inside the returned page.
+     *
+     * Unfortunately, we have no way to distinguish such type from the normal
+     * queries by the predicates and projection columns from Presto.
+     *
+     * preRowInRG will keep in sync with curRowInRG if readBatch() is actually
+     * called from LazyBlock.load().
+     */
+    private int preRowInRG = 0;
+    /**
+     * Issue #105:
+     * Similar to preRowInRG.
+     */
+    private int preRGIdx = 0;
 
     /**
      * Prepare for the next row batch.
@@ -701,18 +767,62 @@ public class PixelsRecordReaderImpl
                 throw new IOException("Failed to prepare for read.");
             }
         }
+
+        /**
+         * Issue #105:
+         * project nothing, must be count(*).
+         * resultRowBatch.size and resultRowBatch.endOfFile have been set
+         * in prepareRead();
+         */
+        if (resultRowBatch.projectionSize == 0)
+        {
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            return resultRowBatch.size;
+        }
+
         // curBatchSize is the available size of the next batch.
-        int curBatchSize = -curRowInRG;
-        for (int rgIdx = curRGIdx; rgIdx < targetRGNum; ++rgIdx)
+        int curBatchSize = -preRowInRG;
+        for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
         {
             int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
             curBatchSize += rgRowCount;
+            if (curBatchSize <= 0)
+            {
+                // continue for the next row group if we reach the empty last row batch.
+                curBatchSize = 0;
+                preRGIdx++;
+                preRowInRG = 0;
+                continue;
+            }
             if (curBatchSize >= batchSize)
             {
                 curBatchSize = batchSize;
-                break;
+                preRowInRG += curBatchSize;
             }
+            else
+            {
+                // Prepare for reading the next row group.
+                preRGIdx++;
+                preRowInRG = 0;
+            }
+            break;
         }
+
+        // Check if this is the end of the file.
+        if (curBatchSize <= 0)
+        {
+            // resultRowBatch is initialized if prepareRead returns true.
+            if (resultRowBatch == null)
+            {
+                throw new IOException("resultRowBatch is unexpected to be null.");
+            }
+            resultRowBatch.endOfFile = true;
+            return 0;
+        }
+
         return curBatchSize;
     }
 
@@ -735,17 +845,11 @@ public class PixelsRecordReaderImpl
             resultRowBatch.selected = null;
             resultRowBatch.projectionSize = 0;
             resultRowBatch.endOfFile = true;
+            resultRowBatch.size = 0;
             return resultRowBatch;
         }
 
-        // project nothing, must be count(*)
-        if (resultRowBatch.projectionSize == 0)
-        {
-            resultRowBatch.size = postScript.getNumberOfRows();
-            resultRowBatch.endOfFile = true;
-            return resultRowBatch;
-        }
-
+        // Issue #105: reset is not a problem for 'select count(*) from t'.
         resultRowBatch.reset();
 
         if (!everRead)
@@ -753,11 +857,24 @@ public class PixelsRecordReaderImpl
             long start = System.nanoTime();
             if (!read())
             {
-                resultRowBatch.size = 0; // added in Issue #103.
-                resultRowBatch.endOfFile = true;
-                return resultRowBatch;
+                throw new IOException("failed to read file.");
             }
             readTimeNanos += System.nanoTime() - start;
+        }
+
+        // project nothing, must be count(*)
+        if (resultRowBatch.projectionSize == 0)
+        {
+            /**
+             * Issue #105:
+             * EOF and batch size have been set in prepareRead() and checked in read().
+             */
+            if (resultRowBatch.endOfFile == false)
+            {
+                throw new IOException("EOF should be set in case of none projection columns");
+            }
+            checkValid = false; // Issue #105: to reject continuous read.
+            return resultRowBatch;
         }
 
         // ensure size for result row batch
@@ -801,12 +918,14 @@ public class PixelsRecordReaderImpl
 
             // update current row index in the row group
             curRowInRG += curBatchSize;
+            preRowInRG = curRowInRG; // keep in sync with curRowInRG.
             rowIndex += curBatchSize;
             resultRowBatch.size += curBatchSize;
             // update row group index if current row index exceeds max row count in the row group
             if (curRowInRG >= rgRowCount)
             {
                 curRGIdx++;
+                preRGIdx = curRGIdx; // keep in sync with curRGIdx
                 // if not end of file, update row count
                 if (curRGIdx < targetRGNum)
                 {
@@ -815,10 +934,11 @@ public class PixelsRecordReaderImpl
                 // if end of file, set result vectorized row batch endOfFile
                 else
                 {
+                    checkValid = false; // Issue #105: to reject continuous read.
                     resultRowBatch.endOfFile = true;
                     break;
                 }
-                curRowInRG = 0;
+                preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
             }
         }
 
@@ -840,6 +960,21 @@ public class PixelsRecordReaderImpl
             throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
+    }
+
+    /**
+     * This method is valid after calling prepareBatch or readBatch.
+     * Before that, it will always return false.
+     * @return true if reach EOF.
+     */
+    public boolean isEndOfFile ()
+    {
+        if (this.resultRowBatch != null)
+        {
+            // no need to check checkValid, everPrepared, and everRead.
+            return this.resultRowBatch.endOfFile;
+        }
+        return false;
     }
 
     /**
@@ -918,7 +1053,7 @@ public class PixelsRecordReaderImpl
                 } catch (IOException e)
                 {
                     logger.error("Failed to close column reader.", e);
-                    throw e;
+                    throw new IOException("Failed to close column reader.", e);
                 } finally
                 {
                     readers[i] = null;

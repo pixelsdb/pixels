@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core;
 
+import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import com.facebook.presto.spi.predicate.Domain;

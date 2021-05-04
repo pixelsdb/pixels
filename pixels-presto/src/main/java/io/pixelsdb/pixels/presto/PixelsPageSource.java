@@ -31,6 +31,8 @@ import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.FSFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
+import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
@@ -267,6 +269,17 @@ class PixelsPageSource implements ConnectorPageSource
             blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(fieldId, type, batchSize));
         }
         sizeOfData += batchSize;
+
+        /**
+         * Issue #105:
+         * For select count(*) from t, EOF is set here.
+         * Because this.numColumnToRead is 0 and blocks is empty, thus
+         * this.recordReader.readBatch will never be called to get the row batch.
+         */
+        if (this.recordReader.isEndOfFile())
+        {
+            this.endOfFile = true;
+        }
 
         return new Page(batchSize, blocks);
     }

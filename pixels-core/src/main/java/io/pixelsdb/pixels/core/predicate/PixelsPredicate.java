@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.core.predicate;
 
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 
@@ -73,10 +73,14 @@ public interface PixelsPredicate
     };
 
     /**
-     * Check if predicate matches statistics
+     * Check if predicate matches column statistics.
+     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
+     * and vice versa.
      *
-     * @param numberOfRows            number of rows in the corresponding data unit where
-     *                                the statistics come from.
+     * TODO: pay attention to the correctness of this method.
+     *
+     * @param numberOfRows            number of rows in the corresponding horizontal data unit
+     *                                (pixel, row group, file, etc.) where the statistics come from.
      * @param statisticsByColumnIndex statistics map. key: column index in user specified schema,
      *                                value: column statistic
      */
@@ -84,13 +88,19 @@ public interface PixelsPredicate
 
     /**
      * Added in Issue #103.
-     * @return true if no value would ever satisfy this predicate.
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
+     * @return true if this predicate will never match any values.
      */
     boolean matchesNone();
 
     /**
      * Added in Issue #103.
-     * @return true if any value could satisfy this predicate.
+     * This method relies on TupleDomain.isNone() in presto spi,
+     * which is mysterious.
+     * TODO: pay attention to the correctness of this method.
+     * @return true if this predicate will match any values.
      */
     boolean matchesAll();
 }

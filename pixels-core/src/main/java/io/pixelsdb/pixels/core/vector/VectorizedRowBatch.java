@@ -200,7 +200,7 @@ public class VectorizedRowBatch implements AutoCloseable
     }
 
     /**
-     * Resets the row batch to default state
+     * Resets the row batch to default state for the next read.
      * - sets selectedInUse to false
      * - sets size to 0
      * - sets endOfFile to false
