@@ -731,6 +731,27 @@ public class PixelsRecordReaderImpl
     }
 
     /**
+     * Issue #105:
+     * We use preRowInRG instead of curRowInRG to deal with queries like:
+     * <b>select ... from t where f = null</b>
+     * Such query is invalid but Presto does not reject it. For such query,
+     * Presto will call PageSource.getNextPage() but will not call load() on
+     * the lazy blocks inside the returned page.
+     *
+     * Unfortunately, we have no way to distinguish such type from the normal
+     * queries by the predicates and projection columns from Presto.
+     *
+     * preRowInRG will keep in sync with curRowInRG if readBatch() is actually
+     * called from LazyBlock.load().
+     */
+    private int preRowInRG = 0;
+    /**
+     * Issue #105:
+     * Similar to preRowInRG.
+     */
+    private int preRGIdx = 0;
+
+    /**
      * Prepare for the next row batch.
      *
      * @param batchSize the willing batch size
@@ -763,17 +784,45 @@ public class PixelsRecordReaderImpl
         }
 
         // curBatchSize is the available size of the next batch.
-        int curBatchSize = -curRowInRG;
-        for (int rgIdx = curRGIdx; rgIdx < targetRGNum; ++rgIdx)
+        int curBatchSize = -preRowInRG;
+        for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
         {
             int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
             curBatchSize += rgRowCount;
+            if (curBatchSize <= 0)
+            {
+                // continue for the next row group if we reach the empty last row batch.
+                curBatchSize = 0;
+                preRGIdx++;
+                preRowInRG = 0;
+                continue;
+            }
             if (curBatchSize >= batchSize)
             {
                 curBatchSize = batchSize;
-                break;
+                preRowInRG += curBatchSize;
             }
+            else
+            {
+                // Prepare for reading the next row group.
+                preRGIdx++;
+                preRowInRG = 0;
+            }
+            break;
         }
+
+        // Check if this is the end of the file.
+        if (curBatchSize <= 0)
+        {
+            // resultRowBatch is initialized if prepareRead returns true.
+            if (resultRowBatch == null)
+            {
+                throw new IOException("resultRowBatch is unexpected to be null.");
+            }
+            resultRowBatch.endOfFile = true;
+            return 0;
+        }
+
         return curBatchSize;
     }
 
@@ -796,9 +845,11 @@ public class PixelsRecordReaderImpl
             resultRowBatch.selected = null;
             resultRowBatch.projectionSize = 0;
             resultRowBatch.endOfFile = true;
+            resultRowBatch.size = 0;
             return resultRowBatch;
         }
 
+        // Issue #105: reset is not a problem for 'select count(*) from t'.
         resultRowBatch.reset();
 
         if (!everRead)
@@ -822,6 +873,7 @@ public class PixelsRecordReaderImpl
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
+            checkValid = false; // Issue #105: to reject continuous read.
             return resultRowBatch;
         }
 
@@ -866,12 +918,14 @@ public class PixelsRecordReaderImpl
 
             // update current row index in the row group
             curRowInRG += curBatchSize;
+            preRowInRG = curRowInRG; // keep in sync with curRowInRG.
             rowIndex += curBatchSize;
             resultRowBatch.size += curBatchSize;
             // update row group index if current row index exceeds max row count in the row group
             if (curRowInRG >= rgRowCount)
             {
                 curRGIdx++;
+                preRGIdx = curRGIdx; // keep in sync with curRGIdx
                 // if not end of file, update row count
                 if (curRGIdx < targetRGNum)
                 {
@@ -880,10 +934,11 @@ public class PixelsRecordReaderImpl
                 // if end of file, set result vectorized row batch endOfFile
                 else
                 {
+                    checkValid = false; // Issue #105: to reject continuous read.
                     resultRowBatch.endOfFile = true;
                     break;
                 }
-                curRowInRG = 0;
+                preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
             }
         }
 
