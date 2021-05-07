@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.compactor;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
 import io.pixelsdb.pixels.common.physical.PhysicalFSWriter;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
@@ -26,12 +27,10 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriterUtil;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsVersion;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
@@ -446,7 +445,7 @@ public class PixelsCompactor
     {
         PixelsProto.Footer.Builder footerBuilder =
                 PixelsProto.Footer.newBuilder();
-        PixelsWriterImpl.writeTypes(footerBuilder, schema);
+        TypeDescription.writeTypes(footerBuilder, schema);
         for (StatsRecorder recorder : fileColStatRecorders)
         {
             footerBuilder.addColumnStats(recorder.serialize().build());

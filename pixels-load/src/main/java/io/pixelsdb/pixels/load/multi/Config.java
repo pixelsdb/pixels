@@ -155,11 +155,19 @@ public class Config
             } else if (type.equals("long"))
             {
                 type = "bigint";
-            } else if (type.equals("varchar"))
+            } else if (type.equals("varchar") ||
+                    type.equals("char"))
             {
                 type = "string";
             }
-            // TODO: support varchar(n).
+            /**
+             * Issue #100:
+             * For varchar/char without max length, we use string instead of varchar.
+             * For varchar/char with max length and other data types, there is no need
+             * to change the type name. Pixels core will parse them correctly.
+             * Refer TypeDescription, ColumnReader, and ColumnWriter for how Pixels
+             * deals with data types.
+             */
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }

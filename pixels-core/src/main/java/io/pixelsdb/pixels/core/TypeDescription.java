@@ -436,7 +436,6 @@ public final class TypeDescription
                 break;
             case CHAR:
             case VARCHAR:
-                // TODO: fix varchar
                 requireChar(source, '(');
                 result.withMaxLength(parseInt(source));
                 requireChar(source, ')');
@@ -472,6 +471,78 @@ public final class TypeDescription
             throw new IllegalArgumentException("Extra characters at " + source);
         }
         return result;
+    }
+
+    /**
+     * Write the schema into the Pixels footer builder.
+     * @param builder
+     * @param schema
+     */
+    public static void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
+    {
+        List<TypeDescription> children = schema.getChildren();
+        List<String> names = schema.getFieldNames();
+        if (children == null || children.isEmpty())
+        {
+            return;
+        }
+        for (int i = 0; i < children.size(); i++)
+        {
+            PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();
+            tmpType.setName(names.get(i));
+            switch (children.get(i).getCategory())
+            {
+                case BOOLEAN:
+                    tmpType.setKind(PixelsProto.Type.Kind.BOOLEAN);
+                    break;
+                case BYTE:
+                    tmpType.setKind(PixelsProto.Type.Kind.BYTE);
+                    break;
+                case SHORT:
+                    tmpType.setKind(PixelsProto.Type.Kind.SHORT);
+                    break;
+                case INT:
+                    tmpType.setKind(PixelsProto.Type.Kind.INT);
+                    break;
+                case LONG:
+                    tmpType.setKind(PixelsProto.Type.Kind.LONG);
+                    break;
+                case FLOAT:
+                    tmpType.setKind(PixelsProto.Type.Kind.FLOAT);
+                    break;
+                case DOUBLE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
+                    break;
+                case STRING:
+                    tmpType.setKind(PixelsProto.Type.Kind.STRING);
+                    tmpType.setMaximumLength(schema.getMaxLength());
+                    break;
+                case CHAR:
+                    tmpType.setKind(PixelsProto.Type.Kind.CHAR);
+                    tmpType.setMaximumLength(schema.getMaxLength());
+                    break;
+                case VARCHAR:
+                    tmpType.setKind(PixelsProto.Type.Kind.VARCHAR);
+                    tmpType.setMaximumLength(schema.getMaxLength());
+                    break;
+                case BINARY:
+                    tmpType.setKind(PixelsProto.Type.Kind.BINARY);
+                    break;
+                case TIMESTAMP:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
+                    break;
+                case DATE:
+                    tmpType.setKind(PixelsProto.Type.Kind.DATE);
+                    break;
+                case TIME:
+                    tmpType.setKind(PixelsProto.Type.Kind.TIME);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown category: " +
+                            schema.getCategory());
+            }
+            builder.addTypes(tmpType.build());
+        }
     }
 
     /**
@@ -528,7 +599,7 @@ public final class TypeDescription
         if (category != Category.VARCHAR && category != Category.CHAR)
         {
             throw new IllegalArgumentException("maxLength is only allowed on char" +
-                    " and varchar and not " + category.name);
+                    " and varchar, but not " + category.name);
         }
         this.maxLength = maxLength;
         return this;
@@ -937,13 +1008,13 @@ public final class TypeDescription
         buffer.append(category.name);
         buffer.append("\", \"id\": ");
         buffer.append(getId());
-        buffer.append(", \"max\": ");
+        buffer.append(", \"maxId\": ");
         buffer.append(maxId);
         switch (category)
         {
             case CHAR:
             case VARCHAR:
-                buffer.append(", \"length\": ");
+                buffer.append(", \"maxLength\": ");
                 buffer.append(maxLength);
                 break;
             case STRUCT:

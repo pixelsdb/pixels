@@ -43,6 +43,8 @@ import java.util.List;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.TypeDescription.writeTypes;
+import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -110,7 +112,7 @@ public class PixelsWriterImpl
         fileColStatRecorders = new StatsRecorder[children.size()];
         for (int i = 0; i < children.size(); ++i)
         {
-            columnWriters[i] = createColumnWriter(children.get(i), encoding);
+            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding);
             fileColStatRecorders[i] = StatsRecorder.create(children.get(i));
         }
 
@@ -505,107 +507,5 @@ public class PixelsWriterImpl
         tailOffsetBuffer.putLong(tailOffset);
         physicalWriter.append(tailOffsetBuffer);
         physicalWriter.flush();
-    }
-
-    public static void writeTypes(PixelsProto.Footer.Builder builder, TypeDescription schema)
-    {
-        List<TypeDescription> children = schema.getChildren();
-        List<String> names = schema.getFieldNames();
-        if (children == null || children.isEmpty())
-        {
-            return;
-        }
-        for (int i = 0; i < children.size(); i++)
-        {
-            PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();
-            tmpType.setName(names.get(i));
-            switch (children.get(i).getCategory())
-            {
-                case BOOLEAN:
-                    tmpType.setKind(PixelsProto.Type.Kind.BOOLEAN);
-                    break;
-                case BYTE:
-                    tmpType.setKind(PixelsProto.Type.Kind.BYTE);
-                    break;
-                case SHORT:
-                    tmpType.setKind(PixelsProto.Type.Kind.SHORT);
-                    break;
-                case INT:
-                    tmpType.setKind(PixelsProto.Type.Kind.INT);
-                    break;
-                case LONG:
-                    tmpType.setKind(PixelsProto.Type.Kind.LONG);
-                    break;
-                case FLOAT:
-                    tmpType.setKind(PixelsProto.Type.Kind.FLOAT);
-                    break;
-                case DOUBLE:
-                    tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
-                    break;
-                case STRING:
-                    tmpType.setKind(PixelsProto.Type.Kind.STRING);
-                    tmpType.setMaximumLength(schema.getMaxLength());
-                    break;
-                case CHAR:
-                    tmpType.setKind(PixelsProto.Type.Kind.CHAR);
-                    tmpType.setMaximumLength(schema.getMaxLength());
-                    break;
-                case VARCHAR:
-                    tmpType.setKind(PixelsProto.Type.Kind.VARCHAR);
-                    tmpType.setMaximumLength(schema.getMaxLength());
-                    break;
-                case BINARY:
-                    tmpType.setKind(PixelsProto.Type.Kind.BINARY);
-                    break;
-                case TIMESTAMP:
-                    tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
-                    break;
-                case DATE:
-                    tmpType.setKind(PixelsProto.Type.Kind.DATE);
-                    break;
-                case TIME:
-                    tmpType.setKind(PixelsProto.Type.Kind.TIME);
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown category: " +
-                            schema.getCategory());
-            }
-            builder.addTypes(tmpType.build());
-        }
-    }
-
-    private ColumnWriter createColumnWriter(TypeDescription schema, boolean isEncoding)
-    {
-        switch (schema.getCategory())
-        {
-            case BOOLEAN:
-                return new BooleanColumnWriter(schema, pixelStride, isEncoding);
-            case BYTE:
-                return new ByteColumnWriter(schema, pixelStride, isEncoding);
-            case SHORT:
-            case INT:
-            case LONG:
-                return new IntegerColumnWriter(schema, pixelStride, isEncoding);
-            case FLOAT:
-                return new FloatColumnWriter(schema, pixelStride, isEncoding);
-            case DOUBLE:
-                return new DoubleColumnWriter(schema, pixelStride, isEncoding);
-            case STRING:
-                return new StringColumnWriter(schema, pixelStride, isEncoding);
-            case CHAR:
-                return new CharColumnWriter(schema, pixelStride, isEncoding);
-            case VARCHAR:
-                return new VarcharColumnWriter(schema, pixelStride, isEncoding);
-            case BINARY:
-                return new BinaryColumnWriter(schema, pixelStride, isEncoding);
-            case DATE:
-                return new DateColumnWriter(schema, pixelStride, isEncoding);
-            case TIME:
-                return new TimeColumnWriter(schema, pixelStride, isEncoding);
-            case TIMESTAMP:
-                return new TimestampColumnWriter(schema, pixelStride, isEncoding);
-            default:
-                throw new IllegalArgumentException("Bad schema type: " + schema.getCategory());
-        }
     }
 }
