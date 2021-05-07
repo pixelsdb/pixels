@@ -20,23 +20,59 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
+import java.io.IOException;
+
 /**
- * pixels
+ * pixels column writer for <code>Varchar</code>
  *
  * @author guodong
+ * @author hank
  */
-public class VarcharColumnWriter extends BaseColumnWriter
+public class VarcharColumnWriter extends StringColumnWriter
 {
-    public VarcharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    // Implemented in Issue #100.
+
+    /**
+     * Max length of varchar. It is recorded in the file footer's schema.
+     */
+    private final int maxLenght;
+    private int numTruncated;
+
+    public VarcharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLenght)
     {
         super(schema, pixelStride, isEncoding);
+        this.maxLenght = maxLenght;
+        this.numTruncated = 0;
     }
 
     @Override
-    public int write(ColumnVector vector, int length)
+    public int write(ColumnVector vector, int length) throws IOException
     {
-        return 0;
+        BinaryColumnVector columnVector = (BinaryColumnVector) vector;
+        int[] vLens = columnVector.lens;
+
+        for (int i = 0; i < vLens.length; ++i)
+        {
+            if (vLens[i] > maxLenght)
+            {
+                vLens[i] = maxLenght;
+                this.numTruncated++;
+            }
+        }
+
+        return super.write(vector, length);
+    }
+
+    /**
+     * Get the number of truncated values.
+     * TODO: report it as a warning in Pixels and other query engines.
+     * @return
+     */
+    public int getNumTruncated ()
+    {
+        return this.numTruncated;
     }
 }

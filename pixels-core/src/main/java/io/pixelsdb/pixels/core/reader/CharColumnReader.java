@@ -19,55 +19,21 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
-import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
+ * This class is the same as String and Varchar column reader.
+ * It does not pad zeros at the end of a value for performance reasons.
  * @author guodong
+ * @author hank
  */
 public class CharColumnReader
-        extends ColumnReader
+        extends StringColumnReader
 {
+    // This class is implemented in Issue #100.
+
     CharColumnReader(TypeDescription type)
     {
         super(type);
-    }
-
-    /**
-     * Closes this column reader and releases any resources associated
-     * with it. If the column reader is already closed then invoking this
-     * method has no effect.
-     * <p>
-     * <p> As noted in {@link AutoCloseable#close()}, cases where the
-     * close may fail require careful attention. It is strongly advised
-     * to relinquish the underlying resources and to internally
-     * <em>mark</em> the {@code Closeable} as closed, prior to throwing
-     * the {@code IOException}.
-     *
-     * @throws IOException if an I/O error occurs
-     */
-    @Override
-    public void close() throws IOException
-    {
-
-    }
-
-    /**
-     * Read input buffer.
-     *
-     * @param input    input buffer
-     * @param encoding encoding type
-     * @param size     number of values to read
-     * @param vector   vector to read into
-     */
-    @Override
-    public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
-                     int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
-    {
     }
 }

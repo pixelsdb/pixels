@@ -20,24 +20,18 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 /**
  * pixels column writer for <code>Char</code>
- *
+ * It is the same as VarcharColumnWriter, which means it never pads zero
+ * at the end when writing a value. This is for performance reasons.
  * @author guodong
+ * @author hank
  */
-// todo char column writer. basically the same as string column writer.
-public class CharColumnWriter extends BaseColumnWriter
+public class CharColumnWriter extends VarcharColumnWriter
 {
-    public CharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public CharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLength)
     {
-        super(schema, pixelStride, isEncoding);
-    }
-
-    @Override
-    public int write(ColumnVector vector, int length)
-    {
-        return 0;
+        super(schema, pixelStride, isEncoding, maxLength);
     }
 }
