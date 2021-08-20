@@ -51,6 +51,12 @@ public class TestHDFS
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         FileSystem fs = FileSystem.get(URI.create("hdfs://node01:9000/"), conf);
         System.out.println(fs.getScheme());
+
+        URI uri = URI.create("s3://node01:9000/scheme/test");
+        System.out.println(uri.getHost());
+        System.out.println(uri.getPort());
+        System.out.println(uri.getPath());
+        System.out.println(uri.getScheme());
     }
 
     @Test
