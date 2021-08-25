@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -35,7 +34,7 @@ public class PixelsPhysicalReader
     private final PhysicalReader physicalReader;
     private final PixelsProto.FileTail fileTail;
 
-    public PixelsPhysicalReader(Storage storage, String path)
+    public PixelsPhysicalReader(Storage storage, String path) throws IOException
     {
         this.physicalReader = PhysicalReaderUtil.newPhysicalReader(storage, path);
         this.fileTail = readFileTail();
@@ -87,7 +86,7 @@ public class PixelsPhysicalReader
         return content;
     }
 
-    public long getCurrentBlockId() throws FSException, IOException
+    public long getCurrentBlockId() throws IOException
     {
         return physicalReader.getCurrentBlockId();
     }

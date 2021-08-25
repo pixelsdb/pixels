@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -56,5 +54,5 @@ public interface PhysicalReader
      */
     String getName();
 
-    long getCurrentBlockId() throws IOException, FSException;
+    long getCurrentBlockId() throws IOException;
 }

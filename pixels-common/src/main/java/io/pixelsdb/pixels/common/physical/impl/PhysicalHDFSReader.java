@@ -17,10 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.impl;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
@@ -36,7 +36,7 @@ import java.util.List;
 /**
  * @author guodong
  */
-public class PhysicalFSReader
+public class PhysicalHDFSReader
         implements PhysicalReader
 {
     private final HDFS hdfs;
@@ -99,7 +99,7 @@ public class PhysicalFSReader
         };
     }
 
-    public PhysicalFSReader(Storage storage, String path) throws IOException
+    public PhysicalHDFSReader(Storage storage, String path) throws IOException
     {
         if (storage instanceof HDFS)
         {
@@ -219,7 +219,7 @@ public class PhysicalFSReader
      * @throws IOException
      */
     @Override
-    public long getCurrentBlockId() throws IOException, FSException
+    public long getCurrentBlockId() throws IOException
     {
         if (this.blocks != null)
         {
@@ -229,7 +229,7 @@ public class PhysicalFSReader
         }
         else
         {
-            throw new FSException("Failed to get blocks. This reader may be backed by a non-HdfsDataInputStream.");
+            throw new IOException("Failed to get blocks. This reader may be backed by a non-HdfsDataInputStream.");
         }
     }
 }

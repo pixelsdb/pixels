@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSReader;
+
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -32,39 +34,44 @@ public class PhysicalReaderUtil
     {
     }
 
-    public static PhysicalReader newPhysicalReader(String scheme, String path)
-    {
-        checkArgument(scheme != null, "scheme should not be null");
-        checkArgument(path != null, "path should not be null");
-        if (scheme.equalsIgnoreCase("hdfs"))
-        {
-            PhysicalFSReader fsReader;
-            try
-            {
-                fsReader = new PhysicalFSReader(StorageFactory.Instance().getStorage(scheme), path);
-                return fsReader;
-            } catch (IOException ioException)
-            {
-                ioException.printStackTrace();
-            }
-        }
-
-        return null;
-    }
-
-    public static PhysicalReader newPhysicalReader(Storage storage, String path)
+    public static PhysicalReader newPhysicalReader(Storage storage, String path) throws IOException
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
-        PhysicalFSReader fsReader = null;
+        PhysicalReader fsReader = null;
         try
         {
-            fsReader = new PhysicalFSReader(storage, path);
-        } catch (IOException ioException)
+            if (storage.getScheme().equalsIgnoreCase("hdfs"))
+            {
+                fsReader = new PhysicalHDFSReader(storage, path);
+            }
+        } catch (IOException e)
         {
-            ioException.printStackTrace();
+            e.printStackTrace();
+            throw e;
         }
 
         return fsReader;
+    }
+
+    public static PhysicalReader newPhysicalReader(String scheme, String path) throws IOException
+    {
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        PhysicalReader fsReader;
+        try
+        {
+            if (scheme.equalsIgnoreCase("hdfs"))
+            {
+                fsReader = new PhysicalHDFSReader(StorageFactory.Instance().getStorage(scheme), path);
+                return fsReader;
+            }
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+            throw e;
+        }
+
+        return null;
     }
 }

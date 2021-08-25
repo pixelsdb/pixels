@@ -229,9 +229,18 @@ public class PixelsWriterImpl
         public PixelsWriter build()
                 throws PixelsWriterException
         {
-            PhysicalWriter fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(
-                    this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
-                    this.builderBlockPadding);
+            PhysicalWriter fsWriter = null;
+            try
+            {
+                fsWriter = PhysicalWriterUtil.newPhysicalWriter(
+                        this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
+                        this.builderBlockPadding);
+            } catch (IOException e)
+            {
+                LOGGER.error("Failed to create PhysicalWriter");
+                throw new PixelsWriterException(
+                        "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
+            }
             checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
                     "schema is empty");
 

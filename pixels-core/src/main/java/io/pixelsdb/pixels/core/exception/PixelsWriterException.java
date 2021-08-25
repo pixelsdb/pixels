@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.exception;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PixelsWriterException
         extends PixelsRuntimeException
@@ -30,5 +31,10 @@ public class PixelsWriterException
     public PixelsWriterException(String message)
     {
         super(message);
+    }
+
+    public PixelsWriterException(String message, Throwable e)
+    {
+        super(message, e);
     }
 }

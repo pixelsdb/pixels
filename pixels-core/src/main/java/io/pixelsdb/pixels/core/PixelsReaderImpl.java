@@ -155,7 +155,7 @@ public class PixelsReaderImpl
             {
                 throw new IllegalArgumentException("Missing argument to build PixelsReader");
             }
-            // get PhysicalFSReader
+            // get PhysicalReader
             PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
             // try to get file tail from cache
             String fileName = fsReader.getName();
@@ -164,9 +164,9 @@ public class PixelsReaderImpl
             {
                 if (fsReader == null)
                 {
-                    LOGGER.error("Failed to create PhysicalFSReader");
+                    LOGGER.error("Failed to create PhysicalReader");
                     throw new PixelsReaderException(
-                            "Failed to create PixelsReader due to error of creating PhysicalFSReader");
+                            "Failed to create PixelsReader due to error of creating PhysicalReader");
                 }
                 // get FileTail
                 long fileLen = fsReader.getFileLength();

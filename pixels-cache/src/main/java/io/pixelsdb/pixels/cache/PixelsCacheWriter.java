@@ -240,7 +240,7 @@ public class PixelsCacheWriter
             String[] files = fileStr.split(";");
             return internalUpdateAll(version, layout, files);
         }
-        catch (IOException | FSException e)
+        catch (IOException e)
         {
             e.printStackTrace();
             return -1;
@@ -315,7 +315,7 @@ public class PixelsCacheWriter
     }
 
     private int internalUpdateAll(int version, Layout layout, String[] files)
-            throws IOException, FSException
+            throws IOException
     {
         int status = 0;
         // get the new caching layout
@@ -634,7 +634,7 @@ public class PixelsCacheWriter
             {
                 // file is not local, move it to local.
                 PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path);
-                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalFSWriter(storage, newPath,
+                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(storage, newPath,
                         2048l*1024l*1024l, (short) 1, true);
                 byte[] buffer = new byte[1024*1024*32]; // 32MB buffer for copy.
                 long copiedBytes = 0l, fileLength = reader.getFileLength();

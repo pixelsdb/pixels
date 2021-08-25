@@ -17,9 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.impl;
 
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.logging.log4j.LogManager;
@@ -32,10 +33,10 @@ import java.nio.ByteBuffer;
 /**
  * @author guodong
  */
-public class PhysicalFSWriter
+public class PhysicalHDFSWriter
         implements PhysicalWriter
 {
-    private static final Logger LOGGER = LogManager.getLogger(PhysicalFSWriter.class);
+    private static final Logger LOGGER = LogManager.getLogger(PhysicalHDFSWriter.class);
 
     private final HDFS hdfs;
     private final String path;
@@ -44,8 +45,8 @@ public class PhysicalFSWriter
     private final boolean addBlockPadding;
     private final FSDataOutputStream rawWriter;
 
-    public PhysicalFSWriter(Storage storage, String path, short replication,
-                            boolean addBlockPadding, long blockSize) throws IOException
+    public PhysicalHDFSWriter(Storage storage, String path, short replication,
+                              boolean addBlockPadding, long blockSize) throws IOException
     {
         if (storage instanceof HDFS)
         {

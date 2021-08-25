@@ -59,7 +59,7 @@ public class PixelsCompactor
     private final int fileRowNum;
 
     private final Storage storage;
-    private final PhysicalFSWriter fsWriter;
+    private final PhysicalWriter fsWriter;
     private final StatsRecorder[] fileColStatRecorders;
 
     private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList;    // row group information in footer
@@ -77,7 +77,7 @@ public class PixelsCompactor
             long fileContentLength,
             int fileRowNum,
             Storage storage,
-            PhysicalFSWriter fsWriter,
+            PhysicalWriter fsWriter,
             StatsRecorder[] fileColStatRecorders,
             List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList,
             List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList,
@@ -129,7 +129,7 @@ public class PixelsCompactor
         private int pixelStride = 0;
         private long fileContentLength = 0L;
         private int fileRowNum = 0;
-        private PhysicalFSWriter fsWriter = null;
+        private PhysicalWriter fsWriter = null;
         private List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList = new LinkedList<>();
         private List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList = new LinkedList<>();
         private List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList = new LinkedList<>();
@@ -303,7 +303,7 @@ public class PixelsCompactor
                 }
             }
 
-            fsWriter = PhysicalWriterUtil.newPhysicalFSWriter(builderStorage, builderFilePath, builderBlockSize,
+            fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderStorage, builderFilePath, builderBlockSize,
                     builderReplication, builderBlockPadding);
 
             return new PixelsCompactor(

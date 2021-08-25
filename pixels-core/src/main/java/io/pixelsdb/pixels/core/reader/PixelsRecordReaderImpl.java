@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.cache.ColumnletId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -498,7 +497,7 @@ public class PixelsRecordReaderImpl
             {
                 blockId = physicalFSReader.getCurrentBlockId();
             }
-            catch (IOException | FSException e)
+            catch (IOException e)
             {
                 logger.error("failed to get block id.", e);
                 throw new IOException("failed to get block id.", e);

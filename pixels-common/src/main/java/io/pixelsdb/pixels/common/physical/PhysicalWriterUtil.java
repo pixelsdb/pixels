@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSWriter;
+
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -32,10 +34,23 @@ public class PhysicalWriterUtil
     {
     }
 
-    public static PhysicalFSWriter newPhysicalFSWriter(Storage storage, String path, long blockSize,
-                                                       short replication, boolean addBlockPadding)
+    public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
+                                                       short replication, boolean addBlockPadding) throws IOException
     {
-        //TODO: implement;
+        checkArgument(storage != null, "storage should not be null");
+        checkArgument(path != null, "path should not be null");
+        try
+        {
+            if (storage.getScheme().equalsIgnoreCase("hdfs"))
+            {
+                return new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+            }
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+            throw e;
+        }
+
         return null;
     }
 
@@ -50,20 +65,22 @@ public class PhysicalWriterUtil
      * @return physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
-            String scheme, String path, short replication, boolean addBlockPadding, long blockSize)
+            String scheme, String path, short replication, boolean addBlockPadding, long blockSize) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-        if (scheme.equalsIgnoreCase("hdfs"))
+
+        try
         {
-            try
+            if (scheme.equalsIgnoreCase("hdfs"))
             {
-                return new PhysicalFSWriter(StorageFactory.Instance().
+                return new PhysicalHDFSWriter(StorageFactory.Instance().
                         getStorage(scheme), path, replication, addBlockPadding, blockSize);
-            } catch (IOException e)
-            {
-                e.printStackTrace();
             }
+        } catch (IOException e)
+        {
+            e.printStackTrace();
+            throw e;
         }
 
         return null;
