@@ -27,6 +27,8 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
+import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -160,7 +162,40 @@ public class HDFS implements Storage
     @Override
     public long getId(String path) throws IOException
     {
-        return 0;
+        FSDataInputStream rawReader = fs.open(new Path(path));
+        HdfsDataInputStream hdis;
+        if (rawReader instanceof HdfsDataInputStream)
+        {
+            hdis = (HdfsDataInputStream) rawReader;
+            try
+            {
+                List<LocatedBlock> locatedBlocks = hdis.getAllBlocks();
+                if (locatedBlocks == null)
+                {
+                    throw new IOException("Failed to list blocks in HDFS file.");
+                }
+                if (locatedBlocks.size() != 1)
+                {
+                    throw new IOException("Only one block is expected per file, however there is (are) " +
+                            locatedBlocks.size() + ".");
+                }
+                return locatedBlocks.get(0).getBlock().getBlockId();
+            }
+            catch (IOException e)
+            {
+                throw e;
+            }
+        }
+        try
+        {
+            rawReader.close();
+        }
+        catch (IOException e)
+        {
+            throw e;
+        }
+
+        return -1;
     }
 
     @Override

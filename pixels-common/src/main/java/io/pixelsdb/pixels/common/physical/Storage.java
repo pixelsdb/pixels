@@ -38,6 +38,15 @@ public interface Storage
 
     Status getStatus(String path) throws IOException;
 
+    /**
+     * We assume there is an unique id for each file or object
+     * in the storage system.
+     * For HDFS, we assume each file only has one block, and the
+     * file id is the id of this block.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     long getId(String path) throws IOException;
 
     List<Location> getLocations(String path) throws IOException;
