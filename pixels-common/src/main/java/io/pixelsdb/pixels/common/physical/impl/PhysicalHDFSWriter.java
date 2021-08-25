@@ -32,6 +32,7 @@ import java.nio.ByteBuffer;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PhysicalHDFSWriter
         implements PhysicalWriter

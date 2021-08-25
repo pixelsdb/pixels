@@ -27,10 +27,11 @@ import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -47,7 +48,7 @@ public class CacheIndexPerf
     private static ConfigFactory config = ConfigFactory.Instance();
     private static PixelsCacheKey[] pixelsCacheKeys;
     private static List<String> cachedColumnlets;
-    private static List<Path> cachedPaths = new ArrayList<>();
+    private static List<String> cachedPaths = new ArrayList<>();
 
     public static void main(String[] args)
     {
@@ -69,7 +70,7 @@ public class CacheIndexPerf
 //            MemoryMappedFile indexFile = new MemoryMappedFile("/home/guod/Desktop/pixels.index", 1024*1024*1024);
 
             int idx = 0;
-            for (Path path : cachedPaths)
+            for (String path : cachedPaths)
             {
                 for (int i = 0; i < cachedColumnlets.size(); i++)
                 {
@@ -114,7 +115,7 @@ public class CacheIndexPerf
 
     // prepare correct answers
     private void prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, FSException
+            throws MetadataException, FSException, IOException
     {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
@@ -142,11 +143,11 @@ public class CacheIndexPerf
 //        {
 //            e.printStackTrace();
 //        }
-        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
-        List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
-        for (Path path : paths)
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
+        List<String> paths = storage.listPaths(layout.getCompactPath());
+        for (String path : paths)
         {
-            if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+            if (storage.getHosts(path)[0].equalsIgnoreCase(hostName))
             {
                 cachedPaths.add(path);
             }

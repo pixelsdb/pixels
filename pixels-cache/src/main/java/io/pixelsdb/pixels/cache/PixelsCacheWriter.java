@@ -681,7 +681,7 @@ public class PixelsCacheWriter
             }
         } catch (IOException e)
         {
-            logger.error("failed to instance FSFactory", e);
+            logger.error("failed to ensure the locality of a file/data object.", e);
         }
 
         return null;

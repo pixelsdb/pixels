@@ -21,12 +21,11 @@ package io.pixelsdb.pixels.hive.mapred;
 
 import com.alibaba.fastjson.JSON;
 import com.coreos.jetcd.data.KeyValue;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
-import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.physical.impl.HDFS;
 import io.pixelsdb.pixels.common.split.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -140,7 +139,7 @@ public class PixelsInputFormat
         // before anything is done.
         init(job);
 
-        FSFactory fsFactory = new FSFactory(FileSystem.get(job));
+        HDFS hdfs = new HDFS(FileSystem.get(job), job);
         String[] includedColumns = ColumnProjectionUtils.getReadColumnNames(job);
         ConfigFactory config = ConfigFactory.Instance();
         boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
@@ -243,27 +242,27 @@ public class PixelsInputFormat
                         try
                         {
                             // 3. add splits in orderedPath
-                            List<Path> orderedPaths = fsFactory.listFiles(layout.getOrderPath());
-                            for (Path path : orderedPaths)
+                            List<String> orderedPaths = hdfs.listPaths(layout.getOrderPath());
+                            for (String path : orderedPaths)
                             {
-                                long fileLength = fsFactory.getFileLength(path);
-                                String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
+                                long fileLength = hdfs.getStatus(path).getLength();
+                                String[] hosts = hdfs.getHosts(path);
                                 PixelsSplit pixelsSplit = new PixelsSplit(
-                                        path, 0, 1, false,
+                                        new Path(path), 0, 1, false,
                                         new ArrayList<>(0), order.getColumnOrder(), fileLength, hosts);
                                 pixelsSplits.add(pixelsSplit);
                             }
                             // 4. add splits in compactPath
                             int curFileRGIdx;
-                            for (Path path : fsFactory.listFiles(layout.getCompactPath()))
+                            for (String path : hdfs.listPaths(layout.getCompactPath()))
                             {
-                                long fileLength = fsFactory.getFileLength(path);
+                                long fileLength = hdfs.getStatus(path).getLength();
                                 curFileRGIdx = 0;
                                 while (curFileRGIdx < rowGroupNum)
                                 {
                                     String node = fileLocations.get(path.toString());
                                     String[] hosts = {node};
-                                    PixelsSplit pixelsSplit = new PixelsSplit(path, curFileRGIdx, splitSize,
+                                    PixelsSplit pixelsSplit = new PixelsSplit(new Path(path), curFileRGIdx, splitSize,
                                             true, cacheColumnletOrders, order.getColumnOrder(),
                                             fileLength, hosts);
                                     pixelsSplits.add(pixelsSplit);
@@ -271,7 +270,7 @@ public class PixelsInputFormat
                                 }
                             }
                         }
-                        catch (FSException e)
+                        catch (IOException e)
                         {
                             log.error("Failed to open or read HDFS file.", e);
                             return null;
@@ -292,39 +291,41 @@ public class PixelsInputFormat
             else
             {
                 log.debug("cache is disabled");
-                List<Path> orderedPaths;
-                List<Path> compactPaths;
+                List<String> orderedPaths;
+                List<String> compactPaths;
                 try
                 {
-                    orderedPaths = fsFactory.listFiles(layout.getOrderPath());
-                    compactPaths = fsFactory.listFiles(layout.getCompactPath());
+                    orderedPaths = hdfs.listPaths(layout.getOrderPath());
+                    compactPaths = hdfs.listPaths(layout.getCompactPath());
 
                     // add splits in orderedPath
-                    for (Path path : orderedPaths)
+                    for (String path : orderedPaths)
                     {
-                        String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
-                        PixelsSplit pixelsSplit = new PixelsSplit(path, 0, 1,
-                                false, new ArrayList<>(0), order.getColumnOrder(), fsFactory.getFileLength(path), hosts);
+                        String[] hosts = hdfs.getHosts(path);
+                        PixelsSplit pixelsSplit = new PixelsSplit(new Path(path), 0, 1,
+                                false, new ArrayList<>(0), order.getColumnOrder(),
+                                hdfs.getStatus(path).getLength(), hosts);
                         pixelsSplits.add(pixelsSplit);
                     }
                     // add splits in compactPath
                     int curFileRGIdx;
-                    for (Path path : compactPaths)
+                    for (String path : compactPaths)
                     {
                         curFileRGIdx = 0;
                         while (curFileRGIdx < rowGroupNum)
                         {
-                            String[] hosts = fsFactory.getBlockHosts(path, 0, Long.MAX_VALUE);
-                            PixelsSplit pixelsSplit = new PixelsSplit(path, curFileRGIdx, splitSize,
-                                    false, new ArrayList<>(0), order.getColumnOrder(), splitSize, hosts);
+                            String[] hosts = hdfs.getHosts(path);
+                            PixelsSplit pixelsSplit = new PixelsSplit(new Path(path), curFileRGIdx, splitSize,
+                                    false, new ArrayList<>(0), order.getColumnOrder(),
+                                    splitSize, hosts);
                             pixelsSplits.add(pixelsSplit);
                             curFileRGIdx += splitSize;
                         }
                     }
                 }
-                catch (FSException e)
+                catch (IOException e)
                 {
-                    log.error("Failed to open or read HDFS file.", e);
+                    log.error("Failed to open or read file/object from storage.", e);
                     return null;
                 }
             }

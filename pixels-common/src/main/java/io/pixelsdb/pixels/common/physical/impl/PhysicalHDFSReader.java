@@ -35,6 +35,7 @@ import java.util.List;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PhysicalHDFSReader
         implements PhysicalReader
