@@ -48,5 +48,13 @@ public interface PhysicalReader
 
     void close() throws IOException;
 
+    String getPath();
+
+    /**
+     * Get the last domain in path.
+     * @return
+     */
+    String getName();
+
     long getCurrentBlockId() throws IOException, FSException;
 }

@@ -41,6 +41,7 @@ public class PixelsSplit
     private final String connectorId;
     private final String schemaName;
     private final String tableName;
+    private final String storageScheme;
     private final List<String> paths;
     private final int start;
     private final int len;
@@ -56,6 +57,7 @@ public class PixelsSplit
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
+            @JsonProperty("storageScheme") String storageScheme,
             @JsonProperty("paths") List<String> paths,
             @JsonProperty("start") int start,
             @JsonProperty("len") int len,
@@ -67,6 +69,7 @@ public class PixelsSplit
         this.schemaName = requireNonNull(schemaName, "schema name is null");
         this.connectorId = requireNonNull(connectorId, "connector id is null");
         this.tableName = requireNonNull(tableName, "table name is null");
+        this.storageScheme = requireNonNull(storageScheme, "storage scheme is null");
         this.paths = requireNonNull(paths, "paths is null");
         if (paths.isEmpty())
         {
@@ -104,6 +107,11 @@ public class PixelsSplit
     @JsonProperty
     public String getTableName() {
         return tableName;
+    }
+
+    @JsonProperty
+    public String getStorageScheme() {
+        return storageScheme;
     }
 
     @JsonProperty
@@ -213,6 +221,7 @@ public class PixelsSplit
                 "connectorId=" + connectorId +
                 ", schemaName='" + schemaName + '\'' +
                 ", tableName='" + tableName + '\'' +
+                ", storageScheme='" + storageScheme + '\'' +
                 ", paths=" + pathBuilder.toString() +
                 ", start=" + start +
                 ", len=" + len +

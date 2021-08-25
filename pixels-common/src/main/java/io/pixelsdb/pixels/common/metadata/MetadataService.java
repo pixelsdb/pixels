@@ -86,6 +86,34 @@ public class MetadataService
         return schemas;
     }
 
+    public Table getTable(String schemaName, String tableName) throws MetadataException
+    {
+        Table table = null;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetTableRequest request = MetadataProto.GetTableRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setTableName(tableName).build();
+        try
+        {
+            MetadataProto.GetTableResponse response = this.stub.getTable(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            table = new Table(response.getTable());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get tables from metadata", e);
+        }
+        return table;
+    }
+
     public List<Table> getTables(String schemaName) throws MetadataException
     {
         List<Table> tables = new ArrayList<>();
@@ -379,7 +407,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean createTable(String schemaName, String tableName, List<Column> columns) throws MetadataException
+    public boolean createTable(String schemaName, String tableName, String storageScheme, List<Column> columns) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert tableName != null && !tableName.isEmpty();
@@ -395,7 +423,8 @@ public class MetadataService
         }
         MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).addAllColumns(columnList).build();
+                .setSchemaName(schemaName).setTableName(tableName).setStorageScheme(storageScheme)
+                .addAllColumns(columnList).build();
         MetadataProto.CreateTableResponse response = this.stub.createTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {

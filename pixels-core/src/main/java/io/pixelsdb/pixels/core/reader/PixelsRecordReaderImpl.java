@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.cache.ColumnletId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
-import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
@@ -47,7 +47,7 @@ public class PixelsRecordReaderImpl
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
-    private final PhysicalFSReader physicalFSReader;
+    private final PhysicalReader physicalFSReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
@@ -85,7 +85,7 @@ public class PixelsRecordReaderImpl
     private long cacheReadBytes = 0L;
     private long readTimeNanos = 0L;
 
-    public PixelsRecordReaderImpl(PhysicalFSReader physicalFSReader,
+    public PixelsRecordReaderImpl(PhysicalReader physicalReader,
                                   PixelsProto.PostScript postScript,
                                   PixelsProto.Footer footer,
                                   PixelsReaderOption option,
@@ -96,7 +96,7 @@ public class PixelsRecordReaderImpl
                                   PixelsCacheReader cacheReader,
                                   PixelsFooterCache pixelsFooterCache) throws IOException
     {
-        this.physicalFSReader = physicalFSReader;
+        this.physicalFSReader = physicalReader;
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
@@ -109,7 +109,7 @@ public class PixelsRecordReaderImpl
         this.cacheOrder = cacheOrder;
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
-        this.fileName = physicalFSReader.getPath().getName();
+        this.fileName = physicalFSReader.getName();
         checkBeforeRead();
     }
 

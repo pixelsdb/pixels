@@ -1,5 +1,7 @@
 package io.pixelsdb.pixels.common.physical;
 
+import org.apache.hadoop.fs.BlockLocation;
+
 import java.io.IOException;
 
 /**
@@ -32,6 +34,13 @@ public class Location
         this.corrupt = that.corrupt;
     }
 
+    public Location(BlockLocation blockLocation) throws IOException
+    {
+        this.hosts = blockLocation.getHosts();
+        this.names = blockLocation.getNames();
+        this.corrupt = blockLocation.isCorrupt();
+    }
+
     /**
      * Constructor with host, name, offset and length
      */
@@ -62,7 +71,7 @@ public class Location
     /**
      * Get the list of hosts (hostname) hosting this block
      */
-    public String[] getHosts() throws IOException
+    public String[] getHosts()
     {
         return hosts;
     }
@@ -70,7 +79,7 @@ public class Location
     /**
      * Get the list of names (IP:xferPort) hosting this block
      */
-    public String[] getNames() throws IOException
+    public String[] getNames()
     {
         return names;
     }
@@ -94,7 +103,7 @@ public class Location
     /**
      * Set the hosts hosting this block
      */
-    public void setHosts(String[] hosts) throws IOException
+    public void setHosts(String[] hosts)
     {
         if (hosts == null)
         {
@@ -108,7 +117,7 @@ public class Location
     /**
      * Set the names (host:port) hosting this block
      */
-    public void setNames(String[] names) throws IOException
+    public void setNames(String[] names)
     {
         if (names == null)
         {

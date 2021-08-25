@@ -19,12 +19,9 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.utils.Constants;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-
 import java.io.IOException;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
@@ -35,33 +32,40 @@ public class PhysicalWriterUtil
     {
     }
 
+    public static PhysicalFSWriter newPhysicalFSWriter(Storage storage, String path, long blockSize,
+                                                       short replication, boolean addBlockPadding)
+    {
+        //TODO: implement;
+        return null;
+    }
+
     /**
      * Get a physical file system writer.
      *
-     * @param fs              file system
+     * @param scheme          name of the scheme
      * @param path            write file path
-     * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
+     * @param blockSize       hdfs block size
      * @return physical writer
      */
-    public static PhysicalFSWriter newPhysicalFSWriter(
-            FileSystem fs, Path path, long blockSize, short replication, boolean addBlockPadding)
+    public static PhysicalWriter newPhysicalWriter(
+            String scheme, String path, short replication, boolean addBlockPadding, long blockSize)
     {
-        FSDataOutputStream rawWriter = null;
-        try
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        if (scheme.equalsIgnoreCase("hdfs"))
         {
-            rawWriter = fs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
+            try
+            {
+                return new PhysicalFSWriter(StorageFactory.Instance().
+                        getStorage(scheme), path, replication, addBlockPadding, blockSize);
+            } catch (IOException e)
+            {
+                e.printStackTrace();
+            }
         }
 
-        if (rawWriter == null)
-        {
-            return null;
-        }
-        return new PhysicalFSWriter(fs, path, blockSize, replication, addBlockPadding, rawWriter);
+        return null;
     }
 }

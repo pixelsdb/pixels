@@ -24,14 +24,14 @@ import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import org.apache.hadoop.fs.Path;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -62,7 +62,8 @@ public class CheckCacheContent
                 Long.parseLong(config.getProperty("cache.size")));
         indexFile = new MemoryMappedFile(config.getProperty("index.location"),
                 Long.parseLong(config.getProperty("index.size")));
-        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+        //FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+        Storage storage = StorageFactory.Instance().getStorage(config.getProperty("storage.scheme"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
@@ -76,21 +77,21 @@ public class CheckCacheContent
                 .setCacheFile(cacheFile)
                 .setIndexFile(indexFile)
                 .build();
-        long blockId = fsFactory.listLocatedBlocks(path).get(0).getBlock().getBlockId();
+        long blockId = storage.getId(path);
         ByteBuffer cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
         System.out.println("Cache content length " + cacheContent.capacity());
 
         PixelsReader pixelsReader = PixelsReaderImpl
                 .newBuilder()
-                .setPath(new Path(path))
-                .setFS(fsFactory.getFileSystem().get())
+                .setPath(path)
+                .setStorage(storage)
                 .setEnableCache(false)
                 .setCacheOrder(cachedColumnlets)
                 .setPixelsCacheReader(cacheReader)
                 .build();
         PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(rgId);
         PhysicalReader physicalReader =
-                PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), new Path(path));
+                PhysicalReaderUtil.newPhysicalReader(storage, path);
         PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                 .getColumnChunkIndexEntries(colId);
         physicalReader.seek(chunkIndex.getChunkOffset());

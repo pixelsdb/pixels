@@ -52,6 +52,7 @@ public class RdbTableDao extends TableDao
                 .setId(id)
                 .setName(rs.getString("TBL_NAME"))
                 .setType(rs.getString("TBL_TYPE"))
+                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
                 .setSchemaId(rs.getLong("DBS_DB_ID")).build();
                 return table;
             }
@@ -86,6 +87,7 @@ public class RdbTableDao extends TableDao
                 .setId(rs.getLong("TBL_ID"))
                 .setName(name)
                 .setType(rs.getString("TBL_TYPE"))
+                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
                 .setSchemaId(schema.getId()).build();
                 return table;
             }
@@ -111,6 +113,7 @@ public class RdbTableDao extends TableDao
                 .setId(rs.getLong("TBL_ID"))
                 .setName(name)
                 .setType(rs.getString("TBL_TYPE"))
+                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
                 .setSchemaId(rs.getLong("DBS_DB_ID")).build();
                 tables.add(table);
             }
@@ -141,6 +144,7 @@ public class RdbTableDao extends TableDao
                 .setId(rs.getLong("TBL_ID"))
                 .setName(rs.getString("TBL_NAME"))
                 .setType(rs.getString("TBL_TYPE"))
+                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
                 .setSchemaId(schema.getId()).build();
                 tables.add(table);
             }
@@ -187,12 +191,14 @@ public class RdbTableDao extends TableDao
         String sql = "INSERT INTO TBLS(" +
                 "`TBL_NAME`," +
                 "`TBL_TYPE`," +
-                "`DBS_DB_ID`) VALUES (?,?,?)";
+                "`TBL_STORAGE_SCHEME`," +
+                "`DBS_DB_ID`) VALUES (?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
-            pst.setLong(3, table.getSchemaId());
+            pst.setString(3, table.getStorageScheme());
+            pst.setLong(4, table.getSchemaId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
@@ -207,13 +213,15 @@ public class RdbTableDao extends TableDao
         String sql = "UPDATE TBLS\n" +
                 "SET\n" +
                 "`TBL_NAME` = ?," +
-                "`TBL_TYPE` = ?\n" +
+                "`TBL_TYPE` = ?," +
+                "`TBL_STORAGE_SCHEME` = ?\n" +
                 "WHERE `TBL_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
-            pst.setLong(3, table.getId());
+            pst.setString(3, table.getStorageScheme());
+            pst.setLong(4, table.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

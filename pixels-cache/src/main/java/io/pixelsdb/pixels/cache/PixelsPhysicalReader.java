@@ -22,9 +22,8 @@ package io.pixelsdb.pixels.cache;
 import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsProto;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 
@@ -36,9 +35,9 @@ public class PixelsPhysicalReader
     private final PhysicalReader physicalReader;
     private final PixelsProto.FileTail fileTail;
 
-    public PixelsPhysicalReader(FileSystem fs, Path path)
+    public PixelsPhysicalReader(Storage storage, String path)
     {
-        this.physicalReader = PhysicalReaderUtil.newPhysicalFSReader(fs, path);
+        this.physicalReader = PhysicalReaderUtil.newPhysicalReader(storage, path);
         this.fileTail = readFileTail();
     }
 

@@ -28,9 +28,10 @@ import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -40,7 +41,6 @@ import io.pixelsdb.pixels.presto.block.TimeArrayBlock;
 import io.pixelsdb.pixels.presto.block.VarcharArrayBlock;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
-import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ class PixelsPageSource implements ConnectorPageSource
     private final int BatchSize;
     private PixelsSplit split;
     private List<PixelsColumnHandle> columns;
-    private FSFactory fsFactory;
+    private Storage storage;
     private boolean closed;
     private boolean endOfFile;
     private PixelsReader pixelsReader;
@@ -78,12 +78,12 @@ class PixelsPageSource implements ConnectorPageSource
     private VectorizedRowBatch rowBatch;
     private boolean rowBatchRead;
 
-    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, FSFactory fsFactory,
+    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
                             String connectorId)
     {
         this.split = split;
-        this.fsFactory = fsFactory;
+        this.storage = storage;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
         this.footerCache = pixelsFooterCache;
@@ -146,12 +146,12 @@ class PixelsPageSource implements ConnectorPageSource
 
         try
         {
-            if (this.fsFactory.getFileSystem().isPresent())
+            if (this.storage != null)
             {
                 this.pixelsReader = PixelsReaderImpl
                         .newBuilder()
-                        .setFS(this.fsFactory.getFileSystem().get())
-                        .setPath(new Path(split.getPath()))
+                        .setStorage(this.storage)
+                        .setPath(split.getPath())
                         .setEnableCache(split.getCached())
                         .setCacheOrder(split.getCacheOrder())
                         .setPixelsCacheReader(pixelsCacheReader)
@@ -159,7 +159,8 @@ class PixelsPageSource implements ConnectorPageSource
                         .build();
             } else
             {
-                logger.error("pixelsReader error: getFileSystem() returns null");
+                logger.error("pixelsReader error: storage handler is null");
+                throw new IOException("pixelsReader error: storage handler is null.");
             }
         } catch (IOException e)
         {
@@ -175,12 +176,12 @@ class PixelsPageSource implements ConnectorPageSource
         {
             if (this.split.nextPath())
             {
-                if (this.fsFactory.getFileSystem().isPresent())
+                if (this.storage != null)
                 {
                     this.pixelsReader = PixelsReaderImpl
                             .newBuilder()
-                            .setFS(this.fsFactory.getFileSystem().get())
-                            .setPath(new Path(split.getPath()))
+                            .setStorage(this.storage)
+                            .setPath(split.getPath())
                             .setEnableCache(split.getCached())
                             .setCacheOrder(split.getCacheOrder())
                             .setPixelsCacheReader(this.cacheReader)
@@ -189,8 +190,8 @@ class PixelsPageSource implements ConnectorPageSource
                     this.recordReader = this.pixelsReader.read(this.option);
                 } else
                 {
-                    logger.error("pixelsReader error: getFileSystem() returns null");
-                    throw new FSException("pixelsReader error: getFileSystem() returns null");
+                    logger.error("pixelsReader error: storage handler is null");
+                    throw new IOException("pixelsReader error: storage handler is null");
                 }
                 return true;
             } else

@@ -1,13 +1,12 @@
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.impl.HDFS;
 import io.pixelsdb.pixels.common.physical.impl.LocalFS;
 import io.pixelsdb.pixels.common.physical.impl.S3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.net.URI;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,27 +32,35 @@ public class StorageFactory
         return instance;
     }
 
-    public Storage getStorage(URI uri) throws FSException
+    public synchronized void reload()
     {
-        if (storageImpls.containsKey(uri.getScheme()))
+        this.storageImpls.clear();
+    }
+
+    public synchronized Storage getStorage(String scheme) throws IOException
+    {
+        if (storageImpls.containsKey(scheme))
         {
-            return storageImpls.get(uri.getScheme());
+            return storageImpls.get(scheme);
         }
 
         Storage storage = null;
-        if (uri.getScheme().equalsIgnoreCase("hdfs"))
+        if (scheme.equalsIgnoreCase("hdfs"))
         {
-            storage = new HDFS(uri);
+            storage = new HDFS();
         }
-        else if (uri.getScheme().equalsIgnoreCase("s3"))
+        else if (scheme.equalsIgnoreCase("s3"))
         {
-            storage = new S3(uri);
+            storage = new S3();
         }
-        else if (uri.getScheme().equalsIgnoreCase("file"))
+        else if (scheme.equalsIgnoreCase("file"))
         {
-            storage = new LocalFS(uri);
+            storage = new LocalFS();
         }
-        storageImpls.put(uri.getScheme(), storage);
+        if (storage != null)
+        {
+            storageImpls.put(scheme, storage);
+        }
 
         return storage;
     }

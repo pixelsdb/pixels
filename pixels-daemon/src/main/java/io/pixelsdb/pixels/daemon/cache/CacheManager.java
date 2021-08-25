@@ -19,6 +19,13 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
+import com.coreos.jetcd.Lease;
+import com.coreos.jetcd.Watch;
+import com.coreos.jetcd.data.ByteSequence;
+import com.coreos.jetcd.data.KeyValue;
+import com.coreos.jetcd.options.WatchOption;
+import com.coreos.jetcd.watch.WatchEvent;
+import com.coreos.jetcd.watch.WatchResponse;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
@@ -28,20 +35,10 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.Server;
-import com.coreos.jetcd.Lease;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.options.WatchOption;
-import com.coreos.jetcd.watch.WatchEvent;
-import com.coreos.jetcd.watch.WatchResponse;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.net.InetAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -77,6 +74,9 @@ public class CacheManager
     private final PixelsCacheConfig cacheConfig;
     private final EtcdUtil etcdUtil;
     private final ScheduledExecutorService scheduledExecutor;
+    /**
+     * The hostname of the node where this CacheManager is running.
+     */
     private String hostName;
     private boolean initializeSuccess = false;
     private int localCacheVersion = 0;
@@ -123,10 +123,6 @@ public class CacheManager
                 return;
             }
             // init cache writer and metadata service
-            Configuration conf = new Configuration();
-            conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-            conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-            FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             this.cacheWriter =
                     PixelsCacheWriter.newBuilder()
                             .setCacheLocation(cacheConfig.getCacheLocation())
@@ -134,7 +130,6 @@ public class CacheManager
                             .setIndexLocation(cacheConfig.getIndexLocation())
                             .setIndexSize(cacheConfig.getIndexSize())
                             .setOverwrite(false)
-                            .setFS(fs)
                             .setHostName(hostName)
                             .setCacheConfig(cacheConfig)
                             .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").

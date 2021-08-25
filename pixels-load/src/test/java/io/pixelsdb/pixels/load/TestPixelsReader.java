@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.load;
 
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -26,7 +28,6 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
@@ -34,7 +35,6 @@ import org.apache.orc.RecordReader;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 
 /**
@@ -45,13 +45,13 @@ public class TestPixelsReader
     String filePath = "hdfs://dbiir10:9000/pixels/pixels/test_105/v_1_order/20190111212837_0.pxl";
 
     @Test
-    public void testPixelsReader() {
-        Configuration conf = new Configuration();
-        Path currentPath = new Path(filePath);
+    public void testPixelsReader()
+    {
+        String currentPath = filePath;
         try {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             PixelsReader reader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
+                    .setStorage(storage)
                     .setPath(currentPath)
                     .build();
 

@@ -1,5 +1,7 @@
 package io.pixelsdb.pixels.common.physical;
 
+import org.apache.hadoop.fs.FileStatus;
+
 import java.io.IOException;
 
 /**
@@ -10,28 +12,29 @@ public class Status implements Comparable
 {
     private String path;
     private long length;
-    /**
-     * id is used by the index in pixels cache,
-     * each file should have its own path and id, but id
-     * is not used in the comparision of two Status instances.
-     */
-    private long id;
     private boolean isdir;
     private short replication;
 
     public Status()
     {
-        this(null, 0, 0, false, 0);
+        this(null, 0, false, 0);
     }
 
     //We should deprecate this soon?
-    public Status(String path, long length, long id, boolean isdir, int replication)
+    public Status(String path, long length, boolean isdir, int replication)
     {
         this.path = path;
         this.length = length;
-        this.id = id;
         this.isdir = isdir;
         this.replication = (short) replication;
+    }
+
+    public Status (FileStatus hdfs)
+    {
+        this.path = hdfs.getPath().toString();
+        this.length = hdfs.getLen();
+        this.isdir = hdfs.isDirectory();
+        this.replication = hdfs.getReplication();
     }
 
     /**
@@ -41,7 +44,7 @@ public class Status implements Comparable
      */
     public Status(Status other) throws IOException
     {
-        this(other.getPath(), other.getLength(), other.getId(), other.isDirectory(), other.getReplication());
+        this(other.getPath(), other.getLength(), other.isDirectory(), other.getReplication());
     }
 
     /**
@@ -52,11 +55,6 @@ public class Status implements Comparable
     public long getLength()
     {
         return length;
-    }
-
-    public long getId()
-    {
-        return id;
     }
 
     /**
@@ -92,6 +90,12 @@ public class Status implements Comparable
     public String getPath()
     {
         return path;
+    }
+
+    public String getName()
+    {
+        int slash = this.path.lastIndexOf("/");
+        return this.path.substring(slash+1);
     }
 
     public void setPath(final String path)

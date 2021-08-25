@@ -19,12 +19,14 @@
  */
 package io.pixelsdb.pixels.load.multi;
 
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.impl.HDFS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
@@ -34,8 +36,6 @@ import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
-import org.apache.hadoop.fs.*;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.IOUtils;
 
 import java.io.*;
@@ -168,9 +168,8 @@ public class Main
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
-                    BlockingQueue<Path> fileQueue;
-                    ConfigFactory configFactory = ConfigFactory.Instance();
-                    FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
+                    BlockingQueue<String> fileQueue;
+                    Storage storage = StorageFactory.Instance().getStorage("hdfs");
 
                     if (format != null)
                     {
@@ -184,7 +183,7 @@ public class Main
                     } else if (!producer && config != null)
                     {
                         // source already exist, producer option is false, add list of source to the queue
-                        List<Path> hdfsList = fsFactory.listFiles(originalDataPath);
+                        List<String> hdfsList = storage.listPaths(originalDataPath);
                         fileQueue = new LinkedBlockingQueue<>(hdfsList);
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
@@ -359,25 +358,24 @@ public class Main
                     }
 
                     ConfigFactory configFactory = ConfigFactory.Instance();
-                    FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
 
-                    FileSystem fs = fsFactory.getFileSystem().get();
+                    HDFS storage = (HDFS) StorageFactory.Instance().getStorage("hdfs");
 
-                    List<Path> files =  fsFactory.listFiles(source);
+                    List<Status> files =  storage.listStatus(source);
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
                     for (int i = 0; i < n; ++i)
                     {
-                        for (Path s : files)
+                        for (Status s : files)
                         {
                             String sourceName = s.getName();
                             String destName = destination +
                                     sourceName.substring(0, sourceName.indexOf(postfix)) +
                                     "_copy_" + DateUtil.getCurTime() + postfix;
-                            Path dest = new Path(destName);
-                            FSDataInputStream inputStream = fs.open(s, Constants.HDFS_BUFFER_SIZE);
-                            FSDataOutputStream outputStream = fs.create(dest, false,
+                            String dest = destName;
+                            DataInputStream inputStream = storage.open(s.getPath());
+                            DataOutputStream outputStream = storage.create(dest, false,
                                     Constants.HDFS_BUFFER_SIZE, replication, blockSize);
                             IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
                             inputStream.close();
@@ -385,10 +383,7 @@ public class Main
                         }
                     }
                 }
-                catch (FSException e)
-                {
-                    e.printStackTrace();
-                } catch (IOException e)
+                catch (IOException e)
                 {
                     e.printStackTrace();
                 }
@@ -458,21 +453,19 @@ public class Main
 
                     // get input file paths
                     ConfigFactory configFactory = ConfigFactory.Instance();
-                    FSFactory fsFactory = FSFactory.Instance(configFactory.getProperty("hdfs.config.dir"));
-                    FileSystem fs = fsFactory.getFileSystem().get();
+                    Storage storage = StorageFactory.Instance().getStorage("hdfs"); // TODO: support other storage type.
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
-                    FileStatus[] statuses = fs.listStatus(
-                            new Path(layout.getOrderPath()));
+                    List<Status> statuses = storage.listStatus(layout.getOrderPath());
 
                     // compact
-                    for (int i = 0; i + numRowGroupInBlock < statuses.length; i+=numRowGroupInBlock)
+                    for (int i = 0; i + numRowGroupInBlock < statuses.size(); i+=numRowGroupInBlock)
                     {
-                        List<Path> sourcePaths = new ArrayList<>();
+                        List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {
                             //System.out.println(statuses[i+j].getPath().toString());
-                            sourcePaths.add(statuses[i+j].getPath());
+                            sourcePaths.add(statuses.get(i+j).getPath());
                         }
 
                         long start = System.currentTimeMillis();
@@ -484,8 +477,8 @@ public class Main
                                 PixelsCompactor.newBuilder()
                                         .setSourcePaths(sourcePaths)
                                         .setCompactLayout(compactLayout)
-                                        .setFS(fs)
-                                        .setFilePath(new Path(filePath))
+                                        .setStorage(storage)
+                                        .setFilePath(filePath)
                                         .setBlockSize(blockSize)
                                         .setReplication(replication)
                                         .setBlockPadding(false)
@@ -502,9 +495,6 @@ public class Main
                 {
                     e.printStackTrace();
                 } catch (IOException e)
-                {
-                    e.printStackTrace();
-                } catch (FSException e)
                 {
                     e.printStackTrace();
                 }

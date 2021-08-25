@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ORCConsumer
         extends Consumer {
-    private BlockingQueue<Path> queue;
+    private BlockingQueue<String> queue;
     private Properties prop;
     private Config config;
 
@@ -51,7 +51,7 @@ public class ORCConsumer
         return prop;
     }
 
-    public ORCConsumer(BlockingQueue<Path> queue, Properties prop, Config config) {
+    public ORCConsumer(BlockingQueue<String> queue, Properties prop, Config config) {
         this.queue = queue;
         this.prop = prop;
         this.config = config;
@@ -98,10 +98,10 @@ public class ORCConsumer
             int rowCounter = 0;
 
             while (isRunning) {
-                Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
+                String originalFilePath = queue.poll(2, TimeUnit.SECONDS);
                 if (originalFilePath != null) {
                     count++;
-                    reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
+                    reader = new BufferedReader(new InputStreamReader(fs.open(new Path(originalFilePath))));
 
                     while ((line = reader.readLine()) != null) {
                         if (initPixelsFile == true) {

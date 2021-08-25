@@ -6,7 +6,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.net.URI;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -15,9 +15,14 @@ import java.util.List;
  */
 public class LocalFS implements Storage
 {
-    public LocalFS(URI uri)
+    public LocalFS()
     {
 
+    }
+    @Override
+    public String getScheme()
+    {
+        return "file";
     }
 
     @Override
@@ -33,9 +38,27 @@ public class LocalFS implements Storage
     }
 
     @Override
-    public Location getLocation(String path)
+    public List<String> listPaths(String path) throws IOException
     {
         return null;
+    }
+
+    @Override
+    public long getId(String path) throws IOException
+    {
+        return 0;
+    }
+
+    @Override
+    public List<Location> getLocations(String path)
+    {
+        return null;
+    }
+
+    @Override
+    public String[] getHosts(String path) throws IOException
+    {
+        return new String[0];
     }
 
     @Override
@@ -45,9 +68,15 @@ public class LocalFS implements Storage
     }
 
     @Override
-    public DataOutputStream create(String path)
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
     {
         return null;
+    }
+
+    @Override
+    public boolean delete(String path, boolean recursive) throws IOException
+    {
+        return false;
     }
 
     @Override

@@ -19,11 +19,9 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-
 import java.io.IOException;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
@@ -34,33 +32,39 @@ public class PhysicalReaderUtil
     {
     }
 
-    public static PhysicalFSReader newPhysicalFSReader(FileSystem fs, Path path)
+    public static PhysicalReader newPhysicalReader(String scheme, String path)
     {
-        FSDataInputStream rawReader = null;
-        try
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        if (scheme.equalsIgnoreCase("hdfs"))
         {
-            rawReader = fs.open(path);
-            if (rawReader != null)
+            PhysicalFSReader fsReader;
+            try
             {
-                return new PhysicalFSReader(fs, path, rawReader);
-            }
-        }
-        catch (IOException e)
-        {
-            if (rawReader != null)
+                fsReader = new PhysicalFSReader(StorageFactory.Instance().getStorage(scheme), path);
+                return fsReader;
+            } catch (IOException ioException)
             {
-                try
-                {
-                    rawReader.close();
-                }
-                catch (IOException e1)
-                {
-                    e1.printStackTrace();
-                }
+                ioException.printStackTrace();
             }
-            e.printStackTrace();
         }
 
         return null;
+    }
+
+    public static PhysicalReader newPhysicalReader(Storage storage, String path)
+    {
+        checkArgument(storage != null, "storage should not be null");
+        checkArgument(path != null, "path should not be null");
+        PhysicalFSReader fsReader = null;
+        try
+        {
+            fsReader = new PhysicalFSReader(storage, path);
+        } catch (IOException ioException)
+        {
+            ioException.printStackTrace();
+        }
+
+        return fsReader;
     }
 }

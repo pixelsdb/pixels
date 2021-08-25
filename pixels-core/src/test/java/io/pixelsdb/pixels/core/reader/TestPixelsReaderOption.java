@@ -19,21 +19,14 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
+import io.pixelsdb.pixels.core.vector.*;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Objects;
 
 import static junit.framework.TestCase.assertEquals;
@@ -187,16 +180,12 @@ public class TestPixelsReaderOption
         PixelsReader pixelsReader = null;
         String filePath = Objects.requireNonNull(
                 this.getClass().getClassLoader().getResource("files/" + fileName)).getPath();
-        Path path = new Path(filePath);
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(path)
+                    .setStorage(storage)
+                    .setPath(filePath)
                     .build();
         }
         catch (IOException e)

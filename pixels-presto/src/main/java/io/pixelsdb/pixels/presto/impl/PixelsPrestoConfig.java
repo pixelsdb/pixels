@@ -19,12 +19,11 @@
  */
 package io.pixelsdb.pixels.presto.impl;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import com.facebook.presto.spi.PrestoException;
 import io.airlift.configuration.Config;
 import io.airlift.log.Logger;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
 import javax.validation.constraints.NotNull;
@@ -39,7 +38,6 @@ public class PixelsPrestoConfig
 {
     private Logger logger = Logger.get(PixelsPrestoConfig.class);
     private ConfigFactory configFactory = null;
-    private FSFactory fsFactory = null;
 
     private static int BatchSize = 1000;
 
@@ -79,6 +77,7 @@ public class PixelsPrestoConfig
                     ConfigFactory.Instance().loadProperties(pixelsHome + "pixels.properties");
                     ConfigFactory.Instance().addProperty("pixels.home", pixelsHome);
                     logger.info("using pixels.properties under connector specified pixels.home: " + pixelsHome);
+                    StorageFactory.Instance().reload();
 
                 } catch (IOException e)
                 {
@@ -89,14 +88,6 @@ public class PixelsPrestoConfig
             }
 
             this.configFactory = ConfigFactory.Instance();
-            try
-            {
-                this.fsFactory = FSFactory.Instance(this.configFactory.getProperty("hdfs.config.dir"));
-
-            } catch (FSException e)
-            {
-                throw new PrestoException(PixelsErrorCode.PIXELS_CONFIG_ERROR, e);
-            }
             try
             {
                 int batchSize = Integer.parseInt(this.configFactory.getProperty("row.batch.size"));
@@ -127,15 +118,5 @@ public class PixelsPrestoConfig
     public ConfigFactory getConfigFactory()
     {
         return this.configFactory;
-    }
-
-    /**
-     * Injected class should get FSFactory instance by this method instead of FSFactory.Instance(...).
-     * @return
-     */
-    @NotNull
-    public FSFactory getFsFactory()
-    {
-        return this.fsFactory;
     }
 }

@@ -28,6 +28,7 @@ public class Table extends Base
 {
     private String name;
     private String type;
+    private String storageScheme;
     private long schemaId;
     private List<Long> columnIds = new ArrayList<>();
 
@@ -39,6 +40,7 @@ public class Table extends Base
     {
         this.name = table.getName();
         this.type = table.getType();
+        this.storageScheme = table.getStorageScheme();
         this.schemaId = table.getSchemaId();
         this.columnIds.addAll(table.getColumnIdsList());
     }
@@ -61,6 +63,16 @@ public class Table extends Base
     public void setType(String type)
     {
         this.type = type;
+    }
+
+    public String getStorageScheme()
+    {
+        return storageScheme;
+    }
+
+    public void setStorageScheme(String storageScheme)
+    {
+        this.storageScheme = storageScheme;
     }
 
     public long getSchemaId()
@@ -94,6 +106,7 @@ public class Table extends Base
         return "Table{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
+                ", storageScheme='" + storageScheme + '\'' +
                 ", schemaId=" + schemaId +
                 '}';
     }

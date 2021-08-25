@@ -2,6 +2,7 @@ package io.pixelsdb.pixels.common.physical;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -10,19 +11,30 @@ import java.util.List;
  */
 public interface Storage
 {
-    List<Status> listStatus(String path);
+    String getScheme();
 
-    Status getStatus(String path);
+    List<Status> listStatus(String path) throws IOException;
 
-    Location getLocation(String path);
+    List<String> listPaths(String path) throws IOException;
 
-    DataInputStream open(String path);
+    Status getStatus(String path) throws IOException;
 
-    DataOutputStream create(String path);
+    long getId(String path) throws IOException;
 
-    boolean exists(String path);
+    List<Location> getLocations(String path) throws IOException;
 
-    boolean isFile(String path);
+    String[] getHosts(String path) throws IOException;
 
-    boolean isDirectory(String path);
+    DataInputStream open(String path) throws IOException;
+
+    DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication) throws IOException;
+
+    boolean delete(String path, boolean recursive) throws IOException;
+
+    boolean exists(String path) throws IOException;
+
+    boolean isFile(String path) throws IOException;
+
+    boolean isDirectory(String path) throws IOException;
 }

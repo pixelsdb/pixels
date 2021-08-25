@@ -25,14 +25,11 @@ import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import org.apache.hadoop.fs.Path;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -45,6 +42,7 @@ import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * pixels
@@ -58,8 +56,9 @@ public class CacheReaderPerfMulti
     private static MemoryMappedFile cacheFile;
     private static MemoryMappedFile indexFile;
     private static String cacheDropScript;
-    private static FSFactory fsFactory;
-    private static Map<Path, List<PixelsProto.RowGroupFooter>> rowGroupMetas = new HashMap<>();
+    //private static FSFactory fsFactory;
+    private static Storage storage;
+    private static Map<String, List<PixelsProto.RowGroupFooter>> rowGroupMetas = new HashMap<>();
 
     // 1. get table layout and cache order
     // 2. generate read workloads
@@ -76,7 +75,7 @@ public class CacheReaderPerfMulti
         CacheReaderPerfMulti cacheReaderPerf = new CacheReaderPerfMulti();
 
         List<String> cachedColumnlets;
-        List<Path> localFiles;
+        List<String> localFiles;
         ConfigFactory config = ConfigFactory.Instance();
 
         String hostName = System.getenv("HOSTNAME");
@@ -103,7 +102,8 @@ public class CacheReaderPerfMulti
             indexFile = new MemoryMappedFile(config.getProperty("index.location"), Long.parseLong(config.getProperty("index.size")));
             mapFileEndNano = System.nanoTime();
             long indexMemInitCost = mapFileEndNano - mapFileStartNano;
-            fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+            //fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
+            storage = StorageFactory.Instance().getStorage(config.getProperty("storage.scheme"));
             System.out.println("cache file init: " + cacheMemInitCost + ", index file init: " + indexMemInitCost);
 
             // get cached columnlets
@@ -116,11 +116,12 @@ public class CacheReaderPerfMulti
             System.out.println("Get cached columnlets");
 
             // get local read files
-            List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
+            List<String> paths = storage.listStatus(layout.getCompactPath()).stream().map(Status::getPath).collect(Collectors.toList());
             localFiles = new ArrayList<>(30);
-            for (Path path : paths)
+            for (String path : paths)
             {
-                if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+                //if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+                if (storage.getHosts(path)[0].equalsIgnoreCase(hostName))
                 {
                     localFiles.add(path);
                 }
@@ -133,12 +134,12 @@ public class CacheReaderPerfMulti
                     .setCacheFile(cacheFile)
                     .setIndexFile(indexFile)
                     .build();
-            for (Path path : localFiles)
+            for (String path : localFiles)
             {
                 PixelsReader pixelsReader = PixelsReaderImpl
                         .newBuilder()
                         .setPath(path)
-                        .setFS(fsFactory.getFileSystem().get())
+                        .setStorage(storage)
                         .setEnableCache(false)
                         .setCacheOrder(cachedColumnlets)
                         .setPixelsCacheReader(cacheReader)
@@ -334,7 +335,7 @@ public class CacheReaderPerfMulti
         return id;
     }
 
-    private List<StatisticMetric> diskRead(String id, String[] columnlets, List<Path> files)
+    private List<StatisticMetric> diskRead(String id, String[] columnlets, List<String> files)
             throws IOException, InterruptedException
     {
         System.out.println("Disk reading workload " + id);
@@ -354,11 +355,11 @@ public class CacheReaderPerfMulti
         }
 
         List<StatisticMetric> metrics = new ArrayList<>();
-        for (Path path : files)
+        for (String path : files)
         {
             System.out.println("Disk reading file " + path.toString());
             PhysicalReader physicalReader =
-                    PhysicalReaderUtil.newPhysicalFSReader(fsFactory.getFileSystem().get(), path);
+                    PhysicalReaderUtil.newPhysicalReader(storage, path);
             List<PixelsProto.RowGroupFooter> rowGroupFooters = rowGroupMetas.get(path);
             List<PixelsProto.ColumnChunkIndex> chunkIndices = new ArrayList<>();
             for (ColumnletId columnletId : columnletIds)
@@ -401,14 +402,14 @@ public class CacheReaderPerfMulti
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;
-            StatisticMetric metric = new StatisticMetric(path.getName(), cost, size);
+            StatisticMetric metric = new StatisticMetric(physicalReader.getName(), cost, size);
             metrics.add(metric);
             physicalReader.close();
         }
         return metrics;
     }
 
-    private void cacheRead(String id, String[] columnlets, List<Path> files, BlockingQueue<StatisticMetric> metricQueue)
+    private void cacheRead(String id, String[] columnlets, List<String> files, BlockingQueue<StatisticMetric> metricQueue)
             throws IOException, InterruptedException, FSException
     {
         System.out.println("Cache reading workload " + id);
@@ -430,7 +431,7 @@ public class CacheReaderPerfMulti
         for (int i = 0; i < files.size(); i++)
         {
             readers[i] = new CacheReader(cacheReader, columnlets, files.get(i),
-                    fsFactory.listLocatedBlocks(files.get(i)).get(0).getBlock().getBlockId(), metricQueue);
+                    storage.getId(files.get(i)), metricQueue);
             readers[i].start();
 
         }
@@ -499,11 +500,11 @@ public class CacheReaderPerfMulti
     {
         PixelsCacheReader cacheReader;
         String[] columnlets;
-        Path path;
+        String path;
         long blockId;
         BlockingQueue<StatisticMetric> metricQueue;
 
-        public CacheReader(PixelsCacheReader cacheReader, String[] columnlets, Path path, long blockId, BlockingQueue<StatisticMetric> metricQueue)
+        public CacheReader(PixelsCacheReader cacheReader, String[] columnlets, String path, long blockId, BlockingQueue<StatisticMetric> metricQueue)
         {
             this.cacheReader = cacheReader;
             this.columnlets = columnlets;
@@ -526,7 +527,7 @@ public class CacheReaderPerfMulti
             // read
             long size = 0;
 
-            System.out.println("Cache reading file " + path.toString());
+            System.out.println("Cache reading file " + path);
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {
@@ -535,7 +536,8 @@ public class CacheReaderPerfMulti
             }
             long readEndNano = System.nanoTime();
             long cost = readEndNano - readStartNano;
-            StatisticMetric metric = new StatisticMetric(path.getName(), cost, size);
+            int slash = path.lastIndexOf("/");
+            StatisticMetric metric = new StatisticMetric(path.substring(slash+1), cost, size);
 
             // write metrics
             try

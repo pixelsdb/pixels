@@ -6,7 +6,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.net.URI;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -15,13 +15,25 @@ import java.util.List;
  */
 public class S3 implements Storage
 {
-    public S3(URI uri)
+    public S3()
     {
 
     }
 
     @Override
+    public String getScheme()
+    {
+        return "s3";
+    }
+
+    @Override
     public List<Status> listStatus(String path)
+    {
+        return null;
+    }
+
+    @Override
+    public List<String> listPaths(String path) throws IOException
     {
         return null;
     }
@@ -33,9 +45,21 @@ public class S3 implements Storage
     }
 
     @Override
-    public Location getLocation(String path)
+    public long getId(String path) throws IOException
+    {
+        return 0;
+    }
+
+    @Override
+    public List<Location> getLocations(String path)
     {
         return null;
+    }
+
+    @Override
+    public String[] getHosts(String path) throws IOException
+    {
+        return new String[0];
     }
 
     @Override
@@ -45,9 +69,15 @@ public class S3 implements Storage
     }
 
     @Override
-    public DataOutputStream create(String path)
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
     {
         return null;
+    }
+
+    @Override
+    public boolean delete(String path, boolean recursive) throws IOException
+    {
+        return false;
     }
 
     @Override

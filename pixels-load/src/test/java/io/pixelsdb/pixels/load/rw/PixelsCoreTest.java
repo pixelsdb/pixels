@@ -19,21 +19,11 @@
  */
 package io.pixelsdb.pixels.load.rw;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
-import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import io.pixelsdb.pixels.core.vector.*;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -48,23 +38,22 @@ public class PixelsCoreTest {
     String hdfsDir = "/home/tao/data/hadoop-2.7.3/etc/hadoop/"; // dbiir10
 
     @Test
-    public void testReadPixelsFile() throws FSException {
+    public void testReadPixelsFile() throws IOException
+    {
         String pixelsFile = "hdfs://dbiir10:9000/pixels/pixels/test_105/20181117213047_3239.pxl";
-        FSFactory fsFactory = FSFactory.Instance(hdfsDir);
-        Path file = new Path(pixelsFile);
-        FileSystem fs = fsFactory.getFileSystem().get();
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
 
         PixelsReader pixelsReader = null;
         try {
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(file)
+                    .setStorage(storage)
+                    .setPath(pixelsFile)
                     .build();
             System.out.println(pixelsReader.getRowGroupNum());
             System.out.println(pixelsReader.getRowGroupInfo(0).toString());
             System.out.println(pixelsReader.getRowGroupInfo(1).toString());
             if (pixelsReader.getFooter().getRowGroupStatsList().size() != 1) {
-                System.out.println("Path: " + file + ", RGNum: " + pixelsReader.getRowGroupNum());
+                System.out.println("Path: " + pixelsFile + ", RGNum: " + pixelsReader.getRowGroupNum());
             }
 
             pixelsReader.close();
@@ -74,11 +63,10 @@ public class PixelsCoreTest {
     }
 
     @Test
-    public void testWritePixelsFile() throws FSException {
+    public void testWritePixelsFile() throws IOException
+    {
         String pixelsFile = "hdfs://dbiir10:9000//pixels/pixels/test_105/v_0_order/.pxl";
-        FSFactory fsFactory = FSFactory.Instance(hdfsDir);
-        Path file = new Path(pixelsFile);
-        FileSystem fs = fsFactory.getFileSystem().get();
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         String schemaStr = "struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>";
@@ -98,8 +86,8 @@ public class PixelsCoreTest {
                             .setSchema(schema)
                             .setPixelStride(10000)
                             .setRowGroupSize(64 * 1024 * 1024)
-                            .setFS(fs)
-                            .setFilePath(file)
+                            .setStorage(storage)
+                            .setFilePath(pixelsFile)
                             .setBlockSize(256 * 1024 * 1024)
                             .setReplication((short) 3)
                             .setBlockPadding(true)

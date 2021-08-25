@@ -63,6 +63,11 @@ public class PixelsCacheConfig
         return Integer.parseInt(configFactory.getProperty("metadata.server.port"));
     }
 
+    public String getStorageScheme()
+    {
+         return configFactory.getProperty("storage.scheme");
+    }
+
     public String getSchema()
     {
         return configFactory.getProperty("cache.schema");
