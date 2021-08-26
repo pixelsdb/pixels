@@ -45,7 +45,8 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_NAME, TBL_TYPE, DBS_DB_ID FROM TBLS WHERE TBL_ID=" + id);
+            ResultSet rs = st.executeQuery("SELECT TBL_NAME, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
+                    "FROM TBLS WHERE TBL_ID=" + id);
             if (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
@@ -79,8 +80,8 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE FROM TBLS WHERE TBL_NAME='" + name +
-                    "' AND DBS_DB_ID=" + schema.getId());
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME FROM TBLS WHERE TBL_NAME='" +
+                    name + "' AND DBS_DB_ID=" + schema.getId());
             if (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
@@ -105,7 +106,8 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, DBS_DB_ID FROM TBLS WHERE TBL_NAME='" + name + "'");
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
+                    "FROM TBLS WHERE TBL_NAME='" + name + "'");
             List<MetadataProto.Table> tables = new ArrayList<>();
             while (rs.next())
             {
@@ -136,7 +138,8 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_NAME, TBL_TYPE, DBS_DB_ID FROM TBLS WHERE DBS_DB_ID=" + schema.getId());
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_NAME, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
+                    "FROM TBLS WHERE DBS_DB_ID=" + schema.getId());
             List<MetadataProto.Table> tables = new ArrayList<>();
             while (rs.next())
             {

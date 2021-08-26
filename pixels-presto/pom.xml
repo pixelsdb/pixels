@@ -42,7 +42,7 @@
                     <artifactId>asm</artifactId>
                 </exclusion>
             </exclusions>
-            <optional>true</optional>
+            <optional>false</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -53,7 +53,7 @@
                     <artifactId>asm</artifactId>
                 </exclusion>
             </exclusions>
-            <optional>true</optional>
+            <optional>false</optional>
         </dependency>
 
         <!-- protobuf -->
