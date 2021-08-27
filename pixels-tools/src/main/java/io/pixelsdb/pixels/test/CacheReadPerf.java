@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.test;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheIdx;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -129,7 +128,7 @@ public class CacheReadPerf
 
     // prepare correct answers
     private void prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, FSException, IOException
+            throws MetadataException, IOException
     {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);

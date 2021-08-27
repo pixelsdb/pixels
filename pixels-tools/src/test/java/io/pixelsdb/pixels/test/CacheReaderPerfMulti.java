@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.test;
 
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -410,7 +409,7 @@ public class CacheReaderPerfMulti
     }
 
     private void cacheRead(String id, String[] columnlets, List<String> files, BlockingQueue<StatisticMetric> metricQueue)
-            throws IOException, InterruptedException, FSException
+            throws IOException, InterruptedException
     {
         System.out.println("Cache reading workload " + id);
         // clear cache

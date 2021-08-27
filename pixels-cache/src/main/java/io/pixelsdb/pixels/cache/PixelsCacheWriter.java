@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.cache;
 
 import com.coreos.jetcd.data.KeyValue;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -287,7 +286,7 @@ public class PixelsCacheWriter
             String[] files = fileStr.split(";");
             return internalUpdateIncremental(version, layout, files);
         }
-        catch (IOException | FSException e)
+        catch (IOException e)
         {
             e.printStackTrace();
             return -1;
@@ -419,10 +418,9 @@ public class PixelsCacheWriter
      * @param files
      * @return
      * @throws IOException
-     * @throws FSException
      */
     private int internalUpdateIncremental(int version, Layout layout, String[] files)
-            throws IOException, FSException
+            throws IOException
     {
         int status = 0;
         /**
