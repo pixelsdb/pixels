@@ -55,7 +55,7 @@ public class StorageFactory
     {
         this.storageImpls.clear();
         storageImpls.put("hdfs", new HDFS());
-        storageImpls.put("local", new LocalFS());
+        storageImpls.put("file", new LocalFS());
         storageImpls.put("s3", new S3());
     }
 
