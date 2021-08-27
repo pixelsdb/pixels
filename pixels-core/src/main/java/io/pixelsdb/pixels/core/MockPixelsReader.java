@@ -19,11 +19,10 @@
  */
 package io.pixelsdb.pixels.core;
 
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 
@@ -31,17 +30,18 @@ import java.io.IOException;
  * pixels
  *
  * @author guodong
+ * @author hank
  */
 public class MockPixelsReader
         implements Runnable
 {
-    private final FileSystem fs;
-    private final Path filePath;
+    private final Storage storage;
+    private final String filePath;
     private final String[] schema;
 
-    public MockPixelsReader(FileSystem fs, Path filePath, String[] schema)
+    public MockPixelsReader(Storage storage, String filePath, String[] schema)
     {
-        this.fs = fs;
+        this.storage = storage;
         this.filePath = filePath;
         this.schema = schema;
     }
@@ -57,7 +57,7 @@ public class MockPixelsReader
         try
         {
             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
+                    .setStorage(storage)
                     .setPath(filePath)
                     .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
@@ -76,7 +76,7 @@ public class MockPixelsReader
                 num += rowBatch.size;
             }
             long end = System.currentTimeMillis();
-            System.out.println("[" + filePath.getName() + "] "
+            System.out.println("[" + filePath + "] "
                     + start + " " + end + " " + num + ", cpu cost: " + (end - start));
             pixelsReader.close();
         }

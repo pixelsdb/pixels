@@ -29,8 +29,6 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.PixelsProto;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -53,8 +51,11 @@ public class PixelsCacheWriter
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
-    private final FileSystem fs;
+    private final Storage storage;
     private final EtcdUtil etcdUtil;
+    /**
+     * The host name of the node where this cache writer is running.
+     */
     private final String host;
     /**
      * Call beginIndexWrite() before changing radix, which is shared by all threads.
@@ -69,7 +70,7 @@ public class PixelsCacheWriter
 
     private PixelsCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
-                              FileSystem fs,
+                              Storage storage,
                               PixelsRadix radix,
                               Set<String> cachedColumnlets,
                               EtcdUtil etcdUtil,
@@ -77,7 +78,7 @@ public class PixelsCacheWriter
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
-        this.fs = fs;
+        this.storage = storage;
         this.radix = radix;
         this.etcdUtil = etcdUtil;
         this.host = host;
@@ -94,7 +95,6 @@ public class PixelsCacheWriter
         private long builderCacheSize;
         private String builderIndexLocation = "";
         private long builderIndexSize;
-        private FileSystem builderFS;
         private boolean builderOverwrite = true;
         private String builderHostName = null;
         private PixelsCacheConfig cacheConfig = null;
@@ -105,7 +105,8 @@ public class PixelsCacheWriter
 
         public PixelsCacheWriter.Builder setCacheLocation(String cacheLocation)
         {
-            checkArgument(!cacheLocation.isEmpty(), "location should bot be empty");
+            checkArgument(cacheLocation != null && !cacheLocation.isEmpty(),
+                    "cache location should bot be empty");
             this.builderCacheLocation = cacheLocation;
 
             return this;
@@ -113,16 +114,17 @@ public class PixelsCacheWriter
 
         public PixelsCacheWriter.Builder setCacheSize(long cacheSize)
         {
-            checkArgument(cacheSize > 0, "size should be positive");
+            checkArgument(cacheSize > 0, "cache size should be positive");
             this.builderCacheSize = cacheSize;
 
             return this;
         }
 
-        public PixelsCacheWriter.Builder setIndexLocation(String location)
+        public PixelsCacheWriter.Builder setIndexLocation(String indexLocation)
         {
-            checkArgument(!location.isEmpty(), "index location should not be empty");
-            this.builderIndexLocation = location;
+            checkArgument(indexLocation != null && !indexLocation.isEmpty(),
+                    "index location should not be empty");
+            this.builderIndexLocation = indexLocation;
 
             return this;
         }
@@ -135,14 +137,6 @@ public class PixelsCacheWriter
             return this;
         }
 
-        public PixelsCacheWriter.Builder setFS(FileSystem fs)
-        {
-            checkArgument(fs != null, "fs should not be null");
-            this.builderFS = fs;
-
-            return this;
-        }
-
         public PixelsCacheWriter.Builder setOverwrite(boolean overwrite)
         {
             this.builderOverwrite = overwrite;
@@ -151,12 +145,14 @@ public class PixelsCacheWriter
 
         public PixelsCacheWriter.Builder setHostName(String hostName)
         {
+            checkArgument(hostName != null, "hostname should not be null");
             this.builderHostName = hostName;
             return this;
         }
 
         public PixelsCacheWriter.Builder setCacheConfig(PixelsCacheConfig cacheConfig)
         {
+            checkArgument(cacheConfig != null, "cache config should not be null");
             this.cacheConfig = cacheConfig;
             return this;
         }
@@ -192,7 +188,9 @@ public class PixelsCacheWriter
             }
             EtcdUtil etcdUtil = EtcdUtil.Instance();
 
-            return new PixelsCacheWriter(cacheFile, indexFile, builderFS, radix,
+            Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
+
+            return new PixelsCacheWriter(cacheFile, indexFile, storage, radix,
                     cachedColumnlets, etcdUtil, builderHostName);
         }
     }
@@ -242,7 +240,7 @@ public class PixelsCacheWriter
             String[] files = fileStr.split(";");
             return internalUpdateAll(version, layout, files);
         }
-        catch (IOException | FSException e)
+        catch (IOException e)
         {
             e.printStackTrace();
             return -1;
@@ -317,7 +315,7 @@ public class PixelsCacheWriter
     }
 
     private int internalUpdateAll(int version, Layout layout, String[] files)
-            throws IOException, FSException
+            throws IOException
     {
         int status = 0;
         // get the new caching layout
@@ -364,7 +362,7 @@ public class PixelsCacheWriter
                 // may be removed later.
                 file = ensureLocality(file);
             }
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
@@ -454,7 +452,7 @@ public class PixelsCacheWriter
         List<PixelsCacheKeyIdx> survivedIdxes = new ArrayList<>(survivedColumnlets.size()*files.length);
         for (String file : files)
         {
-            PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
             // TODO: in case of block id was changed, the survived columnlets in this block can not survive in the cache update.
             // This problem only affects the efficiency, but it is better to resolve it.
             long blockId = physicalReader.getCurrentBlockId();
@@ -532,7 +530,7 @@ public class PixelsCacheWriter
                 // may be removed later.
                 file = ensureLocality(file);
             }
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, new Path(file));
+            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
@@ -620,13 +618,9 @@ public class PixelsCacheWriter
     private String ensureLocality (String path)
     {
         String newPath = path.substring(0, path.indexOf(".pxl")) + "_" + host + ".pxl";
-        String configDir = ConfigFactory.Instance().getProperty("hdfs.config.dir");
         try
         {
-            FSFactory fsFactory = FSFactory.Instance(configDir);
-            Path dfsPath = new Path(path);
-            Path newDfsPath = new Path(newPath);
-            String[] dataNodes = fsFactory.getBlockHosts(dfsPath, 0, Long.MAX_VALUE);
+            String[] dataNodes = storage.getHosts(path);
             boolean isLocal = false;
             for (String dataNode : dataNodes)
             {
@@ -639,9 +633,8 @@ public class PixelsCacheWriter
             if (isLocal == false)
             {
                 // file is not local, move it to local.
-                FileSystem fs = fsFactory.getFileSystem().get();
-                PhysicalReader reader = PhysicalReaderUtil.newPhysicalFSReader(fs, dfsPath);
-                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalFSWriter(fs, newDfsPath,
+                PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path);
+                PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(storage, newPath,
                         2048l*1024l*1024l, (short) 1, true);
                 byte[] buffer = new byte[1024*1024*32]; // 32MB buffer for copy.
                 long copiedBytes = 0l, fileLength = reader.getFileLength();
@@ -673,12 +666,12 @@ public class PixelsCacheWriter
                 }
                 if (success)
                 {
-                    fs.delete(dfsPath, false);
+                    storage.delete(path, false);
                     return newPath;
                 }
                 else
                 {
-                    fs.delete(newDfsPath, false);
+                    storage.delete(newPath, false);
                     return path;
                 }
 
@@ -686,12 +679,9 @@ public class PixelsCacheWriter
             {
                 return path;
             }
-        } catch (FSException e)
-        {
-            logger.error("failed to instance FSFactory", e);
         } catch (IOException e)
         {
-            logger.error("failed to delete file", e);
+            logger.error("failed to ensure the locality of a file/data object.", e);
         }
 
         return null;

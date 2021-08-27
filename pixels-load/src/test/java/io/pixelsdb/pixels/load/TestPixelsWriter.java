@@ -20,29 +20,21 @@
 package io.pixelsdb.pixels.load;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.StringUtil;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.load.multi.Config;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URI;
 
 /**
  * Created at: 18-11-19
@@ -67,26 +59,23 @@ public class TestPixelsWriter
         long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
         TypeDescription schema = TypeDescription.fromString(schemaStr);
         VectorizedRowBatch rowBatch = schema.createRowBatch();
         ColumnVector[] columnVectors = rowBatch.cols;
 
-        fs.deleteOnExit(new Path(loadingDataPath + "test_5000_lines.pxl"));
+        storage.delete(loadingDataPath + "test_5000_lines.pxl", false);
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(
-                new Path("hdfs://dbiir10:9000/pixels/pixels/test_105/source_small/000148_0_small"))));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(storage.open(
+                "hdfs://dbiir10:9000/pixels/pixels/test_105/source_small/000148_0_small")));
         String line;
 
         PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
                 .setSchema(schema)
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
-                .setFS(fs)
-                .setFilePath(new Path(loadingDataPath + "test_5000_lines.pxl"))
+                .setStorage(storage)
+                .setFilePath(loadingDataPath + "test_5000_lines.pxl")
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)
@@ -156,15 +145,12 @@ public class TestPixelsWriter
         config.load(configFactory);
         String loadingDataPath = config.getPixelsPath();
 
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
         VectorizedRowBatch rowBatch;
 
         PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                .setFS(fs)
-                .setPath(new Path(loadingDataPath + "test_5000_lines.pxl"))
+                .setStorage(storage)
+                .setPath(loadingDataPath + "test_5000_lines.pxl")
                 .build();
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);

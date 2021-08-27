@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -48,5 +46,13 @@ public interface PhysicalReader
 
     void close() throws IOException;
 
-    long getCurrentBlockId() throws IOException, FSException;
+    String getPath();
+
+    /**
+     * Get the last domain in path.
+     * @return
+     */
+    String getName();
+
+    long getCurrentBlockId() throws IOException;
 }

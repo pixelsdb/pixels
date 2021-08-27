@@ -17,43 +17,62 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.impl;
 
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
  * @author guodong
+ * @author hank
  */
-public class PhysicalFSWriter
+public class PhysicalHDFSWriter
         implements PhysicalWriter
 {
-    private static final Logger LOGGER = LogManager.getLogger(PhysicalFSWriter.class);
+    private static final Logger LOGGER = LogManager.getLogger(PhysicalHDFSWriter.class);
 
-    private final FileSystem fs;
-    private final Path path;
+    private final HDFS hdfs;
+    private final String path;
     private final long blockSize;
     private final short replication;
     private final boolean addBlockPadding;
     private final FSDataOutputStream rawWriter;
 
-    public PhysicalFSWriter(FileSystem fs, Path path, long blockSize,
-                            short replication, boolean addBlockPadding,
-                            FSDataOutputStream rawWriter)
+    public PhysicalHDFSWriter(Storage storage, String path, short replication,
+                              boolean addBlockPadding, long blockSize) throws IOException
     {
-        this.fs = fs;
+        if (storage instanceof HDFS)
+        {
+            this.hdfs = (HDFS) storage;
+        }
+        else
+        {
+            throw new IOException("Storage is not HDFS.");
+        }
         this.path = path;
         this.blockSize = blockSize;
         this.replication = replication;
         this.addBlockPadding = addBlockPadding;
-        this.rawWriter = rawWriter;
+
+        DataOutputStream dos = null;
+        try
+        {
+            dos = hdfs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        this.rawWriter = (FSDataOutputStream) dos;
     }
 
     @Override
@@ -109,12 +128,12 @@ public class PhysicalFSWriter
         rawWriter.flush();
     }
 
-    public FileSystem getFs()
+    public Storage getStorage()
     {
-        return fs;
+        return hdfs;
     }
 
-    public Path getPath()
+    public String getPath()
     {
         return path;
     }

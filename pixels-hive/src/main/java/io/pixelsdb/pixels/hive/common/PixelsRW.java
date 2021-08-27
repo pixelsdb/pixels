@@ -21,6 +21,9 @@ package io.pixelsdb.pixels.hive.common;
 
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.impl.HDFS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -55,7 +58,7 @@ public class PixelsRW
 
     public static class ReaderOptions
     {
-        private FileSystem fileSystem;
+        private Storage storage;
         private PixelsReaderOption option;
         private PixelsSplit split;
         private int batchSize;
@@ -68,10 +71,11 @@ public class PixelsRW
             this.split = split;
             try
             {
-                this.fileSystem = FileSystem.get(conf);
+                // Pixels Hive only supports hdfs.
+                this.storage = StorageFactory.Instance().getStorage("hdfs");
             } catch (IOException e)
             {
-                this.fileSystem = null;
+                this.storage = null;
                 log.error("failed to get file system.", e);
             }
             this.batchSize = Integer.parseInt(pixelsConf.getProperty("row.batch.size"));
@@ -137,9 +141,9 @@ public class PixelsRW
             }
         }
 
-        public FileSystem getFileSystem()
+        public Storage getStorage()
         {
-            return fileSystem;
+            return storage;
         }
 
         public PixelsReaderOption getReaderOption()
@@ -181,8 +185,8 @@ public class PixelsRW
     {
         boolean isCacheEnabled = options.isCacheEnabled();
         return PixelsReaderImpl.newBuilder()
-                .setFS(options.getFileSystem())
-                .setPath(path)
+                .setStorage(options.getStorage())
+                .setPath(path.toString())
                 .setEnableCache(isCacheEnabled)
                 // cache order should not be null.
                 .setCacheOrder(isCacheEnabled ? options.getCacheOrder() : new ArrayList<>(0))
@@ -428,8 +432,8 @@ public class PixelsRW
                         .setSchema(opts.schema)
                         .setPixelStride(opts.getRowIndexStride())
                         .setRowGroupSize(opts.getRowIndexStride())
-                        .setFS(fs)
-                        .setFilePath(path)
+                        .setStorage(new HDFS(fs, opts.getConfiguration()))
+                        .setFilePath(path.toString())
                         .setBlockSize(opts.getBlockSize())
                         .setReplication(opts.getBlockReplication())
                         .setBlockPadding(opts.getBlockPadding())

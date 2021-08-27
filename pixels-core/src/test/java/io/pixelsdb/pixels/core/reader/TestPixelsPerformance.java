@@ -19,20 +19,17 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TestParams;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
+import java.util.List;
 
 public class TestPixelsPerformance
 {
@@ -40,22 +37,18 @@ public class TestPixelsPerformance
     public void testPixels()
     {
         String filePath = TestParams.filePath;
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        Path currentPath = new Path(filePath);
+        String currentPath = filePath;
 
         try
         {
-            Path path = new Path(filePath);
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
-            FileStatus[] fileStatuses = fs.listStatus(path);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            List<Status> fileStatuses = storage.listStatus(filePath);
             PixelsReader reader;
-            for (FileStatus fileStatus : fileStatuses)
+            for (Status fileStatus : fileStatuses)
             {
                 currentPath = fileStatus.getPath();
                 reader = PixelsReaderImpl.newBuilder()
-                        .setFS(fs)
+                        .setStorage(storage)
                         .setPath(currentPath)
                         .build();
                 PixelsReaderOption option = new PixelsReaderOption();

@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.load.single;
 
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.common.utils.StringUtil;
@@ -27,17 +30,10 @@ import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,10 +55,7 @@ public class PixelsLoader
                                   int[] orderMapping, ConfigFactory configFactory, int maxRowNum, String regex)
             throws IOException
     {
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", LocalFileSystem.class.getName());
-        FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
         TypeDescription schema = TypeDescription.fromString(schemaStr);
         VectorizedRowBatch rowBatch = schema.createRowBatch();
         ColumnVector[] columnVectors = rowBatch.cols;
@@ -72,13 +65,13 @@ public class PixelsLoader
         short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
         // read original data
-        FileStatus[] fileStatuses = fs.listStatus(new Path(originalDataPath));
-        List<Path> originalFilePaths = new ArrayList<>();
-        for (FileStatus fileStatus : fileStatuses)
+        List<Status> statuses = storage.listStatus(originalDataPath);
+        List<String> originalFilePaths = new ArrayList<>();
+        for (Status status : statuses)
         {
-            if (fileStatus.isFile())
+            if (status.isFile())
             {
-                originalFilePaths.add(fileStatus.getPath());
+                originalFilePaths.add(status.getPath());
             }
         }
         BufferedReader reader = null;
@@ -88,8 +81,8 @@ public class PixelsLoader
                 .setSchema(schema)
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
-                .setFS(fs)
-                .setFilePath(new Path(loadingFilePath))
+                .setStorage(storage)
+                .setFilePath(loadingFilePath)
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)
@@ -97,9 +90,9 @@ public class PixelsLoader
                 .setCompressionBlockSize(1)
                 .build();
         int rowCounter = 0;
-        for (Path originalFilePath : originalFilePaths)
+        for (String originalFilePath : originalFilePaths)
         {
-            reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
+            reader = new BufferedReader(new InputStreamReader(storage.open(originalFilePath)));
             while ((line = reader.readLine()) != null)
             {
                 line = StringUtil.replaceAll(line, "false", "0");
@@ -137,8 +130,8 @@ public class PixelsLoader
                                 .setSchema(schema)
                                 .setPixelStride(pixelStride)
                                 .setRowGroupSize(rowGroupSize)
-                                .setFS(fs)
-                                .setFilePath(new Path(loadingFilePath))
+                                .setStorage(storage)
+                                .setFilePath(loadingFilePath)
                                 .setBlockSize(blockSize)
                                 .setReplication(replication)
                                 .setBlockPadding(true)

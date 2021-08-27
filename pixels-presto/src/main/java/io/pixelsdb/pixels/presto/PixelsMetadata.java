@@ -235,6 +235,8 @@ public class PixelsMetadata
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
+        String storageScheme = (String) Optional.ofNullable(tableMetadata.getProperties().get("storage.scheme"))
+                .orElse("hdfs"); // use HDFS by default.
         List<Column> columns = new ArrayList<>();
         for (ColumnMetadata columnMetadata : tableMetadata.getColumns())
         {
@@ -250,7 +252,7 @@ public class PixelsMetadata
         try
         {
             logger.debug("create table: column number=" + columns.size());
-            boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, columns);
+            boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, storageScheme, columns);
             if (res == false && ignoreExisting == false)
             {
                 throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "table " + schemaTableName.toString() +

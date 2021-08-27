@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.presto.impl;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.presto.PixelsColumnHandle;
-import io.pixelsdb.pixels.presto.PixelsTable;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,16 +67,11 @@ public class testPixelsMetadataProxy
     }
 
     @Test
-    public void testLog() {
-        log.info("Hello World");
-    }
-
-    @Test
     public void getTable() throws MetadataException
     {
-        PixelsTable table = pixelsMetadataProxy.getTable("pixels", "default", "test");
-        System.out.println(table.getTableHandle().toString());
-        System.out.println(table.getTableLayout().toString());
-        System.out.println(table.getColumns().toString());
+        Table table = pixelsMetadataProxy.getTable("default", "test");
+        System.out.println(table.getName());
+        System.out.println(table.getType());
+        System.out.println(table.getStorageScheme());
     }
 }

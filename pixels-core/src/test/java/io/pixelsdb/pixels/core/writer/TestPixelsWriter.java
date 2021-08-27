@@ -26,20 +26,17 @@ import io.pixelsdb.pixels.cache.PixelsPhysicalReader;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.exception.PixelsWriterException;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -59,14 +56,11 @@ public class TestPixelsWriter
     public void testWriterWithNull()
     {
         String filePath = TestParams.filePath;
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
@@ -83,8 +77,8 @@ public class TestPixelsWriter
                             .setSchema(schema)
                             .setPixelStride(TestParams.pixelStride)
                             .setRowGroupSize(TestParams.rowGroupSize)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
+                            .setStorage(storage)
+                            .setFilePath(filePath)
                             .setBlockSize(TestParams.blockSize)
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
@@ -159,14 +153,11 @@ public class TestPixelsWriter
     public void testWriterWithoutNull()
     {
         String filePath = TestParams.filePath;
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
@@ -181,8 +172,8 @@ public class TestPixelsWriter
                             .setSchema(schema)
                             .setPixelStride(TestParams.pixelStride)
                             .setRowGroupSize(TestParams.rowGroupSize)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
+                            .setStorage(storage)
+                            .setFilePath(filePath)
                             .setBlockSize(TestParams.blockSize)
                             .setReplication(TestParams.blockReplication)
                             .setBlockPadding(TestParams.blockPadding)
@@ -238,16 +229,13 @@ public class TestPixelsWriter
 
         VectorizedRowBatch rowBatch;
         PixelsReader pixelsReader;
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(TestParams.filePath), conf);
-            Path path = new Path(TestParams.filePath);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            String path = TestParams.filePath;
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
+                    .setStorage(storage)
                     .setPath(path)
                     .setEnableCache(false)
                     .setCacheOrder(new ArrayList<>())
@@ -288,11 +276,8 @@ public class TestPixelsWriter
         try
         {
             // get fs
-            Configuration conf = new Configuration();
-            conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-            conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-            FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
                             .setCacheLocation("/Users/Jelly/Desktop/pixels.cache")
@@ -300,11 +285,11 @@ public class TestPixelsWriter
                             .setIndexLocation("/Users/Jelly/Desktop/pixels.index")
                             .setIndexSize(1024 * 1024 * 1024L)
                             .setOverwrite(true)
-                            .setFS(fs)
+                            .setCacheConfig(cacheConfig)
                             .build();
             String directory = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_1_compact";
             long cacheLength = 0L;
-            FileStatus[] fileStatuses = fs.listStatus(new Path(directory));
+            List<Status> fileStatuses = storage.listStatus(directory);
             MetadataService metadataService = new MetadataService("dbiir10", 18888);
             Layout layout = metadataService.getLayout("pixels", "test_105", 0);
             Compact compact = layout.getCompactObject();
@@ -312,10 +297,10 @@ public class TestPixelsWriter
             List<String> cacheOrders = compact.getColumnletOrder().subList(0, cacheBorder);
             long startNano = System.nanoTime();
             // write cache
-            for (FileStatus fileStatus : fileStatuses)
+            for (Status fileStatus : fileStatuses)
             {
-                Path file = fileStatus.getPath();
-                PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(fs, file);
+                String file = fileStatus.getPath();
+                PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
                 for (int i = 0; i < cacheBorder; i++)
                 {
                     String[] cacheColumnletIdParts = cacheOrders.get(i).split(":");

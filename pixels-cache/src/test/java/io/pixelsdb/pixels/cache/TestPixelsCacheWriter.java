@@ -19,11 +19,8 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.junit.Test;
 
-import java.net.URI;
 import java.nio.ByteBuffer;
 
 /**
@@ -36,12 +33,7 @@ public class TestPixelsCacheWriter
     {
         try
         {
-            // get fs
-            Configuration conf = new Configuration();
-            conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-            conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
             PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-            FileSystem fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), conf);
             PixelsCacheWriter cacheWriter =
                     PixelsCacheWriter.newBuilder()
                             .setCacheLocation("/home/hank/Desktop/pixels.cache")
@@ -49,9 +41,8 @@ public class TestPixelsCacheWriter
                             .setIndexLocation("/home/hank/Desktop/pixels.index")
                             .setIndexSize(1024 * 1024 * 64L)
                             .setOverwrite(true)
-                            .setFS(fs)
+                            .setCacheConfig(cacheConfig)
                             .build();
-            String path = "/pixels/pixels/test_105/2121211211212.pxl";
             int index = 0;
             for (short i = 0; i < 1000; i++)
             {

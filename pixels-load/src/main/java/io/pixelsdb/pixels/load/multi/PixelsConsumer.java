@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.load.multi;
 
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.common.utils.StringUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -26,17 +28,11 @@ import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.util.Date;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
@@ -50,7 +46,7 @@ import java.util.concurrent.TimeUnit;
 public class PixelsConsumer extends Consumer
 {
 
-    private BlockingQueue<Path> queue;
+    private BlockingQueue<String> queue;
     private Properties prop;
     private Config config;
 
@@ -59,7 +55,7 @@ public class PixelsConsumer extends Consumer
         return prop;
     }
 
-    public PixelsConsumer(BlockingQueue<Path> queue, Properties prop, Config config)
+    public PixelsConsumer(BlockingQueue<String> queue, Properties prop, Config config)
     {
         this.queue = queue;
         this.prop = prop;
@@ -87,10 +83,7 @@ public class PixelsConsumer extends Consumer
             long blockSize = Long.parseLong(prop.getProperty("block.size")) * 1024l * 1024l;
             short replication = Short.parseShort(prop.getProperty("block.replication"));
 
-            Configuration conf = new Configuration();
-            conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-            conf.set("fs.file.impl", LocalFileSystem.class.getName());
-            FileSystem fs = FileSystem.get(URI.create(loadingDataPath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             TypeDescription schema = TypeDescription.fromString(schemaStr);
             // System.out.println(schemaStr);
             // System.out.println(loadingDataPath);
@@ -107,11 +100,11 @@ public class PixelsConsumer extends Consumer
 
             while (isRunning)
             {
-                Path originalFilePath = queue.poll(2, TimeUnit.SECONDS);
+                String originalFilePath = queue.poll(2, TimeUnit.SECONDS);
                 if (originalFilePath != null)
                 {
                     count++;
-                    reader = new BufferedReader(new InputStreamReader(fs.open(originalFilePath)));
+                    reader = new BufferedReader(new InputStreamReader(storage.open(originalFilePath)));
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -128,8 +121,8 @@ public class PixelsConsumer extends Consumer
                                     .setSchema(schema)
                                     .setPixelStride(pixelStride)
                                     .setRowGroupSize(rowGroupSize)
-                                    .setFS(fs)
-                                    .setFilePath(new Path(loadingFilePath))
+                                    .setStorage(storage)
+                                    .setFilePath(loadingFilePath)
                                     .setBlockSize(blockSize)
                                     .setReplication(replication)
                                     .setBlockPadding(true)

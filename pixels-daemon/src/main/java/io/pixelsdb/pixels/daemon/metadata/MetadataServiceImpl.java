@@ -77,6 +77,47 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * @param responseObserver
      */
     @Override
+    public void getTable(MetadataProto.GetTableRequest request, StreamObserver<MetadataProto.GetTableResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetTableResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        MetadataProto.Table table;
+
+        if(schema != null)
+        {
+            table = tableDao.getByNameAndSchema(request.getTableName(), schema);
+            if (table == null)
+            {
+                header = headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND)
+                        .setErrorMsg("metadata server failed to get table").build();
+                response = MetadataProto.GetTableResponse.newBuilder()
+                        .setHeader(header).build();
+            }
+            else
+            {
+                header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                response = MetadataProto.GetTableResponse.newBuilder()
+                        .setHeader(header)
+                        .setTable(table).build();
+            }
+        }
+        else
+        {
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
+            response = MetadataProto.GetTableResponse.newBuilder().setHeader(header).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * @param request
+     * @param responseObserver
+     */
+    @Override
     public void getTables(MetadataProto.GetTablesRequest request, StreamObserver<MetadataProto.GetTablesResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
@@ -420,6 +461,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.Table table = MetadataProto.Table.newBuilder()
         .setName(request.getTableName())
         .setType("user")
+        .setStorageScheme(request.getStorageScheme())
         .setSchemaId(schema.getId()).build();
         if (tableDao.exists(table))
         {

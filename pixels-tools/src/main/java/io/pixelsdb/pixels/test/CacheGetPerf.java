@@ -26,10 +26,11 @@ import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.hadoop.fs.Path;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,18 +102,18 @@ public class CacheGetPerf
 
     // prepare correct answers
     private int prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, FSException
+            throws MetadataException, FSException, IOException
     {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
         List<String> cachedColumnlets =
                 layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
-        FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
-        List<Path> paths = fsFactory.listFiles(layout.getCompactPath());
-        List<Path> cachedPaths = new ArrayList<>();
-        for (Path path : paths)
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
+        List<String> paths = storage.listPaths(layout.getCompactPath());
+        List<String> cachedPaths = new ArrayList<>();
+        for (String path : paths)
         {
-            if (fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE).get(0).getHostText().equalsIgnoreCase(hostName))
+            if (storage.getHosts(path)[0].equalsIgnoreCase(hostName))
             {
                 cachedPaths.add(path);
             }
@@ -120,7 +121,7 @@ public class CacheGetPerf
         int idx = 0;
         int size = cachedColumnlets.size() * cachedPaths.size();
         cacheKeys = new PixelsCacheKey[size];
-        for (Path path : cachedPaths)
+        for (String path : cachedPaths)
         {
             for (String columnlet : cachedColumnlets)
             {

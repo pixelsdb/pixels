@@ -13,6 +13,8 @@ Source code in this module partially refers to [ORC SerDe](https://github.com/ap
 Pixels Serde is tested on Hive 2.1 and 2.3. Other hive version which is compatible
 with the SerDe API in Hive 2.3 should also work fine with Pixels SerDe.
 
+Currently, Pixels Hive SerDe only supports HDFS as the underlying storage.
+
 ## Usage
 ./bin/hive
 

@@ -23,6 +23,9 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
@@ -31,15 +34,9 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,10 +47,6 @@ public class TestPixelsCompactor
     public void testBasicCompact()
             throws MetadataException, IOException
     {
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
         List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
@@ -72,19 +65,17 @@ public class TestPixelsCompactor
         }
 
         // get input file paths
-        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir01:9000/"), conf);
-        FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order"));
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
+        List<Status> statuses = storage.listStatus("hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order");
 
         // compact
         int NO = 0;
-        for (int i = 0; i < statuses.length; i += 16)
+        for (int i = 0; i < statuses.size(); i += 16)
         {
-            List<Path> sourcePaths = new ArrayList<>();
+            List<String> sourcePaths = new ArrayList<>();
             for (int j = 0; j < 16; ++j)
             {
-                //System.out.println(statuses[i+j].getPath().toString());
-                sourcePaths.add(statuses[i + j].getPath());
+                sourcePaths.add(statuses.get(i + j).getPath());
             }
             long start = System.currentTimeMillis();
 
@@ -96,8 +87,8 @@ public class TestPixelsCompactor
                     PixelsCompactor.newBuilder()
                             .setSourcePaths(sourcePaths)
                             .setCompactLayout(compactLayout)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
+                            .setStorage(storage)
+                            .setFilePath(filePath)
                             .setBlockSize(2L * 1024 * 1024 * 1024)
                             .setReplication((short) 2)
                             .setBlockPadding(false)
@@ -134,20 +125,19 @@ public class TestPixelsCompactor
         CompactLayout compactLayout = CompactLayout.fromCompact(compact);
 
         // get input file paths
-        Configuration conf = new Configuration();
-        FileSystem fs = FileSystem.get(URI.create("hdfs://dbiir01:9000/"), conf);
-        FileStatus[] statuses = fs.listStatus(
-                new Path("hdfs://dbiir01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_order"));
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
+        List<Status> statuses = storage.listStatus("hdfs://dbiir01:9000/pixels/pixels/test_105/v_" +
+                layout.getVersion() + "_order");
 
         // compact
         int NO = 0;
-        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.length; i += compact.getNumRowGroupInBlock())
+        for (int i = 0; i + compact.getNumRowGroupInBlock() < statuses.size(); i += compact.getNumRowGroupInBlock())
         {
-            List<Path> sourcePaths = new ArrayList<>();
+            List<String> sourcePaths = new ArrayList<>();
             for (int j = 0; j < compact.getNumRowGroupInBlock(); ++j)
             {
                 //System.out.println(statuses[i+j].getPath().toString());
-                sourcePaths.add(statuses[i + j].getPath());
+                sourcePaths.add(statuses.get(i + j).getPath());
             }
 
             long start = System.currentTimeMillis();
@@ -160,8 +150,8 @@ public class TestPixelsCompactor
                     PixelsCompactor.newBuilder()
                             .setSourcePaths(sourcePaths)
                             .setCompactLayout(compactLayout)
-                            .setFS(fs)
-                            .setFilePath(new Path(filePath))
+                            .setStorage(storage)
+                            .setFilePath(filePath)
                             .setBlockSize(2L * 1024 * 1024 * 1024)
                             .setReplication((short) 2)
                             .setBlockPadding(false)
@@ -181,12 +171,10 @@ public class TestPixelsCompactor
     {
         String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/compact.3.pxl";
         //String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
-        Path path = new Path(filePath);
-        Configuration conf = new Configuration();
-        FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+        Storage storage = StorageFactory.Instance().getStorage("hdfs");
         PixelsReader reader = PixelsReaderImpl.newBuilder()
-                .setFS(fs)
-                .setPath(path)
+                .setStorage(storage)
+                .setPath(filePath)
                 .build();
 
         PixelsReaderOption option = new PixelsReaderOption();

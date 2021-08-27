@@ -19,24 +19,26 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.common.exception.FSException;
-import io.pixelsdb.pixels.common.physical.FSFactory;
-import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
-import com.facebook.presto.spi.HostAddress;
 import io.airlift.units.Duration;
+import io.pixelsdb.pixels.common.exception.FSException;
+import io.pixelsdb.pixels.common.physical.Location;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.impl.HDFS;
+import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -54,12 +56,12 @@ public class TestHdfs {
      * @date: 2:45PM 2018-2-23
      */
     @Test
-    public void testReadBlock() throws FSException
+    public void testReadBlock() throws IOException
     {
         String filePath = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_order/201809231217040.pxl";
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        FSFactory fsFactory = config.getFsFactory();
-        List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
+        HDFS hdfs = (HDFS) StorageFactory.Instance().getStorage("hdfs");
+        List<LocatedBlock> allBlocks = listLocatedBlocks(hdfs.getFileSystem(), filePath);
         for (LocatedBlock block : allBlocks) {
             ExtendedBlock eBlock = block.getBlock();
             System.out.println("BlockId: " + eBlock.getBlockId());
@@ -80,16 +82,15 @@ public class TestHdfs {
 
     // see all the datanodeInfo of one locatedBlock
     @Test
-    public void testDistribute() throws FSException
+    public void testDistribute() throws IOException
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_0_order";
-        FSFactory fsFactory = config.getFsFactory();
-        List<Path> hdfsList = fsFactory.listFiles(hdfsDir);
+        HDFS hdfs = (HDFS) StorageFactory.Instance().getStorage("hdfs");
+        List<String> hdfsList = hdfs.listPaths(hdfsDir);
         Map<String, Integer> hostMap = new HashMap<>();
-        for(Path hdfsPath : hdfsList){
-            String filePath = hdfsPath.toString();
-            List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
+        for(String hdfsPath : hdfsList){
+            List<LocatedBlock> allBlocks = listLocatedBlocks(hdfs.getFileSystem(), hdfsPath);
             System.out.println(hdfsPath);
             for (LocatedBlock block : allBlocks) {
                 DatanodeInfo[] locations =
@@ -112,16 +113,15 @@ public class TestHdfs {
 
     // see the first datanodeInfo of one locatedBlock
     @Test
-    public void testDistributeByFirst() throws FSException
+    public void testDistributeByFirst() throws FSException, IOException
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_order";
-        FSFactory fsFactory = config.getFsFactory();
-        List<Path> hdfsList = fsFactory.listFiles(hdfsDir);
+        HDFS hdfs = (HDFS) StorageFactory.Instance().getStorage("hdfs");
+        List<String> hdfsList = hdfs.listPaths(hdfsDir);
         Map<String, Integer> hostMap = new HashMap<>();
-        for(Path hdfsPath : hdfsList){
-            String filePath = hdfsPath.toString();
-            List<LocatedBlock> allBlocks = fsFactory.listLocatedBlocks(filePath);
+        for(String hdfsPath : hdfsList){
+            List<LocatedBlock> allBlocks = listLocatedBlocks(hdfs.getFileSystem(), hdfsPath);
             System.out.println(hdfsPath);
             for (LocatedBlock block : allBlocks) {
                 DatanodeInfo[] locations =
@@ -154,20 +154,19 @@ public class TestHdfs {
 
 
     @Test
-    public void testGetFileBlocks() throws FSException
+    public void testGetFileBlocks() throws IOException
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_order/201809231217552.pxl";
-        FSFactory fsFactory = config.getFsFactory();
-        List<LocatedBlock> blocks = fsFactory.listLocatedBlocks(hdfsDir);
+        HDFS hdfs = (HDFS) StorageFactory.Instance().getStorage("hdfs");
+        List<LocatedBlock> blocks = listLocatedBlocks(hdfs.getFileSystem(), hdfsDir);
         for (LocatedBlock block : blocks) {
             System.out.println(block.getBlock().toString() + "\n" + Arrays.asList(block.getLocations()));
             System.out.println(block.toString());
         }
 
-        Path path = new Path(hdfsDir);
-        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-        for (HostAddress host : addresses){
+        List<Location> addresses = hdfs.getLocations(hdfsDir);
+        for (Location host : addresses){
             System.out.println(host.toString());
         }
     }
@@ -186,5 +185,29 @@ public class TestHdfs {
         System.out.println(end);
         System.out.println(end - start);
         System.out.println(Duration.succinctNanos(end - start));
+    }
+
+    public List<LocatedBlock> listLocatedBlocks(FileSystem fs, String path) throws IOException
+    {
+        FSDataInputStream in = null;
+        try
+        {
+            in = fs.open(new Path(path));
+        }
+        catch (IOException e)
+        {
+            throw new IOException("I/O error occurs when opening file.", e);
+        }
+        HdfsDataInputStream hdis = (HdfsDataInputStream) in;
+        List<LocatedBlock> allBlocks = null;
+        try
+        {
+            allBlocks = hdis.getAllBlocks();
+        }
+        catch (IOException e)
+        {
+            throw new IOException("I/O error occurs when getting blocks.", e);
+        }
+        return allBlocks;
     }
 }

@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.load.multi;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -50,7 +49,7 @@ public class ConsumerGenerator
         return instance;
     }
 
-    public boolean startConsumer(BlockingQueue<Path> queue, Config config)
+    public boolean startConsumer(BlockingQueue<String> queue, Config config)
     {
         // init info
         ConfigFactory configFactory = ConfigFactory.Instance();

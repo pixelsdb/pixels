@@ -19,24 +19,17 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
-import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
+import io.pixelsdb.pixels.core.vector.*;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -60,17 +53,13 @@ public class TestPixelsReaderBasic
     @Test
     public void testMetadata()
     {
-        String fileName = "hdfs://dbiir10:9000/pixels/pixels/test_105/old3_v_order/20181109162236_1437.pxl";
+        String path = "hdfs://dbiir10:9000/pixels/pixels/test_105/old3_v_order/20181109162236_1437.pxl";
         PixelsReader reader;
-        Path path = new Path(fileName);
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(fileName), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             reader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
+                    .setStorage(storage)
                     .setPath(path)
                     .build();
             List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getFooter().getRowGroupInfosList();
@@ -409,16 +398,12 @@ public class TestPixelsReaderBasic
         PixelsReader pixelsReader = null;
         String filePath = Objects.requireNonNull(
                 this.getClass().getClassLoader().getResource("files/" + fileName)).getPath();
-        Path path = new Path(filePath);
-        Configuration conf = new Configuration();
-        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
-        conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
         try
         {
-            FileSystem fs = FileSystem.get(URI.create(filePath), conf);
+            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setFS(fs)
-                    .setPath(path)
+                    .setStorage(storage)
+                    .setPath(filePath)
                     .build();
         }
         catch (IOException e)

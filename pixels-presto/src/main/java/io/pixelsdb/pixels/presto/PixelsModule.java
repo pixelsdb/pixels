@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
-import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -28,6 +26,8 @@ import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
+import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import javax.inject.Inject;
 
@@ -35,8 +35,6 @@ import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.json.JsonBinder.jsonBinder;
-import static io.airlift.json.JsonCodec.listJsonCodec;
-import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
 
 public class PixelsModule
@@ -62,7 +60,7 @@ public class PixelsModule
         configBinder(binder).bindConfig(PixelsPrestoConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
-        jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PixelsTable.class));
+        // jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PixelsTable.class));
     }
 
     public static final class TypeDeserializer

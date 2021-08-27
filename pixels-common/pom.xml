@@ -34,11 +34,13 @@
             <optional>true</optional>
         </dependency>
 
-        <dependency>
+        <!-- ozone, if it is enabled,
+        make sure that it is compatible with hadoop libs. -->
+        <!--<dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-ozone-client</artifactId>
             <optional>true</optional>
-        </dependency>
+        </dependency>-->
 
         <!-- hadoop -->
         <dependency>

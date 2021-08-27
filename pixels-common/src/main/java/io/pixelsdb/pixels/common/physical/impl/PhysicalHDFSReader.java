@@ -17,11 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.impl;
 
-import io.pixelsdb.pixels.common.exception.FSException;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.client.HdfsDataInputStream;
 import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
@@ -35,12 +35,13 @@ import java.util.List;
 
 /**
  * @author guodong
+ * @author hank
  */
-public class PhysicalFSReader
+public class PhysicalHDFSReader
         implements PhysicalReader
 {
-    private final FileSystem fs;
-    private final Path path;
+    private final HDFS hdfs;
+    private final String path;
     private final FSDataInputStream rawReader;
     private final List<BlockWrapper> blocks;
     private static Comparator<BlockWrapper> comp;
@@ -99,24 +100,47 @@ public class PhysicalFSReader
         };
     }
 
-    public PhysicalFSReader(FileSystem fs, Path path, FSDataInputStream rawReader) throws IOException
+    public PhysicalHDFSReader(Storage storage, String path) throws IOException
     {
-        this.fs = fs;
+        if (storage instanceof HDFS)
+        {
+            this.hdfs = (HDFS) storage;
+        }
+        else
+        {
+            throw new IOException("Storage is not HDFS.");
+        }
         this.path = path;
-        this.rawReader = rawReader;
+        this.rawReader = (FSDataInputStream) hdfs.open(path);
         HdfsDataInputStream hdis = null;
         if (this.rawReader instanceof HdfsDataInputStream)
         {
             hdis = (HdfsDataInputStream) rawReader;
-            List<LocatedBlock> locatedBlocks = hdis.getAllBlocks();
-            this.blocks = new ArrayList<>();
-            for (LocatedBlock block : locatedBlocks)
+            try
             {
-                this.blocks.add(
-                        new BlockWrapper(block.getStartOffset(),
-                                block.getBlockSize(), block.getBlock()));
+                List<LocatedBlock> locatedBlocks = hdis.getAllBlocks();
+                this.blocks = new ArrayList<>();
+                for (LocatedBlock block : locatedBlocks)
+                {
+                    this.blocks.add(
+                            new BlockWrapper(block.getStartOffset(),
+                                    block.getBlockSize(), block.getBlock()));
+                }
+                Collections.sort(this.blocks, comp);
             }
-            Collections.sort(this.blocks, comp);
+            catch (IOException e)
+            {
+                try
+                {
+                    this.rawReader.close();
+                }
+                catch (IOException e1)
+                {
+                    e.addSuppressed(e1);
+                    throw e;
+                }
+                throw e;
+            }
         }
         else
         {
@@ -127,7 +151,7 @@ public class PhysicalFSReader
     @Override
     public long getFileLength() throws IOException
     {
-        return fs.getFileStatus(path).getLen();
+        return hdfs.getStatus(path).getLength();
     }
 
     public void seek(long desired) throws IOException
@@ -177,14 +201,16 @@ public class PhysicalFSReader
         rawReader.close();
     }
 
-    public FileSystem getFs()
-    {
-        return fs;
-    }
-
-    public Path getPath()
+    @Override
+    public String getPath()
     {
         return path;
+    }
+
+    @Override
+    public String getName()
+    {
+        return new Path(path).getName();
     }
 
     /**
@@ -194,7 +220,7 @@ public class PhysicalFSReader
      * @throws IOException
      */
     @Override
-    public long getCurrentBlockId() throws IOException, FSException
+    public long getCurrentBlockId() throws IOException
     {
         if (this.blocks != null)
         {
@@ -204,7 +230,7 @@ public class PhysicalFSReader
         }
         else
         {
-            throw new FSException("Failed to get blocks. This reader may be backed by a non-HdfsDataInputStream.");
+            throw new IOException("Failed to get blocks. This reader may be backed by a non-HdfsDataInputStream.");
         }
     }
 }

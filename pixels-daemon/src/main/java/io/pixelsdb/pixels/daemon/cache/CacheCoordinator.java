@@ -19,19 +19,6 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
-import io.pixelsdb.pixels.cache.CacheLocationDistribution;
-import io.pixelsdb.pixels.cache.PixelsCacheConfig;
-import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
-import io.pixelsdb.pixels.common.balance.Balancer;
-import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
-import io.pixelsdb.pixels.common.exception.BalancerException;
-import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.daemon.Server;
 import com.coreos.jetcd.Lease;
 import com.coreos.jetcd.Watch;
 import com.coreos.jetcd.data.ByteSequence;
@@ -41,24 +28,34 @@ import com.coreos.jetcd.watch.WatchEvent;
 import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import io.pixelsdb.pixels.cache.CacheLocationDistribution;
+import io.pixelsdb.pixels.cache.PixelsCacheConfig;
+import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
+import io.pixelsdb.pixels.common.balance.Balancer;
+import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
+import io.pixelsdb.pixels.common.exception.BalancerException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.physical.Location;
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.daemon.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * CacheCoordinator is responsible for the following tasks:
@@ -78,7 +75,7 @@ public class CacheCoordinator
     private final ScheduledExecutorService scheduledExecutor;
     private final MetadataService metadataService;
     private String hostName;
-    private FileSystem fs = null;
+    private Storage storage = null;
     // coordinator status: 0: init, 1: ready; -1: dead
     private AtomicInteger coordinatorStatus = new AtomicInteger(0);
     private CacheCoordinatorRegister cacheCoordinatorRegister = null;
@@ -114,11 +111,8 @@ public class CacheCoordinator
             return;
         }
         try {
-            Configuration configuration = new Configuration();
-            configuration.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
-            configuration.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-            if (fs == null) {
-                fs = FileSystem.get(URI.create(cacheConfig.getWarehousePath()), configuration);
+            if (storage == null) {
+                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
             }
             // register coordinator
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
@@ -243,19 +237,18 @@ public class CacheCoordinator
             throws IOException
     {
         String compactPath = layout.getCompactPath();
-        List<Path> files = new ArrayList<>();
-        FileStatus[] fileStatuses = fs.listStatus(new Path(compactPath));
-        if (fileStatuses != null) {
-            for (FileStatus fileStatus : fileStatuses)
+        List<String> files = new ArrayList<>();
+        List<Status> statuses = storage.listStatus(compactPath);
+        if (statuses != null) {
+            for (Status status : statuses)
             {
-                if (fileStatus.isFile()) {
-                    files.add(fileStatus.getPath());
+                if (status.isFile()) {
+                    files.add(status.getPath());
                 }
             }
         }
         String[] result = new String[files.size()];
-        List<String> paths = files.stream().map(Path::toString).collect(Collectors.toList());
-        paths.toArray(result);
+        files.toArray(result);
         return result;
     }
 
@@ -303,17 +296,17 @@ public class CacheCoordinator
         for (String path : paths)
         {
             // get a set of nodes where the blocks of the file is located (location_set)
-            Set<HostAddress> locations = new HashSet<>();
-            BlockLocation[] blockLocations = fs.getFileBlockLocations(new Path(path), 0, Long.MAX_VALUE);
-            for (BlockLocation blockLocation : blockLocations)
+            Set<HostAddress> addresses = new HashSet<>();
+            List<Location> locations = storage.getLocations(path);
+            for (Location location : locations)
             {
-                locations.addAll(toHostAddress(blockLocation.getHosts()));
+                addresses.addAll(toHostAddress(location.getHosts()));
             }
-            if (locations.size() == 0)
+            if (addresses.size() == 0)
             {
                 continue;
             }
-            replicaBalancer.put(path, locations);
+            replicaBalancer.put(path, addresses);
         }
         try
         {

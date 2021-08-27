@@ -19,18 +19,18 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import com.facebook.presto.spi.ColumnHandle;
-import com.facebook.presto.spi.ConnectorPageSource;
-import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.inject.Inject;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
-import io.pixelsdb.pixels.common.physical.FSFactory;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
+import java.io.IOException;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -44,7 +44,6 @@ public class PixelsPageSourceProvider
         implements ConnectorPageSourceProvider
 {
     private final String connectorId;
-    private final FSFactory fsFactory;
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
     private final PixelsFooterCache pixelsFooterCache;
@@ -54,7 +53,6 @@ public class PixelsPageSourceProvider
             throws Exception
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
-        this.fsFactory = requireNonNull(config.getFsFactory(), "fsFactory is null");
         if (config.getConfigFactory().getProperty("cache.enabled").equalsIgnoreCase("true")) {
             // NOTICE: creating a MemoryMappedFile is efficient, usually cost tens of us.
             // TODO: is it necessary to create memory mapped files in top layer and share them here?
@@ -82,6 +80,15 @@ public class PixelsPageSourceProvider
         PixelsSplit pixelsSplit = (PixelsSplit) split;
         checkArgument(pixelsSplit.getConnectorId().equals(connectorId), "connectorId is not for this connector");
 
-        return new PixelsPageSource(pixelsSplit, pixelsColumns, fsFactory, cacheFile, indexFile, pixelsFooterCache, connectorId);
+        Storage storage = null;
+        try
+        {
+            storage = StorageFactory.Instance().getStorage(pixelsSplit.getStorageScheme());
+        } catch (IOException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_STORAGE_ERROR, e);
+        }
+
+        return new PixelsPageSource(pixelsSplit, pixelsColumns, storage, cacheFile, indexFile, pixelsFooterCache, connectorId);
     }
 }

@@ -20,8 +20,9 @@
 package io.pixelsdb.pixels.core;
 
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.physical.PhysicalFSReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.exception.PixelsFileMagicInvalidException;
 import io.pixelsdb.pixels.core.exception.PixelsFileVersionInvalidException;
@@ -31,8 +32,6 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReaderImpl;
 import io.pixelsdb.pixels.core.utils.PixelsCoreConfig;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -57,7 +56,7 @@ public class PixelsReaderImpl
     private static final Logger LOGGER = LogManager.getLogger(PixelsReaderImpl.class);
 
     private final TypeDescription fileSchema;
-    private final PhysicalFSReader physicalFSReader;
+    private final PhysicalReader physicalReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final List<PixelsRecordReader> recordReaders;
@@ -70,7 +69,7 @@ public class PixelsReaderImpl
     private final Random random;
 
     private PixelsReaderImpl(TypeDescription fileSchema,
-                             PhysicalFSReader physicalFSReader,
+                             PhysicalReader physicalReader,
                              PixelsProto.FileTail fileTail,
                              String metricsDir,
                              float metricsCollectProb,
@@ -80,7 +79,7 @@ public class PixelsReaderImpl
                              PixelsFooterCache pixelsFooterCache)
     {
         this.fileSchema = fileSchema;
-        this.physicalFSReader = physicalFSReader;
+        this.physicalReader = physicalReader;
         this.postScript = fileTail.getPostscript();
         this.footer = fileTail.getFooter();
         this.recordReaders = new LinkedList<>();
@@ -95,8 +94,8 @@ public class PixelsReaderImpl
 
     public static class Builder
     {
-        private FileSystem builderFS = null;
-        private Path builderPath = null;
+        private Storage builderStorage = null;
+        private String builderPath = null;
         private List<String> builderCacheOrder = null;
         private TypeDescription builderSchema = null;
         private boolean builderEnableCache = false;
@@ -107,13 +106,13 @@ public class PixelsReaderImpl
         {
         }
 
-        public Builder setFS(FileSystem fs)
+        public Builder setStorage(Storage storage)
         {
-            this.builderFS = requireNonNull(fs);
+            this.builderStorage = requireNonNull(storage);
             return this;
         }
 
-        public Builder setPath(Path path)
+        public Builder setPath(String path)
         {
             this.builderPath = requireNonNull(path);
             return this;
@@ -152,21 +151,22 @@ public class PixelsReaderImpl
                 throws IllegalArgumentException, IOException
         {
             // check arguments
-            if (builderFS == null || builderPath == null)
+            if (builderStorage == null || builderPath == null)
             {
                 throw new IllegalArgumentException("Missing argument to build PixelsReader");
             }
-            // get PhysicalFSReader
-            PhysicalFSReader fsReader = PhysicalReaderUtil.newPhysicalFSReader(builderFS, builderPath);
+            // get PhysicalReader
+            PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, builderPath);
             // try to get file tail from cache
-            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(builderPath.getName());
+            String fileName = fsReader.getName();
+            PixelsProto.FileTail fileTail = builderPixelsFooterCache.getFileTail(fileName);
             if (fileTail == null)
             {
                 if (fsReader == null)
                 {
-                    LOGGER.error("Failed to create PhysicalFSReader");
+                    LOGGER.error("Failed to create PhysicalReader");
                     throw new PixelsReaderException(
-                            "Failed to create PixelsReader due to error of creating PhysicalFSReader");
+                            "Failed to create PixelsReader due to error of creating PhysicalReader");
                 }
                 // get FileTail
                 long fileLen = fsReader.getFileLength();
@@ -177,7 +177,7 @@ public class PixelsReaderImpl
                 byte[] fileTailBuffer = new byte[fileTailLength];
                 fsReader.readFully(fileTailBuffer);
                 fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
-                builderPixelsFooterCache.putFileTail(builderPath.getName(), fileTail);
+                builderPixelsFooterCache.putFileTail(fileName, fileTail);
             }
 
             // check file MAGIC and file version
@@ -228,8 +228,8 @@ public class PixelsReaderImpl
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
         int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
         byte[] footer = new byte[footerLength];
-        physicalFSReader.seek(footerOffset);
-        physicalFSReader.readFully(footer);
+        physicalReader.seek(footerOffset);
+        physicalReader.readFully(footer);
         return PixelsProto.RowGroupFooter.parseFrom(footer);
     }
 
@@ -248,7 +248,7 @@ public class PixelsReaderImpl
             enableMetrics = true;
         }
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
-        PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalFSReader, postScript, footer, option,
+        PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalReader, postScript, footer, option,
                 enableMetrics, metricsDir, enableCache, cacheOrder,
                 pixelsCacheReader, pixelsFooterCache);
         recordReaders.add(recordReader);
@@ -449,7 +449,7 @@ public class PixelsReaderImpl
         {
             recordReader.close();
         }
-        this.physicalFSReader.close();
+        this.physicalReader.close();
         /* no need to close the pixelsCacheReader, because it is usually maintained
            as a global singleton instance and shared across different PixelsReaders.
          */
