@@ -38,7 +38,7 @@ public class StorageFactory
     private Logger logger = LogManager.getLogger(StorageFactory.class);
     private Map<String, Storage> storageImpls = new HashMap<>();
 
-    private StorageFactory() {}
+    private StorageFactory() { }
 
     private static StorageFactory instance = null;
 
@@ -51,9 +51,12 @@ public class StorageFactory
         return instance;
     }
 
-    public synchronized void reload()
+    public synchronized void reload() throws IOException
     {
         this.storageImpls.clear();
+        storageImpls.put("hdfs", new HDFS());
+        storageImpls.put("local", new LocalFS());
+        storageImpls.put("s3", new S3());
     }
 
     public synchronized Storage getStorage(String scheme) throws IOException

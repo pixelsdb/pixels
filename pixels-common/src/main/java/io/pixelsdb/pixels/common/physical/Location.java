@@ -24,6 +24,13 @@ import org.apache.hadoop.fs.BlockLocation;
 import java.io.IOException;
 
 /**
+ * In Pixels, we assume that each file or object has its locations.
+ *
+ * <p>
+ * In some storage systems, like HDFS, each file may have a set of
+ * blocks and each block has its own location. For these storage systems,
+ * the file's locations are the locations of the blocks.
+ * <p/>
  * Created at: 20/08/2021
  * Author: hank
  */

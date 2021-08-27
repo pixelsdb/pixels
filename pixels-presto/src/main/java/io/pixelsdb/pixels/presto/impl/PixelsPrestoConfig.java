@@ -77,7 +77,6 @@ public class PixelsPrestoConfig
                     ConfigFactory.Instance().loadProperties(pixelsHome + "pixels.properties");
                     ConfigFactory.Instance().addProperty("pixels.home", pixelsHome);
                     logger.info("using pixels.properties under connector specified pixels.home: " + pixelsHome);
-                    StorageFactory.Instance().reload();
 
                 } catch (IOException e)
                 {
@@ -99,6 +98,23 @@ public class PixelsPrestoConfig
             } catch (NumberFormatException e)
             {
                 throw new PrestoException(PixelsErrorCode.PIXELS_CONFIG_ERROR, e);
+            }
+            try
+            {
+                /**
+                 * Issue #108:
+                 * We reload the storage here, because in other classes like
+                 * PixelsSplitManager, when we try to create storage instance
+                 * by StorageFactory.Instance().getStorage(), Presto does not
+                 * load the dependencies (e.g. hadoop-hdfs-xxx.jar) of the storage
+                 * implementation (e.g. io.pixelsdb.pixels.common.physical.impl.HDFS).
+                 *
+                 * I currently don't know the reason (08.27.2021).
+                 */
+                StorageFactory.Instance().reload();
+            } catch (IOException e)
+            {
+                throw new PrestoException(PixelsErrorCode.PIXELS_STORAGE_ERROR, e);
             }
         }
         return this;
