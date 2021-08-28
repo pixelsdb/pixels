@@ -64,7 +64,7 @@
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
-        <dep.netty.version>4.1.25.Final</dep.netty.version>
+        <dep.netty.version>4.1.42.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
         <dep.guava.version>21.0</dep.guava.version>
         <dep.protobuf.version>3.6.1</dep.protobuf.version>

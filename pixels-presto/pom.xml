@@ -63,11 +63,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
+        -->
 
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -175,6 +177,8 @@
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
+            <optional>true</optional>
+            <!--
             <exclusions>
                 <exclusion>
                     <groupId>io.netty</groupId>
@@ -185,7 +189,7 @@
                     <artifactId>netty-handler-proxy</artifactId>
                 </exclusion>
             </exclusions>
-            <optional>true</optional>
+            -->
         </dependency>
     </dependencies>
 </project>
