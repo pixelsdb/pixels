@@ -50,7 +50,7 @@ public class MetadataService
         assert (host != null);
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext(true).build();
+                .usePlaintext().build();
         this.stub = MetadataServiceGrpc.newBlockingStub(channel);
     }
 

@@ -19,8 +19,10 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import org.junit.Test;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Created at: 18-10-14
@@ -39,7 +41,7 @@ public class TestEtcdUtil
         long end = System.currentTimeMillis();
         System.out.println((end - start));
         if (keyValue != null)
-            System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
+            System.out.println("keyValue is：" + keyValue.getValue().toString(StandardCharsets.UTF_8));
         else
             System.out.println("keyValue is null.");
     }

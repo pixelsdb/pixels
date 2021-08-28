@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.common.lock;
 
-import com.coreos.jetcd.Client;
+import io.etcd.jetcd.Client;
 
 /**
  * @author: tao

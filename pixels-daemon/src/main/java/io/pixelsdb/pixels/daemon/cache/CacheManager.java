@@ -19,13 +19,12 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
-import com.coreos.jetcd.Lease;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.options.WatchOption;
-import com.coreos.jetcd.watch.WatchEvent;
-import com.coreos.jetcd.watch.WatchResponse;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.Lease;
+import io.etcd.jetcd.Watch;
+import io.etcd.jetcd.options.WatchOption;
+import io.etcd.jetcd.watch.WatchEvent;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.cache.PixelsCacheUtil;
 import io.pixelsdb.pixels.cache.PixelsCacheWriter;
@@ -40,6 +39,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -142,7 +143,7 @@ public class CacheManager
             // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
             if (null != globalCacheVersionKV) {
-                int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toStringUtf8());
+                int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 logger.debug("Current global cache version: " + globalCacheVersion);
                 // if cache file exists already. we need check local cache version with global cache version stored in etcd
                 if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion) {
@@ -201,34 +202,68 @@ public class CacheManager
             logger.info("Initialization failed. Stop now.");
             return;
         }
-        Watch watch = etcdUtil.getClient().getWatchClient();
-        Watch.Watcher watcher = watch.watch(
-                ByteSequence.fromString(Constants.CACHE_VERSION_LITERAL), WatchOption.DEFAULT);
-        outer_loop: while (cacheStatus.get() >= 0) {
-            try {
-                WatchResponse watchResponse = watcher.listen();
-                for (WatchEvent event : watchResponse.getEvents()) {
-                    // update a new version
-                    if (event.getEventType() == WatchEvent.EventType.PUT) {
-                        int version = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
-                        logger.debug("Cache version update detected, new global version is " + version);
-                        if (version > localCacheVersion) {
-                            logger.debug("New global version is greater than the local version, update the local cache");
-                            update(version);
+        CountDownLatch latch = new CountDownLatch(1);
+        Watch.Watcher watcher = etcdUtil.getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
+                {
+                    for (WatchEvent event : watchResponse.getEvents())
+                    {
+
+                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        {
+                            // Get a new cache layout version.
+                            int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                            if (cacheStatus.get() == CacheNodeStatus.READY.statusCode)
+                            {
+                                // Ready to update the local cache.
+                                logger.debug("Cache version update detected, new global version is (" + version + ").");
+                                if (version > localCacheVersion)
+                                {
+                                    // The new version is newer, update the local cache.
+                                    logger.debug("New global version is greater than the local version, update the local cache.");
+                                    try
+                                    {
+                                        update(version);
+                                    } catch (MetadataException e)
+                                    {
+                                        logger.error(e.getMessage());
+                                        e.printStackTrace();
+                                    }
+                                }
+                            }
+                            else if (cacheStatus.get() == CacheNodeStatus.UPDATING.statusCode)
+                            {
+                                // The local cache is been updating, ignore the new version.
+                                logger.warn("The local cache is been updating for version (" + localCacheVersion + "), " +
+                                        "ignore the new cache version (" + version + ").");
+                            }
+                            else
+                            {
+                                // Shutdown this cache manager.
+                                latch.countDown();
+                            }
+                        }
+                        else if (event.getEventType() == WatchEvent.EventType.DELETE)
+                        {
+                            logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
+                            cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
+                            // Shutdown the cache manager.
+                            latch.countDown();
                         }
                     }
-                    else if (event.getEventType() == WatchEvent.EventType.DELETE){
-                        logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
-                        cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
-                        break outer_loop;
-                    }
-                }
-            }
-            catch (InterruptedException | MetadataException e) {
-                logger.error(e.getMessage());
-                e.printStackTrace();
-                break;
-            }
+                });
+        try
+        {
+            // Wait for this cache manager to be shutdown.
+            latch.await();
+        } catch (InterruptedException e)
+        {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+        } finally
+        {
+            watcher.close();
         }
     }
 

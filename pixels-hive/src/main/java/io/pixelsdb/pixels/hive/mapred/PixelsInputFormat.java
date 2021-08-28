@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.hive.mapred;
 
 import com.alibaba.fastjson.JSON;
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
@@ -57,6 +57,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -223,7 +224,7 @@ public class PixelsInputFormat
                 if(keyValue != null)
                 {
                     // 1. get version
-                    cacheVersion = keyValue.getValue().toStringUtf8();
+                    cacheVersion = keyValue.getValue().toString(StandardCharsets.UTF_8);
                     log.debug("cache version: " + cacheVersion);
                     // 2. get files of each node
                     List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
@@ -232,8 +233,8 @@ public class PixelsInputFormat
                         Map<String, String> fileLocations = new HashMap<>();
                         for (KeyValue kv : nodeFiles)
                         {
-                            String[] files = kv.getValue().toStringUtf8().split(";");
-                            String node = kv.getKey().toStringUtf8().split("_")[2];
+                            String[] files = kv.getValue().toString(StandardCharsets.UTF_8).split(";");
+                            String node = kv.getKey().toString(StandardCharsets.UTF_8).split("_")[2];
                             for(String file : files)
                             {
                                 fileLocations.put(file, node);

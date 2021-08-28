@@ -24,7 +24,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.coreos</groupId>
+            <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
             <optional>true</optional>
         </dependency>

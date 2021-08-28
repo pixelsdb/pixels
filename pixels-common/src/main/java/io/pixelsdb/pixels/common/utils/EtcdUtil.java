@@ -19,19 +19,18 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
-import com.coreos.jetcd.Client;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.kv.PutResponse;
-import com.coreos.jetcd.lease.LeaseGrantResponse;
-import com.coreos.jetcd.options.DeleteOption;
-import com.coreos.jetcd.options.GetOption;
-import com.coreos.jetcd.options.PutOption;
-import com.coreos.jetcd.options.WatchOption;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.Client;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.kv.PutResponse;
+import io.etcd.jetcd.lease.LeaseGrantResponse;
+import io.etcd.jetcd.options.DeleteOption;
+import io.etcd.jetcd.options.GetOption;
+import io.etcd.jetcd.options.PutOption;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -88,7 +87,8 @@ public class EtcdUtil
         KeyValue keyValue = null;
         try
         {
-            List<KeyValue> keyValues = this.client.getKVClient().get(ByteSequence.fromString(key)).get().getKvs();
+            List<KeyValue> keyValues = this.client.getKVClient().get(
+                    ByteSequence.from(key, StandardCharsets.UTF_8)).get().getKvs();
             if (keyValues.size() > 0)
             {
                 keyValue = keyValues.get(0);
@@ -110,10 +110,12 @@ public class EtcdUtil
     public List<KeyValue> getKeyValuesByPrefix(String prefix)
     {
         List<KeyValue> keyValues = new ArrayList<>();
-        GetOption getOption = GetOption.newBuilder().withPrefix(ByteSequence.fromString(prefix)).build();
+        GetOption getOption = GetOption.newBuilder().withPrefix(
+                ByteSequence.from(prefix, StandardCharsets.UTF_8)).build();
         try
         {
-            keyValues = this.client.getKVClient().get(ByteSequence.fromString(prefix), getOption).get().getKvs();
+            keyValues = this.client.getKVClient().get(
+                    ByteSequence.from(prefix, StandardCharsets.UTF_8), getOption).get().getKvs();
         }
         catch (Exception e)
         {
@@ -130,7 +132,8 @@ public class EtcdUtil
      */
     public void putKeyValue(String key, String value)
     {
-        CompletableFuture<PutResponse> future = client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromString(value));
+        CompletableFuture<PutResponse> future = client.getKVClient().put(
+                ByteSequence.from(key, StandardCharsets.UTF_8), ByteSequence.from(value, StandardCharsets.UTF_8));
         try
         {
             future.get();
@@ -149,7 +152,8 @@ public class EtcdUtil
      */
     public void putKeyValue(String key, byte[] value)
     {
-        CompletableFuture<PutResponse> future = client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromBytes(value));
+        CompletableFuture<PutResponse> future = client.getKVClient().put(
+                ByteSequence.from(key, StandardCharsets.UTF_8), ByteSequence.from(value));
         try
         {
             future.get();
@@ -175,7 +179,8 @@ public class EtcdUtil
         try
         {
             putOption = PutOption.newBuilder().withLeaseId(leaseGrantResponse.get().getID()).build();
-            this.client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromString(value), putOption);
+            this.client.getKVClient().put(ByteSequence.from(key, StandardCharsets.UTF_8),
+                    ByteSequence.from(value, StandardCharsets.UTF_8), putOption);
             return leaseGrantResponse.get().getID();
         }
         catch (Exception e)
@@ -196,7 +201,8 @@ public class EtcdUtil
     public long putKeyValueWithLeaseId(String key, String value, long leaseId) throws Exception
     {
         PutOption putOption = PutOption.newBuilder().withLeaseId(leaseId).build();
-        CompletableFuture<PutResponse> putResponse = this.client.getKVClient().put(ByteSequence.fromString(key), ByteSequence.fromString(value), putOption);
+        CompletableFuture<PutResponse> putResponse = this.client.getKVClient().put(
+                ByteSequence.from(key, StandardCharsets.UTF_8), ByteSequence.from(value, StandardCharsets.UTF_8), putOption);
         try
         {
             return putResponse.get().getHeader().getRevision();
@@ -209,23 +215,13 @@ public class EtcdUtil
     }
 
     /**
-     * keep a lease alive.
-     *
-     * @param leaseId
-     */
-    public void keepLeaseAlive(long leaseId)
-    {
-        this.client.getLeaseClient().keepAlive(leaseId);
-    }
-
-    /**
      * delete key-value by key.
      *
      * @param key
      */
     public void delete(String key)
     {
-        this.client.getKVClient().delete(ByteSequence.fromString(key));
+        this.client.getKVClient().delete(ByteSequence.from(key, StandardCharsets.UTF_8));
     }
 
     /**
@@ -235,31 +231,8 @@ public class EtcdUtil
      */
     public void deleteByPrefix(String prefix)
     {
-        DeleteOption deleteOption = DeleteOption.newBuilder().withPrefix(ByteSequence.fromString(prefix)).build();
-        this.client.getKVClient().delete(ByteSequence.fromString(prefix), deleteOption);
+        DeleteOption deleteOption = DeleteOption.newBuilder().withPrefix(
+                ByteSequence.from(prefix, StandardCharsets.UTF_8)).build();
+        this.client.getKVClient().delete(ByteSequence.from(prefix, StandardCharsets.UTF_8), deleteOption);
     }
-
-    /**
-     * get the custom watcher of the key.
-     *
-     * @param key
-     * @return
-     */
-    public Watch.Watcher getCustomWatcherForKey(String key)
-    {
-        return this.client.getWatchClient().watch(ByteSequence.fromString(key));
-    }
-
-    /**
-     * get a watcher who watches the set of keys with the same prefix.
-     *
-     * @param prefix
-     * @return
-     */
-    public Watch.Watcher getCustomWatcherForPrefix(String prefix)
-    {
-        WatchOption watchOption = WatchOption.newBuilder().withPrefix(ByteSequence.fromString(prefix)).build();
-        return this.client.getWatchClient().watch(ByteSequence.fromString(prefix), watchOption);
-    }
-
 }

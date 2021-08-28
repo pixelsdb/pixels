@@ -19,15 +19,14 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
-import com.coreos.jetcd.Lease;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.options.WatchOption;
-import com.coreos.jetcd.watch.WatchEvent;
-import com.coreos.jetcd.watch.WatchResponse;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
+import io.etcd.jetcd.ByteSequence;
+import io.etcd.jetcd.KeyValue;
+import io.etcd.jetcd.Lease;
+import io.etcd.jetcd.Watch;
+import io.etcd.jetcd.options.WatchOption;
+import io.etcd.jetcd.watch.WatchEvent;
 import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
@@ -51,7 +50,9 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +70,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CacheCoordinator
         implements Server
 {
+    enum CoordinatorStatus
+    {
+        DEAD(-1), INIT(0), READY(1);
+
+        int statusCode;
+        CoordinatorStatus(int statusCode)
+        {
+            this.statusCode = statusCode;
+        }
+    }
+
     private static final Logger logger = LogManager.getLogger(CacheCoordinator.class);
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
@@ -77,7 +89,7 @@ public class CacheCoordinator
     private String hostName;
     private Storage storage = null;
     // coordinator status: 0: init, 1: ready; -1: dead
-    private AtomicInteger coordinatorStatus = new AtomicInteger(0);
+    private AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.statusCode);
     private CacheCoordinatorRegister cacheCoordinatorRegister = null;
     private boolean initializeSuccess = false;
 
@@ -125,17 +137,17 @@ public class CacheCoordinator
             int cache_version = 0, layout_version = 0;
             KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
             if (null != cacheVersionKV) {
-                cache_version = Integer.parseInt(cacheVersionKV.getValue().toStringUtf8());
+                cache_version = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
             }
             KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
             if (null != layoutVersionKV) {
-                layout_version = Integer.parseInt(layoutVersionKV.getValue().toStringUtf8());
+                layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
             }
             if (cache_version < layout_version) {
                 logger.debug("Current cache version is left behind of current layout version. Update.");
                 update(layout_version);
             }
-            coordinatorStatus.set(CacheManager.CacheNodeStatus.READY.statusCode);
+            coordinatorStatus.set(CoordinatorStatus.READY.statusCode);
             initializeSuccess = true;
             logger.info("CacheCoordinator on " + hostName + " has started.");
         }
@@ -153,44 +165,68 @@ public class CacheCoordinator
             return;
         }
         Watch watch = etcdUtil.getClient().getWatchClient();
-        Watch.Watcher watcher = watch.watch(
-                ByteSequence.fromString(Constants.LAYOUT_VERSION_LITERAL), WatchOption.DEFAULT);
+        CountDownLatch latch = new CountDownLatch(1);
         // watch layout version change, and update cache distribution and cache version
-        while (coordinatorStatus.get() >= 0) {
-            try {
-                // layout version can be changed by rainbow.
-                WatchResponse watchResponse = watcher.listen();
-                for (WatchEvent event : watchResponse.getEvents()) {
-                    if (event.getEventType() == WatchEvent.EventType.PUT) {
-                        logger.debug("Update cache distribution");
-                        // update the cache distribution
-                        int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toStringUtf8());
-                        update(layoutVersion);
-                        // update cache version, notify cache managers on each node to update cache.
-                        logger.debug("Update cache version to " + layoutVersion);
-                        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+        Watch.Watcher watcher = watch.watch(ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8), WatchOption.DEFAULT, watchResponse ->
+        {
+            for (WatchEvent event : watchResponse.getEvents())
+            {
+                if (event.getEventType() == WatchEvent.EventType.PUT)
+                {
+                    // listen to the PUT even on the LAYOUT VERSION, which can be changed by rainbow.
+                    if (coordinatorStatus.get() == CoordinatorStatus.READY.statusCode)
+                    {
+                        try
+                        {
+                            // this coordinator is ready.
+                            logger.debug("Update cache distribution");
+                            // update the cache distribution
+                            int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                            update(layoutVersion);
+                            // update cache version, notify cache managers on each node to update cache.
+                            logger.debug("Update cache version to " + layoutVersion);
+                            etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                        } catch (IOException | MetadataException e)
+                        {
+                            logger.error(e.getMessage());
+                            e.printStackTrace();
+                        }
+                    } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.statusCode)
+                    {
+                        // coordinator is shutdown.
+                        latch.countDown();
                     }
+                    break;
                 }
             }
-            catch (InterruptedException | MetadataException | IOException e) {
-                logger.error(e.getMessage());
-                e.printStackTrace();
-                break;
-            }
+        });
+        try
+        {
+            // Wait for this coordinator to be shutdown.
+            latch.await();
+        } catch (InterruptedException e)
+        {
+            logger.error(e.getMessage());
+            e.printStackTrace();
+        } finally
+        {
+            watcher.close();
         }
     }
 
     @Override
     public boolean isRunning()
     {
-        return coordinatorStatus.get() >= 0;
+        int status = coordinatorStatus.get();
+        return status == CoordinatorStatus.INIT.statusCode ||
+                status == CoordinatorStatus.READY.statusCode;
     }
 
     @Override
     public void shutdown()
     {
         // TODO: check if the objects here are not null in case that coordinator was not started successfully.
-        coordinatorStatus.set(CacheManager.CacheNodeStatus.UNHEALTHY.statusCode);
+        coordinatorStatus.set(CoordinatorStatus.DEAD.statusCode);
         cacheCoordinatorRegister.stop();
         etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
         logger.info("CacheCoordinator shuts down.");
@@ -220,8 +256,8 @@ public class CacheCoordinator
         for (int i = 0; i < nodes.size(); i++) {
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
-            if (Integer.parseInt(node.getValue().toStringUtf8()) == CacheManager.CacheNodeStatus.READY.statusCode) {
-                hosts[hostIndex++] = HostAddress.fromString(node.getKey().toStringUtf8().substring(5));
+            if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) == CacheManager.CacheNodeStatus.READY.statusCode) {
+                hosts[hostIndex++] = HostAddress.fromString(node.getKey().toString(StandardCharsets.UTF_8).substring(5));
             }
         }
         allocate(paths, hosts, hostIndex, layoutVersion);

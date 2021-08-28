@@ -19,19 +19,16 @@
  */
 package io.pixelsdb.pixels.common.lock;
 
-import com.coreos.jetcd.Client;
-import com.coreos.jetcd.Lease;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.kv.PutResponse;
-import com.coreos.jetcd.options.GetOption;
-import com.coreos.jetcd.options.PutOption;
-import com.coreos.jetcd.watch.WatchEvent;
-import com.coreos.jetcd.watch.WatchResponse;
+import io.etcd.jetcd.*;
+import io.etcd.jetcd.kv.PutResponse;
+import io.etcd.jetcd.options.GetOption;
+import io.etcd.jetcd.options.PutOption;
+import io.etcd.jetcd.options.WatchOption;
+import io.etcd.jetcd.watch.WatchEvent;
 import org.apache.curator.utils.PathUtils;
 import org.apache.curator.utils.ZKPaths;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,8 +107,8 @@ public class LockInternals
         try
         {
             PutResponse putResponse = client.getKVClient()
-                    .put(ByteSequence.fromString(ourPath),
-                            ByteSequence.fromString(""),
+                    .put(ByteSequence.from(ourPath, StandardCharsets.UTF_8),
+                            ByteSequence.from("", StandardCharsets.UTF_8),
                             PutOption.newBuilder().withLeaseId(this.leaseId).build())
                     .get(10, TimeUnit.SECONDS);
 
@@ -160,7 +157,7 @@ public class LockInternals
                         }
                         else
                         {
-                            String beforeKey = kv.getKey().toStringUtf8();
+                            String beforeKey = kv.getKey().toString(StandardCharsets.UTF_8);
                             if (beforeKey.contains("_WRIT_"))
                             {
                                 preIndex = index;
@@ -179,34 +176,38 @@ public class LockInternals
                     {
                         // listen last 'WRIT'
                         ByteSequence preKeyBS = children.get(preIndex).getKey();
-                        Watch.Watcher watcher = client.getWatchClient().watch(preKeyBS);
-                        WatchResponse res = null;
+                        CountDownLatch latch = new CountDownLatch(1);
+                        Watch.Watcher watcher = client.getWatchClient().watch(preKeyBS, WatchOption.DEFAULT, watchResponse ->
+                        {
+                            for (WatchEvent event : watchResponse.getEvents())
+                            {
+                                if (event.getEventType() == WatchEvent.EventType.DELETE)
+                                {
+                                    // listen to the DELETE even on the last WRIT.
+                                    latch.countDown();
+                                    break;
+                                }
+                            }
+                        });
 
                         try
                         {
-                            System.out.println("[lock-read]: waiting: " + ourPath + ", " + revisionOfMyself + ", watch the lock: " + preKeyBS.toStringUtf8());
-                            res = watcher.listen();
+                            System.out.println("[lock-read]: waiting: " + ourPath + ", " + revisionOfMyself +
+                                    ", watch the lock: " + preKeyBS.toString(StandardCharsets.UTF_8));
+                            latch.await();
+                            System.out.println("[lock-read]: lock successfully. [revision]:" +
+                                    revisionOfMyself + "," + ourPath);
+                            if (watcher != null)
+                            {
+                                System.out.println(watcher.hashCode() + " close" + "," + ourPath);
+                                // close() to avoid leaving unneeded watchers which is a type of resource leak
+                                watcher.close();
+                            }
+                            haveTheLock = true;
                         }
                         catch (InterruptedException e)
                         {
                             System.out.println("[error]: failed to listen key.");
-                        }
-
-                        List<WatchEvent> eventlist = res.getEvents();
-                        for (WatchEvent event : eventlist)
-                        {
-                            if (event.getEventType().toString().equals("DELETE"))
-                            {
-                                System.out.println("[lock-read]: lock successfully. [revision]:" + revisionOfMyself + "," + ourPath);
-                                if (watcher != null)
-                                {
-                                    System.out.println(watcher.hashCode() + " close" + "," + ourPath);
-                                    // close() to avoid leaving unneeded watchers which is a type of resource leak
-                                    watcher.close();
-                                }
-                                haveTheLock = true;
-                                break;
-                            }
                         }
                     }
                 }
@@ -219,7 +220,8 @@ public class LockInternals
                     {
                         if (canGetWriteLock(ourPath))
                         {
-                            System.out.println("[lock-write]: lock successfully. [revision]:" + revisionOfMyself + "," + ourPath);
+                            System.out.println("[lock-write]: lock successfully. [revision]:" +
+                                    revisionOfMyself + "," + ourPath);
                             haveTheLock = true;
                             break;
                         }
@@ -274,7 +276,8 @@ public class LockInternals
         long revisionOfMyself = this.pathToVersion.get(path);
         boolean result = revisionOfMyself == children.get(0).getModRevision();
         System.out.println(path);
-        System.out.println("Current locksize: " + children.size() + ", getWriteLock: " + result + ", revision: " + revisionOfMyself);
+        System.out.println("Current locksize: " + children.size() + ", getWriteLock: " + result +
+                ", revision: " + revisionOfMyself);
 
         return result;
     }
@@ -287,8 +290,8 @@ public class LockInternals
      */
     List<KeyValue> getSortedChildren() throws Exception
     {
-        List<KeyValue> kvList = client.getKVClient().get(ByteSequence.fromString(basePath),
-                GetOption.newBuilder().withPrefix(ByteSequence.fromString(basePath))
+        List<KeyValue> kvList = client.getKVClient().get(ByteSequence.from(basePath, StandardCharsets.UTF_8),
+                GetOption.newBuilder().withPrefix(ByteSequence.from(basePath, StandardCharsets.UTF_8))
                         .withSortField(GetOption.SortTarget.MOD).build())
                 .get().getKvs();
         return kvList;
@@ -304,7 +307,7 @@ public class LockInternals
     {
         try
         {
-            client.getKVClient().delete(ByteSequence.fromString(ourPath)).get(10,
+            client.getKVClient().delete(ByteSequence.from(ourPath, StandardCharsets.UTF_8)).get(10,
                     TimeUnit.SECONDS);
             System.out.println("[unLock]: unlock successfully.[lockName]:" + ourPath);
         }

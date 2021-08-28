@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.lock;
 
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import com.coreos.jetcd.Client;
+import io.etcd.jetcd.Client;
 import org.junit.Test;
 
 /**

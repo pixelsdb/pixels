@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
