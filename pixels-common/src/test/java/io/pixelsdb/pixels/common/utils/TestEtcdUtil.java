@@ -41,7 +41,7 @@ public class TestEtcdUtil
         if (keyValue != null)
             System.out.println("keyValue is：" + keyValue.getValue().toStringUtf8());
         else
-            System.out.println("keyValue is：" + keyValue);
+            System.out.println("keyValue is null.");
     }
 
 }

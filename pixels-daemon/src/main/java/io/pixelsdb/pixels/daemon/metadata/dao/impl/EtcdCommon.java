@@ -66,6 +66,7 @@ public class EtcdCommon
         } catch (Exception e)
         {
             log.error(e);
+            e.printStackTrace();
         } finally
         {
             try
@@ -74,6 +75,7 @@ public class EtcdCommon
             } catch (Exception e)
             {
                 log.error(e);
+                e.printStackTrace();
             }
         }
     }
@@ -92,13 +94,14 @@ public class EtcdCommon
             KeyValue idKV = etcd.getKeyValue(idKey);
             if (idKV != null)
             {
-                id = Long.parseLong(idKV.getValue().toString());
+                id = Long.parseLong(new String(idKV.getValue().getBytes()));
                 id++;
                 etcd.putKeyValue(idKey, id + "");
             }
         } catch (Exception e)
         {
             log.error(e);
+            e.printStackTrace();
         } finally
         {
             try
@@ -107,6 +110,7 @@ public class EtcdCommon
             } catch (Exception e)
             {
                 log.error(e);
+                e.printStackTrace();
             }
         }
         return id;

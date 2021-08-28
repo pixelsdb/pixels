@@ -62,22 +62,5 @@
             <artifactId>hadoop-hdfs</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <dependency>
-            <groupId>com.coreos</groupId>
-            <artifactId>jetcd-core</artifactId>
-            <optional>true</optional>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-codec-http2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-handler-proxy</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
     </dependencies>
 </project>

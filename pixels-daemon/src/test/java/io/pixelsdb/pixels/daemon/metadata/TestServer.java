@@ -19,7 +19,15 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import io.pixelsdb.pixels.common.lock.EtcdMutex;
+import io.pixelsdb.pixels.common.lock.EtcdReadWriteLock;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.Test;
+
+import static io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon.schemaIdLockPath;
 
 /**
  * @author: tao
@@ -31,5 +39,52 @@ public class TestServer {
     public void test() {
         MetadataServer server = new MetadataServer(18888);
         server.run();
+    }
+
+
+
+    class Locker implements Runnable
+    {
+
+        @Override
+        public void run()
+        {
+            EtcdUtil etcd = EtcdUtil.Instance();
+            Logger log = LogManager.getLogger(EtcdCommon.class);
+            EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
+                    schemaIdLockPath);
+            EtcdMutex writeLock = readWriteLock.writeLock();
+            try
+            {
+                writeLock.acquire();
+                System.out.println(this);
+            } catch (Exception e)
+            {
+                log.error(e);
+                e.printStackTrace();
+            }
+            finally
+            {
+                try
+                {
+                    writeLock.release();
+                } catch (Exception e)
+                {
+                    log.error(e);
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testEtcdLock() throws InterruptedException
+    {
+        Thread t1 = new Thread(new Locker());
+        Thread t2 = new Thread(new Locker());
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
     }
 }
