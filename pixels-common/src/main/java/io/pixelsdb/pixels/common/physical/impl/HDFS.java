@@ -94,9 +94,9 @@ public class HDFS implements Storage
     }
 
     @Override
-    public String getScheme()
+    public Scheme getScheme()
     {
-        return "hdfs";
+        return Scheme.hdfs;
     }
 
     @Override

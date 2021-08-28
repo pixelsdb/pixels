@@ -60,7 +60,6 @@ public class PixelsModule
         configBinder(binder).bindConfig(PixelsPrestoConfig.class);
 
         jsonBinder(binder).addDeserializerBinding(Type.class).to(TypeDeserializer.class);
-        // jsonCodecBinder(binder).bindMapJsonCodec(String.class, listJsonCodec(PixelsTable.class));
     }
 
     public static final class TypeDeserializer

@@ -40,9 +40,9 @@ public class S3 implements Storage
     }
 
     @Override
-    public String getScheme()
+    public Scheme getScheme()
     {
-        return "s3";
+        return Scheme.s3;
     }
 
     @Override

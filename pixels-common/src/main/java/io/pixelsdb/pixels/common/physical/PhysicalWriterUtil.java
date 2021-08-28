@@ -41,7 +41,7 @@ public class PhysicalWriterUtil
         checkArgument(path != null, "path should not be null");
         try
         {
-            if (storage.getScheme().equalsIgnoreCase("hdfs"))
+            if (storage.getScheme().equals(Storage.Scheme.hdfs))
             {
                 return new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
             }
@@ -65,14 +65,14 @@ public class PhysicalWriterUtil
      * @return physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
-            String scheme, String path, short replication, boolean addBlockPadding, long blockSize) throws IOException
+            Storage.Scheme scheme, String path, short replication, boolean addBlockPadding, long blockSize) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
 
         try
         {
-            if (scheme.equalsIgnoreCase("hdfs"))
+            if (scheme == Storage.Scheme.hdfs)
             {
                 return new PhysicalHDFSWriter(StorageFactory.Instance().
                         getStorage(scheme), path, replication, addBlockPadding, blockSize);

@@ -19,10 +19,14 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import com.google.common.collect.ImmutableList;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Created at: 20/08/2021
@@ -30,7 +34,54 @@ import java.util.List;
  */
 public interface Storage
 {
-    String getScheme();
+    /**
+     * If we want to add more storage schemes here, modify this enum.
+     */
+    enum Scheme
+    {
+        hdfs, // HDFS
+        file, // local fs
+        s3; // Amazon S3
+
+        /**
+         * Case insensitive parsing from String to enum value.
+         * @param value
+         * @return
+         */
+        public static Scheme from(String value)
+        {
+            return valueOf(value.toLowerCase());
+        }
+
+        /**
+         * Whether the value is a valid storage scheme.
+         * @param value
+         * @return
+         */
+        public static boolean isValid(String value)
+        {
+            for (Scheme scheme : values())
+            {
+                if (scheme.equals(value))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean equals(String other)
+        {
+            return this.toString().equalsIgnoreCase(other);
+        }
+
+        public boolean equals(Scheme other)
+        {
+            return this == other;
+        }
+    }
+
+    Scheme getScheme();
 
     List<Status> listStatus(String path) throws IOException;
 

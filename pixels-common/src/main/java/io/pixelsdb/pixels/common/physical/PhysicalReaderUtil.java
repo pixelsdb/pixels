@@ -41,7 +41,7 @@ public class PhysicalReaderUtil
         PhysicalReader fsReader = null;
         try
         {
-            if (storage.getScheme().equalsIgnoreCase("hdfs"))
+            if (storage.getScheme().equals(Storage.Scheme.hdfs))
             {
                 fsReader = new PhysicalHDFSReader(storage, path);
             }
@@ -54,14 +54,14 @@ public class PhysicalReaderUtil
         return fsReader;
     }
 
-    public static PhysicalReader newPhysicalReader(String scheme, String path) throws IOException
+    public static PhysicalReader newPhysicalReader(Storage.Scheme scheme, String path) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
         PhysicalReader fsReader;
         try
         {
-            if (scheme.equalsIgnoreCase("hdfs"))
+            if (scheme == Storage.Scheme.hdfs)
             {
                 fsReader = new PhysicalHDFSReader(StorageFactory.Instance().getStorage(scheme), path);
                 return fsReader;

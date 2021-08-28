@@ -38,10 +38,11 @@ public class LocalFS implements Storage
     {
 
     }
+
     @Override
-    public String getScheme()
+    public Scheme getScheme()
     {
-        return "file";
+        return Scheme.file;
     }
 
     @Override
