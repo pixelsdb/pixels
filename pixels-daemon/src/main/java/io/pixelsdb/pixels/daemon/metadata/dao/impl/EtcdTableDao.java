@@ -11,6 +11,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+
 /**
  * Created at: 2020/5/27
  * Author: hank
@@ -111,8 +113,7 @@ public class EtcdTableDao extends TableDao
     @Override
     public boolean insert(MetadataProto.Table table)
     {
-        long id = EtcdCommon.generateId(EtcdCommon.tableIdKey,
-                EtcdCommon.tableIdLockPath);
+        long id = GenerateId(EtcdCommon.tableIdKey);
         table = table.toBuilder().setId(id).build();
         etcd.putKeyValue(EtcdCommon.tablePrimaryKeyPrefix + id,
                 table.toByteArray());

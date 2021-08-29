@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,19 +17,28 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metadata;
+package io.pixelsdb.pixels.common.utils;
 
 import org.junit.Test;
 
-/**
- * @author: tao
- * @date: Create in 2018-01-27 10:46
- **/
-public class TestServer {
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 
+/**
+ * Created at: 8/28/21
+ * Author: hank
+ */
+public class TestAutoIncrement
+{
     @Test
-    public void test() {
-        MetadataServer server = new MetadataServer(18888);
-        server.run();
+    public void testEtcdDao()
+    {
+        long id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
     }
 }

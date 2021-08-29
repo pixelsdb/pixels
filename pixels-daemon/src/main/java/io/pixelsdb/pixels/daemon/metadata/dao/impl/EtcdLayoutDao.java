@@ -11,6 +11,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+
 /**
  * Created at: 2020/5/27
  * Author: hank
@@ -117,8 +119,7 @@ public class EtcdLayoutDao extends LayoutDao
     @Override
     public boolean insert(MetadataProto.Layout layout)
     {
-        long id = EtcdCommon.generateId(EtcdCommon.layoutIdKey,
-                EtcdCommon.layoutIdLockPath);
+        long id = GenerateId(EtcdCommon.layoutIdKey);
         layout = layout.toBuilder().setId(id).build();
         etcd.putKeyValue(EtcdCommon.layoutPrimaryKeyPrefix + id,
                 layout.toByteArray());

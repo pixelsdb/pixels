@@ -19,11 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon;
 import org.junit.Test;
-
-import static io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon.schemaIdKey;
-import static io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon.schemaIdLockPath;
 
 /**
  * Created at: 8/28/21
@@ -34,13 +30,5 @@ public class TestEtcdDaos
     @Test
     public void testEtcdDao()
     {
-        long id = EtcdCommon.generateId(schemaIdKey, schemaIdLockPath);
-        System.out.println(id);
-        id = EtcdCommon.generateId(schemaIdKey, schemaIdLockPath);
-        System.out.println(id);
-        id = EtcdCommon.generateId(schemaIdKey, schemaIdLockPath);
-        System.out.println(id);
-        id = EtcdCommon.generateId(schemaIdKey, schemaIdLockPath);
-        System.out.println(id);
     }
 }

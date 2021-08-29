@@ -11,6 +11,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+
 /**
  * Created at: 2020/5/27
  * Author: hank
@@ -93,8 +95,7 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public boolean insert(MetadataProto.Schema schema)
     {
-        long id = EtcdCommon.generateId(EtcdCommon.schemaIdKey,
-                EtcdCommon.schemaIdLockPath);
+        long id = GenerateId(EtcdCommon.schemaIdKey);
         schema = schema.toBuilder().setId(id).build();
         etcd.putKeyValue(EtcdCommon.schemaPrimaryKeyPrefix + id,
                 schema.toByteArray());

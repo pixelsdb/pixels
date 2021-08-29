@@ -12,6 +12,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+
 /**
  * Created at: 2020/5/27
  * Author: hank
@@ -106,8 +108,7 @@ public class EtcdColumnDao extends ColumnDao
         int n = 0;
         for (MetadataProto.Column column : columns)
         {
-            long id = EtcdCommon.generateId(EtcdCommon.columnIdKey,
-                    EtcdCommon.columnIdLockPath);
+            long id = GenerateId(EtcdCommon.columnIdKey);
             MetadataProto.Column newColumn = column.toBuilder().setId(id).setTableId(table.getId()).build();
             etcd.putKeyValue(EtcdCommon.columnPrimaryKeyPrefix + newColumn.getId(),
                     newColumn.toByteArray());
