@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author: tao
+ * @author hank
  * @date: Create in 2018-10-27 14:33
  **/
 public class EtcdMutex implements InterProcessLock
@@ -62,6 +63,17 @@ public class EtcdMutex implements InterProcessLock
         internals = new LockInternals(client, path, lockName);
     }
 
+    public EtcdMutex verbose(boolean verbose)
+    {
+        this.internals.verbose(verbose);
+        return this;
+    }
+
+    public EtcdMutex verbose()
+    {
+        return verbose(true);
+    }
+
     /**
      * Acquire the mutex - blocking until it's available. Note: the same thread
      * can call acquire re-entrantly. Each call to acquire must be balanced by a call
@@ -71,17 +83,16 @@ public class EtcdMutex implements InterProcessLock
      */
     public void acquire() throws Exception
     {
-        if (!this.internalLock(-1L, (TimeUnit) null))
+        if (!this.internalLock(Long.MAX_VALUE, TimeUnit.SECONDS))
         {
             throw new IOException("Lost connection while trying to acquire lock: " + this.basePath);
         }
-
     }
 
     private boolean internalLock(long time, TimeUnit unit) throws Exception
     {
         Thread currentThread = Thread.currentThread();
-        EtcdMutex.LockData lockData = (EtcdMutex.LockData) this.threadData.get(currentThread);
+        EtcdMutex.LockData lockData = this.threadData.get(currentThread);
         if (lockData != null)
         {
             lockData.lockCount.incrementAndGet();
@@ -90,7 +101,6 @@ public class EtcdMutex implements InterProcessLock
         else
         {
             String lockPath = internals.attemptLock(time, unit);
-            System.out.println("[attemptLock]: end, " + lockPath);
             if (lockPath != null)
             {
                 EtcdMutex.LockData newLockData = new EtcdMutex.LockData(currentThread, lockPath);
@@ -141,7 +151,8 @@ public class EtcdMutex implements InterProcessLock
         LockData lockData = threadData.get(currentThread);
         if (lockData == null)
         {
-            throw new IllegalMonitorStateException("You do not own the lock: " + basePath);
+            // don't throw exception if the lock is not owned by this thread
+            return;
         }
 
         int newLockCount = lockData.lockCount.decrementAndGet();
@@ -176,5 +187,4 @@ public class EtcdMutex implements InterProcessLock
             this.lockPath = lockPath;
         }
     }
-
 }

@@ -27,6 +27,8 @@ import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
 import org.apache.curator.utils.PathUtils;
 import org.apache.curator.utils.ZKPaths;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -38,15 +40,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author: tao
+ * @author hank
  * @date: Create in 2018-10-27 18:31
  **/
 public class LockInternals
 {
+    private static Logger logger = LogManager.getLogger(LockInternals.class);
 
     private final String path;
     private final Client client;
     private final String basePath;
     private final String lockName;
+    private boolean verbose = false;
     private Long leaseId = 0L;
     private static AtomicInteger count = new AtomicInteger(0);
     private volatile Map<String, Long> pathToVersion = new HashMap<>();
@@ -64,18 +69,30 @@ public class LockInternals
         }
         catch (InterruptedException | ExecutionException | TimeoutException e1)
         {
-            System.out.println("[error]: create lease failed:" + e1);
+            logger.error("[create-lease-error]: " + e1);
             return;
         }
         ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
         service.scheduleAtFixedRate(new KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
     }
 
-    String attemptLock(long time, TimeUnit unit) throws Exception
+    LockInternals verbose(boolean verbose)
+    {
+        this.verbose = verbose;
+        return this;
+    }
+
+    private void DEBUG(String msg)
+    {
+        if (verbose)
+        {
+            logger.debug(msg);
+        }
+    }
+
+    String attemptLock(long timeout, TimeUnit unit) throws Exception
     {
         // startMillis, millisToWait maybe useful later, refer 'InterProcessReadWriteLock' in 'org.apache.curator'
-        long startMillis = System.currentTimeMillis();
-        Long millisToWait = unit != null ? unit.toMillis(time) : null;
         String ourPath = null;
         boolean hasTheLock = false;
         boolean isDone = false;
@@ -84,7 +101,7 @@ public class LockInternals
         {
             isDone = true;
             ourPath = this.createsTheLock(this.client, this.path);
-            hasTheLock = this.internalLockLoop(ourPath);
+            hasTheLock = this.internalLockLoop(ourPath, timeout, unit);
         }
         return hasTheLock ? ourPath : null;
     }
@@ -114,29 +131,29 @@ public class LockInternals
 
             long revisionOfMyself = putResponse.getHeader().getRevision();
             pathToVersion.put(ourPath, revisionOfMyself);
-            System.out.println("[createsTheLock]: " + ourPath + ": " + revisionOfMyself);
+            DEBUG("[create-lock-key-success]: " + ourPath + ": " + revisionOfMyself);
         }
         catch (InterruptedException | ExecutionException | TimeoutException e1)
         {
-            System.out.println("[error]: lock operation failed:" + e1);
+            logger.error("[create-lock-key-error]: " + e1);
         }
         return ourPath;
     }
 
-    private synchronized boolean internalLockLoop(String ourPath) throws Exception
+    private synchronized boolean internalLockLoop(String ourPath, long timeout, TimeUnit unit) throws Exception
     {
         boolean haveTheLock = false;
         boolean doDelete = false;
         try
         {
-            while (!haveTheLock)
+            while (true)
             {
                 List<KeyValue> children = this.getSortedChildren();
 
                 long revisionOfMyself = this.pathToVersion.get(ourPath);
                 if (revisionOfMyself == children.get(0).getCreateRevision())
                 {
-                    System.out.println("[lock]: lock successfully. [revision]:" + revisionOfMyself + ", " + ourPath);
+                    DEBUG("[lock-success]: " + ourPath + "(" + revisionOfMyself + ")");
                     haveTheLock = true;
                     break;
                 }
@@ -169,7 +186,7 @@ public class LockInternals
                     if (isRead)
                     {
                         haveTheLock = true;
-                        System.out.println("[Share lock]: " + ourPath + ", " + revisionOfMyself);
+                        DEBUG("[read-lock-success]: " + ourPath + "(" + revisionOfMyself + ") [read-only]");
                         break;
                     }
                     else
@@ -192,50 +209,64 @@ public class LockInternals
 
                         try
                         {
-                            System.out.println("[lock-read]: waiting: " + ourPath + ", " + revisionOfMyself +
-                                    ", watch the lock: " + preKeyBS.toString(StandardCharsets.UTF_8));
-                            latch.await();
-                            System.out.println("[lock-read]: lock successfully. [revision]:" +
-                                    revisionOfMyself + "," + ourPath);
+                            DEBUG("[read-lock-wait]: " + ourPath + "(" + revisionOfMyself +
+                                    "), [wait for]: " + preKeyBS.toString(StandardCharsets.UTF_8));
+                            if (latch.await(timeout, unit))
+                            {
+                                DEBUG("[read-lock-success]: " + ourPath + "(" + revisionOfMyself +
+                                        ") [read-write]");
+                                haveTheLock = true;
+                            }
+                            else
+                            {
+                                DEBUG("[read-lock-timeout]: " + ourPath + "(" + revisionOfMyself +
+                                        ") [read-write]");
+                                haveTheLock = false;
+                            }
                             if (watcher != null)
                             {
-                                System.out.println(watcher.hashCode() + " close" + "," + ourPath);
                                 // close() to avoid leaving unneeded watchers which is a type of resource leak
                                 watcher.close();
                             }
-                            haveTheLock = true;
+                            break;
                         }
                         catch (InterruptedException e)
                         {
-                            System.out.println("[error]: failed to listen key.");
+                            logger.error("[read-lock-error]: failed to listen key.");
                         }
                     }
                 }
                 else
                 {
                     // current is 'WRIT'
-                    System.out.println("[lock-write]: keep waiting." + ourPath + ", " + revisionOfMyself);
-                    // wait all the key before to be deleted
-                    while (true)
+                    DEBUG("[write-lock-wait]: " + ourPath + "(" + revisionOfMyself +")");
+                    long startMillis = System.currentTimeMillis();
+                    Long millisToWait = unit != null ? unit.toMillis(timeout) : null;
+                    // wait all the keys before this key to be deleted
+                    if (canGetWriteLock(ourPath))
                     {
-                        if (canGetWriteLock(ourPath))
+                        DEBUG("[write-lock-success]: " + ourPath + "(" +
+                                revisionOfMyself + ")");
+                        haveTheLock = true;
+                        break;
+                    }
+                    else
+                    {
+                        // don't try write lock too often
+                        try
                         {
-                            System.out.println("[lock-write]: lock successfully. [revision]:" +
-                                    revisionOfMyself + "," + ourPath);
-                            haveTheLock = true;
-                            break;
+                            Thread.sleep(1000);
+                            if (System.currentTimeMillis() - startMillis >= millisToWait)
+                            {
+                                DEBUG("[write-lock-timeout]: " + ourPath + "(" +
+                                        revisionOfMyself + ")");
+                                haveTheLock = false;
+                                break;
+                            }
                         }
-                        else
+                        catch (InterruptedException e)
                         {
-                            // write too often
-                            try
-                            {
-                                Thread.sleep(1000);
-                            }
-                            catch (InterruptedException e)
-                            {
-                                e.printStackTrace();
-                            }
+                            logger.error("Interrupted when waiting to acquire write lock.", e);
                         }
                     }
                 }
@@ -275,9 +306,6 @@ public class LockInternals
         //only id the first key is myself can get the write-lock
         long revisionOfMyself = this.pathToVersion.get(path);
         boolean result = revisionOfMyself == children.get(0).getModRevision();
-        System.out.println(path);
-        System.out.println("Current locksize: " + children.size() + ", getWriteLock: " + result +
-                ", revision: " + revisionOfMyself);
 
         return result;
     }
@@ -309,11 +337,11 @@ public class LockInternals
         {
             client.getKVClient().delete(ByteSequence.from(ourPath, StandardCharsets.UTF_8)).get(10,
                     TimeUnit.SECONDS);
-            System.out.println("[unLock]: unlock successfully.[lockName]:" + ourPath);
+            DEBUG("[unLock-success]: " + ourPath);
         }
         catch (InterruptedException | ExecutionException | TimeoutException e)
         {
-            System.out.println("[error]: unlock failed：" + e);
+            DEBUG("[unlock-error]: " + e);
         }
     }
 

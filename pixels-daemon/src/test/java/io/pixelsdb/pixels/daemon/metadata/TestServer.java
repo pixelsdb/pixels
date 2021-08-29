@@ -22,12 +22,11 @@ package io.pixelsdb.pixels.daemon.metadata;
 import io.pixelsdb.pixels.common.lock.EtcdMutex;
 import io.pixelsdb.pixels.common.lock.EtcdReadWriteLock;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
-import static io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon.schemaIdLockPath;
+import static io.pixelsdb.pixels.daemon.metadata.dao.impl.EtcdCommon.tableIdLockPath;
 
 /**
  * @author: tao
@@ -43,21 +42,21 @@ public class TestServer {
 
 
 
-    class Locker implements Runnable
+    class WriteLock implements Runnable
     {
 
         @Override
         public void run()
         {
             EtcdUtil etcd = EtcdUtil.Instance();
-            Logger log = LogManager.getLogger(EtcdCommon.class);
+            Logger log = LogManager.getLogger(WriteLock.class);
             EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                    schemaIdLockPath);
-            EtcdMutex writeLock = readWriteLock.writeLock();
+                    tableIdLockPath);
+            EtcdMutex writeLock = readWriteLock.writeLock().verbose();
             try
             {
                 writeLock.acquire();
-                System.out.println(this);
+                System.out.println(this +", lock success.");
             } catch (Exception e)
             {
                 log.error(e);
@@ -67,7 +66,42 @@ public class TestServer {
             {
                 try
                 {
+                    Thread.sleep(10000);
                     writeLock.release();
+                } catch (Exception e)
+                {
+                    log.error(e);
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    class ReadLock implements Runnable
+    {
+
+        @Override
+        public void run()
+        {
+            EtcdUtil etcd = EtcdUtil.Instance();
+            Logger log = LogManager.getLogger(ReadLock.class);
+            EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
+                    tableIdLockPath);
+            EtcdMutex readLock = readWriteLock.readLock().verbose();
+            try
+            {
+                readLock.acquire();
+                System.out.println(this + ", lock success.");
+            } catch (Exception e)
+            {
+                log.error(e);
+                e.printStackTrace();
+            }
+            finally
+            {
+                try
+                {
+                    readLock.release();
                 } catch (Exception e)
                 {
                     log.error(e);
@@ -80,9 +114,10 @@ public class TestServer {
     @Test
     public void testEtcdLock() throws InterruptedException
     {
-        Thread t1 = new Thread(new Locker());
-        Thread t2 = new Thread(new Locker());
+        Thread t1 = new Thread(new WriteLock());
+        Thread t2 = new Thread(new WriteLock());
         t1.start();
+        Thread.sleep(2000);
         t2.start();
         t1.join();
         t2.join();
