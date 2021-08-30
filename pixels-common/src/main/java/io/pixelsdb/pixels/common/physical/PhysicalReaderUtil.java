@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSReader;
+import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalReader;
 
 import java.io.IOException;
 
@@ -41,9 +42,16 @@ public class PhysicalReaderUtil
         PhysicalReader fsReader = null;
         try
         {
-            if (storage.getScheme().equals(Storage.Scheme.hdfs))
+            switch (storage.getScheme())
             {
-                fsReader = new PhysicalHDFSReader(storage, path);
+                case hdfs:
+                    fsReader = new PhysicalHDFSReader(storage, path);
+                    break;
+                case file:
+                    new PhysicalLocalReader(storage, path);
+                    break;
+                case s3:
+                    throw new IOException("S3 storage is not supported");
             }
         } catch (IOException e)
         {
@@ -58,20 +66,6 @@ public class PhysicalReaderUtil
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-        PhysicalReader fsReader;
-        try
-        {
-            if (scheme == Storage.Scheme.hdfs)
-            {
-                fsReader = new PhysicalHDFSReader(StorageFactory.Instance().getStorage(scheme), path);
-                return fsReader;
-            }
-        } catch (IOException e)
-        {
-            e.printStackTrace();
-            throw e;
-        }
-
-        return null;
+        return newPhysicalReader(StorageFactory.Instance().getStorage(scheme), path);
     }
 }

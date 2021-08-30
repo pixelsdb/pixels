@@ -21,7 +21,9 @@ package io.pixelsdb.pixels.common.physical;
 
 import org.apache.hadoop.fs.FileStatus;
 
-import java.io.IOException;
+import java.io.File;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -50,18 +52,28 @@ public class Status implements Comparable
 
     public Status (FileStatus hdfs)
     {
+        requireNonNull(hdfs);
         this.path = hdfs.getPath().toString();
         this.length = hdfs.getLen();
         this.isdir = hdfs.isDirectory();
         this.replication = hdfs.getReplication();
     }
 
+    public Status(File file)
+    {
+        requireNonNull(file);
+        this.path = file.getPath();
+        this.length = file.length();
+        this.isdir = file.isDirectory();
+        this.replication = 1;
+    }
+
     /**
      * Copy constructor.
      *
-     * @param other FileStatus to copy
+     * @param other Status to copy
      */
-    public Status(Status other) throws IOException
+    public Status(Status other)
     {
         this(other.getPath(), other.getLength(), other.isDirectory(), other.getReplication());
     }
@@ -115,11 +127,6 @@ public class Status implements Comparable
     {
         int slash = this.path.lastIndexOf("/");
         return this.path.substring(slash+1);
-    }
-
-    public void setPath(final String path)
-    {
-        this.path = path;
     }
 
     /**

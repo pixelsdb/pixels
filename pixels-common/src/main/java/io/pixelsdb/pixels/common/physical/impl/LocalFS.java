@@ -19,14 +19,27 @@
  */
 package io.pixelsdb.pixels.common.physical.impl;
 
+import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
+import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_ID_KEY;
+import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
 
 /**
  * Created at: 20/08/2021
@@ -34,9 +47,49 @@ import java.util.List;
  */
 public class LocalFS implements Storage
 {
+    static
+    {
+        InitId(LOCAL_FS_ID_KEY);
+    }
+
+    private static Logger logger = LogManager.getLogger(LocalFS.class);
+
+    private String hostName;
+
     public LocalFS()
     {
+        this.hostName = System.getenv("HOSTNAME");
+        logger.debug("HostName from system env: " + hostName);
+        if (hostName == null)
+        {
+            try
+            {
+                this.hostName = InetAddress.getLocalHost().getHostName();
+                logger.debug("HostName from InetAddress: " + hostName);
+            }
+            catch (UnknownHostException e)
+            {
+                logger.debug("Hostname is null. Exit");
+                return;
+            }
+        }
+        logger.debug("Local FS created on host: " + hostName);
+    }
 
+    private String getPathKey(String path)
+    {
+        return LOCAL_FS_META_PREFIX + path + ":" + hostName;
+    }
+
+    private String getPathKeyPrefix(String path)
+    {
+        return LOCAL_FS_META_PREFIX + path + ":";
+    }
+
+    private String getHostFromPathKey(String pathKey)
+    {
+        int last = pathKey.lastIndexOf(":");
+        return pathKey.substring(last + 1);
     }
 
     @Override
@@ -46,74 +99,177 @@ public class LocalFS implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path)
+    public List<Status> listStatus(String path) throws IOException
     {
-        return null;
+        File[] files = new File(path).listFiles();
+        if (files == null)
+        {
+            throw new IOException("Failed to list files in path: " + path + ".");
+        }
+        else
+        {
+            return Stream.of(files).map(Status::new).collect(Collectors.toList());
+        }
     }
 
     @Override
     public Status getStatus(String path)
     {
-        return null;
+        return new Status(new File(path));
     }
 
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        return null;
+        File[] files = new File(path).listFiles();
+        if (files == null)
+        {
+            throw new IOException("Failed to list files in path: " + path + ".");
+        }
+        else
+        {
+            return Stream.of(files).map(File::getPath).collect(Collectors.toList());
+        }
     }
 
     @Override
-    public long getId(String path) throws IOException
+    public long getFileId(String path) throws IOException
     {
-        return 0;
+        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
+        return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
     }
 
     @Override
     public List<Location> getLocations(String path)
     {
-        return null;
+        List<Location> locations = new ArrayList<>();
+        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
+        for (KeyValue kv : kvs)
+        {
+            String key = kv.getKey().toString(StandardCharsets.UTF_8);
+            String host = getHostFromPathKey(key);
+            locations.add(new Location(new String[]{host}));
+        }
+        return locations;
     }
 
     @Override
     public String[] getHosts(String path) throws IOException
     {
-        return new String[0];
+        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
+        String[] hosts = new String[kvs.size()];
+        int i = 0;
+        for (KeyValue kv : kvs)
+        {
+            String key = kv.getKey().toString(StandardCharsets.UTF_8);
+            hosts[i++] = getHostFromPathKey(key);
+        }
+        return hosts;
     }
 
     @Override
-    public DataInputStream open(String path)
+    public DataInputStream open(String path) throws IOException
     {
-        return null;
+        File file = new File(path);
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+        }
+        if (!file.exists())
+        {
+            throw new IOException("File '" + path + "' doesn't exists.");
+        }
+        return new DataInputStream(new FileInputStream(file));
+    }
+
+    public RandomAccessFile openRaf(String path) throws IOException
+    {
+        File file = new File(path);
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+        }
+        if (!file.exists())
+        {
+            throw new IOException("File '" + path + "' doesn't exists.");
+        }
+        return new RandomAccessFile(file, "r");
     }
 
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
     {
-        return null;
+        File file = new File(path);
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+        }
+        if (file.exists())
+        {
+            if (overwrite)
+            {
+                file.delete();
+            }
+            else
+            {
+                throw new IOException("File '" + path + "' already exists.");
+            }
+        }
+        long id = GenerateId(LOCAL_FS_ID_KEY);
+        EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+        if (!file.createNewFile())
+        {
+            throw new IOException("Failed to create local file '" + path + "'.");
+        }
+        return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
     @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
-        return false;
+        File file = new File(path);
+        boolean subDeleted = true;
+        if (file.isDirectory())
+        {
+            if (!recursive)
+            {
+                throw new IOException("Can not delete a directory '" + path + "' with recursive = false.");
+            }
+            else
+            {
+                File[] subs = file.listFiles();
+
+                for (File sub : subs)
+                {
+                    if(!delete(sub.getPath(), true))
+                    {
+                        subDeleted = false;
+                    }
+                }
+            }
+        }
+        /**
+         * Attempt to delete the key, but it does not need to be exist.
+         */
+        EtcdUtil.Instance().delete(getPathKey(path));
+        return subDeleted && new File(path).delete();
     }
 
     @Override
     public boolean exists(String path)
     {
-        return false;
+        return new File(path).exists();
     }
 
     @Override
     public boolean isFile(String path)
     {
-        return false;
+        return new File(path).isFile();
     }
 
     @Override
     public boolean isDirectory(String path)
     {
-        return false;
+        return new File(path).isDirectory();
     }
 }

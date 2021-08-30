@@ -64,7 +64,7 @@ public class S3 implements Storage
     }
 
     @Override
-    public long getId(String path) throws IOException
+    public long getFileId(String path) throws IOException
     {
         return 0;
     }

@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import static io.pixelsdb.pixels.common.utils.Constants.LOCK_PATH_PREFIX;
+
 /**
  * Created at: 8/29/21
  * Author: hank
@@ -34,11 +36,16 @@ public class EtcdAutoIncrement
 
     private EtcdAutoIncrement() { }
 
+    /**
+     * Initialize the id (set init value to '0') by the id key.
+     * This method is idempotent.
+     * @param idKey
+     */
     public static void InitId(String idKey)
     {
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                "/pixels_lock/" + idKey);
+                LOCK_PATH_PREFIX + idKey);
         EtcdMutex writeLock = readWriteLock.writeLock();
         try
         {
@@ -70,7 +77,7 @@ public class EtcdAutoIncrement
         long id = 0;
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                "/pixels_lock/" + idKey);
+                LOCK_PATH_PREFIX + idKey);
         EtcdMutex writeLock = readWriteLock.writeLock();
         try
         {

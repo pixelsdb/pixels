@@ -495,7 +495,7 @@ public class PixelsRecordReaderImpl
             long blockId;
             try
             {
-                blockId = physicalFSReader.getCurrentBlockId();
+                blockId = physicalFSReader.getBlockId();
             }
             catch (IOException e)
             {

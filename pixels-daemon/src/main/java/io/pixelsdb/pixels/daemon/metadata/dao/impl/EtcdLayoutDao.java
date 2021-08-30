@@ -27,7 +27,7 @@ public class EtcdLayoutDao extends LayoutDao
     @Override
     public MetadataProto.Layout getById(long id)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.layoutPrimaryKeyPrefix + id);
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + id);
         if (kv == null)
         {
             return null;
@@ -77,7 +77,7 @@ public class EtcdLayoutDao extends LayoutDao
     public List<MetadataProto.Layout> getByTable(MetadataProto.Table table, int version, MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         List<MetadataProto.Layout> layouts = new ArrayList<>();
-        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdCommon.layoutTableIdKeyPrefix + table.getId());
+        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.layoutTableIdKeyPrefix + table.getId());
         for (KeyValue kv : kvs)
         {
             MetadataProto.Layout layout = null;
@@ -112,18 +112,18 @@ public class EtcdLayoutDao extends LayoutDao
     @Override
     public boolean exists(MetadataProto.Layout layout)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.layoutPrimaryKeyPrefix + layout.getId());
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + layout.getId());
         return kv != null;
     }
 
     @Override
     public boolean insert(MetadataProto.Layout layout)
     {
-        long id = GenerateId(EtcdCommon.layoutIdKey);
+        long id = GenerateId(EtcdDaoCommon.layoutIdKey);
         layout = layout.toBuilder().setId(id).build();
-        etcd.putKeyValue(EtcdCommon.layoutPrimaryKeyPrefix + id,
+        etcd.putKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + id,
                 layout.toByteArray());
-        etcd.putKeyValue(EtcdCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
                 layout.toByteArray());
         return true;
     }
@@ -131,9 +131,9 @@ public class EtcdLayoutDao extends LayoutDao
     @Override
     public boolean update(MetadataProto.Layout layout)
     {
-        etcd.putKeyValue(EtcdCommon.layoutPrimaryKeyPrefix + layout.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + layout.getId(),
                 layout.toByteArray());
-        etcd.putKeyValue(EtcdCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
                 layout.toByteArray());
         return true;
     }

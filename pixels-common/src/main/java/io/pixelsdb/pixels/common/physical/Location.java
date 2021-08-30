@@ -68,6 +68,15 @@ public class Location
     }
 
     /**
+     * Constructor with only hosts, the names will be the same as hosts.
+     * @param hosts
+     */
+    public Location(String[] hosts)
+    {
+        this(hosts, hosts, false);
+    }
+
+    /**
      * Constructor with host, name, offset and length
      */
     public Location(String[] names, String[] hosts)

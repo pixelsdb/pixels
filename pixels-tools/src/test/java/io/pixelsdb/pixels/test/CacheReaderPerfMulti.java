@@ -430,7 +430,7 @@ public class CacheReaderPerfMulti
         for (int i = 0; i < files.size(); i++)
         {
             readers[i] = new CacheReader(cacheReader, columnlets, files.get(i),
-                    storage.getId(files.get(i)), metricQueue);
+                    storage.getFileId(files.get(i)), metricQueue);
             readers[i].start();
 
         }

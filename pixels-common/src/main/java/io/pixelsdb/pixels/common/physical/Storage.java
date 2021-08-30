@@ -19,14 +19,10 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import com.google.common.collect.ImmutableList;
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Created at: 20/08/2021
@@ -83,10 +79,31 @@ public interface Storage
 
     Scheme getScheme();
 
+    /**
+     * Get the statuses of the contents in this path if it is a directory.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     List<Status> listStatus(String path) throws IOException;
 
+    /**
+     * Get the paths of the contents in this path if it is a directory.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     List<String> listPaths(String path) throws IOException;
 
+    /**
+     * Get the status of this path if it is a file.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     Status getStatus(String path) throws IOException;
 
     /**
@@ -96,24 +113,65 @@ public interface Storage
      * file id is the id of this block.
      * @param path
      * @return
-     * @throws IOException
+     * @throws IOException if HDFS file has more than one blocks.
      */
-    long getId(String path) throws IOException;
+    long getFileId(String path) throws IOException;
 
     List<Location> getLocations(String path) throws IOException;
 
     String[] getHosts(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     DataInputStream open(String path) throws IOException;
 
+
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @param replication
+     * @return
+     * @throws IOException if path is a directory.
+     */
     DataOutputStream create(String path, boolean overwrite,
                             int bufferSize, short replication) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param recursive
+     * @return
+     * @throws IOException
+     */
     boolean delete(String path, boolean recursive) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean exists(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean isFile(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean isDirectory(String path) throws IOException;
 }

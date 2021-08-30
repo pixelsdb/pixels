@@ -28,7 +28,7 @@ public class EtcdColumnDao extends ColumnDao
     @Override
     public MetadataProto.Column getById(long id)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.columnPrimaryKeyPrefix + id);
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.columnPrimaryKeyPrefix + id);
         if (kv == null)
         {
             return null;
@@ -47,7 +47,7 @@ public class EtcdColumnDao extends ColumnDao
     @Override
     public List<MetadataProto.Column> getByTable(MetadataProto.Table table)
     {
-        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdCommon.columnTableNameKeyPrefix + table.getId());
+        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.columnTableNameKeyPrefix + table.getId());
         List<MetadataProto.Column> columns = new ArrayList<>();
         for (KeyValue kv : kvs)
         {
@@ -71,7 +71,7 @@ public class EtcdColumnDao extends ColumnDao
     public Order getOrderByTable(MetadataProto.Table table)
     {
         Order columnOrder = new Order();
-        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdCommon.columnTableNameKeyPrefix + table.getId());
+        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.columnTableNameKeyPrefix + table.getId());
         List<String> columns = new ArrayList<>();
         for (KeyValue kv : kvs)
         {
@@ -95,9 +95,9 @@ public class EtcdColumnDao extends ColumnDao
     @Override
     public boolean update(MetadataProto.Column column)
     {
-        etcd.putKeyValue(EtcdCommon.columnPrimaryKeyPrefix + column.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.columnPrimaryKeyPrefix + column.getId(),
                 column.toByteArray());
-        etcd.putKeyValue(EtcdCommon.columnTableNameKeyPrefix + column.getTableId() + column.getName(),
+        etcd.putKeyValue(EtcdDaoCommon.columnTableNameKeyPrefix + column.getTableId() + column.getName(),
                 column.toByteArray());
         return true;
     }
@@ -108,11 +108,11 @@ public class EtcdColumnDao extends ColumnDao
         int n = 0;
         for (MetadataProto.Column column : columns)
         {
-            long id = GenerateId(EtcdCommon.columnIdKey);
+            long id = GenerateId(EtcdDaoCommon.columnIdKey);
             MetadataProto.Column newColumn = column.toBuilder().setId(id).setTableId(table.getId()).build();
-            etcd.putKeyValue(EtcdCommon.columnPrimaryKeyPrefix + newColumn.getId(),
+            etcd.putKeyValue(EtcdDaoCommon.columnPrimaryKeyPrefix + newColumn.getId(),
                     newColumn.toByteArray());
-            etcd.putKeyValue(EtcdCommon.columnTableNameKeyPrefix + newColumn.getTableId() + newColumn.getName(),
+            etcd.putKeyValue(EtcdDaoCommon.columnTableNameKeyPrefix + newColumn.getTableId() + newColumn.getName(),
                     newColumn.toByteArray());
             n++;
         }
@@ -125,9 +125,9 @@ public class EtcdColumnDao extends ColumnDao
         List<MetadataProto.Column> columns = getByTable(table);
         for (MetadataProto.Column column : columns)
         {
-            etcd.delete(EtcdCommon.columnPrimaryKeyPrefix + column.getId());
+            etcd.delete(EtcdDaoCommon.columnPrimaryKeyPrefix + column.getId());
         }
-        etcd.deleteByPrefix(EtcdCommon.columnTableNameKeyPrefix + table.getId());
+        etcd.deleteByPrefix(EtcdDaoCommon.columnTableNameKeyPrefix + table.getId());
         return true;
     }
 }

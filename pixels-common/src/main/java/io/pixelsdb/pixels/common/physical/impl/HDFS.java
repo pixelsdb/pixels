@@ -160,7 +160,7 @@ public class HDFS implements Storage
     }
 
     @Override
-    public long getId(String path) throws IOException
+    public long getFileId(String path) throws IOException
     {
         FSDataInputStream rawReader = fs.open(new Path(path));
         HdfsDataInputStream hdis;

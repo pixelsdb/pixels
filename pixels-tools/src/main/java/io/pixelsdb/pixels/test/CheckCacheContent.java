@@ -77,7 +77,7 @@ public class CheckCacheContent
                 .setCacheFile(cacheFile)
                 .setIndexFile(indexFile)
                 .build();
-        long blockId = storage.getId(path);
+        long blockId = storage.getFileId(path);
         ByteBuffer cacheContent = cacheReader.get(blockId, (short) rgId, (short) colId);
         System.out.println("Cache content length " + cacheContent.capacity());
 

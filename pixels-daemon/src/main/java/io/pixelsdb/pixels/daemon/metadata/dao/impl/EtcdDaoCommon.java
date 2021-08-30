@@ -6,7 +6,7 @@ import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
  * Created at: 2020/5/27
  * Author: hank
  */
-public class EtcdCommon
+public class EtcdDaoCommon
 {
     // prefix + schema id
     public static final String schemaPrimaryKeyPrefix = "pixels_meta_schema_primary_";

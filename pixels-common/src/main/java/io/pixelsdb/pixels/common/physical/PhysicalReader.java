@@ -54,5 +54,19 @@ public interface PhysicalReader
      */
     String getName();
 
-    long getCurrentBlockId() throws IOException;
+    /**
+     * For a file or object in the storage, it can have one or more
+     * blocks. Each block has its unique id. This method returns the
+     * block id of the current block that is been reading.
+     *
+     * For local fs, each file only has one block id, which is also
+     * the file id.
+     *
+     * <p>Note: Storage.getFileId() assumes that each file or object
+     * only has one block. In this case, the file id is the same as
+     * the block id here.</p>
+     * @return
+     * @throws IOException
+     */
+    long getBlockId() throws IOException;
 }

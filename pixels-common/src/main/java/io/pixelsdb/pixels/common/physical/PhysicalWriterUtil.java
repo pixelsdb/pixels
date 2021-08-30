@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSWriter;
+import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalWriter;
 
 import java.io.IOException;
 
@@ -41,9 +42,14 @@ public class PhysicalWriterUtil
         checkArgument(path != null, "path should not be null");
         try
         {
-            if (storage.getScheme().equals(Storage.Scheme.hdfs))
+            switch (storage.getScheme())
             {
+                case hdfs:
                 return new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                case file:
+                    return new PhysicalLocalWriter(storage, path);
+                case s3:
+                    throw new IOException("S3 storage is not supported.");
             }
         } catch (IOException e)
         {
@@ -59,30 +65,16 @@ public class PhysicalWriterUtil
      *
      * @param scheme          name of the scheme
      * @param path            write file path
+     * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
-     * @param blockSize       hdfs block size
      * @return physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
-            Storage.Scheme scheme, String path, short replication, boolean addBlockPadding, long blockSize) throws IOException
+            Storage.Scheme scheme, String path, long blockSize, short replication, boolean addBlockPadding) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-
-        try
-        {
-            if (scheme == Storage.Scheme.hdfs)
-            {
-                return new PhysicalHDFSWriter(StorageFactory.Instance().
-                        getStorage(scheme), path, replication, addBlockPadding, blockSize);
-            }
-        } catch (IOException e)
-        {
-            e.printStackTrace();
-            throw e;
-        }
-
-        return null;
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path, blockSize, replication, addBlockPadding);
     }
 }
