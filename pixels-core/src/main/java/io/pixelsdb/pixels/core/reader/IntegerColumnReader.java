@@ -80,8 +80,12 @@ public class IntegerColumnReader
      *
      * @param input    input buffer
      * @param encoding encoding type
+     * @param offset   starting reading offset of values
      * @param size     number of values to read
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the starting index in the vector
      * @param vector   vector to read into
+     * @param chunkIndex the metadata of the column chunk to read.
      */
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,

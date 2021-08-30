@@ -55,11 +55,11 @@ public interface PhysicalReader
     String getName();
 
     /**
-     * For a file or object in the storage, it can have one or more
+     * For a file or object in the storage, it may have one or more
      * blocks. Each block has its unique id. This method returns the
      * block id of the current block that is been reading.
      *
-     * For local fs, each file only has one block id, which is also
+     * For local fs, each file has only one block id, which is also
      * the file id.
      *
      * <p>Note: Storage.getFileId() assumes that each file or object

@@ -46,7 +46,7 @@ public class PixelsRecordReaderImpl
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
-    private final PhysicalReader physicalFSReader;
+    private final PhysicalReader physicalReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
@@ -95,7 +95,7 @@ public class PixelsRecordReaderImpl
                                   PixelsCacheReader cacheReader,
                                   PixelsFooterCache pixelsFooterCache) throws IOException
     {
-        this.physicalFSReader = physicalReader;
+        this.physicalReader = physicalReader;
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
@@ -108,7 +108,7 @@ public class PixelsRecordReaderImpl
         this.cacheOrder = cacheOrder;
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
-        this.fileName = physicalFSReader.getName();
+        this.fileName = this.physicalReader.getName();
         checkBeforeRead();
     }
 
@@ -410,8 +410,8 @@ public class PixelsRecordReaderImpl
                 byte[] footerBuffer = new byte[(int) footerLength];
                 try
                 {
-                    physicalFSReader.seek(footerOffset);
-                    physicalFSReader.readFully(footerBuffer);
+                    physicalReader.seek(footerOffset);
+                    physicalReader.readFully(footerBuffer);
                     rowGroupFooters[i] =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
                     pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[i]);
@@ -495,7 +495,7 @@ public class PixelsRecordReaderImpl
             long blockId;
             try
             {
-                blockId = physicalFSReader.getBlockId();
+                blockId = physicalReader.getBlockId();
             }
             catch (IOException e)
             {
@@ -694,8 +694,8 @@ public class PixelsRecordReaderImpl
 //                }
 //                else
 //                {
-                    physicalFSReader.seek(offset);
-                    physicalFSReader.readFully(chunkBlockBuffer.array());
+                    physicalReader.seek(offset);
+                    physicalReader.readFully(chunkBlockBuffer.array());
 //                }
                     List<ChunkId> chunkIds = seq.getChunks();
                     int chunkSliceOffset = 0;
