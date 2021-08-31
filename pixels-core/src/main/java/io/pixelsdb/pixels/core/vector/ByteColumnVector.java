@@ -43,6 +43,7 @@ public class ByteColumnVector extends ColumnVector
     {
         super(len);
         vector = new byte[len];
+        memoryUsage += Byte.BYTES * len;
     }
 
     @Override
@@ -163,6 +164,7 @@ public class ByteColumnVector extends ColumnVector
         {
             byte[] oldArray = vector;
             vector = new byte[size];
+            memoryUsage += Byte.BYTES * size;
             length = size;
             if (preserveData)
             {

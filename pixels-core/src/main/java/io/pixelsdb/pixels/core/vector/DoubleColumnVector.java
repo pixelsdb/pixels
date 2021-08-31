@@ -62,6 +62,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         super(len);
         vector = new long[len];
+        memoryUsage += Long.BYTES * len;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
@@ -250,6 +251,7 @@ public class DoubleColumnVector extends ColumnVector
         {
             long[] oldArray = vector;
             vector = new long[size];
+            memoryUsage += Long.BYTES * size;
             length = size;
             if (preserveData)
             {
@@ -268,6 +270,7 @@ public class DoubleColumnVector extends ColumnVector
     public void toDoubleValues()
     {
         this.dValues = new double[writeIndex];
+        memoryUsage += Double.BYTES * writeIndex;
         for (int i = 0; i < writeIndex; i++)
         {
             dValues[i] = Double.longBitsToDouble(vector[i]);

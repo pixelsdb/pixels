@@ -73,6 +73,7 @@ public class TimeColumnVector extends ColumnVector
         super(len);
 
         time = new int[len];
+        memoryUsage += Integer.BYTES * len;
 
         scratchTime = new Time(0);
     }
@@ -443,6 +444,7 @@ public class TimeColumnVector extends ColumnVector
         }
         int[] oldTime = time;
         time = new int[size];
+        memoryUsage += Integer.BYTES * size;
         length = size;
         if (preserveData)
         {

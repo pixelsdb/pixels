@@ -95,4 +95,10 @@ public class PhysicalLocalWriter implements PhysicalWriter
     {
         rawWriter.flush();
     }
+
+    @Override
+    public String getPath()
+    {
+        return path;
+    }
 }

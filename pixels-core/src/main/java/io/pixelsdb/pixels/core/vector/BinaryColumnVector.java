@@ -89,6 +89,7 @@ public class BinaryColumnVector extends ColumnVector
         vector = new byte[size][];
         start = new int[size];
         lens = new int[size];
+        memoryUsage += Integer.BYTES * (size * 2 + 2);
     }
 
     /**
@@ -150,6 +151,7 @@ public class BinaryColumnVector extends ColumnVector
                 bufferSize = DEFAULT_BUFFER_SIZE;
             }
             buffer = new byte[bufferSize];
+            memoryUsage += Byte.BYTES * bufferSize;
             smallBuffer = buffer;
         }
         bufferAllocationCount = 0;
@@ -313,6 +315,7 @@ public class BinaryColumnVector extends ColumnVector
             // buffer/nextFree will be set to a newly allocated array just for the current row.
             // The next row will require another call to increaseBufferSpace() since this new buffer should be used up.
             byte[] newBuffer = new byte[nextElemLength];
+            memoryUsage += Byte.BYTES * nextElemLength;
             ++bufferAllocationCount;
             // If the buffer was pointing to smallBuffer, then nextFree keeps track of the current state
             // of the free index for smallBuffer. We now need to save this value to smallBufferNextFree
@@ -349,6 +352,7 @@ public class BinaryColumnVector extends ColumnVector
                     newLength *= 2;
                 }
                 smallBuffer = new byte[newLength];
+                memoryUsage += Byte.BYTES * newLength;
                 ++bufferAllocationCount;
                 smallBufferNextFree = 0;
                 // Update buffer
@@ -581,6 +585,7 @@ public class BinaryColumnVector extends ColumnVector
             lens = new int[size];
             byte[][] oldVector = vector;
             vector = new byte[size][];
+            memoryUsage += Integer.BYTES * size * 2;
             length = size;
             if (preserveData)
             {

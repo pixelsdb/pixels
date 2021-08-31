@@ -120,11 +120,7 @@ public class PhysicalHDFSWriter
         rawWriter.flush();
     }
 
-    public Storage getStorage()
-    {
-        return hdfs;
-    }
-
+    @Override
     public String getPath()
     {
         return path;
