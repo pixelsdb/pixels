@@ -229,6 +229,14 @@ class PixelsPageSource implements ConnectorPageSource
     @Override
     public long getSystemMemoryUsage()
     {
+        /**
+         * Issue #113:
+         * I am still not sure show the result of this method are used by Presto.
+         * Currently, we return the cumulative memory usage. However this may be
+         * inappropriate.
+         * I tested about ten queries on test_1187, there was no problem, but
+         * TODO: we still need to be careful about this method in the future.
+         */
         if (closed)
         {
             return memoryUsage;
