@@ -41,7 +41,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * pixels
+ * Predicate implementation mainly for Presto.
  *
  * @author guodong
  * @author hank
@@ -59,7 +59,7 @@ public class TupleDomainPixelsPredicate<C>
     }
 
     /**
-     * Check if predicate matches column statistics.
+     * Check if the predicate matches the column statistics.
      * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
      * and vice versa.
      *

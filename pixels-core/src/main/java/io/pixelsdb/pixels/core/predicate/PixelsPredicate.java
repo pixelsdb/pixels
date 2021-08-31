@@ -24,9 +24,10 @@ import io.pixelsdb.pixels.core.stats.ColumnStats;
 import java.util.Map;
 
 /**
- * pixels
+ * The Predicate interface of Pixels, for filtering tuples.
  *
  * @author guodong
+ * @author hank
  */
 public interface PixelsPredicate
 {
@@ -73,11 +74,7 @@ public interface PixelsPredicate
     };
 
     /**
-     * Check if predicate matches column statistics.
-     * Note that on the same column, onlyNull (e.g. 'is null') predicate will match hasNull statistics
-     * and vice versa.
-     *
-     * TODO: pay attention to the correctness of this method.
+     * Check if the predicate matches the column statistics.
      *
      * @param numberOfRows            number of rows in the corresponding horizontal data unit
      *                                (pixel, row group, file, etc.) where the statistics come from.
@@ -87,19 +84,11 @@ public interface PixelsPredicate
     boolean matches(long numberOfRows, Map<Integer, ColumnStats> statisticsByColumnIndex);
 
     /**
-     * Added in Issue #103.
-     * This method relies on TupleDomain.isNone() in presto spi,
-     * which is mysterious.
-     * TODO: pay attention to the correctness of this method.
      * @return true if this predicate will never match any values.
      */
     boolean matchesNone();
 
     /**
-     * Added in Issue #103.
-     * This method relies on TupleDomain.isNone() in presto spi,
-     * which is mysterious.
-     * TODO: pay attention to the correctness of this method.
      * @return true if this predicate will match any values.
      */
     boolean matchesAll();

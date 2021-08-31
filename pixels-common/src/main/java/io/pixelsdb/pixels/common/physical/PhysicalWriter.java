@@ -65,4 +65,6 @@ public interface PhysicalWriter
      * Flush writer.
      */
     void flush() throws IOException;
+
+    String getPath();
 }
