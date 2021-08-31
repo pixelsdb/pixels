@@ -28,6 +28,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PhysicalReaderUtil
 {
@@ -39,27 +40,26 @@ public class PhysicalReaderUtil
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
-        PhysicalReader fsReader = null;
+        PhysicalReader reader = null;
         try
         {
             switch (storage.getScheme())
             {
                 case hdfs:
-                    fsReader = new PhysicalHDFSReader(storage, path);
+                    reader = new PhysicalHDFSReader(storage, path);
                     break;
                 case file:
-                    new PhysicalLocalReader(storage, path);
+                    reader = new PhysicalLocalReader(storage, path);
                     break;
                 case s3:
                     throw new IOException("S3 storage is not supported");
             }
         } catch (IOException e)
         {
-            e.printStackTrace();
             throw e;
         }
 
-        return fsReader;
+        return reader;
     }
 
     public static PhysicalReader newPhysicalReader(Storage.Scheme scheme, String path) throws IOException

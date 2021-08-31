@@ -28,6 +28,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PhysicalWriterUtil
 {
@@ -40,24 +41,24 @@ public class PhysicalWriterUtil
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
+        PhysicalWriter writer = null;
         try
         {
             switch (storage.getScheme())
             {
                 case hdfs:
-                return new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                    writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
                 case file:
-                    return new PhysicalLocalWriter(storage, path);
+                    writer = new PhysicalLocalWriter(storage, path);
                 case s3:
                     throw new IOException("S3 storage is not supported.");
             }
         } catch (IOException e)
         {
-            e.printStackTrace();
             throw e;
         }
 
-        return null;
+        return writer;
     }
 
     /**

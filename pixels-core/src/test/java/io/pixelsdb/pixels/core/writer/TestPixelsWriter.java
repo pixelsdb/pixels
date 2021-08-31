@@ -60,7 +60,7 @@ public class TestPixelsWriter
         // schema: struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>
         try
         {
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            Storage storage = StorageFactory.Instance().getStorage("file");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
             LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
@@ -232,7 +232,7 @@ public class TestPixelsWriter
 
         try
         {
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            Storage storage = StorageFactory.Instance().getStorage("file");
             String path = TestParams.filePath;
             pixelsReader = PixelsReaderImpl.newBuilder()
                     .setStorage(storage)

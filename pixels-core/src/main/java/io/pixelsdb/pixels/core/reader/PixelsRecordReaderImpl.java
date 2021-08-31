@@ -318,11 +318,11 @@ public class PixelsRecordReaderImpl
                      * 1. matches() is fixed in this issue, but it is not sure if there is
                      * any further problems with it, as the related domain APIs in presto spi is mysterious.
                      *
-                     * 2. Whenever predicate does not match any column statistics, we should be return
-                     * false. Instead, we must make sure that includedRGs will be filled with false values.
+                     * 2. Whenever predicate does not match any column statistics, we should not return
+                     * false. Instead, we must make sure that includedRGs are filled in by false values.
                      * By this way, the subsequent methods such as read() an readBatch() can skip all row
-                     * groups in this file without additional overheads, as targetRGs would be empty and
-                     * targetRGNum would be 0.
+                     * groups of this record reader without additional overheads, as targetRGs would be
+                     * empty (has no valid element) and targetRGNum would be 0.
                      */
                     //return false;
                     for (int i = 0; i < RGLen; i++)
