@@ -40,6 +40,7 @@ public abstract class ColumnVector implements AutoCloseable
 {
     int length;
     int writeIndex = 0;
+    long memoryUsage = 0L;
 
     /**
      * The current kinds of column vectors.
@@ -99,6 +100,7 @@ public abstract class ColumnVector implements AutoCloseable
     {
         this.length = len;
         isNull = new boolean[len];
+        memoryUsage += len + Integer.BYTES*3 + 4;
         noNulls = true;
         isRepeating = false;
         preFlattenNoNulls = true;
@@ -158,6 +160,21 @@ public abstract class ColumnVector implements AutoCloseable
     public int getLength()
     {
         return length;
+    }
+
+    /**
+     * Get the approximate (may be slightly lower than actual)
+     * cumulative memory usage, which is more meaningful for GC
+     * performance tuning.
+     *
+     * <br/>
+     * <b>NOTE:</b> Only the heap memory allocated internally are
+     * counted. The memory usage of the external parameters are not included.
+     * @return
+     */
+    public long getMemoryUsage()
+    {
+        return memoryUsage;
     }
 
     /**
@@ -311,6 +328,7 @@ public abstract class ColumnVector implements AutoCloseable
         {
             boolean[] oldArray = isNull;
             isNull = new boolean[size];
+            memoryUsage += size;
             if (preserveData && !noNulls)
             {
                 if (isRepeating)
@@ -333,6 +351,7 @@ public abstract class ColumnVector implements AutoCloseable
      */
     public abstract void stringifyValue(StringBuilder buffer,
                                         int row);
+
     @Override
     public void close()
     {

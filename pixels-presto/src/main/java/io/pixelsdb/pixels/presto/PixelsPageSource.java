@@ -69,9 +69,9 @@ class PixelsPageSource implements ConnectorPageSource
     private PixelsRecordReader recordReader;
     private PixelsCacheReader cacheReader;
     private PixelsFooterCache footerCache;
-    private long sizeOfData = 0L;
     private long completedBytes = 0L;
     private long readTimeNanos = 0L;
+    private long memoryUsage = 0L;
     private PixelsReaderOption option;
     private int numColumnToRead;
     private int batchId;
@@ -227,6 +227,16 @@ class PixelsPageSource implements ConnectorPageSource
     }
 
     @Override
+    public long getSystemMemoryUsage()
+    {
+        if (closed)
+        {
+            return memoryUsage;
+        }
+        return this.memoryUsage + recordReader.getMemoryUsage();
+    }
+
+    @Override
     public boolean isFinished()
     {
         return this.closed;
@@ -269,7 +279,6 @@ class PixelsPageSource implements ConnectorPageSource
             Type type = columns.get(fieldId).getColumnType();
             blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(fieldId, type, batchSize));
         }
-        sizeOfData += batchSize;
 
         /**
          * Issue #105:
@@ -286,12 +295,6 @@ class PixelsPageSource implements ConnectorPageSource
     }
 
     @Override
-    public long getSystemMemoryUsage()
-    {
-        return sizeOfData;
-    }
-
-    @Override
     public void close()
     {
         try
@@ -302,6 +305,7 @@ class PixelsPageSource implements ConnectorPageSource
                 {
                     this.completedBytes += recordReader.getCompletedBytes();
                     this.readTimeNanos += recordReader.getReadTimeNanos();
+                    this.memoryUsage += recordReader.getMemoryUsage();
                 }
                 pixelsReader.close();
             }

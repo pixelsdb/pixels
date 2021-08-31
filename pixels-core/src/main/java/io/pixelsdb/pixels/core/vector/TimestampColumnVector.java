@@ -73,6 +73,7 @@ public class TimestampColumnVector extends ColumnVector
 
         time = new long[len];
         nanos = new long[len];
+        memoryUsage += Long.BYTES * len * 2;
 
         scratchTimestamp = new Timestamp(0);
     }
@@ -479,6 +480,7 @@ public class TimestampColumnVector extends ColumnVector
         long[] oldNanos = nanos;
         time = new long[size];
         nanos = new long[size];
+        memoryUsage += Long.BYTES * size * 2;
         length = size;
         if (preserveData)
         {

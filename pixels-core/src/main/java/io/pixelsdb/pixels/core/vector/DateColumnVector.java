@@ -75,6 +75,7 @@ public class DateColumnVector extends ColumnVector
         super(len);
 
         time = new int[len];
+        memoryUsage += Integer.BYTES * len;
 
         scratchDate = new Date(0);
     }
@@ -445,6 +446,7 @@ public class DateColumnVector extends ColumnVector
         }
         int[] oldTime = time;
         time = new int[size];
+        memoryUsage += Integer.BYTES * size;
         length = size;
         if (preserveData)
         {

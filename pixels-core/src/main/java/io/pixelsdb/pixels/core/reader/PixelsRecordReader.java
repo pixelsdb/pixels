@@ -97,6 +97,14 @@ public interface PixelsRecordReader
     long getReadTimeNanos();
 
     /**
+     * Get the approximate (may be slightly lower than actual)
+     * <b>cumulative</b> memory usage, which is more meaningful for GC
+     * performance tuning.
+     * @return
+     */
+    long getMemoryUsage();
+
+    /**
      * Cleanup and release resources
      *
      * @throws java.io.IOException

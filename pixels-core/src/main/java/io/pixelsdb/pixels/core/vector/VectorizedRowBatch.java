@@ -41,6 +41,8 @@ public class VectorizedRowBatch implements AutoCloseable
     private int dataColumnCount;
     private int partitionColumnCount;
 
+    private long memoryUsage = 0L;
+
     /*
      * If no filtering has been applied yet, selectedInUse is false,
      * meaning that all rows qualify. If it is true, then the selected[] array
@@ -85,6 +87,9 @@ public class VectorizedRowBatch implements AutoCloseable
         selectedInUse = false;
         this.cols = new ColumnVector[numCols];
         projectedColumns = new int[numCols];
+
+        memoryUsage += (long) Integer.BYTES * (size + numCols) +
+        Integer.BYTES * 6 + Long.BYTES + 2;
 
         // Initially all columns are projected and in the same order
         projectionSize = numCols;
@@ -196,6 +201,7 @@ public class VectorizedRowBatch implements AutoCloseable
                 }
             }
         }
+        memoryUsage += b.length();
         return b.toString();
     }
 
@@ -235,6 +241,28 @@ public class VectorizedRowBatch implements AutoCloseable
                 cols[i].ensureSize(rows, false);
             }
         }
+    }
+
+    /**
+     * Get the approximate (may be slightly lower than actual)
+     * cumulative memory usage, which is more meaningful for GC
+     * performance tuning.
+     *
+     * <br/>
+     * <b>NOTE:</b> The memory usage of the column vectors are included.
+     * @return
+     */
+    public long getMemoryUsage()
+    {
+        long colsUsage = 0;
+        for (ColumnVector col : this.cols)
+        {
+            if (col != null)
+            {
+                colsUsage += col.getMemoryUsage();
+            }
+        }
+        return memoryUsage + colsUsage;
     }
 
     @Override

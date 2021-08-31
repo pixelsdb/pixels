@@ -57,6 +57,7 @@ public class LongColumnVector extends ColumnVector
     {
         super(len);
         vector = new long[len];
+        memoryUsage += Long.BYTES * len;
     }
 
     @Override
@@ -247,6 +248,7 @@ public class LongColumnVector extends ColumnVector
         {
             long[] oldArray = vector;
             vector = new long[size];
+            memoryUsage += Long.BYTES * size;
             length = size;
             if (preserveData)
             {
