@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.presto;
 
 import com.alibaba.fastjson.JSON;
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -42,6 +42,7 @@ import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
@@ -185,7 +186,7 @@ public class PixelsSplitManager
                 if(keyValue != null)
                 {
                     // 1. get version
-                    cacheVersion = keyValue.getValue().toStringUtf8();
+                    cacheVersion = keyValue.getValue().toString(StandardCharsets.UTF_8);
                     logger.debug("cache version: " + cacheVersion);
                     // 2. get files of each node
                     List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_LOCATION_LITERAL + cacheVersion);
@@ -194,8 +195,8 @@ public class PixelsSplitManager
                         Map<String, String> fileToNodeMap = new HashMap<>();
                         for (KeyValue kv : nodeFiles)
                         {
-                            String node = kv.getKey().toStringUtf8().split("_")[2];
-                            String[] files = kv.getValue().toStringUtf8().split(";");
+                            String node = kv.getKey().toString(StandardCharsets.UTF_8).split("_")[2];
+                            String[] files = kv.getValue().toString(StandardCharsets.UTF_8).split(";");
                             for(String file : files)
                             {
                                 fileToNodeMap.put(file, node);

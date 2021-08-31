@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.presto;
 
 import io.airlift.units.Duration;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.physical.impl.HDFS;
@@ -113,7 +112,7 @@ public class TestHdfs {
 
     // see the first datanodeInfo of one locatedBlock
     @Test
-    public void testDistributeByFirst() throws FSException, IOException
+    public void testDistributeByFirst() throws IOException
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
         String hdfsDir = "hdfs://dbiir01:9000/pixels/pixels/test_105/v_2_order";

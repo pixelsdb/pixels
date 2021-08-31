@@ -214,13 +214,13 @@ public class PhysicalHDFSReader
     }
 
     /**
-     * if this is not
+     * Block id of the current block that is been reading.
      *
      * @return
      * @throws IOException
      */
     @Override
-    public long getCurrentBlockId() throws IOException
+    public long getBlockId() throws IOException
     {
         if (this.blocks != null)
         {

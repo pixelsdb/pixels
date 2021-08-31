@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSWriter;
+import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalWriter;
 
 import java.io.IOException;
 
@@ -27,6 +28,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
+ * @author hank
  */
 public class PhysicalWriterUtil
 {
@@ -39,19 +41,24 @@ public class PhysicalWriterUtil
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
+        PhysicalWriter writer = null;
         try
         {
-            if (storage.getScheme().equalsIgnoreCase("hdfs"))
+            switch (storage.getScheme())
             {
-                return new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                case hdfs:
+                    writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                case file:
+                    writer = new PhysicalLocalWriter(storage, path);
+                case s3:
+                    throw new IOException("S3 storage is not supported.");
             }
         } catch (IOException e)
         {
-            e.printStackTrace();
             throw e;
         }
 
-        return null;
+        return writer;
     }
 
     /**
@@ -59,30 +66,16 @@ public class PhysicalWriterUtil
      *
      * @param scheme          name of the scheme
      * @param path            write file path
+     * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
-     * @param blockSize       hdfs block size
      * @return physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
-            String scheme, String path, short replication, boolean addBlockPadding, long blockSize) throws IOException
+            Storage.Scheme scheme, String path, long blockSize, short replication, boolean addBlockPadding) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-
-        try
-        {
-            if (scheme.equalsIgnoreCase("hdfs"))
-            {
-                return new PhysicalHDFSWriter(StorageFactory.Instance().
-                        getStorage(scheme), path, replication, addBlockPadding, blockSize);
-            }
-        } catch (IOException e)
-        {
-            e.printStackTrace();
-            throw e;
-        }
-
-        return null;
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path, blockSize, replication, addBlockPadding);
     }
 }

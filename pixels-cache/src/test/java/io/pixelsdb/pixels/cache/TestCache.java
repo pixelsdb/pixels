@@ -17,14 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.presto;
+package io.pixelsdb.pixels.cache;
 
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -50,7 +51,7 @@ public class TestCache
         if(keyValue != null)
         {
             // 1. get version
-            cacheVersion = keyValue.getValue().toStringUtf8();
+            cacheVersion = keyValue.getValue().toString(StandardCharsets.UTF_8);
             System.out.println("cache_version: " + cacheVersion);
             // 2. get files of each node
             List<KeyValue> nodeFiles = etcdUtil.getKeyValuesByPrefix("location_" + cacheVersion);
@@ -58,8 +59,8 @@ public class TestCache
             {
                 for (KeyValue kv : nodeFiles)
                 {
-                    String node = kv.getKey().toStringUtf8().split("_")[2];
-                    String[] files = kv.getValue().toStringUtf8().split(";");
+                    String node = kv.getKey().toString(StandardCharsets.UTF_8).split("_")[2];
+                    String[] files = kv.getValue().toString(StandardCharsets.UTF_8).split(";");
                     for(String file : files)
                     {
                         System.out.println(file + ", " + node);

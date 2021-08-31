@@ -36,7 +36,7 @@ import java.util.Map;
 public class StorageFactory
 {
     private Logger logger = LogManager.getLogger(StorageFactory.class);
-    private Map<String, Storage> storageImpls = new HashMap<>();
+    private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
 
     private StorageFactory() { }
 
@@ -54,12 +54,25 @@ public class StorageFactory
     public synchronized void reload() throws IOException
     {
         this.storageImpls.clear();
-        storageImpls.put("hdfs", new HDFS());
-        storageImpls.put("local", new LocalFS());
-        storageImpls.put("s3", new S3());
+        storageImpls.put(Storage.Scheme.hdfs, new HDFS());
+        storageImpls.put(Storage.Scheme.file, new LocalFS());
+        storageImpls.put(Storage.Scheme.s3, new S3());
     }
 
     public synchronized Storage getStorage(String scheme) throws IOException
+    {
+        try
+        {
+            // 'synchronized' in Java is reentrant, it is fine the call the other getStorage().
+            return getStorage(Storage.Scheme.from(scheme));
+        }
+        catch (RuntimeException re)
+        {
+            throw new IOException("Invalid storage scheme: " + scheme, re);
+        }
+    }
+
+    public synchronized Storage getStorage(Storage.Scheme scheme) throws IOException
     {
         if (storageImpls.containsKey(scheme))
         {
@@ -67,15 +80,15 @@ public class StorageFactory
         }
 
         Storage storage = null;
-        if (scheme.equalsIgnoreCase("hdfs"))
+        if (scheme == Storage.Scheme.hdfs)
         {
             storage = new HDFS();
         }
-        else if (scheme.equalsIgnoreCase("s3"))
+        else if (scheme == Storage.Scheme.s3)
         {
             storage = new S3();
         }
-        else if (scheme.equalsIgnoreCase("file"))
+        else if (scheme == Storage.Scheme.file)
         {
             storage = new LocalFS();
         }

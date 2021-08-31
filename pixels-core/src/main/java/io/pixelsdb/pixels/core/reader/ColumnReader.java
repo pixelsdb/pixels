@@ -83,7 +83,10 @@ public abstract class ColumnReader implements Closeable
      * @param encoding encoding type
      * @param offset   starting reading offset of values
      * @param size     number of values to read
-     * @param vector   vector to read into
+     * @param pixelStride the stride (number of rows) in a pixels.
+     * @param vectorIndex the index from where we start reading values into the vector
+     * @param vector   vector to read values into
+     * @param chunkIndex the metadata of the column chunk to read.
      * @throws java.io.IOException
      */
     public abstract void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,

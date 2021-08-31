@@ -30,12 +30,80 @@ import java.util.List;
  */
 public interface Storage
 {
-    String getScheme();
+    /**
+     * If we want to add more storage schemes here, modify this enum.
+     */
+    enum Scheme
+    {
+        hdfs, // HDFS
+        file, // local fs
+        s3; // Amazon S3
 
+        /**
+         * Case insensitive parsing from String to enum value.
+         * @param value
+         * @return
+         */
+        public static Scheme from(String value)
+        {
+            return valueOf(value.toLowerCase());
+        }
+
+        /**
+         * Whether the value is a valid storage scheme.
+         * @param value
+         * @return
+         */
+        public static boolean isValid(String value)
+        {
+            for (Scheme scheme : values())
+            {
+                if (scheme.equals(value))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public boolean equals(String other)
+        {
+            return this.toString().equalsIgnoreCase(other);
+        }
+
+        public boolean equals(Scheme other)
+        {
+            return this == other;
+        }
+    }
+
+    Scheme getScheme();
+
+    /**
+     * Get the statuses of the contents in this path if it is a directory.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     List<Status> listStatus(String path) throws IOException;
 
+    /**
+     * Get the paths of the contents in this path if it is a directory.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     List<String> listPaths(String path) throws IOException;
 
+    /**
+     * Get the status of this path if it is a file.
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     Status getStatus(String path) throws IOException;
 
     /**
@@ -45,24 +113,65 @@ public interface Storage
      * file id is the id of this block.
      * @param path
      * @return
-     * @throws IOException
+     * @throws IOException if HDFS file has more than one blocks.
      */
-    long getId(String path) throws IOException;
+    long getFileId(String path) throws IOException;
 
     List<Location> getLocations(String path) throws IOException;
 
     String[] getHosts(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     DataInputStream open(String path) throws IOException;
 
+
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @param replication
+     * @return
+     * @throws IOException if path is a directory.
+     */
     DataOutputStream create(String path, boolean overwrite,
                             int bufferSize, short replication) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param recursive
+     * @return
+     * @throws IOException
+     */
     boolean delete(String path, boolean recursive) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean exists(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean isFile(String path) throws IOException;
 
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     boolean isDirectory(String path) throws IOException;
 }

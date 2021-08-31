@@ -40,9 +40,9 @@ public class S3 implements Storage
     }
 
     @Override
-    public String getScheme()
+    public Scheme getScheme()
     {
-        return "s3";
+        return Scheme.s3;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class S3 implements Storage
     }
 
     @Override
-    public long getId(String path) throws IOException
+    public long getFileId(String path) throws IOException
     {
         return 0;
     }

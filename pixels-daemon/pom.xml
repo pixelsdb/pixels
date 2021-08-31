@@ -36,11 +36,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <optional>true</optional>
         </dependency>
+        -->
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
@@ -60,9 +62,10 @@
         </dependency>
 
         <dependency>
-            <groupId>com.coreos</groupId>
+            <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
             <optional>true</optional>
+            <!--
             <exclusions>
                 <exclusion>
                     <groupId>io.netty</groupId>
@@ -73,6 +76,7 @@
                     <artifactId>netty-handler-proxy</artifactId>
                 </exclusion>
             </exclusions>
+            -->
         </dependency>
 
         <!-- hdfs -->

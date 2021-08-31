@@ -64,7 +64,7 @@
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
-        <dep.netty.version>4.1.25.Final</dep.netty.version>
+        <dep.netty.version>4.1.42.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
         <dep.guava.version>21.0</dep.guava.version>
         <dep.protobuf.version>3.6.1</dep.protobuf.version>
@@ -75,12 +75,12 @@
         <dep.google.jrs305.version>3.0.0</dep.google.jrs305.version>
         <dep.javax.inject.version>1</dep.javax.inject.version>
         <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
-        <dep.jetcd.version>0.0.2</dep.jetcd.version>
+        <dep.jetcd.version>0.5.0</dep.jetcd.version>
         <dep.prometheus.client.version>0.2.0</dep.prometheus.client.version>
         <dep.argparse4j.version>0.7.0</dep.argparse4j.version>
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
-        <dep.grpc.version>1.9.1</dep.grpc.version>
+        <dep.grpc.version>1.27.1</dep.grpc.version>
         <dep.log4j.version>2.11.1</dep.log4j.version>
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
@@ -130,7 +130,7 @@
 
             <!-- jetcd -->
             <dependency>
-                <groupId>com.coreos</groupId>
+                <groupId>io.etcd</groupId>
                 <artifactId>jetcd-core</artifactId>
                 <version>${dep.jetcd.version}</version>
             </dependency>

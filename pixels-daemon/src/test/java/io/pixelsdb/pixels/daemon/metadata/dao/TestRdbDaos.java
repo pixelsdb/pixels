@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class TestDaos
+public class TestRdbDaos
 {
     @Test
     public void testSchema ()

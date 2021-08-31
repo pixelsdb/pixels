@@ -46,7 +46,7 @@ public class PixelsRecordReaderImpl
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
-    private final PhysicalReader physicalFSReader;
+    private final PhysicalReader physicalReader;
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
@@ -95,7 +95,7 @@ public class PixelsRecordReaderImpl
                                   PixelsCacheReader cacheReader,
                                   PixelsFooterCache pixelsFooterCache) throws IOException
     {
-        this.physicalFSReader = physicalReader;
+        this.physicalReader = physicalReader;
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
@@ -108,7 +108,7 @@ public class PixelsRecordReaderImpl
         this.cacheOrder = cacheOrder;
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
-        this.fileName = physicalFSReader.getName();
+        this.fileName = this.physicalReader.getName();
         checkBeforeRead();
     }
 
@@ -318,11 +318,11 @@ public class PixelsRecordReaderImpl
                      * 1. matches() is fixed in this issue, but it is not sure if there is
                      * any further problems with it, as the related domain APIs in presto spi is mysterious.
                      *
-                     * 2. Whenever predicate does not match any column statistics, we should be return
-                     * false. Instead, we must make sure that includedRGs will be filled with false values.
+                     * 2. Whenever predicate does not match any column statistics, we should not return
+                     * false. Instead, we must make sure that includedRGs are filled in by false values.
                      * By this way, the subsequent methods such as read() an readBatch() can skip all row
-                     * groups in this file without additional overheads, as targetRGs would be empty and
-                     * targetRGNum would be 0.
+                     * groups of this record reader without additional overheads, as targetRGs would be
+                     * empty (has no valid element) and targetRGNum would be 0.
                      */
                     //return false;
                     for (int i = 0; i < RGLen; i++)
@@ -410,8 +410,8 @@ public class PixelsRecordReaderImpl
                 byte[] footerBuffer = new byte[(int) footerLength];
                 try
                 {
-                    physicalFSReader.seek(footerOffset);
-                    physicalFSReader.readFully(footerBuffer);
+                    physicalReader.seek(footerOffset);
+                    physicalReader.readFully(footerBuffer);
                     rowGroupFooters[i] =
                             PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
                     pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[i]);
@@ -495,7 +495,7 @@ public class PixelsRecordReaderImpl
             long blockId;
             try
             {
-                blockId = physicalFSReader.getCurrentBlockId();
+                blockId = physicalReader.getBlockId();
             }
             catch (IOException e)
             {
@@ -694,8 +694,8 @@ public class PixelsRecordReaderImpl
 //                }
 //                else
 //                {
-                    physicalFSReader.seek(offset);
-                    physicalFSReader.readFully(chunkBlockBuffer.array());
+                    physicalReader.seek(offset);
+                    physicalReader.readFully(chunkBlockBuffer.array());
 //                }
                     List<ChunkId> chunkIds = seq.getChunks();
                     int chunkSliceOffset = 0;

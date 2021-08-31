@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.test;
 
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
-import io.pixelsdb.pixels.common.exception.FSException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -410,7 +409,7 @@ public class CacheReadStat
     }
 
     private List<StatisticMetric> cacheRead(String id, String[] columnlets, List<String> files)
-            throws IOException, InterruptedException, FSException
+            throws IOException, InterruptedException
     {
         System.out.println("Cache reading workload " + id);
         // clear cache
@@ -439,7 +438,7 @@ public class CacheReadStat
         for (String path : files)
         {
             System.out.println("Cache reading file " + path.toString());
-            long blockId = storage.getId(path);
+            long blockId = storage.getFileId(path);
             long readStartNano = System.nanoTime();
             for (ColumnletId columnletId : columnletIds)
             {

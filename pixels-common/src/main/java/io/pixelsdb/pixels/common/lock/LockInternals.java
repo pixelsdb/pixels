@@ -19,19 +19,18 @@
  */
 package io.pixelsdb.pixels.common.lock;
 
-import com.coreos.jetcd.Client;
-import com.coreos.jetcd.Lease;
-import com.coreos.jetcd.Watch;
-import com.coreos.jetcd.data.ByteSequence;
-import com.coreos.jetcd.data.KeyValue;
-import com.coreos.jetcd.kv.PutResponse;
-import com.coreos.jetcd.options.GetOption;
-import com.coreos.jetcd.options.PutOption;
-import com.coreos.jetcd.watch.WatchEvent;
-import com.coreos.jetcd.watch.WatchResponse;
+import io.etcd.jetcd.*;
+import io.etcd.jetcd.kv.PutResponse;
+import io.etcd.jetcd.options.GetOption;
+import io.etcd.jetcd.options.PutOption;
+import io.etcd.jetcd.options.WatchOption;
+import io.etcd.jetcd.watch.WatchEvent;
 import org.apache.curator.utils.PathUtils;
 import org.apache.curator.utils.ZKPaths;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,15 +40,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author: tao
+ * @author hank
  * @date: Create in 2018-10-27 18:31
  **/
 public class LockInternals
 {
+    private static Logger logger = LogManager.getLogger(LockInternals.class);
 
     private final String path;
     private final Client client;
     private final String basePath;
     private final String lockName;
+    private boolean verbose = false;
     private Long leaseId = 0L;
     private static AtomicInteger count = new AtomicInteger(0);
     private volatile Map<String, Long> pathToVersion = new HashMap<>();
@@ -67,18 +69,30 @@ public class LockInternals
         }
         catch (InterruptedException | ExecutionException | TimeoutException e1)
         {
-            System.out.println("[error]: create lease failed:" + e1);
+            logger.error("[create-lease-error]: " + e1);
             return;
         }
         ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
         service.scheduleAtFixedRate(new KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
     }
 
-    String attemptLock(long time, TimeUnit unit) throws Exception
+    LockInternals verbose(boolean verbose)
+    {
+        this.verbose = verbose;
+        return this;
+    }
+
+    private void DEBUG(String msg)
+    {
+        if (verbose)
+        {
+            logger.debug(msg);
+        }
+    }
+
+    String attemptLock(long timeout, TimeUnit unit) throws Exception
     {
         // startMillis, millisToWait maybe useful later, refer 'InterProcessReadWriteLock' in 'org.apache.curator'
-        long startMillis = System.currentTimeMillis();
-        Long millisToWait = unit != null ? unit.toMillis(time) : null;
         String ourPath = null;
         boolean hasTheLock = false;
         boolean isDone = false;
@@ -87,7 +101,7 @@ public class LockInternals
         {
             isDone = true;
             ourPath = this.createsTheLock(this.client, this.path);
-            hasTheLock = this.internalLockLoop(ourPath);
+            hasTheLock = this.internalLockLoop(ourPath, timeout, unit);
         }
         return hasTheLock ? ourPath : null;
     }
@@ -110,36 +124,36 @@ public class LockInternals
         try
         {
             PutResponse putResponse = client.getKVClient()
-                    .put(ByteSequence.fromString(ourPath),
-                            ByteSequence.fromString(""),
+                    .put(ByteSequence.from(ourPath, StandardCharsets.UTF_8),
+                            ByteSequence.from("", StandardCharsets.UTF_8),
                             PutOption.newBuilder().withLeaseId(this.leaseId).build())
                     .get(10, TimeUnit.SECONDS);
 
             long revisionOfMyself = putResponse.getHeader().getRevision();
             pathToVersion.put(ourPath, revisionOfMyself);
-            System.out.println("[createsTheLock]: " + ourPath + ": " + revisionOfMyself);
+            DEBUG("[create-lock-key-success]: " + ourPath + ": " + revisionOfMyself);
         }
         catch (InterruptedException | ExecutionException | TimeoutException e1)
         {
-            System.out.println("[error]: lock operation failed:" + e1);
+            logger.error("[create-lock-key-error]: " + e1);
         }
         return ourPath;
     }
 
-    private synchronized boolean internalLockLoop(String ourPath) throws Exception
+    private synchronized boolean internalLockLoop(String ourPath, long timeout, TimeUnit unit) throws Exception
     {
         boolean haveTheLock = false;
         boolean doDelete = false;
         try
         {
-            while (!haveTheLock)
+            while (true)
             {
                 List<KeyValue> children = this.getSortedChildren();
 
                 long revisionOfMyself = this.pathToVersion.get(ourPath);
                 if (revisionOfMyself == children.get(0).getCreateRevision())
                 {
-                    System.out.println("[lock]: lock successfully. [revision]:" + revisionOfMyself + ", " + ourPath);
+                    DEBUG("[lock-success]: " + ourPath + "(" + revisionOfMyself + ")");
                     haveTheLock = true;
                     break;
                 }
@@ -160,7 +174,7 @@ public class LockInternals
                         }
                         else
                         {
-                            String beforeKey = kv.getKey().toStringUtf8();
+                            String beforeKey = kv.getKey().toString(StandardCharsets.UTF_8);
                             if (beforeKey.contains("_WRIT_"))
                             {
                                 preIndex = index;
@@ -172,68 +186,87 @@ public class LockInternals
                     if (isRead)
                     {
                         haveTheLock = true;
-                        System.out.println("[Share lock]: " + ourPath + ", " + revisionOfMyself);
+                        DEBUG("[read-lock-success]: " + ourPath + "(" + revisionOfMyself + ") [read-only]");
                         break;
                     }
                     else
                     {
                         // listen last 'WRIT'
                         ByteSequence preKeyBS = children.get(preIndex).getKey();
-                        Watch.Watcher watcher = client.getWatchClient().watch(preKeyBS);
-                        WatchResponse res = null;
+                        CountDownLatch latch = new CountDownLatch(1);
+                        Watch.Watcher watcher = client.getWatchClient().watch(preKeyBS, WatchOption.DEFAULT, watchResponse ->
+                        {
+                            for (WatchEvent event : watchResponse.getEvents())
+                            {
+                                if (event.getEventType() == WatchEvent.EventType.DELETE)
+                                {
+                                    // listen to the DELETE even on the last WRIT.
+                                    latch.countDown();
+                                    break;
+                                }
+                            }
+                        });
 
                         try
                         {
-                            System.out.println("[lock-read]: waiting: " + ourPath + ", " + revisionOfMyself + ", watch the lock: " + preKeyBS.toStringUtf8());
-                            res = watcher.listen();
+                            DEBUG("[read-lock-wait]: " + ourPath + "(" + revisionOfMyself +
+                                    "), [wait for]: " + preKeyBS.toString(StandardCharsets.UTF_8));
+                            if (latch.await(timeout, unit))
+                            {
+                                DEBUG("[read-lock-success]: " + ourPath + "(" + revisionOfMyself +
+                                        ") [read-write]");
+                                haveTheLock = true;
+                            }
+                            else
+                            {
+                                DEBUG("[read-lock-timeout]: " + ourPath + "(" + revisionOfMyself +
+                                        ") [read-write]");
+                                haveTheLock = false;
+                            }
+                            if (watcher != null)
+                            {
+                                // close() to avoid leaving unneeded watchers which is a type of resource leak
+                                watcher.close();
+                            }
+                            break;
                         }
                         catch (InterruptedException e)
                         {
-                            System.out.println("[error]: failed to listen key.");
-                        }
-
-                        List<WatchEvent> eventlist = res.getEvents();
-                        for (WatchEvent event : eventlist)
-                        {
-                            if (event.getEventType().toString().equals("DELETE"))
-                            {
-                                System.out.println("[lock-read]: lock successfully. [revision]:" + revisionOfMyself + "," + ourPath);
-                                if (watcher != null)
-                                {
-                                    System.out.println(watcher.hashCode() + " close" + "," + ourPath);
-                                    // close() to avoid leaving unneeded watchers which is a type of resource leak
-                                    watcher.close();
-                                }
-                                haveTheLock = true;
-                                break;
-                            }
+                            logger.error("[read-lock-error]: failed to listen key.");
                         }
                     }
                 }
                 else
                 {
                     // current is 'WRIT'
-                    System.out.println("[lock-write]: keep waiting." + ourPath + ", " + revisionOfMyself);
-                    // wait all the key before to be deleted
-                    while (true)
+                    DEBUG("[write-lock-wait]: " + ourPath + "(" + revisionOfMyself +")");
+                    long startMillis = System.currentTimeMillis();
+                    Long millisToWait = unit != null ? unit.toMillis(timeout) : null;
+                    // wait all the keys before this key to be deleted
+                    if (canGetWriteLock(ourPath))
                     {
-                        if (canGetWriteLock(ourPath))
+                        DEBUG("[write-lock-success]: " + ourPath + "(" +
+                                revisionOfMyself + ")");
+                        haveTheLock = true;
+                        break;
+                    }
+                    else
+                    {
+                        // don't try write lock too often
+                        try
                         {
-                            System.out.println("[lock-write]: lock successfully. [revision]:" + revisionOfMyself + "," + ourPath);
-                            haveTheLock = true;
-                            break;
+                            Thread.sleep(1000);
+                            if (System.currentTimeMillis() - startMillis >= millisToWait)
+                            {
+                                DEBUG("[write-lock-timeout]: " + ourPath + "(" +
+                                        revisionOfMyself + ")");
+                                haveTheLock = false;
+                                break;
+                            }
                         }
-                        else
+                        catch (InterruptedException e)
                         {
-                            // write too often
-                            try
-                            {
-                                Thread.sleep(1000);
-                            }
-                            catch (InterruptedException e)
-                            {
-                                e.printStackTrace();
-                            }
+                            logger.error("Interrupted when waiting to acquire write lock.", e);
                         }
                     }
                 }
@@ -273,8 +306,6 @@ public class LockInternals
         //only id the first key is myself can get the write-lock
         long revisionOfMyself = this.pathToVersion.get(path);
         boolean result = revisionOfMyself == children.get(0).getModRevision();
-        System.out.println(path);
-        System.out.println("Current locksize: " + children.size() + ", getWriteLock: " + result + ", revision: " + revisionOfMyself);
 
         return result;
     }
@@ -287,8 +318,8 @@ public class LockInternals
      */
     List<KeyValue> getSortedChildren() throws Exception
     {
-        List<KeyValue> kvList = client.getKVClient().get(ByteSequence.fromString(basePath),
-                GetOption.newBuilder().withPrefix(ByteSequence.fromString(basePath))
+        List<KeyValue> kvList = client.getKVClient().get(ByteSequence.from(basePath, StandardCharsets.UTF_8),
+                GetOption.newBuilder().withPrefix(ByteSequence.from(basePath, StandardCharsets.UTF_8))
                         .withSortField(GetOption.SortTarget.MOD).build())
                 .get().getKvs();
         return kvList;
@@ -304,13 +335,13 @@ public class LockInternals
     {
         try
         {
-            client.getKVClient().delete(ByteSequence.fromString(ourPath)).get(10,
+            client.getKVClient().delete(ByteSequence.from(ourPath, StandardCharsets.UTF_8)).get(10,
                     TimeUnit.SECONDS);
-            System.out.println("[unLock]: unlock successfully.[lockName]:" + ourPath);
+            DEBUG("[unLock-success]: " + ourPath);
         }
         catch (InterruptedException | ExecutionException | TimeoutException e)
         {
-            System.out.println("[error]: unlock failed：" + e);
+            DEBUG("[unlock-error]: " + e);
         }
     }
 

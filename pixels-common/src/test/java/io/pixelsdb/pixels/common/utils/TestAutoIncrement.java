@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,31 +19,26 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
-import io.etcd.jetcd.KeyValue;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 
 /**
- * Created at: 18-10-14
+ * Created at: 8/28/21
  * Author: hank
  */
-public class TestEtcdUtil
+public class TestAutoIncrement
 {
     @Test
-    public void test()
+    public void testEtcdDao()
     {
-        String key = "cache_version";
-        EtcdUtil etcdUtil = EtcdUtil.Instance();
-        long start = System.currentTimeMillis();
-        //EtcdUtil.putEtcdKey(key, "hello world");
-        KeyValue keyValue = etcdUtil.getKeyValue(key);
-        long end = System.currentTimeMillis();
-        System.out.println((end - start));
-        if (keyValue != null)
-            System.out.println("keyValue is：" + keyValue.getValue().toString(StandardCharsets.UTF_8));
-        else
-            System.out.println("keyValue is null.");
+        long id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
+        id = GenerateId("test-id");
+        System.out.println(id);
     }
-
 }

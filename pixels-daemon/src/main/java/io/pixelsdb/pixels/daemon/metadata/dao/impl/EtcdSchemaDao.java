@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
-import com.coreos.jetcd.data.KeyValue;
+import io.etcd.jetcd.KeyValue;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -10,6 +10,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 
 /**
  * Created at: 2020/5/27
@@ -25,7 +27,7 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public MetadataProto.Schema getById(long id)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.schemaPrimaryKeyPrefix + id);
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.schemaPrimaryKeyPrefix + id);
         if (kv == null)
         {
             return null;
@@ -44,7 +46,7 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public List<MetadataProto.Schema> getAll()
     {
-        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdCommon.schemaPrimaryKeyPrefix);
+        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.schemaPrimaryKeyPrefix);
         List<MetadataProto.Schema> schemas = new ArrayList<>();
         for (KeyValue kv : kvs)
         {
@@ -67,7 +69,7 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public MetadataProto.Schema getByName(String name)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.schemaNameKeyPrefix + name);
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.schemaNameKeyPrefix + name);
         if (kv == null)
         {
             return null;
@@ -86,19 +88,18 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public boolean exists(MetadataProto.Schema schema)
     {
-        KeyValue kv = etcd.getKeyValue(EtcdCommon.schemaPrimaryKeyPrefix + schema.getId());
+        KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.schemaPrimaryKeyPrefix + schema.getId());
         return kv != null;
     }
 
     @Override
     public boolean insert(MetadataProto.Schema schema)
     {
-        long id = EtcdCommon.generateId(EtcdCommon.schemaIdKey,
-                EtcdCommon.schemaIdLockPath);
+        long id = GenerateId(EtcdDaoCommon.schemaIdKey);
         schema = schema.toBuilder().setId(id).build();
-        etcd.putKeyValue(EtcdCommon.schemaPrimaryKeyPrefix + id,
+        etcd.putKeyValue(EtcdDaoCommon.schemaPrimaryKeyPrefix + id,
                 schema.toByteArray());
-        etcd.putKeyValue(EtcdCommon.schemaNameKeyPrefix + schema.getName(),
+        etcd.putKeyValue(EtcdDaoCommon.schemaNameKeyPrefix + schema.getName(),
                 schema.toByteArray());
         return true;
     }
@@ -106,9 +107,9 @@ public class EtcdSchemaDao extends SchemaDao
     @Override
     public boolean update(MetadataProto.Schema schema)
     {
-        etcd.putKeyValue(EtcdCommon.schemaPrimaryKeyPrefix + schema.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.schemaPrimaryKeyPrefix + schema.getId(),
                 schema.toByteArray());
-        etcd.putKeyValue(EtcdCommon.schemaNameKeyPrefix + schema.getName(),
+        etcd.putKeyValue(EtcdDaoCommon.schemaNameKeyPrefix + schema.getName(),
                 schema.toByteArray());
         return true;
     }
@@ -127,8 +128,8 @@ public class EtcdSchemaDao extends SchemaDao
         MetadataProto.Schema schema = getByName(name);
         if (schema != null)
         {
-            etcd.delete(EtcdCommon.schemaPrimaryKeyPrefix + schema.getId());
-            etcd.delete(EtcdCommon.schemaNameKeyPrefix + schema.getName());
+            etcd.delete(EtcdDaoCommon.schemaPrimaryKeyPrefix + schema.getId());
+            etcd.delete(EtcdDaoCommon.schemaNameKeyPrefix + schema.getName());
         }
         return true;
     }

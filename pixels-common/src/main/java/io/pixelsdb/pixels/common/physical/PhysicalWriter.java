@@ -30,7 +30,7 @@ public interface PhysicalWriter
         extends Closeable
 {
     /**
-     * Prepare the writer to ensure the length can fit into current hdfs block
+     * Prepare the writer to ensure the length can fit into current block.
      *
      * @param length length of content
      * @return starting offset after preparing. If -1, means prepare has failed,

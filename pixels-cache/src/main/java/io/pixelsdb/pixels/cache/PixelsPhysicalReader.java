@@ -88,6 +88,6 @@ public class PixelsPhysicalReader
 
     public long getCurrentBlockId() throws IOException
     {
-        return physicalReader.getCurrentBlockId();
+        return physicalReader.getBlockId();
     }
 }
