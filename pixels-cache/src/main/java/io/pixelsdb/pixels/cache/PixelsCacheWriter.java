@@ -301,7 +301,7 @@ public class PixelsCacheWriter
     public void write(PixelsCacheKey key, byte[] value)
     {
         PixelsCacheIdx cacheIdx = new PixelsCacheIdx(cacheOffset, value.length);
-        cacheFile.putBytes(cacheOffset, value);
+        cacheFile.setBytes(cacheOffset, value);
         cacheOffset += value.length;
         radix.put(key.blockId, key.rowGroupId, key.columnId, cacheIdx);
     }
@@ -387,7 +387,7 @@ public class PixelsCacheWriter
                     radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
                             new PixelsCacheIdx(currCacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.putBytes(currCacheOffset, columnlet);
+                    cacheFile.setBytes(currCacheOffset, columnlet);
                     logger.debug(
                             "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                     currCacheOffset += physicalLen;
@@ -557,7 +557,7 @@ public class PixelsCacheWriter
                     //radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
                     //        new PixelsCacheIdx(newCacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                    cacheFile.putBytes(newCacheOffset, columnlet);
+                    cacheFile.setBytes(newCacheOffset, columnlet);
                     logger.debug(
                             "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + newCacheOffset + ", length: " + columnlet.length);
                     newCacheOffset += physicalLen;
@@ -766,7 +766,7 @@ public class PixelsCacheWriter
             header = header | isKeyMask;
         }
         header = header | node.getChildren().size();
-        indexFile.putInt(currentIndexOffset, header);  // header
+        indexFile.setInt(currentIndexOffset, header);  // header
         currentIndexOffset += 4;
         for (Byte key : node.getChildren().keySet())
         {   // children
@@ -784,14 +784,14 @@ public class PixelsCacheWriter
         byte[] nodeBytes = new byte[node.getChildren().size() * 8];
         nodeBuffer.flip();
         nodeBuffer.get(nodeBytes);
-        indexFile.putBytes(currentIndexOffset, nodeBytes); // children
+        indexFile.setBytes(currentIndexOffset, nodeBytes); // children
         currentIndexOffset += nodeBytes.length;
-        indexFile.putBytes(currentIndexOffset, node.getEdge()); // edge
+        indexFile.setBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
         if (node.isKey())
         {  // value
             node.getValue().getBytes(cacheIdxBuffer);
-            indexFile.putBytes(currentIndexOffset, cacheIdxBuffer.array());
+            indexFile.setBytes(currentIndexOffset, cacheIdxBuffer.array());
             currentIndexOffset += 12;
         }
         return true;

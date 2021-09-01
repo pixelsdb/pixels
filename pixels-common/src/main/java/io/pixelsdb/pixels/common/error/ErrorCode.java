@@ -25,20 +25,34 @@ package io.pixelsdb.pixels.common.error;
  */
 public class ErrorCode
 {
+    public static final int SUCCESS = 0;
+    private static final int ERROR_BASE = 10000;
+
     // begin error code for metadata rpc
-    public static final int METADATA_SCHEMA_NOT_FOUND = 10000;
-    public static final int METADATA_TABLE_NOT_FOUND = 10001;
-    public static final int METADATA_LAYOUT_NOT_FOUND = 10002;
-    public static final int METADATA_COLUMN_NOT_FOUND = 10003;
-    public static final int METADATA_LAYOUT_DUPLICATED = 10004;
-    public static final int METADATA_SCHEMA_EXIST = 10005;
-    public static final int METADATA_TABLE_EXIST = 10006;
-    public static final int METADATA_DELETE_SCHEMA_FAILED = 10007;
-    public static final int METADATA_DELETE_TABLE_FAILED = 10008;
-    public static final int METADATA_ADD_COUMNS_FAILED = 10009;
-    public static final int METADATA_UPDATE_COUMN_FAILED = 10010;
-    public static final int METADATA_UPDATE_LAYOUT_FAILED = 10010;
-    public static final int METADATA_ADD_LAYOUT_FAILED = 10010;
-    public static final int METADATA_ADD_SCHEMA_FAILED = 10011;
+    private static final int ERROR_BASE_METADATA = ERROR_BASE;
+    public static final int METADATA_SCHEMA_NOT_FOUND = (ERROR_BASE_METADATA + 1);
+    public static final int METADATA_TABLE_NOT_FOUND = (ERROR_BASE_METADATA + 2);
+    public static final int METADATA_LAYOUT_NOT_FOUND = (ERROR_BASE_METADATA + 3);
+    public static final int METADATA_COLUMN_NOT_FOUND = (ERROR_BASE_METADATA + 4);
+    public static final int METADATA_LAYOUT_DUPLICATED = (ERROR_BASE_METADATA + 5);
+    public static final int METADATA_SCHEMA_EXIST = (ERROR_BASE_METADATA + 6);
+    public static final int METADATA_TABLE_EXIST = (ERROR_BASE_METADATA + 7);
+    public static final int METADATA_DELETE_SCHEMA_FAILED = (ERROR_BASE_METADATA + 8);
+    public static final int METADATA_DELETE_TABLE_FAILED = (ERROR_BASE_METADATA + 9);
+    public static final int METADATA_ADD_COUMNS_FAILED = (ERROR_BASE_METADATA + 10);
+    public static final int METADATA_UPDATE_COUMN_FAILED = (ERROR_BASE_METADATA + 11);
+    public static final int METADATA_UPDATE_LAYOUT_FAILED = (ERROR_BASE_METADATA + 12);
+    public static final int METADATA_ADD_LAYOUT_FAILED = (ERROR_BASE_METADATA + 13);
+    public static final int METADATA_ADD_SCHEMA_FAILED = (ERROR_BASE_METADATA + 14);
     // end error code for metadata rpc
+
+    // begin error code for shared memory message queue
+    private static final int ERROR_BASE_MQ = ERROR_BASE + 100;
+    public static final int ERROR_MQ_IS_EMPTY = (ERROR_BASE_MQ + 1);
+    public static final int ERROR_MQ_IS_FULL = (ERROR_BASE_MQ + 2);
+    public static final int ERROR_MQ_WRITER_IS_ROLLBACK = (ERROR_BASE_MQ + 3);
+    public static final int ERROR_MQ_WRITER_IS_RUNNING = (ERROR_BASE_MQ + 4);
+    public static final int ERROR_MQ_READER_IS_ROLLBACK = (ERROR_BASE_MQ + 5);
+    public static final int ERROR_MQ_READER_IS_RUNNING = (ERROR_BASE_MQ + 6);
+    // end error code for shared memory message queue
 }

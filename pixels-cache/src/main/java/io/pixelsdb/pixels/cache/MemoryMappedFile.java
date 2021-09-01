@@ -19,13 +19,15 @@
  */
 
 /*
- * This file is derived from MappedBus, with the attribution notice:
+ * This file is derived from MemoryMappedFile in MappedBus,
+ * with the attribution notice:
  *
  *   Copyright 2015 Caplogic AB.
  *   Licensed under the Apache License, Version 2.0.
  *   This class was inspired from an entry in Bryce Nyeggen's blog.
  *
- * We changed the visibility of some methods from protect to public.
+ * We changed the visibility of some methods from protect to public,
+ * and added direct (i.e. zero-copy) memory access.
  */
 package io.pixelsdb.pixels.cache;
 
@@ -43,7 +45,6 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
 /**
- * By hank:
  * This class has been tested.
  * It can read and write memory mapped file larger than 2GB.
  * When the backing file is located under /dev/shm/, it works as a shared memory,
@@ -163,6 +164,11 @@ public class MemoryMappedFile
         unmmap.invoke(null, addr, this.size);
     }
 
+    public void clear()
+    {
+        unsafe.setMemory(addr, size, (byte)0);
+    }
+
     public static ByteOrder getOrder()
     {
         return order;
@@ -250,17 +256,9 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putByte(long pos, byte val)
+    public void setByte(long pos, byte val)
     {
         unsafe.putByte(pos + addr, val);
-    }
-
-    public void putBytes(long pos, byte[] val)
-    {
-        for (byte v : val)
-        {
-            unsafe.putByte(pos++ + addr, v);
-        }
     }
 
     /**
@@ -269,17 +267,17 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putByteVolatile(long pos, byte val)
+    public void setByteVolatile(long pos, byte val)
     {
         unsafe.putByteVolatile(null, pos + addr, val);
     }
 
-    public void putShort(long pos, short val)
+    public void setShort(long pos, short val)
     {
         unsafe.putShort(pos + addr, val);
     }
 
-    public void putShortVolatile(long pos, short val)
+    public void setShortVolatile(long pos, short val)
     {
         unsafe.putShortVolatile(null, pos + addr, val);
     }
@@ -290,7 +288,7 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putInt(long pos, int val)
+    public void setInt(long pos, int val)
     {
         unsafe.putInt(pos + addr, val);
     }
@@ -301,7 +299,7 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putIntVolatile(long pos, int val)
+    public void setIntVolatile(long pos, int val)
     {
         unsafe.putIntVolatile(null, pos + addr, val);
     }
@@ -312,7 +310,7 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putLong(long pos, long val)
+    public void setLong(long pos, long val)
     {
         unsafe.putLong(pos + addr, val);
     }
@@ -323,7 +321,7 @@ public class MemoryMappedFile
      * @param pos the position in the memory mapped file
      * @param val the value to write
      */
-    public void putLongVolatile(long pos, long val)
+    public void setLongVolatile(long pos, long val)
     {
         unsafe.putLongVolatile(null, pos + addr, val);
     }
@@ -362,11 +360,22 @@ public class MemoryMappedFile
      * @param pos    the position in the memory mapped file
      * @param data   the output buffer
      * @param offset the offset in the buffer of the first byte to write
-     * @param length the length of the data
+     * @param length the length of the data to write
      */
     public void setBytes(long pos, byte[] data, int offset, int length)
     {
         unsafe.copyMemory(data, BYTE_ARRAY_OFFSET + offset, null, pos + addr, length);
+    }
+
+    /**
+     * Writes a buffer of data.
+     *
+     * @param pos    the position in the memory mapped file
+     * @param data   the output buffer
+     */
+    public void setBytes(long pos, byte[] data)
+    {
+        unsafe.copyMemory(data, BYTE_ARRAY_OFFSET, null, pos + addr, data.length);
     }
 
     public void copyMemory(long srcPos, long destPos, long length)
