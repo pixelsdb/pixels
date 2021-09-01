@@ -107,7 +107,7 @@ public class TestMemFile
         {
             bytes = randomByte(new Random(), 8);
             kvMap.put(i, bytes);
-            mem.putBytes(8 * i, bytes);
+            mem.setBytes(8 * i, bytes);
         }
     }
 
@@ -142,7 +142,7 @@ public class TestMemFile
         for (int i = 0; i < 1024; ++i)
         {
             //mem.putBytes(8 * i, bytes);
-            mem.putLong(8 * i, repeatLong);
+            mem.setLong(8 * i, repeatLong);
         }
     }
 

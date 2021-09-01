@@ -46,7 +46,7 @@ public class TestMemFileWrite
         {
             //mem.getAndAddLong(addr[i], 8);
 //            mem.putBytes(i * 8, bytes);
-            mem.putLong(i * 8, 1);
+            mem.setLong(i * 8, 1);
         }
         System.out.println("ns/op: " + (System.nanoTime() - start) / 1024.0 / 1024);
     }

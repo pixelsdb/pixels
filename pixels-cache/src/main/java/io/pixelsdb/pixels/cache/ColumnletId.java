@@ -19,20 +19,28 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import io.pixelsdb.pixels.cache.mq.MappedBusMessage;
+import io.pixelsdb.pixels.cache.mq.Message;
 
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 /**
+ * ColumnletId can be used as the cache miss message.
  * @author guodong
  * @author hank
  */
 public class ColumnletId
-        implements MappedBusMessage
+        implements Message
 {
-    public long blockId;
+    private final static int SIZE = 2 * Short.BYTES + Long.BYTES;
+
+    /**
+     * Issue 115:
+     * Currently, blockId is not assigned and use externally.
+     * TODO: assign it with valid value which can be used to lookup the file/object in storage.
+     */
+    private long blockId = 0;
     public short rowGroupId;
     public short columnId;
     public boolean direct;
@@ -59,9 +67,9 @@ public class ColumnletId
     @Override
     public void write(MemoryMappedFile mem, long pos)
     {
-//        mem.putLong(0, blockId);
-//        mem.putShort(8, rowGroupId);
-//        mem.putShort(12, columnId);
+        mem.setLong(pos, blockId);
+        mem.setShort(pos + Long.BYTES, rowGroupId);
+        mem.setShort(pos + Long.BYTES + Short.BYTES, columnId);
     }
 
     /**
@@ -73,20 +81,18 @@ public class ColumnletId
     @Override
     public void read(MemoryMappedFile mem, long pos)
     {
-        mem.getLong(0);
-        mem.getShort(8);
-        mem.getShort(12);
+        blockId = mem.getLong(pos);
+        rowGroupId = mem.getShort(pos + Long.BYTES);
+        columnId = mem.getShort(pos + Long.BYTES + Short.BYTES);
     }
 
     /**
-     * Returns the message type.
-     *
-     * @return the message type
+     * @return the size of message in bytes.
      */
     @Override
-    public int type()
+    public int size()
     {
-        return 0;
+        return SIZE;
     }
 
     @Override
@@ -113,6 +119,16 @@ public class ColumnletId
                 .add("block id", blockId)
                 .add("row group id", rowGroupId)
                 .add("column id", columnId)
+                .toString();
+    }
+
+    @Override
+    public String print(MemoryMappedFile mem, long pos)
+    {
+        return toStringHelper(this)
+                .add("block id", mem.getLong(pos))
+                .add("row group id", mem.getShort(pos + Long.BYTES))
+                .add("column id", mem.getShort(pos + Long.BYTES + Short.BYTES))
                 .toString();
     }
 

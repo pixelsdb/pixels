@@ -139,7 +139,7 @@ public class PixelsCacheUtil
 
     private static void setMagic(MemoryMappedFile file)
     {
-        file.putBytes(0, Constants.MAGIC.getBytes(StandardCharsets.UTF_8));
+        file.setBytes(0, Constants.MAGIC.getBytes(StandardCharsets.UTF_8));
     }
 
     public static String getMagic(MemoryMappedFile file)
@@ -157,13 +157,13 @@ public class PixelsCacheUtil
 
     private static void clearIndexRWAndCount(MemoryMappedFile indexFile)
     {
-        indexFile.putIntVolatile(6, 0);
+        indexFile.setIntVolatile(6, 0);
     }
 
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
-        indexFile.putByteVolatile(6, (byte) 1);
+        indexFile.setByteVolatile(6, (byte) 1);
         final int sleepMs = 10;
         int waitMs = 0;
         while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0)
@@ -180,7 +180,7 @@ public class PixelsCacheUtil
             if (waitMs > CACHE_READ_LEASE_MS)
             {
                 // clear reader count to continue writing.
-                indexFile.putIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
+                indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
                 break;
             }
         }
@@ -188,7 +188,7 @@ public class PixelsCacheUtil
 
     public static void endIndexWrite(MemoryMappedFile indexFile)
     {
-        indexFile.putByteVolatile(6, (byte) 0);
+        indexFile.setByteVolatile(6, (byte) 0);
     }
 
     /**
@@ -248,7 +248,7 @@ public class PixelsCacheUtil
 
     public static void setIndexVersion(MemoryMappedFile indexFile, int version)
     {
-        indexFile.putIntVolatile(10, version);
+        indexFile.setIntVolatile(10, version);
     }
 
     public static int getIndexVersion(MemoryMappedFile indexFile)
@@ -369,7 +369,7 @@ public class PixelsCacheUtil
 
     public static void setCacheStatus(MemoryMappedFile cacheFile, short status)
     {
-        cacheFile.putShortVolatile(6, status);
+        cacheFile.setShortVolatile(6, status);
     }
 
     public static short getCacheStatus(MemoryMappedFile cacheFile)
@@ -379,7 +379,7 @@ public class PixelsCacheUtil
 
     public static void setCacheSize(MemoryMappedFile cacheFile, long size)
     {
-        cacheFile.putLongVolatile(8, size);
+        cacheFile.setLongVolatile(8, size);
     }
 
     public static long getCacheSize(MemoryMappedFile cacheFile)
