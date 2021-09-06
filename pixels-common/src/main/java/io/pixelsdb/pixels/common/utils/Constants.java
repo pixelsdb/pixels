@@ -48,7 +48,14 @@ public final class Constants
      * Issue #108:
      * The prefix for read-write lock used in etcd auto-increment id.
      */
-    public static final String LOCK_PATH_PREFIX = "/pixels_lock/";
+    public static final String AI_LOCK_PATH_PREFIX = "/pixels_ai_lock/";
+
     public static final String LOCAL_FS_ID_KEY = "pixels_storage_local_id";
+    // the prefix for keys of local fs metadata (i.e. file path -> file id).
     public static final String LOCAL_FS_META_PREFIX = "pixels_storage_local_meta:";
+
+    public static final String S3_ID_KEY = "pixels_storage_s3_id";
+    // the prefix for keys of s3 metadata (i.e. file path -> file id).
+    public static final String S3_META_PREFIX = "pixels_storage_s3_meta:";
+
 }

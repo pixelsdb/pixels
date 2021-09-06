@@ -48,6 +48,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- aws sdk -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- protobuf -->
         <dependency>
             <groupId>com.google.protobuf</groupId>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,19 +17,25 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.impl;
 
-import java.io.Closeable;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.Storage;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
- * @author guodong
- * @author hank
+ * Created at: 06/09/2021
+ * Author: hank
  */
-public interface PhysicalWriter
-        extends Closeable
+public class PhysicalS3Writer implements PhysicalWriter
 {
+    public PhysicalS3Writer(Storage storage, String path) throws IOException
+    {
+
+    }
+
     /**
      * Prepare the writer to ensure the length can fit into current block.
      *
@@ -37,7 +43,11 @@ public interface PhysicalWriter
      * @return starting offset after preparing. If -1, means prepare has failed,
      * due to the specified length cannot fit into current block.
      */
-    long prepare(int length) throws IOException;
+    @Override
+    public long prepare(int length) throws IOException
+    {
+        return 0;
+    }
 
     /**
      * Append content to the file.
@@ -45,7 +55,11 @@ public interface PhysicalWriter
      * @param buffer content buffer
      * @return start offset of content in the file.
      */
-    long append(ByteBuffer buffer) throws IOException;
+    @Override
+    public long append(ByteBuffer buffer) throws IOException
+    {
+        return 0;
+    }
 
     /**
      * Append content to the file.
@@ -55,17 +69,33 @@ public interface PhysicalWriter
      * @param length length of actual content buffer
      * @return start offset of content in the file.
      */
-    long append(byte[] buffer, int offset, int length) throws IOException;
+    @Override
+    public long append(byte[] buffer, int offset, int length) throws IOException
+    {
+        return 0;
+    }
 
     /**
      * Close writer.
      */
-    void close() throws IOException;
+    @Override
+    public void close() throws IOException
+    {
+
+    }
 
     /**
      * Flush writer.
      */
-    void flush() throws IOException;
+    @Override
+    public void flush() throws IOException
+    {
 
-    String getPath();
+    }
+
+    @Override
+    public String getPath()
+    {
+        return null;
+    }
 }

@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import static io.pixelsdb.pixels.common.utils.Constants.LOCK_PATH_PREFIX;
+import static io.pixelsdb.pixels.common.utils.Constants.AI_LOCK_PATH_PREFIX;
 
 /**
  * Created at: 8/29/21
@@ -45,7 +45,7 @@ public class EtcdAutoIncrement
     {
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                LOCK_PATH_PREFIX + idKey);
+                AI_LOCK_PATH_PREFIX + idKey);
         EtcdMutex writeLock = readWriteLock.writeLock();
         try
         {
@@ -77,7 +77,7 @@ public class EtcdAutoIncrement
         long id = 0;
         EtcdUtil etcd = EtcdUtil.Instance();
         EtcdReadWriteLock readWriteLock = new EtcdReadWriteLock(etcd.getClient(),
-                LOCK_PATH_PREFIX + idKey);
+                AI_LOCK_PATH_PREFIX + idKey);
         EtcdMutex writeLock = readWriteLock.writeLock();
         try
         {

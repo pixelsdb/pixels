@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSWriter;
 import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalWriter;
+import io.pixelsdb.pixels.common.physical.impl.PhysicalS3Writer;
 
 import java.io.IOException;
 
@@ -41,21 +42,21 @@ public class PhysicalWriterUtil
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
-        PhysicalWriter writer = null;
-        try
+
+        PhysicalWriter writer;
+        switch (storage.getScheme())
         {
-            switch (storage.getScheme())
-            {
-                case hdfs:
-                    writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
-                case file:
-                    writer = new PhysicalLocalWriter(storage, path);
-                case s3:
-                    throw new IOException("S3 storage is not supported.");
-            }
-        } catch (IOException e)
-        {
-            throw e;
+            case hdfs:
+                writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                break;
+            case file:
+                writer = new PhysicalLocalWriter(storage, path);
+                break;
+            case s3:
+                writer = new PhysicalS3Writer(storage, path);
+                break;
+            default:
+                throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
         }
 
         return writer;

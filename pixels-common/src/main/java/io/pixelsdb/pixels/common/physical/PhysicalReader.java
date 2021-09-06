@@ -21,9 +21,12 @@ package io.pixelsdb.pixels.common.physical;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author guodong
+ * @author hank
  */
 public interface PhysicalReader
         extends Closeable
@@ -32,13 +35,18 @@ public interface PhysicalReader
 
     void seek(long desired) throws IOException;
 
-    int read(byte[] buffer) throws IOException;
-
-    int read(byte[] buffer, int offset, int length) throws IOException;
+    ByteBuffer readFully(int length) throws IOException;
 
     void readFully(byte[] buffer) throws IOException;
 
     void readFully(byte[] buffer, int offset, int length) throws IOException;
+
+    /**
+     * @return true if readAsync is supported.
+     */
+    boolean supportsAsync();
+
+    CompletableFuture<ByteBuffer> readAsync(int length) throws IOException;
 
     long readLong() throws IOException;
 

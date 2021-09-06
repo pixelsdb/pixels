@@ -129,7 +129,6 @@ public interface Storage
      */
     DataInputStream open(String path) throws IOException;
 
-
     /**
      * For local fs, path is considered as local.
      * @param path
