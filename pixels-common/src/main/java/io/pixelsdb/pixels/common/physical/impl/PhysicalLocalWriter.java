@@ -50,6 +50,7 @@ public class PhysicalLocalWriter implements PhysicalWriter
         }
         if (path.startsWith("file://"))
         {
+            // remove the scheme.
             path = path.substring(7);
         }
         this.path = path;

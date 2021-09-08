@@ -21,9 +21,13 @@ package io.pixelsdb.pixels.common.physical.impl;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created at: 06/09/2021
@@ -31,9 +35,37 @@ import java.nio.ByteBuffer;
  */
 public class PhysicalS3Writer implements PhysicalWriter
 {
+    private static Logger logger = LogManager.getLogger(PhysicalS3Writer.class);
+
+    private S3 s3;
+    private S3.Path path;
+    private String pathStr;
+    private long id;
+    private AtomicLong position;
+    private long length;
+    private S3AsyncClient client;
+
     public PhysicalS3Writer(Storage storage, String path) throws IOException
     {
-
+        if (storage instanceof S3)
+        {
+            this.s3 = (S3) storage;
+        }
+        else
+        {
+            throw new IOException("Storage is not S3.");
+        }
+        if (path.startsWith("s3://"))
+        {
+            // remove the scheme.
+            path = path.substring(5);
+        }
+        this.path = new S3.Path(path);
+        this.pathStr = path;
+        this.id = this.s3.getFileId(path);
+        this.length = this.s3.getStatus(path).getLength();
+        this.position = new AtomicLong(0);
+        this.client = s3.getClient();
     }
 
     /**

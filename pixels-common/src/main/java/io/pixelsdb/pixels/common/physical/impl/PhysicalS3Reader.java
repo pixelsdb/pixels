@@ -52,7 +52,7 @@ public class PhysicalS3Reader implements PhysicalReader
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
-        if (storage instanceof LocalFS)
+        if (storage instanceof S3)
         {
             this.s3 = (S3) storage;
         }
@@ -62,6 +62,7 @@ public class PhysicalS3Reader implements PhysicalReader
         }
         if (path.startsWith("s3://"))
         {
+            // remove the scheme.
             path = path.substring(5);
         }
         this.path = new S3.Path(path);
