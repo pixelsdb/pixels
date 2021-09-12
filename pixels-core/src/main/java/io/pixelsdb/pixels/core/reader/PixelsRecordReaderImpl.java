@@ -39,6 +39,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author guodong
@@ -404,6 +405,7 @@ public class PixelsRecordReaderImpl
          * Use request batch and read scheduler to execute the read requests.
          */
         Scheduler.RequestBatch requestBatch = new Scheduler.RequestBatch(targetRGNum);
+        AtomicReference<Throwable> lastErr = new AtomicReference<>(null);
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -416,32 +418,25 @@ public class PixelsRecordReaderImpl
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
-                /*
-                byte[] footerBuffer = new byte[(int) footerLength];
-                try
-                {
-                    physicalReader.seek(footerOffset);
-                    physicalReader.readFully(footerBuffer);
-                    rowGroupFooters[i] =
-                            PixelsProto.RowGroupFooter.parseFrom(footerBuffer);
-                    pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[i]);
-                }
-                catch (IOException e)
-                {
-                    logger.error("failed to read file footer.", e);
-                    throw new IOException("failed to read file footer.", e);
-                }
-                */
                 int fi = i;
                 requestBatch.add(footerOffset, (int) footerLength).whenComplete((resp, err) ->
                 {
-                    try
+                    if (resp != null)
                     {
-                        rowGroupFooters[fi] = PixelsProto.RowGroupFooter.parseFrom(resp);
-                        pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[fi]);
-                    } catch (InvalidProtocolBufferException e)
+                        try
+                        {
+                            rowGroupFooters[fi] = PixelsProto.RowGroupFooter.parseFrom(resp);
+                            pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[fi]);
+                        } catch (InvalidProtocolBufferException e)
+                        {
+                            logger.error("Failed to parse row group footer from byte buffer.", e);
+                            lastErr.set(e);
+                        }
+                    }
+                    else
                     {
-                        logger.error("failed to read file footer.", e);
+                        logger.error("Failed to read row group footer.", err);
+                        lastErr.set(err);
                     }
                 });
             }
@@ -450,6 +445,11 @@ public class PixelsRecordReaderImpl
             {
                 rowGroupFooters[i] = rowGroupFooter;
             }
+        }
+        if (lastErr.get() != null)
+        {
+            throw new IOException("Failed to read row group footers, " +
+                    "only the last error is thrown, check the logs for more information.", lastErr.get());
         }
         Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
         scheduler.executeBatch(physicalReader, requestBatch).join();
@@ -611,7 +611,7 @@ public class PixelsRecordReaderImpl
             long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
             /*
             // We used deal with null or empty cache chunk here to get more accurate cacheReadCost.
-            // In Issue #67 (patch), we move the logic into the above loop for better performance.
+            // In Issue #67 (patch), we moved this logic into the above loop for better performance.
             for (ColumnletId chunkId : cacheChunks)
             {
                 short rgId = chunkId.rowGroupId;
@@ -654,7 +654,7 @@ public class PixelsRecordReaderImpl
             }
         }
 
-        if (diskChunks.isEmpty() == false)
+        if (!diskChunks.isEmpty())
         {
             /**
              * Comments added in Issue #67 (path):
@@ -665,91 +665,65 @@ public class PixelsRecordReaderImpl
              * similar strategy is called disk range merging.
              *
              * diskChunks.sort and ChunkSeq are also optimized in Issue #67 (path).
+             *
+             * Issue #114:
+             * disk chunks ordering and request merging are moved into the sortmerge
+             * scheduler, which can be enabled by setting read.request.scheduler=sortmerge.
              */
-
-            // sort chunks by starting offset
-            diskChunks.sort((o1, o2) -> (
-                    o1.offset < o2.offset ? -1 :
-                            (o1.offset > o2.offset ? 1 : 0)));
-
-            // get chunk blocks. In best case, diskChunkSeqs.size() == targetRGNum.
-            List<ChunkSeq> diskChunkSeqs = new ArrayList<>(this.targetRGNum);
-            ChunkSeq diskChunkSeq = new ChunkSeq();
+            Scheduler.RequestBatch batch = new Scheduler.RequestBatch(diskChunks.size());
+            AtomicReference<Throwable> lastErr = new AtomicReference<>(null);
             for (ChunkId chunk : diskChunks)
             {
-                if (!diskChunkSeq.addChunk(chunk))
+                /**
+                 * Comments added in Issue #103:
+                 * chunk.rowGroupId does not mean the row group id in the Pixels file,
+                 * it is the index of group that is to be read (some row groups in the file
+                 * may be filtered out by the predicate and will not be read) and it is
+                 * used to calculate the index of chunkBuffers.
+                 */
+                int rgIdx = chunk.rowGroupId;
+                int colId = chunk.columnId;
+                /**
+                 * Issue #114:
+                 * The old code segment of chunk reading is remove in this issue.
+                 * Now, if enableMetrics == true, we can add the read performance metrics here.
+                 *
+                 * Examples of how to add performance metrics:
+                 *
+                 * BytesMsCost seekCost = new BytesMsCost();
+                 * seekCost.setBytes(seekDistanceInBytes);
+                 * seekCost.setMs(seekTimeMs);
+                 * readPerfMetrics.addSeek(seekCost);
+                 *
+                 * BytesMsCost readCost = new BytesMsCost();
+                 * readCost.setBytes(bytesRead);
+                 * readCost.setMs(readTimeMs);
+                 * readPerfMetrics.addSeqRead(readCost);
+                 */
+                batch.add(new Scheduler.Request(chunk.offset, (int)chunk.length))
+                        .whenComplete((resp, err) ->
                 {
-                    diskChunkSeqs.add(diskChunkSeq);
-                    diskChunkSeq = new ChunkSeq();
-                    diskChunkSeq.addChunk(chunk);
-                }
+                    if (resp != null)
+                    {
+                        chunkBuffers[rgIdx * includedColumns.length + colId] = resp;
+                    }
+                    else
+                    {
+                        logger.error("Failed to read chunks block into buffers.", err);
+                        lastErr.set(err);
+                    }
+                });
+                // don't update statistics in whenComplete as it may be executed in other threads.
+                diskReadBytes += chunk.length;
+                memoryUsage += chunk.length;
             }
-            diskChunkSeqs.add(diskChunkSeq);
 
-            // read chunk blocks into buffers
-            try
+            Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
+            scheduler.executeBatch(physicalReader, batch).join();
+            if (lastErr.get() != null)
             {
-                for (ChunkSeq seq : diskChunkSeqs)
-                {
-                    if (seq.getLength() == 0)
-                    {
-                        continue;
-                    }
-                    int offset = (int) seq.getOffset();
-                    int length = (int) seq.getLength();
-                    diskReadBytes += length;
-                    ByteBuffer chunkBlockBuffer = ByteBuffer.allocate(length);
-                    memoryUsage += length;
-//                if (enableMetrics)
-//                {
-//                    long seekStart = System.currentTimeMillis();
-//                    physicalFSReader.seek(offset);
-//                    long seekEnd = System.currentTimeMillis();
-//                    BytesMsCost seekCost = new BytesMsCost();
-//                    seekCost.setBytes(Math.abs(offsetBeforeSeek - offset));
-//                    seekCost.setMs(seekEnd - seekStart);
-//                    readPerfMetrics.addSeek(seekCost);
-//                    offsetBeforeSeek = offset;
-//
-//                    long readStart = System.currentTimeMillis();
-//                    physicalFSReader.readFully(chunkBlockBuffer);
-//                    long readEnd = System.currentTimeMillis();
-//                    BytesMsCost readCost = new BytesMsCost();
-//                    readCost.setBytes(length);
-//                    readCost.setMs(readEnd - readStart);
-//                    readPerfMetrics.addSeqRead(readCost);
-//                }
-//                else
-//                {
-                    physicalReader.seek(offset);
-                    physicalReader.readFully(chunkBlockBuffer.array());
-//                }
-                    List<ChunkId> chunkIds = seq.getChunks();
-                    int chunkSliceOffset = 0;
-                    for (ChunkId chunkId : chunkIds)
-                    {
-                        int chunkLength = (int) chunkId.length;
-                        /**
-                         * Comments added in Issue #103:
-                         * chunkId.rowGroupId does not mean the row group id in the Pixels file,
-                         * it is the index of group that is to be read (some row groups in the file
-                         * may be filtered out by the predicate and will not be read) and it is
-                         * used to calculate the index of chunkBuffers.
-                         */
-                        int rgIdx = chunkId.rowGroupId;
-                        int colId = chunkId.columnId;
-                        chunkBlockBuffer.position(chunkSliceOffset);
-                        chunkBlockBuffer.limit(chunkSliceOffset + chunkLength);
-                        ByteBuffer chunkBuffer = chunkBlockBuffer.slice();
-                        chunkBuffers[rgIdx * includedColumns.length + colId] = chunkBuffer;
-                        chunkSliceOffset += chunkLength;
-                    }
-                }
-            } catch (IOException e)
-            {
-                logger.error("failed to read chunks block into buffers.", e);
-                throw new IOException("failed to read chunks block into buffers.", e);
-                // return false;
+                throw new IOException("Failed to read chunks block into buffers, " +
+                        "only the last error is thrown, check the logs for more information.", lastErr.get());
             }
         }
 
