@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.scheduler.NoopScheduler;
+import io.pixelsdb.pixels.common.physical.impl.scheduler.SortMergeScheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
@@ -49,6 +50,9 @@ public class SchedulerFactory
             // Add more schedulers here.
             case "noop":
                 scheduler = new NoopScheduler();
+                break;
+            case "sortmerge":
+                scheduler = new SortMergeScheduler();
                 break;
             default:
                 throw new UnsupportedOperationException("The read request scheduler '" +

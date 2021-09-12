@@ -16,9 +16,9 @@ public class TestS3
     @Test
     public void testS3Writer() throws IOException
     {
-        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(Storage.Scheme.s3, "pixels-01/object-3",
+        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(Storage.Scheme.s3, "pixels-01/object-4",
                 0, (short) 1, false);
-        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        ByteBuffer buffer = ByteBuffer.allocate(10240);
         buffer.putLong(1);
         writer.append(buffer);
         writer.flush();
@@ -28,8 +28,8 @@ public class TestS3
     @Test
     public void testS3Reader() throws IOException
     {
-        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-01/object-0");
-        CompletableFuture<ByteBuffer> future = reader.readAsync(1024);
+        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-01/object-4");
+        CompletableFuture<ByteBuffer> future = reader.readAsync(8);
         future.whenComplete((resp, err) ->
         {
             if (resp != null)

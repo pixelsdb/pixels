@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.physical;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -32,6 +34,14 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface Scheduler
 {
+    /**
+     * Execute a batch of read requests, and return the future of the completion of
+     * all the requests.
+     * @param reader
+     * @param batch
+     * @return should never return null.
+     * @throws IOException
+     */
     CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException;
 
     class Request implements Comparable<Request>
@@ -72,33 +82,39 @@ public interface Scheduler
 
     class RequestBatch
     {
-        private int pos;
         private int size;
-        private Request[] requests;
-        private CompletableFuture<ByteBuffer>[] futures;
+        private List<Request> requests;
+        private List<CompletableFuture<ByteBuffer>> futures;
 
-        @SuppressWarnings("unchecked")
-        public RequestBatch(int size)
+        public RequestBatch()
         {
-            if (size <= 0)
+            this.requests = new ArrayList<>();
+            this.futures = new ArrayList<>();
+            this.size = 0;
+        }
+
+        public RequestBatch(int capacity)
+        {
+            if (capacity <= 0)
             {
-                throw new IllegalArgumentException("Request batch size: " + size);
+                throw new IllegalArgumentException("Request batch capacity: " + capacity);
             }
-            this.requests = new Request[size];
-            this.futures = new CompletableFuture[size];
-            this.pos = 0;
+            this.requests = new ArrayList<>(capacity);
+            this.futures = new ArrayList<>(capacity);
+            this.size = 0;
+        }
+
+        public CompletableFuture<ByteBuffer> add(long start, int length)
+        {
+            return add(new Request(start, length));
         }
 
         public CompletableFuture<ByteBuffer> add(Request request)
         {
-            if (pos >= size)
-            {
-                throw new IndexOutOfBoundsException("pos: " + pos);
-            }
             CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
-            requests[pos] = request;
-            futures[pos] = future;
-            pos++;
+            requests.add(request);
+            futures.add(future);
+            size++;
             return future;
         }
 
@@ -107,14 +123,34 @@ public interface Scheduler
             return size;
         }
 
-        public Request[] getRequests()
+        public List<Request> getRequests()
         {
             return requests;
         }
 
-        public CompletableFuture<ByteBuffer>[] getFutures()
+        public List<CompletableFuture<ByteBuffer>> getFutures()
         {
             return futures;
+        }
+
+        /**
+         * If batch is empty, this method returns and completed future.
+         * @return
+         */
+        public CompletableFuture<Void> completeAll()
+        {
+            if (size <= 0)
+            {
+                CompletableFuture<Void> future = new CompletableFuture<>();
+                future.complete(null);
+                return future;
+            }
+            CompletableFuture[] fs = new CompletableFuture[size];
+            for (int i = 0; i < size; ++i)
+            {
+                fs[i] = this.futures.get(i);
+            }
+            return CompletableFuture.allOf(fs);
         }
     }
 }

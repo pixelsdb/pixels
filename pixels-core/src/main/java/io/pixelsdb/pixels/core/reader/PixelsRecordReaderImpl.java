@@ -19,10 +19,13 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.cache.ColumnletId;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.Scheduler;
+import io.pixelsdb.pixels.common.physical.SchedulerFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
@@ -396,6 +399,11 @@ public class PixelsRecordReaderImpl
         // read row group footers
         rowGroupFooters =
                 new PixelsProto.RowGroupFooter[targetRGNum];
+        /**
+         * Issue #114:
+         * Use request batch and read scheduler to execute the read requests.
+         */
+        Scheduler.RequestBatch requestBatch = new Scheduler.RequestBatch(targetRGNum);
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -408,6 +416,7 @@ public class PixelsRecordReaderImpl
                         footer.getRowGroupInfos(rgId);
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
+                /*
                 byte[] footerBuffer = new byte[(int) footerLength];
                 try
                 {
@@ -422,6 +431,19 @@ public class PixelsRecordReaderImpl
                     logger.error("failed to read file footer.", e);
                     throw new IOException("failed to read file footer.", e);
                 }
+                */
+                int fi = i;
+                requestBatch.add(footerOffset, (int) footerLength).whenComplete((resp, err) ->
+                {
+                    try
+                    {
+                        rowGroupFooters[fi] = PixelsProto.RowGroupFooter.parseFrom(resp);
+                        pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[fi]);
+                    } catch (InvalidProtocolBufferException e)
+                    {
+                        logger.error("failed to read file footer.", e);
+                    }
+                });
             }
             // cache hit
             else
@@ -429,6 +451,8 @@ public class PixelsRecordReaderImpl
                 rowGroupFooters[i] = rowGroupFooter;
             }
         }
+        Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
+        scheduler.executeBatch(physicalReader, requestBatch).join();
         return true;
     }
 

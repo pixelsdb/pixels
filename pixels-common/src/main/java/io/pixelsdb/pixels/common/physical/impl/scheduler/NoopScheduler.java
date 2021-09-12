@@ -26,6 +26,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -44,14 +45,14 @@ public class NoopScheduler implements Scheduler
     @Override
     public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
     {
-        CompletableFuture<ByteBuffer>[] futures = batch.getFutures();
-        Request[] requests = batch.getRequests();
+        List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
+        List<Request> requests = batch.getRequests();
         if (reader.supportsAsync())
         {
             for (int i = 0; i < batch.size(); ++i)
             {
-                CompletableFuture<ByteBuffer> future = futures[i];
-                Request request = requests[i];
+                CompletableFuture<ByteBuffer> future = futures.get(i);
+                Request request = requests.get(i);
                 reader.seek(request.start);
                 reader.readAsync(request.length).whenComplete((resp, err) ->
                 {
@@ -72,12 +73,12 @@ public class NoopScheduler implements Scheduler
         {
             for (int i = 0; i < batch.size(); ++i)
             {
-                Request request = requests[i];
+                Request request = requests.get(i);
                 reader.seek(request.start);
-                futures[i].complete(reader.readFully(request.length));
+                futures.get(i).complete(reader.readFully(request.length));
             }
         }
 
-        return CompletableFuture.allOf(futures);
+        return batch.completeAll();
     }
 }
