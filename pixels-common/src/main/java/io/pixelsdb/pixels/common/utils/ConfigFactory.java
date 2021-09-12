@@ -23,6 +23,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -49,9 +51,24 @@ public class ConfigFactory
     // Properties is thread safe, so we do not put synchronization on it.
     private Properties prop = null;
 
+    /**
+     * Issue #114:
+     * Add configuration update callbacks.
+     * By registering update callback, other class can get their
+     * members updated when the properties on ConfigurationFactory
+     * are reloaded or updated.
+     */
+    public interface UpdateCallback
+    {
+        void update(String value);
+    }
+
+    private Map<String, UpdateCallback> callbacks;
+
     private ConfigFactory()
     {
         prop = new Properties();
+        callbacks = new HashMap<>();
         String pixelsHome = System.getenv("PIXELS_HOME");
         InputStream in = null;
         if (pixelsHome == null)
@@ -87,13 +104,26 @@ public class ConfigFactory
         }
     }
 
-    public void loadProperties(String propFilePath) throws IOException
+    public synchronized void registerUpdateCallback(String key, UpdateCallback callback)
+    {
+        this.callbacks.put(key, callback);
+    }
+
+    public synchronized void loadProperties(String propFilePath) throws IOException
     {
         FileInputStream in = null;
         try
         {
             in = new FileInputStream(propFilePath);
             this.prop.load(in);
+            for (Map.Entry<String, UpdateCallback> entry : this.callbacks.entrySet())
+            {
+                String value = this.prop.getProperty(entry.getKey());
+                if (value != null)
+                {
+                    entry.getValue().update(value);
+                }
+            }
         }
         catch (IOException e)
         {
@@ -115,12 +145,16 @@ public class ConfigFactory
         }
     }
 
-    public void addProperty(String key, String value)
+    public synchronized void addProperty(String key, String value)
     {
         this.prop.setProperty(key, value);
+        if (this.callbacks.containsKey(key))
+        {
+            this.callbacks.get(key).update(value);
+        }
     }
 
-    public String getProperty(String key)
+    public synchronized String getProperty(String key)
     {
         return this.prop.getProperty(key);
     }
