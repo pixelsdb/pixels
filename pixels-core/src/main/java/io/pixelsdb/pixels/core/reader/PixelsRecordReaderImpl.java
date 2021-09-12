@@ -667,8 +667,9 @@ public class PixelsRecordReaderImpl
              * diskChunks.sort and ChunkSeq are also optimized in Issue #67 (path).
              *
              * Issue #114:
-             * disk chunks ordering and request merging are moved into the sortmerge
-             * scheduler, which can be enabled by setting read.request.scheduler=sortmerge.
+             * Disk chunks ordering and request merging (was implemented in the removed
+             * ChunkSeq) are moved into the sortmerge scheduler, which can be enabled
+             * by setting read.request.scheduler=sortmerge.
              */
             Scheduler.RequestBatch batch = new Scheduler.RequestBatch(diskChunks.size());
             AtomicReference<Throwable> lastErr = new AtomicReference<>(null);
@@ -1098,5 +1099,21 @@ public class PixelsRecordReaderImpl
 //        }
         // reset read performance metrics
 //        readPerfMetrics.clear();
+    }
+
+    public class ChunkId
+    {
+        public final int rowGroupId;
+        public final int columnId;
+        public final long offset;
+        public final long length;
+
+        public ChunkId(int rowGroupId, int columnId, long offset, long length)
+        {
+            this.rowGroupId = rowGroupId;
+            this.columnId = columnId;
+            this.offset = offset;
+            this.length = length;
+        }
     }
 }

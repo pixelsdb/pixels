@@ -45,6 +45,10 @@ public class NoopScheduler implements Scheduler
     @Override
     public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
     {
+        if (batch.size() <= 0)
+        {
+            return batch.completeAll();
+        }
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
         if (reader.supportsAsync())
