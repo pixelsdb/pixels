@@ -316,6 +316,13 @@ class PixelsPageSource implements ConnectorPageSource
                     this.memoryUsage += recordReader.getMemoryUsage();
                 }
                 pixelsReader.close();
+                /**
+                 * Issue #114:
+                 * Must set pixelsReader and recordReader to null,
+                 * close() may be called multiple times by Presto.
+                 */
+                recordReader = null;
+                pixelsReader = null;
             }
             rowBatch = null;
         } catch (Exception e)

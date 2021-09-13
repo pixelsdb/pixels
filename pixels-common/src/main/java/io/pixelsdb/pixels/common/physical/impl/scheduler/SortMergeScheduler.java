@@ -199,8 +199,12 @@ public class SortMergeScheduler implements Scheduler
         {
             for (int i = 0; i < size; ++i)
             {
-                buffer.position(positions.get(i));
+                /**
+                 * Issue #114:
+                 * Limit should be set before position.
+                 */
                 buffer.limit(positions.get(i) + lengths.get(i));
+                buffer.position(positions.get(i));
                 futures.get(i).complete(buffer.slice());
             }
         }
