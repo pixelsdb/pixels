@@ -968,6 +968,7 @@ public class PixelsRecordReaderImpl
      * Before that, it will always return false.
      * @return true if reach EOF.
      */
+    @Override
     public boolean isEndOfFile ()
     {
         if (this.resultRowBatch != null)
