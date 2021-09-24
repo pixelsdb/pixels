@@ -265,6 +265,7 @@ public class HDFS implements Storage
         return fs.create(fsPath, overwrite, bufferSize, replication, fs.getDefaultBlockSize(fsPath));
     }
 
+    @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
     {
         return fs.create(new Path(path), overwrite, bufferSize, replication, blockSize);

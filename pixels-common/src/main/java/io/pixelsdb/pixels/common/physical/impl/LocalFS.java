@@ -225,6 +225,12 @@ public class LocalFS implements Storage
     }
 
     @Override
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    {
+        return this.create(path, overwrite, bufferSize, replication);
+    }
+
+    @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
         File file = new File(path);

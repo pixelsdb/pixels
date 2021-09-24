@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
@@ -359,9 +358,10 @@ public class Main
 
                     ConfigFactory configFactory = ConfigFactory.Instance();
 
-                    HDFS storage = (HDFS) StorageFactory.Instance().getStorage("hdfs");
+                    Storage sourceStorage = StorageFactory.Instance().getStorage(source);
+                    Storage destStorage = StorageFactory.Instance().getStorage(destination);
 
-                    List<Status> files =  storage.listStatus(source);
+                    List<Status> files =  sourceStorage.listStatus(source);
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
@@ -374,12 +374,10 @@ public class Main
                                     sourceName.substring(0, sourceName.indexOf(postfix)) +
                                     "_copy_" + DateUtil.getCurTime() + postfix;
                             String dest = destName;
-                            DataInputStream inputStream = storage.open(s.getPath());
-                            DataOutputStream outputStream = storage.create(dest, false,
+                            DataInputStream inputStream = sourceStorage.open(s.getPath());
+                            DataOutputStream outputStream = destStorage.create(dest, false,
                                     Constants.HDFS_BUFFER_SIZE, replication, blockSize);
                             IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
-                            inputStream.close();
-                            outputStream.close();
                         }
                     }
                 }

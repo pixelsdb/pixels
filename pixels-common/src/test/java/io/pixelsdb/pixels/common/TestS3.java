@@ -33,6 +33,12 @@ import java.util.concurrent.CompletableFuture;
 public class TestS3
 {
     @Test
+    public void testStorageScheme()
+    {
+        System.out.println(Storage.Scheme.fromPath("s3://container/object"));
+    }
+
+    @Test
     public void testS3Writer() throws IOException
     {
         PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(Storage.Scheme.s3, "pixels-01/object-4",

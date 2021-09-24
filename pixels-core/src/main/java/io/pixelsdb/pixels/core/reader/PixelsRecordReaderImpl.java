@@ -734,7 +734,7 @@ public class PixelsRecordReaderImpl
     /**
      * Issue #105:
      * We use preRowInRG instead of curRowInRG to deal with queries like:
-     * <b>select ... from t where f = null</b>
+     * <b>select ... from t where f = null</b>.
      * Such query is invalid but Presto does not reject it. For such query,
      * Presto will call PageSource.getNextPage() but will not call load() on
      * the lazy blocks inside the returned page.

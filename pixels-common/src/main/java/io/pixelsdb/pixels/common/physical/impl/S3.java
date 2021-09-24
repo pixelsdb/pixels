@@ -37,7 +37,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
@@ -93,7 +97,7 @@ public class S3 implements Storage
     {
         if (key.startsWith(S3_META_PREFIX))
         {
-            key.substring(S3_META_PREFIX.length());
+            return key.substring(S3_META_PREFIX.length());
         }
         return null;
     }
@@ -108,6 +112,10 @@ public class S3 implements Storage
         public Path(String path)
         {
             requireNonNull(path);
+            if (path.contains("://"))
+            {
+                path = path.substring(path.indexOf("://") + 3);
+            }
             int slash = path.indexOf("/");
             if (slash > 0)
             {
@@ -123,6 +131,20 @@ public class S3 implements Storage
                 this.valid = true;
             }
         }
+
+        @Override
+        public String toString()
+        {
+            if (!this.valid)
+            {
+                return null;
+            }
+            if (this.isBucket)
+            {
+                return this.bucket;
+            }
+            return this.bucket + "/" + this.key;
+        }
     }
 
     @Override
@@ -132,15 +154,42 @@ public class S3 implements Storage
     }
 
     @Override
-    public List<Status> listStatus(String path)
+    public List<Status> listStatus(String path) throws IOException
     {
-        return null;
+        Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("Path '" + path + "' is not valid.");
+        }
+        if (!this.exists(path))
+        {
+            throw new IOException("Path '" + path + "' does not exist.");
+        }
+        ListObjectsV2Request request = ListObjectsV2Request.builder()
+                .bucket(p.bucket).build();
+        CompletableFuture<ListObjectsV2Response> response = s3.listObjectsV2(request);
+        try
+        {
+            List<S3Object> objects = response.get().contents();
+            List<Status> statuses = new ArrayList<>();
+            Path op = new Path(path);
+            for (S3Object object : objects)
+            {
+                op.key = object.key();
+                statuses.add(new Status(op.toString(), object.size(), false, 1));
+            }
+            return statuses;
+        } catch (InterruptedException | ExecutionException e)
+        {
+            throw new IOException("Failed to list objects.", e);
+        }
     }
 
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        return null;
+        return this.listStatus(path).stream().map(Status::getPath)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -246,7 +295,7 @@ public class S3 implements Storage
      * @param overwrite
      * @param bufferSize
      * @param replication
-     * @return always return null.
+     * @return
      * @throws IOException
      */
     @Override
@@ -263,7 +312,13 @@ public class S3 implements Storage
         }
         long id = GenerateId(S3_ID_KEY);
         EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-        return null;
+        return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
+    }
+
+    @Override
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    {
+        return this.create(path, overwrite, bufferSize, replication);
     }
 
     @Override
