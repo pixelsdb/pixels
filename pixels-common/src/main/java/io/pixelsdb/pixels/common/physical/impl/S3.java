@@ -130,6 +130,11 @@ public class S3 implements Storage
                 }
                 this.valid = true;
             }
+            else if (path.length() > 0)
+            {
+                this.bucket = path;
+                this.isBucket = true;
+            }
         }
 
         @Override
