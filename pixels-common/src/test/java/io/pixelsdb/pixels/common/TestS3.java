@@ -20,9 +20,12 @@
 package io.pixelsdb.pixels.common;
 
 import io.pixelsdb.pixels.common.physical.*;
+import io.pixelsdb.pixels.common.physical.impl.S3OutputStream;
+import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
@@ -48,6 +51,24 @@ public class TestS3
         writer.append(buffer);
         writer.flush();
         writer.close();
+    }
+
+    @Test
+    public void testS3OutputStream() throws IOException
+    {
+        S3AsyncClient s3 = S3AsyncClient.builder().build();
+        InputStream input = new FileInputStream("/home/hank/Downloads/JData/JData_Action_201603.csv");
+        OutputStream output = new S3OutputStream(s3, "pixels-01", "object-6");
+        IOUtils.copyBytes(input, output, 1024*1024, true);
+    }
+
+    @Test
+    public void testS3Download() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/object-6");
+        InputStream input = storage.open("s3://pixels-01/object-6");
+        OutputStream output = new FileOutputStream("/home/hank/JData_Action_201603.csv");
+        IOUtils.copyBytes(input, output, 1024*1024, true);
     }
 
     @Test
