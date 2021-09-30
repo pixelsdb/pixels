@@ -60,7 +60,7 @@ public class S3OutputStream extends OutputStream
     /**
      * The temporary buffer used for storing the chunks
      */
-    private final byte[] buf;
+    private final byte[] buffer;
 
     /**
      * The position in the buffer
@@ -75,7 +75,7 @@ public class S3OutputStream extends OutputStream
     /**
      * The unique id for this upload
      */
-    private String uploadId;
+    private String uploadId = null;
 
     /**
      * Collection of the etags for the parts that have been uploaded
@@ -99,7 +99,7 @@ public class S3OutputStream extends OutputStream
         this.s3Client = s3Client;
         this.bucket = bucket;
         this.key = key;
-        this.buf = new byte[BUFFER_SIZE];
+        this.buffer = new byte[BUFFER_SIZE];
         this.position = 0;
         this.parts = new ArrayList<>();
         this.open = true;
@@ -119,26 +119,26 @@ public class S3OutputStream extends OutputStream
     /**
      * Writes an array to the S3 Output Stream
      *
-     * @param byteArray the array to write
-     * @param o         the offset into the array
-     * @param l         the number of bytes to write
+     * @param buf the array to write
+     * @param off the offset into the array
+     * @param len the number of bytes to write
      */
     @Override
-    public void write(final byte[] byteArray, final int o, final int l) throws IOException
+    public void write(final byte[] buf, final int off, final int len) throws IOException
     {
         this.assertOpen();
-        int ofs = o, len = l;
-        int size;
-        while (len > (size = this.buf.length - position))
+        int offsetInBuf = off, remainToRead = len;
+        int remainInBuffer;
+        while (remainToRead > (remainInBuffer = this.buffer.length - position))
         {
-            System.arraycopy(byteArray, ofs, this.buf, this.position, size);
-            this.position += size;
+            System.arraycopy(buf, offsetInBuf, this.buffer, this.position, remainInBuffer);
+            this.position += remainInBuffer;
             flushBufferAndRewind();
-            ofs += size;
-            len -= size;
+            offsetInBuf += remainInBuffer;
+            remainToRead -= remainInBuffer;
         }
-        System.arraycopy(byteArray, ofs, this.buf, this.position, len);
-        this.position += len;
+        System.arraycopy(buf, offsetInBuf, this.buffer, this.position, remainToRead);
+        this.position += remainToRead;
     }
 
     /**
@@ -178,7 +178,7 @@ public class S3OutputStream extends OutputStream
                 .partNumber(this.parts.size() + 1).build();
         CompletableFuture<UploadPartResponse> response =
                 this.s3Client.uploadPart(request, AsyncRequestBody.fromByteBuffer(
-                        ByteBuffer.wrap(buf, 0, position)));
+                        ByteBuffer.wrap(buffer, 0, position)));
         try
         {
             String etag = response.get().eTag();
@@ -218,7 +218,7 @@ public class S3OutputStream extends OutputStream
                 final PutObjectRequest request = PutObjectRequest.builder().bucket(this.bucket).key(this.key)
                         .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
                 this.s3Client.putObject(request, AsyncRequestBody.fromByteBuffer(
-                        ByteBuffer.wrap(buf, 0, position))).join();
+                        ByteBuffer.wrap(buffer, 0, position))).join();
             }
         }
     }
@@ -241,11 +241,11 @@ public class S3OutputStream extends OutputStream
     public void write(int b) throws IOException
     {
         this.assertOpen();
-        if (position >= this.buf.length)
+        if (position >= this.buffer.length)
         {
             flushBufferAndRewind();
         }
-        this.buf[position++] = (byte) b;
+        this.buffer[position++] = (byte) b;
     }
 
     private void assertOpen()

@@ -65,10 +65,20 @@ public class TestS3
     @Test
     public void testS3Download() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/object-6");
-        InputStream input = storage.open("s3://pixels-01/object-6");
-        OutputStream output = new FileOutputStream("/home/hank/JData_Action_201603.csv");
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
+        InputStream input = storage.open("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
+        OutputStream output = new FileOutputStream("20200828093836_0.compact_copy_20210929102009_0.pxl");
         IOUtils.copyBytes(input, output, 1024*1024, true);
+    }
+
+    @Test
+    public void testGetStatus() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
+        Status status = storage.getStatus("/pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
+        System.out.println(status.getLength());
+        System.out.println(status.getName());
+        System.out.println(status.getPath());
     }
 
     @Test

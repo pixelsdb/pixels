@@ -27,8 +27,6 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.model.*;
@@ -115,6 +113,10 @@ public class S3 implements Storage
             if (path.contains("://"))
             {
                 path = path.substring(path.indexOf("://") + 3);
+            }
+            else if (path.startsWith("/"))
+            {
+                path = path.substring(1);
             }
             int slash = path.indexOf("/");
             if (slash > 0)
@@ -217,13 +219,13 @@ public class S3 implements Storage
         }
         if (p.isBucket)
         {
-            return new Status(path, 0, true, 1);
+            return new Status(p.toString(), 0, true, 1);
         }
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(p.bucket).key(p.key).build();
         try
         {
             HeadObjectResponse response = s3.headObject(request).get();
-            return new Status(path, response.contentLength(), false, 1);
+            return new Status(p.toString(), response.contentLength(), false, 1);
         } catch (Exception e)
         {
             throw new IOException("Failed to get object head of '" + path + "'", e);
@@ -281,16 +283,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
-        GetObjectRequest request = GetObjectRequest.builder().bucket(p.bucket).key(p.key).build();
-        try
-        {
-            ResponseBytes<GetObjectResponse> get =
-                    s3.getObject(request, AsyncResponseTransformer.toBytes()).get();
-            return new DataInputStream(get.asInputStream());
-        } catch (Exception e)
-        {
-            throw new IOException("Failed to get object '" + path + "'.", e);
-        }
+        return new DataInputStream(new S3InputStream(s3, p.bucket, p.key));
     }
 
     /**
