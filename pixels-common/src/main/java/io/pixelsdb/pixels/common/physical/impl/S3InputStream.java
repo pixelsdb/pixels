@@ -116,7 +116,10 @@ public class S3InputStream extends InputStream
         this.assertOpen();
         if (bufferPosition >= this.buffer.length)
         {
-            populateBuffer();
+            if (populateBuffer() < 0)
+            {
+                return -1;
+            }
         }
         return this.buffer[bufferPosition++];
     }
@@ -140,7 +143,6 @@ public class S3InputStream extends InputStream
             }
         }
         int offsetInBuf = off, remainToRead = len;
-
         while (remainToRead > 0)
         {
             int remainInBuffer = this.buffer.length - bufferPosition;
@@ -216,11 +218,12 @@ public class S3InputStream extends InputStream
     @Override
     public int available() throws IOException
     {
-        if (this.length - this.position > Integer.MAX_VALUE)
+        long available = this.length - this.position;
+        if (this.buffer != null)
         {
-            return Integer.MAX_VALUE;
+            available += this.buffer.length - this.bufferPosition;
         }
-        return (int) (this.length - this.position);
+        return available > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) available;
     }
 
     @Override
