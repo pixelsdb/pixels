@@ -57,7 +57,7 @@ public class TestS3
     public void testS3OutputStream() throws IOException
     {
         S3AsyncClient s3 = S3AsyncClient.builder().build();
-        InputStream input = new FileInputStream("/home/hank/Downloads/JData/JData_Action_201603.csv");
+        InputStream input = new FileInputStream("/home/hank/test.csv");
         OutputStream output = new S3OutputStream(s3, "pixels-01", "object-6");
         IOUtils.copyBytes(input, output, 1024*1024, true);
     }
@@ -65,17 +65,17 @@ public class TestS3
     @Test
     public void testS3Download() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
-        InputStream input = storage.open("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
-        OutputStream output = new FileOutputStream("20200828093836_0.compact_copy_20210929102009_0.pxl");
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/test.pxl");
+        InputStream input = storage.open("s3://pixels-01/test.pxl");
+        OutputStream output = new FileOutputStream("test.pxl");
         IOUtils.copyBytes(input, output, 1024*1024, true);
     }
 
     @Test
     public void testGetStatus() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
-        Status status = storage.getStatus("/pixels-00/20200828093836_0.compact_copy_20210929102009_0.pxl");
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/test.pxl");
+        Status status = storage.getStatus("s3://pixels-01/test.pxl");
         System.out.println(status.getLength());
         System.out.println(status.getName());
         System.out.println(status.getPath());

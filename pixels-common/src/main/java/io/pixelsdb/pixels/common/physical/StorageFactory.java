@@ -112,4 +112,12 @@ public class StorageFactory
 
         return storage;
     }
+
+    public void closeAll() throws IOException
+    {
+        for (Storage.Scheme scheme : storageImpls.keySet())
+        {
+            storageImpls.get(scheme).close();
+        }
+    }
 }

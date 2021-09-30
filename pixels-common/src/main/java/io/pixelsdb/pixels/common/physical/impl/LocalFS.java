@@ -262,6 +262,21 @@ public class LocalFS implements Storage
     }
 
     @Override
+    public boolean supportDirectCopy()
+    {
+        return false;
+    }
+
+    @Override
+    public boolean directCopy(String src, String dest)
+    {
+        throw new UnsupportedOperationException("Direct copy is unsupported on LocalFS storage.");
+    }
+
+    @Override
+    public void close() throws IOException { }
+
+    @Override
     public boolean exists(String path)
     {
         return new File(path).exists();

@@ -278,6 +278,24 @@ public class HDFS implements Storage
     }
 
     @Override
+    public boolean supportDirectCopy()
+    {
+        return false;
+    }
+
+    @Override
+    public boolean directCopy(String src, String dest)
+    {
+        throw new UnsupportedOperationException("direct copy is unsupported on HDFS storage.");
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        this.fs.close();
+    }
+
+    @Override
     public boolean exists(String path) throws IOException
     {
         return fs.exists(new Path(path));

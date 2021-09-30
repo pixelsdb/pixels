@@ -175,6 +175,27 @@ public interface Storage
     boolean delete(String path, boolean recursive) throws IOException;
 
     /**
+     * Whether this storage supports direct (short circuit) copying.
+     * @return true if copy is supported.
+     */
+    boolean supportDirectCopy();
+
+    /**
+     * Copy from the source to the destination without going through this client.
+     * @param src
+     * @param dest
+     * @return
+     * @throws IOException
+     */
+    boolean directCopy(String src, String dest) throws IOException;
+
+    /**
+     * Close the storage.
+     * @throws IOException
+     */
+    void close() throws IOException;
+
+    /**
      * For local fs, path is considered as local.
      * @param path
      * @return

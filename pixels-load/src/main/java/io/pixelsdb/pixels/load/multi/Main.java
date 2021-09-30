@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -104,6 +105,14 @@ public class Main
             if (inputStr.equalsIgnoreCase("exit") || inputStr.equalsIgnoreCase("quit") ||
                     inputStr.equalsIgnoreCase("-q"))
             {
+                try
+                {
+                    StorageFactory.Instance().closeAll();
+                    EtcdUtil.Instance().getClient().close();
+                } catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
                 System.out.println("Bye.");
                 break;
             }
@@ -370,14 +379,21 @@ public class Main
                         for (Status s : files)
                         {
                             String sourceName = s.getName();
-                            String destName = destination +
+                            String destPath = destination +
                                     sourceName.substring(0, sourceName.indexOf(postfix)) +
                                     "_copy_" + DateUtil.getCurTime() + postfix;
-                            String dest = destName;
-                            DataInputStream inputStream = sourceStorage.open(s.getPath());
-                            DataOutputStream outputStream = destStorage.create(dest, false,
-                                    Constants.HDFS_BUFFER_SIZE, replication, blockSize);
-                            IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
+                            if (sourceStorage.getScheme() == destStorage.getScheme() &&
+                                    destStorage.supportDirectCopy())
+                            {
+                                destStorage.directCopy(s.getPath(), destPath);
+                            }
+                            else
+                            {
+                                DataInputStream inputStream = sourceStorage.open(s.getPath());
+                                DataOutputStream outputStream = destStorage.create(destPath, false,
+                                        Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+                                IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
+                            }
                         }
                     }
                 }

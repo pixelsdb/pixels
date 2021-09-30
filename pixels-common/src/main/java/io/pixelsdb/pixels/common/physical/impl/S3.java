@@ -136,6 +136,7 @@ public class S3 implements Storage
             {
                 this.bucket = path;
                 this.isBucket = true;
+                this.valid = true;
             }
         }
 
@@ -168,9 +169,9 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.exists(path))
+        if (!p.isBucket)
         {
-            throw new IOException("Path '" + path + "' does not exist.");
+            throw new IOException("Path '" + path + "' is not a directory (bucket).");
         }
         ListObjectsV2Request request = ListObjectsV2Request.builder()
                 .bucket(p.bucket).build();
@@ -180,6 +181,7 @@ public class S3 implements Storage
             List<S3Object> objects = response.get().contents();
             List<Status> statuses = new ArrayList<>();
             Path op = new Path(path);
+            op.isBucket = false;
             for (S3Object object : objects)
             {
                 op.key = object.key();
@@ -359,6 +361,39 @@ public class S3 implements Storage
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean supportDirectCopy()
+    {
+        return true;
+    }
+
+    @Override
+    public boolean directCopy(String src, String dest) throws IOException
+    {
+        Path srcPath = new Path(src);
+        Path destPath = new Path(dest);
+        CopyObjectRequest copyReq = CopyObjectRequest.builder()
+                .copySource(srcPath.toString())
+                .destinationBucket(destPath.bucket)
+                .destinationKey(destPath.key)
+                .build();
+        try
+        {
+            s3.copyObject(copyReq).join();
+            return true;
+        }
+        catch (RuntimeException e)
+        {
+            throw new IOException("Failed to copy object from '" + src + "' to '" + dest + "'", e);
+        }
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        s3.close();
     }
 
     @Override
