@@ -55,6 +55,7 @@ public class LockInternals
     private Long leaseId = 0L;
     private static AtomicInteger count = new AtomicInteger(0);
     private volatile Map<String, Long> pathToVersion = new HashMap<>();
+    private ScheduledExecutorService keepAliveService;
 
     public LockInternals(Client client, String path, String lockName)
     {
@@ -72,8 +73,9 @@ public class LockInternals
             logger.error("[create-lease-error]: " + e1);
             return;
         }
-        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-        service.scheduleAtFixedRate(new KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
+        keepAliveService = Executors.newSingleThreadScheduledExecutor();
+        keepAliveService.scheduleAtFixedRate(new KeepAliveTask(leaseClient, leaseId), 1, 12, TimeUnit.SECONDS);
+        keepAliveService.shutdown();
     }
 
     LockInternals verbose(boolean verbose)
@@ -348,6 +350,7 @@ public class LockInternals
     public void releaseLock(String lockPath) throws Exception
     {
         deleteOurPath(lockPath);
+        this.keepAliveService.shutdownNow();
     }
 
     public static class KeepAliveTask implements Runnable

@@ -379,6 +379,10 @@ public class Main
                         for (Status s : files)
                         {
                             String sourceName = s.getName();
+                            if (!sourceName.contains(postfix))
+                            {
+                                continue;
+                            }
                             String destPath = destination +
                                     sourceName.substring(0, sourceName.indexOf(postfix)) +
                                     "_copy_" + DateUtil.getCurTime() + postfix;
