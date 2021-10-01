@@ -24,10 +24,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -47,7 +44,6 @@ public class PhysicalS3Writer implements PhysicalWriter
     private String pathStr;
     private long position;
     private S3AsyncClient client;
-    private File tempFile;
     private OutputStream out;
 
     public PhysicalS3Writer(Storage storage, String path) throws IOException
@@ -70,8 +66,7 @@ public class PhysicalS3Writer implements PhysicalWriter
         this.position = 0L;
         this.client = s3.getClient();
         this.s3.create(path, false, S3_BUFFER_SIZE, (short)1);
-        this.tempFile = File.createTempFile("pixels-s3-", ".tmp");
-        this.out = new FileOutputStream(tempFile);
+        this.out = new S3OutputStream(this.client, this.path.bucket, this.path.key);
     }
 
     /**
@@ -125,17 +120,8 @@ public class PhysicalS3Writer implements PhysicalWriter
     public void close() throws IOException
     {
         this.out.close();
-        PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(path.bucket).key(path.key).build();
-        try
-        {
-            this.client.putObject(request, this.tempFile.toPath()).get();
-        } catch (Exception e)
-        {
-            throw new IOException("Failed to put local temp file to S3.", e);
-        }
-        this.tempFile.deleteOnExit();
-        this.client.close();
+        // Don't close the client as it is external.
+        // this.client.close();
     }
 
     /**
