@@ -46,7 +46,14 @@ public interface PhysicalReader
      */
     boolean supportsAsync();
 
-    CompletableFuture<ByteBuffer> readAsync(int length) throws IOException;
+    /**
+     * readAsync does not affect the position of this reader, and is not affected by seek().
+     * @param offset
+     * @param length
+     * @return
+     * @throws IOException
+     */
+    CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException;
 
     long readLong() throws IOException;
 

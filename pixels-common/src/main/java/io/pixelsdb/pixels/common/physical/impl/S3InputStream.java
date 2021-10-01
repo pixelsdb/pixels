@@ -211,7 +211,7 @@ public class S3InputStream extends InputStream
     private String toRange(long start, int length)
     {
         StringBuilder builder = new StringBuilder("bytes=");
-        builder.append(start).append('-').append(start+length);
+        builder.append(start).append('-').append(start+length-1);
         return builder.toString();
     }
 

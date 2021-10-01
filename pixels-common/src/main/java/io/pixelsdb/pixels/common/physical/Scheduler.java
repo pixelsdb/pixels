@@ -42,7 +42,9 @@ public interface Scheduler
      * @return should never return null.
      * @throws IOException
      */
-    CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException;
+    CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch,
+                                         List<CompletableFuture> actionFutures)
+            throws IOException;
 
     class Request implements Comparable<Request>
     {
@@ -137,8 +139,10 @@ public interface Scheduler
          * If batch is empty, this method returns and completed future.
          * @return
          */
-        public CompletableFuture<Void> completeAll()
+        public CompletableFuture<Void> completeAll(List<CompletableFuture> actionFutures)
         {
+            assert actionFutures != null;
+            assert actionFutures.size() == size;
             if (size <= 0)
             {
                 CompletableFuture<Void> future = new CompletableFuture<>();
@@ -148,7 +152,7 @@ public interface Scheduler
             CompletableFuture[] fs = new CompletableFuture[size];
             for (int i = 0; i < size; ++i)
             {
-                fs[i] = this.futures.get(i);
+                fs[i] = actionFutures.get(i);
             }
             return CompletableFuture.allOf(fs);
         }

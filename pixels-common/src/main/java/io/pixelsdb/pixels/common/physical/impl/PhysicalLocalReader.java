@@ -100,7 +100,7 @@ public class PhysicalLocalReader implements PhysicalReader
     }
 
     @Override
-    public CompletableFuture<ByteBuffer> readAsync(int length) throws IOException
+    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
     {
         throw new IOException("Asynchronous read is not supported for local fs.");
     }

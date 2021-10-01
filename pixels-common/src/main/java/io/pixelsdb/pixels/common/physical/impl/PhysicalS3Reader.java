@@ -75,8 +75,9 @@ public class PhysicalS3Reader implements PhysicalReader
 
     private String toRange(long start, int length)
     {
+        assert start >= 0 && length > 0;
         StringBuilder builder = new StringBuilder("bytes=");
-        builder.append(start).append('-').append(start+length);
+        builder.append(start).append('-').append(start+length-1);
         return builder.toString();
     }
 
@@ -140,19 +141,19 @@ public class PhysicalS3Reader implements PhysicalReader
     public boolean supportsAsync()
     {
         // TODO: async read does not work properly.
-        return false;
+        return true;
     }
 
     @Override
-    public CompletableFuture<ByteBuffer> readAsync(int len) throws IOException
+    public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
     {
-        if (this.position.get() + len > this.length)
+        if (offset + len > this.length)
         {
-            throw new IOException("Current position " + this.position.get() + " plus " +
+            throw new IOException("Offset " + offset + " plus " +
                     len + " exceeds object length " + this.length + ".");
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
-                .key(path.key).range(toRange(position.get(), len)).build();
+                .key(path.key).range(toRange(offset, len)).build();
         CompletableFuture<ResponseBytes<GetObjectResponse>> future =
                 client.getObject(request, AsyncResponseTransformer.toBytes());
         try
@@ -163,7 +164,6 @@ public class PhysicalS3Reader implements PhysicalReader
                 if (resp != null)
                 {
                     futureBuffer.complete(ByteBuffer.wrap(resp.asByteArray()));
-                    this.position.addAndGet(len);
                 }
                 else
                 {

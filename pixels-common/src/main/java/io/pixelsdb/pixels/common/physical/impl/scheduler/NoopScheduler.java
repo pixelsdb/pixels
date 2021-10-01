@@ -43,11 +43,12 @@ public class NoopScheduler implements Scheduler
     private static Logger logger = LogManager.getLogger(NoopScheduler.class);
 
     @Override
-    public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch,
+                                                List<CompletableFuture> actionFutures) throws IOException
     {
         if (batch.size() <= 0)
         {
-            return batch.completeAll();
+            return batch.completeAll(actionFutures);
         }
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
@@ -57,8 +58,7 @@ public class NoopScheduler implements Scheduler
             {
                 CompletableFuture<ByteBuffer> future = futures.get(i);
                 Request request = requests.get(i);
-                reader.seek(request.start);
-                reader.readAsync(request.length).whenComplete((resp, err) ->
+                reader.readAsync(request.start, request.length).whenComplete((resp, err) ->
                 {
                     if (resp != null)
                     {
@@ -83,6 +83,6 @@ public class NoopScheduler implements Scheduler
             }
         }
 
-        return batch.completeAll();
+        return batch.completeAll(actionFutures);
     }
 }

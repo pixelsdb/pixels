@@ -27,7 +27,9 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
@@ -39,7 +41,8 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * @author guodong
@@ -62,7 +65,7 @@ public class PixelsRecordReaderImpl
     private final boolean enableCache;
     private final List<String> cacheOrder;
     private final PixelsCacheReader cacheReader;
-    private final PixelsFooterCache pixelsFooterCache;
+    private volatile PixelsFooterCache pixelsFooterCache;
     private final String fileName;
 
     private TypeDescription fileSchema;
@@ -80,8 +83,9 @@ public class PixelsRecordReaderImpl
     private int curRGIdx = 0;            // index of current reading row group in targetRGs
     private int curRowInRG = 0;          // starting index of values to read by reader in current row group
 
-    private volatile PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private volatile ByteBuffer[] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private volatile AtomicReferenceArray<PixelsProto.RowGroupFooter> rowGroupFooters;
+    // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private volatile AtomicReferenceArray<ByteBuffer> chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
 
     private long diskReadBytes = 0L;
@@ -398,14 +402,16 @@ public class PixelsRecordReaderImpl
         targetRGNum = targetRGIdx;
 
         // read row group footers
-        rowGroupFooters =
-                new PixelsProto.RowGroupFooter[targetRGNum];
+        rowGroupFooters = new AtomicReferenceArray<>(targetRGNum);
         /**
          * Issue #114:
          * Use request batch and read scheduler to execute the read requests.
+         *
+         * Here, we create an empty batch as footer cache is very likely to be hit in
+         * the subsequent queries on the same table.
          */
-        Scheduler.RequestBatch requestBatch = new Scheduler.RequestBatch(targetRGNum);
-        AtomicReference<Throwable> lastErr = new AtomicReference<>(null);
+        Scheduler.RequestBatch requestBatch = new Scheduler.RequestBatch();
+        List<CompletableFuture> actionFutures = new ArrayList<>();
         for (int i = 0; i < targetRGNum; i++)
         {
             int rgId = targetRGs[i];
@@ -419,40 +425,37 @@ public class PixelsRecordReaderImpl
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
                 int fi = i;
-                requestBatch.add(footerOffset, (int) footerLength).whenComplete((resp, err) ->
+                actionFutures.add(requestBatch.add(footerOffset, (int) footerLength).whenComplete((resp, err) ->
                 {
                     if (resp != null)
                     {
                         try
                         {
-                            rowGroupFooters[fi] = PixelsProto.RowGroupFooter.parseFrom(resp);
-                            pixelsFooterCache.putRGFooter(rgCacheId, rowGroupFooters[fi]);
+                            PixelsProto.RowGroupFooter parsed = PixelsProto.RowGroupFooter.parseFrom(resp);
+                            rowGroupFooters.set(fi, parsed);
+                            pixelsFooterCache.putRGFooter(rgCacheId, parsed);
                         } catch (InvalidProtocolBufferException e)
                         {
-                            logger.error("Failed to parse row group footer from byte buffer.", e);
-                            lastErr.set(e);
+                            throw new RuntimeException("Failed to parse row group footer from byte buffer.", e);
                         }
                     }
-                    else
-                    {
-                        logger.error("Failed to read row group footer.", err);
-                        lastErr.set(err);
-                    }
-                });
+                }));
             }
             // cache hit
             else
             {
-                rowGroupFooters[i] = rowGroupFooter;
+                rowGroupFooters.set(i, rowGroupFooter);
             }
         }
-        if (lastErr.get() != null)
+        Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
+        try
+        {
+            scheduler.executeBatch(physicalReader, requestBatch, actionFutures).get();
+        } catch (Exception e)
         {
             throw new IOException("Failed to read row group footers, " +
-                    "only the last error is thrown, check the logs for more information.", lastErr.get());
+                    "only the last error is thrown, check the logs for more information.", e);
         }
-        Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
-        scheduler.executeBatch(physicalReader, requestBatch).join();
         return true;
     }
 
@@ -512,7 +515,7 @@ public class PixelsRecordReaderImpl
         }
 
         // read chunk offset and length of each target column chunks
-        this.chunkBuffers = new ByteBuffer[targetRGNum * includedColumns.length];
+        this.chunkBuffers = new AtomicReferenceArray<>(targetRGNum * includedColumns.length);
         List<ChunkId> diskChunks = new ArrayList<>(targetRGNum * targetColumns.length);
         // read cached data which are in need
         if (enableCache)
@@ -556,7 +559,7 @@ public class PixelsRecordReaderImpl
                     else
                     {
                         PixelsProto.RowGroupIndex rowGroupIndex =
-                                rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                                rowGroupFooters.get(rgIdx).getRowGroupIndexEntry();
                         PixelsProto.ColumnChunkIndex chunkIndex =
                                 rowGroupIndex.getColumnChunkIndexEntries(colId);
                         /**
@@ -584,7 +587,7 @@ public class PixelsRecordReaderImpl
                 memoryUsage += columnletId.direct ? 0 : columnlet.capacity();
 //                long getEnd = System.nanoTime();
 //                logger.debug("[cache get]: " + columnlet.length + "," + (getEnd - getBegin));
-                chunkBuffers[(rgId - RGStart) * includedColumns.length + colId] = columnlet;
+                chunkBuffers.set((rgId - RGStart) * includedColumns.length + colId, columnlet);
                 if (columnlet == null || columnlet.capacity() == 0)
                 {
                     /**
@@ -595,7 +598,7 @@ public class PixelsRecordReaderImpl
                      */
                     int rgIdx = rgId - RGStart;
                     PixelsProto.RowGroupIndex rowGroupIndex =
-                            rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                            rowGroupFooters.get(rgIdx).getRowGroupIndexEntry();
                     PixelsProto.ColumnChunkIndex chunkIndex =
                             rowGroupIndex.getColumnChunkIndexEntries(colId);
                     ChunkId diskChunk = new ChunkId(rgIdx, colId, chunkIndex.getChunkOffset(),
@@ -641,7 +644,7 @@ public class PixelsRecordReaderImpl
             for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
             {
                 PixelsProto.RowGroupIndex rowGroupIndex =
-                        rowGroupFooters[rgIdx].getRowGroupIndexEntry();
+                        rowGroupFooters.get(rgIdx).getRowGroupIndexEntry();
                 for (int colId : targetColumns)
                 {
                     PixelsProto.ColumnChunkIndex chunkIndex =
@@ -671,8 +674,8 @@ public class PixelsRecordReaderImpl
              * ChunkSeq) are moved into the sortmerge scheduler, which can be enabled
              * by setting read.request.scheduler=sortmerge.
              */
-            Scheduler.RequestBatch batch = new Scheduler.RequestBatch(diskChunks.size());
-            AtomicReference<Throwable> lastErr = new AtomicReference<>(null);
+            Scheduler.RequestBatch requestBatch = new Scheduler.RequestBatch(diskChunks.size());
+            List<CompletableFuture> actionFutures = new ArrayList<>(diskChunks.size());
             for (ChunkId chunk : diskChunks)
             {
                 /**
@@ -683,6 +686,7 @@ public class PixelsRecordReaderImpl
                  * used to calculate the index of chunkBuffers.
                  */
                 int rgIdx = chunk.rowGroupId;
+                int numCols = includedColumns.length;
                 int colId = chunk.columnId;
                 /**
                  * Issue #114:
@@ -701,30 +705,27 @@ public class PixelsRecordReaderImpl
                  * readCost.setMs(readTimeMs);
                  * readPerfMetrics.addSeqRead(readCost);
                  */
-                batch.add(new Scheduler.Request(chunk.offset, (int)chunk.length))
+                actionFutures.add(requestBatch.add(new Scheduler.Request(chunk.offset, (int)chunk.length))
                         .whenComplete((resp, err) ->
                 {
                     if (resp != null)
                     {
-                        chunkBuffers[rgIdx * includedColumns.length + colId] = resp;
+                        chunkBuffers.set(rgIdx * numCols + colId, resp);
                     }
-                    else
-                    {
-                        logger.error("Failed to read chunks block into buffers.", err);
-                        lastErr.set(err);
-                    }
-                });
+                }));
                 // don't update statistics in whenComplete as it may be executed in other threads.
                 diskReadBytes += chunk.length;
                 memoryUsage += chunk.length;
             }
 
             Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
-            scheduler.executeBatch(physicalReader, batch).join();
-            if (lastErr.get() != null)
+            try
+            {
+                scheduler.executeBatch(physicalReader, requestBatch, actionFutures).get();
+            } catch (Exception e)
             {
                 throw new IOException("Failed to read chunks block into buffers, " +
-                        "only the last error is thrown, check the logs for more information.", lastErr.get());
+                        "only the last error is thrown, check the logs for more information.", e);
             }
         }
 
@@ -903,8 +904,7 @@ public class PixelsRecordReaderImpl
             {
                 if (!columnVectors[i].duplicated)
                 {
-                    PixelsProto.RowGroupFooter rowGroupFooter =
-                            rowGroupFooters[curRGIdx];
+                    PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters.get(curRGIdx);
                     PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
                             .getColumnChunkEncodings(resultColumns[i]);
                     int index = curRGIdx * includedColumns.length + resultColumns[i];
@@ -912,7 +912,7 @@ public class PixelsRecordReaderImpl
                             .getColumnChunkIndexEntries(
                                     resultColumns[i]);
                     // TODO: read chunk buffer lazily when a column block is read by PixelsPageSource.
-                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                    readers[i].read(chunkBuffers.get(index), encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
             }
@@ -1043,9 +1043,9 @@ public class PixelsRecordReaderImpl
         // release chunk buffer
         if (chunkBuffers != null)
         {
-            for (int i = 0; i < chunkBuffers.length; i++)
+            for (int i = 0; i < chunkBuffers.length(); i++)
             {
-                chunkBuffers[i] = null;
+                chunkBuffers.set(i, null);
             }
         }
         if (readers != null)
@@ -1075,9 +1075,9 @@ public class PixelsRecordReaderImpl
         }
         if (rowGroupFooters != null)
         {
-            for (int i = 0; i < rowGroupFooters.length; ++i)
+            for (int i = 0; i < rowGroupFooters.length(); ++i)
             {
-                rowGroupFooters[i] = null;
+                rowGroupFooters.set(i, null);
             }
         }
         // write out read performance metrics

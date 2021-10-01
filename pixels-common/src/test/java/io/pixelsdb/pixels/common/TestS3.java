@@ -29,6 +29,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created at: 9/8/21
@@ -114,7 +115,7 @@ public class TestS3
     public void testS3Reader() throws IOException
     {
         PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-01/object-4");
-        CompletableFuture<ByteBuffer> future = reader.readAsync(8);
+        CompletableFuture<ByteBuffer> future = reader.readAsync(0, 8);
         future.whenComplete((resp, err) ->
         {
             if (resp != null)
@@ -128,5 +129,39 @@ public class TestS3
         });
         future.join();
         reader.close();
+    }
+
+    @Test
+    public void testEnclosure() throws InterruptedException
+    {
+        //byte[] bytes = new byte[100];
+        //PixelsProto.RowGroupFooter footer = PixelsProto.RowGroupFooter.parseFrom(ByteBuffer.wrap(null));
+        //System.out.println(footer);
+        AtomicInteger integer = new AtomicInteger(0);
+        for (int i = 0; i < 3; ++i)
+        {
+            String a = "" + i;
+            int fi = i;
+            Thread thread = new Thread(() ->
+            {
+                try
+                {
+                    Thread.sleep(500);
+                    System.out.println("in: " + integer.get());
+                    System.out.println("in: " + a + ", " + fi);
+                    integer.addAndGet(10);
+                    System.out.println("in: " + integer.get());
+                    System.out.println("in: " + a + ", " + fi);
+                } catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            });
+            thread.start();
+        }
+        integer.set(5);
+        System.out.println(integer.get());
+        Thread.sleep(1000);
+        System.out.println(integer.get());
     }
 }
