@@ -27,8 +27,11 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.DataInputStream;
@@ -37,8 +40,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
@@ -61,15 +62,20 @@ public class S3 implements Storage
 {
     private static Logger logger = LogManager.getLogger(S3.class);
 
-    private static S3AsyncClient s3;
+    private static S3Client s3;
+    private static S3AsyncClient s3Async;
 
     static
     {
         InitId(S3_ID_KEY);
 
-        S3AsyncClientBuilder builder = S3AsyncClient.builder();
-        // TODO: config builder.
-        s3 = builder.build();
+        S3AsyncClientBuilder builder = S3AsyncClient.builder()
+                .httpClientBuilder(NettyNioAsyncHttpClient.builder()
+                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(10).build())
+                        .maxConcurrency(100).maxPendingConnectionAcquires(10_000));
+        s3Async = builder.build();
+
+        s3 = S3Client.builder().build();
     }
 
     private String[] allHosts;
@@ -175,23 +181,17 @@ public class S3 implements Storage
         }
         ListObjectsV2Request request = ListObjectsV2Request.builder()
                 .bucket(p.bucket).build();
-        CompletableFuture<ListObjectsV2Response> response = s3.listObjectsV2(request);
-        try
+        ListObjectsV2Response response = s3.listObjectsV2(request);
+        List<S3Object> objects = response.contents();
+        List<Status> statuses = new ArrayList<>();
+        Path op = new Path(path);
+        op.isBucket = false;
+        for (S3Object object : objects)
         {
-            List<S3Object> objects = response.get().contents();
-            List<Status> statuses = new ArrayList<>();
-            Path op = new Path(path);
-            op.isBucket = false;
-            for (S3Object object : objects)
-            {
-                op.key = object.key();
-                statuses.add(new Status(op.toString(), object.size(), false, 1));
-            }
-            return statuses;
-        } catch (InterruptedException | ExecutionException e)
-        {
-            throw new IOException("Failed to list objects.", e);
+            op.key = object.key();
+            statuses.add(new Status(op.toString(), object.size(), false, 1));
         }
+        return statuses;
     }
 
     @Override
@@ -226,7 +226,7 @@ public class S3 implements Storage
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(p.bucket).key(p.key).build();
         try
         {
-            HeadObjectResponse response = s3.headObject(request).get();
+            HeadObjectResponse response = s3.headObject(request);
             return new Status(p.toString(), response.contentLength(), false, 1);
         } catch (Exception e)
         {
@@ -238,6 +238,13 @@ public class S3 implements Storage
     public long getFileId(String path) throws IOException
     {
         KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
+        if (kv == null)
+        {
+            // the file id does not exist, register a new id for this file.
+            long id = GenerateId(S3_ID_KEY);
+            EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+            return id;
+        }
         return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
     }
 
@@ -285,7 +292,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
-        return new DataInputStream(new S3InputStream(s3, p.bucket, p.key));
+        return new DataInputStream(new S3InputStream(s3Async, p.bucket, p.key));
     }
 
     /**
@@ -312,7 +319,7 @@ public class S3 implements Storage
         }
         long id = GenerateId(S3_ID_KEY);
         EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-        return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
+        return new DataOutputStream(new S3OutputStream(s3Async, p.bucket, p.key));
     }
 
     @Override
@@ -342,7 +349,7 @@ public class S3 implements Storage
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
                 try
                 {
-                    s3.deleteObject(request).get();
+                    s3Async.deleteObject(request).get();
                 } catch (Exception e)
                 {
                     throw new IOException("Failed to delete object '" + sub.bucket + "/" + sub.key + "' from S3.", e);
@@ -354,7 +361,7 @@ public class S3 implements Storage
             DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(p.bucket).key(p.key).build();
             try
             {
-                s3.deleteObject(request).get();
+                s3Async.deleteObject(request).get();
             } catch (Exception e)
             {
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
@@ -381,7 +388,7 @@ public class S3 implements Storage
                 .build();
         try
         {
-            s3.copyObject(copyReq).join();
+            s3Async.copyObject(copyReq).join();
             return true;
         }
         catch (RuntimeException e)
@@ -393,7 +400,7 @@ public class S3 implements Storage
     @Override
     public void close() throws IOException
     {
-        s3.close();
+        s3Async.close();
     }
 
     @Override
@@ -416,6 +423,6 @@ public class S3 implements Storage
 
     public S3AsyncClient getClient()
     {
-        return s3;
+        return s3Async;
     }
 }

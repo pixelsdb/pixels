@@ -27,6 +27,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -82,6 +83,34 @@ public class TestS3
     }
 
     @Test
+    public void testlistStatus() throws IOException, InterruptedException
+    {
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00");
+        List<Status> statuses = storage.listStatus("s3://pixels-00");
+        System.out.println(statuses.size());
+        for (Status status : statuses)
+        {
+            System.out.println(status.getPath());
+        }
+    }
+
+    @Test
+    public void testGetPaths() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00");
+        List<String> paths = storage.listPaths("s3://pixels-00");
+        if (paths == null)
+        {
+            System.out.println("null");
+            return;
+        }
+        for (String path : paths)
+        {
+            System.out.println(path);
+        }
+    }
+
+    @Test
     public void testS3Reader() throws IOException
     {
         PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-01/object-4");
@@ -98,5 +127,6 @@ public class TestS3
             }
         });
         future.join();
+        reader.close();
     }
 }

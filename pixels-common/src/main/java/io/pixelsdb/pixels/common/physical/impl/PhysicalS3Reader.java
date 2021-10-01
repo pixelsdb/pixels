@@ -70,7 +70,7 @@ public class PhysicalS3Reader implements PhysicalReader
         this.id = this.s3.getFileId(path);
         this.length = this.s3.getStatus(path).getLength();
         this.position = new AtomicLong(0);
-        this.client = s3.getClient();
+        this.client = this.s3.getClient();
     }
 
     private String toRange(long start, int length)
@@ -139,7 +139,8 @@ public class PhysicalS3Reader implements PhysicalReader
     @Override
     public boolean supportsAsync()
     {
-        return true;
+        // TODO: async read does not work properly.
+        return false;
     }
 
     @Override
@@ -194,7 +195,8 @@ public class PhysicalS3Reader implements PhysicalReader
     @Override
     public void close() throws IOException
     {
-        this.client.close();
+        // Should not close the client because it is shared by all threads.
+        // this.client.close(); // Closing s3 client may take several seconds.
     }
 
     @Override

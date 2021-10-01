@@ -80,8 +80,8 @@ public class PixelsRecordReaderImpl
     private int curRGIdx = 0;            // index of current reading row group in targetRGs
     private int curRowInRG = 0;          // starting index of values to read by reader in current row group
 
-    private PixelsProto.RowGroupFooter[] rowGroupFooters;
-    private ByteBuffer[] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
+    private volatile PixelsProto.RowGroupFooter[] rowGroupFooters;
+    private volatile ByteBuffer[] chunkBuffers;       // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ColumnReader[] readers;      // column readers for each target columns
 
     private long diskReadBytes = 0L;
