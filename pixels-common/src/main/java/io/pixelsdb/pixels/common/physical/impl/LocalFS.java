@@ -225,6 +225,12 @@ public class LocalFS implements Storage
     }
 
     @Override
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    {
+        return this.create(path, overwrite, bufferSize, replication);
+    }
+
+    @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
         File file = new File(path);
@@ -254,6 +260,21 @@ public class LocalFS implements Storage
         EtcdUtil.Instance().delete(getPathKey(path));
         return subDeleted && new File(path).delete();
     }
+
+    @Override
+    public boolean supportDirectCopy()
+    {
+        return false;
+    }
+
+    @Override
+    public boolean directCopy(String src, String dest)
+    {
+        throw new UnsupportedOperationException("Direct copy is unsupported on LocalFS storage.");
+    }
+
+    @Override
+    public void close() throws IOException { }
 
     @Override
     public boolean exists(String path)

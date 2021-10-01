@@ -265,6 +265,7 @@ public class HDFS implements Storage
         return fs.create(fsPath, overwrite, bufferSize, replication, fs.getDefaultBlockSize(fsPath));
     }
 
+    @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
     {
         return fs.create(new Path(path), overwrite, bufferSize, replication, blockSize);
@@ -274,6 +275,24 @@ public class HDFS implements Storage
     public boolean delete(String path, boolean recursive) throws IOException
     {
         return fs.delete(new Path(path), recursive);
+    }
+
+    @Override
+    public boolean supportDirectCopy()
+    {
+        return false;
+    }
+
+    @Override
+    public boolean directCopy(String src, String dest)
+    {
+        throw new UnsupportedOperationException("direct copy is unsupported on HDFS storage.");
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        this.fs.close();
     }
 
     @Override

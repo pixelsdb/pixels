@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 
 /**
  * @author guodong
+ * @author hank
  */
 public interface PhysicalWriter
         extends Closeable

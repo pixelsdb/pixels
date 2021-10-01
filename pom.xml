@@ -85,6 +85,7 @@
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
+        <dep.awssdk.version>2.16.60</dep.awssdk.version>
     </properties>
 
     <dependencyManagement>
@@ -222,6 +223,15 @@
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-client</artifactId>
                 <version>${dep.hadoop.version}</version>
+            </dependency>
+
+            <!-- amazon aws -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${dep.awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- airlift -->

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSReader;
 import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalReader;
+import io.pixelsdb.pixels.common.physical.impl.PhysicalS3Reader;
 
 import java.io.IOException;
 
@@ -40,23 +41,21 @@ public class PhysicalReaderUtil
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
-        PhysicalReader reader = null;
-        try
+
+        PhysicalReader reader;
+        switch (storage.getScheme())
         {
-            switch (storage.getScheme())
-            {
-                case hdfs:
-                    reader = new PhysicalHDFSReader(storage, path);
-                    break;
-                case file:
-                    reader = new PhysicalLocalReader(storage, path);
-                    break;
-                case s3:
-                    throw new IOException("S3 storage is not supported");
-            }
-        } catch (IOException e)
-        {
-            throw e;
+            case hdfs:
+                reader = new PhysicalHDFSReader(storage, path);
+                break;
+            case file:
+                reader = new PhysicalLocalReader(storage, path);
+                break;
+            case s3:
+                reader = new PhysicalS3Reader(storage, path);
+                break;
+            default:
+                throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
         }
 
         return reader;

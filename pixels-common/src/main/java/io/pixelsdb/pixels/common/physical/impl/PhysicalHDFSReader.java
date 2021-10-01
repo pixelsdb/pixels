@@ -28,10 +28,12 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author guodong
@@ -172,15 +174,11 @@ public class PhysicalHDFSReader
     }
 
     @Override
-    public int read(byte[] buffer) throws IOException
+    public ByteBuffer readFully(int length) throws IOException
     {
-        return rawReader.read(buffer);
-    }
-
-    @Override
-    public int read(byte[] buffer, int offset, int length) throws IOException
-    {
-        return rawReader.read(buffer, offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        rawReader.readFully(buffer.array());
+        return buffer;
     }
 
     @Override
@@ -193,6 +191,21 @@ public class PhysicalHDFSReader
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
         rawReader.readFully(buffer, offset, length);
+    }
+
+    /**
+     * @return true if readAsync is supported.
+     */
+    @Override
+    public boolean supportsAsync()
+    {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
+    {
+        throw new IOException("Asynchronous read is not supported for HDFS.");
     }
 
     @Override

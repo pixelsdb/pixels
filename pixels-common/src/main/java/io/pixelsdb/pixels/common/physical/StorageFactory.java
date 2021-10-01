@@ -59,16 +59,29 @@ public class StorageFactory
         storageImpls.put(Storage.Scheme.s3, new S3());
     }
 
-    public synchronized Storage getStorage(String scheme) throws IOException
+    /**
+     * Get the storage instance from a scheme name or a scheme prefixed path.
+     * @param schemeOrPath
+     * @return
+     * @throws IOException
+     */
+    public synchronized Storage getStorage(String schemeOrPath) throws IOException
     {
         try
         {
             // 'synchronized' in Java is reentrant, it is fine the call the other getStorage().
-            return getStorage(Storage.Scheme.from(scheme));
+            if (schemeOrPath.contains("://"))
+            {
+                return getStorage(Storage.Scheme.fromPath(schemeOrPath));
+            }
+            else
+            {
+                return getStorage(Storage.Scheme.from(schemeOrPath));
+            }
         }
         catch (RuntimeException re)
         {
-            throw new IOException("Invalid storage scheme: " + scheme, re);
+            throw new IOException("Invalid storage scheme or path: " + schemeOrPath, re);
         }
     }
 
@@ -98,5 +111,13 @@ public class StorageFactory
         }
 
         return storage;
+    }
+
+    public void closeAll() throws IOException
+    {
+        for (Storage.Scheme scheme : storageImpls.keySet())
+        {
+            storageImpls.get(scheme).close();
+        }
     }
 }

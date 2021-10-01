@@ -21,41 +21,52 @@ package io.pixelsdb.pixels.common.physical.impl;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.utils.Constants;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
+
 /**
- * Created at: 30/08/2021
+ * Created at: 06/09/2021
  * Author: hank
  */
-public class PhysicalLocalWriter implements PhysicalWriter
+public class PhysicalS3Writer implements PhysicalWriter
 {
-    private LocalFS local;
-    private String path;
-    private long position;
-    private DataOutputStream rawWriter;
+    private static Logger logger = LogManager.getLogger(PhysicalS3Writer.class);
 
-    public PhysicalLocalWriter(Storage storage, String path) throws IOException
+    private S3 s3;
+    private S3.Path path;
+    private String pathStr;
+    private long position;
+    private S3AsyncClient client;
+    private OutputStream out;
+
+    public PhysicalS3Writer(Storage storage, String path) throws IOException
     {
-        if (storage instanceof LocalFS)
+        if (storage instanceof S3)
         {
-            this.local = (LocalFS) storage;
+            this.s3 = (S3) storage;
         }
         else
         {
-            throw new IOException("Storage is not LocalFS.");
+            throw new IOException("Storage is not S3.");
         }
-        if (path.startsWith("file://"))
+        if (path.startsWith("s3://"))
         {
             // remove the scheme.
-            path = path.substring(7);
+            path = path.substring(5);
         }
-        this.path = path;
-        this.position = 0;
-        this.rawWriter = this.local.create(path, false, Constants.LOCAL_BUFFER_SIZE, (short) 1);
+        this.path = new S3.Path(path);
+        this.pathStr = path;
+        this.position = 0L;
+        this.client = s3.getClient();
+        this.s3.create(path, false, S3_BUFFER_SIZE, (short)1);
+        this.out = new S3OutputStream(this.client, this.path.bucket, this.path.key);
     }
 
     /**
@@ -97,7 +108,7 @@ public class PhysicalLocalWriter implements PhysicalWriter
     public long append(byte[] buffer, int offset, int length) throws IOException
     {
         long start = position;
-        rawWriter.write(buffer, offset, length);
+        this.out.write(buffer, offset, length);
         position += length;
         return start;
     }
@@ -108,7 +119,9 @@ public class PhysicalLocalWriter implements PhysicalWriter
     @Override
     public void close() throws IOException
     {
-        rawWriter.close();
+        this.out.close();
+        // Don't close the client as it is external.
+        // this.client.close();
     }
 
     /**
@@ -117,12 +130,12 @@ public class PhysicalLocalWriter implements PhysicalWriter
     @Override
     public void flush() throws IOException
     {
-        rawWriter.flush();
+        this.out.flush();
     }
 
     @Override
     public String getPath()
     {
-        return path;
+        return pathStr;
     }
 }

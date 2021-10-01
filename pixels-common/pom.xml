@@ -48,6 +48,19 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- aws sdk -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- protobuf -->
         <dependency>
             <groupId>com.google.protobuf</groupId>

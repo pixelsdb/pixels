@@ -1,3 +1,22 @@
+/*
+ * Copyright 2021 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.common.physical.impl;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
@@ -5,6 +24,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Created at: 30/08/2021
@@ -27,6 +48,11 @@ public class PhysicalLocalReader implements PhysicalReader
         {
             throw new IOException("Storage is not LocalFS.");
         }
+        if (path.startsWith("file://"))
+        {
+            // remove the scheme.
+            path = path.substring(7);
+        }
         this.path = path;
         this.raf = this.local.openRaf(path);
         this.id = this.local.getFileId(path);
@@ -45,15 +71,11 @@ public class PhysicalLocalReader implements PhysicalReader
     }
 
     @Override
-    public int read(byte[] buffer) throws IOException
+    public ByteBuffer readFully(int length) throws IOException
     {
-        return raf.read(buffer);
-    }
-
-    @Override
-    public int read(byte[] buffer, int offset, int length) throws IOException
-    {
-        return raf.read(buffer, offset, length);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        raf.readFully(buffer.array());
+        return buffer;
     }
 
     @Override
@@ -66,6 +88,21 @@ public class PhysicalLocalReader implements PhysicalReader
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
         raf.readFully(buffer, offset, length);
+    }
+
+    /**
+     * @return true if readAsync is supported.
+     */
+    @Override
+    public boolean supportsAsync()
+    {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
+    {
+        throw new IOException("Asynchronous read is not supported for local fs.");
     }
 
     @Override

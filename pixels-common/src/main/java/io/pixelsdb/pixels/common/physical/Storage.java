@@ -50,6 +50,16 @@ public interface Storage
         }
 
         /**
+         * Parse the scheme from the path which is prefixed with the storage scheme.
+         * @param schemedPath
+         */
+        public static Scheme fromPath(String schemedPath)
+        {
+            String scheme = schemedPath.substring(0, schemedPath.indexOf("://"));
+            return Scheme.from(scheme);
+        }
+
+        /**
          * Whether the value is a valid storage scheme.
          * @param value
          * @return
@@ -129,7 +139,6 @@ public interface Storage
      */
     DataInputStream open(String path) throws IOException;
 
-
     /**
      * For local fs, path is considered as local.
      * @param path
@@ -143,6 +152,20 @@ public interface Storage
                             int bufferSize, short replication) throws IOException;
 
     /**
+     * This method is for the compatability of block-based storage like HDFS.
+     * For local fs, path is considered as local.
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @param replication
+     * @param blockSize
+     * @return
+     * @throws IOException if path is a directory.
+     */
+    DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication, long blockSize) throws IOException;
+
+    /**
      * For local fs, path is considered as local.
      * @param path
      * @param recursive
@@ -150,6 +173,27 @@ public interface Storage
      * @throws IOException
      */
     boolean delete(String path, boolean recursive) throws IOException;
+
+    /**
+     * Whether this storage supports direct (short circuit) copying.
+     * @return true if copy is supported.
+     */
+    boolean supportDirectCopy();
+
+    /**
+     * Copy from the source to the destination without going through this client.
+     * @param src
+     * @param dest
+     * @return
+     * @throws IOException
+     */
+    boolean directCopy(String src, String dest) throws IOException;
+
+    /**
+     * Close the storage.
+     * @throws IOException
+     */
+    void close() throws IOException;
 
     /**
      * For local fs, path is considered as local.

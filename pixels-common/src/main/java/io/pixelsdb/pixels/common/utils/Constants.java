@@ -30,6 +30,7 @@ public final class Constants
     public static final int DEFAULT_HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
     public static final int HDFS_BUFFER_SIZE = 256 * 1024;
     public static final int LOCAL_BUFFER_SIZE = 256 * 1024;
+    public static final int S3_BUFFER_SIZE = 256 * 1024;
 
     public static final int MIN_REPEAT = 3;
     public static final int MAX_SCOPE = 512;
@@ -48,7 +49,14 @@ public final class Constants
      * Issue #108:
      * The prefix for read-write lock used in etcd auto-increment id.
      */
-    public static final String LOCK_PATH_PREFIX = "/pixels_lock/";
+    public static final String AI_LOCK_PATH_PREFIX = "/pixels_ai_lock/";
+
     public static final String LOCAL_FS_ID_KEY = "pixels_storage_local_id";
+    // the prefix for keys of local fs metadata (i.e. file path -> file id).
     public static final String LOCAL_FS_META_PREFIX = "pixels_storage_local_meta:";
+
+    public static final String S3_ID_KEY = "pixels_storage_s3_id";
+    // the prefix for keys of s3 metadata (i.e. file path -> file id).
+    public static final String S3_META_PREFIX = "pixels_storage_s3_meta:";
+
 }

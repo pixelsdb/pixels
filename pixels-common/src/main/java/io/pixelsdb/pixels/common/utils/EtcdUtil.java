@@ -80,7 +80,7 @@ public class EtcdUtil
      * you should ensure that there is only one value for this key.
      *
      * @param key etcdKey
-     * @return
+     * @return null if the key is not found.
      */
     public KeyValue getKeyValue(String key)
     {

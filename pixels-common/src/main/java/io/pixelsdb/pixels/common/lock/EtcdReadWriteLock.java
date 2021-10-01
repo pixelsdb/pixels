@@ -23,12 +23,17 @@ import io.etcd.jetcd.Client;
 
 /**
  * @author: tao
+ * @author hank
  * @date: Create in 2018-10-27 14:29
  **/
 public class EtcdReadWriteLock
 {
-    private final EtcdMutex readMutex;
-    private final EtcdMutex writeMutex;
+    private EtcdMutex readMutex;
+    private EtcdMutex writeMutex;
+
+    private final Client client;
+    private final String basePath;
+    private final byte[] lockData;
 
     private static final String READ_LOCK_NAME = "_READ_";
     private static final String WRITE_LOCK_NAME = "_WRIT_";
@@ -49,8 +54,11 @@ public class EtcdReadWriteLock
      */
     public EtcdReadWriteLock(Client client, String basePath, byte[] lockData)
     {
-        this.writeMutex = new EtcdReadWriteLock.InternalInterProcessMutex(client, basePath, WRITE_LOCK_NAME, lockData);
-        this.readMutex = new EtcdReadWriteLock.InternalInterProcessMutex(client, basePath, READ_LOCK_NAME, lockData);
+        this.client = client;
+        this.basePath = basePath;
+        this.lockData = lockData;
+        this.readMutex = null;
+        this.writeMutex = null;
     }
 
     /**
@@ -60,6 +68,10 @@ public class EtcdReadWriteLock
      */
     public EtcdMutex readLock()
     {
+        if (this.readMutex == null)
+        {
+            this.readMutex = new EtcdReadWriteLock.InternalInterProcessMutex(client, basePath, READ_LOCK_NAME, lockData);
+        }
         return this.readMutex;
     }
 
@@ -70,6 +82,10 @@ public class EtcdReadWriteLock
      */
     public EtcdMutex writeLock()
     {
+        if (this.writeMutex == null)
+        {
+            this.writeMutex = new EtcdReadWriteLock.InternalInterProcessMutex(client, basePath, WRITE_LOCK_NAME, lockData);
+        }
         return this.writeMutex;
     }
 
