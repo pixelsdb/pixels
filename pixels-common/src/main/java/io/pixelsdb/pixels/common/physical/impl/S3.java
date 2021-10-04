@@ -27,6 +27,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -36,6 +38,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -67,10 +70,11 @@ public class S3 implements Storage
     {
         InitId(S3_ID_KEY);
 
-        S3AsyncClientBuilder builder = S3AsyncClient.builder();
-                //.httpClientBuilder(NettyNioAsyncHttpClient.builder()
-                //        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(20).build())
-                //        .maxConcurrency(100).maxPendingConnectionAcquires(10_000));
+        S3AsyncClientBuilder builder = S3AsyncClient.builder()
+                .httpClientBuilder(NettyNioAsyncHttpClient.builder().connectionTimeout(Duration.ofSeconds(60))
+                        .connectionAcquisitionTimeout(Duration.ofSeconds(60))
+                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(20).build())
+                        .maxConcurrency(200).maxPendingConnectionAcquires(50_000));
         s3Async = builder.build();
 
         s3 = S3Client.builder().build();
