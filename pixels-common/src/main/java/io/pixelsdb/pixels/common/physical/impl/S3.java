@@ -423,7 +423,12 @@ public class S3 implements Storage
         return new Path(path).isBucket;
     }
 
-    public S3AsyncClient getClient()
+    public S3Client getClient()
+    {
+        return s3;
+    }
+
+    public S3AsyncClient getAsyncClient()
     {
         return s3Async;
     }

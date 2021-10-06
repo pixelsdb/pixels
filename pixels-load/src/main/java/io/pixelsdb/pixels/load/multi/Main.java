@@ -29,7 +29,6 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
-import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -105,14 +104,6 @@ public class Main
             if (inputStr.equalsIgnoreCase("exit") || inputStr.equalsIgnoreCase("quit") ||
                     inputStr.equalsIgnoreCase("-q"))
             {
-                try
-                {
-                    StorageFactory.Instance().closeAll();
-                    EtcdUtil.Instance().getClient().close();
-                } catch (IOException e)
-                {
-                    e.printStackTrace();
-                }
                 System.out.println("Bye.");
                 break;
             }

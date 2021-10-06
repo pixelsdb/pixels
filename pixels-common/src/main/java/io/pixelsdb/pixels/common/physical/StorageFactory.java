@@ -35,7 +35,7 @@ import java.util.Map;
  */
 public class StorageFactory
 {
-    private Logger logger = LogManager.getLogger(StorageFactory.class);
+    private static Logger logger = LogManager.getLogger(StorageFactory.class);
     private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
 
     private StorageFactory() { }
@@ -47,6 +47,17 @@ public class StorageFactory
         if (instance == null)
         {
             instance = new StorageFactory();
+            Runtime.getRuntime().addShutdownHook(new Thread(()->
+            {
+                try
+                {
+                    instance.closeAll();
+                } catch (IOException e)
+                {
+                    logger.error("Failed to close all storage instances.", e);
+                    e.printStackTrace();
+                }
+            }));
         }
         return instance;
     }

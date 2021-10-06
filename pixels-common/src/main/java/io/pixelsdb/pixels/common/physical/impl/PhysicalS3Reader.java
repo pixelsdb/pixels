@@ -26,13 +26,17 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -42,7 +46,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class PhysicalS3Reader implements PhysicalReader
 {
     private static Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
-    private boolean enableAsync = false;
+    private static boolean enableAsync = false;
+    private static boolean useAsyncClient = false;
+    private static final ExecutorService clientService;
+
+    static
+    {
+        clientService = Executors.newFixedThreadPool(32);
+        Runtime.getRuntime().addShutdownHook( new Thread(clientService::shutdownNow));
+    }
 
     private S3 s3;
     private S3.Path path;
@@ -50,7 +62,8 @@ public class PhysicalS3Reader implements PhysicalReader
     private long id;
     private AtomicLong position;
     private long length;
-    private S3AsyncClient client;
+    private S3Client client;
+    private S3AsyncClient asyncClient;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
@@ -73,7 +86,13 @@ public class PhysicalS3Reader implements PhysicalReader
         this.length = this.s3.getStatus(path).getLength();
         this.position = new AtomicLong(0);
         this.client = this.s3.getClient();
+        this.asyncClient = this.s3.getAsyncClient();
         enableAsync = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.enable.async"));
+        useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.use.async.client"));
+        if (!useAsyncClient)
+        {
+            this.asyncClient.close();
+        }
     }
 
     private String toRange(long start, int length)
@@ -111,12 +130,12 @@ public class PhysicalS3Reader implements PhysicalReader
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
                 .key(path.key).range(toRange(position.get(), len)).build();
-        CompletableFuture<ResponseBytes<GetObjectResponse>> future =
-                client.getObject(request, AsyncResponseTransformer.toBytes());
+        ResponseBytes<GetObjectResponse> response =
+                client.getObject(request, ResponseTransformer.toBytes());
         try
         {
             this.position.addAndGet(len);
-            return ByteBuffer.wrap(future.get().asByteArray());
+            return ByteBuffer.wrap(response.asByteArray());
         } catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);
@@ -156,8 +175,21 @@ public class PhysicalS3Reader implements PhysicalReader
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
                 .key(path.key).range(toRange(offset, len)).build();
-        CompletableFuture<ResponseBytes<GetObjectResponse>> future =
-                client.getObject(request, AsyncResponseTransformer.toBytes());
+        CompletableFuture<ResponseBytes<GetObjectResponse>> future;
+        if (useAsyncClient)
+        {
+            future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+        }
+        else
+        {
+            future = new CompletableFuture<>();
+            clientService.execute(() -> {
+                ResponseBytes<GetObjectResponse> response =
+                        client.getObject(request, ResponseTransformer.toBytes());
+                future.complete(response);
+            });
+        }
+
         try
         {
             CompletableFuture<ByteBuffer> futureBuffer = new CompletableFuture<>();
