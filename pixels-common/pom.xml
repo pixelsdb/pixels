@@ -61,6 +61,12 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- protobuf -->
         <dependency>
             <groupId>com.google.protobuf</groupId>

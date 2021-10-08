@@ -46,7 +46,7 @@ public class SortMergeScheduler implements Scheduler
     static
     {
         ConfigFactory.Instance().registerUpdateCallback("read.request.merge.gap", value ->
-                MaxGap = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.merge.gap")));
+                MaxGap = Integer.parseInt(value));
         MaxGap = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.merge.gap"));
     }
 

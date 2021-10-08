@@ -19,8 +19,8 @@
  */
 package io.pixelsdb.pixels.common.physical.impl;
 
-import software.amazon.awssdk.core.async.AsyncRequestBody;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
@@ -28,8 +28,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * <p>
@@ -70,7 +68,7 @@ public class S3OutputStream extends OutputStream
     /**
      * Amazon S3 client.
      */
-    private final S3AsyncClient s3Client;
+    private final S3Client s3Client;
 
     /**
      * The unique id for this upload
@@ -94,7 +92,7 @@ public class S3OutputStream extends OutputStream
      * @param bucket   name of the bucket
      * @param key      path (key) within the bucket
      */
-    public S3OutputStream(S3AsyncClient s3Client, String bucket, String key)
+    public S3OutputStream(S3Client s3Client, String bucket, String key)
     {
         this.s3Client = s3Client;
         this.bucket = bucket;
@@ -158,10 +156,10 @@ public class S3OutputStream extends OutputStream
             {
                 final CreateMultipartUploadRequest request = CreateMultipartUploadRequest.builder().bucket(this.bucket)
                         .key(this.key).acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-                CompletableFuture<CreateMultipartUploadResponse> response = s3Client.createMultipartUpload(request);
-                this.uploadId = response.get().uploadId();
+                CreateMultipartUploadResponse response = s3Client.createMultipartUpload(request);
+                this.uploadId = response.uploadId();
             }
-        } catch (ExecutionException | InterruptedException e)
+        } catch (Exception e)
         {
             throw new IOException("Failed to initiate multipart upload.", e);
         }
@@ -176,15 +174,14 @@ public class S3OutputStream extends OutputStream
                 .key(this.key)
                 .uploadId(this.uploadId)
                 .partNumber(this.parts.size() + 1).build();
-        CompletableFuture<UploadPartResponse> response =
-                this.s3Client.uploadPart(request, AsyncRequestBody.fromByteBuffer(
-                        ByteBuffer.wrap(buffer, 0, position)));
+        UploadPartResponse response = this.s3Client.uploadPart(request, RequestBody.fromByteBuffer(
+                ByteBuffer.wrap(buffer, 0, position)));
         try
         {
-            String etag = response.get().eTag();
+            String etag = response.eTag();
             CompletedPart part = CompletedPart.builder().partNumber(this.parts.size() + 1).eTag(etag).build();
             this.parts.add(part);
-        } catch (InterruptedException | ExecutionException e)
+        } catch (Exception e)
         {
             throw new IOException("Failed to upload part.", e);
         }
@@ -212,13 +209,12 @@ public class S3OutputStream extends OutputStream
                                 .uploadId(uploadId)
                                 .multipartUpload(completedMultipartUpload)
                                 .build();
-                this.s3Client.completeMultipartUpload(completeMultipartUploadRequest).join();
+                this.s3Client.completeMultipartUpload(completeMultipartUploadRequest);
             } else
             {
                 final PutObjectRequest request = PutObjectRequest.builder().bucket(this.bucket).key(this.key)
                         .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL).build();
-                this.s3Client.putObject(request, AsyncRequestBody.fromByteBuffer(
-                        ByteBuffer.wrap(buffer, 0, position))).join();
+                this.s3Client.putObject(request, RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position)));
             }
         }
     }
@@ -233,7 +229,7 @@ public class S3OutputStream extends OutputStream
         {
             AbortMultipartUploadRequest request = AbortMultipartUploadRequest.builder()
                     .bucket(this.bucket).key(this.key).uploadId(this.uploadId).build();
-            this.s3Client.abortMultipartUpload(request).join();
+            this.s3Client.abortMultipartUpload(request);
         }
     }
 

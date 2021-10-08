@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.common.physical.impl;
 
 import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.async.AsyncResponseTransformer;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
@@ -29,8 +29,6 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Created at: 9/29/21
@@ -76,7 +74,7 @@ public class S3InputStream extends InputStream
     /**
      * Amazon S3 client.
      */
-    private final S3AsyncClient s3Client;
+    private final S3Client s3Client;
 
     /**
      * indicates whether the stream is still open / valid
@@ -90,7 +88,7 @@ public class S3InputStream extends InputStream
      * @param bucket   name of the bucket
      * @param key      path (key) within the bucket
      */
-    public S3InputStream(S3AsyncClient s3Client, String bucket, String key) throws IOException
+    public S3InputStream(S3Client s3Client, String bucket, String key) throws IOException
     {
         this.s3Client = s3Client;
         this.bucket = bucket;
@@ -102,7 +100,7 @@ public class S3InputStream extends InputStream
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(bucket).key(key).build();
         try
         {
-            HeadObjectResponse response = s3Client.headObject(request).get();
+            HeadObjectResponse response = s3Client.headObject(request);
             this.length = response.contentLength();
         } catch (Exception e)
         {
@@ -192,15 +190,14 @@ public class S3InputStream extends InputStream
         }
         GetObjectRequest request = GetObjectRequest.builder().bucket(this.bucket)
                 .key(this.key).range(toRange(this.position, bytesToRead)).build();
-        CompletableFuture<ResponseBytes<GetObjectResponse>> future =
-                this.s3Client.getObject(request, AsyncResponseTransformer.toBytes());
+        ResponseBytes<GetObjectResponse> future = this.s3Client.getObject(request, ResponseTransformer.toBytes());
         try
         {
-            this.buffer = future.get().asByteArray();
+            this.buffer = future.asByteArray();
             this.bufferPosition = 0;
             this.position += this.buffer.length;
             return this.buffer.length;
-        } catch (InterruptedException | ExecutionException e)
+        } catch (Exception e)
         {
             this.buffer = null;
             this.bufferPosition = 0;

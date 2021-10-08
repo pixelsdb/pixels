@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -43,7 +43,7 @@ public class PhysicalS3Writer implements PhysicalWriter
     private S3.Path path;
     private String pathStr;
     private long position;
-    private S3AsyncClient client;
+    private S3Client client;
     private OutputStream out;
 
     public PhysicalS3Writer(Storage storage, String path) throws IOException

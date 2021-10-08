@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.physical.impl.S3OutputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -58,7 +58,7 @@ public class TestS3
     @Test
     public void testS3OutputStream() throws IOException
     {
-        S3AsyncClient s3 = S3AsyncClient.builder().build();
+        S3Client s3 = S3Client.builder().build();
         InputStream input = new FileInputStream("/home/hank/test.csv");
         OutputStream output = new S3OutputStream(s3, "pixels-01", "object-6");
         IOUtils.copyBytes(input, output, 1024*1024, true);
