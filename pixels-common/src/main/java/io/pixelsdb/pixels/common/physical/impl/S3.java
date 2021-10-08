@@ -24,11 +24,14 @@ import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
-import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
@@ -36,6 +39,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -60,6 +64,11 @@ public class S3 implements Storage
 {
     private static Logger logger = LogManager.getLogger(S3.class);
 
+    private static int connectionTimeoutSec = 60;
+    private static int connectionAcquisitionTimeoutSec = 60;
+    private static int eventLoopGroupThreads = 20;
+    private static int maxConcurrentRequests = 200;
+    private static int maxPendingRequests = 50_000;
     private static S3Client s3;
     private static S3AsyncClient s3Async;
 
@@ -67,13 +76,40 @@ public class S3 implements Storage
     {
         InitId(S3_ID_KEY);
 
-        S3AsyncClientBuilder builder = S3AsyncClient.builder();
-                //.httpClientBuilder(NettyNioAsyncHttpClient.builder()
-                //        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(20).build())
-                //        .maxConcurrency(100).maxPendingConnectionAcquires(10_000));
-        s3Async = builder.build();
+        connectionTimeoutSec = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
+        connectionAcquisitionTimeoutSec = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.connection.acquisition.timeout.sec"));
+        eventLoopGroupThreads = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.event.loop.group.threads"));
+        maxConcurrentRequests = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.max.concurrent.requests"));
+        maxPendingRequests = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.max.pending.requests"));
 
-        s3 = S3Client.builder().build();
+        ConfigFactory.Instance().registerUpdateCallback("s3.connection.timeout.sec", value ->
+                connectionTimeoutSec = Integer.parseInt(value));
+        ConfigFactory.Instance().registerUpdateCallback("s3.connection.acquisition.timeout.sec", value ->
+                connectionAcquisitionTimeoutSec = Integer.parseInt(value));
+        ConfigFactory.Instance().registerUpdateCallback("s3.event.loop.group.threads", value ->
+                eventLoopGroupThreads = Integer.parseInt(value));
+        ConfigFactory.Instance().registerUpdateCallback("s3.max.concurrent.requests", value ->
+                maxConcurrentRequests = Integer.parseInt(value));
+        ConfigFactory.Instance().registerUpdateCallback("s3.max.pending.requests", value ->
+                maxPendingRequests = Integer.parseInt(value));
+
+        s3Async = S3AsyncClient.builder()
+                .httpClientBuilder(NettyNioAsyncHttpClient.builder()
+                        .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                        .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(eventLoopGroupThreads).build())
+                        .maxConcurrency(maxConcurrentRequests).maxPendingConnectionAcquires(maxPendingRequests)).build();
+
+        s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
+                .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                .maxConnections(maxConcurrentRequests)).build();
     }
 
     private String[] allHosts;
@@ -290,7 +326,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
-        return new DataInputStream(new S3InputStream(s3Async, p.bucket, p.key));
+        return new DataInputStream(new S3InputStream(s3, p.bucket, p.key));
     }
 
     /**
@@ -317,7 +353,7 @@ public class S3 implements Storage
         }
         long id = GenerateId(S3_ID_KEY);
         EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-        return new DataOutputStream(new S3OutputStream(s3Async, p.bucket, p.key));
+        return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
     }
 
     @Override
@@ -419,7 +455,12 @@ public class S3 implements Storage
         return new Path(path).isBucket;
     }
 
-    public S3AsyncClient getClient()
+    public S3Client getClient()
+    {
+        return s3;
+    }
+
+    public S3AsyncClient getAsyncClient()
     {
         return s3Async;
     }

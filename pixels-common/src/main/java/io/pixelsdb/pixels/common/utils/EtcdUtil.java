@@ -65,6 +65,17 @@ public class EtcdUtil
         return instance;
     }
 
+    static
+    {
+        Runtime.getRuntime().addShutdownHook(new Thread(() ->
+        {
+            if (instance != null && instance.getClient() != null)
+            {
+                instance.getClient().close();
+            }
+        }));
+    }
+
     /**
      * get the singleton client instance.
      *
