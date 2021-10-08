@@ -216,7 +216,15 @@ public class S3 implements Storage
         ListObjectsV2Request request = ListObjectsV2Request.builder()
                 .bucket(p.bucket).build();
         ListObjectsV2Response response = s3.listObjectsV2(request);
-        List<S3Object> objects = response.contents();
+        List<S3Object> objects = new ArrayList<>(response.keyCount());
+        while (response.isTruncated())
+        {
+            objects.addAll(response.contents());
+            request = ListObjectsV2Request.builder().bucket(p.bucket)
+                    .continuationToken(response.nextContinuationToken()).build();
+            response = s3.listObjectsV2(request);
+        }
+        objects.addAll(response.contents());
         List<Status> statuses = new ArrayList<>();
         Path op = new Path(path);
         op.isBucket = false;
