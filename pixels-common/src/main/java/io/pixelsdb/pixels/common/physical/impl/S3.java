@@ -29,8 +29,7 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
-import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
-import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
+import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
@@ -97,13 +96,20 @@ public class S3 implements Storage
                 maxConcurrentRequests = Integer.parseInt(value));
         ConfigFactory.Instance().registerUpdateCallback("s3.max.pending.requests", value ->
                 maxPendingRequests = Integer.parseInt(value));
-
+        /*
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
                         .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                        .putChannelOption(ChannelOption.SO_RCVBUF, 1024*1024*1024)
                         .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
                         .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(eventLoopGroupThreads).build())
-                        .maxConcurrency(maxConcurrentRequests).maxPendingConnectionAcquires(maxPendingRequests)).build();
+                        .maxConcurrency(maxConcurrentRequests).maxPendingConnectionAcquires(maxPendingRequests)).build();*/
+
+        s3Async = S3AsyncClient.builder()
+                .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
+                        .maxConcurrency(maxConcurrentRequests)
+                        .connectionMaxIdleTime(Duration.ofSeconds(connectionTimeoutSec))
+                        .readBufferSize(1024*1024*1024)).build();
 
         s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))

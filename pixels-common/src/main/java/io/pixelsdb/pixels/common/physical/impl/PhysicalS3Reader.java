@@ -135,7 +135,7 @@ public class PhysicalS3Reader implements PhysicalReader
         try
         {
             this.position.addAndGet(len);
-            return ByteBuffer.wrap(response.asByteArray());
+            return ByteBuffer.wrap(response.asByteArrayUnsafe());
         } catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);
@@ -192,20 +192,18 @@ public class PhysicalS3Reader implements PhysicalReader
 
         try
         {
-            CompletableFuture<ByteBuffer> futureBuffer = new CompletableFuture<>();
-            future.whenComplete((resp, err) ->
+            return future.thenApply(resp ->
             {
                 if (resp != null)
                 {
-                    futureBuffer.complete(ByteBuffer.wrap(resp.asByteArray()));
+                    return ByteBuffer.wrap(resp.asByteArrayUnsafe());
                 }
                 else
                 {
-                    logger.error("Failed complete the asynchronous read.", err);
-                    err.printStackTrace();
+                    logger.error("Failed complete the asynchronous read.");
+                    return null;
                 }
             });
-            return futureBuffer;
         } catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);

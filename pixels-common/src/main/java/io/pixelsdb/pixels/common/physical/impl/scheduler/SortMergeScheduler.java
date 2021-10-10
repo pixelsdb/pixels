@@ -51,12 +51,11 @@ public class SortMergeScheduler implements Scheduler
     }
 
     @Override
-    public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch,
-                                                List<CompletableFuture> actionFutures) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
     {
         if (batch.size() <= 0)
         {
-            return batch.completeAll(actionFutures);
+            return;
         }
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
@@ -85,7 +84,8 @@ public class SortMergeScheduler implements Scheduler
         {
             for (MergedRequest merged : mergedRequests)
             {
-                reader.readAsync(merged.getStart(), merged.getLength()).whenComplete((resp, err) ->
+                String path = reader.getPath();
+                reader.readAsync(merged.getStart(), merged.getLength()).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
@@ -94,8 +94,8 @@ public class SortMergeScheduler implements Scheduler
                     else
                     {
                         logger.error("Failed to read asynchronously from path '" +
-                                reader.getPath() + "'.", err);
-                        err.printStackTrace();
+                                path + "'.");
+                        //err.printStackTrace();
                     }
                 });
             }
@@ -109,8 +109,6 @@ public class SortMergeScheduler implements Scheduler
                 merged.complete(buffer);
             }
         }
-
-        return batch.completeAll(actionFutures);
     }
 
     class RequestFuture implements Comparable<RequestFuture>

@@ -51,6 +51,11 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>aws-crt-client</artifactId>
+        </dependency>
+
         <!-- hdfs -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
