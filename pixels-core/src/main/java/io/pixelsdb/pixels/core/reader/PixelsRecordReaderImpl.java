@@ -451,6 +451,8 @@ public class PixelsRecordReaderImpl
         {
             scheduler.executeBatch(physicalReader, requestBatch);
             requestBatch.completeAll(actionFutures).join();
+            requestBatch.clear();
+            actionFutures.clear();
         } catch (Exception e)
         {
             throw new IOException("Failed to read row group footers, " +
@@ -723,6 +725,8 @@ public class PixelsRecordReaderImpl
             {
                 scheduler.executeBatch(physicalReader, requestBatch);
                 requestBatch.completeAll(actionFutures).join();
+                requestBatch.clear();
+                actionFutures.clear();
             } catch (Exception e)
             {
                 throw new IOException("Failed to read chunks block into buffers, " +

@@ -154,5 +154,12 @@ public interface Scheduler
             }
             return CompletableFuture.allOf(fs);
         }
+
+        public void clear()
+        {
+            this.futures.clear();
+            this.requests.clear();
+            this.size = 0;
+        }
     }
 }

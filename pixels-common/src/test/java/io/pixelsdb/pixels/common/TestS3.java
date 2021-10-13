@@ -56,6 +56,19 @@ public class TestS3
     }
 
     @Test
+    public void testFuture()
+    {
+        CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
+        ByteBuffer[] buffer = {null};
+        future.thenAccept(resp -> buffer[0] = resp);
+
+        for (int i = 0; i < 1000_000_0; ++i)
+        {
+            ByteBuffer.allocate(1000_00);
+        }
+    }
+
+    @Test
     public void testS3OutputStream() throws IOException
     {
         S3Client s3 = S3Client.builder().build();
