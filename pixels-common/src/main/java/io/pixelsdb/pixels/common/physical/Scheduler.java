@@ -39,11 +39,9 @@ public interface Scheduler
      * all the requests.
      * @param reader
      * @param batch
-     * @return should never return null.
      * @throws IOException
      */
-    CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch,
-                                         List<CompletableFuture> actionFutures)
+    void executeBatch(PhysicalReader reader, RequestBatch batch)
             throws IOException;
 
     class Request implements Comparable<Request>
@@ -155,6 +153,13 @@ public interface Scheduler
                 fs[i] = actionFutures.get(i);
             }
             return CompletableFuture.allOf(fs);
+        }
+
+        public void clear()
+        {
+            this.futures.clear();
+            this.requests.clear();
+            this.size = 0;
         }
     }
 }

@@ -86,6 +86,7 @@
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
         <dep.awssdk.version>2.16.60</dep.awssdk.version>
+        <dep.awssdk.preview.version>2.16.60-PREVIEW</dep.awssdk.preview.version>
     </properties>
 
     <dependencyManagement>
@@ -232,6 +233,12 @@
                 <version>${dep.awssdk.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>aws-crt-client</artifactId>
+                <version>${dep.awssdk.preview.version}</version>
             </dependency>
 
             <!-- airlift -->

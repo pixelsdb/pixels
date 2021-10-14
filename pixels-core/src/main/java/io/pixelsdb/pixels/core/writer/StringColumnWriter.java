@@ -201,7 +201,8 @@ public class StringColumnWriter extends BaseColumnWriter
         if (currentUseDictionaryEncoding)
         {
             return PixelsProto.ColumnEncoding.newBuilder()
-                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY);
+                    .setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
+                    .setDictionarySize(dictionary.size());
         }
         return PixelsProto.ColumnEncoding.newBuilder()
                 .setKind(PixelsProto.ColumnEncoding.Kind.NONE);

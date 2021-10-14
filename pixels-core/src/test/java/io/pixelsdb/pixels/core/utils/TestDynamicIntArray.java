@@ -41,4 +41,26 @@ public class TestDynamicIntArray
             assert i == ints[i];
         }
     }
+
+    @Test
+    public void testPerf()
+    {
+        DynamicIntArray array = new DynamicIntArray(8192);
+        for (int i = 0; i < 256*1024; ++i)
+        {
+            array.add(i);
+        }
+        int[] a = array.toArray();
+        long start = System.nanoTime();
+        for (int i = 0; i < array.size(); ++i)
+        {
+            int b = array.get(i);
+            if (b == -1)
+            {
+                break;
+            }
+            //assert i == array.get(i);
+        }
+        System.out.println(System.nanoTime()-start);
+    }
 }

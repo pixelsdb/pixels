@@ -43,12 +43,11 @@ public class NoopScheduler implements Scheduler
     private static Logger logger = LogManager.getLogger(NoopScheduler.class);
 
     @Override
-    public CompletableFuture<Void> executeBatch(PhysicalReader reader, RequestBatch batch,
-                                                List<CompletableFuture> actionFutures) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
     {
         if (batch.size() <= 0)
         {
-            return batch.completeAll(actionFutures);
+            return;
         }
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
@@ -58,7 +57,8 @@ public class NoopScheduler implements Scheduler
             {
                 CompletableFuture<ByteBuffer> future = futures.get(i);
                 Request request = requests.get(i);
-                reader.readAsync(request.start, request.length).whenComplete((resp, err) ->
+                String path = reader.getPath();
+                reader.readAsync(request.start, request.length).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
@@ -66,9 +66,7 @@ public class NoopScheduler implements Scheduler
                     }
                     else
                     {
-                        logger.error("Failed to read asynchronously from path '" +
-                                reader.getPath() + "'.", err);
-                        err.printStackTrace();
+                        logger.error("Failed to read asynchronously from path '" + path + "'.");
                     }
                 });
             }
@@ -82,7 +80,5 @@ public class NoopScheduler implements Scheduler
                 futures.get(i).complete(reader.readFully(request.length));
             }
         }
-
-        return batch.completeAll(actionFutures);
     }
 }

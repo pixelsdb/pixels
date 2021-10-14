@@ -86,6 +86,11 @@ public class StringColumnReader
 
     private int isNullBitIndex = 0;
 
+    /**
+     * This is the predicted size (number of elements) of dictionary.
+     */
+    private static final int DEFAULT_STARTS_SIZE = 1024;
+
     StringColumnReader(TypeDescription type)
     {
         super(type);
@@ -292,7 +297,21 @@ public class StringColumnReader
             // read starts and orders
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
-            DynamicIntArray startsArray = new DynamicIntArray(1024);
+
+            DynamicIntArray startsArray;
+            /**
+             * Issue #124:
+             * Try to ensure that starts is large enough, so that to reduce GC.
+             */
+            if (encoding.hasDictionarySize())
+            {
+                startsArray = new DynamicIntArray(encoding.getDictionarySize());
+            }
+            else
+            {
+                startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
+            }
+
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
             while (startsDecoder.hasNext())
             {
