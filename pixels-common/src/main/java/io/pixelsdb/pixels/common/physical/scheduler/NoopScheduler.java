@@ -17,10 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.impl.scheduler;
+package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.Scheduler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,6 +40,8 @@ import java.util.concurrent.CompletableFuture;
 public class NoopScheduler implements Scheduler
 {
     private static Logger logger = LogManager.getLogger(NoopScheduler.class);
+
+    NoopScheduler() {}
 
     @Override
     public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException

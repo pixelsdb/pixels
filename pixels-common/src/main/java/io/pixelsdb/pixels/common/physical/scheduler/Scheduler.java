@@ -17,7 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.scheduler;
+
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

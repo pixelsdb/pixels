@@ -85,8 +85,8 @@
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
-        <dep.awssdk.version>2.16.60</dep.awssdk.version>
-        <dep.awssdk.preview.version>2.16.60-PREVIEW</dep.awssdk.preview.version>
+        <dep.awssdk.version>2.17.61</dep.awssdk.version>
+        <dep.awssdk.preview.version>2.17.61-PREVIEW</dep.awssdk.preview.version>
     </properties>
 
     <dependencyManagement>

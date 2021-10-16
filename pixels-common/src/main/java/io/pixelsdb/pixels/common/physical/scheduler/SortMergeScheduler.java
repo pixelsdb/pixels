@@ -17,10 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.impl.scheduler;
+package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -43,6 +42,8 @@ public class SortMergeScheduler implements Scheduler
     private static Logger logger = LogManager.getLogger(SortMergeScheduler.class);
     private static int MaxGap;
 
+    SortMergeScheduler() {}
+
     static
     {
         ConfigFactory.Instance().registerUpdateCallback("read.request.merge.gap", value ->
@@ -50,13 +51,8 @@ public class SortMergeScheduler implements Scheduler
         MaxGap = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.merge.gap"));
     }
 
-    @Override
-    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    protected List<MergedRequest> sortMerge(RequestBatch batch)
     {
-        if (batch.size() <= 0)
-        {
-            return;
-        }
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
         List<RequestFuture> requestFutures = new ArrayList<>(batch.size());
@@ -80,6 +76,19 @@ public class SortMergeScheduler implements Scheduler
         }
         mergedRequests.add(mr2);
 
+        return mergedRequests;
+    }
+
+    @Override
+    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    {
+        if (batch.size() <= 0)
+        {
+            return;
+        }
+
+        List<MergedRequest> mergedRequests = sortMerge(batch);
+
         if (reader.supportsAsync())
         {
             for (MergedRequest merged : mergedRequests)
@@ -95,7 +104,6 @@ public class SortMergeScheduler implements Scheduler
                     {
                         logger.error("Failed to read asynchronously from path '" +
                                 path + "'.");
-                        //err.printStackTrace();
                     }
                 });
             }
@@ -111,7 +119,7 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
-    class RequestFuture implements Comparable<RequestFuture>
+    protected class RequestFuture implements Comparable<RequestFuture>
     {
         public Request request;
         public CompletableFuture<ByteBuffer> future;
@@ -129,7 +137,7 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
-    class MergedRequest
+    protected class MergedRequest
     {
         private long start;
         private long end;
@@ -178,11 +186,19 @@ public class SortMergeScheduler implements Scheduler
             return start;
         }
 
+        /**
+         * The length in bytes of this merged request.
+         * @return
+         */
         public int getLength()
         {
             return (int) (end - start);
         }
 
+        /**
+         * The number of the origin requests that are merged here.
+         * @return
+         */
         public int getSize()
         {
             return size;
