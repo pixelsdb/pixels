@@ -12,6 +12,11 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 /**
+ * <p>
+ *     RateLimitedScheduler adds the data transfer rate limit and the
+ *     request throughput limit to SortMergeScheduler.
+ * </p>
+ *
  * Created at: 16/10/2021
  * Author: hank
  */
@@ -22,6 +27,7 @@ public class RateLimitedScheduler extends SortMergeScheduler
     private RateLimiter mbpsRateLimiter;
     private RateLimiter rpsRateLimiter;
     private RetryPolicy retryPolicy;
+    private final boolean enableRetry;
 
     RateLimitedScheduler()
     {
@@ -55,7 +61,11 @@ public class RateLimitedScheduler extends SortMergeScheduler
         double rpsRateLimit = Double.parseDouble(ConfigFactory.Instance().getProperty("read.request.rate.limit.rps"));
         rpsRateLimiter = RateLimiter.create(rpsRateLimit);
 
-        this.retryPolicy = new RetryPolicy(1000);
+        this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
+        if (this.enableRetry)
+        {
+            this.retryPolicy = new RetryPolicy(1000);
+        }
     }
 
     @Override
@@ -100,7 +110,10 @@ public class RateLimitedScheduler extends SortMergeScheduler
                                 path + "'.");
                     }
                 });
-                this.retryPolicy.add(merged, reader);
+                if (enableRetry)
+                {
+                    this.retryPolicy.monitor(merged, reader);
+                }
             }
         }
         else

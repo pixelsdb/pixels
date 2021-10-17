@@ -47,10 +47,15 @@ public class SortMergeScheduler implements Scheduler
     private static int MaxGap;
 
     private RetryPolicy retryPolicy;
+    private final boolean enableRetry;
 
     SortMergeScheduler()
     {
-        this.retryPolicy = new RetryPolicy(1000);
+        this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
+        if (this.enableRetry)
+        {
+            this.retryPolicy = new RetryPolicy(1000);
+        }
     }
 
     static
@@ -113,11 +118,14 @@ public class SortMergeScheduler implements Scheduler
                     }
                     else
                     {
-                        logger.error("Failed to read asynchronously from path '" +
-                                path + "'.");
+                        logger.error("Asynchronous read from path '" +
+                                path + "' got null response.");
                     }
                 });
-                this.retryPolicy.add(merged, reader);
+                if (enableRetry)
+                {
+                    this.retryPolicy.monitor(merged, reader);
+                }
             }
         }
         else
@@ -153,13 +161,15 @@ public class SortMergeScheduler implements Scheduler
     {
         private long start;
         private long end;
-        protected long startTimeMs = -1;
-        protected long completeTimeMs = -1;
         private int position;
         private int size;
         private List<Integer> positions;
         private List<Integer> lengths;
         private List<CompletableFuture<ByteBuffer>> futures;
+        // fields used by the retry policy.
+        protected long startTimeMs = -1;
+        protected long completeTimeMs = -1;
+        private int retried = 0;
 
         public MergedRequest(RequestFuture first)
         {
@@ -237,10 +247,14 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
+    /**
+     * Combination of MergedRequest and PhysicalReader,
+     * it is used by the RetryPolicy.
+     */
     protected class MergedRequestReader
     {
-        protected MergedRequest request;
-        protected PhysicalReader reader;
+        private MergedRequest request;
+        private PhysicalReader reader;
 
         protected MergedRequestReader(MergedRequest request, PhysicalReader reader)
         {
@@ -249,17 +263,26 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
+    /**
+     * The retry policy that retries timeout read requests for a given number of times at most.
+     * The timeout is determined by a cost model.
+     */
     protected class RetryPolicy
     {
-        protected int intervalMs;
-        protected ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
-        protected ExecutorService monitor = Executors.newSingleThreadExecutor();
+        private int maxRetryNum;
+        private int intervalMs;
+        private final ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
+        private final ExecutorService monitorService = Executors.newSingleThreadExecutor();
+
+        private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
+        private static final int TRANSFER_RATE_BPMS = 10240; // 10KB/ms
 
         protected RetryPolicy(int intervalMs)
         {
+            this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
             this.intervalMs = intervalMs;
             this.requestReaders = new ConcurrentLinkedQueue<>();
-            this.monitor.execute(() ->
+            this.monitorService.execute(() ->
             {
                 while (true)
                 {
@@ -270,12 +293,20 @@ public class SortMergeScheduler implements Scheduler
                         MergedRequest request = requestReader.request;
                         if (request.completeTimeMs > 0)
                         {
+                            // request has completed.
                             it.remove();
-                        } else if (currentTimeMs - request.startTimeMs > 10000)
+                        } else if (currentTimeMs - request.startTimeMs > timeoutMs(request.getLength()))
                         {
-                            // only retry once.
-                            logger.info("Retry request: start=" + request.start + ", length=" + request.getLength());
+                            if (request.retried >= 3)
+                            {
+                                // give up retry.
+                                it.remove();
+                                continue;
+                            }
+                            // retry request.
                             String path = requestReader.reader.getPath();
+                            logger.debug("Retry request: path='" + path + "', start=" +
+                                    request.start + ", length=" + request.getLength());
                             try
                             {
                                 requestReader.reader.readAsync(request.start, request.getLength()).thenAccept(resp ->
@@ -287,8 +318,8 @@ public class SortMergeScheduler implements Scheduler
                                     }
                                     else
                                     {
-                                        logger.error("Failed to read asynchronously from path '" +
-                                                path + "'.");
+                                        logger.error("Asynchronous read from path '" +
+                                                path + "' got null response.");
                                     }
                                 });
                             } catch (IOException e)
@@ -298,12 +329,19 @@ public class SortMergeScheduler implements Scheduler
                             }
                             finally
                             {
-                                it.remove();
+                                /**
+                                 * The retried request does not be removed here.
+                                 * It will be remove when:
+                                 * 1. the retry complete on time, or
+                                 * 2. the max number of retries has been reached.
+                                 */
+                                request.retried++;
                             }
                         }
                     }
                     try
                     {
+                        // sleep for some time, to release the cpu.
                         Thread.sleep(intervalMs);
                     } catch (InterruptedException e)
                     {
@@ -312,10 +350,17 @@ public class SortMergeScheduler implements Scheduler
                 }
             });
 
-            this.monitor.shutdown();
+            this.monitorService.shutdown();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(monitorService::shutdownNow));
         }
 
-        protected void add(MergedRequest request, PhysicalReader reader)
+        private int timeoutMs(int length)
+        {
+            return FIRST_BYTE_LATENCY_MS + length/TRANSFER_RATE_BPMS;
+        }
+
+        protected void monitor(MergedRequest request, PhysicalReader reader)
         {
             this.requestReaders.add(new MergedRequestReader(request, reader));
         }
