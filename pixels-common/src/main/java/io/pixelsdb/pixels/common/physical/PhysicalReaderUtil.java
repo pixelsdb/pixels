@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSReader;
-import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalReader;
-import io.pixelsdb.pixels.common.physical.impl.PhysicalS3Reader;
+import io.pixelsdb.pixels.common.physical.io.PhysicalHDFSReader;
+import io.pixelsdb.pixels.common.physical.io.PhysicalLocalReader;
+import io.pixelsdb.pixels.common.physical.io.PhysicalS3Reader;
 
 import java.io.IOException;
 

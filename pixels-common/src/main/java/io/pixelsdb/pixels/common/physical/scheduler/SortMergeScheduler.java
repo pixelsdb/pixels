@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,12 +45,22 @@ import java.util.concurrent.Executors;
 public class SortMergeScheduler implements Scheduler
 {
     private static Logger logger = LogManager.getLogger(SortMergeScheduler.class);
+    private static SortMergeScheduler instance;
     private static int MaxGap;
+
+    public static Scheduler Instance()
+    {
+        if (instance == null)
+        {
+            instance = new SortMergeScheduler();
+        }
+        return instance;
+    }
 
     private RetryPolicy retryPolicy;
     private final boolean enableRetry;
 
-    SortMergeScheduler()
+    protected SortMergeScheduler()
     {
         this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (this.enableRetry)

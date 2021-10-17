@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.impl.PhysicalHDFSWriter;
-import io.pixelsdb.pixels.common.physical.impl.PhysicalLocalWriter;
-import io.pixelsdb.pixels.common.physical.impl.PhysicalS3Writer;
+import io.pixelsdb.pixels.common.physical.io.PhysicalHDFSWriter;
+import io.pixelsdb.pixels.common.physical.io.PhysicalLocalWriter;
+import io.pixelsdb.pixels.common.physical.io.PhysicalS3Writer;
 
 import java.io.IOException;
 
@@ -38,7 +38,7 @@ public class PhysicalWriterUtil
     }
 
     public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
-                                                       short replication, boolean addBlockPadding) throws IOException
+                                                   short replication, boolean addBlockPadding) throws IOException
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");

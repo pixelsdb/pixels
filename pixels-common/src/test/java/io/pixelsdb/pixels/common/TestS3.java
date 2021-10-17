@@ -20,7 +20,11 @@
 package io.pixelsdb.pixels.common;
 
 import io.pixelsdb.pixels.common.physical.*;
-import io.pixelsdb.pixels.common.physical.impl.S3OutputStream;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
+import io.pixelsdb.pixels.common.physical.Status;
+import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 import software.amazon.awssdk.services.s3.S3Client;

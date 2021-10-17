@@ -86,11 +86,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!--
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>netty-nio-client</artifactId>
             <optional>true</optional>
         </dependency>
+        -->
 
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

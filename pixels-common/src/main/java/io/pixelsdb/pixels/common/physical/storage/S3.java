@@ -17,13 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.impl;
+package io.pixelsdb.pixels.common.physical.storage;
 
 import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.io.S3InputStream;
+import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;

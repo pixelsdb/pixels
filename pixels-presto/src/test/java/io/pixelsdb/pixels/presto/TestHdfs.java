@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.presto;
 import io.airlift.units.Duration;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
+import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
