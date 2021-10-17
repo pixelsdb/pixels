@@ -69,10 +69,13 @@ public class S3 implements Storage
     private static int connectionTimeoutSec = 60;
     private static int connectionAcquisitionTimeoutSec = 60;
     private static int eventLoopGroupThreads = 20;
-    private static int maxConcurrentRequests = 200;
+    private static int maxRequestConcurrency = 200;
     private static int maxPendingRequests = 50_000;
     private static S3Client s3;
     private static S3AsyncClient s3Async;
+    private static S3AsyncClient s3Async1M;
+    private static S3AsyncClient s3Async10M;
+    private final static boolean enableRequestDiversion;
 
     static
     {
@@ -84,21 +87,22 @@ public class S3 implements Storage
                 ConfigFactory.Instance().getProperty("s3.connection.acquisition.timeout.sec"));
         eventLoopGroupThreads = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.event.loop.group.threads"));
-        maxConcurrentRequests = Integer.parseInt(
-                ConfigFactory.Instance().getProperty("s3.max.concurrent.requests"));
+        maxRequestConcurrency = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.max.request.concurrency"));
         maxPendingRequests = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.pending.requests"));
 
-        ConfigFactory.Instance().registerUpdateCallback("s3.connection.timeout.sec", value ->
-                connectionTimeoutSec = Integer.parseInt(value));
-        ConfigFactory.Instance().registerUpdateCallback("s3.connection.acquisition.timeout.sec", value ->
-                connectionAcquisitionTimeoutSec = Integer.parseInt(value));
-        ConfigFactory.Instance().registerUpdateCallback("s3.event.loop.group.threads", value ->
-                eventLoopGroupThreads = Integer.parseInt(value));
-        ConfigFactory.Instance().registerUpdateCallback("s3.max.concurrent.requests", value ->
-                maxConcurrentRequests = Integer.parseInt(value));
-        ConfigFactory.Instance().registerUpdateCallback("s3.max.pending.requests", value ->
-                maxPendingRequests = Integer.parseInt(value));
+        enableRequestDiversion = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("s3.enable.request.diversion"));
+        logger.info("Request diversion enabled: " + enableRequestDiversion);
+
+        String[] concurrencyAssign = null;
+        if (enableRequestDiversion)
+        {
+            String assign = ConfigFactory.Instance().getProperty("s3.request.concurrency.assign");
+            logger.info("Request concurrency assignment: " + assign);
+            concurrencyAssign = assign.split(":");
+        }
 /*
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
@@ -108,20 +112,61 @@ public class S3 implements Storage
                         .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(eventLoopGroupThreads).build())
                         .maxConcurrency(maxConcurrentRequests).maxPendingConnectionAcquires(maxPendingRequests)).build();
 */
+        int maxConcurrency, maxConcurrency1M, maxConcurrency10M;
+        if (enableRequestDiversion)
+        {
+            maxConcurrency = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[0]));
+            maxConcurrency1M = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[1]));
+            maxConcurrency10M = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[2]));
+        }
+        else
+        {
+            maxConcurrency = maxRequestConcurrency;
+            maxConcurrency1M = 0;
+            maxConcurrency10M = 0;
+        }
+
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
-                        .maxConcurrency(maxConcurrentRequests)
-                        .readBufferSize(1024 * 1024 * 1024))
+                        .maxConcurrency(maxConcurrency))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
                         .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
                         .build()).build();
 
+        if (enableRequestDiversion)
+        {
+            s3Async1M = S3AsyncClient.builder()
+                    .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
+                            .maxConcurrency(maxConcurrency1M))
+                    .overrideConfiguration(ClientOverrideConfiguration.builder()
+                            .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                            .build()).build();
+
+            s3Async10M = S3AsyncClient.builder()
+                    .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
+                            .maxConcurrency(maxConcurrency10M))
+                    .overrideConfiguration(ClientOverrideConfiguration.builder()
+                            .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                            .build()).build();
+        }
+        else
+        {
+            s3Async1M = s3Async10M = null;
+        }
+
         s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
                 .socketTimeout(Duration.ofSeconds(connectionTimeoutSec))
                 .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
-                .maxConnections(maxConcurrentRequests)).build();
+                .maxConnections(maxRequestConcurrency)).build();
+    }
+
+    public static boolean isRequestDiversionEnabled()
+    {
+        return enableRequestDiversion;
     }
 
     private String[] allHosts;
@@ -454,7 +499,10 @@ public class S3 implements Storage
     @Override
     public void close() throws IOException
     {
+        s3.close();
         s3Async.close();
+        s3Async1M.close();
+        s3Async10M.close();
     }
 
     @Override
@@ -483,5 +531,15 @@ public class S3 implements Storage
     public S3AsyncClient getAsyncClient()
     {
         return s3Async;
+    }
+
+    public S3AsyncClient getAsyncClient1M()
+    {
+        return s3Async1M;
+    }
+
+    public S3AsyncClient getAsyncClient10M()
+    {
+        return s3Async10M;
     }
 }
