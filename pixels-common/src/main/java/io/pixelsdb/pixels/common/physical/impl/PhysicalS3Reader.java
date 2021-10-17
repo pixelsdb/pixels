@@ -268,4 +268,15 @@ public class PhysicalS3Reader implements PhysicalReader
     {
         return s3.getFileId(pathStr);
     }
+
+    /**
+     * Get the scheme of the backed physical storage.
+     *
+     * @return
+     */
+    @Override
+    public Storage.Scheme getStorageScheme()
+    {
+        return s3.getScheme();
+    }
 }

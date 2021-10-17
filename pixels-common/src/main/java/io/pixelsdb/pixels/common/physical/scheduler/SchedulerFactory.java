@@ -17,10 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.scheduler;
 
-import io.pixelsdb.pixels.common.physical.impl.scheduler.NoopScheduler;
-import io.pixelsdb.pixels.common.physical.impl.scheduler.SortMergeScheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
@@ -44,7 +42,7 @@ public class SchedulerFactory
 
     private SchedulerFactory()
     {
-        String name = ConfigFactory.Instance().getProperty("read.request.scheduler");
+        String name = ConfigFactory.Instance().getProperty("read.request.scheduler").toLowerCase();
         switch (name)
         {
             // Add more schedulers here.
@@ -54,9 +52,12 @@ public class SchedulerFactory
             case "sortmerge":
                 scheduler = new SortMergeScheduler();
                 break;
+            case "ratelimited":
+                scheduler = new RateLimitedScheduler();
+                break;
             default:
                 throw new UnsupportedOperationException("The read request scheduler '" +
-                        name + "' is unsupported.");
+                        name + "' is not supported.");
         }
     }
 

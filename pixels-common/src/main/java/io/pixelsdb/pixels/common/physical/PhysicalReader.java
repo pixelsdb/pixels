@@ -84,4 +84,10 @@ public interface PhysicalReader
      * @throws IOException
      */
     long getBlockId() throws IOException;
+
+    /**
+     * Get the scheme of the backed physical storage.
+     * @return
+     */
+    Storage.Scheme getStorageScheme();
 }

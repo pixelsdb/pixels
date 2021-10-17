@@ -155,4 +155,15 @@ public class PhysicalLocalReader implements PhysicalReader
     {
         return id;
     }
+
+    /**
+     * Get the scheme of the backed physical storage.
+     *
+     * @return
+     */
+    @Override
+    public Storage.Scheme getStorageScheme()
+    {
+        return local.getScheme();
+    }
 }

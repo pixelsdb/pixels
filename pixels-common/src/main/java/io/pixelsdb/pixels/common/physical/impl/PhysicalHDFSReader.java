@@ -246,4 +246,15 @@ public class PhysicalHDFSReader
             throw new IOException("Failed to get blocks. This reader may be backed by a non-HdfsDataInputStream.");
         }
     }
+
+    /**
+     * Get the scheme of the backed physical storage.
+     *
+     * @return
+     */
+    @Override
+    public Storage.Scheme getStorageScheme()
+    {
+        return hdfs.getScheme();
+    }
 }
