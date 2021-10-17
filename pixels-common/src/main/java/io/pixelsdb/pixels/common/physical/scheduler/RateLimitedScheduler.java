@@ -21,6 +21,7 @@ public class RateLimitedScheduler extends SortMergeScheduler
 
     private RateLimiter mbpsRateLimiter;
     private RateLimiter rpsRateLimiter;
+    private RetryPolicy retryPolicy;
 
     RateLimitedScheduler()
     {
@@ -53,6 +54,8 @@ public class RateLimitedScheduler extends SortMergeScheduler
         });
         double rpsRateLimit = Double.parseDouble(ConfigFactory.Instance().getProperty("read.request.rate.limit.rps"));
         rpsRateLimiter = RateLimiter.create(rpsRateLimit);
+
+        this.retryPolicy = new RetryPolicy(1000);
     }
 
     @Override
@@ -83,10 +86,12 @@ public class RateLimitedScheduler extends SortMergeScheduler
             for (MergedRequest merged : mergedRequests)
             {
                 String path = reader.getPath();
+                merged.startTimeMs = System.currentTimeMillis();
                 reader.readAsync(merged.getStart(), merged.getLength()).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
+                        merged.completeTimeMs = System.currentTimeMillis();
                         merged.complete(resp);
                     }
                     else
@@ -95,6 +100,7 @@ public class RateLimitedScheduler extends SortMergeScheduler
                                 path + "'.");
                     }
                 });
+                this.retryPolicy.add(merged, reader);
             }
         }
         else

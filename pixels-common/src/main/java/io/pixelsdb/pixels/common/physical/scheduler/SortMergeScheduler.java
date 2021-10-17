@@ -28,8 +28,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
@@ -42,7 +46,12 @@ public class SortMergeScheduler implements Scheduler
     private static Logger logger = LogManager.getLogger(SortMergeScheduler.class);
     private static int MaxGap;
 
-    SortMergeScheduler() {}
+    private RetryPolicy retryPolicy;
+
+    SortMergeScheduler()
+    {
+        this.retryPolicy = new RetryPolicy(1000);
+    }
 
     static
     {
@@ -94,10 +103,12 @@ public class SortMergeScheduler implements Scheduler
             for (MergedRequest merged : mergedRequests)
             {
                 String path = reader.getPath();
-                reader.readAsync(merged.getStart(), merged.getLength()).thenAccept(resp ->
+                merged.startTimeMs = System.currentTimeMillis();
+                reader.readAsync(merged.start, merged.getLength()).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
+                        merged.completeTimeMs = System.currentTimeMillis();
                         merged.complete(resp);
                     }
                     else
@@ -106,6 +117,7 @@ public class SortMergeScheduler implements Scheduler
                                 path + "'.");
                     }
                 });
+                this.retryPolicy.add(merged, reader);
             }
         }
         else
@@ -141,6 +153,8 @@ public class SortMergeScheduler implements Scheduler
     {
         private long start;
         private long end;
+        protected long startTimeMs = -1;
+        protected long completeTimeMs = -1;
         private int position;
         private int size;
         private List<Integer> positions;
@@ -220,6 +234,90 @@ public class SortMergeScheduler implements Scheduler
                 buffer.position(positions.get(i));
                 futures.get(i).complete(buffer.slice());
             }
+        }
+    }
+
+    protected class MergedRequestReader
+    {
+        protected MergedRequest request;
+        protected PhysicalReader reader;
+
+        protected MergedRequestReader(MergedRequest request, PhysicalReader reader)
+        {
+            this.request = request;
+            this.reader = reader;
+        }
+    }
+
+    protected class RetryPolicy
+    {
+        protected int intervalMs;
+        protected ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
+        protected ExecutorService monitor = Executors.newSingleThreadExecutor();
+
+        protected RetryPolicy(int intervalMs)
+        {
+            this.intervalMs = intervalMs;
+            this.requestReaders = new ConcurrentLinkedQueue<>();
+            this.monitor.execute(() ->
+            {
+                while (true)
+                {
+                    long currentTimeMs = System.currentTimeMillis();
+                    for (Iterator<MergedRequestReader> it = requestReaders.iterator(); it.hasNext(); )
+                    {
+                        MergedRequestReader requestReader = it.next();
+                        MergedRequest request = requestReader.request;
+                        if (request.completeTimeMs > 0)
+                        {
+                            it.remove();
+                        } else if (currentTimeMs - request.startTimeMs > 10000)
+                        {
+                            // only retry once.
+                            logger.info("Retry request: start=" + request.start + ", length=" + request.getLength());
+                            String path = requestReader.reader.getPath();
+                            try
+                            {
+                                requestReader.reader.readAsync(request.start, request.getLength()).thenAccept(resp ->
+                                {
+                                    if (resp != null)
+                                    {
+                                        request.completeTimeMs = System.currentTimeMillis();
+                                        request.complete(resp);
+                                    }
+                                    else
+                                    {
+                                        logger.error("Failed to read asynchronously from path '" +
+                                                path + "'.");
+                                    }
+                                });
+                            } catch (IOException e)
+                            {
+                                logger.error("Failed to read asynchronously from path '" +
+                                        path + "'.");
+                            }
+                            finally
+                            {
+                                it.remove();
+                            }
+                        }
+                    }
+                    try
+                    {
+                        Thread.sleep(intervalMs);
+                    } catch (InterruptedException e)
+                    {
+                        logger.error("Retry policy is interrupted during sleep.", e);
+                    }
+                }
+            });
+
+            this.monitor.shutdown();
+        }
+
+        protected void add(MergedRequest request, PhysicalReader reader)
+        {
+            this.requestReaders.add(new MergedRequestReader(request, reader));
         }
     }
 }
