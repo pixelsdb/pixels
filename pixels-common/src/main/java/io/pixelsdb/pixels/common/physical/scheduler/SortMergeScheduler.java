@@ -178,8 +178,8 @@ public class SortMergeScheduler implements Scheduler
         private List<Integer> lengths;
         private List<CompletableFuture<ByteBuffer>> futures;
         // fields used by the retry policy.
-        protected long startTimeMs = -1;
-        protected long completeTimeMs = -1;
+        protected volatile long startTimeMs = -1;
+        protected volatile long completeTimeMs = -1;
         private int retried = 0;
 
         public MergedRequest(RequestFuture first)
