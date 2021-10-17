@@ -17,10 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.impl;
+package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.storage.S3;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -49,6 +50,8 @@ public class PhysicalS3Reader implements PhysicalReader
     private static boolean enableAsync = false;
     private static boolean useAsyncClient = false;
     private static final ExecutorService clientService;
+    private final static int LEN_1M = 1024*1024;
+    private final static int LEN_10M = 1024*1024*10;
 
     static
     {
@@ -64,6 +67,8 @@ public class PhysicalS3Reader implements PhysicalReader
     private long length;
     private S3Client client;
     private S3AsyncClient asyncClient;
+    private S3AsyncClient asyncClient1M;
+    private S3AsyncClient asyncClient10M;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
@@ -87,6 +92,15 @@ public class PhysicalS3Reader implements PhysicalReader
         this.position = new AtomicLong(0);
         this.client = this.s3.getClient();
         this.asyncClient = this.s3.getAsyncClient();
+        if (S3.isRequestDiversionEnabled())
+        {
+            this.asyncClient1M = this.s3.getAsyncClient1M();
+            this.asyncClient10M = this.s3.getAsyncClient10M();
+        }
+        else
+        {
+            this.asyncClient1M = this.asyncClient10M = null;
+        }
         enableAsync = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.enable.async"));
         useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.use.async.client"));
         if (!useAsyncClient)
@@ -178,7 +192,23 @@ public class PhysicalS3Reader implements PhysicalReader
         CompletableFuture<ResponseBytes<GetObjectResponse>> future;
         if (useAsyncClient)
         {
-            future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+            if (S3.isRequestDiversionEnabled())
+            {
+                if (len < LEN_1M)
+                {
+                    future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+                } else if (len < LEN_10M)
+                {
+                    future = asyncClient1M.getObject(request, AsyncResponseTransformer.toBytes());
+                } else
+                {
+                    future = asyncClient10M.getObject(request, AsyncResponseTransformer.toBytes());
+                }
+            }
+            else
+            {
+                future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+            }
         }
         else
         {
@@ -192,6 +222,11 @@ public class PhysicalS3Reader implements PhysicalReader
 
         try
         {
+            /**
+             * Issue #128:
+             * We tried to use thenApplySync using the clientService executor,
+             * it does not help improving the query performance.
+             */
             return future.thenApply(resp ->
             {
                 if (resp != null)

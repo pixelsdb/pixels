@@ -107,7 +107,7 @@ public class PixelsPrestoConfig
                  * PixelsSplitManager, when we try to create storage instance
                  * by StorageFactory.Instance().getStorage(), Presto does not
                  * load the dependencies (e.g. hadoop-hdfs-xxx.jar) of the storage
-                 * implementation (e.g. io.pixelsdb.pixels.common.physical.impl.HDFS).
+                 * implementation (e.g. io.pixelsdb.pixels.common.physical.storage.HDFS).
                  *
                  * I currently don't know the reason (08.27.2021).
                  */

@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.impl;
+package io.pixelsdb.pixels.common.physical.storage;
 
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Location;

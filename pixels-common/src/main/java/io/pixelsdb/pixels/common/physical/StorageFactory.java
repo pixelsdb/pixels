@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
-import io.pixelsdb.pixels.common.physical.impl.LocalFS;
-import io.pixelsdb.pixels.common.physical.impl.S3;
+import io.pixelsdb.pixels.common.physical.storage.HDFS;
+import io.pixelsdb.pixels.common.physical.storage.LocalFS;
+import io.pixelsdb.pixels.common.physical.storage.S3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

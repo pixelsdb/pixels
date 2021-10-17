@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.Scheduler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -40,8 +41,18 @@ import java.util.concurrent.CompletableFuture;
 public class NoopScheduler implements Scheduler
 {
     private static Logger logger = LogManager.getLogger(NoopScheduler.class);
+    private static NoopScheduler instance;
 
-    NoopScheduler() {}
+    public static Scheduler Instance()
+    {
+        if (instance == null)
+        {
+            instance = new NoopScheduler();
+        }
+        return instance;
+    }
+
+    protected NoopScheduler() {}
 
     @Override
     public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException

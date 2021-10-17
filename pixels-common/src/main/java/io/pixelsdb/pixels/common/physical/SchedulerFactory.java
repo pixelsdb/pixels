@@ -17,8 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.scheduler;
+package io.pixelsdb.pixels.common.physical;
 
+import io.pixelsdb.pixels.common.physical.scheduler.NoopScheduler;
+import io.pixelsdb.pixels.common.physical.scheduler.RateLimitedScheduler;
+import io.pixelsdb.pixels.common.physical.scheduler.SortMergeScheduler;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
@@ -47,13 +50,13 @@ public class SchedulerFactory
         {
             // Add more schedulers here.
             case "noop":
-                scheduler = new NoopScheduler();
+                scheduler = NoopScheduler.Instance();
                 break;
             case "sortmerge":
-                scheduler = new SortMergeScheduler();
+                scheduler = SortMergeScheduler.Instance();
                 break;
             case "ratelimited":
-                scheduler = new RateLimitedScheduler();
+                scheduler = RateLimitedScheduler.Instance();
                 break;
             default:
                 throw new UnsupportedOperationException("The read request scheduler '" +

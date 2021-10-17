@@ -25,7 +25,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
-import io.pixelsdb.pixels.common.physical.impl.HDFS;
+import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.split.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
