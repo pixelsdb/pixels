@@ -59,6 +59,7 @@ public class RdbLayoutDao extends LayoutDao
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
                 .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
                 .setTableId(rs.getInt("TBLS_TBL_ID")).build();
                 return layout;
             }
@@ -135,6 +136,7 @@ public class RdbLayoutDao extends LayoutDao
                 .setCompact(rs.getString("LAYOUT_COMPACT"))
                 .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
+                .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
                 .setTableId(table.getId()).build();
                 layouts.add(layout);
             }
@@ -177,7 +179,8 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_COMPACT`," +
                 "`LAYOUT_COMPACT_PATH`," +
                 "`LAYOUT_SPLITS`," +
-                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?)";
+                "`LAYOUT_PROJECTIONS`," +
+                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setInt(1, layout.getVersion());
@@ -188,7 +191,8 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(6, layout.getCompact());
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
-            pst.setLong(9, layout.getTableId());
+            pst.setString(9, layout.getProjections());
+            pst.setLong(10, layout.getTableId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
@@ -210,6 +214,7 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_COMPACT` = ?," +
                 "`LAYOUT_COMPACT_PATH` = ?," +
                 "`LAYOUT_SPLITS` = ?\n" +
+                "`LAYOUT_PROJECTIONS = ?\n`" +
                 "WHERE `LAYOUT_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
@@ -221,7 +226,8 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(6, layout.getCompact());
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
-            pst.setLong(9, layout.getId());
+            pst.setString(9, layout.getProjections());
+            pst.setLong(10, layout.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

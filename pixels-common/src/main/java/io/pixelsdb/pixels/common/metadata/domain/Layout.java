@@ -40,10 +40,12 @@ public class Layout extends Base
     private String compact;
     private String compactPath;
     private String splits;
+    private String projections;
     private long tableId;
     private Order orderObj = null;
     private Compact compactObj = null;
     private Splits splitsObj = null;
+    private Projections projectionsObj = null;
 
     public Layout()
     {
@@ -74,6 +76,7 @@ public class Layout extends Base
         this.compact = layout.getCompact();
         this.compactPath = layout.getCompactPath();
         this.splits = layout.getSplits();
+        this.projections = layout.getProjections();
         this.tableId = layout.getTableId();
     }
 
@@ -195,6 +198,25 @@ public class Layout extends Base
         this.splits = split;
     }
 
+    public String getProjections()
+    {
+        return projections;
+    }
+
+    public Projections getProjectionsObject()
+    {
+        if (this.projectionsObj == null)
+        {
+            this.projectionsObj = JSON.parseObject(this.projections, Projections.class);
+        }
+        return this.projectionsObj;
+    }
+
+    public void setProjections(String projections)
+    {
+        this.projections = projections;
+    }
+
     public long getTableId()
     {
         return tableId;
@@ -211,12 +233,13 @@ public class Layout extends Base
         return "Layout{" +
                 "version=" + version +
                 ", createAt=" + createAt +
-                ", permission=" + permission +
+                ", permission=" + permission + '\'' +
                 ", order='" + order + '\'' +
                 ", orderPath='" + orderPath + '\'' +
                 ", compact='" + compact + '\'' +
                 ", compactPath='" + compactPath + '\'' +
                 ", splits='" + splits + '\'' +
+                ", projections='" + projections + '\'' +
                 ", tableId=" + tableId +
                 '}';
     }
