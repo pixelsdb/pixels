@@ -315,7 +315,8 @@ public class MetadataService
                 .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
                 .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
                 .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setTableId(layout.getTableId()).build();
+                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setTableId(layout.getTableId()).build();
         MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();
@@ -347,7 +348,8 @@ public class MetadataService
                 .setCreateAt(layout.getCreateAt()).setSplits(layout.getSplits())
                 .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
                 .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
-                .setVersion(layout.getVersion()).setTableId(layout.getTableId()).build();
+                .setVersion(layout.getVersion()).setProjections(layout.getProjections())
+                .setTableId(layout.getTableId()).build();
         MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();

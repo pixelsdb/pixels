@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,39 +17,43 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.metadata.domain;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
-public class IndexFactory
+/**
+ * Created at: 10/19/21
+ * Author: hank
+ */
+public class OriginProjectionPattern
 {
-    private static IndexFactory instance = null;
+    private List<Integer> accessedColumns = new ArrayList<>();
+    private String path;
 
-    public static IndexFactory Instance()
+    public List<Integer> getAccessedColumns()
     {
-        if (instance == null)
-        {
-            instance = new IndexFactory();
-        }
-        return instance;
+        return accessedColumns;
     }
 
-    private Map<IndexEntry, Index> indexCache = null;
-
-    private IndexFactory()
+    public void setAccessedColumns(List<Integer> accessedColumns)
     {
-        this.indexCache = new HashMap<>();
+        this.accessedColumns = accessedColumns;
     }
 
-    public void cacheIndex(IndexEntry entry, Index index)
+
+    public void addAccessedColumns(int accessedColumn)
     {
-        this.indexCache.put(entry, index);
+        this.accessedColumns.add(accessedColumn);
     }
 
-    public Index getIndex(IndexEntry entry)
+    public String getPath()
     {
-        return this.indexCache.get(entry);
+        return path;
     }
 
+    public void setPath(String path)
+    {
+        this.path = path;
+    }
 }

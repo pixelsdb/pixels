@@ -17,14 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
 import java.util.*;
 
 /**
  * @author hank
  */
-public class Inverted implements Index
+public class InvertedSplitsIndex implements SplitsIndex
 {
     /**
      * key: column name;
@@ -34,25 +34,25 @@ public class Inverted implements Index
 
     private final int defaultSplitSize;
 
-    private Map<String, BitSet> bitMapIndex = null;
+    private Map<String, BitSet> bitMapIndex;
 
-    private List<AccessPattern> queryAccessPatterns = null;
+    private List<SplitPattern> querySplitPatterns;
 
-    private List<String> columnOrder = null;
+    private List<String> columnOrder;
 
-    public Inverted(List<String> columnOrder, List<AccessPattern> patterns, int defaultSplitSize)
+    public InvertedSplitsIndex(List<String> columnOrder, List<SplitPattern> patterns, int defaultSplitSize)
     {
         this.defaultSplitSize = defaultSplitSize;
         this.columnOrder = new ArrayList<>(columnOrder);
-        this.queryAccessPatterns = new ArrayList<>(patterns);
+        this.querySplitPatterns = new ArrayList<>(patterns);
         this.bitMapIndex = new HashMap<>(this.columnOrder.size());
 
         for (String column : this.columnOrder)
         {
-            BitSet bitMap = new BitSet(this.queryAccessPatterns.size());
-            for (int i = 0; i < this.queryAccessPatterns.size(); ++i)
+            BitSet bitMap = new BitSet(this.querySplitPatterns.size());
+            for (int i = 0; i < this.querySplitPatterns.size(); ++i)
             {
-                if (this.queryAccessPatterns.get(i).contaiansColumn(column))
+                if (this.querySplitPatterns.get(i).contaiansColumn(column))
                 {
                     bitMap.set(i, true);
                 }
@@ -62,24 +62,22 @@ public class Inverted implements Index
     }
 
     @Override
-    public AccessPattern search(ColumnSet columnSet)
+    public SplitPattern search(ColumnSet columnSet)
     {
-        AccessPattern bestPattern = null;
+        SplitPattern bestPattern = null;
 
         if (columnSet.isEmpty())
         {
-            bestPattern = new AccessPattern();
+            bestPattern = new SplitPattern();
             bestPattern.setSplitSize(this.defaultSplitSize);
             return bestPattern;
         }
 
-        List<BitSet> bitMaps = new ArrayList<>();
-        BitSet and = new BitSet(this.queryAccessPatterns.size());
-        and.set(0, this.queryAccessPatterns.size(), true);
+        BitSet and = new BitSet(this.querySplitPatterns.size());
+        and.set(0, this.querySplitPatterns.size(), true);
         for (String column : columnSet.getColumns())
         {
             BitSet bitMap = this.bitMapIndex.get(column);
-            bitMaps.add(bitMap);
             and.and(bitMap);
         }
 
@@ -95,12 +93,12 @@ public class Inverted implements Index
             int minPatternSize = Integer.MAX_VALUE;
             int temp;
 
-            for (int i = 0; i < this.queryAccessPatterns.size(); ++i)
+            for (int i = 0; i < this.querySplitPatterns.size(); ++i)
             {
-                temp = Math.abs(this.queryAccessPatterns.get(i).size() - numColumns);
+                temp = Math.abs(this.querySplitPatterns.get(i).size() - numColumns);
                 if (temp < minPatternSize)
                 {
-                    bestPattern = this.queryAccessPatterns.get(i);
+                    bestPattern = this.querySplitPatterns.get(i);
                     minPatternSize = temp;
                 }
             }
@@ -110,9 +108,9 @@ public class Inverted implements Index
             int i = 0;
             while ((i = and.nextSetBit(i)) >= 0)
             {
-                if (this.queryAccessPatterns.get(i).size() < minPatternSize)
+                if (this.querySplitPatterns.get(i).size() < minPatternSize)
                 {
-                    bestPattern = this.queryAccessPatterns.get(i);
+                    bestPattern = this.querySplitPatterns.get(i);
                     minPatternSize = bestPattern.size();
                 }
                 i++;

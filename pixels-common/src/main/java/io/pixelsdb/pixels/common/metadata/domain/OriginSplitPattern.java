@@ -22,33 +22,34 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Splits
+public class OriginSplitPattern
 {
-    private int numRowGroupInBlock;
-    private List<OriginSplitPattern> splitPatterns = new ArrayList<>();
+    private List<Integer> accessedColumns = new ArrayList<>();
+    private int numRowGroupInSplit;
 
-    public int getNumRowGroupInBlock()
+    public List<Integer> getAccessedColumns()
     {
-        return numRowGroupInBlock;
+        return accessedColumns;
     }
 
-    public void setNumRowGroupInBlock(int numRowGroupInBlock)
+    public void setAccessedColumns(List<Integer> accessedColumns)
     {
-        this.numRowGroupInBlock = numRowGroupInBlock;
+        this.accessedColumns = accessedColumns;
     }
 
-    public List<OriginSplitPattern> getSplitPatterns()
+
+    public void addAccessedColumns(int accessedColumn)
     {
-        return splitPatterns;
+        this.accessedColumns.add(accessedColumn);
     }
 
-    public void setSplitPatterns(List<OriginSplitPattern> splitPatterns)
+    public int getNumRowGroupInSplit()
     {
-        this.splitPatterns = splitPatterns;
+        return numRowGroupInSplit;
     }
 
-    public void addSplitPatterns(OriginSplitPattern splitPattern)
+    public void setNumRowGroupInSplit(int numRowGroupInSplit)
     {
-        this.splitPatterns.add(splitPattern);
+        this.numRowGroupInSplit = numRowGroupInSplit;
     }
 }

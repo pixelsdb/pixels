@@ -86,7 +86,8 @@ message Layout {
     string compact = 7;
     string compactPath = 8;
     string splits = 9;
-    uint64 tableId = 10;
+    string projections = 10;
+    uint64 tableId = 11;
 }
 // end domain objects defitions
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -22,34 +22,37 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SplitPattern
+/**
+ * Created at: 10/19/21
+ * Author: hank
+ */
+public class Projections
 {
-    private List<Integer> accessedColumns = new ArrayList<>();
-    private int numRowGroupInSplit;
+    private int numProjections;
+    private List<OriginProjectionPattern> projectionPatterns = new ArrayList<>();
 
-    public List<Integer> getAccessedColumns()
+    public int getNumProjections()
     {
-        return accessedColumns;
+        return numProjections;
     }
 
-    public void setAccessedColumns(List<Integer> accessedColumns)
+    public void setNumProjections(int numProjections)
     {
-        this.accessedColumns = accessedColumns;
+        this.numProjections = numProjections;
     }
 
-
-    public void addAccessedColumns(int accessedColumn)
+    public List<OriginProjectionPattern> getProjectionPatterns()
     {
-        this.accessedColumns.add(accessedColumn);
+        return projectionPatterns;
     }
 
-    public int getNumRowGroupInSplit()
+    public void setProjectionPatterns(List<OriginProjectionPattern> projectionPatterns)
     {
-        return numRowGroupInSplit;
+        this.projectionPatterns = projectionPatterns;
     }
 
-    public void setNumRowGroupInSplit(int numRowGroupInSplit)
+    public void addProjectionPatterns(OriginProjectionPattern projectionPattern)
     {
-        this.numRowGroupInSplit = numRowGroupInSplit;
+        this.projectionPatterns.add(projectionPattern);
     }
 }

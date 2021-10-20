@@ -17,24 +17,26 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
-import io.pixelsdb.pixels.common.metadata.domain.SplitPattern;
+import io.pixelsdb.pixels.common.metadata.domain.OriginSplitPattern;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * @author hank
  */
-public class AccessPattern
+public class SplitPattern
 {
     // it seems that this.pattern can be a Set.
-    private ColumnSet columnSet = null;
+    private ColumnSet columnSet;
     private int splitSize;
 
-    public AccessPattern()
+    public SplitPattern()
     {
         this.columnSet = new ColumnSet();
     }
@@ -84,25 +86,25 @@ public class AccessPattern
         return "splitSize: " + splitSize + ", pattern: " + builder.substring(1);
     }
 
-    public static List<AccessPattern> buildPatterns(List<String> columns, Splits splitInfo)
-            throws IOException
+    public static List<SplitPattern> buildPatterns(List<String> columns, Splits splitInfo)
     {
-        List<AccessPattern> patterns = new ArrayList<>();
-        List<SplitPattern> splitPatterns = splitInfo.getSplitPatterns();
+        List<SplitPattern> patterns = new ArrayList<>();
+        List<OriginSplitPattern> originSplitPatterns =
+                splitInfo.getSplitPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (SplitPattern splitPattern : splitPatterns)
+        for (OriginSplitPattern originSplitPattern : originSplitPatterns)
         {
-            accessedColumns = splitPattern.getAccessedColumns();
+            accessedColumns = originSplitPattern.getAccessedColumns();
 
-            AccessPattern pattern = new AccessPattern();
+            SplitPattern pattern = new SplitPattern();
             for (int column : accessedColumns)
             {
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setSplitSize(splitPattern.getNumRowGroupInSplit());
+            pattern.setSplitSize(originSplitPattern.getNumRowGroupInSplit());
 
             ColumnSet columnSet = pattern.getColumnSet();
 

@@ -28,11 +28,12 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.layout.SplitPattern;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.split.*;
+import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.presto.exception.CacheException;
@@ -62,6 +63,7 @@ public class PixelsSplitManager
     private final PixelsMetadataProxy metadataProxy;
     private final boolean cacheEnabled;
     private final boolean multiSplitForOrdered;
+    private final boolean projectionReadEnabled;
     private final String cacheSchema;
     private final String cacheTable;
     private final int fixedSplitSize;
@@ -70,10 +72,12 @@ public class PixelsSplitManager
     public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
-        String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        String cacheEnabled = config.getConfigFactory().getProperty("cache.enabled");
+        String projectionReadEnabled = config.getConfigFactory().getProperty("projection.read.enabled");
         String multiSplit = config.getConfigFactory().getProperty("multi.split.for.ordered");
         this.fixedSplitSize = Integer.parseInt(config.getConfigFactory().getProperty("fixed.split.size"));
-        this.cacheEnabled = Boolean.parseBoolean(enabled);
+        this.cacheEnabled = Boolean.parseBoolean(cacheEnabled);
+        this.projectionReadEnabled = Boolean.parseBoolean(projectionReadEnabled);
         this.multiSplitForOrdered = Boolean.parseBoolean(multiSplit);
         this.cacheSchema = config.getConfigFactory().getProperty("cache.schema");
         this.cacheTable = config.getConfigFactory().getProperty("cache.table");
@@ -132,48 +136,82 @@ public class PixelsSplitManager
         {
             // get index
             int version = layout.getVersion();
-            IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
-
+            IndexName indexName = new IndexName(schemaName, tableName);
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            ColumnSet columnSet = new ColumnSet();
+            for (PixelsColumnHandle column : desiredColumns)
+            {
+                columnSet.addColumn(column.getColumnName());
+            }
 
             // get split size
             int splitSize;
+            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (this.fixedSplitSize > 0)
             {
                 splitSize = this.fixedSplitSize;
             }
             else
             {
-                ColumnSet columnSet = new ColumnSet();
-                for (PixelsColumnHandle column : desiredColumns)
-                {
-                    columnSet.addColumn(column.getColumnName());
-                }
-
                 // log.info("columns to be accessed: " + columnSet.toString());
-
-                Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
-                if (index == null)
+                SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
+                if (splitsIndex == null)
                 {
-                    logger.debug("index not exist in factory, building index...");
-                    index = getInverted(order, splits, indexEntry);
+                    logger.debug("splits index not exist in factory, building index...");
+                    splitsIndex = buildSplitsIndex(order, splits, indexName);
                 }
                 else
                 {
-                    int indexVersion = index.getVersion();
-                    if (indexVersion < version) {
-                        logger.debug("index version is not up to date, updating index...");
-                        index = getInverted(order, splits, indexEntry);
+                    int indexVersion = splitsIndex.getVersion();
+                    if (indexVersion < version)
+                    {
+                        logger.debug("splits index version is not up-to-date, updating index...");
+                        splitsIndex = buildSplitsIndex(order, splits, indexName);
                     }
                 }
-
-                AccessPattern bestPattern = index.search(columnSet);
+                SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 // log.info("bestPattern: " + bestPattern.toString());
-                splitSize = bestPattern.getSplitSize();
+                splitSize = bestSplitPattern.getSplitSize();
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
+
+            // get compact path
+            String compactPath;
+            if (projectionReadEnabled)
+            {
+                ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(indexName);
+                Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
+                if (projectionsIndex == null)
+                {
+                    logger.debug("projections index not exist in factory, building index...");
+                    projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                }
+                else
+                {
+                    int indexVersion = projectionsIndex.getVersion();
+                    if (indexVersion < version)
+                    {
+                        logger.debug("projections index is not up-to-date, updating index...");
+                        projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                    }
+                }
+                ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
+                if (projectionPattern != null)
+                {
+                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPath() + '\'');
+                    compactPath = projectionPattern.getPath();
+                }
+                else
+                {
+                    compactPath = layout.getCompactPath();
+                }
+            }
+            else
+            {
+                compactPath = layout.getCompactPath();
+            }
+            logger.debug("using compact path: " + compactPath);
 
             if(usingCache)
             {
@@ -245,7 +283,7 @@ public class PixelsSplitManager
                             }
                             // 4. add splits in compactPath
                             int curFileRGIdx;
-                            for (String path : storage.listPaths(layout.getCompactPath()))
+                            for (String path : storage.listPaths(compactPath))
                             {
                                 curFileRGIdx = 0;
                                 while (curFileRGIdx < rowGroupNum)
@@ -309,7 +347,7 @@ public class PixelsSplitManager
 //                    orderedBalancer.balance();
 //                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
 
-                    compactPaths = storage.listPaths(layout.getCompactPath());
+                    compactPaths = storage.listPaths(compactPath);
 //                    for (Path path : compactPaths)
 //                    {
 //                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
@@ -394,16 +432,20 @@ public class PixelsSplitManager
         return addressBuilder.build();
     }
 
-    private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
+    private SplitsIndex buildSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
-        Inverted index;
-        try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheIndex(indexEntry, index);
-        } catch (IOException e) {
-            logger.error("getInverted error: " + e.getMessage());
-            throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
-        }
+        SplitsIndex index;
+        index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
+                splits.getNumRowGroupInBlock());
+        IndexFactory.Instance().cacheSplitsIndex(indexName, index);
+        return index;
+    }
+
+    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, IndexName indexName) {
+        List<String> columnOrder = order.getColumnOrder();
+        ProjectionsIndex index;
+        index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));
+        IndexFactory.Instance().cacheProjectionsIndex(indexName, index);
         return index;
     }
 }

@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
 import java.util.HashSet;
 import java.util.Set;
