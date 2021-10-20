@@ -31,10 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
@@ -283,7 +280,8 @@ public class SortMergeScheduler implements Scheduler
         private int maxRetryNum;
         private int intervalMs;
         private final ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
-        private final ExecutorService monitorService = Executors.newSingleThreadExecutor();
+        ThreadGroup monitorThreadGroup;
+        private final ExecutorService monitorService;
 
         private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
         private static final int TRANSFER_RATE_BPMS = 10240; // 10KB/ms
@@ -293,6 +291,19 @@ public class SortMergeScheduler implements Scheduler
             this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
             this.intervalMs = intervalMs;
             this.requestReaders = new ConcurrentLinkedQueue<>();
+
+            // Issue #133: set the monitor thread as daemon thread with max priority.
+            this.monitorThreadGroup = new ThreadGroup("pixels retry monitor");
+            this.monitorThreadGroup.setMaxPriority(Thread.MAX_PRIORITY);
+            this.monitorThreadGroup.setDaemon(true);
+            this.monitorService = Executors.newSingleThreadExecutor(runnable ->
+            {
+                Thread thread = new Thread(monitorThreadGroup, runnable);
+                thread.setDaemon(true);
+                thread.setPriority(Thread.MAX_PRIORITY);
+                return thread;
+            });
+
             this.monitorService.execute(() ->
             {
                 while (true)
@@ -320,6 +331,7 @@ public class SortMergeScheduler implements Scheduler
                                     request.start + ", length=" + request.getLength());
                             try
                             {
+                                request.startTimeMs = System.currentTimeMillis();
                                 requestReader.reader.readAsync(request.start, request.getLength()).thenAccept(resp ->
                                 {
                                     if (resp != null)
@@ -362,8 +374,6 @@ public class SortMergeScheduler implements Scheduler
             });
 
             this.monitorService.shutdown();
-
-            Runtime.getRuntime().addShutdownHook(new Thread(monitorService::shutdownNow));
         }
 
         private int timeoutMs(int length)
