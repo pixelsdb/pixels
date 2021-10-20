@@ -69,13 +69,11 @@ public class InvertedProjectionsIndex implements ProjectionsIndex
             return null;
         }
 
-        List<BitSet> bitMaps = new ArrayList<>();
         BitSet and = new BitSet(this.projectionPatterns.size());
         and.set(0, this.projectionPatterns.size(), true);
         for (String column : columnSet.getColumns())
         {
             BitSet bitMap = this.bitMapIndex.get(column);
-            bitMaps.add(bitMap);
             and.and(bitMap);
         }
 

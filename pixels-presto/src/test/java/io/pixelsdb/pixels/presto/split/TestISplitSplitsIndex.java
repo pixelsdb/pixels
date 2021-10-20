@@ -19,16 +19,13 @@
  */
 package io.pixelsdb.pixels.presto.split;
 
+import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
-import com.alibaba.fastjson.JSON;
-import com.facebook.presto.spi.PrestoException;
-import io.pixelsdb.pixels.common.layout.SplitsIndex;
-import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import org.junit.Test;
 
 import java.io.BufferedReader;
@@ -143,12 +140,8 @@ public class TestISplitSplitsIndex
     private InvertedSplitsIndex getInverted(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
         InvertedSplitsIndex index;
-        try {
-            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
-        } catch (IOException e) {
-            throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
-        }
+        index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
+        IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         return index;
     }
 }

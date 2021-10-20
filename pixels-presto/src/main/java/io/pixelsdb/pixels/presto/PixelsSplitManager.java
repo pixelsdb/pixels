@@ -211,6 +211,7 @@ public class PixelsSplitManager
             {
                 compactPath = layout.getCompactPath();
             }
+            logger.debug("using compact path: " + compactPath);
 
             if(usingCache)
             {

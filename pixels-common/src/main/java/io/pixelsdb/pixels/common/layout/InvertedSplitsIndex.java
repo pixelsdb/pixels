@@ -73,13 +73,11 @@ public class InvertedSplitsIndex implements SplitsIndex
             return bestPattern;
         }
 
-        List<BitSet> bitMaps = new ArrayList<>();
         BitSet and = new BitSet(this.querySplitPatterns.size());
         and.set(0, this.querySplitPatterns.size(), true);
         for (String column : columnSet.getColumns())
         {
             BitSet bitMap = this.bitMapIndex.get(column);
-            bitMaps.add(bitMap);
             and.and(bitMap);
         }
 
