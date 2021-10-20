@@ -63,6 +63,7 @@ public class PixelsSplitManager
     private final PixelsMetadataProxy metadataProxy;
     private final boolean cacheEnabled;
     private final boolean multiSplitForOrdered;
+    private final boolean projectionReadEnabled;
     private final String cacheSchema;
     private final String cacheTable;
     private final int fixedSplitSize;
@@ -71,10 +72,12 @@ public class PixelsSplitManager
     public PixelsSplitManager(PixelsConnectorId connectorId, PixelsMetadataProxy metadataProxy, PixelsPrestoConfig config) {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.metadataProxy = requireNonNull(metadataProxy, "metadataProxy is null");
-        String enabled = config.getConfigFactory().getProperty("cache.enabled");
+        String cacheEnabled = config.getConfigFactory().getProperty("cache.enabled");
+        String projectionReadEnabled = config.getConfigFactory().getProperty("projection.read.enabled");
         String multiSplit = config.getConfigFactory().getProperty("multi.split.for.ordered");
         this.fixedSplitSize = Integer.parseInt(config.getConfigFactory().getProperty("fixed.split.size"));
-        this.cacheEnabled = Boolean.parseBoolean(enabled);
+        this.cacheEnabled = Boolean.parseBoolean(cacheEnabled);
+        this.projectionReadEnabled = Boolean.parseBoolean(projectionReadEnabled);
         this.multiSplitForOrdered = Boolean.parseBoolean(multiSplit);
         this.cacheSchema = config.getConfigFactory().getProperty("cache.schema");
         this.cacheTable = config.getConfigFactory().getProperty("cache.table");
@@ -134,47 +137,80 @@ public class PixelsSplitManager
             // get index
             int version = layout.getVersion();
             IndexName indexName = new IndexName(schemaName, tableName);
-
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            ColumnSet columnSet = new ColumnSet();
+            for (PixelsColumnHandle column : desiredColumns)
+            {
+                columnSet.addColumn(column.getColumnName());
+            }
 
             // get split size
             int splitSize;
+            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (this.fixedSplitSize > 0)
             {
                 splitSize = this.fixedSplitSize;
             }
             else
             {
-                ColumnSet columnSet = new ColumnSet();
-                for (PixelsColumnHandle column : desiredColumns)
-                {
-                    columnSet.addColumn(column.getColumnName());
-                }
-
                 // log.info("columns to be accessed: " + columnSet.toString());
-
                 SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
                 if (splitsIndex == null)
                 {
-                    logger.debug("Splits index not exist in factory, building index...");
-                    splitsIndex = getSplitsIndex(order, splits, indexName);
+                    logger.debug("splits index not exist in factory, building index...");
+                    splitsIndex = buildSplitsIndex(order, splits, indexName);
                 }
                 else
                 {
                     int indexVersion = splitsIndex.getVersion();
-                    if (indexVersion < version) {
-                        logger.debug("Splits index version is not up to date, updating index...");
-                        splitsIndex = getSplitsIndex(order, splits, indexName);
+                    if (indexVersion < version)
+                    {
+                        logger.debug("splits index version is not up-to-date, updating index...");
+                        splitsIndex = buildSplitsIndex(order, splits, indexName);
                     }
                 }
-
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestSplitPattern.getSplitSize();
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
+
+            // get compact path
+            String compactPath;
+            if (projectionReadEnabled)
+            {
+                ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(indexName);
+                Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
+                if (projectionsIndex == null)
+                {
+                    logger.debug("projections index not exist in factory, building index...");
+                    projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                }
+                else
+                {
+                    int indexVersion = projectionsIndex.getVersion();
+                    if (indexVersion < version)
+                    {
+                        logger.debug("projections index is not up-to-date, updating index...");
+                        projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                    }
+                }
+                ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
+                if (projectionPattern != null)
+                {
+                    logger.debug("suitable projection pattern is found, path='" + projectionPattern.getPath() + '\'');
+                    compactPath = projectionPattern.getPath();
+                }
+                else
+                {
+                    compactPath = layout.getCompactPath();
+                }
+            }
+            else
+            {
+                compactPath = layout.getCompactPath();
+            }
 
             if(usingCache)
             {
@@ -246,7 +282,7 @@ public class PixelsSplitManager
                             }
                             // 4. add splits in compactPath
                             int curFileRGIdx;
-                            for (String path : storage.listPaths(layout.getCompactPath()))
+                            for (String path : storage.listPaths(compactPath))
                             {
                                 curFileRGIdx = 0;
                                 while (curFileRGIdx < rowGroupNum)
@@ -310,7 +346,7 @@ public class PixelsSplitManager
 //                    orderedBalancer.balance();
 //                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
 
-                    compactPaths = storage.listPaths(layout.getCompactPath());
+                    compactPaths = storage.listPaths(compactPath);
 //                    for (Path path : compactPaths)
 //                    {
 //                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
@@ -395,12 +431,20 @@ public class PixelsSplitManager
         return addressBuilder.build();
     }
 
-    private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
+    private SplitsIndex buildSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
         SplitsIndex index;
         index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
                 splits.getNumRowGroupInBlock());
         IndexFactory.Instance().cacheSplitsIndex(indexName, index);
+        return index;
+    }
+
+    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, IndexName indexName) {
+        List<String> columnOrder = order.getColumnOrder();
+        ProjectionsIndex index;
+        index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));
+        IndexFactory.Instance().cacheProjectionsIndex(indexName, index);
         return index;
     }
 }

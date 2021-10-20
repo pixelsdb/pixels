@@ -35,11 +35,13 @@ public class IndexFactory
         return instance;
     }
 
-    private Map<IndexName, SplitsIndex> splitsIndexes = null;
+    private Map<IndexName, SplitsIndex> splitsIndexes;
+    private Map<IndexName, ProjectionsIndex> projectionsIndexes;
 
     private IndexFactory()
     {
         this.splitsIndexes = new HashMap<>();
+        this.projectionsIndexes = new HashMap<>();
     }
 
     public void cacheSplitsIndex(IndexName entry, SplitsIndex splitsIndex)
@@ -52,4 +54,13 @@ public class IndexFactory
         return this.splitsIndexes.get(entry);
     }
 
+    public void cacheProjectionsIndex(IndexName entry, ProjectionsIndex projectionsIndex)
+    {
+        this.projectionsIndexes.put(entry, projectionsIndex);
+    }
+
+    public ProjectionsIndex getProjectionsIndex(IndexName entry)
+    {
+        return this.projectionsIndexes.get(entry);
+    }
 }

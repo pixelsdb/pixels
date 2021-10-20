@@ -21,10 +21,7 @@ package io.pixelsdb.pixels.hive.mapred;
 
 import com.alibaba.fastjson.JSON;
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.metadata.domain.Compact;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Order;
-import io.pixelsdb.pixels.common.metadata.domain.Splits;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -144,6 +141,7 @@ public class PixelsInputFormat
         String[] includedColumns = ColumnProjectionUtils.getReadColumnNames(job);
         ConfigFactory config = ConfigFactory.Instance();
         boolean cacheEnabled = Boolean.parseBoolean(config.getProperty("cache.enabled"));
+        boolean projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         int fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
 
         /**
@@ -174,36 +172,34 @@ public class PixelsInputFormat
             // get index
             int version = layout.getVersion();
             IndexName indexName = new IndexName(st.getSchemaName(), st.getTableName());
-
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
-            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
+            ColumnSet columnSet = new ColumnSet();
+            for (String columnName : includedColumns)
+            {
+                columnSet.addColumn(columnName);
+            }
 
             // get split size
             int splitSize;
+            Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (fixedSplitSize > 0)
             {
                 splitSize = fixedSplitSize;
             }
             else
             {
-                ColumnSet columnSet = new ColumnSet();
-                for (String columnName : includedColumns)
-                {
-                    columnSet.addColumn(columnName);
-                }
-
                 SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
                 if (splitsIndex == null)
                 {
-                    log.debug("Splits index not exist in factory, building index...");
-                    splitsIndex = getSplitsIndex(order, splits, indexName);
+                    log.debug("splits index not exist in factory, building index...");
+                    splitsIndex = buildSplitsIndex(order, splits, indexName);
                 }
                 else
                 {
                     int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version) {
-                        log.debug("Splits index is expired, building new index...");
-                        splitsIndex = getSplitsIndex(order, splits, indexName);
+                        log.debug("splits index is expired, building new index...");
+                        splitsIndex = buildSplitsIndex(order, splits, indexName);
                     }
                 }
 
@@ -212,6 +208,42 @@ public class PixelsInputFormat
             }
             log.error("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
+
+            // get compact path
+            String compactPath;
+            if (projectionReadEnabled)
+            {
+                ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(indexName);
+                Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
+                if (projectionsIndex == null)
+                {
+                    log.debug("projections index not exist in factory, building index...");
+                    projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                }
+                else
+                {
+                    int indexVersion = projectionsIndex.getVersion();
+                    if (indexVersion < version)
+                    {
+                        log.debug("projections index is not up-to-date, updating index...");
+                        projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                    }
+                }
+                ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
+                if (projectionPattern != null)
+                {
+                    log.debug("suitable projection pattern is found, path='" + projectionPattern.getPath() + '\'');
+                    compactPath = projectionPattern.getPath();
+                }
+                else
+                {
+                    compactPath = layout.getCompactPath();
+                }
+            }
+            else
+            {
+                compactPath = layout.getCompactPath();
+            }
 
             if(usingCache)
             {
@@ -255,7 +287,7 @@ public class PixelsInputFormat
                             }
                             // 4. add splits in compactPath
                             int curFileRGIdx;
-                            for (String path : hdfs.listPaths(layout.getCompactPath()))
+                            for (String path : hdfs.listPaths(compactPath))
                             {
                                 long fileLength = hdfs.getStatus(path).getLength();
                                 curFileRGIdx = 0;
@@ -297,7 +329,7 @@ public class PixelsInputFormat
                 try
                 {
                     orderedPaths = hdfs.listPaths(layout.getOrderPath());
-                    compactPaths = hdfs.listPaths(layout.getCompactPath());
+                    compactPaths = hdfs.listPaths(compactPath);
 
                     // add splits in orderedPath
                     for (String path : orderedPaths)
@@ -345,11 +377,19 @@ public class PixelsInputFormat
         return pixelsSplits.toArray(new PixelsSplit[pixelsSplits.size()]);
     }
 
-    private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
+    private SplitsIndex buildSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
-        SplitsIndex index = null;
+        SplitsIndex index;
         index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
         IndexFactory.Instance().cacheSplitsIndex(indexName, index);
+        return index;
+    }
+
+    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, IndexName indexName) {
+        List<String> columnOrder = order.getColumnOrder();
+        ProjectionsIndex index;
+        index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));
+        IndexFactory.Instance().cacheProjectionsIndex(indexName, index);
         return index;
     }
 
