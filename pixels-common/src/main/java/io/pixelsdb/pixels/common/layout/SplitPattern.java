@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.layout;
 
+import io.pixelsdb.pixels.common.metadata.domain.OriginSplitPattern;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 
 import java.util.ArrayList;
@@ -88,14 +89,14 @@ public class SplitPattern
     public static List<SplitPattern> buildPatterns(List<String> columns, Splits splitInfo)
     {
         List<SplitPattern> patterns = new ArrayList<>();
-        List<io.pixelsdb.pixels.common.metadata.domain.SplitPattern> splitPatterns =
+        List<OriginSplitPattern> originSplitPatterns =
                 splitInfo.getSplitPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (io.pixelsdb.pixels.common.metadata.domain.SplitPattern splitPattern : splitPatterns)
+        for (OriginSplitPattern originSplitPattern : originSplitPatterns)
         {
-            accessedColumns = splitPattern.getAccessedColumns();
+            accessedColumns = originSplitPattern.getAccessedColumns();
 
             SplitPattern pattern = new SplitPattern();
             for (int column : accessedColumns)
@@ -103,7 +104,7 @@ public class SplitPattern
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setSplitSize(splitPattern.getNumRowGroupInSplit());
+            pattern.setSplitSize(originSplitPattern.getNumRowGroupInSplit());
 
             ColumnSet columnSet = pattern.getColumnSet();
 

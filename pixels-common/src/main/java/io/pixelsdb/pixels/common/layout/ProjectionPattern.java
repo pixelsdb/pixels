@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.layout;
 
+import io.pixelsdb.pixels.common.metadata.domain.OriginProjectionPattern;
 import io.pixelsdb.pixels.common.metadata.domain.Projections;
 
 import java.util.ArrayList;
@@ -89,14 +90,14 @@ public class ProjectionPattern
     public static List<ProjectionPattern> buildPatterns(List<String> columns, Projections projectionInfo)
     {
         List<ProjectionPattern> patterns = new ArrayList<>();
-        List<io.pixelsdb.pixels.common.metadata.domain.ProjectionPattern> projPatterns =
+        List<OriginProjectionPattern> originProjPatterns =
                 projectionInfo.getProjectionPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (io.pixelsdb.pixels.common.metadata.domain.ProjectionPattern projPattern : projPatterns)
+        for (OriginProjectionPattern originProjPattern : originProjPatterns)
         {
-            accessedColumns = projPattern.getAccessedColumns();
+            accessedColumns = originProjPattern.getAccessedColumns();
 
             ProjectionPattern pattern = new ProjectionPattern();
             for (int column : accessedColumns)
@@ -104,7 +105,7 @@ public class ProjectionPattern
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setPath(projPattern.getPath());
+            pattern.setPath(originProjPattern.getPath());
 
             ColumnSet columnSet = pattern.getColumnSet();
 

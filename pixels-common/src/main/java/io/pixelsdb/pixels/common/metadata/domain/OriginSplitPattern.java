@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2019 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -22,14 +22,10 @@ package io.pixelsdb.pixels.common.metadata.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Created at: 10/19/21
- * Author: hank
- */
-public class ProjectionPattern
+public class OriginSplitPattern
 {
     private List<Integer> accessedColumns = new ArrayList<>();
-    private String path;
+    private int numRowGroupInSplit;
 
     public List<Integer> getAccessedColumns()
     {
@@ -47,13 +43,13 @@ public class ProjectionPattern
         this.accessedColumns.add(accessedColumn);
     }
 
-    public String getPath()
+    public int getNumRowGroupInSplit()
     {
-        return path;
+        return numRowGroupInSplit;
     }
 
-    public void setPath(String path)
+    public void setNumRowGroupInSplit(int numRowGroupInSplit)
     {
-        this.path = path;
+        this.numRowGroupInSplit = numRowGroupInSplit;
     }
 }

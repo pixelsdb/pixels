@@ -25,7 +25,7 @@ import java.util.List;
 public class Splits
 {
     private int numRowGroupInBlock;
-    private List<SplitPattern> splitPatterns = new ArrayList<>();
+    private List<OriginSplitPattern> splitPatterns = new ArrayList<>();
 
     public int getNumRowGroupInBlock()
     {
@@ -37,17 +37,17 @@ public class Splits
         this.numRowGroupInBlock = numRowGroupInBlock;
     }
 
-    public List<SplitPattern> getSplitPatterns()
+    public List<OriginSplitPattern> getSplitPatterns()
     {
         return splitPatterns;
     }
 
-    public void setSplitPatterns(List<SplitPattern> splitPatterns)
+    public void setSplitPatterns(List<OriginSplitPattern> splitPatterns)
     {
         this.splitPatterns = splitPatterns;
     }
 
-    public void addSplitPatterns(SplitPattern splitPattern)
+    public void addSplitPatterns(OriginSplitPattern splitPattern)
     {
         this.splitPatterns.add(splitPattern);
     }

@@ -29,7 +29,7 @@ import java.util.List;
 public class Projections
 {
     private int numProjections;
-    private List<ProjectionPattern> projectionPatterns = new ArrayList<>();
+    private List<OriginProjectionPattern> projectionPatterns = new ArrayList<>();
 
     public int getNumProjections()
     {
@@ -41,17 +41,17 @@ public class Projections
         this.numProjections = numProjections;
     }
 
-    public List<ProjectionPattern> getProjectionPatterns()
+    public List<OriginProjectionPattern> getProjectionPatterns()
     {
         return projectionPatterns;
     }
 
-    public void setProjectionPatterns(List<ProjectionPattern> projectionPatterns)
+    public void setProjectionPatterns(List<OriginProjectionPattern> projectionPatterns)
     {
         this.projectionPatterns = projectionPatterns;
     }
 
-    public void addProjectionPatterns(ProjectionPattern projectionPattern)
+    public void addProjectionPatterns(OriginProjectionPattern projectionPattern)
     {
         this.projectionPatterns.add(projectionPattern);
     }
