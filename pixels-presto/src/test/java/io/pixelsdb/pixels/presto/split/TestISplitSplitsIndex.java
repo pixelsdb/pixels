@@ -20,18 +20,14 @@
 package io.pixelsdb.pixels.presto.split;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import com.alibaba.fastjson.JSON;
 import com.facebook.presto.spi.PrestoException;
-import io.pixelsdb.pixels.common.split.AccessPattern;
-import io.pixelsdb.pixels.common.split.ColumnSet;
-import io.pixelsdb.pixels.common.split.Index;
-import io.pixelsdb.pixels.common.split.IndexEntry;
-import io.pixelsdb.pixels.common.split.IndexFactory;
-import io.pixelsdb.pixels.common.split.Inverted;
+import io.pixelsdb.pixels.common.layout.SplitsIndex;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import org.junit.Test;
 
@@ -41,12 +37,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TestISplitIndex
+public class TestISplitSplitsIndex
 {
     @Test
     public void testLocal () throws IOException
     {
-        IndexEntry entry = new IndexEntry("test","t1");
+        IndexName entry = new IndexName("test","t1");
         BufferedReader schemaReader = new BufferedReader(
                 new FileReader(
                         "/home/hank/dev/idea-projects/pixels/pixels-presto/target/classes/105_schema.text"));
@@ -60,30 +56,30 @@ public class TestISplitIndex
         BufferedReader workloadReader = new BufferedReader(
                 new FileReader("/home/hank/dev/idea-projects/pixels/pixels-presto/target/classes/105_workload.text")
         );
-        List<AccessPattern> accessPatterns = new ArrayList<>();
+        List<SplitPattern> splitPatterns = new ArrayList<>();
         int i = 0;
         while ((line = workloadReader.readLine()) != null)
         {
             String[] columns = line.split("\t")[2].split(",");
-            AccessPattern accessPattern = new AccessPattern();
+            SplitPattern splitPattern = new SplitPattern();
             for (String column : columns)
             {
-                accessPattern.addColumn(column);
+                splitPattern.addColumn(column);
             }
-            accessPattern.setSplitSize(i++);
-            accessPatterns.add(accessPattern);
+            splitPattern.setSplitSize(i++);
+            splitPatterns.add(splitPattern);
         }
         workloadReader.close();
-        Index index = new Inverted(columnOrder, accessPatterns, 16);
-        IndexFactory.Instance().cacheIndex(entry, index);
-        index = IndexFactory.Instance().getIndex(new IndexEntry("test", "t1"));
+        SplitsIndex splitsIndex = new InvertedSplitsIndex(columnOrder, splitPatterns, 16);
+        IndexFactory.Instance().cacheSplitsIndex(entry, splitsIndex);
+        splitsIndex = IndexFactory.Instance().getSplitsIndex(new IndexName("test", "t1"));
         ColumnSet columnSet = new ColumnSet();
         String[] columns = {"QueryDate_","Market","IsBotVNext","IsNormalQuery","Vertical","AppInfoServerName","AppInfoClientName","QueryDate_","TrafficCount"};
         for (String column : columns)
         {
             columnSet.addColumn(column);
         }
-        System.out.println(index.search(columnSet).toString());
+        System.out.println(splitsIndex.search(columnSet).toString());
     }
 
     @Test
@@ -95,19 +91,19 @@ public class TestISplitIndex
         {
             // get index
             int version = layout.getVersion();
-            IndexEntry indexEntry = new IndexEntry("pixels", "test_105");
-            Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
+            IndexName indexName = new IndexName("pixels", "test_105");
+            InvertedSplitsIndex index = (InvertedSplitsIndex) IndexFactory.Instance().getSplitsIndex(indexName);
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
             if (index == null)
             {
-                index = getInverted(order, splits, indexEntry);
+                index = getInverted(order, splits, indexName);
             }
             else
             {
                 int indexVersion = index.getVersion();
                 if (indexVersion < version) {
-                    index = getInverted(order, splits, indexEntry);
+                    index = getInverted(order, splits, indexName);
                 }
             }
 
@@ -135,7 +131,7 @@ public class TestISplitIndex
             columnSet.addColumn("AppInfoClientName".toLowerCase());
             columnSet.addColumn("Market".toLowerCase());
             columnSet.addColumn("IsHomepageView".toLowerCase());
-            AccessPattern bestPattern = index.search(columnSet);
+            SplitPattern bestPattern = index.search(columnSet);
             int splitSize = bestPattern.getSplitSize();
             int rowGroupNum = splits.getNumRowGroupInBlock();
             System.out.println(bestPattern.toString());
@@ -144,12 +140,12 @@ public class TestISplitIndex
         }
     }
 
-    private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
+    private InvertedSplitsIndex getInverted(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
-        Inverted index;
+        InvertedSplitsIndex index;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheIndex(indexEntry, index);
+            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
+            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         } catch (IOException e) {
             throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
         }

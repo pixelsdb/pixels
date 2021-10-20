@@ -28,11 +28,12 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.layout.SplitPattern;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.split.*;
+import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.presto.exception.CacheException;
@@ -132,7 +133,7 @@ public class PixelsSplitManager
         {
             // get index
             int version = layout.getVersion();
-            IndexEntry indexEntry = new IndexEntry(schemaName, tableName);
+            IndexName indexName = new IndexName(schemaName, tableName);
 
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
@@ -153,24 +154,24 @@ public class PixelsSplitManager
 
                 // log.info("columns to be accessed: " + columnSet.toString());
 
-                Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
-                if (index == null)
+                SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
+                if (splitsIndex == null)
                 {
-                    logger.debug("index not exist in factory, building index...");
-                    index = getInverted(order, splits, indexEntry);
+                    logger.debug("Splits index not exist in factory, building index...");
+                    splitsIndex = getSplitsIndex(order, splits, indexName);
                 }
                 else
                 {
-                    int indexVersion = index.getVersion();
+                    int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version) {
-                        logger.debug("index version is not up to date, updating index...");
-                        index = getInverted(order, splits, indexEntry);
+                        logger.debug("Splits index version is not up to date, updating index...");
+                        splitsIndex = getSplitsIndex(order, splits, indexName);
                     }
                 }
 
-                AccessPattern bestPattern = index.search(columnSet);
+                SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 // log.info("bestPattern: " + bestPattern.toString());
-                splitSize = bestPattern.getSplitSize();
+                splitSize = bestSplitPattern.getSplitSize();
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
@@ -394,12 +395,13 @@ public class PixelsSplitManager
         return addressBuilder.build();
     }
 
-    private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
+    private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
-        Inverted index;
+        SplitsIndex index;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheIndex(indexEntry, index);
+            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
+                    splits.getNumRowGroupInBlock());
+            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         } catch (IOException e) {
             logger.error("getInverted error: " + e.getMessage());
             throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);

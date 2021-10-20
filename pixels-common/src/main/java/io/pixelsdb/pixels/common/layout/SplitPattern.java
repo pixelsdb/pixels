@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
-import io.pixelsdb.pixels.common.metadata.domain.SplitPattern;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 
 import java.io.IOException;
@@ -28,13 +27,13 @@ import java.util.*;
 /**
  * @author hank
  */
-public class AccessPattern
+public class SplitPattern
 {
     // it seems that this.pattern can be a Set.
     private ColumnSet columnSet = null;
     private int splitSize;
 
-    public AccessPattern()
+    public SplitPattern()
     {
         this.columnSet = new ColumnSet();
     }
@@ -84,19 +83,20 @@ public class AccessPattern
         return "splitSize: " + splitSize + ", pattern: " + builder.substring(1);
     }
 
-    public static List<AccessPattern> buildPatterns(List<String> columns, Splits splitInfo)
+    public static List<SplitPattern> buildPatterns(List<String> columns, Splits splitInfo)
             throws IOException
     {
-        List<AccessPattern> patterns = new ArrayList<>();
-        List<SplitPattern> splitPatterns = splitInfo.getSplitPatterns();
+        List<SplitPattern> patterns = new ArrayList<>();
+        List<io.pixelsdb.pixels.common.metadata.domain.SplitPattern> splitPatterns =
+                splitInfo.getSplitPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (SplitPattern splitPattern : splitPatterns)
+        for (io.pixelsdb.pixels.common.metadata.domain.SplitPattern splitPattern : splitPatterns)
         {
             accessedColumns = splitPattern.getAccessedColumns();
 
-            AccessPattern pattern = new AccessPattern();
+            SplitPattern pattern = new SplitPattern();
             for (int column : accessedColumns)
             {
                 pattern.addColumn(columns.get(column));

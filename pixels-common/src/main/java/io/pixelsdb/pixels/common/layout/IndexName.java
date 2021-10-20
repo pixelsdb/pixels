@@ -17,18 +17,18 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
 /**
  * @author: tao
  * @date: Create in 2018-06-19 14:46
  **/
-public class IndexEntry
+public class IndexName
 {
     private String schemaName;
     private String tableName;
 
-    public IndexEntry(String schemaName, String tableName)
+    public IndexName(String schemaName, String tableName)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
@@ -60,7 +60,7 @@ public class IndexEntry
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        IndexEntry that = (IndexEntry) o;
+        IndexName that = (IndexName) o;
 
         if (schemaName != null ? !schemaName.equals(that.schemaName) : that.schemaName != null) return false;
         return tableName != null ? tableName.equals(that.tableName) : that.tableName == null;

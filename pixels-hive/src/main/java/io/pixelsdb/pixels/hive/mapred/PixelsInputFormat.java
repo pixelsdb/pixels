@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
-import io.pixelsdb.pixels.common.split.*;
+import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
@@ -173,7 +173,7 @@ public class PixelsInputFormat
         {
             // get index
             int version = layout.getVersion();
-            IndexEntry indexEntry = new IndexEntry(st.getSchemaName(), st.getTableName());
+            IndexName indexName = new IndexName(st.getSchemaName(), st.getTableName());
 
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             Splits splits = JSON.parseObject(layout.getSplits(), Splits.class);
@@ -192,23 +192,23 @@ public class PixelsInputFormat
                     columnSet.addColumn(columnName);
                 }
 
-                Inverted index = (Inverted) IndexFactory.Instance().getIndex(indexEntry);
-                if (index == null)
+                SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
+                if (splitsIndex == null)
                 {
-                    log.debug("split index not exist in factory, building index...");
-                    index = getInverted(order, splits, indexEntry);
+                    log.debug("Splits index not exist in factory, building index...");
+                    splitsIndex = getSplitsIndex(order, splits, indexName);
                 }
                 else
                 {
-                    int indexVersion = index.getVersion();
+                    int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version) {
-                        log.debug("split index is expired, building new index...");
-                        index = getInverted(order, splits, indexEntry);
+                        log.debug("Splits index is expired, building new index...");
+                        splitsIndex = getSplitsIndex(order, splits, indexName);
                     }
                 }
 
-                AccessPattern bestPattern = index.search(columnSet);
-                splitSize = bestPattern.getSplitSize();
+                SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
+                splitSize = bestSplitPattern.getSplitSize();
             }
             log.error("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
@@ -345,12 +345,12 @@ public class PixelsInputFormat
         return pixelsSplits.toArray(new PixelsSplit[pixelsSplits.size()]);
     }
 
-    private Inverted getInverted(Order order, Splits splits, IndexEntry indexEntry) {
+    private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
-        Inverted index = null;
+        SplitsIndex index = null;
         try {
-            index = new Inverted(columnOrder, AccessPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheIndex(indexEntry, index);
+            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
+            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         } catch (IOException e) {
             log.error("getInverted error: " + e.getMessage());
         }

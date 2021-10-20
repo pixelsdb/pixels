@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.split;
+package io.pixelsdb.pixels.common.layout;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,21 +35,21 @@ public class IndexFactory
         return instance;
     }
 
-    private Map<IndexEntry, Index> indexCache = null;
+    private Map<IndexName, SplitsIndex> splitsIndexes = null;
 
     private IndexFactory()
     {
-        this.indexCache = new HashMap<>();
+        this.splitsIndexes = new HashMap<>();
     }
 
-    public void cacheIndex(IndexEntry entry, Index index)
+    public void cacheSplitsIndex(IndexName entry, SplitsIndex splitsIndex)
     {
-        this.indexCache.put(entry, index);
+        this.splitsIndexes.put(entry, splitsIndex);
     }
 
-    public Index getIndex(IndexEntry entry)
+    public SplitsIndex getSplitsIndex(IndexName entry)
     {
-        return this.indexCache.get(entry);
+        return this.splitsIndexes.get(entry);
     }
 
 }
