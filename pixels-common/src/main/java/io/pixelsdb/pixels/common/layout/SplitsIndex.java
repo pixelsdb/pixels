@@ -4,7 +4,7 @@ package io.pixelsdb.pixels.common.layout;
 public interface SplitsIndex
 {
     /**
-     * search viable access pattern for a column set
+     * search viable split pattern for a column set
      *
      * @param columnSet
      * @return

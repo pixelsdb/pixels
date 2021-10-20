@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -22,9 +22,10 @@ package io.pixelsdb.pixels.common.layout;
 import java.util.*;
 
 /**
- * @author hank
+ * Created at: 20/10/2021
+ * Author: hank
  */
-public class InvertedSplitsIndex implements SplitsIndex
+public class InvertedProjectionsIndex implements ProjectionsIndex
 {
     /**
      * key: column name;
@@ -32,27 +33,24 @@ public class InvertedSplitsIndex implements SplitsIndex
      */
     private int version;
 
-    private final int defaultSplitSize;
-
     private Map<String, BitSet> bitMapIndex;
 
-    private List<SplitPattern> querySplitPatterns;
+    private List<ProjectionPattern> projectionPatterns;
 
     private List<String> columnOrder;
 
-    public InvertedSplitsIndex(List<String> columnOrder, List<SplitPattern> patterns, int defaultSplitSize)
+    public InvertedProjectionsIndex(List<String> columnOrder, List<ProjectionPattern> patterns)
     {
-        this.defaultSplitSize = defaultSplitSize;
         this.columnOrder = new ArrayList<>(columnOrder);
-        this.querySplitPatterns = new ArrayList<>(patterns);
+        this.projectionPatterns = new ArrayList<>(patterns);
         this.bitMapIndex = new HashMap<>(this.columnOrder.size());
 
         for (String column : this.columnOrder)
         {
-            BitSet bitMap = new BitSet(this.querySplitPatterns.size());
-            for (int i = 0; i < this.querySplitPatterns.size(); ++i)
+            BitSet bitMap = new BitSet(this.projectionPatterns.size());
+            for (int i = 0; i < this.projectionPatterns.size(); ++i)
             {
-                if (this.querySplitPatterns.get(i).contaiansColumn(column))
+                if (this.projectionPatterns.get(i).contaiansColumn(column))
                 {
                     bitMap.set(i, true);
                 }
@@ -62,20 +60,18 @@ public class InvertedSplitsIndex implements SplitsIndex
     }
 
     @Override
-    public SplitPattern search(ColumnSet columnSet)
+    public ProjectionPattern search(ColumnSet columnSet)
     {
-        SplitPattern bestPattern = null;
+        ProjectionPattern bestPattern = null;
 
         if (columnSet.isEmpty())
         {
-            bestPattern = new SplitPattern();
-            bestPattern.setSplitSize(this.defaultSplitSize);
-            return bestPattern;
+            return null;
         }
 
         List<BitSet> bitMaps = new ArrayList<>();
-        BitSet and = new BitSet(this.querySplitPatterns.size());
-        and.set(0, this.querySplitPatterns.size(), true);
+        BitSet and = new BitSet(this.projectionPatterns.size());
+        and.set(0, this.projectionPatterns.size(), true);
         for (String column : columnSet.getColumns())
         {
             BitSet bitMap = this.bitMapIndex.get(column);
@@ -86,33 +82,16 @@ public class InvertedSplitsIndex implements SplitsIndex
         if (and.nextSetBit(0) < 0)
         {
             // no exact access pattern found.
-            // look for the minimum difference in size
-            // TODO: this is not a good strategy.
-            // Instead, the access pattern with minimum difference in actual read size
-            // should be used as the best access pattern. It requires that data size of each column
-            // be maintained in ColumnSet.
-            int numColumns = columnSet.size();
-            int minPatternSize = Integer.MAX_VALUE;
-            int temp;
-
-            for (int i = 0; i < this.querySplitPatterns.size(); ++i)
-            {
-                temp = Math.abs(this.querySplitPatterns.get(i).size() - numColumns);
-                if (temp < minPatternSize)
-                {
-                    bestPattern = this.querySplitPatterns.get(i);
-                    minPatternSize = temp;
-                }
-            }
+            return null;
         } else
         {
             int minPatternSize = Integer.MAX_VALUE;
             int i = 0;
             while ((i = and.nextSetBit(i)) >= 0)
             {
-                if (this.querySplitPatterns.get(i).size() < minPatternSize)
+                if (this.projectionPatterns.get(i).size() < minPatternSize)
                 {
-                    bestPattern = this.querySplitPatterns.get(i);
+                    bestPattern = this.projectionPatterns.get(i);
                     minPatternSize = bestPattern.size();
                 }
                 i++;

@@ -398,14 +398,9 @@ public class PixelsSplitManager
     private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
         SplitsIndex index;
-        try {
-            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
-                    splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
-        } catch (IOException e) {
-            logger.error("getInverted error: " + e.getMessage());
-            throw new PrestoException(PixelsErrorCode.PIXELS_INVERTED_INDEX_ERROR, e);
-        }
+        index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
+                splits.getNumRowGroupInBlock());
+        IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         return index;
     }
 }

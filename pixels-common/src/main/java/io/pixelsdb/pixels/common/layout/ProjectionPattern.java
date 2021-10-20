@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2021 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.common.layout;
 
-import io.pixelsdb.pixels.common.metadata.domain.Splits;
+import io.pixelsdb.pixels.common.metadata.domain.Projections;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,15 +27,16 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * @author hank
+ * Created at: 20/10/2021
+ * Author: hank
  */
-public class SplitPattern
+public class ProjectionPattern
 {
     // it seems that this.pattern can be a Set.
     private ColumnSet columnSet;
-    private int splitSize;
+    private String path;
 
-    public SplitPattern()
+    public ProjectionPattern()
     {
         this.columnSet = new ColumnSet();
     }
@@ -55,14 +56,14 @@ public class SplitPattern
         return this.columnSet;
     }
 
-    public void setSplitSize(int splitSize)
+    public void setPath(String path)
     {
-        this.splitSize = splitSize;
+        this.path = path;
     }
 
-    public int getSplitSize()
+    public String getPath()
     {
-        return splitSize;
+        return path;
     }
 
     public boolean contaiansColumn(String column)
@@ -75,35 +76,35 @@ public class SplitPattern
     {
         if (this.columnSet.isEmpty())
         {
-            return "splitSize: " + splitSize + ", pattern is empty";
+            return "path: " + path + ", pattern is empty";
         }
         StringBuilder builder = new StringBuilder();
         for (String column : this.columnSet.getColumns())
         {
             builder.append(",").append(column);
         }
-        return "splitSize: " + splitSize + ", pattern: " + builder.substring(1);
+        return "path: " + path + ", pattern: " + builder.substring(1);
     }
 
-    public static List<SplitPattern> buildPatterns(List<String> columns, Splits splitInfo)
+    public static List<ProjectionPattern> buildPatterns(List<String> columns, Projections projectionInfo)
     {
-        List<SplitPattern> patterns = new ArrayList<>();
-        List<io.pixelsdb.pixels.common.metadata.domain.SplitPattern> splitPatterns =
-                splitInfo.getSplitPatterns();
+        List<ProjectionPattern> patterns = new ArrayList<>();
+        List<io.pixelsdb.pixels.common.metadata.domain.ProjectionPattern> projPatterns =
+                projectionInfo.getProjectionPatterns();
 
         Set<ColumnSet> existingColumnSets = new HashSet<>();
         List<Integer> accessedColumns;
-        for (io.pixelsdb.pixels.common.metadata.domain.SplitPattern splitPattern : splitPatterns)
+        for (io.pixelsdb.pixels.common.metadata.domain.ProjectionPattern projPattern : projPatterns)
         {
-            accessedColumns = splitPattern.getAccessedColumns();
+            accessedColumns = projPattern.getAccessedColumns();
 
-            SplitPattern pattern = new SplitPattern();
+            ProjectionPattern pattern = new ProjectionPattern();
             for (int column : accessedColumns)
             {
                 pattern.addColumn(columns.get(column));
             }
             // set split size of each pattern
-            pattern.setSplitSize(splitPattern.getNumRowGroupInSplit());
+            pattern.setPath(projPattern.getPath());
 
             ColumnSet columnSet = pattern.getColumnSet();
 

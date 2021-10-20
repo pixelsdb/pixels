@@ -348,12 +348,8 @@ public class PixelsInputFormat
     private SplitsIndex getSplitsIndex(Order order, Splits splits, IndexName indexName) {
         List<String> columnOrder = order.getColumnOrder();
         SplitsIndex index = null;
-        try {
-            index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
-            IndexFactory.Instance().cacheSplitsIndex(indexName, index);
-        } catch (IOException e) {
-            log.error("getInverted error: " + e.getMessage());
-        }
+        index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits), splits.getNumRowGroupInBlock());
+        IndexFactory.Instance().cacheSplitsIndex(indexName, index);
         return index;
     }
 
