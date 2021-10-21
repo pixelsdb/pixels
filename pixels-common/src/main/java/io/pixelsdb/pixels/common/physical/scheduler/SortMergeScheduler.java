@@ -293,11 +293,10 @@ public class SortMergeScheduler implements Scheduler
             this.requestReaders = new ConcurrentLinkedQueue<>();
 
             // Issue #133: set the monitor thread as daemon thread with max priority.
-            this.monitorThreadGroup = new ThreadGroup("pixels retry monitor");
+            this.monitorThreadGroup = new ThreadGroup("pixels.retry.monitor");
             this.monitorThreadGroup.setMaxPriority(Thread.MAX_PRIORITY);
             this.monitorThreadGroup.setDaemon(true);
-            this.monitorService = Executors.newSingleThreadExecutor(runnable ->
-            {
+            this.monitorService = Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(monitorThreadGroup, runnable);
                 thread.setDaemon(true);
                 thread.setPriority(Thread.MAX_PRIORITY);
@@ -374,6 +373,8 @@ public class SortMergeScheduler implements Scheduler
             });
 
             this.monitorService.shutdown();
+
+            Runtime.getRuntime().addShutdownHook(new Thread(monitorService::shutdownNow));
         }
 
         private int timeoutMs(int length)

@@ -55,8 +55,26 @@ public class PhysicalS3Reader implements PhysicalReader
 
     static
     {
-        clientService = Executors.newFixedThreadPool(32);
-        Runtime.getRuntime().addShutdownHook( new Thread(clientService::shutdownNow));
+        int clientServiceThreads = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.client.service.threads"));
+        ThreadGroup clientServiceGroup = new ThreadGroup("s3.client.service");
+        clientServiceGroup.setDaemon(true);
+        clientServiceGroup.setMaxPriority(Thread.MAX_PRIORITY-1);
+        clientService = Executors.newFixedThreadPool(clientServiceThreads, runnable -> {
+            Thread thread = new Thread(clientServiceGroup, runnable);
+            thread.setDaemon(true);
+            /**
+             * Issue #136:
+             * Using MAX_PRIORITY-1 for client threads accelerates async read with sync client for
+             * some queries that send many get object requests (e.g. 5%).
+             * Note that clientService is only used for the cause that async client is disabled while
+             * async read is enabled.
+             */
+            thread.setPriority(Thread.MAX_PRIORITY-1);
+            return thread;
+        });
+
+        Runtime.getRuntime().addShutdownHook(new Thread(clientService::shutdownNow));
     }
 
     private S3 s3;
