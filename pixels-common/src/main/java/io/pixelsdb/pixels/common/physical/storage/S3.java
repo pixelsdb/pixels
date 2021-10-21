@@ -68,7 +68,7 @@ public class S3 implements Storage
 
     private static int connectionTimeoutSec = 60;
     private static int connectionAcquisitionTimeoutSec = 60;
-    private static int eventLoopGroupThreads = 20;
+    private static int clientServiceThreads = 20;
     private static int maxRequestConcurrency = 200;
     private static int maxPendingRequests = 50_000;
     private static S3Client s3;
@@ -85,8 +85,8 @@ public class S3 implements Storage
                 ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
         connectionAcquisitionTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.acquisition.timeout.sec"));
-        eventLoopGroupThreads = Integer.parseInt(
-                ConfigFactory.Instance().getProperty("s3.event.loop.group.threads"));
+        clientServiceThreads = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("s3.client.service.threads"));
         maxRequestConcurrency = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.request.concurrency"));
         maxPendingRequests = Integer.parseInt(
@@ -109,8 +109,8 @@ public class S3 implements Storage
                         .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
                         .putChannelOption(ChannelOption.SO_RCVBUF, 1024*1024*1024)
                         .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
-                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(eventLoopGroupThreads).build())
-                        .maxConcurrency(maxConcurrentRequests).maxPendingConnectionAcquires(maxPendingRequests)).build();
+                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(clientServiceThreads).build())
+                        .maxConcurrency(maxRequestConcurrency).maxPendingConnectionAcquires(maxPendingRequests)).build();
 */
         int maxConcurrency, maxConcurrency1M, maxConcurrency10M;
         if (enableRequestDiversion)
