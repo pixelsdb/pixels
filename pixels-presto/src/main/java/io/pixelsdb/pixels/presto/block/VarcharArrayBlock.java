@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.presto.block;
 
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockEncoding;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.slice.XxHash64;
@@ -348,9 +347,9 @@ public class VarcharArrayBlock implements Block
     }
 
     @Override
-    public BlockEncoding getEncoding()
+    public String getEncodingName()
     {
-        return new VarcharArrayBlockEncoding();
+        return VarcharArrayBlockEncoding.NAME;
     }
 
     @Override

@@ -19,8 +19,9 @@
  */
 package io.pixelsdb.pixels.presto.block;
 
-import com.facebook.presto.spi.block.*;
-import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockEncoding;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 
@@ -36,8 +37,14 @@ import static io.pixelsdb.pixels.presto.block.EncoderUtil.encodeNullsAsBits;
 public class TimeArrayBlockEncoding
         implements BlockEncoding
 {
-    public static final BlockEncodingFactory<TimeArrayBlockEncoding> FACTORY = new TimeArrayBlockEncoding.TimeArrayBlockEncodingFactory();
-    private static final String NAME = "TIME_ARRAY";
+    public static final String NAME = "TIME_ARRAY";
+
+    private static final TimeArrayBlockEncoding instance = new TimeArrayBlockEncoding();
+
+    public static TimeArrayBlockEncoding Instance()
+    {
+        return instance;
+    }
 
     @Override
     public String getName()
@@ -46,7 +53,7 @@ public class TimeArrayBlockEncoding
     }
 
     @Override
-    public void writeBlock(SliceOutput sliceOutput, Block block)
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, SliceOutput sliceOutput, Block block)
     {
         int positionCount = block.getPositionCount();
         sliceOutput.appendInt(positionCount);
@@ -61,7 +68,7 @@ public class TimeArrayBlockEncoding
     }
 
     @Override
-    public Block readBlock(SliceInput sliceInput)
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, SliceInput sliceInput)
     {
         int positionCount = sliceInput.readInt();
 
@@ -75,32 +82,5 @@ public class TimeArrayBlockEncoding
         }
 
         return new TimeArrayBlock(positionCount, valueIsNull, values);
-    }
-
-    @Override
-    public BlockEncodingFactory getFactory()
-    {
-        return FACTORY;
-    }
-
-    public static class TimeArrayBlockEncodingFactory
-            implements BlockEncodingFactory<TimeArrayBlockEncoding>
-    {
-        @Override
-        public String getName()
-        {
-            return NAME;
-        }
-
-        @Override
-        public TimeArrayBlockEncoding readEncoding(TypeManager manager, BlockEncodingSerde serde, SliceInput input)
-        {
-            return new TimeArrayBlockEncoding();
-        }
-
-        @Override
-        public void writeEncoding(BlockEncodingSerde serde, SliceOutput output, TimeArrayBlockEncoding blockEncoding)
-        {
-        }
     }
 }

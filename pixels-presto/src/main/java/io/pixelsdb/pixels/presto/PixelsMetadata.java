@@ -142,25 +142,25 @@ public class PixelsMetadata
     }
 
     @Override
-    public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
+    public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
         try
         {
             List<String> schemaNames;
-            if (schemaNameOrNull != null)
+            if (schemaName.isPresent())
             {
-                schemaNames = ImmutableList.of(schemaNameOrNull);
+                schemaNames = ImmutableList.of(schemaName.get());
             } else
             {
                 schemaNames = pixelsMetadataProxy.getSchemaNames();
             }
 
             ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
-            for (String schemaName : schemaNames)
+            for (String schema : schemaNames)
             {
-                for (String tableName : pixelsMetadataProxy.getTableNames(schemaName))
+                for (String table : pixelsMetadataProxy.getTableNames(schema))
                 {
-                    builder.add(new SchemaTableName(schemaName, tableName));
+                    builder.add(new SchemaTableName(schema, table));
                 }
             }
             return builder.build();

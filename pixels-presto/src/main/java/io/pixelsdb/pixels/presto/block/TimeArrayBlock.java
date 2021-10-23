@@ -236,9 +236,9 @@ public class TimeArrayBlock implements Block
     }
 
     @Override
-    public BlockEncoding getEncoding()
+    public String getEncodingName()
     {
-        return new IntArrayBlockEncoding();
+        return TimeArrayBlockEncoding.NAME;
     }
 
     @Override

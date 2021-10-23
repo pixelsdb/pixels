@@ -43,10 +43,7 @@ import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -385,7 +382,7 @@ class PixelsPageSource implements ConnectorPageSource
             }
             checkState(batchId == expectedBatchId);
 
-            if (rowBatchRead == false)
+            if (!rowBatchRead)
             {
                 try
                 {
@@ -409,15 +406,14 @@ class PixelsPageSource implements ConnectorPageSource
             String typeName = type.getDisplayName();
             int projIndex = rowBatch.projectedColumns[columnIndex];
             ColumnVector cv = rowBatch.cols[projIndex];
-            BlockBuilder blockBuilder = type.createBlockBuilder(
-                    new BlockBuilderStatus(), rowBatch.size);
+            BlockBuilder blockBuilder = type.createBlockBuilder(null, rowBatch.size);
 
             switch (typeName)
             {
                 case "integer":
                 case "bigint":
                     LongColumnVector lcv = (LongColumnVector) cv;
-                    block = new LongArrayBlock(rowBatch.size, lcv.isNull, lcv.vector);
+                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(lcv.isNull), lcv.vector);
                     break;
                 case "double":
                 case "real":
@@ -444,7 +440,7 @@ class PixelsPageSource implements ConnectorPageSource
 //                        }
 //                    }
 //                    block = blockBuilder.build();
-                    block = new LongArrayBlock(rowBatch.size, dcv.isNull, dcv.vector);
+                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(dcv.isNull), dcv.vector);
                     break;
                 case "varchar":
                     BinaryColumnVector scv = (BinaryColumnVector) cv;
@@ -489,13 +485,13 @@ class PixelsPageSource implements ConnectorPageSource
 //                        }
 //                    }
 //                    block = blockBuilder.build();
-                    block = new ByteArrayBlock(rowBatch.size, bcv.isNull, bcv.vector);
+                    block = new ByteArrayBlock(rowBatch.size, Optional.ofNullable(bcv.isNull), bcv.vector);
                     break;
                 case "date":
                     // Issue #94: add date type.
                     DateColumnVector dtcv = (DateColumnVector) cv;
                     // In pixels and Presto, date is stored as the number of days from UTC 1970-1-1 0:0:0.
-                    block = new IntArrayBlock(rowBatch.size, dtcv.isNull, dtcv.time);
+                    block = new IntArrayBlock(rowBatch.size, Optional.ofNullable(dtcv.isNull), dtcv.time);
                     break;
                 case "time":
                     // Issue #94: add time type.
@@ -530,7 +526,7 @@ class PixelsPageSource implements ConnectorPageSource
                      * com.facebook.presto.spi.type.AbstractLongType, which creates a LongArrayBlockBuilder.
                      * And this block builder builds a LongArrayBlock.
                      */
-                    block = new LongArrayBlock(rowBatch.size, tscv.isNull, tscv.time);
+                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(tscv.isNull), tscv.time);
                     break;
                 default:
                     for (int i = 0; i < rowBatch.size; ++i)

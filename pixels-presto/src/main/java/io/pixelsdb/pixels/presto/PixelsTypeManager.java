@@ -123,6 +123,12 @@ public class PixelsTypeManager
     }
 
     @Override
+    public boolean canCoerce(Type actualType, Type expectedType)
+    {
+        return false;
+    }
+
+    @Override
     public boolean isTypeOnlyCoercion(Type actualType, Type expectedType)
     {
         return false;
