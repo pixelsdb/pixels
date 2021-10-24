@@ -29,6 +29,8 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 import static io.airlift.slice.SizeOf.sizeOf;
@@ -127,13 +129,24 @@ public class VarcharArrayBlock implements Block
         this.valueIsNull = valueIsNull;
 
         long size = 0L, retainedSize = 0L;
+        Set<byte[]> existingValues = new HashSet<>(2);
         for (int i = 0; i < positionCount; ++i)
         {
             size += lengths[arrayOffset + i];
-            retainedSize += valueIsNull[arrayOffset + i] ? 0L : values[arrayOffset + i].length;
+            // retainedSize should count the physical footprint of the values.
+            if (!valueIsNull[arrayOffset + i])
+            {
+                if (!existingValues.contains(values[arrayOffset + i]))
+                {
+                    existingValues.add(values[arrayOffset + i]);
+                    retainedSize += values[arrayOffset + i].length;
+                }
+            }
         }
+        existingValues.clear();
         sizeInBytes = size;
-        retainedSizeInBytes = INSTANCE_SIZE + retainedSize + sizeOf(valueIsNull) + sizeOf(offsets) + sizeOf(lengths);
+        retainedSizeInBytes = INSTANCE_SIZE + retainedSize + sizeOf(values) +
+                sizeOf(valueIsNull) + sizeOf(offsets) + sizeOf(lengths);
     }
 
     /**
@@ -141,6 +154,7 @@ public class VarcharArrayBlock implements Block
      */
     protected final int getPositionOffset(int position)
     {
+        // offsets[i] is zero if valueIsNull[i] is true, no need to check.
         return offsets[position + arrayOffset];
     }
 
@@ -152,6 +166,7 @@ public class VarcharArrayBlock implements Block
     public int getSliceLength(int position)
     {
         checkReadablePosition(position);
+        // lengths[i] is zero if valueIsNull[i] is true, no need to check.
         return lengths[position + arrayOffset];
     }
 
@@ -178,6 +193,7 @@ public class VarcharArrayBlock implements Block
         long size = 0L;
         for (int i = 0; i < length; ++i)
         {
+            // lengths[i] is zero if valueIsNull[i] is true, no need to check.
             size += lengths[position + arrayOffset + i];
         }
         return size + ((Integer.BYTES + Byte.BYTES) * (long) length);
@@ -256,6 +272,10 @@ public class VarcharArrayBlock implements Block
     {
         // do not specify the offset and length for wrappedBuffer,
         // a raw slice should contain the whole bytes of value at the position.
+        if (valueIsNull[position + arrayOffset])
+        {
+            return Slices.EMPTY_SLICE;
+        }
         return Slices.wrappedBuffer(values[position + arrayOffset]);
     }
 
@@ -417,6 +437,10 @@ public class VarcharArrayBlock implements Block
     public int compareTo(int position, int offset, int length, Block otherBlock, int otherPosition, int otherOffset, int otherLength)
     {
         checkReadablePosition(position);
+        if (valueIsNull[position + arrayOffset])
+        {
+            return -1;
+        }
         Slice rawSlice = getRawSlice(position);
         if (getSliceLength(position) < length)
         {
@@ -429,6 +453,10 @@ public class VarcharArrayBlock implements Block
     public int bytesCompare(int position, int offset, int length, Slice otherSlice, int otherOffset, int otherLength)
     {
         checkReadablePosition(position);
+        if (valueIsNull[position + arrayOffset])
+        {
+            return -1;
+        }
         return getRawSlice(position).compareTo(getPositionOffset(position) + offset, length, otherSlice, otherOffset, otherLength);
     }
 
