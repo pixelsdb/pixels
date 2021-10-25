@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * BinaryColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
@@ -98,7 +99,19 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void reset()
     {
+        // FIXME:
+        isNull = new boolean[isNull.length];
+        vector = new byte[vector.length][];
+        start = new int[start.length];
+        lens = new int[lens.length];
         super.reset();
+        /**
+         * Issue #132:
+         * FIX: column vector is reused in VectorizedRowBatch, so that set all elements in vector
+         * to null 1) help garbage collector to release the old buffers if setVal is used, 2) enable
+         * the column vector users to return values without checking isNull.
+         */
+        Arrays.fill(vector, null);
         initBuffer(0);
     }
 

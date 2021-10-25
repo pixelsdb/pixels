@@ -39,7 +39,7 @@ import java.util.Arrays;
 public class TimestampColumnVector extends ColumnVector
 {
     /*
-     * The storage arrays for this column vector corresponds to the storage of a Timestamp:
+     * The storage arrays for this column vector corresponds to the storage of Timestamp:
      */
     public long[] time;
     // The values from Timestamp.getTime().

@@ -43,10 +43,7 @@ import static io.pixelsdb.pixels.core.utils.DatetimeUtils.roundSqlTime;
  */
 public class TimeColumnVector extends ColumnVector
 {
-    /*
-     * The storage arrays for this column vector corresponds to the storage of a Time:
-     */
-    public int[] time;
+    public int[] times;
     // The values from Time.getTime().
 
     /*
@@ -72,7 +69,7 @@ public class TimeColumnVector extends ColumnVector
     {
         super(len);
 
-        time = new int[len];
+        times = new int[len];
         memoryUsage += Integer.BYTES * len;
 
         scratchTime = new Time(0);
@@ -85,7 +82,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public int getLength()
     {
-        return time.length;
+        return times.length;
     }
 
     /**
@@ -97,7 +94,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public long getTime(int elementNum)
     {
-        return time[elementNum];
+        return times[elementNum];
     }
 
     /**
@@ -109,7 +106,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public void timeUpdate(Time t, int elementNum)
     {
-        t.setTime(time[elementNum]);
+        t.setTime(times[elementNum]);
     }
 
     /**
@@ -121,7 +118,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public Time asScratchTime(int elementNum)
     {
-        scratchTime.setTime(time[elementNum]);
+        scratchTime.setTime(times[elementNum]);
         return scratchTime;
     }
 
@@ -143,7 +140,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public long getTimeAsLong(int elementNum)
     {
-        scratchTime.setTime(time[elementNum]);
+        scratchTime.setTime(times[elementNum]);
         return getTimeAsLong(scratchTime);
     }
 
@@ -237,7 +234,7 @@ public class TimeColumnVector extends ColumnVector
     {
         TimeColumnVector timeColVector = (TimeColumnVector) inputVector;
 
-        time[outElementNum] = timeColVector.time[inputElementNum];
+        times[outElementNum] = timeColVector.times[inputElementNum];
     }
 
     @Override
@@ -246,7 +243,7 @@ public class TimeColumnVector extends ColumnVector
         if (inputVector instanceof TimeColumnVector)
         {
             TimeColumnVector srcVector = (TimeColumnVector) inputVector;
-            this.time = srcVector.time;
+            this.times = srcVector.times;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
@@ -268,18 +265,18 @@ public class TimeColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            int repeatFastTime = time[0];
+            int repeatFastTime = times[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
-                    time[i] = repeatFastTime;
+                    times[i] = repeatFastTime;
                 }
             }
             else
             {
-                Arrays.fill(time, 0, size, repeatFastTime);
+                Arrays.fill(times, 0, size, repeatFastTime);
             }
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
@@ -314,7 +311,7 @@ public class TimeColumnVector extends ColumnVector
         }
         else
         {
-            this.time[elementNum] = roundSqlTime(t.getTime());
+            this.times[elementNum] = roundSqlTime(t.getTime());
         }
     }
 
@@ -327,7 +324,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public void set(int elementNum, int millis)
     {
-        this.time[elementNum] = millis;
+        this.times[elementNum] = millis;
     }
 
     /**
@@ -338,7 +335,7 @@ public class TimeColumnVector extends ColumnVector
     public void setFromScratchTime(int elementNum)
     {
         // scratchTime may be changed outside this class, so we also mod it by millis in a day.
-        this.time[elementNum] = roundSqlTime(scratchTime.getTime());
+        this.times[elementNum] = roundSqlTime(scratchTime.getTime());
     }
 
     /**
@@ -349,7 +346,7 @@ public class TimeColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
-        time[elementNum] = 0;
+        times[elementNum] = 0;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
@@ -364,7 +361,7 @@ public class TimeColumnVector extends ColumnVector
         // Handle repeating case
         if (isRepeating)
         {
-            output.time[0] = time[0];
+            output.times[0] = times[0];
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
             return;
@@ -378,12 +375,12 @@ public class TimeColumnVector extends ColumnVector
             for (int j = 0; j < size; j++)
             {
                 int i = sel[j];
-                output.time[i] = time[i];
+                output.times[i] = times[i];
             }
         }
         else
         {
-            System.arraycopy(time, 0, output.time, 0, size);
+            System.arraycopy(times, 0, output.times, 0, size);
         }
 
         // Copy nulls over if needed
@@ -413,7 +410,7 @@ public class TimeColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = roundSqlTime(t.getTime());
+        times[0] = roundSqlTime(t.getTime());
     }
 
     @Override
@@ -425,7 +422,7 @@ public class TimeColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchTime.setTime(time[row]);
+            scratchTime.setTime(times[row]);
             buffer.append(scratchTime.toString());
         }
         else
@@ -438,23 +435,23 @@ public class TimeColumnVector extends ColumnVector
     public void ensureSize(int size, boolean preserveData)
     {
         super.ensureSize(size, preserveData);
-        if (size <= time.length)
+        if (size <= times.length)
         {
             return;
         }
-        int[] oldTime = time;
-        time = new int[size];
+        int[] oldTime = times;
+        times = new int[size];
         memoryUsage += Integer.BYTES * size;
         length = size;
         if (preserveData)
         {
             if (isRepeating)
             {
-                time[0] = oldTime[0];
+                times[0] = oldTime[0];
             }
             else
             {
-                System.arraycopy(oldTime, 0, time, 0, oldTime.length);
+                System.arraycopy(oldTime, 0, times, 0, oldTime.length);
             }
         }
     }
@@ -463,6 +460,6 @@ public class TimeColumnVector extends ColumnVector
     public void close()
     {
         super.close();
-        this.time = null;
+        this.times = null;
     }
 }

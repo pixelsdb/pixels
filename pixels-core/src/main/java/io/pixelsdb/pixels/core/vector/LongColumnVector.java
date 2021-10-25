@@ -37,7 +37,6 @@ import java.util.Arrays;
 public class LongColumnVector extends ColumnVector
 {
     public long[] vector;
-    public static final long NULL_VALUE = 1;
 
     /**
      * Use this constructor by default. All column vectors
@@ -151,15 +150,6 @@ public class LongColumnVector extends ColumnVector
         noNulls = true;
         isRepeating = true;
         vector[0] = value;
-    }
-
-    // Fill the column vector with nulls
-    public void fillWithNulls()
-    {
-        noNulls = false;
-        isRepeating = true;
-        vector[0] = NULL_VALUE;
-        isNull[0] = true;
     }
 
     // Simplify vector by brute-force flattening noNulls and isRepeating

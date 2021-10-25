@@ -105,9 +105,9 @@ public class TestPixelsWriter
                     e.isNull[row] = true;
                     e.vector[row] = 0;
                     f.isNull[row] = true;
-                    f.time[row] = 0;
+                    f.dates[row] = 0;
                     g.isNull[row] = true;
-                    g.time[row] = 0;
+                    g.times[row] = 0;
                     h.isNull[row] = true;
                     h.vector[row] = new byte[0];
                 }

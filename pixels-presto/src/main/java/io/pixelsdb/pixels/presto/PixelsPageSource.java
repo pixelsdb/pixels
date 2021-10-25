@@ -491,7 +491,7 @@ class PixelsPageSource implements ConnectorPageSource
                     // Issue #94: add date type.
                     DateColumnVector dtcv = (DateColumnVector) cv;
                     // In pixels and Presto, date is stored as the number of days from UTC 1970-1-1 0:0:0.
-                    block = new IntArrayBlock(rowBatch.size, Optional.ofNullable(dtcv.isNull), dtcv.time);
+                    block = new IntArrayBlock(rowBatch.size, Optional.ofNullable(dtcv.isNull), dtcv.dates);
                     break;
                 case "time":
                     // Issue #94: add time type.
@@ -501,7 +501,7 @@ class PixelsPageSource implements ConnectorPageSource
                      * Time value is stored as int, so here we use TimeArrayBlock, which
                      * accepts int values but provides getLong method same as LongArrayBlock.
                      */
-                    block = new TimeArrayBlock(rowBatch.size, tcv.isNull, tcv.time);
+                    block = new TimeArrayBlock(rowBatch.size, tcv.isNull, tcv.times);
                     break;
                 case "timestamp":
                     TimestampColumnVector tscv = (TimestampColumnVector) cv;

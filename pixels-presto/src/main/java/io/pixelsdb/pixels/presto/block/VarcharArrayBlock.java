@@ -154,7 +154,15 @@ public class VarcharArrayBlock implements Block
      */
     protected final int getPositionOffset(int position)
     {
-        // offsets[i] is zero if valueIsNull[i] is true, no need to check.
+        /**
+         * Issue #132:
+         * FIX: null must be checked here as offsets (i.e. starts) in column vector
+         * may be reused in vectorized row batch and is not reset.
+         */
+        if (valueIsNull[position + arrayOffset])
+        {
+            return 0;
+        }
         return offsets[position + arrayOffset];
     }
 
@@ -166,7 +174,15 @@ public class VarcharArrayBlock implements Block
     public int getSliceLength(int position)
     {
         checkReadablePosition(position);
-        // lengths[i] is zero if valueIsNull[i] is true, no need to check.
+        /**
+         * Issue #132:
+         * FIX: null must be checked here as lengths (i.e. lens) in column vector
+         * may be reused in vectorized row batch and is not reset.
+         */
+        if (valueIsNull[position + arrayOffset])
+        {
+            return 0;
+        }
         return lengths[position + arrayOffset];
     }
 
@@ -274,13 +290,33 @@ public class VarcharArrayBlock implements Block
         // a raw slice should contain the whole bytes of value at the position.
         if (valueIsNull[position + arrayOffset])
         {
+            if (values[position + arrayOffset] != null)
+            {
+                throw new IllegalArgumentException("value is not null.");
+            }
             return Slices.EMPTY_SLICE;
+        }
+        if (values[position + arrayOffset] == null)
+        {
+            throw new IllegalArgumentException("value is null.");
         }
         return Slices.wrappedBuffer(values[position + arrayOffset]);
     }
 
     protected byte[] getRawValue(int position)
     {
+        if (valueIsNull[position + arrayOffset])
+        {
+            if (values[position + arrayOffset] != null)
+            {
+                throw new IllegalArgumentException("value is not null.");
+            }
+            return null;
+        }
+        if (values[position + arrayOffset] == null)
+        {
+            throw new IllegalArgumentException("value is null.");
+        }
         return values[position + arrayOffset];
     }
 
@@ -411,6 +447,10 @@ public class VarcharArrayBlock implements Block
     public boolean equals(int position, int offset, Block otherBlock, int otherPosition, int otherOffset, int length)
     {
         checkReadablePosition(position);
+        if (valueIsNull[position + arrayOffset])
+        {
+            return false;
+        }
         Slice rawSlice = getRawSlice(position);
         if (getSliceLength(position) < length)
         {
@@ -423,6 +463,10 @@ public class VarcharArrayBlock implements Block
     public boolean bytesEqual(int position, int offset, Slice otherSlice, int otherOffset, int length)
     {
         checkReadablePosition(position);
+        if (valueIsNull[position + arrayOffset])
+        {
+            return false;
+        }
         return getRawSlice(position).equals(getPositionOffset(position) + offset, length, otherSlice, otherOffset, length);
     }
 
