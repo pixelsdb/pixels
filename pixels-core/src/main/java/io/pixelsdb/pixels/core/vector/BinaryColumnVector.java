@@ -99,11 +99,6 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void reset()
     {
-        // FIXME:
-        isNull = new boolean[isNull.length];
-        vector = new byte[vector.length][];
-        start = new int[start.length];
-        lens = new int[lens.length];
         super.reset();
         /**
          * Issue #132:

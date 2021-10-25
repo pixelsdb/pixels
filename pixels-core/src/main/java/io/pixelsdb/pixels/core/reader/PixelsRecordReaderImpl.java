@@ -64,33 +64,57 @@ public class PixelsRecordReaderImpl
     private final boolean enableCache;
     private final List<String> cacheOrder;
     private final PixelsCacheReader cacheReader;
-    private PixelsFooterCache pixelsFooterCache;
+    private final PixelsFooterCache pixelsFooterCache;
     private final String fileName;
+    private final List<PixelsProto.Type> includedColumnTypes;
+    // Issue #132: add locks to protect members related to readBatch or prepareBatch.
+    private final Object readBatchLock = new Object();
+    private final Object prepareBatchLock = new Object();
 
     private TypeDescription fileSchema;
-    private boolean checkValid = false;
-    private boolean everPrepared = false;
-    private boolean everRead = false;
-    private long rowIndex = 0L;
-    private boolean[] includedColumns;   // columns included by reader option; if included, set true
-    private int[] targetRGs;             // target row groups to read after matching reader option, each element represents a row group id
-    private int[] targetColumns;         // target columns to read after matching reader option, each element represents a column id
-    private int[] resultColumns;         // columns specified in option by user to read
-    private VectorizedRowBatch resultRowBatch;
+    private volatile boolean checkValid = false;
+    private volatile boolean everPrepared = false;
+    private volatile boolean everRead = false;
+    private volatile long rowIndex = 0L;
+    /**
+     * Columns included by reader option; if included, set true
+     */
+    private boolean[] includedColumns;
+    /**
+     * Target row groups to read after matching reader option,
+     * each element represents a row group id.
+     */
+    private int[] targetRGs;
+    /**
+     * Target columns to read after matching reader option,
+     * each element represents a column id (column's index in the schema).
+     * Different from resultColumns, the ith column id in targetColumn
+     * corresponds to the ith true value in includedColumns.
+     */
+    private int[] targetColumns;
+    /**
+     * The ith element in resultColumns is the column id (column's index in the schema)
+     * of ith included column in the read option. The order of columns in the read option's
+     * includedCols may be arbitrary, not related to the column order in schema.
+     */
+    private int[] resultColumns;
+    private volatile int includedColumnNum = 0; // the number of columns to read.
+    private volatile int qualifiedRowNum = 0; // the number of qualified rows in this split.
+    private volatile boolean endOfFile = false;
 
     private int targetRGNum = 0;         // number of target row groups
-    private int curRGIdx = 0;            // index of current reading row group in targetRGs
-    private int curRowInRG = 0;          // starting index of values to read by reader in current row group
+    private volatile int curRGIdx = 0;            // index of current reading row group in targetRGs
+    private volatile int curRowInRG = 0;          // starting index of values to read by reader in current row group
 
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
 
-    private long diskReadBytes = 0L;
-    private long cacheReadBytes = 0L;
-    private long readTimeNanos = 0L;
-    private long memoryUsage = 0L;
+    private volatile long diskReadBytes = 0L;
+    private volatile long cacheReadBytes = 0L;
+    private volatile long readTimeNanos = 0L;
+    private volatile long memoryUsage = 0L;
 
     public PixelsRecordReaderImpl(PhysicalReader physicalReader,
                                   PixelsProto.PostScript postScript,
@@ -117,6 +141,7 @@ public class PixelsRecordReaderImpl
         this.cacheReader = cacheReader;
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
+        this.includedColumnTypes = new ArrayList<>();
         checkBeforeRead();
     }
 
@@ -146,22 +171,21 @@ public class PixelsRecordReaderImpl
             //throw new IOException("ISSUE-103: row group start is out of bound.");
             return;
         }
+        if (RGLen == -1)
+        {
+            RGLen = footer.getRowGroupStatsList().size() - RGStart;
+        }
         if (RGStart + RGLen > rgNum)
         {
             RGLen = rgNum - RGStart;
         }
 
         // filter included columns
-        int includedColumnsNum = 0;
+        includedColumnNum = 0;
         String[] optionIncludedCols = option.getIncludedCols();
         // if size of cols is 0, create an empty row batch
         if (optionIncludedCols.length == 0)
         {
-            TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-            this.resultRowBatch = resultSchema.createRowBatch(0);
-            resultRowBatch.selectedInUse = false;
-            resultRowBatch.selected = null;
-            resultRowBatch.projectionSize = 0;
             checkValid = true;
             // Issue #103: init the following members as null.
             this.includedColumns = null;
@@ -181,14 +205,14 @@ public class PixelsRecordReaderImpl
                 {
                     optionColsIndices.add(j);
                     includedColumns[j] = true;
-                    includedColumnsNum++;
+                    includedColumnNum++;
                     break;
                 }
             }
         }
 
         // check included columns
-        if (includedColumnsNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
+        if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
         {
             checkValid = false;
             //throw new IOException("ISSUE-103: includedColumnsNum is " + includedColumnsNum +
@@ -196,16 +220,16 @@ public class PixelsRecordReaderImpl
             return;
         }
 
-        // create result columns storing result column ids by user specified order
-        this.resultColumns = new int[includedColumnsNum];
+        // create result columns storing result column ids in user specified order
+        this.resultColumns = new int[includedColumnNum];
         for (int i = 0; i < optionColsIndices.size(); i++)
         {
             this.resultColumns[i] = optionColsIndices.get(i);
         }
 
         // assign target columns, ordered by original column order in schema
-        int targetColumnsNum = new HashSet<>(optionColsIndices).size();
-        targetColumns = new int[targetColumnsNum];
+        int targetColumnNum = new HashSet<>(optionColsIndices).size();
+        targetColumns = new int[targetColumnNum];
         int targetColIdx = 0;
         for (int i = 0; i < includedColumns.length; i++)
         {
@@ -226,17 +250,10 @@ public class PixelsRecordReaderImpl
         }
 
         // create result vectorized row batch
-        List<PixelsProto.Type> resultTypes = new ArrayList<>();
         for (int resultColumn : resultColumns)
         {
-            resultTypes.add(fileColTypes.get(resultColumn));
+            includedColumnTypes.add(fileColTypes.get(resultColumn));
         }
-        TypeDescription resultSchema = TypeDescription.createSchema(resultTypes);
-        this.resultRowBatch = resultSchema.createRowBatch(0);
-        // forbid selected array
-        resultRowBatch.selectedInUse = false;
-        resultRowBatch.selected = null;
-        resultRowBatch.projectionSize = includedColumnsNum;
 
         checkValid = true;
     }
@@ -252,20 +269,16 @@ public class PixelsRecordReaderImpl
     {
         if (!checkValid)
         {
+            everPrepared = false;
             return false;
         }
 
-        everPrepared = true;
-
         List<PixelsProto.RowGroupStatistic> rowGroupStatistics
                 = footer.getRowGroupStatsList();
-        if (RGLen == -1)
-        {
-            RGLen = rowGroupStatistics.size() - RGStart;
-        }
         boolean[] includedRGs = new boolean[RGLen];
         if (includedRGs.length == 0)
         {
+            everPrepared = false;
             return false;
         }
 
@@ -377,14 +390,16 @@ public class PixelsRecordReaderImpl
          * project nothing, must be count(*).
          * resultRowBatch.projectionSize should only be set in checkBeforeRead().
          */
-        if (resultRowBatch.projectionSize == 0)
+        if (includedColumnNum == 0)
         {
-            resultRowBatch.size = includedRowNum;
-            resultRowBatch.endOfFile = true;
+            qualifiedRowNum = includedRowNum;
+            endOfFile = true;
             // init the following members as null or 0.
             targetRGs = null;
             targetRGNum = 0;
             rowGroupFooters = null;
+
+            everPrepared = true;
             return true;
         }
 
@@ -458,6 +473,8 @@ public class PixelsRecordReaderImpl
             throw new IOException("Failed to read row group footers, " +
                     "only the last error is thrown, check the logs for more information.", e);
         }
+
+        everPrepared = true;
         return true;
     }
 
@@ -496,9 +513,9 @@ public class PixelsRecordReaderImpl
          * resultRowBatch.size and resultRowBatch.endOfFile have been set
          * in prepareRead();
          */
-        if (resultRowBatch.projectionSize == 0)
+        if (includedColumnNum == 0)
         {
-            if (resultRowBatch.endOfFile == false)
+            if (!endOfFile)
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
@@ -511,8 +528,8 @@ public class PixelsRecordReaderImpl
              * Issue #105:
              * No row groups to read, set EOF and return. EOF will be checked in readBatch().
              */
-            resultRowBatch.size = 0;
-            resultRowBatch.endOfFile = true;
+            qualifiedRowNum = 0;
+            endOfFile = true;
             return true;
         }
 
@@ -751,15 +768,16 @@ public class PixelsRecordReaderImpl
      * preRowInRG will keep in sync with curRowInRG if readBatch() is actually
      * called from LazyBlock.load().
      */
-    private int preRowInRG = 0;
+    private volatile int preRowInRG = 0;
     /**
      * Issue #105:
      * Similar to preRowInRG.
      */
-    private int preRGIdx = 0;
+    private volatile int preRGIdx = 0;
 
     /**
-     * Prepare for the next row batch.
+     * Prepare for the next row batch. This method is thread safe,
+     * and is independent from readBatch().
      *
      * @param batchSize the willing batch size
      * @return the real batch size
@@ -781,60 +799,58 @@ public class PixelsRecordReaderImpl
          * resultRowBatch.size and resultRowBatch.endOfFile have been set
          * in prepareRead();
          */
-        if (resultRowBatch.projectionSize == 0)
+        if (includedColumnNum == 0)
         {
-            if (resultRowBatch.endOfFile == false)
+            if (endOfFile == false)
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
-            return resultRowBatch.size;
+            return qualifiedRowNum;
         }
 
-        // curBatchSize is the available size of the next batch.
-        int curBatchSize = -preRowInRG;
-        for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
+        synchronized (prepareBatchLock)
         {
-            int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
-            curBatchSize += rgRowCount;
+            // curBatchSize is the available size of the next batch.
+            int curBatchSize = -preRowInRG;
+            for (int rgIdx = preRGIdx; rgIdx < targetRGNum; ++rgIdx)
+            {
+                int rgRowCount = (int) footer.getRowGroupInfos(targetRGs[rgIdx]).getNumberOfRows();
+                curBatchSize += rgRowCount;
+                if (curBatchSize <= 0)
+                {
+                    // continue for the next row group if we reach the empty last row batch.
+                    curBatchSize = 0;
+                    preRGIdx++;
+                    preRowInRG = 0;
+                    continue;
+                }
+                if (curBatchSize >= batchSize)
+                {
+                    curBatchSize = batchSize;
+                    preRowInRG += curBatchSize;
+                } else
+                {
+                    // Prepare for reading the next row group.
+                    preRGIdx++;
+                    preRowInRG = 0;
+                }
+                break;
+            }
+
+            // Check if this is the end of the file.
             if (curBatchSize <= 0)
             {
-                // continue for the next row group if we reach the empty last row batch.
-                curBatchSize = 0;
-                preRGIdx++;
-                preRowInRG = 0;
-                continue;
+                endOfFile = true;
+                return 0;
             }
-            if (curBatchSize >= batchSize)
-            {
-                curBatchSize = batchSize;
-                preRowInRG += curBatchSize;
-            }
-            else
-            {
-                // Prepare for reading the next row group.
-                preRGIdx++;
-                preRowInRG = 0;
-            }
-            break;
-        }
 
-        // Check if this is the end of the file.
-        if (curBatchSize <= 0)
-        {
-            // resultRowBatch is initialized if prepareRead returns true.
-            if (resultRowBatch == null)
-            {
-                throw new IOException("resultRowBatch is unexpected to be null.");
-            }
-            resultRowBatch.endOfFile = true;
-            return 0;
+            return curBatchSize;
         }
-
-        return curBatchSize;
     }
 
     /**
-     * Read the next row batch.
+     * Read the next row batch. This method is thread safe, and
+     * is independent from prepareBatch().
      *
      * @param batchSize the row batch to read into
      * @return more rows available
@@ -847,17 +863,12 @@ public class PixelsRecordReaderImpl
         if (!checkValid)
         {
             TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-            this.resultRowBatch = resultSchema.createRowBatch(0);
-            resultRowBatch.selectedInUse = false;
-            resultRowBatch.selected = null;
+            VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
             resultRowBatch.projectionSize = 0;
             resultRowBatch.endOfFile = true;
             resultRowBatch.size = 0;
             return resultRowBatch;
         }
-
-        // Issue #105: reset is not a problem for 'select count(*) from t'.
-        resultRowBatch.reset();
 
         if (!everRead)
         {
@@ -870,81 +881,93 @@ public class PixelsRecordReaderImpl
         }
 
         // project nothing, must be count(*)
-        if (resultRowBatch.projectionSize == 0)
+        if (includedColumnNum == 0)
         {
             /**
              * Issue #105:
              * EOF and batch size have been set in prepareRead() and checked in read().
              */
-            if (resultRowBatch.endOfFile == false)
+            if (endOfFile == false)
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
             checkValid = false; // Issue #105: to reject continuous read.
+            TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
+            VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
+            resultRowBatch.projectionSize = 0;
+            resultRowBatch.size = qualifiedRowNum;
+            resultRowBatch.endOfFile = true;
             return resultRowBatch;
         }
 
-        // ensure size for result row batch
-        resultRowBatch.ensureSize(batchSize);
+        TypeDescription resultSchema = TypeDescription.createSchema(includedColumnTypes);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(batchSize);
+        resultRowBatch.projectionSize = includedColumnNum;
 
         int rgRowCount = 0;
         int curBatchSize = 0;
-        if (curRGIdx < targetRGNum)
-        {
-            rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
-        }
-
         ColumnVector[] columnVectors = resultRowBatch.cols;
-        while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
+
+        synchronized (readBatchLock)
         {
-            // update current batch size
-            curBatchSize = rgRowCount - curRowInRG;
-            if (curBatchSize + resultRowBatch.size >= batchSize)
+
+            if (curRGIdx < targetRGNum)
             {
-                curBatchSize = batchSize - resultRowBatch.size;
+                rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
             }
 
-            // read vectors
-            for (int i = 0; i < resultColumns.length; i++)
-            {
-                if (!columnVectors[i].duplicated)
-                {
-                    PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
-                    PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
-                            .getColumnChunkEncodings(resultColumns[i]);
-                    int index = curRGIdx * includedColumns.length + resultColumns[i];
-                    PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
-                            .getColumnChunkIndexEntries(
-                                    resultColumns[i]);
-                    // TODO: read chunk buffer lazily when a column block is read by PixelsPageSource.
-                    readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
-                            postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
-                }
-            }
 
-            // update current row index in the row group
-            curRowInRG += curBatchSize;
-            preRowInRG = curRowInRG; // keep in sync with curRowInRG.
-            rowIndex += curBatchSize;
-            resultRowBatch.size += curBatchSize;
-            // update row group index if current row index exceeds max row count in the row group
-            if (curRowInRG >= rgRowCount)
+            while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
-                curRGIdx++;
-                preRGIdx = curRGIdx; // keep in sync with curRGIdx
-                // if not end of file, update row count
-                if (curRGIdx < targetRGNum)
+                // update current batch size
+                curBatchSize = rgRowCount - curRowInRG;
+                if (curBatchSize + resultRowBatch.size >= batchSize)
                 {
-                    rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    curBatchSize = batchSize - resultRowBatch.size;
                 }
-                // if end of file, set result vectorized row batch endOfFile
-                else
+
+                // read vectors
+                for (int i = 0; i < resultColumns.length; i++)
                 {
-                    checkValid = false; // Issue #105: to reject continuous read.
-                    resultRowBatch.endOfFile = true;
-                    break;
+                    if (!columnVectors[i].duplicated)
+                    {
+                        PixelsProto.RowGroupFooter rowGroupFooter = rowGroupFooters[curRGIdx];
+                        PixelsProto.ColumnEncoding encoding = rowGroupFooter.getRowGroupEncoding()
+                                .getColumnChunkEncodings(resultColumns[i]);
+                        int index = curRGIdx * includedColumns.length + resultColumns[i];
+                        PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
+                                .getColumnChunkIndexEntries(resultColumns[i]);
+                        // TODO: read chunk buffer lazily when a column block is read by PixelsPageSource.
+                        readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
+                                postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
+                    }
                 }
-                preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
+
+                // update current row index in the row group
+                curRowInRG += curBatchSize;
+                //preRowInRG = curRowInRG; // keep in sync with curRowInRG.
+                rowIndex += curBatchSize;
+                resultRowBatch.size += curBatchSize;
+                // update row group index if current row index exceeds max row count in the row group
+                if (curRowInRG >= rgRowCount)
+                {
+                    curRGIdx++;
+                    //preRGIdx = curRGIdx; // keep in sync with curRGIdx
+                    // if not end of file, update row count
+                    if (curRGIdx < targetRGNum)
+                    {
+                        rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    }
+                    // if end of file, set result vectorized row batch endOfFile
+                    else
+                    {
+                        checkValid = false; // Issue #105: to reject continuous read.
+                        resultRowBatch.endOfFile = true;
+                        break;
+                    }
+                    //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
+                    curRowInRG = 0;
+                }
             }
         }
 
@@ -961,6 +984,13 @@ public class PixelsRecordReaderImpl
         return resultRowBatch;
     }
 
+    /**
+     * Read the next row batch. This method is thread safe, and
+     * is independent from prepareBatch().
+     *
+     * @return more rows available
+     * @throws java.io.IOException
+     */
     @Override
     public VectorizedRowBatch readBatch()
             throws IOException
@@ -976,12 +1006,7 @@ public class PixelsRecordReaderImpl
     @Override
     public boolean isEndOfFile ()
     {
-        if (this.resultRowBatch != null)
-        {
-            // no need to check checkValid, everPrepared, and everRead.
-            return this.resultRowBatch.endOfFile;
-        }
-        return false;
+        return endOfFile;
     }
 
     /**
@@ -1034,7 +1059,8 @@ public class PixelsRecordReaderImpl
     @Override
     public long getMemoryUsage()
     {
-        return memoryUsage + resultRowBatch.getMemoryUsage();
+        // Memory usage in the row batch returned by readBatch() is not counted.
+        return memoryUsage;
     }
 
     /**
@@ -1073,11 +1099,6 @@ public class PixelsRecordReaderImpl
                 }
             }
         }
-        if (resultRowBatch != null)
-        {
-            resultRowBatch.close();
-            resultRowBatch = null;
-        }
         if (rowGroupFooters != null)
         {
             for (int i = 0; i < rowGroupFooters.length; ++i)
@@ -1085,6 +1106,8 @@ public class PixelsRecordReaderImpl
                 rowGroupFooters[i] = null;
             }
         }
+
+        includedColumnTypes.clear();
         // write out read performance metrics
 //        if (enableMetrics)
 //        {

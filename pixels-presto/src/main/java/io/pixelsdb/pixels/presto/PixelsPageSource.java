@@ -44,6 +44,7 @@ import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -72,8 +73,9 @@ class PixelsPageSource implements ConnectorPageSource
     private PixelsReaderOption option;
     private int numColumnToRead;
     private int batchId;
-    private VectorizedRowBatch rowBatch;
-    private boolean rowBatchRead;
+
+    private ReentrantLock readLock = new ReentrantLock();
+    private final Object object = new Object();
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
@@ -260,10 +262,10 @@ class PixelsPageSource implements ConnectorPageSource
             closeWithSuppression(e);
             throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
         }
-        this.rowBatchRead = false;
 
         if (batchSize <= 0 || (endOfFile && batchId > 1))
         {
+            // FIXME: add read lock.
             close();
             if (readNextPath())
             {
@@ -279,10 +281,27 @@ class PixelsPageSource implements ConnectorPageSource
         }
         Block[] blocks = new Block[this.numColumnToRead];
 
-        for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
+        if (this.numColumnToRead > 0)
         {
-            Type type = columns.get(fieldId).getColumnType();
-            blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(fieldId, type, batchSize));
+            try
+            {
+                VectorizedRowBatch rowBatch = recordReader.readBatch(batchSize);
+                batchSize = rowBatch.size;
+                if (rowBatch.endOfFile)
+                {
+                    endOfFile = true;
+                }
+                for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
+                {
+                    Type type = columns.get(fieldId).getColumnType();
+                    ColumnVector vector = rowBatch.cols[fieldId];
+                    blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(vector, type, batchSize));
+                }
+            } catch (IOException e)
+            {
+                closeWithSuppression(e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+            }
         }
 
         /**
@@ -321,7 +340,6 @@ class PixelsPageSource implements ConnectorPageSource
                 recordReader = null;
                 pixelsReader = null;
             }
-            rowBatch = null;
         } catch (Exception e)
         {
             logger.error("close error: " + e.getMessage());
@@ -361,14 +379,14 @@ class PixelsPageSource implements ConnectorPageSource
             implements LazyBlockLoader<LazyBlock>
     {
         private final int expectedBatchId = batchId;
-        private final int columnIndex;
+        private final ColumnVector vector;
         private final Type type;
         private final int batchSize;
         private boolean loaded = false;
 
-        public PixelsBlockLoader(int columnIndex, Type type, int batchSize)
+        public PixelsBlockLoader(ColumnVector vector, Type type, int batchSize)
         {
-            this.columnIndex = columnIndex;
+            this.vector = vector;
             this.type = requireNonNull(type, "type is null");
             this.batchSize = batchSize;
         }
@@ -382,38 +400,17 @@ class PixelsPageSource implements ConnectorPageSource
             }
             checkState(batchId == expectedBatchId);
 
-            if (!rowBatchRead)
-            {
-                try
-                {
-                    // TODO: to reduce GC pressure, not read all the columns at a time.
-                    rowBatch = recordReader.readBatch(batchSize);
-                } catch (IOException e)
-                {
-                    closeWithSuppression(e);
-                    throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
-                }
-                rowBatchRead = true;
-
-                if (rowBatch.endOfFile)
-                {
-                    endOfFile = true;
-                }
-            }
-
             Block block;
 
             String typeName = type.getDisplayName();
-            int projIndex = rowBatch.projectedColumns[columnIndex];
-            ColumnVector cv = rowBatch.cols[projIndex];
-            BlockBuilder blockBuilder = type.createBlockBuilder(null, rowBatch.size);
+            BlockBuilder blockBuilder = type.createBlockBuilder(null, batchSize);
 
             switch (typeName)
             {
                 case "integer":
                 case "bigint":
-                    LongColumnVector lcv = (LongColumnVector) cv;
-                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(lcv.isNull), lcv.vector);
+                    LongColumnVector lcv = (LongColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(lcv.isNull), lcv.vector);
                     break;
                 case "double":
                 case "real":
@@ -427,23 +424,11 @@ class PixelsPageSource implements ConnectorPageSource
                      * LongArrayBlock here without writeDouble (in which double is converted to long).
                      * With this optimization, CPU and GC pressure can be greatly reduced.
                      */
-                    DoubleColumnVector dcv = (DoubleColumnVector) cv;
-//                    for (int i = 0; i < rowBatch.size; ++i)
-//                    {
-//                        if (dcv.isNull[i])
-//                        {
-//                            blockBuilder.appendNull();
-//                        } else
-//                        {
-//                            // type is DoubleType for double, not sure for float.
-//                            type.writeDouble(blockBuilder, dcv.vector[i]);
-//                        }
-//                    }
-//                    block = blockBuilder.build();
-                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(dcv.isNull), dcv.vector);
+                    DoubleColumnVector dcv = (DoubleColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dcv.isNull), dcv.vector);
                     break;
                 case "varchar":
-                    BinaryColumnVector scv = (BinaryColumnVector) cv;
+                    BinaryColumnVector scv = (BinaryColumnVector) vector;
                     /*
                     int vectorContentLen = 0;
                     byte[] vectorContent;
@@ -470,54 +455,30 @@ class PixelsPageSource implements ConnectorPageSource
                             vectorOffsets,
                             scv.isNull);
                             */
-                    block = new VarcharArrayBlock(rowBatch.size, scv.vector, scv.start, scv.lens, scv.isNull);
+                    block = new VarcharArrayBlock(batchSize, scv.vector, scv.start, scv.lens, scv.isNull);
                     break;
                 case "boolean":
-                    ByteColumnVector bcv = (ByteColumnVector) cv;
-//                    for (int i = 0; i < rowBatch.size; ++i)
-//                    {
-//                        if (bcv.isNull[i])
-//                        {
-//                            blockBuilder.appendNull();
-//                        } else
-//                        {
-//                            type.writeBoolean(blockBuilder, bcv.vector[i] == 1);
-//                        }
-//                    }
-//                    block = blockBuilder.build();
-                    block = new ByteArrayBlock(rowBatch.size, Optional.ofNullable(bcv.isNull), bcv.vector);
+                    ByteColumnVector bcv = (ByteColumnVector) vector;
+                    block = new ByteArrayBlock(batchSize, Optional.ofNullable(bcv.isNull), bcv.vector);
                     break;
                 case "date":
                     // Issue #94: add date type.
-                    DateColumnVector dtcv = (DateColumnVector) cv;
+                    DateColumnVector dtcv = (DateColumnVector) vector;
                     // In pixels and Presto, date is stored as the number of days from UTC 1970-1-1 0:0:0.
-                    block = new IntArrayBlock(rowBatch.size, Optional.ofNullable(dtcv.isNull), dtcv.dates);
+                    block = new IntArrayBlock(batchSize, Optional.ofNullable(dtcv.isNull), dtcv.dates);
                     break;
                 case "time":
                     // Issue #94: add time type.
-                    TimeColumnVector tcv = (TimeColumnVector) cv;
+                    TimeColumnVector tcv = (TimeColumnVector) vector;
                     /**
                      * In Presto, LongArrayBlock is used for time type. However, in Pixels,
                      * Time value is stored as int, so here we use TimeArrayBlock, which
                      * accepts int values but provides getLong method same as LongArrayBlock.
                      */
-                    block = new TimeArrayBlock(rowBatch.size, tcv.isNull, tcv.times);
+                    block = new TimeArrayBlock(batchSize, tcv.isNull, tcv.times);
                     break;
                 case "timestamp":
-                    TimestampColumnVector tscv = (TimestampColumnVector) cv;
-                    /*
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        if (tscv.isNull[i])
-                        {
-                            blockBuilder.appendNull();
-                        } else
-                        {
-                            type.writeLong(blockBuilder, tscv.time[i]);
-                        }
-                    }
-                    block = blockBuilder.build();
-                     */
+                    TimestampColumnVector tscv = (TimestampColumnVector) vector;
                     /**
                      * Issue #94: we have confirmed that LongArrayBlock is used for timestamp
                      * type in Presto.
@@ -526,10 +487,10 @@ class PixelsPageSource implements ConnectorPageSource
                      * com.facebook.presto.spi.type.AbstractLongType, which creates a LongArrayBlockBuilder.
                      * And this block builder builds a LongArrayBlock.
                      */
-                    block = new LongArrayBlock(rowBatch.size, Optional.ofNullable(tscv.isNull), tscv.time);
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(tscv.isNull), tscv.time);
                     break;
                 default:
-                    for (int i = 0; i < rowBatch.size; ++i)
+                    for (int i = 0; i < batchSize; ++i)
                     {
                         blockBuilder.appendNull();
                     }
