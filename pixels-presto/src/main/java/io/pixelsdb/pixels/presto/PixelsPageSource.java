@@ -44,9 +44,7 @@ import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.locks.ReentrantLock;
 
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -62,7 +60,8 @@ class PixelsPageSource implements ConnectorPageSource
     private List<PixelsColumnHandle> columns;
     private Storage storage;
     private boolean closed;
-    private boolean endOfFile;
+    // endOfFile is used together with readLock, no need to be atomic.
+    private volatile boolean endOfFile;
     private PixelsReader pixelsReader;
     private PixelsRecordReader recordReader;
     private PixelsCacheReader cacheReader;
@@ -71,11 +70,10 @@ class PixelsPageSource implements ConnectorPageSource
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
     private PixelsReaderOption option;
-    private int numColumnToRead;
+    private final int numColumnToRead;
     private int batchId;
 
-    private ReentrantLock readLock = new ReentrantLock();
-    private final Object object = new Object();
+    private final Object readLock = new Object();
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
@@ -87,6 +85,8 @@ class PixelsPageSource implements ConnectorPageSource
         this.numColumnToRead = columnHandles.size();
         this.footerCache = pixelsFooterCache;
         this.batchId = 0;
+        this.endOfFile = false;
+        this.closed = false;
 
         this.cacheReader = PixelsCacheReader
                 .newBuilder()
@@ -127,7 +127,6 @@ class PixelsPageSource implements ConnectorPageSource
             PixelsColumnHandle column = entry.getKey();
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
-//            logger.debug("column: " + column.getColumnName() + " " + column.getColumnType() + " " + columnOrdinal);
             columnReferences.add(
                     new TupleDomainPixelsPredicate.ColumnReference<>(
                             column,
@@ -265,18 +264,28 @@ class PixelsPageSource implements ConnectorPageSource
 
         if (batchSize <= 0 || (endOfFile && batchId > 1))
         {
-            // FIXME: add read lock.
-            close();
-            if (readNextPath())
+            synchronized (readLock)
             {
-                closed = false;
-                endOfFile = false;
-                batchId = 0;
-                return getNextPage();
-            }
-            else
-            {
-                return null;
+                // TODO: check if the logic related to closing is correct.
+                /**
+                 * If the next path is opened in another thread, will not enter if statement.
+                 * If the next path is not opened in another thread, it is fine to execute
+                 * the if body even multiple times.
+                 */
+                if (endOfFile)
+                {
+                    close();
+                    if (readNextPath())
+                    {
+                        closed = false;
+                        endOfFile = false;
+                        batchId = 0;
+                        return getNextPage();
+                    } else
+                    {
+                        return null;
+                    }
+                }
             }
         }
         Block[] blocks = new Block[this.numColumnToRead];
@@ -289,7 +298,7 @@ class PixelsPageSource implements ConnectorPageSource
                 batchSize = rowBatch.size;
                 if (rowBatch.endOfFile)
                 {
-                    endOfFile = true;
+                    this.endOfFile = true;
                 }
                 for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
                 {
@@ -321,6 +330,11 @@ class PixelsPageSource implements ConnectorPageSource
     @Override
     public void close()
     {
+        if (closed)
+        {
+            return;
+        }
+
         try
         {
             if (pixelsReader != null)
@@ -346,12 +360,9 @@ class PixelsPageSource implements ConnectorPageSource
             throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, e);
         }
 
-        // some hive input formats are broken and bad things can happen if you close them multiple times
-        if (closed)
-        {
-            return;
-        }
         closed = true;
+        endOfFile = true;
+        batchId = 0;
     }
 
     private void closeWithSuppression(Throwable throwable)
@@ -378,7 +389,6 @@ class PixelsPageSource implements ConnectorPageSource
     private final class PixelsBlockLoader
             implements LazyBlockLoader<LazyBlock>
     {
-        private final int expectedBatchId = batchId;
         private final ColumnVector vector;
         private final Type type;
         private final int batchSize;
@@ -398,7 +408,6 @@ class PixelsPageSource implements ConnectorPageSource
             {
                 return;
             }
-            checkState(batchId == expectedBatchId);
 
             Block block;
 

@@ -290,15 +290,7 @@ public class VarcharArrayBlock implements Block
         // a raw slice should contain the whole bytes of value at the position.
         if (valueIsNull[position + arrayOffset])
         {
-            if (values[position + arrayOffset] != null)
-            {
-                throw new IllegalArgumentException("value is not null.");
-            }
             return Slices.EMPTY_SLICE;
-        }
-        if (values[position + arrayOffset] == null)
-        {
-            throw new IllegalArgumentException("value is null.");
         }
         return Slices.wrappedBuffer(values[position + arrayOffset]);
     }
@@ -307,15 +299,7 @@ public class VarcharArrayBlock implements Block
     {
         if (valueIsNull[position + arrayOffset])
         {
-            if (values[position + arrayOffset] != null)
-            {
-                throw new IllegalArgumentException("value is not null.");
-            }
             return null;
-        }
-        if (values[position + arrayOffset] == null)
-        {
-            throw new IllegalArgumentException("value is null.");
         }
         return values[position + arrayOffset];
     }

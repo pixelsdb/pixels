@@ -80,7 +80,6 @@ public interface PixelsRecordReader
      * @return seek success
      * @throws java.io.IOException
      */
-    @Deprecated
     boolean seekToRow(long rowIndex)
             throws IOException;
 
@@ -91,7 +90,6 @@ public interface PixelsRecordReader
      * @return skip success
      * @throws java.io.IOException
      */
-    @Deprecated
     boolean skip(long rowNum)
             throws IOException;
 

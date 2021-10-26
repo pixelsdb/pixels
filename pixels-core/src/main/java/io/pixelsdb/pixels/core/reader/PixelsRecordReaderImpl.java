@@ -388,7 +388,7 @@ public class PixelsRecordReaderImpl
         /**
          * Issue #105:
          * project nothing, must be count(*).
-         * resultRowBatch.projectionSize should only be set in checkBeforeRead().
+         * includedColumnNum should only be set in checkBeforeRead().
          */
         if (includedColumnNum == 0)
         {
@@ -510,8 +510,7 @@ public class PixelsRecordReaderImpl
         /**
          * Issue #105:
          * project nothing, must be count(*).
-         * resultRowBatch.size and resultRowBatch.endOfFile have been set
-         * in prepareRead();
+         * qualifiedRowNum and endOfFile have been set in prepareRead();
          */
         if (includedColumnNum == 0)
         {
@@ -796,8 +795,7 @@ public class PixelsRecordReaderImpl
         /**
          * Issue #105:
          * project nothing, must be count(*).
-         * resultRowBatch.size and resultRowBatch.endOfFile have been set
-         * in prepareRead();
+         * qualifiedRowNum and endOfFile have been set in prepareRead();
          */
         if (includedColumnNum == 0)
         {
@@ -910,12 +908,10 @@ public class PixelsRecordReaderImpl
 
         synchronized (readBatchLock)
         {
-
             if (curRGIdx < targetRGNum)
             {
                 rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
             }
-
 
             while (resultRowBatch.size < batchSize && curRowInRG < rgRowCount)
             {
@@ -937,7 +933,6 @@ public class PixelsRecordReaderImpl
                         int index = curRGIdx * includedColumns.length + resultColumns[i];
                         PixelsProto.ColumnChunkIndex chunkIndex = rowGroupFooter.getRowGroupIndexEntry()
                                 .getColumnChunkIndexEntries(resultColumns[i]);
-                        // TODO: read chunk buffer lazily when a column block is read by PixelsPageSource.
                         readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                                 postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                     }
@@ -1031,7 +1026,6 @@ public class PixelsRecordReaderImpl
      * @param rowIndex row number
      * @return seek success
      */
-    @Deprecated
     @Override
     public boolean seekToRow(long rowIndex)
     {
@@ -1041,7 +1035,7 @@ public class PixelsRecordReaderImpl
     @Override
     public boolean skip(long rowNum)
     {
-        return false;
+        throw new UnsupportedOperationException();
     }
 
     @Override
