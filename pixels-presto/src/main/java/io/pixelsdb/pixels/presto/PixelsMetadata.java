@@ -19,17 +19,15 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.domain.Column;
-import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
-import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
+import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -273,19 +271,6 @@ public class PixelsMetadata
      */
     @Override
     public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
-    {
-        throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "create table with data is currently not supported.");
-    }
-
-    /**
-     * Finish a table creation with data after the data is written.
-     *
-     * @param session
-     * @param tableHandle
-     * @param fragments
-     */
-    @Override
-    public Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments)
     {
         throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "create table with data is currently not supported.");
     }

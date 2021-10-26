@@ -212,7 +212,30 @@ public class VarcharArrayBlock implements Block
             // lengths[i] is zero if valueIsNull[i] is true, no need to check.
             size += lengths[position + arrayOffset + i];
         }
-        return size + ((Integer.BYTES + Byte.BYTES) * (long) length);
+        return size + ((Integer.BYTES * 2 + Byte.BYTES) * (long) length);
+    }
+
+    /**
+     * Returns the size of of all positions marked true in the positions array.
+     * This is equivalent to multiple calls of {@code block.getRegionSizeInBytes(position, length)}
+     * where you mark all positions for the regions first.
+     *
+     * @param positions
+     */
+    @Override
+    public long getPositionsSizeInBytes(boolean[] positions)
+    {
+        long sizeInBytes = 0;
+        int usedPositionCount = 0;
+        for (int i = 0; i < positions.length; ++i)
+        {
+            if (positions[i])
+            {
+                usedPositionCount++;
+                sizeInBytes += lengths[arrayOffset+i];
+            }
+        }
+        return sizeInBytes + (Integer.BYTES * 2 + Byte.BYTES) * (long) usedPositionCount;
     }
 
     /**
@@ -223,6 +246,18 @@ public class VarcharArrayBlock implements Block
     public long getRetainedSizeInBytes()
     {
         return retainedSizeInBytes;
+    }
+
+    /**
+     * Returns the estimated in memory data size for stats of position.
+     * Do not use it for other purpose.
+     *
+     * @param position
+     */
+    @Override
+    public long getEstimatedDataSizeForStats(int position)
+    {
+        return isNull(position) ? 0 : getSliceLength(position);
     }
 
     /**

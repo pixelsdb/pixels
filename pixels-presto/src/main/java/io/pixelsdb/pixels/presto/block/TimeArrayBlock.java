@@ -98,10 +98,43 @@ public class TimeArrayBlock implements Block
         return (Integer.BYTES + Byte.BYTES) * (long) length;
     }
 
+    /**
+     * Returns the size of of all positions marked true in the positions array.
+     * This is equivalent to multiple calls of {@code block.getRegionSizeInBytes(position, length)}
+     * where you mark all positions for the regions first.
+     *
+     * @param positions
+     */
+    @Override
+    public long getPositionsSizeInBytes(boolean[] positions)
+    {
+        int usedPositionCount = 0;
+        for (boolean marked : positions)
+        {
+            if (marked)
+            {
+                usedPositionCount++;
+            }
+        }
+        return (Integer.BYTES + Byte.BYTES) * (long) usedPositionCount;
+    }
+
     @Override
     public long getRetainedSizeInBytes()
     {
         return retainedSizeInBytes;
+    }
+
+    /**
+     * Returns the estimated in memory data size for stats of position.
+     * Do not use it for other purpose.
+     *
+     * @param position
+     */
+    @Override
+    public long getEstimatedDataSizeForStats(int position)
+    {
+        return isNull(position) ? 0 : Integer.BYTES;
     }
 
     @Override

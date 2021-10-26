@@ -60,7 +60,7 @@
         <dep.hive.version>2.3.5</dep.hive.version>
         <dep.hive.storage.api.version>2.4.0</dep.hive.storage.api.version>
         <dep.orc.version>1.3.4</dep.orc.version>
-        <dep.presto.version>0.207</dep.presto.version>
+        <dep.presto.version>0.215</dep.presto.version>
         <dep.airlift.version>0.161</dep.airlift.version>
         <dep.airlift.slice.version>0.32</dep.airlift.slice.version>
         <dep.airlift.units.version>1.0</dep.airlift.units.version>
