@@ -45,6 +45,7 @@ import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import java.io.IOException;
 import java.util.*;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -60,8 +61,6 @@ class PixelsPageSource implements ConnectorPageSource
     private List<PixelsColumnHandle> columns;
     private Storage storage;
     private boolean closed;
-    // endOfFile is used together with readLock, no need to be atomic.
-    private volatile boolean endOfFile;
     private PixelsReader pixelsReader;
     private PixelsRecordReader recordReader;
     private PixelsCacheReader cacheReader;
@@ -73,7 +72,7 @@ class PixelsPageSource implements ConnectorPageSource
     private final int numColumnToRead;
     private int batchId;
 
-    private final Object readLock = new Object();
+    //private final Object readLock = new Object();
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
                             MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
@@ -85,7 +84,6 @@ class PixelsPageSource implements ConnectorPageSource
         this.numColumnToRead = columnHandles.size();
         this.footerCache = pixelsFooterCache;
         this.batchId = 0;
-        this.endOfFile = false;
         this.closed = false;
 
         this.cacheReader = PixelsCacheReader
@@ -174,6 +172,7 @@ class PixelsPageSource implements ConnectorPageSource
         {
             if (this.split.nextPath())
             {
+                closeReader();
                 if (this.storage != null)
                 {
                     this.pixelsReader = PixelsReaderImpl
@@ -252,59 +251,56 @@ class PixelsPageSource implements ConnectorPageSource
     public Page getNextPage()
     {
         this.batchId++;
-        int batchSize = 0;
-        try
-        {
-            batchSize = this.recordReader.prepareBatch(BatchSize);
-        } catch (IOException e)
-        {
-            closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
-        }
+        VectorizedRowBatch rowBatch;
+        int rowBatchSize;
 
-        if (batchSize <= 0 || (endOfFile && batchId > 1))
-        {
-            synchronized (readLock)
-            {
-                // TODO: check if the logic related to closing is correct.
-                /**
-                 * If the next path is opened in another thread, will not enter if statement.
-                 * If the next path is not opened in another thread, it is fine to execute
-                 * the if body even multiple times.
-                 */
-                if (endOfFile)
-                {
-                    close();
-                    if (readNextPath())
-                    {
-                        closed = false;
-                        endOfFile = false;
-                        batchId = 0;
-                        return getNextPage();
-                    } else
-                    {
-                        return null;
-                    }
-                }
-            }
-        }
         Block[] blocks = new Block[this.numColumnToRead];
 
         if (this.numColumnToRead > 0)
         {
             try
             {
-                VectorizedRowBatch rowBatch = recordReader.readBatch(batchSize);
-                batchSize = rowBatch.size;
-                if (rowBatch.endOfFile)
+                rowBatch = recordReader.readBatch(BatchSize);
+                rowBatchSize = rowBatch.size;
+                if (rowBatchSize <= 0)
                 {
-                    this.endOfFile = true;
+                    if (readNextPath())
+                    {
+                        return getNextPage();
+                    } else
+                    {
+                        close();
+                        return null;
+                    }
                 }
                 for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
                 {
                     Type type = columns.get(fieldId).getColumnType();
                     ColumnVector vector = rowBatch.cols[fieldId];
-                    blocks[fieldId] = new LazyBlock(batchSize, new PixelsBlockLoader(vector, type, batchSize));
+                    blocks[fieldId] = new LazyBlock(rowBatchSize, new PixelsBlockLoader(vector, type, rowBatchSize));
+                }
+            } catch (IOException e)
+            {
+                closeWithSuppression(e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+            }
+        }
+        else
+        {
+            // No column to read.
+            try
+            {
+                rowBatchSize = this.recordReader.prepareBatch(BatchSize);
+                if (rowBatchSize <= 0)
+                {
+                    if (readNextPath())
+                    {
+                        return getNextPage();
+                    } else
+                    {
+                        close();
+                        return null;
+                    }
                 }
             } catch (IOException e)
             {
@@ -313,18 +309,7 @@ class PixelsPageSource implements ConnectorPageSource
             }
         }
 
-        /**
-         * Issue #105:
-         * For select count(*) from t, EOF is set here.
-         * Because this.numColumnToRead is 0 and blocks is empty, thus
-         * this.recordReader.readBatch will never be called to get the row batch.
-         */
-        if (this.recordReader.isEndOfFile())
-        {
-            this.endOfFile = true;
-        }
-
-        return new Page(batchSize, blocks);
+        return new Page(rowBatchSize, blocks);
     }
 
     @Override
@@ -335,6 +320,13 @@ class PixelsPageSource implements ConnectorPageSource
             return;
         }
 
+        closeReader();
+
+        closed = true;
+    }
+
+    private void closeReader()
+    {
         try
         {
             if (pixelsReader != null)
@@ -359,10 +351,6 @@ class PixelsPageSource implements ConnectorPageSource
             logger.error("close error: " + e.getMessage());
             throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, e);
         }
-
-        closed = true;
-        endOfFile = true;
-        batchId = 0;
     }
 
     private void closeWithSuppression(Throwable throwable)
@@ -389,10 +377,10 @@ class PixelsPageSource implements ConnectorPageSource
     private final class PixelsBlockLoader
             implements LazyBlockLoader<LazyBlock>
     {
+        private final int expectedBatchId = batchId;
         private final ColumnVector vector;
         private final Type type;
         private final int batchSize;
-        private boolean loaded = false;
 
         public PixelsBlockLoader(ColumnVector vector, Type type, int batchSize)
         {
@@ -404,13 +392,8 @@ class PixelsPageSource implements ConnectorPageSource
         @Override
         public final void load(LazyBlock lazyBlock)
         {
-            if (loaded)
-            {
-                return;
-            }
-
+            checkState(batchId == expectedBatchId);
             Block block;
-
             String typeName = type.getDisplayName();
             BlockBuilder blockBuilder = type.createBlockBuilder(null, batchSize);
 
@@ -508,7 +491,6 @@ class PixelsPageSource implements ConnectorPageSource
             }
 
             lazyBlock.setBlock(block);
-            loaded = true;
         }
     }
 

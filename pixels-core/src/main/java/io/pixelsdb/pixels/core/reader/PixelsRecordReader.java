@@ -30,8 +30,7 @@ public interface PixelsRecordReader
         extends AutoCloseable
 {
     /**
-     * Prepare for the next row batch. This method is thread safe,
-     * and is independent from readBatch().
+     * Prepare for the next row batch. This method is independent from readBatch().
      *
      * @param batchSize the willing batch size
      * @return the real batch size
@@ -39,8 +38,7 @@ public interface PixelsRecordReader
     int prepareBatch(int batchSize) throws IOException;
 
     /**
-     * Read the next row batch. This method is thread safe, and
-     * is independent from prepareBatch().
+     * Read the next row batch. This method is independent from prepareBatch().
      *
      * @param batchSize the row batch size
      * @return vectorized row batch
