@@ -40,7 +40,6 @@ import java.util.Arrays;
  */
 public class DoubleColumnVector extends ColumnVector
 {
-    public double[] dValues;
     public long[] vector;
     public static final double NULL_VALUE = Double.NaN;
 
@@ -62,6 +61,7 @@ public class DoubleColumnVector extends ColumnVector
     {
         super(len);
         vector = new long[len];
+        Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
         memoryUsage += Long.BYTES * len;
     }
 
@@ -123,15 +123,6 @@ public class DoubleColumnVector extends ColumnVector
         noNulls = true;
         isRepeating = true;
         vector[0] = Double.doubleToLongBits(value);
-    }
-
-    // Fill the column vector with nulls
-    public void fillWithNulls()
-    {
-        noNulls = false;
-        isRepeating = true;
-        vector[0] = Double.doubleToLongBits(NULL_VALUE);
-        isNull[0] = true;
     }
 
     // Simplify vector by brute-force flattening noNulls and isRepeating
@@ -239,8 +230,14 @@ public class DoubleColumnVector extends ColumnVector
     public void close()
     {
         super.close();
-        this.dValues = null;
         this.vector = null;
+    }
+
+    @Override
+    public void reset()
+    {
+        super.reset();
+        Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
     }
 
     @Override
@@ -251,6 +248,7 @@ public class DoubleColumnVector extends ColumnVector
         {
             long[] oldArray = vector;
             vector = new long[size];
+            Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
             memoryUsage += Long.BYTES * size;
             length = size;
             if (preserveData)
@@ -264,16 +262,6 @@ public class DoubleColumnVector extends ColumnVector
                     System.arraycopy(oldArray, 0, vector, 0, oldArray.length);
                 }
             }
-        }
-    }
-
-    public void toDoubleValues()
-    {
-        this.dValues = new double[writeIndex];
-        memoryUsage += Double.BYTES * writeIndex;
-        for (int i = 0; i < writeIndex; i++)
-        {
-            dValues[i] = Double.longBitsToDouble(vector[i]);
         }
     }
 }

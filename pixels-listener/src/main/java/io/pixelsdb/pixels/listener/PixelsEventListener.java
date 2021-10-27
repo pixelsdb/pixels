@@ -128,6 +128,12 @@ public class PixelsEventListener implements EventListener
             logger.info("GC time after query: " + gcms + " ms.");
         }
 
+        /**
+         * Issue #132:
+         * TODO: add full gc count and time to the output.
+         * TODO: add cpu and memory statistics to the output.
+         * TODO: make use of resource estimates.
+         */
         String queryId = queryCompletedEvent.getMetadata().getQueryId();
         String user = queryCompletedEvent.getContext().getUser();
         String schema = queryCompletedEvent.getContext().getSchema().get();

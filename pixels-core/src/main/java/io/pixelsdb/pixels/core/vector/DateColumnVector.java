@@ -45,11 +45,11 @@ import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 public class DateColumnVector extends ColumnVector
 {
     /*
-     * The storage arrays for this column vector corresponds to the storage of a Date:
      * They are the days from 1970-1-1. This is consistent with date type's internal
      * representation in Presto.
      */
-    public int[] time;
+    public int[] dates;
+    // The values from millisToDay(date.getTime())
 
     /*
      * Scratch objects.
@@ -74,7 +74,7 @@ public class DateColumnVector extends ColumnVector
     {
         super(len);
 
-        time = new int[len];
+        dates = new int[len];
         memoryUsage += Integer.BYTES * len;
 
         scratchDate = new Date(0);
@@ -87,7 +87,7 @@ public class DateColumnVector extends ColumnVector
      */
     public int getLength()
     {
-        return time.length;
+        return dates.length;
     }
 
     /**
@@ -97,9 +97,9 @@ public class DateColumnVector extends ColumnVector
      * @param elementNum
      * @return the days from 1970-1-1.
      */
-    public int getTime(int elementNum)
+    public int getDate(int elementNum)
     {
-        return time[elementNum];
+        return dates[elementNum];
     }
 
     /**
@@ -112,7 +112,7 @@ public class DateColumnVector extends ColumnVector
     public void dateUpdate(Date date, int elementNum)
     {
 
-        date.setTime(dayToMillis(time[elementNum]));
+        date.setTime(dayToMillis(this.dates[elementNum]));
     }
 
     /**
@@ -124,7 +124,7 @@ public class DateColumnVector extends ColumnVector
      */
     public Date asScratchDate(int elementNum)
     {
-        scratchDate.setTime(dayToMillis(time[elementNum]));
+        scratchDate.setTime(dayToMillis(dates[elementNum]));
         return scratchDate;
     }
 
@@ -146,7 +146,7 @@ public class DateColumnVector extends ColumnVector
      */
     public long getDateAsLong(int elementNum)
     {
-        scratchDate.setTime(dayToMillis(time[elementNum]));
+        scratchDate.setTime(dayToMillis(dates[elementNum]));
         return getDateAsLong(scratchDate);
     }
 
@@ -240,7 +240,7 @@ public class DateColumnVector extends ColumnVector
     {
         DateColumnVector dateColVector = (DateColumnVector) inputVector;
 
-        time[outElementNum] = dateColVector.time[inputElementNum];
+        dates[outElementNum] = dateColVector.dates[inputElementNum];
     }
 
     @Override
@@ -249,7 +249,7 @@ public class DateColumnVector extends ColumnVector
         if (inputVector instanceof DateColumnVector)
         {
             DateColumnVector srcVector = (DateColumnVector) inputVector;
-            this.time = srcVector.time;
+            this.dates = srcVector.dates;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
@@ -271,18 +271,18 @@ public class DateColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            int repeatFastTime = time[0];
+            int repeatFastTime = dates[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
-                    time[i] = repeatFastTime;
+                    dates[i] = repeatFastTime;
                 }
             }
             else
             {
-                Arrays.fill(time, 0, size, repeatFastTime);
+                Arrays.fill(dates, 0, size, repeatFastTime);
             }
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
@@ -317,7 +317,7 @@ public class DateColumnVector extends ColumnVector
         }
         else
         {
-            this.time[elementNum] = millisToDay(date.getTime());
+            this.dates[elementNum] = millisToDay(date.getTime());
         }
     }
 
@@ -330,7 +330,7 @@ public class DateColumnVector extends ColumnVector
      */
     public void set(int elementNum, int days)
     {
-        this.time[elementNum] = days;
+        this.dates[elementNum] = days;
     }
 
     /**
@@ -340,7 +340,7 @@ public class DateColumnVector extends ColumnVector
      */
     public void setFromScratchDate(int elementNum)
     {
-        this.time[elementNum] = millisToDay(scratchDate.getTime());
+        this.dates[elementNum] = millisToDay(scratchDate.getTime());
     }
 
     /**
@@ -351,7 +351,7 @@ public class DateColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
-        time[elementNum] = 0;
+        dates[elementNum] = 0;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
@@ -366,7 +366,7 @@ public class DateColumnVector extends ColumnVector
         // Handle repeating case
         if (isRepeating)
         {
-            output.time[0] = time[0];
+            output.dates[0] = dates[0];
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
             return;
@@ -380,12 +380,12 @@ public class DateColumnVector extends ColumnVector
             for (int j = 0; j < size; j++)
             {
                 int i = sel[j];
-                output.time[i] = time[i];
+                output.dates[i] = dates[i];
             }
         }
         else
         {
-            System.arraycopy(time, 0, output.time, 0, size);
+            System.arraycopy(dates, 0, output.dates, 0, size);
         }
 
         // Copy nulls over if needed
@@ -415,7 +415,7 @@ public class DateColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = millisToDay(date.getTime());
+        dates[0] = millisToDay(date.getTime());
     }
 
     @Override
@@ -427,7 +427,7 @@ public class DateColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchDate.setTime(dayToMillis(time[row]));
+            scratchDate.setTime(dayToMillis(dates[row]));
             buffer.append(scratchDate.toString());
         }
         else
@@ -440,23 +440,23 @@ public class DateColumnVector extends ColumnVector
     public void ensureSize(int size, boolean preserveData)
     {
         super.ensureSize(size, preserveData);
-        if (size <= time.length)
+        if (size <= dates.length)
         {
             return;
         }
-        int[] oldTime = time;
-        time = new int[size];
+        int[] oldTime = dates;
+        dates = new int[size];
         memoryUsage += Integer.BYTES * size;
         length = size;
         if (preserveData)
         {
             if (isRepeating)
             {
-                time[0] = oldTime[0];
+                dates[0] = oldTime[0];
             }
             else
             {
-                System.arraycopy(oldTime, 0, time, 0, oldTime.length);
+                System.arraycopy(oldTime, 0, dates, 0, oldTime.length);
             }
         }
     }
@@ -465,6 +465,6 @@ public class DateColumnVector extends ColumnVector
     public void close()
     {
         super.close();
-        this.time = null;
+        this.dates = null;
     }
 }

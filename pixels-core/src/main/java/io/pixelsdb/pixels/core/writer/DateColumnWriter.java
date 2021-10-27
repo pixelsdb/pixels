@@ -52,7 +52,7 @@ public class DateColumnWriter extends BaseColumnWriter
             throws IOException
     {
         DateColumnVector columnVector = (DateColumnVector) vector;
-        int[] times = columnVector.time;
+        int[] dates = columnVector.dates;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;
@@ -60,14 +60,14 @@ public class DateColumnWriter extends BaseColumnWriter
         while ((curPixelIsNullIndex + nextPartLength) >= pixelStride)
         {
             curPartLength = pixelStride - curPixelIsNullIndex;
-            writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
+            writeCurPartTime(columnVector, dates, curPartLength, curPartOffset);
             newPixel();
             curPartOffset += curPartLength;
             nextPartLength = size - curPartOffset;
         }
 
         curPartLength = nextPartLength;
-        writeCurPartTime(columnVector, times, curPartLength, curPartOffset);
+        writeCurPartTime(columnVector, dates, curPartLength, curPartOffset);
 
         return outputStream.size();
     }

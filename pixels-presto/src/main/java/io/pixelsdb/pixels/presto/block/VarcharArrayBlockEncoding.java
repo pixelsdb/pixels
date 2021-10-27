@@ -21,16 +21,14 @@ package io.pixelsdb.pixels.presto.block;
 
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockEncoding;
-import com.facebook.presto.spi.block.BlockEncodingFactory;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
-import com.facebook.presto.spi.type.TypeManager;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 
+import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.pixelsdb.pixels.presto.block.EncoderUtil.decodeNullBits;
 import static io.pixelsdb.pixels.presto.block.EncoderUtil.encodeNullsAsBits;
-import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 
 /**
  * This class is derived from com.facebook.presto.spi.block.VariableWidthBlockEncoding
@@ -42,8 +40,14 @@ import static io.airlift.slice.SizeOf.SIZE_OF_INT;
  */
 public class VarcharArrayBlockEncoding implements BlockEncoding
 {
-    public static final BlockEncodingFactory<VarcharArrayBlockEncoding> FACTORY = new VarcharArrayBlockEncoding.VarcharArrayBlockEncodingFactory();
-    private static final String NAME = "VARCHAR_ARRAY";
+    public static final String NAME = "VARCHAR_ARRAY";
+
+    private static final VarcharArrayBlockEncoding instance = new VarcharArrayBlockEncoding();
+
+    public static VarcharArrayBlockEncoding Instance()
+    {
+        return instance;
+    }
 
     @Override
     public String getName()
@@ -52,7 +56,7 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
     }
 
     @Override
-    public void writeBlock(SliceOutput sliceOutput, Block block)
+    public void writeBlock(BlockEncodingSerde blockEncodingSerde, SliceOutput sliceOutput, Block block)
     {
         // The down casts here are safe because it is the block itself the provides this encoding implementation.
         VarcharArrayBlock varcharArrayBlock = (VarcharArrayBlock) block;
@@ -81,7 +85,7 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
     }
 
     @Override
-    public Block readBlock(SliceInput sliceInput)
+    public Block readBlock(BlockEncodingSerde blockEncodingSerde, SliceInput sliceInput)
     {
         int positionCount = sliceInput.readInt();
 
@@ -104,32 +108,5 @@ public class VarcharArrayBlockEncoding implements BlockEncoding
         }
 
         return new VarcharArrayBlock(positionCount, values, offsets, lengths, valueIsNull);
-    }
-
-    @Override
-    public BlockEncodingFactory getFactory()
-    {
-        return FACTORY;
-    }
-
-    public static class VarcharArrayBlockEncodingFactory
-            implements BlockEncodingFactory<VarcharArrayBlockEncoding>
-    {
-        @Override
-        public String getName()
-        {
-            return NAME;
-        }
-
-        @Override
-        public VarcharArrayBlockEncoding readEncoding(TypeManager manager, BlockEncodingSerde serde, SliceInput input)
-        {
-            return new VarcharArrayBlockEncoding();
-        }
-
-        @Override
-        public void writeEncoding(BlockEncodingSerde serde, SliceOutput output, VarcharArrayBlockEncoding blockEncoding)
-        {
-        }
     }
 }

@@ -51,7 +51,7 @@ public class TimeColumnWriter extends BaseColumnWriter
             throws IOException
     {
         TimeColumnVector columnVector = (TimeColumnVector) vector;
-        int[] times = columnVector.time;
+        int[] times = columnVector.times;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;

@@ -30,7 +30,7 @@ public interface PixelsRecordReader
         extends AutoCloseable
 {
     /**
-     * Prepare for the next row batch.
+     * Prepare for the next row batch. This method is independent from readBatch().
      *
      * @param batchSize the willing batch size
      * @return the real batch size
@@ -38,7 +38,7 @@ public interface PixelsRecordReader
     int prepareBatch(int batchSize) throws IOException;
 
     /**
-     * Read the next row batch.
+     * Read the next row batch. This method is independent from prepareBatch().
      *
      * @param batchSize the row batch size
      * @return vectorized row batch
@@ -48,7 +48,8 @@ public interface PixelsRecordReader
             throws IOException;
 
     /**
-     * Read the next row batch
+     * Read the next row batch. This method is thread safe, and
+     * is independent from prepareBatch().
      *
      * @return row batch
      * @throws java.io.IOException
@@ -77,7 +78,6 @@ public interface PixelsRecordReader
      * @return seek success
      * @throws java.io.IOException
      */
-    @Deprecated
     boolean seekToRow(long rowIndex)
             throws IOException;
 
@@ -88,7 +88,6 @@ public interface PixelsRecordReader
      * @return skip success
      * @throws java.io.IOException
      */
-    @Deprecated
     boolean skip(long rowNum)
             throws IOException;
 

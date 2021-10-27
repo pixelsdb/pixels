@@ -130,8 +130,7 @@ public class PixelsMapredRecordReader
         int numberOfIncluded = this.pixelsIncluded.size();
         for (int i = 0; i < numberOfIncluded; ++i)
         {
-            int proj = batch.projectedColumns[i];
-            value.setFieldValue(hiveIncluded.get(i), PixelsValue.nextValue(batch.cols[proj], rowIdInBatch,
+            value.setFieldValue(hiveIncluded.get(i), PixelsValue.nextValue(batch.cols[i], rowIdInBatch,
                     columnTypes.get(pixelsIncluded.get(i)), value.getFieldValue(hiveIncluded.get(i))));
         }
 

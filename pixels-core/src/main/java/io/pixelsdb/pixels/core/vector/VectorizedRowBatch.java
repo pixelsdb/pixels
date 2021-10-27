@@ -33,22 +33,10 @@ public class VectorizedRowBatch implements AutoCloseable
     public int numCols;           // number of columns
     public ColumnVector[] cols;   // a vector for each column
     public int size;              // number of rows that qualify (i.e. haven't been filtered out)
-    public int[] selected;        // array of positions of selected values
-    public int[] projectedColumns;
     public int projectionSize;
     public int maxSize;
 
-    private int dataColumnCount;
-    private int partitionColumnCount;
-
     private long memoryUsage = 0L;
-
-    /*
-     * If no filtering has been applied yet, selectedInUse is false,
-     * meaning that all rows qualify. If it is true, then the selected[] array
-     * records the offsets of qualifying rows.
-     */
-    public boolean selectedInUse;
 
     // If this is true, then there is no data in the batch -- we have hit the end of input.
     public boolean endOfFile;
@@ -83,39 +71,13 @@ public class VectorizedRowBatch implements AutoCloseable
         this.numCols = numCols;
         this.size = size;
         this.maxSize = size;
-        selected = new int[size];
-        selectedInUse = false;
         this.cols = new ColumnVector[numCols];
-        projectedColumns = new int[numCols];
 
         memoryUsage += (long) Integer.BYTES * (size + numCols) +
         Integer.BYTES * 6 + Long.BYTES + 2;
 
         // Initially all columns are projected and in the same order
         projectionSize = numCols;
-        for (int i = 0; i < numCols; i++)
-        {
-            projectedColumns[i] = i;
-        }
-
-        dataColumnCount = -1;
-        partitionColumnCount = -1;
-    }
-
-    public void setPartitionInfo(int dataColumnCount, int partitionColumnCount)
-    {
-        this.dataColumnCount = dataColumnCount;
-        this.partitionColumnCount = partitionColumnCount;
-    }
-
-    public int getDataColumnCount()
-    {
-        return dataColumnCount;
-    }
-
-    public int getPartitionColumnCount()
-    {
-        return partitionColumnCount;
     }
 
     /**
@@ -153,52 +115,26 @@ public class VectorizedRowBatch implements AutoCloseable
             return "";
         }
         StringBuilder b = new StringBuilder();
-        if (this.selectedInUse)
+
+        for (int i = 0; i < size; i++)
         {
-            for (int j = 0; j < size; j++)
+            b.append('[');
+            for (int k = 0; k < projectionSize; k++)
             {
-                int i = selected[j];
-                b.append('[');
-                for (int k = 0; k < projectionSize; k++)
+                ColumnVector cv = cols[k];
+                if (k > 0)
                 {
-                    int projIndex = projectedColumns[k];
-                    ColumnVector cv = cols[projIndex];
-                    if (k > 0)
-                    {
-                        b.append(", ");
-                    }
+                    b.append(", ");
+                }
+                if (cv != null)
+                {
                     cv.stringifyValue(b, i);
                 }
-                b.append(']');
-                if (j < size - 1)
-                {
-                    b.append('\n');
-                }
             }
-        }
-        else
-        {
-            for (int i = 0; i < size; i++)
+            b.append(']');
+            if (i < size - 1)
             {
-                b.append('[');
-                for (int k = 0; k < projectionSize; k++)
-                {
-                    int projIndex = projectedColumns[k];
-                    ColumnVector cv = cols[projIndex];
-                    if (k > 0)
-                    {
-                        b.append(", ");
-                    }
-                    if (cv != null)
-                    {
-                        cv.stringifyValue(b, i);
-                    }
-                }
-                b.append(']');
-                if (i < size - 1)
-                {
-                    b.append('\n');
-                }
+                b.append('\n');
             }
         }
         memoryUsage += b.length();
@@ -215,7 +151,6 @@ public class VectorizedRowBatch implements AutoCloseable
      */
     public void reset()
     {
-        selectedInUse = false;
         size = 0;
         endOfFile = false;
         for (ColumnVector vc : cols)
@@ -268,11 +203,8 @@ public class VectorizedRowBatch implements AutoCloseable
     @Override
     public void close()
     {
-        selectedInUse = false;
         size = 0;
         endOfFile = false;
-        this.projectedColumns = null;
-        this.selected = null;
         if (this.cols != null)
         {
             for (ColumnVector vc : cols)
