@@ -274,6 +274,10 @@ public class SortMergeScheduler implements Scheduler
     /**
      * The retry policy that retries timeout read requests for a given number of times at most.
      * The timeout is determined by a cost model.
+     * <p>
+     *     Issue #142:
+     *     We future confirm that retry helps keep the large query performance stable.
+     * </p>
      */
     protected class RetryPolicy
     {
