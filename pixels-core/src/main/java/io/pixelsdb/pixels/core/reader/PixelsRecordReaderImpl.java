@@ -904,11 +904,8 @@ public class PixelsRecordReaderImpl
             this.resultRowBatch = resultSchema.createRowBatch(batchSize);
             resultRowBatch.projectionSize = includedColumnNum;
         }
-        else
-        {
-            this.resultRowBatch.reset();
-            this.resultRowBatch.ensureSize(batchSize);
-        }
+        this.resultRowBatch.reset();
+        this.resultRowBatch.ensureSize(batchSize);
 
         int rgRowCount = 0;
         int curBatchSize = 0;
