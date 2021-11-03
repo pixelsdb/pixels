@@ -30,11 +30,17 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Random;
 
 /**
  * <p>
  *     RateLimitedScheduler adds the data transfer rate limit and the
  *     request throughput limit to SortMergeScheduler.
+ * </p>
+ * <p>
+ *     Issue #142:
+ *     We future confirm that rate limits on both mbps and rps help keep large query
+ *     performance stable.
  * </p>
  *
  * Created at: 16/10/2021
@@ -56,6 +62,7 @@ public class RateLimitedScheduler extends SortMergeScheduler
 
     private RateLimiter mbpsRateLimiter;
     private RateLimiter rpsRateLimiter;
+    private final Random random;
     private RetryPolicy retryPolicy;
     private final boolean enableRetry;
 
@@ -91,6 +98,8 @@ public class RateLimitedScheduler extends SortMergeScheduler
         double rpsRateLimit = Double.parseDouble(ConfigFactory.Instance().getProperty("read.request.rate.limit.rps"));
         rpsRateLimiter = RateLimiter.create(rpsRateLimit);
 
+        random = new Random(System.nanoTime());
+
         this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (this.enableRetry)
         {
@@ -113,13 +122,20 @@ public class RateLimitedScheduler extends SortMergeScheduler
             Storage.Scheme scheme = reader.getStorageScheme();
             if (scheme == Storage.Scheme.s3)
             {
-                // Only do rate limit for S3.
+                // Only do rate limit for S3 async reads.
                 long bytes = 0;
                 for (MergedRequest merged : mergedRequests)
                 {
                     bytes += merged.getLength();
                 }
-                mbpsRateLimiter.acquire((int) (bytes/1024.0/1024.0));
+                double mb = (bytes/1024.0/1024.0);
+                int mbLimit = (int) mb;
+                // Issue #142: ensure the accuracy using random.
+                mbLimit += random.nextDouble() <= (mb - mbLimit) ? 1 : 0;
+                if (mbLimit > 0)
+                {
+                    mbpsRateLimiter.acquire(mbLimit);
+                }
                 rpsRateLimiter.acquire(mergedRequests.size());
             }
 
