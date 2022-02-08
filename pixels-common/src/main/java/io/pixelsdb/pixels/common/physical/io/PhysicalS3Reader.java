@@ -52,6 +52,7 @@ public class PhysicalS3Reader implements PhysicalReader
     private static final ExecutorService clientService;
     private final static int LEN_1M = 1024*1024;
     private final static int LEN_10M = 1024*1024*10;
+    private final static int ADAPTIVE_READ_TH = 1*1024*1024;
 
     static
     {
@@ -208,7 +209,7 @@ public class PhysicalS3Reader implements PhysicalReader
         GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
                 .key(path.key).range(toRange(offset, len)).build();
         CompletableFuture<ResponseBytes<GetObjectResponse>> future;
-        if (useAsyncClient)
+        if (useAsyncClient && len < ADAPTIVE_READ_TH)
         {
             if (S3.isRequestDiversionEnabled())
             {
