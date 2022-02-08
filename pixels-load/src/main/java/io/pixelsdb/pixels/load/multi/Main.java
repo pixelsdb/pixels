@@ -111,8 +111,10 @@ public class Main
             if (inputStr.equalsIgnoreCase("help") || inputStr.equalsIgnoreCase("-h"))
             {
                 System.out.println("Supported commands:\n" +
-                        "LOAD\n"+
-                        "QUERY\n");
+                        "LOAD\n" +
+                        "QUERY\n" +
+                        "COPY\n" +
+                        "COMPACT");
                 System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                 continue;
             }
@@ -400,7 +402,7 @@ public class Main
 
             if (command.equals("COMPACT"))
             {
-                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COPY")
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels ETL COMPACT")
                         .defaultHelp(true);
 
                 argumentParser.addArgument("-s", "--schema").required(true)
