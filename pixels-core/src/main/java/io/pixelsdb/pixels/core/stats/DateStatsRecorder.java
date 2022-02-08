@@ -35,8 +35,8 @@ public class DateStatsRecorder
         extends StatsRecorder implements DateColumnStats
 {
     private boolean hasMinMax = false;
-    private int minimum = Integer.MAX_VALUE;
-    private int maximum = Integer.MIN_VALUE;
+    private long minimum = Integer.MAX_VALUE;
+    private long maximum = Integer.MIN_VALUE;
 
     DateStatsRecorder()
     {
@@ -151,21 +151,21 @@ public class DateStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.DateStatistic.Builder dateBuilder =
                 PixelsProto.DateStatistic.newBuilder();
-        dateBuilder.setMinimum(minimum);
-        dateBuilder.setMaximum(maximum);
+        dateBuilder.setMinimum((int)minimum);
+        dateBuilder.setMaximum((int)maximum);
         builder.setDateStatistics(dateBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;
     }
 
     @Override
-    public Integer getMinimum()
+    public Long getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public Integer getMaximum()
+    public Long getMaximum()
     {
         return maximum;
     }
@@ -225,8 +225,8 @@ public class DateStatsRecorder
     public int hashCode()
     {
         int result = super.hashCode();
-        result = 15 * result + (minimum ^ (minimum >>> 16));
-        result = 15 * result + (maximum ^ (maximum >>> 16));
+        result = 15 * result + (int)(minimum ^ (minimum >>> 16));
+        result = 15 * result + (int)(maximum ^ (maximum >>> 16));
         return result;
     }
 }
