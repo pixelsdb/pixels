@@ -246,9 +246,20 @@ work in other kinds of VMs or physical servers.
 Attach a volume that is larger than the scale factor (e.g., 100GB) to the EC2 instance.
 Download tpch-dbgen to the instance, build it, and generate the dataset and queries into the attached volume.
 
-### Load TPC-H into Pixels
-Log in presto-cli and use the SQL statements in `scripts/sql/tpch-schema.sql` to create the TPC-H database in Pixels.
+### Create TPC-H Database
+Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
 Note that presto-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.
+
+Connect to MySQL using the user `pixels`, and execute the SQL statements in `scripts/sql/tpch_layouts.sql`
+to create the table layouts for the tables in the TPC-H database in Pixels. Actually, these layouts
+should be created by the storage layout optimizer ([Rainbow](https://ieeexplore.ieee.org/document/8509421)).
+However, we directly load the layouts here for simplicity.
+
+Create the containers for the tables layouts in S3. The container name is the same as the hostname
+(e.g., `pixels-tpch-customer-v-0-order`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
+Change the paths in the table layouts if the container names are already used.
+
+### Load Data

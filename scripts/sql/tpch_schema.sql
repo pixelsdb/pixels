@@ -1,3 +1,5 @@
+-- Run the following statements in Presto to create database for TPC-H
+
 CREATE SCHEMA IF NOT EXISTS tpch;
 
 USE tpch;
