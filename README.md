@@ -243,8 +243,10 @@ work in other kinds of VMs or physical servers.
 
 ### Prepare TPC-H
 
-Attach a volume that is larger than the scale factor (e.g., 100GB) to the EC2 instance.
+Attach a volume that is larger than the scale factor (e.g., 150GB for SF100) to the EC2 instance.
+Mount the attached volume to a local path (e.g., `/data/tpch-100`).
 Download tpch-dbgen to the instance, build it, and generate the dataset and queries into the attached volume.
+Here, we put the dataset in `/data/tpch-100/100g/`.
 
 ### Create TPC-H Database
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
@@ -263,3 +265,29 @@ Create the containers for the tables layouts in S3. The container name is the sa
 Change the paths in the table layouts if the container names are already used.
 
 ### Load Data
+Under `PIXELS_HOME`, run pixels-load:
+```bash
+java -jar pixels-load-*-full.jar
+```
+
+Then use the following command in pixels-load to load data for the TPC-H tables:
+```bash
+LOAD -f pixels -o file:///data/tpch-100/100g/customer -d tpch -t customer -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/lineitem -d tpch -t lineitem -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/nation -d tpch -t nation -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/orders -d tpch -t orders -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/part -d tpch -t part -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/partsupp -d tpch -t partsupp -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/region -d tpch -t region -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch-100/100g/supplier -d tpch -t supplier -n 220000 -r \| -c 1
+```
+This may take a few hours.
+
+### Run Queries
+Connect to presto-cli:
+```bash
+cd ~/opt/presto-server
+./bin/presto --server=localhost:8080 --catalog=pixels-presto --schema tpch
+```
+
+Execute the TPC-H queries in presto-cli.
