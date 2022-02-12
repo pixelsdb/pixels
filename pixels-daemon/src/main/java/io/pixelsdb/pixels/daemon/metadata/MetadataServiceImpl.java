@@ -57,7 +57,11 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         List<MetadataProto.Schema> schemas = this.schemaDao.getAll();
         MetadataProto.ResponseHeader header;
         MetadataProto.GetSchemasResponse response;
-        if (schemas == null || schemas.isEmpty())
+        /**
+         * Issue #156:
+         * schemas.isEmpty() is normal when there is no existing schema.
+         */
+        if (schemas == null)
         {
             header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
             response = MetadataProto.GetSchemasResponse.newBuilder().setHeader(header).build();
@@ -132,7 +136,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             tables = tableDao.getBySchema(schema);
             /**
              * Issue #85:
-             *  tables.isEmpty() is normal for empty schema.
+             * tables.isEmpty() is normal for empty schema.
              */
             if (tables == null)
             {
