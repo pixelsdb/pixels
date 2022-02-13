@@ -467,14 +467,33 @@ public class Main
 
                     // get input file paths
                     ConfigFactory configFactory = ConfigFactory.Instance();
-                    Storage storage = StorageFactory.Instance().getStorage("hdfs"); // TODO: support other storage type.
+                    Storage orderStorage = StorageFactory.Instance().getStorage(layout.getOrderPath());
+                    Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPath());
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
-                    List<Status> statuses = storage.listStatus(layout.getOrderPath());
+                    List<Status> statuses = orderStorage.listStatus(layout.getOrderPath());
 
                     // compact
-                    for (int i = 0; i + numRowGroupInBlock < statuses.size(); i+=numRowGroupInBlock)
+                    for (int i = 0; i < statuses.size(); i+=numRowGroupInBlock)
                     {
+                        if (i + numRowGroupInBlock > statuses.size())
+                        {
+                            /**
+                             * Issue #160:
+                             * Compact the tail files that can not full fill the compactLayout
+                             * defined in the metadata.
+                             * Note that if (i + numRowGroupInBlock == statues.size()),
+                             * then the remaining files are not tail files.
+                             *
+                             * Here we set numRowGroupInBlock to the number of tail files,
+                             * and rebuild a pure compactLayout for the tail files as the
+                             * compactLayout in metadata does not work for the tail files.
+                             */
+                            numRowGroupInBlock = statuses.size() - i;
+                            compactLayout = CompactLayout.buildPure(
+                                    numRowGroupInBlock, compact.getNumColumn());
+                        }
+
                         List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {
@@ -491,7 +510,7 @@ public class Main
                                 PixelsCompactor.newBuilder()
                                         .setSourcePaths(sourcePaths)
                                         .setCompactLayout(compactLayout)
-                                        .setStorage(storage)
+                                        .setStorage(compactStorage)
                                         .setFilePath(filePath)
                                         .setBlockSize(blockSize)
                                         .setReplication(replication)

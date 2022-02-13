@@ -298,5 +298,22 @@ Connect to presto-cli:
 cd ~/opt/presto-server
 ./bin/presto --server=localhost:8080 --catalog=pixels-presto --schema tpch
 ```
-
 Execute the TPC-H queries in presto-cli.
+
+### Data Compaction*
+This is optional. It is only needed if we want to test the query performance on the compact layout.
+In pixels-load, use the following command to compact the files in the ordered path of each table:
+```bash
+COMPACT -s tpch -t customer -l 1 -n no
+COMPACT -s tpch -t lineitem -l 2 -n no
+COMPACT -s tpch -t orders -l 4 -n no
+COMPACT -s tpch -t part -l 5 -n no
+COMPACT -s tpch -t partsupp -l 6 -n no
+COMPACT -s tpch -t supplier -l 8 -n no
+```
+The tables `nation` and `region` are too small, no need to compact them.
+Compaction is faster than loading.
+
+To avoid scanning the small files in the ordered path during query execution,
+create an empty bucket in S3 and change the ordered path in the metadata database
+to the empty bucket.

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.reader;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import org.junit.Test;
@@ -36,10 +37,10 @@ public class TestFileMetadata
     {
         PixelsReader pixelsReader = null;
         //String filePath = "hdfs://presto00:9000/pixels/testNull_pixels/201806190954180.pxl";
-        String filePath = "hdfs://presto00:9000/pixels/pixels/testnull_pixels/v_0_order/";
+        String filePath = "file:///home/hank/Downloads/20220213200323_1.compact.pxl";
         try
         {
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
             List<Status> fileStatuses = storage.listStatus(filePath);
             int i = 0;
             for (Status fileStatus : fileStatuses)
@@ -47,6 +48,8 @@ public class TestFileMetadata
                 pixelsReader = PixelsReaderImpl.newBuilder()
                         .setStorage(storage)
                         .setPath(fileStatus.getPath())
+                        .setEnableCache(false)
+                        .setPixelsFooterCache(new PixelsFooterCache())
                         .build();
 //                System.out.println(pixelsReader.getRowGroupNum());
                 if (pixelsReader.getFooter().getRowGroupStatsList().size() != 1)
@@ -56,6 +59,7 @@ public class TestFileMetadata
                 i++;
                 pixelsReader.close();
             }
+            System.out.println(i + " file(s) in total.");
         }
         catch (IOException e)
         {
