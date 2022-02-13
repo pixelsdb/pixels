@@ -89,8 +89,11 @@ public interface Storage
 
     Scheme getScheme();
 
+    String ensureSchemePrefix(String path) throws IOException;
+
     /**
      * Get the statuses of the contents in this path if it is a directory.
+     * The path in the returned status does not start with the scheme name.
      * For local fs, path is considered as local.
      * @param path
      * @return
@@ -100,6 +103,7 @@ public interface Storage
 
     /**
      * Get the paths of the contents in this path if it is a directory.
+     * The returned path does not start with the scheme name.
      * For local fs, path is considered as local.
      * @param path
      * @return

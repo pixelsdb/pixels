@@ -71,7 +71,7 @@ public class PixelsConsumer extends Consumer
         boolean isRunning = true;
         try
         {
-            String loadingDataPath = config.getPixelsPath();
+            String targetDirPath = config.getPixelsPath();
             String schemaStr = config.getSchema();
             int[] orderMapping = config.getOrderMapping();
             int maxRowNum = config.getMaxRowNum();
@@ -83,7 +83,6 @@ public class PixelsConsumer extends Consumer
             long blockSize = Long.parseLong(prop.getProperty("block.size")) * 1024l * 1024l;
             short replication = Short.parseShort(prop.getProperty("block.replication"));
 
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
             TypeDescription schema = TypeDescription.fromString(schemaStr);
             // System.out.println(schemaStr);
             // System.out.println(loadingDataPath);
@@ -94,9 +93,11 @@ public class PixelsConsumer extends Consumer
             String line;
 
             boolean initPixelsFile = true;
-            String loadingFilePath;
+            String targetFilePath;
             PixelsWriter pixelsWriter = null;
             int rowCounter = 0;
+
+            Storage targetStorage = StorageFactory.Instance().getStorage(targetDirPath);
 
             while (isRunning)
             {
@@ -104,7 +105,8 @@ public class PixelsConsumer extends Consumer
                 if (originalFilePath != null)
                 {
                     count++;
-                    reader = new BufferedReader(new InputStreamReader(storage.open(originalFilePath)));
+                    Storage originStorage = StorageFactory.Instance().getStorage(originalFilePath);
+                    reader = new BufferedReader(new InputStreamReader(originStorage.open(originalFilePath)));
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -116,13 +118,14 @@ public class PixelsConsumer extends Consumer
                                 continue;
                             }
                             // we create a new pixels file if we can read a next line from the source file.
-                            loadingFilePath = loadingDataPath + DateUtil.getCurTime() + ".pxl";
+
+                            targetFilePath = targetDirPath + DateUtil.getCurTime() + ".pxl";
                             pixelsWriter = PixelsWriterImpl.newBuilder()
                                     .setSchema(schema)
                                     .setPixelStride(pixelStride)
                                     .setRowGroupSize(rowGroupSize)
-                                    .setStorage(storage)
-                                    .setFilePath(loadingFilePath)
+                                    .setStorage(targetStorage)
+                                    .setFilePath(targetFilePath)
                                     .setBlockSize(blockSize)
                                     .setReplication(replication)
                                     .setBlockPadding(true)

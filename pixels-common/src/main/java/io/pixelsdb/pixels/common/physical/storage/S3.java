@@ -65,6 +65,7 @@ import static java.util.Objects.requireNonNull;
 public class S3 implements Storage
 {
     private static Logger logger = LogManager.getLogger(S3.class);
+    private static String SchemePrefix = Scheme.s3.name() + "://";
 
     private static int connectionTimeoutSec = 60;
     private static int connectionAcquisitionTimeoutSec = 60;
@@ -201,8 +202,8 @@ public class S3 implements Storage
     {
         public String bucket = null;
         public String key = null;
-        boolean valid = false;
-        boolean isBucket = false;
+        public boolean valid = false;
+        public boolean isBucket = false;
 
         public Path(String path)
         {
@@ -256,6 +257,21 @@ public class S3 implements Storage
     public Scheme getScheme()
     {
         return Scheme.s3;
+    }
+
+    @Override
+    public String ensureSchemePrefix(String path) throws IOException
+    {
+        if (path.startsWith(SchemePrefix))
+        {
+            return path;
+        }
+        if (path.contains("://"))
+        {
+            throw new IOException("Path '" + path +
+                    "' already has a different scheme prefix than '" + SchemePrefix + "'.");
+        }
+        return SchemePrefix + path;
     }
 
     @Override
@@ -499,10 +515,22 @@ public class S3 implements Storage
     @Override
     public void close() throws IOException
     {
-        s3.close();
-        s3Async.close();
-        s3Async1M.close();
-        s3Async10M.close();
+        if (s3 != null)
+        {
+            s3.close();
+        }
+        if (s3Async != null)
+        {
+            s3Async.close();
+        }
+        if (s3Async1M != null)
+        {
+            s3Async1M.close();
+        }
+        if (s3Async10M != null)
+        {
+            s3Async10M.close();
+        }
     }
 
     @Override

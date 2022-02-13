@@ -161,7 +161,7 @@ public class Main
                     String format = ns.getString("format");
                     String dbName = ns.getString("db_name");
                     String tableName = ns.getString("table_name");
-                    String originalDataPath = ns.getString("original_data_path");
+                    String origin = ns.getString("original_data_path");
                     int rowNum = Integer.parseInt(ns.getString("row_num"));
                     String regex = ns.getString("row_regex");
                     String loadingDataPath = ns.getString("loading_data_path");
@@ -169,8 +169,7 @@ public class Main
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
-                    BlockingQueue<String> fileQueue;
-                    Storage storage = StorageFactory.Instance().getStorage("hdfs");
+                    Storage storage = StorageFactory.Instance().getStorage(origin);
 
                     if (format != null)
                     {
@@ -184,8 +183,12 @@ public class Main
                     } else if (!producer && config != null)
                     {
                         // source already exist, producer option is false, add list of source to the queue
-                        List<String> hdfsList = storage.listPaths(originalDataPath);
-                        fileQueue = new LinkedBlockingQueue<>(hdfsList);
+                        List<String> fileList = storage.listPaths(origin);
+                        BlockingQueue<String> fileQueue = new LinkedBlockingQueue<>(fileList.size());
+                        for (String filePath : fileList)
+                        {
+                            fileQueue.add(storage.ensureSchemePrefix(filePath));
+                        }
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
                         long startTime = System.currentTimeMillis();
@@ -199,7 +202,7 @@ public class Main
                         }
 
                         long endTime = System.currentTimeMillis();
-                        System.out.println("Files in Source " + originalDataPath + " is loaded into " + format + " format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                        System.out.println("Files in Source " + origin + " is loaded into " + format + " format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
 
                     } else
                     {

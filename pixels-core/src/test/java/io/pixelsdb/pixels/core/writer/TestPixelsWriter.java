@@ -271,6 +271,50 @@ public class TestPixelsWriter
     }
 
     @Test
+    public void testReadTpchNation()
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        String[] cols = {"n_nationkey", "n_name", "n_regionkey", "n_comment"};
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.includeCols(cols);
+        option.rgRange(0, 1);
+
+        VectorizedRowBatch rowBatch;
+        PixelsReader pixelsReader;
+
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage("file");
+            String path = TestParams.filePath;
+            pixelsReader = PixelsReaderImpl.newBuilder()
+                    .setStorage(storage)
+                    .setPath(path)
+                    .setEnableCache(false)
+                    .setCacheOrder(new ArrayList<>())
+                    .setPixelsCacheReader(null)
+                    .setPixelsFooterCache(new PixelsFooterCache())
+                    .build();
+            PixelsRecordReader recordReader = pixelsReader.read(option);
+            rowBatch = recordReader.readBatch();
+            LongColumnVector nationkeyVector = (LongColumnVector) rowBatch.cols[0];
+            BinaryColumnVector nameVector = (BinaryColumnVector) rowBatch.cols[1];
+            LongColumnVector regionkeyVector = (LongColumnVector) rowBatch.cols[2];
+            BinaryColumnVector commentVector = (BinaryColumnVector) rowBatch.cols[3];
+            for (int i = 0; i < rowBatch.size; ++i)
+            {
+                String name = new String(nameVector.vector[i], nameVector.start[i], nameVector.lens[i]);
+                String comment = new String(commentVector.vector[i], commentVector.start[i], commentVector.lens[i]);
+                System.out.println(nationkeyVector.vector[i] + ", " + name + ", " + regionkeyVector.vector[i] + ", " + comment);
+            }
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
     public void prepareCacheData()
     {
         try

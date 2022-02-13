@@ -5,7 +5,7 @@ Pixels is a columnar storage engine for data lakes. It is optimized for data ana
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
-## Build
+## Build Pixels
 Install JDK (>=8.0).
 Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
@@ -214,6 +214,14 @@ However, **even if HDFS is not used**, Pixels has to read Hadoop configuration f
 is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
 exist in `hdfs.config.dir`.
 
+### AWS Credentials
+If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+
+Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
+Therefore, we have to configure these credentials using 
+[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
+[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). 
+
 ## Start Pixels
 Enter `PIXELS_HOME` and start the daemons of Pixels using:
 ```bash
@@ -244,9 +252,10 @@ work in other kinds of VMs or physical servers.
 ### Prepare TPC-H
 
 Attach a volume that is larger than the scale factor (e.g., 150GB for SF100) to the EC2 instance.
-Mount the attached volume to a local path (e.g., `/data/tpch-100`).
+Mount the attached volume to a local path (e.g., `/data/tpch`).
 Download tpch-dbgen to the instance, build it, and generate the dataset and queries into the attached volume.
-Here, we put the dataset in `/data/tpch-100/100g/`.
+Here, we put the dataset in `/data/tpch/100g/`.
+The file(s) of each table are stored in a separate directory named by the table name.
 
 ### Create TPC-H Database
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
@@ -272,14 +281,14 @@ java -jar pixels-load-*-full.jar
 
 Then use the following command in pixels-load to load data for the TPC-H tables:
 ```bash
-LOAD -f pixels -o file:///data/tpch-100/100g/customer -d tpch -t customer -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/lineitem -d tpch -t lineitem -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/nation -d tpch -t nation -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/orders -d tpch -t orders -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/part -d tpch -t part -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/partsupp -d tpch -t partsupp -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/region -d tpch -t region -n 220000 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch-100/100g/supplier -d tpch -t supplier -n 220000 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/nation -d tpch -t nation -n 100 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/orders -d tpch -t orders -n 638300 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/part -d tpch -t part -n 357150 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
 ```
 This may take a few hours.
 

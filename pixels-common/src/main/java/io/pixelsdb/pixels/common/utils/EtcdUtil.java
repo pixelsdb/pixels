@@ -58,6 +58,13 @@ public class EtcdUtil
         String port = ConfigFactory.Instance().getProperty("etcd.port");
 
         this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
+
+        /**
+         * Issue #158:
+         * Close the etcd client when the system is exiting.
+         */
+        Runtime.getRuntime().addShutdownHook( new Thread( () ->
+                this.client.close()));
     }
 
     public static EtcdUtil Instance()
