@@ -47,6 +47,7 @@ import java.util.List;
 public class HDFS implements Storage
 {
     private static Logger logger = LogManager.getLogger(HDFS.class);
+    private static String SchemePrefix = Scheme.hdfs.name() + "://";
 
     private FileSystem fs;
     private Configuration conf;
@@ -97,6 +98,21 @@ public class HDFS implements Storage
     public Scheme getScheme()
     {
         return Scheme.hdfs;
+    }
+
+    @Override
+    public String ensureSchemePrefix(String path) throws IOException
+    {
+        if (path.startsWith(SchemePrefix))
+        {
+            return path;
+        }
+        if (path.contains("://"))
+        {
+            throw new IOException("Path '" + path +
+                    "' already has a different scheme prefix than '" + SchemePrefix + "'.");
+        }
+        return SchemePrefix + path;
     }
 
     @Override

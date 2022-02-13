@@ -5,7 +5,7 @@ Pixels is a columnar storage engine for data lakes. It is optimized for data ana
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
-## Build
+## Build Pixels
 Install JDK (>=8.0).
 Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
@@ -213,6 +213,14 @@ of either system.
 However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
 is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
 exist in `hdfs.config.dir`.
+
+### AWS Credentials
+If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+
+Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
+Therefore, we have to configure these credentials using 
+[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
+[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). 
 
 ## Start Pixels
 Enter `PIXELS_HOME` and start the daemons of Pixels using:

@@ -54,6 +54,7 @@ public class LocalFS implements Storage
     }
 
     private static Logger logger = LogManager.getLogger(LocalFS.class);
+    private static String SchemePrefix = Scheme.file.name() + "://";
 
     private String hostName;
 
@@ -138,6 +139,21 @@ public class LocalFS implements Storage
     }
 
     @Override
+    public String ensureSchemePrefix(String path) throws IOException
+    {
+        if (path.startsWith(SchemePrefix))
+        {
+            return path;
+        }
+        if (path.contains("://"))
+        {
+            throw new IOException("Path '" + path +
+                    "' already has a different scheme prefix than '" + SchemePrefix + "'.");
+        }
+        return SchemePrefix + path;
+    }
+
+    @Override
     public List<Status> listStatus(String path) throws IOException
     {
         Path p = new Path(path);
@@ -177,6 +193,16 @@ public class LocalFS implements Storage
     public long getFileId(String path) throws IOException
     {
         KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
+        if (kv == null)
+        {
+            /**
+             * Issue #158:
+             * Create an id for this file if it does not exist in etcd.
+             */
+            long id = GenerateId(LOCAL_FS_ID_KEY);
+            EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+            return id;
+        }
         return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
     }
 

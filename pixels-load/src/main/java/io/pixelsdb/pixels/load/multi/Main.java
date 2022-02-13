@@ -169,7 +169,6 @@ public class Main
                     int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
-                    BlockingQueue<String> fileQueue;
                     Storage storage = StorageFactory.Instance().getStorage(origin);
 
                     if (format != null)
@@ -185,7 +184,11 @@ public class Main
                     {
                         // source already exist, producer option is false, add list of source to the queue
                         List<String> fileList = storage.listPaths(origin);
-                        fileQueue = new LinkedBlockingQueue<>(fileList);
+                        BlockingQueue<String> fileQueue = new LinkedBlockingQueue<>(fileList.size());
+                        for (String filePath : fileList)
+                        {
+                            fileQueue.add(storage.ensureSchemePrefix(filePath));
+                        }
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
                         long startTime = System.currentTimeMillis();
@@ -470,16 +473,8 @@ public class Main
                     List<Status> statuses = storage.listStatus(layout.getOrderPath());
 
                     // compact
-                    for (int i = 0; i < statuses.size(); i+=numRowGroupInBlock)
+                    for (int i = 0; i + numRowGroupInBlock < statuses.size(); i+=numRowGroupInBlock)
                     {
-                        if (i + numRowGroupInBlock < statuses.size())
-                        {
-                            /**
-                             * Issue #158:
-                             * Compact the tail files.
-                             */
-                            numRowGroupInBlock = statuses.size() - i;
-                        }
                         List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {
