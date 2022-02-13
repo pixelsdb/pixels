@@ -53,12 +53,37 @@ public class CompactLayout
         return layout;
     }
 
+    /**
+     * Build the naive row-group-first compact layout.
+     * @param rowGroupNumber
+     * @param columnNumber
+     * @return
+     */
     public static CompactLayout buildNaive(int rowGroupNumber, int columnNumber)
     {
         CompactLayout layout = new CompactLayout(rowGroupNumber, columnNumber);
         for (int i = 0; i < rowGroupNumber; i++)
         {
             for (int j = 0; j < columnNumber; j++)
+            {
+                layout.append(i, j);
+            }
+        }
+        return layout;
+    }
+
+    /**
+     * Build the pure column-first compact layout.
+     * @param rowGroupNumber
+     * @param columnNumber
+     * @return
+     */
+    public static CompactLayout buildPure(int rowGroupNumber, int columnNumber)
+    {
+        CompactLayout layout = new CompactLayout(rowGroupNumber, columnNumber);
+        for (int j = 0; j < columnNumber; j++)
+        {
+            for (int i = 0; i < rowGroupNumber; i++)
             {
                 layout.append(i, j);
             }

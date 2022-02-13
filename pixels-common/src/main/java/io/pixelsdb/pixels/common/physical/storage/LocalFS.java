@@ -157,7 +157,16 @@ public class LocalFS implements Storage
     public List<Status> listStatus(String path) throws IOException
     {
         Path p = new Path(path);
-        File[] files = new File(p.realPath).listFiles();
+        File file = new File(p.realPath);
+        File[] files = null;
+        if (file.isDirectory())
+        {
+            files = file.listFiles();
+        }
+        else
+        {
+            files = new File[] {file};
+        }
         if (files == null)
         {
             throw new IOException("Failed to list files in path: " + p.realPath + ".");
@@ -178,7 +187,16 @@ public class LocalFS implements Storage
     public List<String> listPaths(String path) throws IOException
     {
         Path p = new Path(path);
-        File[] files = new File(p.realPath).listFiles();
+        File file = new File(p.realPath);
+        File[] files = null;
+        if (file.isDirectory())
+        {
+            files = file.listFiles();
+        }
+        else
+        {
+            files = new File[] {file};
+        }
         if (files == null)
         {
             throw new IOException("Failed to list files in path: " + p.realPath + ".");
