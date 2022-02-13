@@ -234,7 +234,7 @@ Enter the home of presto-server and start Presto:
 
 Connect to presto-server using presto-cli:
 ```bash
-./bin/presto --server=localhost:8080 --catalog=pixels-presto
+./bin/presto --server localhost:8080 --catalog pixels-presto
 ```
 Run `SHOW SCHEMAS` in presto-cli, the result should be as follows if everything is installed correctly.
 ```sql
@@ -285,7 +285,7 @@ LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 
 LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/nation -d tpch -t nation -n 100 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/orders -d tpch -t orders -n 638300 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/part -d tpch -t part -n 357150 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/part -d tpch -t part -n 769240 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
@@ -296,7 +296,7 @@ This may take a few hours.
 Connect to presto-cli:
 ```bash
 cd ~/opt/presto-server
-./bin/presto --server=localhost:8080 --catalog=pixels-presto --schema tpch
+./bin/presto --server localhost:8080 --catalog pixels-presto --schema tpch
 ```
 Execute the TPC-H queries in presto-cli.
 
