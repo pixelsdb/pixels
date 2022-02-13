@@ -40,6 +40,7 @@ import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
 import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_ID_KEY;
 import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -92,6 +93,44 @@ public class LocalFS implements Storage
         return pathKey.substring(last + 1);
     }
 
+    public static class Path
+    {
+        public String realPath = null;
+        public boolean valid = false;
+        public boolean isDir = false;
+
+        public Path(String path)
+        {
+            requireNonNull(path);
+            if (path.startsWith("file:///"))
+            {
+                valid = true;
+                realPath = path.substring(path.indexOf("://") + 3);
+            }
+            else if (path.startsWith("/"))
+            {
+                valid = true;
+                realPath = path;
+            }
+
+            if (valid)
+            {
+                File file = new File(realPath);
+                isDir = file.isDirectory();
+            }
+        }
+
+        @Override
+        public String toString()
+        {
+            if (!this.valid)
+            {
+                return null;
+            }
+            return this.realPath;
+        }
+    }
+
     @Override
     public Scheme getScheme()
     {
@@ -101,10 +140,11 @@ public class LocalFS implements Storage
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        File[] files = new File(path).listFiles();
+        Path p = new Path(path);
+        File[] files = new File(p.realPath).listFiles();
         if (files == null)
         {
-            throw new IOException("Failed to list files in path: " + path + ".");
+            throw new IOException("Failed to list files in path: " + p.realPath + ".");
         }
         else
         {
@@ -115,16 +155,17 @@ public class LocalFS implements Storage
     @Override
     public Status getStatus(String path)
     {
-        return new Status(new File(path));
+        return new Status(new File(new Path(path).realPath));
     }
 
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        File[] files = new File(path).listFiles();
+        Path p = new Path(path);
+        File[] files = new File(p.realPath).listFiles();
         if (files == null)
         {
-            throw new IOException("Failed to list files in path: " + path + ".");
+            throw new IOException("Failed to list files in path: " + p.realPath + ".");
         }
         else
         {
@@ -170,28 +211,30 @@ public class LocalFS implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        File file = new File(path);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
         if (file.isDirectory())
         {
-            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
         }
         if (!file.exists())
         {
-            throw new IOException("File '" + path + "' doesn't exists.");
+            throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
         return new DataInputStream(new FileInputStream(file));
     }
 
     public RandomAccessFile openRaf(String path) throws IOException
     {
-        File file = new File(path);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
         if (file.isDirectory())
         {
-            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
         }
         if (!file.exists())
         {
-            throw new IOException("File '" + path + "' doesn't exists.");
+            throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
         return new RandomAccessFile(file, "r");
     }
@@ -199,10 +242,11 @@ public class LocalFS implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
     {
-        File file = new File(path);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
         if (file.isDirectory())
         {
-            throw new IOException("Path '" + path + "' is a directory, it must be a file.");
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
         }
         if (file.exists())
         {
@@ -212,14 +256,14 @@ public class LocalFS implements Storage
             }
             else
             {
-                throw new IOException("File '" + path + "' already exists.");
+                throw new IOException("File '" + p.realPath + "' already exists.");
             }
         }
         long id = GenerateId(LOCAL_FS_ID_KEY);
         EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
         if (!file.createNewFile())
         {
-            throw new IOException("Failed to create local file '" + path + "'.");
+            throw new IOException("Failed to create local file '" + p.realPath + "'.");
         }
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
@@ -233,13 +277,14 @@ public class LocalFS implements Storage
     @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
-        File file = new File(path);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
         boolean subDeleted = true;
         if (file.isDirectory())
         {
             if (!recursive)
             {
-                throw new IOException("Can not delete a directory '" + path + "' with recursive = false.");
+                throw new IOException("Can not delete a directory '" + p.realPath + "' with recursive = false.");
             }
             else
             {
@@ -279,18 +324,18 @@ public class LocalFS implements Storage
     @Override
     public boolean exists(String path)
     {
-        return new File(path).exists();
+        return new File(new Path(path).realPath).exists();
     }
 
     @Override
     public boolean isFile(String path)
     {
-        return new File(path).isFile();
+        return !new Path(path).isDir;
     }
 
     @Override
     public boolean isDirectory(String path)
     {
-        return new File(path).isDirectory();
+        return new Path(path).isDir;
     }
 }

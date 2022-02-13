@@ -161,7 +161,7 @@ public class Main
                     String format = ns.getString("format");
                     String dbName = ns.getString("db_name");
                     String tableName = ns.getString("table_name");
-                    String originalDataPath = ns.getString("original_data_path");
+                    String origin = ns.getString("original_data_path");
                     int rowNum = Integer.parseInt(ns.getString("row_num"));
                     String regex = ns.getString("row_regex");
                     String loadingDataPath = ns.getString("loading_data_path");
@@ -170,7 +170,7 @@ public class Main
                     boolean producer = ns.getBoolean("producer");
 
                     BlockingQueue<String> fileQueue;
-                    Storage storage = StorageFactory.Instance().getStorage("hdfs");
+                    Storage storage = StorageFactory.Instance().getStorage(origin);
 
                     if (format != null)
                     {
@@ -184,8 +184,8 @@ public class Main
                     } else if (!producer && config != null)
                     {
                         // source already exist, producer option is false, add list of source to the queue
-                        List<String> hdfsList = storage.listPaths(originalDataPath);
-                        fileQueue = new LinkedBlockingQueue<>(hdfsList);
+                        List<String> fileList = storage.listPaths(origin);
+                        fileQueue = new LinkedBlockingQueue<>(fileList);
 
                         ConsumerGenerator instance = ConsumerGenerator.getInstance(threadNum);
                         long startTime = System.currentTimeMillis();
@@ -199,7 +199,7 @@ public class Main
                         }
 
                         long endTime = System.currentTimeMillis();
-                        System.out.println("Files in Source " + originalDataPath + " is loaded into " + format + " format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                        System.out.println("Files in Source " + origin + " is loaded into " + format + " format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
 
                     } else
                     {
@@ -470,8 +470,16 @@ public class Main
                     List<Status> statuses = storage.listStatus(layout.getOrderPath());
 
                     // compact
-                    for (int i = 0; i + numRowGroupInBlock < statuses.size(); i+=numRowGroupInBlock)
+                    for (int i = 0; i < statuses.size(); i+=numRowGroupInBlock)
                     {
+                        if (i + numRowGroupInBlock < statuses.size())
+                        {
+                            /**
+                             * Issue #158:
+                             * Compact the tail files.
+                             */
+                            numRowGroupInBlock = statuses.size() - i;
+                        }
                         List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {

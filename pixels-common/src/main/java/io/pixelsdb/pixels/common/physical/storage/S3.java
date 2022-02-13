@@ -201,8 +201,8 @@ public class S3 implements Storage
     {
         public String bucket = null;
         public String key = null;
-        boolean valid = false;
-        boolean isBucket = false;
+        public boolean valid = false;
+        public boolean isBucket = false;
 
         public Path(String path)
         {
