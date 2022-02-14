@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS customer (
   c_acctbal double,
   c_mktsegment varchar(10),
   c_comment varchar(117)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS lineitem (
   l_orderkey bigint,
@@ -32,14 +32,14 @@ CREATE TABLE IF NOT EXISTS lineitem (
   l_shipinstruct varchar(25),
   l_shipmode varchar(10),
   l_comment varchar(44)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS nation (
   n_nationkey bigint,
   n_name varchar(25),
   n_regionkey bigint,
   n_comment varchar(152)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS orders (
   o_orderkey bigint,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS orders (
   o_clerk varchar(15),
   o_shippriority integer,
   o_comment varchar(79)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS part (
   p_partkey bigint,
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS part (
   p_container varchar(10),
   p_retailprice double,
   p_comment varchar(23)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS partsupp (
   ps_partkey bigint,
@@ -71,13 +71,13 @@ CREATE TABLE IF NOT EXISTS partsupp (
   ps_availqty integer,
   ps_supplycost double,
   ps_comment varchar(199)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS region (
   r_regionkey bigint,
   r_name varchar(25),
   r_comment varchar(152)
-);
+) WITH (storage='s3');
 
 CREATE TABLE IF NOT EXISTS supplier (
   s_suppkey bigint,
@@ -87,4 +87,4 @@ CREATE TABLE IF NOT EXISTS supplier (
   s_phone varchar(15),
   s_acctbal double,
   s_comment varchar(101)
-);
+) WITH (storage='s3');

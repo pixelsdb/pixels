@@ -24,12 +24,15 @@ import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
 import javax.inject.Inject;
+
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
@@ -41,17 +44,20 @@ public class PixelsConnector
     private final PixelsMetadata metadata;
     private final PixelsSplitManager splitManager;
     private final PixelsPageSourceProvider pageSourceProvider;
+    private final PixelsTableProperties tableProperties;
 
     @Inject
     public PixelsConnector(
             LifeCycleManager lifeCycleManager,
             PixelsMetadata metadata,
             PixelsSplitManager splitManager,
-            PixelsPageSourceProvider pageSourceProvider) {
+            PixelsPageSourceProvider pageSourceProvider,
+            PixelsTableProperties tableProperties) {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "recordSetProvider is null");
+        this.tableProperties = requireNonNull(tableProperties, "tableProperties is null");
     }
 
     @Override
@@ -82,5 +88,11 @@ public class PixelsConnector
             logger.error(e, "error in shutting down connector");
             throw new PrestoException(PixelsErrorCode.PIXELS_CONNECTOR_ERROR, e);
         }
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getTableProperties()
+    {
+        return tableProperties.getTableProperties();
     }
 }

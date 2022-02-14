@@ -83,6 +83,7 @@ public interface Storage
 
         public boolean equals(Scheme other)
         {
+            // enums in Java can be compared using '=='.
             return this == other;
         }
     }

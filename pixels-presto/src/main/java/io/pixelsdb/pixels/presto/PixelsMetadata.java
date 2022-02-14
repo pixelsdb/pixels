@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 
@@ -83,7 +84,8 @@ public class PixelsMetadata
         {
             if (this.pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
             {
-                PixelsTableHandle tableHandle = new PixelsTableHandle(connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
+                PixelsTableHandle tableHandle = new PixelsTableHandle(
+                        connectorId, tableName.getSchemaName(), tableName.getTableName(), "");
                 return tableHandle;
             }
         } catch (MetadataException e)
@@ -94,7 +96,9 @@ public class PixelsMetadata
     }
 
     @Override
-    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
+    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table,
+                                                            Constraint<ColumnHandle> constraint,
+                                                            Optional<Set<ColumnHandle>> desiredColumns)
     {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
         PixelsTableLayoutHandle tableLayout = new PixelsTableLayoutHandle(tableHandle);
@@ -115,7 +119,8 @@ public class PixelsMetadata
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table)
     {
         PixelsTableHandle tableHandle = (PixelsTableHandle) table;
-        checkArgument(tableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
+        checkArgument(tableHandle.getConnectorId().equals(connectorId),
+                "tableHandle is not for this connector");
         return getTableMetadataInternal(tableHandle.getSchemaName(), tableHandle.getTableName());
     }
 
@@ -172,12 +177,14 @@ public class PixelsMetadata
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         PixelsTableHandle pixelsTableHandle = (PixelsTableHandle) tableHandle;
-        checkArgument(pixelsTableHandle.getConnectorId().equals(connectorId), "tableHandle is not for this connector");
+        checkArgument(pixelsTableHandle.getConnectorId().equals(connectorId),
+                "tableHandle is not for this connector");
 
         List<PixelsColumnHandle> columnHandleList = null;
         try
         {
-            columnHandleList = pixelsMetadataProxy.getTableColumn(connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
+            columnHandleList = pixelsMetadataProxy.getTableColumn(
+                    connectorId, pixelsTableHandle.getSchemaName(), pixelsTableHandle.getTableName());
         } catch (MetadataException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
@@ -196,7 +203,8 @@ public class PixelsMetadata
     }
 
     @Override
-    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
+    public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session,
+                                                                       SchemaTablePrefix prefix)
     {
         requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
@@ -222,7 +230,8 @@ public class PixelsMetadata
     }
 
     @Override
-    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
+    public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle,
+                                            ColumnHandle columnHandle)
     {
         return ((PixelsColumnHandle) columnHandle).getColumnMetadata();
     }
@@ -233,8 +242,13 @@ public class PixelsMetadata
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
-        String storageScheme = (String) Optional.ofNullable(tableMetadata.getProperties().get("storage.scheme"))
-                .orElse("hdfs"); // use HDFS by default.
+        String storageScheme = ((String) Optional.ofNullable(tableMetadata.getProperties().get("storage"))
+                .orElse("hdfs")).toLowerCase(); // use HDFS by default.
+        if (!Storage.Scheme.isValid(storageScheme))
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR,
+                    "Unsupported storage scheme '" + storageScheme + "'.");
+        }
         List<Column> columns = new ArrayList<>();
         for (ColumnMetadata columnMetadata : tableMetadata.getColumns())
         {
@@ -253,8 +267,8 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, storageScheme, columns);
             if (res == false && ignoreExisting == false)
             {
-                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "table " + schemaTableName.toString() +
-                " exists");
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "Table " + schemaTableName.toString() + " already exists.");
             }
         } catch (MetadataException e)
         {
@@ -270,9 +284,12 @@ public class PixelsMetadata
      * @param layout
      */
     @Override
-    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session,
+                                                       ConnectorTableMetadata tableMetadata,
+                                                       Optional<ConnectorNewTableLayout> layout)
     {
-        throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "create table with data is currently not supported.");
+        throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                "Create table with data is currently not supported.");
     }
 
     @Override
@@ -287,8 +304,8 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.dropTable(schemaName, tableName);
             if (res == false)
             {
-                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "no such table " + schemaName +
-                        "." + tableName);
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "Table " + schemaName + "." + tableName + " does not exist.");
             }
         } catch (MetadataException e)
         {
@@ -304,8 +321,8 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.createSchema(schemaName);
             if (res == false)
             {
-                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "schema " + schemaName +
-                        " exists");
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "Schema " + schemaName + " already exists.");
             }
         } catch (MetadataException e)
         {
@@ -321,7 +338,8 @@ public class PixelsMetadata
             boolean res = this.pixelsMetadataProxy.dropSchema(schemaName);
             if (res == false)
             {
-                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR, "no such schema " + schemaName);
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "Schema " + schemaName + " does not exist.");
             }
         } catch (MetadataException e)
         {
