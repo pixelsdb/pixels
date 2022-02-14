@@ -261,6 +261,8 @@ The file(s) of each table are stored in a separate directory named by the table 
 
 ### Create TPC-H Database
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
+Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the 
+underlying storage system instead of S3.
 Note that presto-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
