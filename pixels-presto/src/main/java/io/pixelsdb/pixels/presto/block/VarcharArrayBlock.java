@@ -62,6 +62,11 @@ public class VarcharArrayBlock implements Block
     private final boolean[] valueIsNull; // isNull flag of each item.
 
     private final long retainedSizeInBytes;
+    /**
+     * Issue #167:
+     * The actual memory footprint of the member values.
+     */
+    private final long retainedSizeOfValues;
     private final long sizeInBytes;
 
     static
@@ -145,7 +150,8 @@ public class VarcharArrayBlock implements Block
         }
         existingValues.clear();
         sizeInBytes = size;
-        retainedSizeInBytes = INSTANCE_SIZE + retainedSize + sizeOf(values) +
+        retainedSizeOfValues = retainedSize + sizeOf(values);
+        retainedSizeInBytes = INSTANCE_SIZE + retainedSizeOfValues +
                 sizeOf(valueIsNull) + sizeOf(offsets) + sizeOf(lengths);
     }
 
@@ -271,12 +277,11 @@ public class VarcharArrayBlock implements Block
     @Override
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
-        long retainedSize = 0L;
-        for (int i = 0; i < positionCount; ++i)
-        {
-            retainedSize += valueIsNull[arrayOffset + i] ? 0L : values[arrayOffset + i].length;
-        }
-        consumer.accept(values, retainedSize);
+        /**
+         * Issue #167:
+         * DO NOT calculate the retained size of values by adding up values[i].length.
+         */
+        consumer.accept(values, retainedSizeOfValues);
         consumer.accept(offsets, sizeOf(offsets));
         consumer.accept(lengths, sizeOf(lengths));
         consumer.accept(valueIsNull, sizeOf(valueIsNull));
