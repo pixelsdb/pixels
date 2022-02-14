@@ -81,21 +81,41 @@ public class PixelsTypeManager
         signatureToType = new HashMap<>();
         for (Type type : supportedTypes)
         {
-            signatureToType.put(type.getDisplayName(), type);
+            /**
+             * Issue #163:
+             * Register the lowercase of the type's display name.
+             */
+            signatureToType.put(type.getDisplayName().toLowerCase(), type);
         }
+        /**
+         * Issue #163:
+         * Support char(n) using varchar.
+         */
+        signatureToType.put("char", VARCHAR);
     }
 
     private PixelsTypeManager () {}
 
     public Type getType(String signature)
     {
-        return signatureToType.get(signature);
+        /**
+         * Issue #163:
+         * The signature in signatureToType is the prefix in lowercase of the type's display name.
+         * Fore example, varchar or char instead of varchar(10) or char(10). Therefore we use the
+         * lowercase of the prefix of the parameter to do the matching.
+         */
+        int index = signature.indexOf("(");
+        if (index > 0)
+        {
+            signature = signature.substring(0, index);
+        }
+        return signatureToType.get(signature.toLowerCase());
     }
 
     @Override
     public Type getType(TypeSignature signature)
     {
-        return signatureToType.get(signature.toString());
+        return getType(signature.toString());
     }
 
     @Override

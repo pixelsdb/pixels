@@ -54,6 +54,10 @@ public class Column extends Base
         this.name = name;
     }
 
+    /**
+     * Get the full type's display name, e.g., integer, varchar(10).
+     * @return
+     */
     public String getType()
     {
         return type;
