@@ -75,10 +75,12 @@ To use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in
 sudo mkdir -p /mnt/ramfs
 sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramfs
 ```
+The path `/mnt/ramfs` is determined by `cache.location` and `index.location` in `PIXELS_HOME/pixels.properties`.
 The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in 
 `PIXELS_HOME/pixels.properties`. And it must be smaller than the physical memory size.
 Also ensure that `cache.enabled` and `cache.read.direct` are set to `true` in `PIXELS_HOME/pixels.properties`.
-Set `cache.enabled` to `false` if you don't want to use pixels-cache.
+Set `cache.enabled` to `false` if you don't want to use pixels-cache. 
+But **NOTE** that the path `/mnt/ramfs` must exist even if pixels-cache is disabled, as Pixels checks this path when starts.
 
 ### Install MySQL
 MySQL and etcd are used to store the metadata and states of Pixels. To install MySQL:

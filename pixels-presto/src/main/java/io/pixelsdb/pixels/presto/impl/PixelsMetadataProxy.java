@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.presto.impl;
 
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.Type;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -31,6 +32,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.presto.PixelsColumnHandle;
 import io.pixelsdb.pixels.presto.PixelsTypeManager;
+import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -86,7 +88,8 @@ public class PixelsMetadataProxy
             Type columnType = PixelsTypeManager.getColumnType(c);
             if (columnType == null)
             {
-                log.error("columnType is not defined.");
+                throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR,
+                        "columnType '" + c.getType() + "' is not defined.");
             }
             String name = c.getName();
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
