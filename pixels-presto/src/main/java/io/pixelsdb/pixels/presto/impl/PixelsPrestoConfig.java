@@ -30,7 +30,7 @@ import javax.validation.constraints.NotNull;
 import java.io.IOException;
 
 /**
- * @Description: Configuration read from etc/catalog/pixels-presto.properties
+ * @Description: Configuration read from etc/catalog/pixels.properties
  * @author: tao
  * @date: Create in 2018-01-20 11:16
  **/

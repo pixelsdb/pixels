@@ -152,13 +152,14 @@ log.dir=/home/ubuntu/opt/pixels/listener/
 `log-dir` should point to
 an existing directory where the listener logs will appear
 
-* Create the catalog config file named `pixels-presto.properties` for Pixels in the `catalog` subdirectory,
+* Create the catalog config file named `pixels.properties` for Pixels in the `catalog` subdirectory,
 with the following content:
 ```properties
-connector.name=pixels-presto
+connector.name=pixels
 pixels.home=/home/ubuntu/opt/pixels/
 ```
 `pixels.home` should be the same as `PIXELS_HOME`.
+**Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
 
 Some scripts in Presto may also require python:
 ```bash
@@ -236,7 +237,7 @@ Enter the home of presto-server and start Presto:
 
 Connect to presto-server using presto-cli:
 ```bash
-./bin/presto --server localhost:8080 --catalog pixels-presto
+./bin/presto --server localhost:8080 --catalog pixels
 ```
 Run `SHOW SCHEMAS` in presto-cli, the result should be as follows if everything is installed correctly.
 ```sql
@@ -300,7 +301,7 @@ This may take a few hours.
 Connect to presto-cli:
 ```bash
 cd ~/opt/presto-server
-./bin/presto --server localhost:8080 --catalog pixels-presto --schema tpch
+./bin/presto --server localhost:8080 --catalog pixels --schema tpch
 ```
 Execute the TPC-H queries in presto-cli.
 

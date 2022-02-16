@@ -36,7 +36,7 @@ Use `LOAD -h`, you can see the usages of the command
 Create table in presto:
 ```
 cd /home/iir/opt/presto-server-0.192
-./bin/presto --server localhost:8080 --catalog pixels-presto --schema pixels
+./bin/presto --server localhost:8080 --catalog pixels --schema pixels
 create table ...;
 ```
 
