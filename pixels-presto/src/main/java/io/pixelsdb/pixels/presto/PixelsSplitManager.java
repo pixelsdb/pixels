@@ -40,6 +40,7 @@ import io.pixelsdb.pixels.presto.exception.CacheException;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
+import io.pixelsdb.pixels.presto.properties.PixelsSessionProperties;
 
 import javax.inject.Inject;
 import java.io.IOException;
@@ -130,6 +131,13 @@ public class PixelsSplitManager
                 usingCache = true;
             }
         }
+
+        /**
+         * Issue #169:
+         * We use session properties to configure if the ordered and compact layout path are enabled.
+         */
+        boolean orderedPathEnabled = PixelsSessionProperties.getOrderedPathEnabled(session);
+        boolean compactPathEnabled = PixelsSessionProperties.getCompactPathEnabled(session);
 
         List<ConnectorSplit> pixelsSplits = new ArrayList<>();
         for (Layout layout : layouts)
@@ -244,72 +252,79 @@ public class PixelsSplitManager
                         try
                         {
                             // 3. add splits in orderedPath
-//                            Balancer orderedBalancer = new Balancer();
-                            List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
-//                            for (Path path : orderedPaths) {
-//                                List<HostAddress> hostAddresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-//                                orderedBalancer.put(hostAddresses.get(0), path);
-//                            }
-//                            orderedBalancer.balance();
-
-                            int numPath = orderedPaths.size();
-                            for (int i = 0; i < numPath; ++i)
+                            if (orderedPathEnabled)
                             {
-                                int firstPath = i;
-                                List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
-                                if (this.multiSplitForOrdered)
+                                List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
+                                /*
+                                Balancer orderedBalancer = new Balancer();
+                                for (Path path : orderedPaths) {
+                                    List<HostAddress> hostAddresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                                    orderedBalancer.put(hostAddresses.get(0), path);
+                                }
+                                orderedBalancer.balance();
+                                */
+
+                                int numPath = orderedPaths.size();
+                                for (int i = 0; i < numPath; ++i)
                                 {
-                                    for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                                    int firstPath = i;
+                                    List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
+                                    if (this.multiSplitForOrdered)
+                                    {
+                                        for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                                        {
+                                            paths.add(orderedPaths.get(i));
+                                        }
+                                    } else
                                     {
                                         paths.add(orderedPaths.get(i));
                                     }
-                                }
-                                else
-                                {
-                                    paths.add(orderedPaths.get(i));
-                                }
-//                              ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                              builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
+                                    // ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                                    // builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
 
-                                List<HostAddress> orderedAddresses = toHostAddresses(
-                                        storage.getLocations(orderedPaths.get(firstPath)));
-
-                                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                                        tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                        table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
-                                        order.getColumnOrder(), new ArrayList<>(0), constraint);
-                                // log.debug("Split in orderPath: " + pixelsSplit.toString());
-                                pixelsSplits.add(pixelsSplit);
-                            }
-                            // 4. add splits in compactPath
-                            int curFileRGIdx;
-                            for (String path : storage.listPaths(compactPath))
-                            {
-                                curFileRGIdx = 0;
-                                while (curFileRGIdx < rowGroupNum)
-                                {
-                                    String node = fileToNodeMap.get(path);
-                                    List<HostAddress> compactAddresses;
-                                    if (node == null)
-                                    {
-                                        compactAddresses = toHostAddresses(storage.getLocations(path));
-                                    }
-                                    else
-                                    {
-                                        // this file is cached.
-                                        ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-                                        builder.add(HostAddress.fromString(node));
-                                        compactAddresses = builder.build();
-                                    }
+                                    List<HostAddress> orderedAddresses = toHostAddresses(
+                                            storage.getLocations(orderedPaths.get(firstPath)));
 
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                             tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                            table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
-                                            true, compactAddresses, order.getColumnOrder(),
-                                            cacheColumnletOrders, constraint);
+                                            table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
+                                            order.getColumnOrder(), new ArrayList<>(0), constraint);
+                                    // log.debug("Split in orderPath: " + pixelsSplit.toString());
                                     pixelsSplits.add(pixelsSplit);
-                                    // log.debug("Split in compactPath" + pixelsSplit.toString());
-                                    curFileRGIdx += splitSize;
+                                }
+                            }
+                            // 4. add splits in compactPath
+                            if (compactPathEnabled)
+                            {
+                                int curFileRGIdx;
+                                List<String> compactPaths = storage.listPaths(compactPath);
+                                for (String path : compactPaths)
+                                {
+                                    curFileRGIdx = 0;
+                                    while (curFileRGIdx < rowGroupNum)
+                                    {
+                                        String node = fileToNodeMap.get(path);
+                                        List<HostAddress> compactAddresses;
+                                        if (node == null)
+                                        {
+                                            compactAddresses = toHostAddresses(storage.getLocations(path));
+                                        } else
+                                        {
+                                            // this file is cached.
+                                            ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                                            builder.add(HostAddress.fromString(node));
+                                            compactAddresses = builder.build();
+                                        }
+
+                                        PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                                tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                                table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
+                                                true, compactAddresses, order.getColumnOrder(),
+                                                cacheColumnletOrders, constraint);
+                                        pixelsSplits.add(pixelsSplit);
+                                        // log.debug("Split in compactPath" + pixelsSplit.toString());
+                                        curFileRGIdx += splitSize;
+                                    }
                                 }
                             }
                         }
@@ -332,78 +347,84 @@ public class PixelsSplitManager
             else
             {
                 logger.debug("cache is disabled or no cache available on this table");
-                List<String> orderedPaths;
-//                Balancer orderedBalancer = new Balancer();
-                List<String> compactPaths;
-//                Balancer compactBalancer = new Balancer();
                 try
                 {
-                    orderedPaths = storage.listPaths(layout.getOrderPath());
-//                    for (Path path : orderedPaths)
-//                    {
-//                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-//                        orderedBalancer.put(addresses.get(0), path);
-//                    }
-//                    orderedBalancer.balance();
-//                    log.info("ordered files balanced=" + orderedBalancer.isBalanced());
-
-                    compactPaths = storage.listPaths(compactPath);
-//                    for (Path path : compactPaths)
-//                    {
-//                        List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
-//                        compactBalancer.put(addresses.get(0), path);
-//                    }
-//                    compactBalancer.balance();
-//                    log.info("compact files balanced=" + compactBalancer.isBalanced());
-
-
-                    // add splits in orderedPath
-                    int numPath = orderedPaths.size();
-                    for (int i = 0; i < numPath; ++i)
+                    // 1. add splits in orderedPath
+                    if (orderedPathEnabled)
                     {
-                        int firstPath = i;
-                        List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
-                        if (this.multiSplitForOrdered)
+                        List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
+                        /*
+                        Balancer orderedBalancer = new Balancer();
+                        for (Path path : orderedPaths)
                         {
-                            for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                            List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                            orderedBalancer.put(addresses.get(0), path);
+                        }
+                        orderedBalancer.balance();
+                        log.info("ordered files balanced=" + orderedBalancer.isBalanced());
+                        */
+                        int numPath = orderedPaths.size();
+                        for (int i = 0; i < numPath; ++i)
+                        {
+                            int firstPath = i;
+                            List<String> paths = new ArrayList<>(this.multiSplitForOrdered ? splitSize : 1);
+                            if (this.multiSplitForOrdered)
+                            {
+                                for (int j = 0; j < splitSize && i < numPath; ++j, ++i)
+                                {
+                                    paths.add(orderedPaths.get(i));
+                                }
+                            } else
                             {
                                 paths.add(orderedPaths.get(i));
                             }
-                        }
-                        else
-                        {
-                            paths.add(orderedPaths.get(i));
-                        }
-//                              ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                              builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
+                            // ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                            // builder.add(orderedBalancer.get(orderedPaths.get(firstPath)));
 
-                        List<HostAddress> orderedAddresses = toHostAddresses(storage.getLocations(orderedPaths.get(firstPath)));
-                        PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
-                                tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
-                                order.getColumnOrder(), new ArrayList<>(0), constraint);
-                        // log.debug("Split in orderPath: " + pixelsSplit.toString());
-                        pixelsSplits.add(pixelsSplit);
-                    }
-                    // add splits in compactPath
-                    int curFileRGIdx;
-                    for (String path : compactPaths)
-                    {
-//                      ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
-//                      builder.add(compactBalancer.get(path));
-                        // log.info("balanced path:" + compactBalancer.get(path).toString());
-//                      List<HostAddress> hostAddresses = builder.build();
-                        curFileRGIdx = 0;
-                        while (curFileRGIdx < rowGroupNum)
-                        {
-                            List<HostAddress> compactAddresses = toHostAddresses(storage.getLocations(path));
+                            List<HostAddress> orderedAddresses = toHostAddresses(storage.getLocations(orderedPaths.get(firstPath)));
                             PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                     tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                    table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
-                                    false, compactAddresses, order.getColumnOrder(),
-                                    new ArrayList<>(0), constraint);
+                                    table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
+                                    order.getColumnOrder(), new ArrayList<>(0), constraint);
+                            // log.debug("Split in orderPath: " + pixelsSplit.toString());
                             pixelsSplits.add(pixelsSplit);
-                            curFileRGIdx += splitSize;
+                        }
+                    }
+                    // 2. add splits in compactPath
+                    if (compactPathEnabled)
+                    {
+                        List<String> compactPaths = storage.listPaths(compactPath);
+                        /*
+                        Balancer compactBalancer = new Balancer();
+                        for (Path path : compactPaths)
+                        {
+                            List<HostAddress> addresses = fsFactory.getBlockLocations(path, 0, Long.MAX_VALUE);
+                            compactBalancer.put(addresses.get(0), path);
+                        }
+                        compactBalancer.balance();
+                        log.info("compact files balanced=" + compactBalancer.isBalanced());
+                        */
+                        int curFileRGIdx;
+                        for (String path : compactPaths)
+                        {
+                            /*
+                            ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
+                            builder.add(compactBalancer.get(path));
+                            log.info("balanced path:" + compactBalancer.get(path).toString());
+                            List<HostAddress> hostAddresses = builder.build();
+                            */
+                            curFileRGIdx = 0;
+                            while (curFileRGIdx < rowGroupNum)
+                            {
+                                List<HostAddress> compactAddresses = toHostAddresses(storage.getLocations(path));
+                                PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
+                                        tableHandle.getSchemaName(), tableHandle.getTableName(),
+                                        table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
+                                        false, compactAddresses, order.getColumnOrder(),
+                                        new ArrayList<>(0), constraint);
+                                pixelsSplits.add(pixelsSplit);
+                                curFileRGIdx += splitSize;
+                            }
                         }
                     }
                 }

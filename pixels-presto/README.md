@@ -2,7 +2,8 @@
 
 
 ## Installation
-Copy `pixels-presto.properties` to the catalog directory of Presto
+Copy the `pixels.properties` under `pixels-presto/src/main/resources`
+to the `etc/catalog` directory of Presto's home.
 Build Pixels by `mvn package`, copy and unzip `pixels-presto-0.1.0-SNAPSHOT.zip`
 to the plugin directory of Presto
 
@@ -32,7 +33,7 @@ Run the presto client, we should do the following things:
 ```
 - execute
 ```sh
-./bin/presto --server localhost:8080 --catalog pixels-presto --schema pixels 
+./bin/presto --server localhost:8080 --catalog pixels --schema pixels 
 
 select * from test;
 select count(*) from test;

@@ -28,6 +28,8 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
+import io.pixelsdb.pixels.presto.properties.PixelsSessionProperties;
+import io.pixelsdb.pixels.presto.properties.PixelsTableProperties;
 
 import javax.inject.Inject;
 
@@ -57,6 +59,7 @@ public class PixelsModule
         binder.bind(PixelsMetadataProxy.class).in(Scopes.SINGLETON);
         binder.bind(PixelsSplitManager.class).in(Scopes.SINGLETON);
         binder.bind(PixelsPageSourceProvider.class).in(Scopes.SINGLETON);
+        binder.bind(PixelsSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(PixelsTableProperties.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(PixelsPrestoConfig.class);
 

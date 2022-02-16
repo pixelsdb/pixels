@@ -29,9 +29,10 @@ import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
+import io.pixelsdb.pixels.presto.properties.PixelsSessionProperties;
+import io.pixelsdb.pixels.presto.properties.PixelsTableProperties;
 
 import javax.inject.Inject;
-
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -44,6 +45,7 @@ public class PixelsConnector
     private final PixelsMetadata metadata;
     private final PixelsSplitManager splitManager;
     private final PixelsPageSourceProvider pageSourceProvider;
+    private final PixelsSessionProperties sessionProperties;
     private final PixelsTableProperties tableProperties;
 
     @Inject
@@ -52,11 +54,13 @@ public class PixelsConnector
             PixelsMetadata metadata,
             PixelsSplitManager splitManager,
             PixelsPageSourceProvider pageSourceProvider,
+            PixelsSessionProperties sessionProperties,
             PixelsTableProperties tableProperties) {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "recordSetProvider is null");
+        this.sessionProperties = requireNonNull(sessionProperties, "sessionProperties is null");
         this.tableProperties = requireNonNull(tableProperties, "tableProperties is null");
     }
 
@@ -88,6 +92,12 @@ public class PixelsConnector
             logger.error(e, "error in shutting down connector");
             throw new PrestoException(PixelsErrorCode.PIXELS_CONNECTOR_ERROR, e);
         }
+    }
+
+    @Override
+    public List<PropertyMetadata<?>> getSessionProperties()
+    {
+        return sessionProperties.getSessionProperties();
     }
 
     @Override
