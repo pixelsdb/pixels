@@ -37,6 +37,7 @@ import java.sql.Timestamp;
  * All timestamp values are translated to the specified time zone after read from file.
  *
  * @author guodong
+ * @author hank
  */
 public class TimestampColumnReader
         extends ColumnReader

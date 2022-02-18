@@ -268,10 +268,10 @@ public class TestPixelsReaderBasic
                         System.out.println("[c] size: " + elementSize
                                 + ", expected: " + elementSize * 3.14159d + ", actual: " + ccv.vector[i]);
                     }
-                    if (dcv.time[i] != time)
+                    if (dcv.times[i] != time)
                     {
                         System.out.println("[d] size: " + elementSize
-                                + ", expected: " + time + ", actual: " + dcv.time[i]);
+                                + ", expected: " + time + ", actual: " + dcv.times[i]);
                     }
                     int expectedBool = elementSize > 25 ? 1 : 0;
                     if (expectedBool != ecv.vector[i])
@@ -292,7 +292,7 @@ public class TestPixelsReaderBasic
                     assertEquals(elementSize, acv.vector[i]);
                     assertEquals(elementSize * 3.1415f, bcv.vector[i], 0.000001f);
                     assertEquals(elementSize * 3.14159d, ccv.vector[i], 0.000001d);
-                    assertEquals(time, dcv.time[i]);
+                    assertEquals(time, dcv.times[i]);
                     assertEquals((elementSize > 25 ? 1 : 0), ecv.vector[i]);
                     assertEquals(String.valueOf(elementSize),
                             new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));
@@ -342,10 +342,10 @@ public class TestPixelsReaderBasic
                 {
                     System.out.println("[c] size: " + elementSize + ", null");
                 }
-                if (dcv.time[i] != time)
+                if (dcv.times[i] != time)
                 {
                     System.out.println("[d] size: " + elementSize
-                            + ", expected: " + time + ", actual: " + dcv.time[i]);
+                            + ", expected: " + time + ", actual: " + dcv.times[i]);
                 }
                 if (dcv.isNull[i])
                 {
@@ -382,7 +382,7 @@ public class TestPixelsReaderBasic
                 assertFalse(ccv.isNull[i]);
                 assertEquals(elementSize * 3.14159d, ccv.vector[i], 0.000001f);
                 assertFalse(dcv.isNull[i]);
-                assertEquals(dcv.time[i], 1528901945696L);
+                assertEquals(dcv.times[i], 1528901945696L);
                 assertFalse(ecv.isNull[i]);
                 assertEquals((elementSize > 25000 ? 1 : 0), ecv.vector[i]);
                 assertFalse(zcv.isNull[i]);

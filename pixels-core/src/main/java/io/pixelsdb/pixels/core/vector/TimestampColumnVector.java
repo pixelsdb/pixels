@@ -39,9 +39,9 @@ import java.util.Arrays;
 public class TimestampColumnVector extends ColumnVector
 {
     /*
-     * The storage arrays for this column vector corresponds to the storage of Timestamp:
+     * Milliseconds from the epoch (1970-0-1).
      */
-    public long[] time;
+    public long[] times;
     // The values from Timestamp.getTime().
 
     // TODO: fully support or remove nanos. And it can be int[].
@@ -70,8 +70,7 @@ public class TimestampColumnVector extends ColumnVector
     public TimestampColumnVector(int len)
     {
         super(len);
-
-        time = new long[len];
+        times = new long[len];
         nanos = new long[len];
         memoryUsage += Long.BYTES * len * 2;
 
@@ -85,7 +84,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public int getLength()
     {
-        return time.length;
+        return times.length;
     }
 
     /**
@@ -97,7 +96,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public long getTime(int elementNum)
     {
-        return time[elementNum];
+        return times[elementNum];
     }
 
     /**
@@ -121,7 +120,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void timestampUpdate(Timestamp timestamp, int elementNum)
     {
-        timestamp.setTime(time[elementNum]);
+        timestamp.setTime(times[elementNum]);
         timestamp.setNanos((int) nanos[elementNum]);
     }
 
@@ -134,7 +133,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public Timestamp asScratchTimestamp(int elementNum)
     {
-        scratchTimestamp.setTime(time[elementNum]);
+        scratchTimestamp.setTime(times[elementNum]);
         scratchTimestamp.setNanos((int) nanos[elementNum]);
         return scratchTimestamp;
     }
@@ -157,7 +156,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public long getTimestampAsLong(int elementNum)
     {
-        scratchTimestamp.setTime(time[elementNum]);
+        scratchTimestamp.setTime(times[elementNum]);
         scratchTimestamp.setNanos((int) nanos[elementNum]);
         return getTimestampAsLong(scratchTimestamp);
     }
@@ -199,7 +198,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public double getDouble(int elementNum)
     {
-        scratchTimestamp.setTime(time[elementNum]);
+        scratchTimestamp.setTime(times[elementNum]);
         scratchTimestamp.setNanos((int) nanos[elementNum]);
         return getDouble(scratchTimestamp);
     }
@@ -281,7 +280,7 @@ public class TimestampColumnVector extends ColumnVector
 
         TimestampColumnVector timestampColVector = (TimestampColumnVector) inputVector;
 
-        time[outElementNum] = timestampColVector.time[inputElementNum];
+        times[outElementNum] = timestampColVector.times[inputElementNum];
         nanos[outElementNum] = timestampColVector.nanos[inputElementNum];
     }
 
@@ -291,7 +290,7 @@ public class TimestampColumnVector extends ColumnVector
         if (inputVector instanceof TimestampColumnVector)
         {
             TimestampColumnVector srcVector = (TimestampColumnVector) inputVector;
-            this.time = srcVector.time;
+            this.times = srcVector.times;
             this.nanos = srcVector.nanos;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
@@ -309,20 +308,20 @@ public class TimestampColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatFastTime = time[0];
+            long repeatFastTime = times[0];
             int repeatNanos = (int) nanos[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
-                    time[i] = repeatFastTime;
+                    times[i] = repeatFastTime;
                     nanos[i] = repeatNanos;
                 }
             }
             else
             {
-                Arrays.fill(time, 0, size, repeatFastTime);
+                Arrays.fill(times, 0, size, repeatFastTime);
                 Arrays.fill(nanos, 0, size, repeatNanos);
             }
             flattenRepeatingNulls(selectedInUse, sel, size);
@@ -352,7 +351,7 @@ public class TimestampColumnVector extends ColumnVector
         }
         else
         {
-            this.time[elementNum] = timestamp.getTime();
+            this.times[elementNum] = timestamp.getTime();
             this.nanos[elementNum] = timestamp.getNanos();
         }
     }
@@ -364,7 +363,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void setFromScratchTimestamp(int elementNum)
     {
-        this.time[elementNum] = scratchTimestamp.getTime();
+        this.times[elementNum] = scratchTimestamp.getTime();
         this.nanos[elementNum] = scratchTimestamp.getNanos();
     }
 
@@ -376,7 +375,7 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
-        time[elementNum] = 0;
+        times[elementNum] = 0;
         nanos[elementNum] = 1;
     }
 
@@ -393,7 +392,7 @@ public class TimestampColumnVector extends ColumnVector
         // Handle repeating case
         if (isRepeating)
         {
-            output.time[0] = time[0];
+            output.times[0] = times[0];
             output.nanos[0] = nanos[0];
             output.isNull[0] = isNull[0];
             output.isRepeating = true;
@@ -408,13 +407,13 @@ public class TimestampColumnVector extends ColumnVector
             for (int j = 0; j < size; j++)
             {
                 int i = sel[j];
-                output.time[i] = time[i];
+                output.times[i] = times[i];
                 output.nanos[i] = nanos[i];
             }
         }
         else
         {
-            System.arraycopy(time, 0, output.time, 0, size);
+            System.arraycopy(times, 0, output.times, 0, size);
             System.arraycopy(nanos, 0, output.nanos, 0, size);
         }
 
@@ -445,7 +444,7 @@ public class TimestampColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        time[0] = timestamp.getTime();
+        times[0] = timestamp.getTime();
         nanos[0] = timestamp.getNanos();
     }
 
@@ -458,7 +457,7 @@ public class TimestampColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchTimestamp.setTime(time[row]);
+            scratchTimestamp.setTime(times[row]);
             scratchTimestamp.setNanos((int) nanos[row]);
             buffer.append(scratchTimestamp.toString());
         }
@@ -472,13 +471,13 @@ public class TimestampColumnVector extends ColumnVector
     public void ensureSize(int size, boolean preserveData)
     {
         super.ensureSize(size, preserveData);
-        if (size <= time.length)
+        if (size <= times.length)
         {
             return;
         }
-        long[] oldTime = time;
+        long[] oldTime = times;
         long[] oldNanos = nanos;
-        time = new long[size];
+        times = new long[size];
         nanos = new long[size];
         memoryUsage += Long.BYTES * size * 2;
         length = size;
@@ -486,12 +485,12 @@ public class TimestampColumnVector extends ColumnVector
         {
             if (isRepeating)
             {
-                time[0] = oldTime[0];
+                times[0] = oldTime[0];
                 nanos[0] = oldNanos[0];
             }
             else
             {
-                System.arraycopy(oldTime, 0, time, 0, oldTime.length);
+                System.arraycopy(oldTime, 0, times, 0, oldTime.length);
                 System.arraycopy(oldNanos, 0, nanos, 0, oldNanos.length);
             }
         }
@@ -502,6 +501,6 @@ public class TimestampColumnVector extends ColumnVector
     {
         super.close();
         this.nanos = null;
-        this.time = null;
+        this.times = null;
     }
 }

@@ -51,7 +51,7 @@ public class TimestampColumnWriter extends BaseColumnWriter
             throws IOException
     {
         TimestampColumnVector columnVector = (TimestampColumnVector) vector;
-        long[] times = columnVector.time;
+        long[] times = columnVector.times;
         int curPartLength;
         int curPartOffset = 0;
         int nextPartLength = size;

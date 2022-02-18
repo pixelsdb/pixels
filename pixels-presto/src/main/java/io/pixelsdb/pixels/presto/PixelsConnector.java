@@ -20,15 +20,13 @@
 package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.connector.Connector;
-import com.facebook.presto.spi.connector.ConnectorMetadata;
-import com.facebook.presto.spi.connector.ConnectorSplitManager;
-import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.connector.*;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
+import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import io.pixelsdb.pixels.presto.properties.PixelsSessionProperties;
 import io.pixelsdb.pixels.presto.properties.PixelsTableProperties;
 
@@ -44,7 +42,9 @@ public class PixelsConnector
     private final LifeCycleManager lifeCycleManager;
     private final PixelsMetadata metadata;
     private final PixelsSplitManager splitManager;
+    private final boolean recordCursorEnabled;
     private final PixelsPageSourceProvider pageSourceProvider;
+    private final PixelsRecordSetProvider recordSetProvider;
     private final PixelsSessionProperties sessionProperties;
     private final PixelsTableProperties tableProperties;
 
@@ -53,15 +53,20 @@ public class PixelsConnector
             LifeCycleManager lifeCycleManager,
             PixelsMetadata metadata,
             PixelsSplitManager splitManager,
+            PixelsPrestoConfig config,
             PixelsPageSourceProvider pageSourceProvider,
+            PixelsRecordSetProvider recordSetProvider,
             PixelsSessionProperties sessionProperties,
             PixelsTableProperties tableProperties) {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "recordSetProvider is null");
+        this.recordSetProvider = requireNonNull(recordSetProvider, "recordSetProvider is null");
         this.sessionProperties = requireNonNull(sessionProperties, "sessionProperties is null");
         this.tableProperties = requireNonNull(tableProperties, "tableProperties is null");
+        requireNonNull(config, "config is null");
+        this.recordCursorEnabled = Boolean.parseBoolean(config.getConfigFactory().getProperty("record.cursor.enabled"));
     }
 
     @Override
@@ -79,9 +84,29 @@ public class PixelsConnector
         return splitManager;
     }
 
+    /**
+     * @throws UnsupportedOperationException if this connector does not support reading tables page at a time
+     */
     @Override
     public PixelsPageSourceProvider getPageSourceProvider() {
+        if (this.recordCursorEnabled)
+        {
+            throw new UnsupportedOperationException();
+        }
         return pageSourceProvider;
+    }
+
+    /**
+     * @throws UnsupportedOperationException if this connector does not support reading tables record at a time
+     */
+    @Override
+    public ConnectorRecordSetProvider getRecordSetProvider()
+    {
+        if (this.recordCursorEnabled)
+        {
+            return recordSetProvider;
+        }
+        throw new UnsupportedOperationException();
     }
 
     @Override

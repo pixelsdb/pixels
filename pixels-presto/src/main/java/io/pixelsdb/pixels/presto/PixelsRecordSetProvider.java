@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.*;
-import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
+import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.google.inject.Inject;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
@@ -38,10 +38,10 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 /**
- * Provider Class for Pixels Page Source class.
+ * Created at: 17/02/2022
+ * Author: hank
  */
-public class PixelsPageSourceProvider
-        implements ConnectorPageSourceProvider
+public class PixelsRecordSetProvider implements ConnectorRecordSetProvider
 {
     private final String connectorId;
     private final MemoryMappedFile cacheFile;
@@ -49,7 +49,7 @@ public class PixelsPageSourceProvider
     private final PixelsFooterCache pixelsFooterCache;
 
     @Inject
-    public PixelsPageSourceProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
+    public PixelsRecordSetProvider(PixelsConnectorId connectorId, PixelsPrestoConfig config)
             throws Exception
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
@@ -71,8 +71,10 @@ public class PixelsPageSourceProvider
     }
 
     @Override
-    public ConnectorPageSource createPageSource(ConnectorTransactionHandle transactionHandle,
-                                                ConnectorSession session, ConnectorSplit split, List<ColumnHandle> columns) {
+    public RecordSet getRecordSet(ConnectorTransactionHandle transactionHandle,
+                                  ConnectorSession session,
+                                  ConnectorSplit split, List<? extends ColumnHandle> columns)
+    {
         List<PixelsColumnHandle> pixelsColumns = columns.stream()
                 .map(PixelsColumnHandle.class::cast)
                 .collect(toList());
@@ -89,6 +91,6 @@ public class PixelsPageSourceProvider
             throw new PrestoException(PixelsErrorCode.PIXELS_STORAGE_ERROR, e);
         }
 
-        return new PixelsPageSource(pixelsSplit, pixelsColumns, storage, cacheFile, indexFile, pixelsFooterCache, connectorId);
+        return new PixelsRecordSet(pixelsSplit, pixelsColumns, storage, cacheFile, indexFile, pixelsFooterCache, connectorId);
     }
 }
