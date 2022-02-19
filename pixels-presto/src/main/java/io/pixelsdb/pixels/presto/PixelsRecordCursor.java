@@ -46,7 +46,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.facebook.presto.spi.type.StandardTypes.*;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
@@ -82,14 +81,6 @@ public class PixelsRecordCursor implements RecordCursor
     private VectorizedRowBatch rowBatch;
     private volatile int rowBatchSize;
     private volatile int rowIndex;
-
-    private final Map<Integer, ByteColumnVector> byteColumnVectors = new HashMap<>();
-    private final Map<Integer, BinaryColumnVector> byteArrayColumnVectors = new HashMap<>();
-    private final Map<Integer, DateColumnVector> dateColumnVectors = new HashMap<>();
-    private final Map<Integer, TimeColumnVector> timeColumnVectors = new HashMap<>();
-    private final Map<Integer, TimestampColumnVector> timestampColumnVectors = new HashMap<>();
-    private final Map<Integer, DoubleColumnVector> doubleColumnVectors = new HashMap<>();
-    private final Map<Integer, LongColumnVector> longColumnVectors = new HashMap<>();
 
     public PixelsRecordCursor(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
                               MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache footerCache,
@@ -271,14 +262,14 @@ public class PixelsRecordCursor implements RecordCursor
         {
             try
             {
-                VectorizedRowBatch newRowBatch = this.recordReader.readBatch(BatchSize);
+                VectorizedRowBatch newRowBatch = this.recordReader.readBatch(BatchSize, false);
                 if (newRowBatch.size <= 0)
                 {
                     // reach the end of the file
                     if (readNextPath())
                     {
                         // open and start reading the next file (path).
-                        newRowBatch = this.recordReader.readBatch(BatchSize);
+                        newRowBatch = this.recordReader.readBatch(BatchSize, false);
                     } else
                     {
                         // no more files (paths) to read, close.
@@ -290,7 +281,7 @@ public class PixelsRecordCursor implements RecordCursor
                 {
                     // VectorizedRowBatch may be reused by PixelsRecordReader.
                     this.rowBatch = newRowBatch;
-                    this.setColumnVectors();
+                    // this.setColumnVectors();
                 }
                 this.rowBatchSize = this.rowBatch.size;
                 this.rowIndex = -1;
@@ -328,58 +319,11 @@ public class PixelsRecordCursor implements RecordCursor
         }
     }
 
-    private void setColumnVectors()
-    {
-        requireNonNull(this.rowBatch, "this.rowBatch is null");
-        requireNonNull(this.columns, "this.columns is null");
-
-        this.byteColumnVectors.clear();
-        this.byteArrayColumnVectors.clear();
-        this.dateColumnVectors.clear();
-        this.timeColumnVectors.clear();
-        this.timestampColumnVectors.clear();
-        this.doubleColumnVectors.clear();
-        this.longColumnVectors.clear();
-
-        for (int i = 0; i < this.numColumnToRead; ++i)
-        {
-            Type type = this.columns.get(i).getColumnType();
-            switch (type.getDisplayName())
-            {
-                case INTEGER:
-                case BIGINT:
-                    this.longColumnVectors.put(i, (LongColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case DOUBLE:
-                case REAL:
-                    this.doubleColumnVectors.put(i, (DoubleColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case VARCHAR:
-                    this.byteArrayColumnVectors.put(i, (BinaryColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case BOOLEAN:
-                    this.byteColumnVectors.put(i, (ByteColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case DATE:
-                    this.dateColumnVectors.put(i, (DateColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case TIME:
-                    this.timeColumnVectors.put(i, (TimeColumnVector) this.rowBatch.cols[i]);
-                    break;
-                case TIMESTAMP:
-                    this.timestampColumnVectors.put(i, (TimestampColumnVector) this.rowBatch.cols[i]);
-                    break;
-                default:
-                    throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
-                            "Column type '" + type.getDisplayName() + "' is not supported.");
-            }
-        }
-    }
-
     @Override
     public boolean getBoolean(int field)
     {
-        return this.byteColumnVectors.get(field).vector[this.rowIndex] > 0;
+        //return this.byteColumnVectors.get(field).vector[this.rowIndex] > 0;
+        return ((ByteColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex] > 0;
     }
 
     @Override
@@ -388,19 +332,19 @@ public class PixelsRecordCursor implements RecordCursor
         Type type = this.columns.get(field).getColumnType();
         if (type.equals(IntegerType.INTEGER) || type.equals(BigintType.BIGINT))
         {
-            return this.longColumnVectors.get(field).vector[this.rowIndex];
+            return ((LongColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex];
         }
         else if (type.equals(DateType.DATE))
         {
-            return this.dateColumnVectors.get(field).dates[this.rowIndex];
+            return ((DateColumnVector) this.rowBatch.cols[field]).dates[this.rowIndex];
         }
         else if (type.equals(TimeType.TIME))
         {
-            return this.timeColumnVectors.get(field).times[this.rowIndex];
+            return ((TimeColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
         }
         else if (type.equals(TimestampType.TIMESTAMP))
         {
-            return this.timestampColumnVectors.get(field).times[this.rowIndex];
+            return ((TimestampColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
         }
         throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
                 "Column type '" + type.getDisplayName() + "' is not Long/Integer based.");
@@ -409,7 +353,7 @@ public class PixelsRecordCursor implements RecordCursor
     @Override
     public double getDouble(int field)
     {
-        return Double.longBitsToDouble(this.doubleColumnVectors.get(field).vector[this.rowIndex]);
+        return Double.longBitsToDouble(((DoubleColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex]);
     }
 
     @Override
@@ -418,7 +362,7 @@ public class PixelsRecordCursor implements RecordCursor
         Type type = this.columns.get(field).getColumnType();
         checkArgument (type.equals(VarcharType.VARCHAR),
                 "Column type '" + type.getDisplayName() + "' is not Slice based.");
-        BinaryColumnVector columnVector = this.byteArrayColumnVectors.get(field);
+        BinaryColumnVector columnVector = (BinaryColumnVector)this.rowBatch.cols[field];
         return Slices.wrappedBuffer(columnVector.vector[this.rowIndex],
                 columnVector.start[this.rowIndex], columnVector.lens[this.rowIndex]);
     }
@@ -451,15 +395,6 @@ public class PixelsRecordCursor implements RecordCursor
         }
 
         closeReader();
-
-        this.byteColumnVectors.clear();
-        this.byteArrayColumnVectors.clear();
-        this.longColumnVectors.clear();
-        this.doubleColumnVectors.clear();
-        this.dateColumnVectors.clear();
-        this.timeColumnVectors.clear();
-        this.timeColumnVectors.clear();
-
         closed = true;
     }
 

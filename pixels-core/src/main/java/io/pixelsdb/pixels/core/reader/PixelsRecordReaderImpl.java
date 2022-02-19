@@ -69,6 +69,7 @@ public class PixelsRecordReaderImpl
     private final List<PixelsProto.Type> includedColumnTypes;
 
     private TypeDescription fileSchema;
+    private TypeDescription resultSchema;
     private boolean checkValid = false;
     private boolean everPrepared = false;
     private boolean everRead = false;
@@ -253,6 +254,7 @@ public class PixelsRecordReaderImpl
             includedColumnTypes.add(fileColTypes.get(resultColumn));
         }
 
+        resultSchema = TypeDescription.createSchema(includedColumnTypes);
         checkValid = true;
     }
 
@@ -845,21 +847,14 @@ public class PixelsRecordReaderImpl
         return curBatchSize;
     }
 
-    /**
-     * Read the next row batch. This method is independent from prepareBatch().
-     *
-     * @param batchSize the row batch to read into
-     * @return more rows available
-     * @throws java.io.IOException
-     */
     @Override
-    public VectorizedRowBatch readBatch(int batchSize)
+    public VectorizedRowBatch readBatch(int batchSize, boolean reuse)
             throws IOException
     {
         if (!checkValid || endOfFile)
         {
             TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-            this.resultRowBatch = resultSchema.createRowBatch(0);
+            VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
             resultRowBatch.projectionSize = 0;
             resultRowBatch.endOfFile = true;
             this.endOfFile = true;
@@ -890,7 +885,7 @@ public class PixelsRecordReaderImpl
             }
             checkValid = false; // Issue #105: to reject continuous read.
             TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-            this.resultRowBatch = resultSchema.createRowBatch(0);
+            VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
             resultRowBatch.projectionSize = 0;
             resultRowBatch.size = qualifiedRowNum;
             resultRowBatch.endOfFile = true;
@@ -898,14 +893,22 @@ public class PixelsRecordReaderImpl
             return resultRowBatch;
         }
 
-        if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
+        VectorizedRowBatch resultRowBatch;
+        if (reuse)
         {
-            TypeDescription resultSchema = TypeDescription.createSchema(includedColumnTypes);
-            this.resultRowBatch = resultSchema.createRowBatch(batchSize);
+            if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
+            {
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize);
+                this.resultRowBatch.projectionSize = includedColumnNum;
+            }
+            this.resultRowBatch.reset();
+            this.resultRowBatch.ensureSize(batchSize);
+            resultRowBatch = this.resultRowBatch;
+        } else
+        {
+            resultRowBatch = resultSchema.createRowBatch(batchSize);
             resultRowBatch.projectionSize = includedColumnNum;
         }
-        this.resultRowBatch.reset();
-        this.resultRowBatch.ensureSize(batchSize);
 
         int rgRowCount = 0;
         int curBatchSize = 0;
@@ -982,18 +985,25 @@ public class PixelsRecordReaderImpl
         return resultRowBatch;
     }
 
-    /**
-     * Read the next row batch. This method is thread safe, and
-     * is independent from prepareBatch().
-     *
-     * @return more rows available
-     * @throws java.io.IOException
-     */
+    @Override
+    public VectorizedRowBatch readBatch(int batchSize)
+            throws IOException
+    {
+        return readBatch(batchSize, false);
+    }
+
+    @Override
+    public VectorizedRowBatch readBatch(boolean reuse)
+            throws IOException
+    {
+        return readBatch(VectorizedRowBatch.DEFAULT_SIZE, reuse);
+    }
+
     @Override
     public VectorizedRowBatch readBatch()
             throws IOException
     {
-        return readBatch(VectorizedRowBatch.DEFAULT_SIZE);
+        return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
     }
 
     /**

@@ -259,7 +259,7 @@ class PixelsPageSource implements ConnectorPageSource
         {
             try
             {
-                rowBatch = recordReader.readBatch(BatchSize);
+                rowBatch = recordReader.readBatch(BatchSize, true);
                 rowBatchSize = rowBatch.size;
                 if (rowBatchSize <= 0)
                 {
