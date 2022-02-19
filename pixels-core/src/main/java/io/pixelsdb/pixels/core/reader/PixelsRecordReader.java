@@ -38,7 +38,19 @@ public interface PixelsRecordReader
     int prepareBatch(int batchSize) throws IOException;
 
     /**
-     * Read the next row batch. This method is independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     *
+     * @param batchSize the row batch size
+     * @return vectorized row batch
+     * @throws java.io.IOException
+     */
+    VectorizedRowBatch readBatch(int batchSize, boolean reuse)
+            throws IOException;
+
+    /**
+     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * The returned row batch is not reused across multiple calls. It is equivalent
+     * to readBatch(batchSize, false).
      *
      * @param batchSize the row batch size
      * @return vectorized row batch
@@ -48,8 +60,19 @@ public interface PixelsRecordReader
             throws IOException;
 
     /**
-     * Read the next row batch. This method is thread safe, and
-     * is independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * It is equivalent to readBatch(DEFAULT_SIZE, reuse).
+     *
+     * @return row batch
+     * @throws java.io.IOException
+     */
+    VectorizedRowBatch readBatch(boolean reuse)
+            throws IOException;
+
+    /**
+     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * The returned row batch is not reused across multiple calls. It is equivalent
+     * to readBatch(DEFAULT_SIZE, false).
      *
      * @return row batch
      * @throws java.io.IOException

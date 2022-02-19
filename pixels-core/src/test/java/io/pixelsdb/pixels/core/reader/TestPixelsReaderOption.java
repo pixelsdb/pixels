@@ -166,7 +166,7 @@ public class TestPixelsReaderOption
                 assertEquals(rowId, acv.vector[i]);
                 assertEquals(rowId * 3.1415f, bcv.vector[i], 0.000001f);
                 assertEquals(rowId * 3.14159d, ccv.vector[i], 0.000001d);
-                assertEquals(time, dcv.time[i]);
+                assertEquals(time, dcv.times[i]);
                 assertEquals(rowId > 25 ? 1 : 0, ecv.vector[i]);
                 assertEquals(String.valueOf(rowId),
                         new String(zcv.vector[i], zcv.start[i], zcv.lens[i]));

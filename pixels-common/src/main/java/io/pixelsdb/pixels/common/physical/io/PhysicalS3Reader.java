@@ -52,7 +52,7 @@ public class PhysicalS3Reader implements PhysicalReader
     private static final ExecutorService clientService;
     private final static int LEN_1M = 1024*1024;
     private final static int LEN_10M = 1024*1024*10;
-    private final static int ADAPTIVE_READ_TH = 1*1024*1024;
+    private final static int ADAPTIVE_READ_TH = 2*1024*1024;
 
     static
     {

@@ -188,7 +188,7 @@ public class BitUtils
     {
         /**
          * Issue #99:
-         * Use as least as variables as possible to reduce stack footprint
+         * Use as least variables as possible to reduce stack footprint
          * and thus improve performance.
          */
         byte bitsLeft = 8, b;

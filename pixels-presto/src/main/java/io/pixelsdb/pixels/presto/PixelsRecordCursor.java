@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,13 +19,13 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import com.facebook.presto.spi.ConnectorPageSource;
-import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.block.*;
+import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.Domain;
-import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.*;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
 import io.pixelsdb.pixels.cache.PixelsCacheReader;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -37,24 +37,23 @@ import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
-import io.pixelsdb.pixels.presto.block.TimeArrayBlock;
-import io.pixelsdb.pixels.presto.block.VarcharArrayBlock;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static com.facebook.presto.spi.type.StandardTypes.*;
-import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @author hank
- * @author guodong
- * @author tao
+ * Created at: 17/02/2022
+ * Author: hank
  */
-class PixelsPageSource implements ConnectorPageSource
+public class PixelsRecordCursor implements RecordCursor
 {
     private static final Logger logger = Logger.get(PixelsPageSource.class);
     private final int BatchSize;
@@ -71,18 +70,27 @@ class PixelsPageSource implements ConnectorPageSource
     private long memoryUsage = 0L;
     private PixelsReaderOption option;
     private final int numColumnToRead;
-    private int batchId;
+    /**
+     * If rowBatch == null && rowBatchSize > 0, numColumnToRead must be 0.
+     * It means that the query is like select count(*) from table, i.e., it
+     * does not read any physical data.
+     *
+     * If rowBatch == null && rowBatchSize == 0, it means that the first row
+     * has not been read.
+     */
+    private VectorizedRowBatch rowBatch;
+    private volatile int rowBatchSize;
+    private volatile int rowIndex;
 
-    public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
-                            MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
-                            String connectorId)
+    public PixelsRecordCursor(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
+                              MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache footerCache,
+                              String connectorId)
     {
         this.split = split;
         this.storage = storage;
         this.columns = columnHandles;
         this.numColumnToRead = columnHandles.size();
-        this.footerCache = pixelsFooterCache;
-        this.batchId = 0;
+        this.footerCache = footerCache;
         this.closed = false;
 
         this.cacheReader = PixelsCacheReader
@@ -90,7 +98,7 @@ class PixelsPageSource implements ConnectorPageSource
                 .setCacheFile(cacheFile)
                 .setIndexFile(indexFile)
                 .build();
-        getPixelsReaderBySchema(split, cacheReader, pixelsFooterCache);
+        getPixelsReaderBySchema(split, cacheReader, footerCache);
 
         try
         {
@@ -103,6 +111,9 @@ class PixelsPageSource implements ConnectorPageSource
             throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
         }
         this.BatchSize = PixelsPrestoConfig.getBatchSize();
+        this.rowIndex = -1;
+        this.rowBatch = null;
+        this.rowBatchSize = 0;
     }
 
     private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader, PixelsFooterCache pixelsFooterCache)
@@ -225,14 +236,6 @@ class PixelsPageSource implements ConnectorPageSource
     @Override
     public long getSystemMemoryUsage()
     {
-        /**
-         * Issue #113:
-         * I am still not sure show the result of this method are used by Presto.
-         * Currently, we return the cumulative memory usage. However this may be
-         * inappropriate.
-         * I tested about ten queries on test_1187, there was no problem, but
-         * TODO: we still need to be careful about this method in the future.
-         */
         if (closed)
         {
             return memoryUsage;
@@ -241,74 +244,146 @@ class PixelsPageSource implements ConnectorPageSource
     }
 
     @Override
-    public boolean isFinished()
+    public Type getType(int field)
     {
-        return this.closed;
+        checkArgument(field >= 0 && field < columns.size(), "Invalid field index");
+        return this.columns.get(field).getColumnType();
     }
 
     @Override
-    public Page getNextPage()
+    public boolean advanceNextPosition()
     {
-        this.batchId++;
-        VectorizedRowBatch rowBatch;
-        int rowBatchSize;
-
-        Block[] blocks = new Block[this.numColumnToRead];
+        if (++this.rowIndex < this.rowBatchSize)
+        {
+            return true;
+        }
 
         if (this.numColumnToRead > 0)
         {
             try
             {
-                rowBatch = recordReader.readBatch(BatchSize, false);
-                rowBatchSize = rowBatch.size;
-                if (rowBatchSize <= 0)
+                VectorizedRowBatch newRowBatch = this.recordReader.readBatch(BatchSize, false);
+                if (newRowBatch.size <= 0)
                 {
+                    // reach the end of the file
                     if (readNextPath())
                     {
-                        return getNextPage();
+                        // open and start reading the next file (path).
+                        newRowBatch = this.recordReader.readBatch(BatchSize, false);
                     } else
                     {
+                        // no more files (paths) to read, close.
                         close();
-                        return null;
+                        return false;
                     }
                 }
-                for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
+                if (this.rowBatch != newRowBatch)
                 {
-                    Type type = columns.get(fieldId).getColumnType();
-                    ColumnVector vector = rowBatch.cols[fieldId];
-                    blocks[fieldId] = new LazyBlock(rowBatchSize, new PixelsBlockLoader(vector, type, rowBatchSize));
+                    // VectorizedRowBatch may be reused by PixelsRecordReader.
+                    this.rowBatch = newRowBatch;
+                    // this.setColumnVectors();
                 }
+                this.rowBatchSize = this.rowBatch.size;
+                this.rowIndex = -1;
+                return advanceNextPosition();
             } catch (IOException e)
             {
                 closeWithSuppression(e);
                 throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
             }
-        }
-        else
+        } else
         {
             // No column to read.
             try
             {
-                rowBatchSize = this.recordReader.prepareBatch(BatchSize);
-                if (rowBatchSize <= 0)
+                int size = this.recordReader.prepareBatch(BatchSize);
+                if (size <= 0)
                 {
                     if (readNextPath())
                     {
-                        return getNextPage();
+                        size = this.recordReader.prepareBatch(BatchSize);
                     } else
                     {
                         close();
-                        return null;
+                        return false;
                     }
                 }
+                this.rowBatchSize = size;
+                this.rowIndex = -1;
+                return advanceNextPosition();
             } catch (IOException e)
             {
                 closeWithSuppression(e);
                 throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
             }
         }
+    }
 
-        return new Page(rowBatchSize, blocks);
+    @Override
+    public boolean getBoolean(int field)
+    {
+        //return this.byteColumnVectors.get(field).vector[this.rowIndex] > 0;
+        return ((ByteColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex] > 0;
+    }
+
+    @Override
+    public long getLong(int field)
+    {
+        Type type = this.columns.get(field).getColumnType();
+        if (type.equals(IntegerType.INTEGER) || type.equals(BigintType.BIGINT))
+        {
+            return ((LongColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex];
+        }
+        else if (type.equals(DateType.DATE))
+        {
+            return ((DateColumnVector) this.rowBatch.cols[field]).dates[this.rowIndex];
+        }
+        else if (type.equals(TimeType.TIME))
+        {
+            return ((TimeColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
+        }
+        else if (type.equals(TimestampType.TIMESTAMP))
+        {
+            return ((TimestampColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
+        }
+        throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
+                "Column type '" + type.getDisplayName() + "' is not Long/Integer based.");
+    }
+
+    @Override
+    public double getDouble(int field)
+    {
+        return Double.longBitsToDouble(((DoubleColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex]);
+    }
+
+    @Override
+    public Slice getSlice(int field)
+    {
+        Type type = this.columns.get(field).getColumnType();
+        checkArgument (type.equals(VarcharType.VARCHAR),
+                "Column type '" + type.getDisplayName() + "' is not Slice based.");
+        BinaryColumnVector columnVector = (BinaryColumnVector)this.rowBatch.cols[field];
+        return Slices.wrappedBuffer(columnVector.vector[this.rowIndex],
+                columnVector.start[this.rowIndex], columnVector.lens[this.rowIndex]);
+    }
+
+    @Override
+    public Object getObject(int field)
+    {
+        throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
+                "Array or Map type is not supported.");
+    }
+
+    @Override
+    public boolean isNull(int field)
+    {
+
+        if (this.rowBatch == null)
+        {
+            return this.rowBatchSize > 0;
+        }
+        checkArgument(field < this.rowBatch.cols.length);
+        return this.rowBatch.cols[field].isNull[this.rowIndex];
     }
 
     @Override
@@ -320,7 +395,6 @@ class PixelsPageSource implements ConnectorPageSource
         }
 
         closeReader();
-
         closed = true;
     }
 
@@ -337,11 +411,6 @@ class PixelsPageSource implements ConnectorPageSource
                     this.memoryUsage += recordReader.getMemoryUsage();
                 }
                 pixelsReader.close();
-                /**
-                 * Issue #114:
-                 * Must set pixelsReader and recordReader to null,
-                 * close() may be called multiple times by Presto.
-                 */
                 recordReader = null;
                 pixelsReader = null;
             }
@@ -367,128 +436,6 @@ class PixelsPageSource implements ConnectorPageSource
                 throwable.addSuppressed(e);
             }
             throw new PrestoException(PixelsErrorCode.PIXELS_CLIENT_ERROR, e);
-        }
-    }
-
-    /**
-     * Lazy Block Implementation for the Pixels
-     */
-    private final class PixelsBlockLoader
-            implements LazyBlockLoader<LazyBlock>
-    {
-        private final int expectedBatchId = batchId;
-        private final ColumnVector vector;
-        private final Type type;
-        private final int batchSize;
-
-        public PixelsBlockLoader(ColumnVector vector, Type type, int batchSize)
-        {
-            this.vector = vector;
-            this.type = requireNonNull(type, "type is null");
-            this.batchSize = batchSize;
-        }
-
-        @Override
-        public final void load(LazyBlock lazyBlock)
-        {
-            checkState(batchId == expectedBatchId);
-            Block block;
-
-            switch (type.getDisplayName())
-            {
-                case INTEGER:
-                case BIGINT:
-                    LongColumnVector lcv = (LongColumnVector) vector;
-                    block = new LongArrayBlock(batchSize, Optional.ofNullable(lcv.isNull), lcv.vector);
-                    break;
-                case DOUBLE:
-                case REAL:
-                    /**
-                     * According to TypeDescription.createColumn(),
-                     * both float and double type use DoubleColumnVector, while they use
-                     * FloatColumnReader and DoubleColumnReader respectively according to
-                     * io.pixelsdb.pixels.reader.ColumnReader.newColumnReader().
-                     * TODO: these two column should also support reading to LongColumnVector,
-                     * without conversions like longBitsToDouble, so that we can directly create
-                     * LongArrayBlock here without writeDouble (in which double is converted to long).
-                     * With this optimization, CPU and GC pressure can be greatly reduced.
-                     */
-                    DoubleColumnVector dcv = (DoubleColumnVector) vector;
-                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dcv.isNull), dcv.vector);
-                    break;
-                case VARCHAR:
-                    BinaryColumnVector scv = (BinaryColumnVector) vector;
-                    /*
-                    int vectorContentLen = 0;
-                    byte[] vectorContent;
-                    int[] vectorOffsets = new int[rowBatch.size + 1];
-                    int curVectorOffset = 0;
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        vectorContentLen += scv.lens[i];
-                    }
-                    vectorContent = new byte[vectorContentLen];
-                    for (int i = 0; i < rowBatch.size; ++i)
-                    {
-                        int elementLen = scv.lens[i];
-                        if (!scv.isNull[i])
-                        {
-                            System.arraycopy(scv.vector[i], scv.start[i], vectorContent, curVectorOffset, elementLen);
-                        }
-                        vectorOffsets[i] = curVectorOffset;
-                        curVectorOffset += elementLen;
-                    }
-                    vectorOffsets[rowBatch.size] = vectorContentLen;
-                    block = new VariableWidthBlock(rowBatch.size,
-                            Slices.wrappedBuffer(vectorContent, 0, vectorContentLen),
-                            vectorOffsets,
-                            scv.isNull);
-                            */
-                    block = new VarcharArrayBlock(batchSize, scv.vector, scv.start, scv.lens, scv.isNull);
-                    break;
-                case BOOLEAN:
-                    ByteColumnVector bcv = (ByteColumnVector) vector;
-                    block = new ByteArrayBlock(batchSize, Optional.ofNullable(bcv.isNull), bcv.vector);
-                    break;
-                case DATE:
-                    // Issue #94: add date type.
-                    DateColumnVector dtcv = (DateColumnVector) vector;
-                    // In pixels and Presto, date is stored as the number of days from UTC 1970-1-1 0:0:0.
-                    block = new IntArrayBlock(batchSize, Optional.ofNullable(dtcv.isNull), dtcv.dates);
-                    break;
-                case TIME:
-                    // Issue #94: add time type.
-                    TimeColumnVector tcv = (TimeColumnVector) vector;
-                    /**
-                     * In Presto, LongArrayBlock is used for time type. However, in Pixels,
-                     * Time value is stored as int, so here we use TimeArrayBlock, which
-                     * accepts int values but provides getLong method same as LongArrayBlock.
-                     */
-                    block = new TimeArrayBlock(batchSize, tcv.isNull, tcv.times);
-                    break;
-                case TIMESTAMP:
-                    TimestampColumnVector tscv = (TimestampColumnVector) vector;
-                    /**
-                     * Issue #94: we have confirmed that LongArrayBlock is used for timestamp
-                     * type in Presto.
-                     *
-                     * com.facebook.presto.spi.type.TimestampType extends
-                     * com.facebook.presto.spi.type.AbstractLongType, which creates a LongArrayBlockBuilder.
-                     * And this block builder builds a LongArrayBlock.
-                     */
-                    block = new LongArrayBlock(batchSize, Optional.ofNullable(tscv.isNull), tscv.times);
-                    break;
-                default:
-                    BlockBuilder blockBuilder = type.createBlockBuilder(null, batchSize);
-                    for (int i = 0; i < batchSize; ++i)
-                    {
-                        blockBuilder.appendNull();
-                    }
-                    block = blockBuilder.build();
-                    break;
-            }
-
-            lazyBlock.setBlock(block);
         }
     }
 

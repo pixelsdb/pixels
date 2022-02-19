@@ -100,7 +100,7 @@ public class TestPixelsWriter
                     c.isNull[row] = true;
                     c.vector[row] = 0;
                     d.isNull[row] = true;
-                    d.time[row] = 0;
+                    d.times[row] = 0;
                     d.nanos[row] = 0;
                     e.isNull[row] = true;
                     e.vector[row] = 0;
