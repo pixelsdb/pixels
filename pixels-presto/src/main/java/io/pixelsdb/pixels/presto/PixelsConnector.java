@@ -26,6 +26,8 @@ import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
@@ -77,25 +79,44 @@ public class PixelsConnector
     @Override
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
     {
-        long queryTimestamp = 0;
+        QueryTransInfo info;
         try
         {
-            queryTimestamp = this.transService.getQueryTimestamp();
+            info = this.transService.getQueryTimestamp();
         } catch (TransException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_SERVICE_ERROR, e);
         }
-        return new PixelsTransactionHandle(queryTimestamp);
+        TransContext.Instance().beginQuery(info);
+        return new PixelsTransactionHandle(info);
     }
 
     @Override
     public void commit(ConnectorTransactionHandle transactionHandle)
     {
+        if (transactionHandle instanceof PixelsTransactionHandle)
+        {
+            PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
+            TransContext.Instance().terminateQuery(handle.getInfo());
+        } else
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,
+                    "The transaction handle is not an instance of PixelsTransactionHandle.");
+        }
     }
 
     @Override
     public void rollback(ConnectorTransactionHandle transactionHandle)
     {
+        if (transactionHandle instanceof PixelsTransactionHandle)
+        {
+            PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
+            TransContext.Instance().terminateQuery(handle.getInfo());
+        } else
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,
+                    "The transaction handle is not an instance of PixelsTransactionHandle.");
+        }
     }
 
     @Override

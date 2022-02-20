@@ -36,6 +36,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
     private static Logger log = LogManager.getLogger(TransServiceImpl.class);
 
+    public static AtomicLong QueryId = new AtomicLong(0);
     /**
      * Issue #174:
      * In this issue, we have not fully implemented the logic related to the watermarks.
@@ -50,13 +51,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void getQueryTimestamp(TransProto.GetQueryTimestampRequest request, StreamObserver<TransProto.GetQueryTimestampResponse> responseObserver)
     {
         TransProto.GetQueryTimestampResponse response = TransProto.GetQueryTimestampResponse.newBuilder()
-                /**
-                 * Issue #174:
-                 * Here, we should use HighWatermark.get().
-                 * However, currently push high watermark is not used, we use getAndIncrement() to generate
-                 * different query timestamps.
-                 */
-                .setErrorCode(ErrorCode.SUCCESS).setQueryTimestamp(HighWatermark.getAndIncrement()).build();
+                .setErrorCode(ErrorCode.SUCCESS)
+                .setQueryId(QueryId.getAndIncrement()) // incremental query id
+                .setQueryTimestamp(HighWatermark.get()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

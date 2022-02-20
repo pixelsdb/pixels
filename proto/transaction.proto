@@ -45,7 +45,8 @@ message GetQueryTimestampRequest {
 
 message GetQueryTimestampResponse {
     int32 errorCode = 1;
-    uint64 queryTimestamp = 2;
+    uint64 queryId = 2;
+    uint64 queryTimestamp = 3;
 }
 
 message PushLowWatermarkRequest {

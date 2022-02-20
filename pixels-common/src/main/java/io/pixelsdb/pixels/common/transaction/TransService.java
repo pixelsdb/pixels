@@ -51,7 +51,7 @@ public class TransService
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public long getQueryTimestamp() throws TransException
+    public QueryTransInfo getQueryTimestamp() throws TransException
     {
         TransProto.GetQueryTimestampRequest request = TransProto.GetQueryTimestampRequest.newBuilder().build();
         try
@@ -61,7 +61,7 @@ public class TransService
             {
                 throw new TransException("failed to get query timestamp, error code=" + response.getErrorCode());
             }
-            return response.getQueryTimestamp();
+            return new QueryTransInfo(response.getQueryId(), response.getQueryTimestamp());
         }
         catch (Exception e)
         {

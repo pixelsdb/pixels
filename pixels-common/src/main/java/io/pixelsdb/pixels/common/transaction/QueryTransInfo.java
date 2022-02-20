@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,40 +17,30 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.presto;
-
-import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
-
-import static java.util.Objects.requireNonNull;
+package io.pixelsdb.pixels.common.transaction;
 
 /**
- * @author hank
- * Finished at: 20/02/2022
+ * Created at: 20/02/2022
+ * Author: hank
  */
-public class PixelsTransactionHandle
-        implements ConnectorTransactionHandle
+public class QueryTransInfo
 {
+    private long queryId;
+    private long queryTimestamp;
 
-    private QueryTransInfo info;
-
-    public PixelsTransactionHandle(QueryTransInfo info)
+    public QueryTransInfo(long queryId, long queryTimestamp)
     {
-        this.info = requireNonNull(info, "info is null");
+        this.queryId = queryId;
+        this.queryTimestamp = queryTimestamp;
     }
 
     public long getQueryId()
     {
-        return this.info.getQueryId();
+        return queryId;
     }
 
     public long getQueryTimestamp()
     {
-        return this.info.getQueryTimestamp();
-    }
-
-    public QueryTransInfo getInfo()
-    {
-        return info;
+        return queryTimestamp;
     }
 }
