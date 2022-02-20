@@ -51,21 +51,21 @@ public class TransService
         this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    public QueryTransInfo getQueryTimestamp() throws TransException
+    public QueryTransInfo getQueryTransInfo() throws TransException
     {
-        TransProto.GetQueryTimestampRequest request = TransProto.GetQueryTimestampRequest.newBuilder().build();
+        TransProto.GetQueryTransInfoRequest request = TransProto.GetQueryTransInfoRequest.newBuilder().build();
         try
         {
-            TransProto.GetQueryTimestampResponse response = this.stub.getQueryTimestamp(request);
+            TransProto.GetQueryTransInfoResponse response = this.stub.getQueryTransInfo(request);
             if (response.getErrorCode() != ErrorCode.SUCCESS)
             {
-                throw new TransException("failed to get query timestamp, error code=" + response.getErrorCode());
+                throw new TransException("failed to get query transaction info, error code=" + response.getErrorCode());
             }
             return new QueryTransInfo(response.getQueryId(), response.getQueryTimestamp());
         }
         catch (Exception e)
         {
-            throw new TransException("failed to get query timestamp", e);
+            throw new TransException("failed to get query transaction info", e);
         }
     }
 

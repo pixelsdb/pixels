@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
+import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -56,6 +57,7 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
+    private final QueryTransInfo transInfo;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -130,6 +132,7 @@ public class PixelsRecordReaderImpl
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
+        this.transInfo = option.getTransInfo();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;

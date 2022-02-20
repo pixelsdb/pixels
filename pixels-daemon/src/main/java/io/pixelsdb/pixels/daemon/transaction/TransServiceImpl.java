@@ -48,9 +48,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public TransServiceImpl () { }
 
     @Override
-    public void getQueryTimestamp(TransProto.GetQueryTimestampRequest request, StreamObserver<TransProto.GetQueryTimestampResponse> responseObserver)
+    public void getQueryTransInfo(TransProto.GetQueryTransInfoRequest request, StreamObserver<TransProto.GetQueryTransInfoResponse> responseObserver)
     {
-        TransProto.GetQueryTimestampResponse response = TransProto.GetQueryTimestampResponse.newBuilder()
+        TransProto.GetQueryTransInfoResponse response = TransProto.GetQueryTransInfoResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
                 .setQueryId(QueryId.getAndIncrement()) // incremental query id
                 .setQueryTimestamp(HighWatermark.get()).build();

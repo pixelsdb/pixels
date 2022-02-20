@@ -19,7 +19,17 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
+ * <P>
+ *     The context of the transactions in Pixels.
+ * </P>
+ *
  * Created at: 20/02/2022
  * Author: hank
  */
@@ -36,15 +46,40 @@ public class TransContext
         return instance;
     }
 
-    private TransContext() { }
+    private Map<Long, QueryTransInfo> queryTransContext;
+
+    private TransContext()
+    {
+        this.queryTransContext = new ConcurrentHashMap<>();
+    }
 
     public void beginQuery(QueryTransInfo info)
     {
-
+        requireNonNull(info, "query transaction info is null");
+        checkArgument(info.getQueryStatus() == QueryTransInfo.Status.PENDING);
+        this.queryTransContext.put(info.getQueryId(), info);
     }
 
-    public void terminateQuery(QueryTransInfo info)
+    public void commitQuery(long queryId)
     {
+        QueryTransInfo info = this.queryTransContext.remove(queryId);
+        if (info != null)
+        {
+            info.setQueryStatus(QueryTransInfo.Status.COMMIT);
+        }
+    }
 
+    public void rollbackQuery(long queryId)
+    {
+        QueryTransInfo info = this.queryTransContext.remove(queryId);
+        if (info != null)
+        {
+            info.setQueryStatus(QueryTransInfo.Status.ROLLBACK);
+        }
+    }
+
+    public QueryTransInfo getQueryTransInfo(long queryId)
+    {
+        return this.queryTransContext.get(queryId);
     }
 }

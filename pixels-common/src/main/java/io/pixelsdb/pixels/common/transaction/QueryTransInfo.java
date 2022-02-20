@@ -27,11 +27,18 @@ public class QueryTransInfo
 {
     private long queryId;
     private long queryTimestamp;
+    private Status queryStatus;
+
+    public enum Status
+    {
+        PENDING, COMMIT, ROLLBACK
+    }
 
     public QueryTransInfo(long queryId, long queryTimestamp)
     {
         this.queryId = queryId;
         this.queryTimestamp = queryTimestamp;
+        this.queryStatus = Status.PENDING;
     }
 
     public long getQueryId()
@@ -42,5 +49,15 @@ public class QueryTransInfo
     public long getQueryTimestamp()
     {
         return queryTimestamp;
+    }
+
+    public Status getQueryStatus()
+    {
+        return queryStatus;
+    }
+
+    public void setQueryStatus(Status status)
+    {
+        this.queryStatus = status;
     }
 }

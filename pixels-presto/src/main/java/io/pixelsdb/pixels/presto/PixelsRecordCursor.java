@@ -149,6 +149,7 @@ public class PixelsRecordCursor implements RecordCursor
         this.option.includeCols(cols);
         this.option.predicate(predicate);
         this.option.rgRange(split.getStart(), split.getLen());
+        this.option.transInfo(split.getTransInfo());
 
         try
         {

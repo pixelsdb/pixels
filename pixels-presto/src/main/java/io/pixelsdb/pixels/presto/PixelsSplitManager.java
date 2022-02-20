@@ -85,9 +85,11 @@ public class PixelsSplitManager
     }
 
     @Override
-    public ConnectorSplitSource getSplits(ConnectorTransactionHandle handle, ConnectorSession session, ConnectorTableLayoutHandle tableLayout,
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle handle, ConnectorSession session,
+                                          ConnectorTableLayoutHandle tableLayout,
                                           SplitSchedulingStrategy splitSchedulingStrategy)
     {
+        PixelsTransactionHandle transHandle = (PixelsTransactionHandle) handle;
         PixelsTableLayoutHandle layoutHandle = (PixelsTableLayoutHandle) tableLayout;
         PixelsTableHandle tableHandle = layoutHandle.getTable();
 
@@ -287,7 +289,8 @@ public class PixelsSplitManager
 
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                             tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                            table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
+                                            table.getStorageScheme(), paths, transHandle.getQueryId(),
+                                            0, 1, false, orderedAddresses,
                                             order.getColumnOrder(), new ArrayList<>(0), constraint);
                                     // log.debug("Split in orderPath: " + pixelsSplit.toString());
                                     pixelsSplits.add(pixelsSplit);
@@ -318,7 +321,8 @@ public class PixelsSplitManager
 
                                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                                table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
+                                                table.getStorageScheme(), Arrays.asList(path),
+                                                transHandle.getQueryId(),curFileRGIdx, splitSize,
                                                 true, compactAddresses, order.getColumnOrder(),
                                                 cacheColumnletOrders, constraint);
                                         pixelsSplits.add(pixelsSplit);
@@ -384,7 +388,8 @@ public class PixelsSplitManager
                             List<HostAddress> orderedAddresses = toHostAddresses(storage.getLocations(orderedPaths.get(firstPath)));
                             PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                     tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                    table.getStorageScheme(), paths, 0, 1, false, orderedAddresses,
+                                    table.getStorageScheme(), paths, transHandle.getQueryId(),
+                                    0, 1, false, orderedAddresses,
                                     order.getColumnOrder(), new ArrayList<>(0), constraint);
                             // log.debug("Split in orderPath: " + pixelsSplit.toString());
                             pixelsSplits.add(pixelsSplit);
@@ -419,7 +424,8 @@ public class PixelsSplitManager
                                 List<HostAddress> compactAddresses = toHostAddresses(storage.getLocations(path));
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                        table.getStorageScheme(), Arrays.asList(path), curFileRGIdx, splitSize,
+                                        table.getStorageScheme(), Arrays.asList(path),
+                                        transHandle.getQueryId(), curFileRGIdx, splitSize,
                                         false, compactAddresses, order.getColumnOrder(),
                                         new ArrayList<>(0), constraint);
                                 pixelsSplits.add(pixelsSplit);

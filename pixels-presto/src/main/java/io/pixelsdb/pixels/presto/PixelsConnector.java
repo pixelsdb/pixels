@@ -82,7 +82,7 @@ public class PixelsConnector
         QueryTransInfo info;
         try
         {
-            info = this.transService.getQueryTimestamp();
+            info = this.transService.getQueryTransInfo();
         } catch (TransException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_SERVICE_ERROR, e);
@@ -97,7 +97,7 @@ public class PixelsConnector
         if (transactionHandle instanceof PixelsTransactionHandle)
         {
             PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
-            TransContext.Instance().terminateQuery(handle.getInfo());
+            TransContext.Instance().commitQuery(handle.getInfo().getQueryId());
         } else
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,
@@ -111,7 +111,7 @@ public class PixelsConnector
         if (transactionHandle instanceof PixelsTransactionHandle)
         {
             PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
-            TransContext.Instance().terminateQuery(handle.getInfo());
+            TransContext.Instance().rollbackQuery(handle.getInfo().getQueryId());
         } else
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,

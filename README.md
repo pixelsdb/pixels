@@ -38,6 +38,14 @@ sudo update-java-alternatives --set /path/to/jdk-8.0
 ```
 Oracle JDK 8.0 also works.
 
+### Setup AWS Credentials
+If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+
+Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
+Therefore, we have to configure these credentials using 
+[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
+[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
+
 ### Install Pixels
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
@@ -67,7 +75,7 @@ Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` an
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME` and `pixels-load-*-full.jar` into `PIXELS_HOME/sbin`.
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
-Modify `pixels.properties` to ensure that the URLs, paths, and passwords are valid.
+Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
 To use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
@@ -124,6 +132,19 @@ cd etcd
 ```
 You can use `screen` or `nohup` to run it in the background.
 
+### Install Hadoop*
+Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
+Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
+Follow the official docs to install Hadoop if needed.
+
+Note that some default ports used by Hadoop
+may conflict with the default ports used by Presto. In this case, modify the default port configuration
+of either system.
+
+However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
+is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
+exist in `hdfs.config.dir`.
+
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
 Download and install Presto-0.215 following the instructions [here](https://prestodb.io/docs/0.215/installation/deployment.html).
@@ -171,7 +192,7 @@ Prometheus and Grafana are optional. We can install them to monitor the
 performance metrics of the whole system.
 
 To install Prometheus, copy `node_exporter-0.15.2.linux-amd64.tar.xz`, `jmx_exporter-0.11.0.tar.gz`, and `prometheus-2.1.0.linux-amd64.tar.xz`
-under `scripts/tars` into the `opt` directory and decompress them.
+under `scripts/tars` into the `~/opt` directory and decompress them.
 
 Create links:
 ```bash
@@ -203,27 +224,6 @@ Set URL to `http://localhost:9090`, Scrape Interval to `5s`, and HTTP Method to 
 Import the json dashboard configuration files under `scripts/grafana` into Grafana.
 Then we get three dashboards `Cluster Exporter`, `JVM Exporter`, and `Node Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
-
-### Install Hadoop*
-Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
-It is tested that Pixels works well with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop if needed.
-
-Note that some default ports used by Hadoop
-may conflict with the default ports used by Presto. In this case, modify the default port configuration
-of either system.
-
-However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
-exist in `hdfs.config.dir`.
-
-### AWS Credentials
-If we use S3 as the underlying storage system, we have to configure the AWS credentials.
-
-Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
-Therefore, we have to configure these credentials using 
-[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
-[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). 
 
 ## Start Pixels
 Enter `PIXELS_HOME` and start the daemons of Pixels using:

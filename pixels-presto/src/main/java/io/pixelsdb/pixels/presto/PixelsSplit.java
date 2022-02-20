@@ -26,6 +26,7 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
 
 import java.util.List;
 import java.util.Objects;
@@ -43,6 +44,7 @@ public class PixelsSplit
     private final String tableName;
     private final String storageScheme;
     private final List<String> paths;
+    private final QueryTransInfo transInfo;
     private final int start;
     private final int len;
     private int pathIndex;
@@ -59,6 +61,7 @@ public class PixelsSplit
             @JsonProperty("tableName") String tableName,
             @JsonProperty("storageScheme") String storageScheme,
             @JsonProperty("paths") List<String> paths,
+            @JsonProperty("transInfo") QueryTransInfo transInfo,
             @JsonProperty("start") int start,
             @JsonProperty("len") int len,
             @JsonProperty("cached") boolean cached,
@@ -76,6 +79,7 @@ public class PixelsSplit
             throw new NullPointerException("paths is empty");
         }
         this.pathIndex = 0;
+        this.transInfo = transInfo;
         this.start = start;
         this.len = len;
         this.cached = cached;
@@ -117,6 +121,11 @@ public class PixelsSplit
     @JsonProperty
     public List<String> getPaths() {
         return paths;
+    }
+
+    @JsonProperty
+    public QueryTransInfo getTransInfo() {
+        return transInfo;
     }
 
     @JsonProperty

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 
 import java.util.Optional;
@@ -32,6 +33,7 @@ public class PixelsReaderOption
     private PixelsPredicate predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
+    private QueryTransInfo transInfo = null;
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
 
@@ -71,6 +73,16 @@ public class PixelsReaderOption
     public boolean isSkipCorruptRecords()
     {
         return skipCorruptRecords;
+    }
+
+    public void transInfo(QueryTransInfo transInfo)
+    {
+        this.transInfo = transInfo;
+    }
+
+    public QueryTransInfo getTransInfo()
+    {
+        return this.transInfo;
     }
 
     public void rgRange(int rgStart, int rgLen)

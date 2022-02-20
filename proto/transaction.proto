@@ -30,7 +30,7 @@ package metadata.proto;
 
 // The transaction services definition.
 service TransService {
-    rpc GetQueryTimestamp (GetQueryTimestampRequest) returns (GetQueryTimestampResponse);
+    rpc GetQueryTransInfo (GetQueryTransInfoRequest) returns (GetQueryTransInfoResponse);
     rpc PushLowWatermark (PushLowWatermarkRequest) returns (PushLowWatermarkResponse);
     rpc PushHighWatermark (PushHighWatermarkRequest) returns (PushHighWatermarkResponse);
 }
@@ -40,10 +40,10 @@ service TransService {
 // For performance considerations, we do not add header and error message to the
 // requests and responses.
 
-message GetQueryTimestampRequest {
+message GetQueryTransInfoRequest {
 }
 
-message GetQueryTimestampResponse {
+message GetQueryTransInfoResponse {
     int32 errorCode = 1;
     uint64 queryId = 2;
     uint64 queryTimestamp = 3;

@@ -59,6 +59,6 @@ public class ErrorCode
     // begin error code for transactions
     private static final int ERROR_TRANS = ERROR_BASE + 200;
     public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
-    public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
+    public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
     // end error code for transactions
 }
