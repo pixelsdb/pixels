@@ -55,4 +55,10 @@ public class ErrorCode
     public static final int ERROR_MQ_READER_IS_ROLLBACK = (ERROR_BASE_MQ + 5);
     public static final int ERROR_MQ_READER_IS_RUNNING = (ERROR_BASE_MQ + 6);
     // end error code for shared memory message queue
+
+    // begin error code for transactions
+    private static final int ERROR_TRANS = ERROR_BASE + 200;
+    public static final int TRANS_LOW_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 1);
+    public static final int TRANS_HIGH_WATERMARK_NOT_PUSHED = (ERROR_TRANS + 2);
+    // end error code for transactions
 }

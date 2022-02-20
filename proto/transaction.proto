@@ -1,0 +1,70 @@
+/*
+ * Copyright 2022 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+// grpc protocol of pixels transaction.
+
+syntax = "proto3";
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.daemon";
+option java_outer_classname = "TransProto";
+
+package metadata.proto;
+
+// The transaction services definition.
+service TransService {
+    rpc GetQueryTransInfo (GetQueryTransInfoRequest) returns (GetQueryTransInfoResponse);
+    rpc PushLowWatermark (PushLowWatermarkRequest) returns (PushLowWatermarkResponse);
+    rpc PushHighWatermark (PushHighWatermarkRequest) returns (PushHighWatermarkResponse);
+}
+
+// begin request/response definition for rpc services
+
+// For performance considerations, we do not add header and error message to the
+// requests and responses.
+
+message GetQueryTransInfoRequest {
+}
+
+message GetQueryTransInfoResponse {
+    int32 errorCode = 1;
+    uint64 queryId = 2;
+    uint64 queryTimestamp = 3;
+}
+
+message PushLowWatermarkRequest {
+    // The timestamp of the terminated (finished or aborted) query.
+    uint64 queryTimestamp = 1;
+}
+
+message PushLowWatermarkResponse {
+    int32 errorCode = 1;
+}
+
+message PushHighWatermarkRequest {
+    // The commit ts of write transaction.
+    uint64 writeTransTimestamp = 1;
+}
+
+message PushHighWatermarkResponse {
+    int32 errorCode = 1;
+}
+
+// end request/response definition for rpc services

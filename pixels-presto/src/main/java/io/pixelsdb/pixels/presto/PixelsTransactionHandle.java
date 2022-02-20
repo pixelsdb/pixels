@@ -20,9 +20,43 @@
 package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public enum PixelsTransactionHandle
+/**
+ * @author hank
+ * Finished at: 20/02/2022
+ */
+public class PixelsTransactionHandle
         implements ConnectorTransactionHandle
 {
-    INSTANCE
+    public static final PixelsTransactionHandle Default = new PixelsTransactionHandle(-1, -1);
+
+    private long transId;
+    private long timestamp;
+
+    /**
+     * Create a transaction handle.
+     * @param transId is also the queryId as a query is a single-statement read-only transaction.
+     * @param timestamp the timestamp of a transaction.
+     */
+    @JsonCreator
+    public PixelsTransactionHandle(@JsonProperty("transId") long transId,
+                                   @JsonProperty("timestamp") long timestamp)
+    {
+        this.transId = transId;
+        this.timestamp = timestamp;
+    }
+
+    @JsonProperty
+    public long getTransId()
+    {
+        return this.transId;
+    }
+
+    @JsonProperty
+    public long getTimestamp()
+    {
+        return this.timestamp;
+    }
 }

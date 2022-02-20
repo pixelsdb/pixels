@@ -6,10 +6,10 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK (>=8.0).
+Install JDK 8.0.
 Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
-Ensure that Pixels is built using language level 1.8, for the Presto version we use is only compatible with JDK 8.0.
+Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
 It may take about one minute to complete. After that, find the following jar/zip files that will be used in the installation:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
@@ -19,7 +19,7 @@ It may take about one minute to complete. After that, find the following jar/zip
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with at least 20GB root volume. Log in the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Log in the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
@@ -37,6 +37,14 @@ update-java-alternatives --list
 sudo update-java-alternatives --set /path/to/jdk-8.0
 ```
 Oracle JDK 8.0 also works.
+
+### Setup AWS Credentials
+If we use S3 as the underlying storage system, we have to configure the AWS credentials.
+
+Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
+Therefore, we have to configure these credentials using 
+[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
+[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
 ### Install Pixels
 Here, we install Pixels and other binary packages into the `~/opt` directory:
@@ -67,7 +75,7 @@ Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` an
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME` and `pixels-load-*-full.jar` into `PIXELS_HOME/sbin`.
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
-Modify `pixels.properties` to ensure that the URLs, paths, and passwords are valid.
+Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
 To use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
@@ -115,7 +123,7 @@ export ETCDCTL_API=3
 export ETCD=$HOME/opt/etcd-v3.3.4-linux-amd64-bin
 export PATH=$PATH:$ETCD
 ```
-All the following commands are executed under `opt` by default.
+All the following commands are executed under `~/opt` by default.
 Create the link and start etcd:
 ```bash
 ln -s etcd-v3.3.4-linux-amd64-bin etcd
@@ -123,6 +131,19 @@ cd etcd
 ./start-etcd.sh
 ```
 You can use `screen` or `nohup` to run it in the background.
+
+### Install Hadoop*
+Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
+Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
+Follow the official docs to install Hadoop if needed.
+
+Note that some default ports used by Hadoop
+may conflict with the default ports used by Presto. In this case, modify the default port configuration
+of either system.
+
+However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
+is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
+exist in `hdfs.config.dir`.
 
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
@@ -171,7 +192,7 @@ Prometheus and Grafana are optional. We can install them to monitor the
 performance metrics of the whole system.
 
 To install Prometheus, copy `node_exporter-0.15.2.linux-amd64.tar.xz`, `jmx_exporter-0.11.0.tar.gz`, and `prometheus-2.1.0.linux-amd64.tar.xz`
-under `scripts/tars` into the `opt` directory and decompress them.
+under `scripts/tars` into the `~/opt` directory and decompress them.
 
 Create links:
 ```bash
@@ -203,27 +224,6 @@ Set URL to `http://localhost:9090`, Scrape Interval to `5s`, and HTTP Method to 
 Import the json dashboard configuration files under `scripts/grafana` into Grafana.
 Then we get three dashboards `Cluster Exporter`, `JVM Exporter`, and `Node Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
-
-### Install Hadoop*
-Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
-It is tested that Pixels works well with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop if needed.
-
-Note that some default ports used by Hadoop
-may conflict with the default ports used by Presto. In this case, modify the default port configuration
-of either system.
-
-However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
-exist in `hdfs.config.dir`.
-
-### AWS Credentials
-If we use S3 as the underlying storage system, we have to configure the AWS credentials.
-
-Currently, we do not configure the `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` from Pixels.
-Therefore, we have to configure these credentials using 
-[environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-set) or 
-[credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). 
 
 ## Start Pixels
 Enter `PIXELS_HOME` and start the daemons of Pixels using:

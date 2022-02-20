@@ -32,6 +32,7 @@ public class PixelsReaderOption
     private PixelsPredicate predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
+    private long queryId = -1L;
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
 
@@ -71,6 +72,16 @@ public class PixelsReaderOption
     public boolean isSkipCorruptRecords()
     {
         return skipCorruptRecords;
+    }
+
+    public void queryId(long queryId)
+    {
+        this.queryId = queryId;
+    }
+
+    public long getQueryId()
+    {
+        return this.queryId;
     }
 
     public void rgRange(int rgStart, int rgLen)

@@ -43,6 +43,7 @@ public class PixelsSplit
     private final String tableName;
     private final String storageScheme;
     private final List<String> paths;
+    private final long queryId;
     private final int start;
     private final int len;
     private int pathIndex;
@@ -59,6 +60,7 @@ public class PixelsSplit
             @JsonProperty("tableName") String tableName,
             @JsonProperty("storageScheme") String storageScheme,
             @JsonProperty("paths") List<String> paths,
+            @JsonProperty("queryId") long queryId,
             @JsonProperty("start") int start,
             @JsonProperty("len") int len,
             @JsonProperty("cached") boolean cached,
@@ -76,6 +78,7 @@ public class PixelsSplit
             throw new NullPointerException("paths is empty");
         }
         this.pathIndex = 0;
+        this.queryId = queryId;
         this.start = start;
         this.len = len;
         this.cached = cached;
@@ -117,6 +120,11 @@ public class PixelsSplit
     @JsonProperty
     public List<String> getPaths() {
         return paths;
+    }
+
+    @JsonProperty
+    public long getQueryId() {
+        return queryId;
     }
 
     @JsonProperty
