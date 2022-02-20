@@ -142,7 +142,7 @@ may conflict with the default ports used by Presto. In this case, modify the def
 of either system.
 
 However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure that these two file
+is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
 exist in `hdfs.config.dir`.
 
 ### Install Presto
