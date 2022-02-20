@@ -144,6 +144,9 @@ public class PixelsRecordReaderImpl
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
+        logger.debug("query id=" + this.transInfo.getQueryId() +
+                ", timestamp=" + this.transInfo.getQueryTimestamp() +
+                ", status=" + this.transInfo.getQueryStatus());
         checkBeforeRead();
     }
 
