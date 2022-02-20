@@ -20,9 +20,8 @@
 package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
-import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
-
-import static java.util.Objects.requireNonNull;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * @author hank
@@ -31,26 +30,33 @@ import static java.util.Objects.requireNonNull;
 public class PixelsTransactionHandle
         implements ConnectorTransactionHandle
 {
+    public static final PixelsTransactionHandle Default = new PixelsTransactionHandle(-1, -1);
 
-    private QueryTransInfo info;
+    private long transId;
+    private long timestamp;
 
-    public PixelsTransactionHandle(QueryTransInfo info)
+    /**
+     * Create a transaction handle.
+     * @param transId is also the queryId as a query is a single-statement read-only transaction.
+     * @param timestamp the timestamp of a transaction.
+     */
+    @JsonCreator
+    public PixelsTransactionHandle(@JsonProperty("transId") long transId,
+                                   @JsonProperty("timestamp") long timestamp)
     {
-        this.info = requireNonNull(info, "info is null");
+        this.transId = transId;
+        this.timestamp = timestamp;
     }
 
-    public long getQueryId()
+    @JsonProperty
+    public long getTransId()
     {
-        return this.info.getQueryId();
+        return this.transId;
     }
 
-    public long getQueryTimestamp()
+    @JsonProperty
+    public long getTimestamp()
     {
-        return this.info.getQueryTimestamp();
-    }
-
-    public QueryTransInfo getInfo()
-    {
-        return info;
+        return this.timestamp;
     }
 }

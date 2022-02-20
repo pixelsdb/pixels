@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
+
 /**
  * Created at: 20/02/2022
  * Author: hank
@@ -59,5 +61,15 @@ public class QueryTransInfo
     public void setQueryStatus(Status status)
     {
         this.queryStatus = status;
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("queryId", queryId)
+                .add("queryTimestamp", queryTimestamp)
+                .add("queryStatus", queryStatus)
+                .toString();
     }
 }

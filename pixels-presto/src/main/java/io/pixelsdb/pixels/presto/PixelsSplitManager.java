@@ -289,7 +289,7 @@ public class PixelsSplitManager
 
                                     PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                             tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                            table.getStorageScheme(), paths, transHandle.getQueryId(),
+                                            table.getStorageScheme(), paths, transHandle.getTransId(),
                                             0, 1, false, orderedAddresses,
                                             order.getColumnOrder(), new ArrayList<>(0), constraint);
                                     // log.debug("Split in orderPath: " + pixelsSplit.toString());
@@ -322,7 +322,7 @@ public class PixelsSplitManager
                                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                                 table.getStorageScheme(), Arrays.asList(path),
-                                                transHandle.getQueryId(),curFileRGIdx, splitSize,
+                                                transHandle.getTransId(),curFileRGIdx, splitSize,
                                                 true, compactAddresses, order.getColumnOrder(),
                                                 cacheColumnletOrders, constraint);
                                         pixelsSplits.add(pixelsSplit);
@@ -388,7 +388,7 @@ public class PixelsSplitManager
                             List<HostAddress> orderedAddresses = toHostAddresses(storage.getLocations(orderedPaths.get(firstPath)));
                             PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                     tableHandle.getSchemaName(), tableHandle.getTableName(),
-                                    table.getStorageScheme(), paths, transHandle.getQueryId(),
+                                    table.getStorageScheme(), paths, transHandle.getTransId(),
                                     0, 1, false, orderedAddresses,
                                     order.getColumnOrder(), new ArrayList<>(0), constraint);
                             // log.debug("Split in orderPath: " + pixelsSplit.toString());
@@ -425,7 +425,7 @@ public class PixelsSplitManager
                                 PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                         tableHandle.getSchemaName(), tableHandle.getTableName(),
                                         table.getStorageScheme(), Arrays.asList(path),
-                                        transHandle.getQueryId(), curFileRGIdx, splitSize,
+                                        transHandle.getTransId(), curFileRGIdx, splitSize,
                                         false, compactAddresses, order.getColumnOrder(),
                                         new ArrayList<>(0), constraint);
                                 pixelsSplits.add(pixelsSplit);

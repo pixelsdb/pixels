@@ -149,7 +149,7 @@ public class PixelsRecordCursor implements RecordCursor
         this.option.includeCols(cols);
         this.option.predicate(predicate);
         this.option.rgRange(split.getStart(), split.getLen());
-        this.option.transInfo(split.getTransInfo());
+        this.option.queryId(split.getQueryId());
 
         try
         {
@@ -378,7 +378,6 @@ public class PixelsRecordCursor implements RecordCursor
     @Override
     public boolean isNull(int field)
     {
-
         if (this.rowBatch == null)
         {
             return this.rowBatchSize > 0;

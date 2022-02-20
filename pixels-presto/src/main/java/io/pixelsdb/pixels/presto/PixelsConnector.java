@@ -79,6 +79,10 @@ public class PixelsConnector
     @Override
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
     {
+        /**
+         * Issue #172:
+         * Be careful that Presto does not set readOnly to true for normal queries.
+         */
         QueryTransInfo info;
         try
         {
@@ -88,7 +92,7 @@ public class PixelsConnector
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_SERVICE_ERROR, e);
         }
         TransContext.Instance().beginQuery(info);
-        return new PixelsTransactionHandle(info);
+        return new PixelsTransactionHandle(info.getQueryId(), info.getQueryTimestamp());
     }
 
     @Override
@@ -97,7 +101,7 @@ public class PixelsConnector
         if (transactionHandle instanceof PixelsTransactionHandle)
         {
             PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
-            TransContext.Instance().commitQuery(handle.getInfo().getQueryId());
+            TransContext.Instance().commitQuery(handle.getTransId());
         } else
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,
@@ -111,7 +115,7 @@ public class PixelsConnector
         if (transactionHandle instanceof PixelsTransactionHandle)
         {
             PixelsTransactionHandle handle = (PixelsTransactionHandle) transactionHandle;
-            TransContext.Instance().rollbackQuery(handle.getInfo().getQueryId());
+            TransContext.Instance().rollbackQuery(handle.getTransId());
         } else
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_HANDLE_TYPE_ERROR,

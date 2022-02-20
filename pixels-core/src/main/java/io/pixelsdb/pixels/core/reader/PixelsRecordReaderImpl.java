@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
 import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -57,7 +58,7 @@ public class PixelsRecordReaderImpl
     private final PixelsProto.PostScript postScript;
     private final PixelsProto.Footer footer;
     private final PixelsReaderOption option;
-    private final QueryTransInfo transInfo;
+    private final long queryId;
     private final int RGStart;
     private int RGLen;
     private final boolean enableMetrics;
@@ -132,7 +133,7 @@ public class PixelsRecordReaderImpl
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
-        this.transInfo = option.getTransInfo();
+        this.queryId = option.getQueryId();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;
@@ -144,9 +145,9 @@ public class PixelsRecordReaderImpl
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
-        logger.debug("query id=" + this.transInfo.getQueryId() +
-                ", timestamp=" + this.transInfo.getQueryTimestamp() +
-                ", status=" + this.transInfo.getQueryStatus());
+        QueryTransInfo transInfo = TransContext.Instance().getQueryTransInfo(this.queryId);
+        logger.debug("query id=" + queryId +
+                ", info=" + transInfo);
         checkBeforeRead();
     }
 

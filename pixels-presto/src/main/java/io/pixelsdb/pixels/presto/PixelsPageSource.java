@@ -138,7 +138,7 @@ class PixelsPageSource implements ConnectorPageSource
         this.option.includeCols(cols);
         this.option.predicate(predicate);
         this.option.rgRange(split.getStart(), split.getLen());
-        this.option.transInfo(split.getTransInfo());
+        this.option.queryId(split.getQueryId());
 
         try
         {
