@@ -21,8 +21,22 @@ package io.pixelsdb.pixels.presto;
 
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 
-public enum PixelsTransactionHandle
+/**
+ * @author hank
+ * Finished at: 20/02/2022
+ */
+public class PixelsTransactionHandle
         implements ConnectorTransactionHandle
 {
-    INSTANCE
+    private long queryTimestamp;
+
+    public PixelsTransactionHandle(long queryTimestamp)
+    {
+        this.queryTimestamp = queryTimestamp;
+    }
+
+    public long getQueryTimestamp()
+    {
+        return this.queryTimestamp;
+    }
 }

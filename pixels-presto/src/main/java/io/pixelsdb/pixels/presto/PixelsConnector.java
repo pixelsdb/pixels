@@ -25,6 +25,8 @@ import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
+import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import io.pixelsdb.pixels.presto.properties.PixelsSessionProperties;
@@ -47,6 +49,7 @@ public class PixelsConnector
     private final PixelsRecordSetProvider recordSetProvider;
     private final PixelsSessionProperties sessionProperties;
     private final PixelsTableProperties tableProperties;
+    private TransService transService;
 
     @Inject
     public PixelsConnector(
@@ -67,11 +70,32 @@ public class PixelsConnector
         this.tableProperties = requireNonNull(tableProperties, "tableProperties is null");
         requireNonNull(config, "config is null");
         this.recordCursorEnabled = Boolean.parseBoolean(config.getConfigFactory().getProperty("record.cursor.enabled"));
+        this.transService = new TransService(config.getConfigFactory().getProperty("trans.server.host"),
+                Integer.parseInt(config.getConfigFactory().getProperty("trans.server.port")));
     }
 
     @Override
-    public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly) {
-        return PixelsTransactionHandle.INSTANCE;
+    public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
+    {
+        long queryTimestamp = 0;
+        try
+        {
+            queryTimestamp = this.transService.getQueryTimestamp();
+        } catch (TransException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_TRANS_SERVICE_ERROR, e);
+        }
+        return new PixelsTransactionHandle(queryTimestamp);
+    }
+
+    @Override
+    public void commit(ConnectorTransactionHandle transactionHandle)
+    {
+    }
+
+    @Override
+    public void rollback(ConnectorTransactionHandle transactionHandle)
+    {
     }
 
     @Override

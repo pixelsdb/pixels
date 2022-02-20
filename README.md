@@ -6,10 +6,10 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK (>=8.0).
+Install JDK 8.0.
 Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
-Ensure that Pixels is built using language level 1.8, for the Presto version we use is only compatible with JDK 8.0.
+Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
 It may take about one minute to complete. After that, find the following jar/zip files that will be used in the installation:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
@@ -19,7 +19,7 @@ It may take about one minute to complete. After that, find the following jar/zip
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with at least 20GB root volume. Log in the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Log in the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
@@ -115,7 +115,7 @@ export ETCDCTL_API=3
 export ETCD=$HOME/opt/etcd-v3.3.4-linux-amd64-bin
 export PATH=$PATH:$ETCD
 ```
-All the following commands are executed under `opt` by default.
+All the following commands are executed under `~/opt` by default.
 Create the link and start etcd:
 ```bash
 ln -s etcd-v3.3.4-linux-amd64-bin etcd

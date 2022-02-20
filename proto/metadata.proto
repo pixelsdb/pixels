@@ -18,7 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-// grpc protocol of pixels metadata
+// grpc protocol of pixels metadata.
 
 syntax = "proto3";
 
@@ -89,9 +89,9 @@ message Layout {
     string projections = 10;
     uint64 tableId = 11;
 }
-// end domain objects defitions
+// end domain objects definitions
 
-// begin requeset/response defition for rpc services
+// begin request/response definition for rpc services
 
 // header
 message RequestHeader {
@@ -257,4 +257,4 @@ message UpdateLayoutResponse {
     ResponseHeader header = 1;
 }
 
-// end requeset/response defition for rpc services
+// end request/response definition for rpc services
