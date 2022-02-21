@@ -55,7 +55,7 @@ public class NoopScheduler implements Scheduler
     protected NoopScheduler() {}
 
     @Override
-    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId) throws IOException
     {
         if (batch.size() <= 0)
         {

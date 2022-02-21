@@ -19,7 +19,7 @@ It may take about one minute to complete. After that, find the following jar/zip
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Log in the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Login the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
@@ -228,6 +228,7 @@ These dashboards can be used to monitor the performance metrics of the instance.
 ## Start Pixels
 Enter `PIXELS_HOME` and start the daemons of Pixels using:
 ```bash
+./sbin/reset-cache.sh
 ./sbin/start-pixels.sh
 ```
 Enter the home of presto-server and start Presto:

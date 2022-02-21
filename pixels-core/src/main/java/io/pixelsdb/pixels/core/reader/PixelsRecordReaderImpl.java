@@ -26,8 +26,6 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
-import io.pixelsdb.pixels.common.transaction.QueryTransInfo;
-import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -145,9 +143,9 @@ public class PixelsRecordReaderImpl
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
-        QueryTransInfo transInfo = TransContext.Instance().getQueryTransInfo(this.queryId);
-        logger.debug("query id=" + queryId +
-                ", info=" + transInfo);
+        // Issue #175: this check is currently not necessary.
+        // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
+        //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");
         checkBeforeRead();
     }
 
@@ -471,7 +469,7 @@ public class PixelsRecordReaderImpl
         Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
         try
         {
-            scheduler.executeBatch(physicalReader, requestBatch);
+            scheduler.executeBatch(physicalReader, requestBatch, queryId);
             requestBatch.completeAll(actionFutures).join();
             requestBatch.clear();
             actionFutures.clear();
@@ -746,7 +744,7 @@ public class PixelsRecordReaderImpl
             Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
             try
             {
-                scheduler.executeBatch(physicalReader, requestBatch);
+                scheduler.executeBatch(physicalReader, requestBatch, queryId);
                 requestBatch.completeAll(actionFutures).join();
                 requestBatch.clear();
                 actionFutures.clear();
