@@ -31,7 +31,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
@@ -73,8 +76,22 @@ public class SortMergeScheduler implements Scheduler
         MaxGap = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.merge.gap"));
     }
 
-    protected List<MergedRequest> sortMerge(RequestBatch batch)
+    /**
+     * Sort the requests in the batch by their start offsets, and try to merge them.
+     * @param batch the request batch.
+     * @param queryId the query id.
+     * @return the merged requests.
+     */
+    protected List<MergedRequest> sortMerge(RequestBatch batch, long queryId)
     {
+        /**
+         * Issue #175:
+         * It has been proved that per-query scheduling, i.e., gradually increase
+         * the maximum size of merged requests does not provide any performance gain.
+         * On the opposite, it decrease the performance of TPC-H (SF=100) by 5-10%.
+         * Tuning the split size of Presto can solve the slow-starting issue of
+         * compact layout of TPC-H.
+         */
         List<CompletableFuture<ByteBuffer>> futures = batch.getFutures();
         List<Request> requests = batch.getRequests();
         List<RequestFuture> requestFutures = new ArrayList<>(batch.size());
@@ -102,14 +119,14 @@ public class SortMergeScheduler implements Scheduler
     }
 
     @Override
-    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId) throws IOException
     {
         if (batch.size() <= 0)
         {
             return;
         }
 
-        List<MergedRequest> mergedRequests = sortMerge(batch);
+        List<MergedRequest> mergedRequests = sortMerge(batch, queryId);
 
         if (reader.supportsAsync())
         {

@@ -108,14 +108,14 @@ public class RateLimitedScheduler extends SortMergeScheduler
     }
 
     @Override
-    public void executeBatch(PhysicalReader reader, RequestBatch batch) throws IOException
+    public void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId) throws IOException
     {
         if (batch.size() <= 0)
         {
             return;
         }
 
-        List<MergedRequest> mergedRequests = sortMerge(batch);
+        List<MergedRequest> mergedRequests = sortMerge(batch, queryId);
 
         if (reader.supportsAsync())
         {

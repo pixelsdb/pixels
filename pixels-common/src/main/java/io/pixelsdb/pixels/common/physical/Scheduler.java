@@ -39,9 +39,10 @@ public interface Scheduler
      * all the requests.
      * @param reader
      * @param batch
+     * @param queryId
      * @throws IOException
      */
-    void executeBatch(PhysicalReader reader, RequestBatch batch)
+    void executeBatch(PhysicalReader reader, RequestBatch batch, long queryId)
             throws IOException;
 
     class Request implements Comparable<Request>
