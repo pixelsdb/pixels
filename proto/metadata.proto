@@ -44,6 +44,7 @@ service MetadataService {
     rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
     rpc DropTable (DropTableRequest) returns (DropTableResponse);
     rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
+    rpc ExistSchema (ExistSchemaRequest) returns (ExistSchemaResponse);
 }
 
 // begin domain objects definition
@@ -162,6 +163,16 @@ message ExistTableRequest {
 }
 
 message ExistTableResponse {
+    ResponseHeader header = 1;
+    bool exists = 2;
+}
+
+message ExistSchemaRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+}
+
+message ExistSchemaResponse {
     ResponseHeader header = 1;
     bool exists = 2;
 }

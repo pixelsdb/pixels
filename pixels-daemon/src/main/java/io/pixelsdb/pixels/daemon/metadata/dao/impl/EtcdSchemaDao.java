@@ -89,7 +89,12 @@ public class EtcdSchemaDao extends SchemaDao
     public boolean exists(MetadataProto.Schema schema)
     {
         KeyValue kv = etcd.getKeyValue(EtcdDaoCommon.schemaPrimaryKeyPrefix + schema.getId());
-        return kv != null;
+        if (kv == null)
+        {
+            kv = etcd.getKeyValue(EtcdDaoCommon.schemaNameKeyPrefix + schema.getName());
+            return kv != null;
+        }
+        return true;
     }
 
     @Override

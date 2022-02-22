@@ -161,9 +161,20 @@ public class PixelsMetadata
             ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
             for (String schema : schemaNames)
             {
-                for (String table : pixelsMetadataProxy.getTableNames(schema))
+                /**
+                 * Issue #179:
+                 * Only try to get table names if the schema exists.
+                 * 'show tables' in information_schema also invokes this method.
+                 * In this case, information_schema does not exist in the metadata,
+                 * we should return an empty list without throwing an exception.
+                 * Presto will add the system tables by itself.
+                 */
+                if (pixelsMetadataProxy.existSchema(schema))
                 {
-                    builder.add(new SchemaTableName(schema, table));
+                    for (String table : pixelsMetadataProxy.getTableNames(schema))
+                    {
+                        builder.add(new SchemaTableName(schema, table));
+                    }
                 }
             }
             return builder.build();
