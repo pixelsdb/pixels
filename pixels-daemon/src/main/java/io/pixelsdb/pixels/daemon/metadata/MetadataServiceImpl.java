@@ -375,8 +375,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             headerBuilder.setErrorCode(METADATA_COLUMN_NOT_FOUND).setErrorMsg("columns of table '" +
                     request.getSchemaName() + "." + request.getTableName() + "' not found");
             response = MetadataProto.GetColumnsResponse.newBuilder()
-                    .setHeader(headerBuilder.build())
-                    .addAllColumns(columns).build();
+                    .setHeader(headerBuilder.build()).build();
         }
 
         responseObserver.onNext(response);
@@ -554,12 +553,35 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
+        MetadataProto.ExistTableResponse response;
         MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        if (schema == null)
+        {
+            /**
+             * Issue #183:
+             * We should firstly check the existence of the schema.
+             */
+            schema = MetadataProto.Schema.newBuilder().setId(-1).setName(request.getSchemaName()).build();
+            if (!schemaDao.exists(schema))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_GET_SCHEMA_FAILED).setErrorMsg(
+                        "failed to get schema '" + request.getSchemaName() + "'");
+            }
+            response = MetadataProto.ExistTableResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            return;
+        }
         MetadataProto.Table table = MetadataProto.Table.newBuilder()
         .setId(-1)
         .setName(request.getTableName())
         .setSchemaId(schema.getId()).build();
-        MetadataProto.ExistTableResponse response;
+
         if (tableDao.exists(table))
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");

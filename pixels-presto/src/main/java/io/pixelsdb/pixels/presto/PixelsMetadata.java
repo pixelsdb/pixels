@@ -221,11 +221,25 @@ public class PixelsMetadata
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
         for (SchemaTableName tableName : listTablesInternal(session, prefix))
         {
-            ConnectorTableMetadata tableMetadata = getTableMetadataInternal(tableName);
-            // table can disappear during listing operation
-            if (tableMetadata != null)
+            try
             {
-                columns.put(tableName, tableMetadata.getColumns());
+                /**
+                 * Issue #183:
+                 * Return an empty result if the table does not exist.
+                 * This is possible when reading the columns of information_schema tables.
+                 */
+                if (pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
+                {
+                    ConnectorTableMetadata tableMetadata = getTableMetadataInternal(tableName);
+                    // table can disappear during listing operation
+                    if (tableMetadata != null)
+                    {
+                        columns.put(tableName, tableMetadata.getColumns());
+                    }
+                }
+            } catch (MetadataException e)
+            {
+                throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
             }
         }
         return columns.build();
