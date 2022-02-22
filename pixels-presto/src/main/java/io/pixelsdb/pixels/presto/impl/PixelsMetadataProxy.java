@@ -128,4 +128,9 @@ public class PixelsMetadataProxy
     {
         return metadataService.existTable(schemaName, tableName);
     }
+
+    public boolean existSchema (String schemaName) throws MetadataException
+    {
+        return metadataService.existSchema(schemaName);
+    }
 }

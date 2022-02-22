@@ -474,7 +474,30 @@ public class MetadataService
         MetadataProto.ExistTableResponse response = this.stub.existTable(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new MetadataException("failed to check table. error code=" + response.getHeader().getErrorCode()
+            throw new MetadataException("failed to check table existence. error code="
+                    + response.getHeader().getErrorCode()
+                    + ", error message=" + response.getHeader().getErrorMsg());
+        }
+        if (response.getHeader().getToken().equals(token) == false)
+        {
+            throw new MetadataException("response token does not match.");
+        }
+        return response.getExists();
+    }
+
+    public boolean existSchema(String schemaName) throws MetadataException
+    {
+        assert schemaName != null && !schemaName.isEmpty();
+
+        String token = UUID.randomUUID().toString();
+        MetadataProto.ExistSchemaRequest request = MetadataProto.ExistSchemaRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).build();
+        MetadataProto.ExistSchemaResponse response = this.stub.existSchema(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new MetadataException("failed to check table existence. error code="
+                    + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
         if (response.getHeader().getToken().equals(token) == false)

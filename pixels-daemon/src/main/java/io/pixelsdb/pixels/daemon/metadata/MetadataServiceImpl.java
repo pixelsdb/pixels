@@ -63,7 +63,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
          */
         if (schemas == null)
         {
-            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND)
+                    .setErrorMsg("metadata server failed to get schemas").build();
             response = MetadataProto.GetSchemasResponse.newBuilder().setHeader(header).build();
         }
         else
@@ -110,7 +111,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found").build();
             response = MetadataProto.GetTableResponse.newBuilder().setHeader(header).build();
         }
         responseObserver.onNext(response);
@@ -155,7 +157,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found").build();
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found").build();
             response = MetadataProto.GetTablesResponse.newBuilder().setHeader(header).build();
         }
         responseObserver.onNext(response);
@@ -183,17 +186,19 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                         MetadataProto.GetLayoutRequest.PermissionRange.READABLE); // version < 0 means get all versions
                 if (layouts == null || layouts.isEmpty())
                 {
-                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout not found");
+                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout for table '" +
+                            request.getSchemaName() + "." + request.getTableName() + "'");
                 }
             }
             else
             {
-                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table '" +
+                        request.getSchemaName() + "." + request.getTableName() + "' not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" + request.getSchemaName() + "' not found");
         }
         if(layouts != null && layouts.isEmpty() == false)
         {
@@ -234,7 +239,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                     layout = layoutDao.getLatestByTable(table, request.getPermissionRange());
                     if (layout == null)
                     {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout exists");
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
+                                request.getPermissionRange().name() + "' not found");
                     }
                 }
                 else
@@ -243,10 +250,13 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                             request.getPermissionRange());
                     if (layouts == null || layouts.isEmpty())
                     {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout version not found");
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of version '" +
+                                request.getVersion() + "' for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
+                                request.getPermissionRange().name() + "' not found");
                     } else if (layouts.size() != 1)
                     {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicate layouts found");
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicated layouts found");
                     } else
                     {
                         layout = layouts.get(0);
@@ -255,12 +265,14 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table '" +
+                        request.getSchemaName() + "." + request.getTableName() + "' not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found");
         }
         if(layout != null)
         {
@@ -312,7 +324,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_UPDATE_LAYOUT_FAILED).setErrorMsg("layout not found");
+            headerBuilder.setErrorCode(METADATA_UPDATE_LAYOUT_FAILED).setErrorMsg("make sure the layout exists");
         }
 
         MetadataProto.UpdateLayoutResponse response = MetadataProto.UpdateLayoutResponse.newBuilder()
@@ -342,12 +354,14 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table not found");
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table '" +
+                        request.getSchemaName() + "." + request.getTableName() + "' not found");
             }
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema not found");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found");
         }
         if(columns != null && columns.isEmpty() == false)
         {
@@ -358,7 +372,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_COLUMN_NOT_FOUND).setErrorMsg("column not found");
+            headerBuilder.setErrorCode(METADATA_COLUMN_NOT_FOUND).setErrorMsg("columns of table '" +
+                    request.getSchemaName() + "." + request.getTableName() + "' not found");
             response = MetadataProto.GetColumnsResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .addAllColumns(columns).build();
@@ -382,7 +397,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_UPDATE_COUMN_FAILED).setErrorMsg("column not found");
+            headerBuilder.setErrorCode(METADATA_UPDATE_COUMN_FAILED).setErrorMsg("make sure the column exists");
         }
 
         MetadataProto.UpdateColumnResponse response = MetadataProto.UpdateColumnResponse.newBuilder()
@@ -396,7 +411,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * @param responseObserver
      */
     @Override
-    public void createSchema(MetadataProto.CreateSchemaRequest request, StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
+    public void createSchema(MetadataProto.CreateSchemaRequest request,
+                             StreamObserver<MetadataProto.CreateSchemaResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -406,7 +422,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         .setDesc(request.getSchemaDesc()).build();
         if (schemaDao.exists(schema))
         {
-            headerBuilder.setErrorCode(METADATA_SCHEMA_EXIST).setErrorMsg("schema already exist");
+            headerBuilder.setErrorCode(METADATA_SCHEMA_EXIST).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' already exist");
         }
         else
         {
@@ -431,7 +448,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * @param responseObserver
      */
     @Override
-    public void dropSchema(MetadataProto.DropSchemaRequest request, StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
+    public void dropSchema(MetadataProto.DropSchemaRequest request,
+                           StreamObserver<MetadataProto.DropSchemaResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -442,7 +460,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_DELETE_SCHEMA_FAILED).setErrorMsg("failed to delete schema");
+            headerBuilder.setErrorCode(METADATA_DELETE_SCHEMA_FAILED).setErrorMsg("failed to delete schema '" +
+                    request.getSchemaName() + "'");
         }
         MetadataProto.DropSchemaResponse response = MetadataProto.DropSchemaResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
@@ -456,7 +475,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
      * @param responseObserver
      */
     @Override
-    public void createTable(MetadataProto.CreateTableRequest request, StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
+    public void createTable(MetadataProto.CreateTableRequest request,
+                            StreamObserver<MetadataProto.CreateTableResponse> responseObserver)
     {
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -469,7 +489,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         .setSchemaId(schema.getId()).build();
         if (tableDao.exists(table))
         {
-            headerBuilder.setErrorCode(METADATA_TABLE_EXIST).setErrorMsg("table already exist");
+            headerBuilder.setErrorCode(METADATA_TABLE_EXIST).setErrorMsg("table '" +
+                    request.getSchemaName() + "." + request.getTableName() + "' already exist");
         }
         else
         {
@@ -484,7 +505,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             else
             {
                 tableDao.deleteByNameAndSchema(table.getName(), schema);
-                headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns");
+                headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns to table '" +
+                        request.getSchemaName() + "." + request.getTableName() + "'");
             }
         }
 
@@ -512,7 +534,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_DELETE_TABLE_FAILED).setErrorMsg("failed to delete table");
+            headerBuilder.setErrorCode(METADATA_DELETE_TABLE_FAILED).setErrorMsg("failed to delete table '" +
+                    request.getSchemaName() + "." + request.getTableName() + "'");
         }
         MetadataProto.DropTableResponse response = MetadataProto.DropTableResponse.newBuilder()
                 .setHeader(headerBuilder.build()).build();
@@ -547,6 +570,36 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         {
             headerBuilder.setErrorCode(0).setErrorMsg("");
             response = MetadataProto.ExistTableResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * @param request
+     * @param responseObserver
+     */
+    @Override
+    public void existSchema(MetadataProto.ExistSchemaRequest request, StreamObserver<MetadataProto.ExistSchemaResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = MetadataProto.Schema.newBuilder()
+                .setId(-1).setName(request.getSchemaName()).build();
+        MetadataProto.ExistSchemaResponse response;
+        if (schemaDao.exists(schema))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistSchemaResponse.newBuilder()
+                    .setExists(true).setHeader(headerBuilder.build()).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistSchemaResponse.newBuilder()
                     .setExists(false).setHeader(headerBuilder.build()).build();
         }
 
