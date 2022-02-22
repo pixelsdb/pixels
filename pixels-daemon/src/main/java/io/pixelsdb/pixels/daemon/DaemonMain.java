@@ -91,9 +91,14 @@ public class DaemonMain
                 }
                 else
                 {
+                    boolean metricsServerEnabled = Boolean.parseBoolean(
+                            ConfigFactory.Instance().getProperty("metrics.server.enabled"));
                     // start metrics server and cache manager on data node
-                    MetricsServer metricsServer = new MetricsServer();
-                    container.addServer("metrics", metricsServer);
+                    if (metricsServerEnabled)
+                    {
+                        MetricsServer metricsServer = new MetricsServer();
+                        container.addServer("metrics", metricsServer);
+                    }
                     CacheManager cacheManager = new CacheManager();
                     container.addServer("cache_manager", cacheManager);
                 }
