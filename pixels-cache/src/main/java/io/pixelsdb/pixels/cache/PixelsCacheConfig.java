@@ -100,8 +100,8 @@ public class PixelsCacheConfig
         return heartbeat;
     }
 
-    public String getWarehousePath()
+    public boolean isCacheEnabled()
     {
-        return configFactory.getProperty("pixels.warehouse.path");
+        return Boolean.parseBoolean(configFactory.getProperty("cache.enabled"));
     }
 }

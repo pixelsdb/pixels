@@ -114,8 +114,13 @@ public class CacheManager
      *      if the local cache is not up-to-date, update the local cache.
      * 4. register the DataNode by updating the status of CacheManager in etcd.
      *
-     * A watcher will be added in run() to listen to changes of the cache version in etcd.
-     * if there is a new version, we need to update caches according to new layouts.
+     * <p>
+     *     2 and 3 are only executed if the cache is enabled.
+     * </p>
+     * <p>
+     *     A watcher will be added in run() to listen to changes of the cache version in etcd.
+     *     if there is a new version, we need to update caches according to new layouts.
+     * </p>
      * */
     private void initialize()
     {
@@ -126,32 +131,37 @@ public class CacheManager
                 logger.info("No coordinator found. Exit");
                 return;
             }
-            // 2. init cache writer and metadata service
-            this.cacheWriter =
-                    PixelsCacheWriter.newBuilder()
-                            .setCacheLocation(cacheConfig.getCacheLocation())
-                            .setCacheSize(cacheConfig.getCacheSize())
-                            .setIndexLocation(cacheConfig.getIndexLocation())
-                            .setIndexSize(cacheConfig.getIndexSize())
-                            .setOverwrite(false)
-                            .setHostName(hostName)
-                            .setCacheConfig(cacheConfig)
-                            .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
-            this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+            if (cacheConfig.isCacheEnabled())
+            {
+                // 2. init cache writer and metadata service
+                this.cacheWriter =
+                        PixelsCacheWriter.newBuilder()
+                                .setCacheLocation(cacheConfig.getCacheLocation())
+                                .setCacheSize(cacheConfig.getCacheSize())
+                                .setIndexLocation(cacheConfig.getIndexLocation())
+                                .setIndexSize(cacheConfig.getIndexSize())
+                                .setOverwrite(false)
+                                .setHostName(hostName)
+                                .setCacheConfig(cacheConfig)
+                                .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
+                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
 
-            // 3. Update cache if necessary.
-            // If the cache is new created using start-vm.sh script, the local cache version would be zero.
-            localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
-            logger.debug("Local cache version: " + localCacheVersion);
-            // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
-            KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
-            if (globalCacheVersionKV != null) {
-                int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
-                logger.debug("Current global cache version: " + globalCacheVersion);
-                // if cache file exists already. we need check local cache version with global cache version stored in etcd
-                if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion) {
-                    // If global version is ahead the local one, update local cache.
-                    updateLocalCache(globalCacheVersion);
+                // 3. Update cache if necessary.
+                // If the cache is new created using start-vm.sh script, the local cache version would be zero.
+                localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
+                logger.debug("Local cache version: " + localCacheVersion);
+                // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
+                KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+                if (globalCacheVersionKV != null)
+                {
+                    int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                    logger.debug("Current global cache version: " + globalCacheVersion);
+                    // if cache file exists already. we need check local cache version with global cache version stored in etcd
+                    if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion)
+                    {
+                        // If global version is ahead the local one, update local cache.
+                        updateLocalCache(globalCacheVersion);
+                    }
                 }
             }
             // 4. register the datanode
@@ -206,55 +216,56 @@ public class CacheManager
             return;
         }
         runningLatch = new CountDownLatch(1);
-        Watch.Watcher watcher = etcdUtil.getClient().getWatchClient().watch(
-                ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
-                WatchOption.DEFAULT, watchResponse ->
-                {
-                    for (WatchEvent event : watchResponse.getEvents())
+        Watch.Watcher watcher = null;
+        if (cacheConfig.isCacheEnabled())
+        {
+            watcher = etcdUtil.getClient().getWatchClient().watch(
+                    ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
+                    WatchOption.DEFAULT, watchResponse ->
                     {
-                        if (event.getEventType() == WatchEvent.EventType.PUT)
+                        for (WatchEvent event : watchResponse.getEvents())
                         {
-                            // Get a new cache layout version.
-                            int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                            if (cacheStatus.get() == CacheNodeStatus.READY.StatusCode)
+                            if (event.getEventType() == WatchEvent.EventType.PUT)
                             {
-                                // Ready to update the local cache.
-                                logger.debug("Cache version update detected, new global version is (" + version + ").");
-                                if (version > localCacheVersion)
+                                // Get a new cache layout version.
+                                int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                                if (cacheStatus.get() == CacheNodeStatus.READY.StatusCode)
                                 {
-                                    // The new version is newer, update the local cache.
-                                    logger.debug("New global version is greater than the local version, update the local cache.");
-                                    try
+                                    // Ready to update the local cache.
+                                    logger.debug("Cache version update detected, new global version is (" + version + ").");
+                                    if (version > localCacheVersion)
                                     {
-                                        updateLocalCache(version);
-                                    } catch (MetadataException e)
-                                    {
-                                        logger.error("Failed to update local cache.", e);
-                                        e.printStackTrace();
+                                        // The new version is newer, update the local cache.
+                                        logger.debug("New global version is greater than the local version, update the local cache.");
+                                        try
+                                        {
+                                            updateLocalCache(version);
+                                        } catch (MetadataException e)
+                                        {
+                                            logger.error("Failed to update local cache.", e);
+                                            e.printStackTrace();
+                                        }
                                     }
+                                } else if (cacheStatus.get() == CacheNodeStatus.UPDATING.StatusCode)
+                                {
+                                    // The local cache is been updating, ignore the new version.
+                                    logger.warn("The local cache is been updating for version (" + localCacheVersion + "), " +
+                                            "ignore the new cache version (" + version + ").");
+                                } else
+                                {
+                                    // Shutdown this node manager.
+                                    runningLatch.countDown();
                                 }
-                            }
-                            else if (cacheStatus.get() == CacheNodeStatus.UPDATING.StatusCode)
+                            } else if (event.getEventType() == WatchEvent.EventType.DELETE)
                             {
-                                // The local cache is been updating, ignore the new version.
-                                logger.warn("The local cache is been updating for version (" + localCacheVersion + "), " +
-                                        "ignore the new cache version (" + version + ").");
-                            }
-                            else
-                            {
-                                // Shutdown this node manager.
+                                logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
+                                cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
+                                // Shutdown the node manager.
                                 runningLatch.countDown();
                             }
                         }
-                        else if (event.getEventType() == WatchEvent.EventType.DELETE)
-                        {
-                            logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
-                            cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
-                            // Shutdown the node manager.
-                            runningLatch.countDown();
-                        }
-                    }
-                });
+                    });
+        }
         try
         {
             // Wait for this cache manager to be shutdown.
@@ -265,7 +276,10 @@ public class CacheManager
             e.printStackTrace();
         } finally
         {
-            watcher.close();
+            if (watcher != null)
+            {
+                watcher.close();
+            }
         }
     }
 
