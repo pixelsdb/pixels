@@ -80,7 +80,7 @@ public class TestISplitSplitsIndex
     }
 
     @Test
-    public void testRemote () throws MetadataException
+    public void testRemote () throws MetadataException, InterruptedException
     {
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
         List<Layout> layouts = metadataService.getLayouts("pixels", "test_105");
@@ -135,6 +135,7 @@ public class TestISplitSplitsIndex
             System.out.println(rowGroupNum);
             System.out.println(splitSize);
         }
+        metadataService.shutdown();
     }
 
     private InvertedSplitsIndex getInverted(Order order, Splits splits, IndexName indexName) {

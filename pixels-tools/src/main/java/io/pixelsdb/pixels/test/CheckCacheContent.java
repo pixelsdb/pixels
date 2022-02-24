@@ -63,10 +63,11 @@ public class CheckCacheContent
         indexFile = new MemoryMappedFile(config.getProperty("index.location"),
                 Long.parseLong(config.getProperty("index.size")));
         //FSFactory fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
-        Storage storage = StorageFactory.Instance().getStorage(config.getProperty("storage.scheme"));
+        Storage storage = StorageFactory.Instance().getStorage(config.getProperty("cache.storage.scheme"));
 
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
+        metadataService.shutdown();
         Compact compact = layout.getCompactObject();
         int cacheBorder = compact.getCacheBorder();
         List<String> columnletOrder = compact.getColumnletOrder();

@@ -74,10 +74,10 @@ public class CacheCoordinator
     {
         DEAD(-1), INIT(0), READY(1);
 
-        int statusCode;
+        public final int StatusCode;
         CoordinatorStatus(int statusCode)
         {
-            this.statusCode = statusCode;
+            this.StatusCode = statusCode;
         }
     }
 
@@ -89,9 +89,10 @@ public class CacheCoordinator
     private String hostName;
     private Storage storage = null;
     // coordinator status: 0: init, 1: ready; -1: dead
-    private AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.statusCode);
+    private AtomicInteger coordinatorStatus = new AtomicInteger(CoordinatorStatus.INIT.StatusCode);
     private CacheCoordinatorRegister cacheCoordinatorRegister = null;
     private boolean initializeSuccess = false;
+    private CountDownLatch runningLatch;
 
     public CacheCoordinator()
     {
@@ -114,26 +115,53 @@ public class CacheCoordinator
         initialize();
     }
 
-    // initialize cache_version as 0 in etcd
+    /**
+     * Initialize Coordinator:
+     *
+     * 1. check if there is an existing coordinator, if yes, return.
+     * 2. register the coordinator.
+     * 3. create the storage instance that is used to get the metadata of the storage.
+     * 4. check the local and the global cache versions, update the cache plan if needed.
+     */
     private void initialize()
     {
-        // if another cache coordinator exists, stop the initialization.
-        if (null != etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL)) {
-            logger.warn("Another coordinator exists. Exit.");
-            return;
+        // 1. if another cache coordinator exists, stop the initialization.
+        KeyValue coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
+        if (coordinatorKV != null && coordinatorKV.getLease() > 0)
+        {
+            /**
+             * Issue #181:
+             * When the lease of the coordinator key exists, wait for the lease ttl to expire.
+             */
+            try
+            {
+                Thread.sleep(cacheConfig.getNodeLeaseTTL() * 1000);
+            } catch (InterruptedException e)
+            {
+                logger.error(e.getMessage());
+                e.printStackTrace();
+            }
+            coordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
+            if (coordinatorKV != null && coordinatorKV.getLease() > 0)
+            {
+                // another coordinator exists
+                logger.error("Another coordinator exists, exit...");
+                return;
+            }
         }
         try {
-            if (storage == null) {
-                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
-            }
-            // register coordinator
+            // 2. register the coordinator
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
             etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_COORDINATOR_LITERAL, hostName, leaseId);
             this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister, 1, 10, TimeUnit.SECONDS);
-            Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
-            // check version consistency
+            scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister,
+                    0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
+            // 3. create the storage instance.
+            if (storage == null) {
+                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
+            }
+            // 4. check version consistency
             int cache_version = 0, layout_version = 0;
             KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
             if (null != cacheVersionKV) {
@@ -144,14 +172,15 @@ public class CacheCoordinator
                 layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
             }
             if (cache_version < layout_version) {
-                logger.debug("Current cache version is left behind of current layout version. Update.");
-                update(layout_version);
+                logger.debug("Current cache version is left behind of current layout version, update the cache...");
+                updateCachePlan(layout_version);
             }
-            coordinatorStatus.set(CoordinatorStatus.READY.statusCode);
+            coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
             initializeSuccess = true;
             logger.info("CacheCoordinator on " + hostName + " has started.");
         }
         catch (Exception e) {
+            logger.error(e.getMessage());
             e.printStackTrace();
         }
     }
@@ -159,22 +188,23 @@ public class CacheCoordinator
     @Override
     public void run()
     {
-        logger.info("Starting cache coordinator");
+        logger.info("Starting Coordinator");
         if (false == initializeSuccess) {
-            logger.info("Initialization failed, stop now.");
+            logger.error("Initialization failed, stop now...");
             return;
         }
-        Watch watch = etcdUtil.getClient().getWatchClient();
-        CountDownLatch latch = new CountDownLatch(1);
+        runningLatch = new CountDownLatch(1);
         // watch layout version change, and update cache distribution and cache version
-        Watch.Watcher watcher = watch.watch(ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8), WatchOption.DEFAULT, watchResponse ->
+        Watch.Watcher watcher = etcdUtil.getClient().getWatchClient().watch(
+                ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
+                WatchOption.DEFAULT, watchResponse ->
         {
             for (WatchEvent event : watchResponse.getEvents())
             {
                 if (event.getEventType() == WatchEvent.EventType.PUT)
                 {
                     // listen to the PUT even on the LAYOUT VERSION, which can be changed by rainbow.
-                    if (coordinatorStatus.get() == CoordinatorStatus.READY.statusCode)
+                    if (coordinatorStatus.get() == CoordinatorStatus.READY.StatusCode)
                     {
                         try
                         {
@@ -182,7 +212,7 @@ public class CacheCoordinator
                             logger.debug("Update cache distribution");
                             // update the cache distribution
                             int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                            update(layoutVersion);
+                            updateCachePlan(layoutVersion);
                             // update cache version, notify cache managers on each node to update cache.
                             logger.debug("Update cache version to " + layoutVersion);
                             etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
@@ -191,10 +221,10 @@ public class CacheCoordinator
                             logger.error(e.getMessage());
                             e.printStackTrace();
                         }
-                    } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.statusCode)
+                    } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
                     {
                         // coordinator is shutdown.
-                        latch.countDown();
+                        runningLatch.countDown();
                     }
                     break;
                 }
@@ -203,7 +233,7 @@ public class CacheCoordinator
         try
         {
             // Wait for this coordinator to be shutdown.
-            latch.await();
+            runningLatch.await();
         } catch (InterruptedException e)
         {
             logger.error(e.getMessage());
@@ -218,27 +248,58 @@ public class CacheCoordinator
     public boolean isRunning()
     {
         int status = coordinatorStatus.get();
-        return status == CoordinatorStatus.INIT.statusCode ||
-                status == CoordinatorStatus.READY.statusCode;
+        return status == CoordinatorStatus.INIT.StatusCode ||
+                status == CoordinatorStatus.READY.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
-        // TODO: check if the objects here are not null in case that coordinator was not started successfully.
-        coordinatorStatus.set(CoordinatorStatus.DEAD.statusCode);
-        cacheCoordinatorRegister.stop();
+        coordinatorStatus.set(CoordinatorStatus.DEAD.StatusCode);
+        logger.debug("Shutting down Coordinator...");
+        scheduledExecutor.shutdownNow();
+        if (cacheCoordinatorRegister != null)
+        {
+            cacheCoordinatorRegister.stop();
+        }
         etcdUtil.delete(Constants.CACHE_COORDINATOR_LITERAL);
-        logger.info("CacheCoordinator shuts down.");
-        this.scheduledExecutor.shutdownNow();
+        if (metadataService != null)
+        {
+            try
+            {
+                metadataService.shutdown();
+            } catch (InterruptedException e)
+            {
+                logger.error("Failed to shutdown rpc channel for metadata service " +
+                        "while shutting down Coordinator.", e);
+                e.printStackTrace();
+            }
+        }
+        if (storage != null)
+        {
+            try
+            {
+                storage.close();
+            } catch (IOException e)
+            {
+                logger.error("Failed to close cache storage while shutting down Coordinator.", e);
+                e.printStackTrace();
+            }
+        }
+        if (runningLatch != null)
+        {
+            runningLatch.countDown();
+        }
+        EtcdUtil.Instance().getClient().close();
+        logger.info("Coordinator on '" + hostName + "' is shutdown.");
     }
 
     /**
-     * Update file caching locations
+     * Update file caching locations:
      * 1. for all files, decide which files to cache
      * 2. for each file, decide which node to cache it
      * */
-    private void update(int layoutVersion)
+    private void updateCachePlan(int layoutVersion)
             throws MetadataException, IOException
     {
         Layout layout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), layoutVersion);
@@ -256,7 +317,7 @@ public class CacheCoordinator
         for (int i = 0; i < nodes.size(); i++) {
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
-            if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) == CacheManager.CacheNodeStatus.READY.statusCode) {
+            if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) == CacheManager.CacheNodeStatus.READY.StatusCode) {
                 hosts[hostIndex++] = HostAddress.fromString(node.getKey().toString(StandardCharsets.UTF_8).substring(5));
             }
         }

@@ -40,6 +40,7 @@ public class Daemon implements Runnable
     private FileChannel partnerChannel = null;
     private String[] partnerCmd = null;
     private volatile boolean running = false;
+    private volatile boolean cleaned = false;
     private ShutdownHandler shutdownHandler = null;
     private static Logger log = LogManager.getLogger(Daemon.class);
 
@@ -72,9 +73,16 @@ public class Daemon implements Runnable
         {
             this.myChannel = new FileOutputStream(myLockFile).getChannel();
             this.partnerChannel = new FileOutputStream(partnerLockFile).getChannel();
+            /**
+             * Issue #181:
+             * We should not bind the SIGTERM handler.
+             * If it is bind, the shutdown hooks will not be called.
+             * Daemon.shutdown() will be called in the shutdown hook in DaemonMain,
+             * instead of in the signal handler.
+             */
             // bind handler for SIGTERM(15) signal.
-            this.shutdownHandler = new ShutdownHandler(this);
-            Signal.handle(new Signal("TERM"), shutdownHandler);
+            //this.shutdownHandler = new ShutdownHandler(this);
+            //Signal.handle(new Signal("TERM"), shutdownHandler);
         } catch (IOException e)
         {
             log.error("I/O exception when creating lock file channels.", e);
@@ -104,7 +112,8 @@ public class Daemon implements Runnable
         {
             log.error("error when closing my partner's channel", e);
         }
-        this.shutdownHandler.unbind();
+        this.cleaned = true;
+        // this.shutdownHandler.unbind();
     }
 
     @Override
@@ -125,7 +134,7 @@ public class Daemon implements Runnable
             else
             {
                 this.running = true;
-                log.info("starting daemon...");
+                log.info("starting daemon thread...");
             }
 
             /*
@@ -159,7 +168,6 @@ public class Daemon implements Runnable
             log.error("exception occurs when running.", e);
         }
 
-        log.info("shutdown, exiting...");
         try
         {
             if (myLock != null)
@@ -170,12 +178,23 @@ public class Daemon implements Runnable
         {
             log.error("error when releasing my lock.");
         }
+        log.info("The daemon thread is stopped, cleaning the file channels...");
         this.clean();
     }
 
     public void shutdown()
     {
         this.running = false;
+        while (!this.cleaned)
+        {
+            try
+            {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e)
+            {
+                log.error("interrupted when waiting for file channel cleaning...");
+            }
+        }
     }
 
     public boolean isRunning()

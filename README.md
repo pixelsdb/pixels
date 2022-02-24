@@ -231,7 +231,8 @@ Enter `PIXELS_HOME` and start the daemons of Pixels using:
 ./sbin/reset-cache.sh
 ./sbin/start-pixels.sh
 ```
-Enter the home of presto-server and start Presto:
+`reset-cache.sh` is only needed for the first time of starting Pixels. It initializes some states in etcd for Pixels.
+Then, enter the home of presto-server and start Presto:
 ```bash
 ./bin/launcher start
 ```
@@ -250,6 +251,8 @@ Run `SHOW SCHEMAS` in presto-cli, the result should be as follows if everything 
 
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
+
+Use the script `stop-pixels.sh` to stop Pixels when needed.
 
 ## TPC-H Evaluation
 

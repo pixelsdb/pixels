@@ -19,15 +19,14 @@
  */
 package io.pixelsdb.pixels.load.multi;
 
+import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import com.alibaba.fastjson.JSON;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -84,7 +83,7 @@ public class Config
         this.pixelsPath = pixelsPath;
     }
 
-    public boolean load(ConfigFactory configFactory) throws IOException, MetadataException
+    public boolean load(ConfigFactory configFactory) throws MetadataException, InterruptedException
     {
         // init metadata service
         String metaHost = configFactory.getProperty("metadata.server.host");
@@ -193,6 +192,7 @@ public class Config
         // init the params
         this.schema = schemaBuilder.toString();
         this.orderMapping = orderMapping;
+        metadataService.shutdown();
         return true;
     }
 

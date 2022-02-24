@@ -45,7 +45,7 @@ public class TestPixelsCompactor
     @SuppressWarnings("Duplicates")
     @Test
     public void testBasicCompact()
-            throws MetadataException, IOException
+            throws MetadataException, IOException, InterruptedException
     {
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -100,12 +100,13 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
+        metadataService.shutdown();
     }
 
     @SuppressWarnings("Duplicates")
     @Test
     public void testRealCompact()
-            throws MetadataException, IOException
+            throws MetadataException, IOException, InterruptedException
     {
         // get compact layout
         MetadataService metadataService = new MetadataService("dbiir01", 18888);
@@ -163,6 +164,7 @@ public class TestPixelsCompactor
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
+        metadataService.shutdown();
     }
 
     @Test
