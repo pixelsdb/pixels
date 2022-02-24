@@ -119,8 +119,8 @@ public class CacheCoordinator
      * Initialize Coordinator:
      *
      * 1. check if there is an existing coordinator, if yes, return.
-     * 2. create the storage instance that is used to get the metadata of the storage.
-     * 3. register the coordinator.
+     * 2. register the coordinator.
+     * 3. create the storage instance that is used to get the metadata of the storage.
      * 4. check the local and the global cache versions, update the cache plan if needed.
      */
     private void initialize()
@@ -150,17 +150,17 @@ public class CacheCoordinator
             }
         }
         try {
-            // 2. create the storage instance.
-            if (storage == null) {
-                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
-            }
-            // 3. register the coordinator
+            // 2. register the coordinator
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
             etcdUtil.putKeyValueWithLeaseId(Constants.CACHE_COORDINATOR_LITERAL, hostName, leaseId);
             this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister,
                     0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
+            // 3. create the storage instance.
+            if (storage == null) {
+                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
+            }
             // 4. check version consistency
             int cache_version = 0, layout_version = 0;
             KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
