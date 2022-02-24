@@ -101,10 +101,11 @@ public class CacheGetPerf
 
     // prepare correct answers
     private int prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, IOException
+            throws MetadataException, IOException, InterruptedException
     {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
+        metadataService.shutdown();
         List<String> cachedColumnlets =
                 layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
         Storage storage = StorageFactory.Instance().getStorage("hdfs");

@@ -179,6 +179,7 @@ public class PixelsCacheWriter
                 Compact compact = cachedLayout.getCompactObject();
                 int cacheBorder = compact.getCacheBorder();
                 cachedColumnlets.addAll(compact.getColumnletOrder().subList(0, cacheBorder));
+                metadataService.shutdown();
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else

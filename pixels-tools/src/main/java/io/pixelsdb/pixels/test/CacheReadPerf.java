@@ -128,12 +128,13 @@ public class CacheReadPerf
 
     // prepare correct answers
     private void prepare(String hostName, String metaHost, int layoutVersion)
-            throws MetadataException, IOException
+            throws MetadataException, IOException, InterruptedException
     {
         MetadataService metadataService = new MetadataService(metaHost, 18888);
         Layout layout = metadataService.getLayout("pixels", "test_1187", layoutVersion);
         cachedColumnlets =
                 layout.getCompactObject().getColumnletOrder().subList(0, layout.getCompactObject().getCacheBorder());
+        metadataService.shutdown();
         Storage storage = StorageFactory.Instance().getStorage("hdfs");
         List<String> paths = storage.listPaths(layout.getCompactPath());
         for (String path : paths)

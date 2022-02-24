@@ -43,7 +43,7 @@ import java.io.InputStreamReader;
 public class TestPixelsWriter
 {
     @Test
-    public void testWrite () throws IOException, MetadataException
+    public void testWrite () throws IOException, MetadataException, InterruptedException
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
         Config config = new Config("pixels", "test_105", 5000, "\t", "pixels", null);
@@ -138,7 +138,7 @@ public class TestPixelsWriter
 
     @Test
     public void testRead()
-            throws IOException, MetadataException
+            throws IOException, MetadataException, InterruptedException
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
         Config config = new Config("pixels", "test_105", 5000, "\t", "pixels", null);

@@ -205,8 +205,9 @@ public class WorkloadAnalyzer
                 writer.newLine();
             }
             writer.close();
+            metadataService.shutdown();
         }
-        catch (IOException | MetadataException e)
+        catch (IOException | MetadataException | InterruptedException e)
         {
             e.printStackTrace();
         }

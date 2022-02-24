@@ -102,12 +102,13 @@ public class CacheReaderPerfMulti
             mapFileEndNano = System.nanoTime();
             long indexMemInitCost = mapFileEndNano - mapFileStartNano;
             //fsFactory = FSFactory.Instance(config.getProperty("hdfs.config.dir"));
-            storage = StorageFactory.Instance().getStorage(config.getProperty("storage.scheme"));
+            storage = StorageFactory.Instance().getStorage(config.getProperty("cache.storage.scheme"));
             System.out.println("cache file init: " + cacheMemInitCost + ", index file init: " + indexMemInitCost);
 
             // get cached columnlets
             MetadataService metadataService = new MetadataService("dbiir01", 18888);
             Layout layout = metadataService.getLayout("pixels", "test_1187", 2);
+            metadataService.shutdown();
             Compact compact = layout.getCompactObject();
             int cacheBorder = compact.getCacheBorder();
             List<String> columnletOrder = compact.getColumnletOrder();

@@ -52,6 +52,17 @@ public class PixelsMetadataProxy
         String host = configFactory.getProperty("metadata.server.host");
         int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         this.metadataService = new MetadataService(host, port);
+        Runtime.getRuntime().addShutdownHook(new Thread( () ->
+        {
+            try
+            {
+                this.metadataService.shutdown();
+            } catch (InterruptedException e)
+            {
+                throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR,
+                        "Failed to shutdown metadata service (client).");
+            }
+        }));
     }
 
     public List<String> getSchemaNames() throws MetadataException

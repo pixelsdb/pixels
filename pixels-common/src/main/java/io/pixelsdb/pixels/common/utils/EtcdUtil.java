@@ -60,27 +60,18 @@ public class EtcdUtil
         this.client = Client.builder().endpoints("http://" + host + ":" + port).build();
 
         /**
-         * Issue #158:
-         * Close the etcd client when the system is exiting.
+         * Issue #181:
+         * Do not use shutdown hook to close the client.
+         * for that Java can not guarantee the executing order of the hooks,
+         * and etcd client may be used by other hooks.
+         *
+         * However, ensure that the other hooks close the etcd client.
          */
-        Runtime.getRuntime().addShutdownHook( new Thread( () ->
-                this.client.close()));
     }
 
     public static EtcdUtil Instance()
     {
         return instance;
-    }
-
-    static
-    {
-        Runtime.getRuntime().addShutdownHook(new Thread(() ->
-        {
-            if (instance != null && instance.getClient() != null)
-            {
-                instance.getClient().close();
-            }
-        }));
     }
 
     /**

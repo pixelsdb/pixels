@@ -441,6 +441,7 @@ public class Main
                     // get compact layout
                     MetadataService metadataService = new MetadataService(metadataHost, metadataPort);
                     List<Layout> layouts = metadataService.getLayouts(schema, table);
+                    metadataService.shutdown();
                     System.out.println("existing number of layouts: " + layouts.size());
                     Layout layout = null;
                     for (Layout layout1 : layouts)
@@ -528,6 +529,9 @@ public class Main
                 {
                     e.printStackTrace();
                 } catch (IOException e)
+                {
+                    e.printStackTrace();
+                } catch (InterruptedException e)
                 {
                     e.printStackTrace();
                 }

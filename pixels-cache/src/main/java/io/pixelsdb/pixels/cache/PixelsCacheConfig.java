@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.cache;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author guodong
  */
@@ -65,7 +67,7 @@ public class PixelsCacheConfig
 
     public String getStorageScheme()
     {
-         return configFactory.getProperty("storage.scheme");
+         return configFactory.getProperty("cache.storage.scheme");
     }
 
     public String getSchema()
@@ -85,7 +87,17 @@ public class PixelsCacheConfig
 
     public int getNodeLeaseTTL()
     {
-        return Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
+        int ttl = Integer.parseInt(configFactory.getProperty("lease.ttl.seconds"));
+        int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
+        checkArgument(ttl > heartbeat);
+        return ttl;
+    }
+
+    public int getNodeHeartbeatPeriod()
+    {
+        int heartbeat = Integer.parseInt(configFactory.getProperty("heartbeat.period.seconds"));
+        checkArgument(heartbeat > 0);
+        return heartbeat;
     }
 
     public String getWarehousePath()

@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.load.multi;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
-import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 
@@ -64,10 +63,10 @@ public class ConsumerGenerator
         {
             // load some config info
             option = config.load(configFactory);
-        } catch (IOException e)
+        } catch (MetadataException e)
         {
             e.printStackTrace();
-        } catch (MetadataException e)
+        } catch (InterruptedException e)
         {
             e.printStackTrace();
         }

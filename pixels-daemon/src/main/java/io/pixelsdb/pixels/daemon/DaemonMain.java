@@ -103,8 +103,8 @@ public class DaemonMain
                     container.addServer("cache_manager", cacheManager);
                 }
 
-                // a shutdown hook ensures the servers are shutdown graceful.
-                // even if this main daemon is not terminated by TERM signal.
+                // The shutdown hook ensures the servers are shutdown graceful
+                // if this main daemon is terminated by SIGTERM(15) signal.
                 Runtime.getRuntime().addShutdownHook( new Thread( () ->
                 {
                     for (String name : container.getServerNames())
@@ -120,7 +120,7 @@ public class DaemonMain
                     }
                     for (int i = 60; i > 0; --i)
                     {
-                        System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
+                        // System.out.print("\rRemaining (" + i + ")s for server threads to shutdown...");
                         try
                         {
                             boolean done = true;
@@ -142,6 +142,12 @@ public class DaemonMain
                             log.error("error when waiting server threads shutdown.", e);
                         }
                     }
+                    /**
+                     * Issue #181:
+                     * Shutdown the daemon thread here instead of using the SIGTERM handler.
+                     */
+                    mainDaemon.shutdown();
+                    log.info("All the servers and the daemon thread are shutdown, byte...");
                 }));
 
                 // continue the main thread, start and check the server threads.
@@ -164,7 +170,7 @@ public class DaemonMain
                         break;
                     }
                 }
-                // when goes here, the ShutdownHook is going to shutdown all the servers gracefully.
+                // Will never reach here.
             }
             else if (role.equalsIgnoreCase("guard") && args.length == 1 &&
                     (args[0].equalsIgnoreCase("coordinator") ||
@@ -222,8 +228,8 @@ public class DaemonMain
                             }
                             int pid = Integer.parseInt(splits[0]);
                             System.out.println("killing " + roleName + ", pid (" + pid + ")");
-                            // terminate the daemon gracefully by sending SIGTERM(15) signal.
-                            Runtime.getRuntime().exec("kill -9 " + pid);
+                            // Terminate the daemon gracefully by sending SIGTERM(15) signal.
+                            Runtime.getRuntime().exec("kill -15 " + pid);
                         }
                     }
                     reader.close();

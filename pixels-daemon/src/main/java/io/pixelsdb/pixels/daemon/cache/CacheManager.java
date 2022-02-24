@@ -59,15 +59,15 @@ public class CacheManager
     {
         UNHEALTHY(-1), READY(0), UPDATING(1), OUT_OF_SIZE(2);
 
-        int statusCode;
+        public final int StatusCode;
         CacheNodeStatus(int statusCode)
         {
-            this.statusCode = statusCode;
+            this.StatusCode = statusCode;
         }
     }
     private static Logger logger = LogManager.getLogger(CacheManager.class);
     // cache status: unhealthy(-1), ready(0), updating(1), out_of_size(2)
-    private static AtomicInteger cacheStatus = new AtomicInteger(0);
+    private static AtomicInteger cacheStatus = new AtomicInteger(CacheNodeStatus.READY.StatusCode);
 
     private PixelsCacheWriter cacheWriter = null;
     private MetadataService metadataService = null;
@@ -81,6 +81,7 @@ public class CacheManager
     private String hostName;
     private boolean initializeSuccess = false;
     private int localCacheVersion = 0;
+    private CountDownLatch runningLatch;
 
     public CacheManager()
     {
@@ -104,26 +105,28 @@ public class CacheManager
     }
 
     /**
-     * Initialize CacheManager
+     * Initialize CacheManager:
      *
-     * 1. check if cache file exists.
-     *    if exists, check if existing cache version is the same as current cache version in etcd.
-     *      if not, existing cache is out of date, goto step #2.
-     * 2. else, update caches with latest layout in etcd/mysql.
-     * 3. update the status of CacheManager in etcd
-     * 4. start a scheduled thread to update node (CacheManager) status
-     * 5. add a watcher to listen to changes of the cache version in etcd.
-     *    if there is a new version, we need to update caches according to new layouts.
+     * 1. check if the cache coordinator exists.
+     *      if not, initialization is failed and return.
+     * 2. initialize the metadata service and cache writer.
+     * 3. check if local cache version is the same as global cache version in etcd.
+     *      if the local cache is not up-to-date, update the local cache.
+     * 4. register the DataNode by updating the status of CacheManager in etcd.
+     *
+     * A watcher will be added in run() to listen to changes of the cache version in etcd.
+     * if there is a new version, we need to update caches according to new layouts.
      * */
     private void initialize()
     {
         try {
+            // 1. check the existence of the cache coordinator.
             KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
             if (cacheCoordinatorKV == null) {
                 logger.info("No coordinator found. Exit");
                 return;
             }
-            // init cache writer and metadata service
+            // 2. init cache writer and metadata service
             this.cacheWriter =
                     PixelsCacheWriter.newBuilder()
                             .setCacheLocation(cacheConfig.getCacheLocation())
@@ -136,28 +139,28 @@ public class CacheManager
                             .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
             this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
 
-            // Update cache if necessary.
-            // If the cache is new created using start-vm.sh script, localCacheVersion would be zero.
+            // 3. Update cache if necessary.
+            // If the cache is new created using start-vm.sh script, the local cache version would be zero.
             localCacheVersion = PixelsCacheUtil.getIndexVersion(cacheWriter.getIndexFile());
             logger.debug("Local cache version: " + localCacheVersion);
             // If Pixels has been reset by reset-pixels.sh, the cache version in etcd would be zero too.
             KeyValue globalCacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
-            if (null != globalCacheVersionKV) {
+            if (globalCacheVersionKV != null) {
                 int globalCacheVersion = Integer.parseInt(globalCacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
                 logger.debug("Current global cache version: " + globalCacheVersion);
                 // if cache file exists already. we need check local cache version with global cache version stored in etcd
                 if (localCacheVersion >= 0 && localCacheVersion < globalCacheVersion) {
                     // If global version is ahead the local one, update local cache.
-                    update(globalCacheVersion);
+                    updateLocalCache(globalCacheVersion);
                 }
             }
-            // register a datanode
+            // 4. register the datanode
             Lease leaseClient = etcdUtil.getClient().getLeaseClient();
             long leaseId = leaseClient.grant(cacheConfig.getNodeLeaseTTL()).get(10, TimeUnit.SECONDS).getID();
             // start a scheduled thread to update node status periodically
             this.cacheManagerRegister = new CacheManagerRegister(leaseClient, leaseId);
-            scheduledExecutor.scheduleAtFixedRate(cacheManagerRegister, 1, 10, TimeUnit.SECONDS);
-            Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+            scheduledExecutor.scheduleAtFixedRate(cacheManagerRegister,
+                    0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
         }
@@ -167,13 +170,13 @@ public class CacheManager
         }
     }
 
-    private void update(int version)
+    private void updateLocalCache(int version)
             throws MetadataException
     {
         Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
         if (matchedLayout != null) {
             // update cache status
-            cacheStatus.set(CacheNodeStatus.UPDATING.statusCode);
+            cacheStatus.set(CacheNodeStatus.UPDATING.StatusCode);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             // update cache content
             int status = 0;
@@ -197,24 +200,23 @@ public class CacheManager
     @Override
     public void run()
     {
-        logger.info("Starting cache manager");
+        logger.info("Starting Node Manager");
         if (false == initializeSuccess) {
-            logger.info("Initialization failed. Stop now.");
+            logger.error("Initialization failed, stop now...");
             return;
         }
-        CountDownLatch latch = new CountDownLatch(1);
+        runningLatch = new CountDownLatch(1);
         Watch.Watcher watcher = etcdUtil.getClient().getWatchClient().watch(
                 ByteSequence.from(Constants.CACHE_VERSION_LITERAL, StandardCharsets.UTF_8),
                 WatchOption.DEFAULT, watchResponse ->
                 {
                     for (WatchEvent event : watchResponse.getEvents())
                     {
-
                         if (event.getEventType() == WatchEvent.EventType.PUT)
                         {
                             // Get a new cache layout version.
                             int version = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                            if (cacheStatus.get() == CacheNodeStatus.READY.statusCode)
+                            if (cacheStatus.get() == CacheNodeStatus.READY.StatusCode)
                             {
                                 // Ready to update the local cache.
                                 logger.debug("Cache version update detected, new global version is (" + version + ").");
@@ -224,15 +226,15 @@ public class CacheManager
                                     logger.debug("New global version is greater than the local version, update the local cache.");
                                     try
                                     {
-                                        update(version);
+                                        updateLocalCache(version);
                                     } catch (MetadataException e)
                                     {
-                                        logger.error(e.getMessage());
+                                        logger.error("Failed to update local cache.", e);
                                         e.printStackTrace();
                                     }
                                 }
                             }
-                            else if (cacheStatus.get() == CacheNodeStatus.UPDATING.statusCode)
+                            else if (cacheStatus.get() == CacheNodeStatus.UPDATING.StatusCode)
                             {
                                 // The local cache is been updating, ignore the new version.
                                 logger.warn("The local cache is been updating for version (" + localCacheVersion + "), " +
@@ -240,26 +242,26 @@ public class CacheManager
                             }
                             else
                             {
-                                // Shutdown this cache manager.
-                                latch.countDown();
+                                // Shutdown this node manager.
+                                runningLatch.countDown();
                             }
                         }
                         else if (event.getEventType() == WatchEvent.EventType.DELETE)
                         {
                             logger.warn("Cache version deletion detected, the cluster is corrupted. Stop now.");
-                            cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
-                            // Shutdown the cache manager.
-                            latch.countDown();
+                            cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
+                            // Shutdown the node manager.
+                            runningLatch.countDown();
                         }
                     }
                 });
         try
         {
             // Wait for this cache manager to be shutdown.
-            latch.await();
+            runningLatch.await();
         } catch (InterruptedException e)
         {
-            logger.error(e.getMessage());
+            logger.error("Node Manager was interrupted abnormally.", e);
             e.printStackTrace();
         } finally
         {
@@ -270,17 +272,52 @@ public class CacheManager
     @Override
     public boolean isRunning()
     {
-        return cacheStatus.get() >= 0;
+        int status = cacheStatus.get();
+        return status == CacheNodeStatus.READY.StatusCode ||
+                status == CacheNodeStatus.UPDATING.StatusCode;
     }
 
     @Override
     public void shutdown()
     {
-        cacheStatus.set(CacheNodeStatus.UNHEALTHY.statusCode);
-        cacheManagerRegister.stop();
+        cacheStatus.set(CacheNodeStatus.UNHEALTHY.StatusCode);
+        logger.info("Shutting down Node Manager...");
+        scheduledExecutor.shutdownNow();
+        if (cacheManagerRegister != null)
+        {
+            cacheManagerRegister.stop();
+        }
         etcdUtil.delete(Constants.CACHE_NODE_STATUS_LITERAL + hostName);
-        logger.info("CacheManager on " + hostName + " shut down.");
-        this.scheduledExecutor.shutdownNow();
+        if (metadataService != null)
+        {
+            try
+            {
+                metadataService.shutdown();
+            } catch (InterruptedException e)
+            {
+                logger.error("Failed to shutdown rpc channel for metadata service " +
+                        "while shutting down Node Manager.", e);
+                e.printStackTrace();
+            }
+        }
+        if (cacheWriter != null)
+        {
+            try
+            {
+                cacheWriter.close();
+            } catch (Exception e)
+            {
+                logger.error("Failed to close cache writer while shutting down Node Manager.", e);
+                e.printStackTrace();
+            }
+        }
+        if (runningLatch != null)
+        {
+            runningLatch.countDown();
+        }
+        EtcdUtil.Instance().getClient().close();
+        logger.info("Node Manager on '" + hostName + "' is shutdown.");
+
     }
 
     /**

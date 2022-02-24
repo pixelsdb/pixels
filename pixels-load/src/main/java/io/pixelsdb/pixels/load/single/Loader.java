@@ -62,7 +62,7 @@ public abstract class Loader
         this.regex = regex;
     }
 
-    boolean load() throws IOException, MetadataException
+    boolean load() throws IOException, MetadataException, InterruptedException
     {
         // init metadata service
         ConfigFactory configFactory = ConfigFactory.Instance();
@@ -145,6 +145,7 @@ public abstract class Loader
             schemaBuilder.append(name).append(":").append(type)
                     .append(",");
         }
+        metadataService.shutdown();
         schemaBuilder.replace(schemaBuilder.length() - 1, schemaBuilder.length(), ">");
         return executeLoad(originalDataPath, loadingDataPath, schemaBuilder.toString(), orderMapping, configFactory, maxRowNum, regex);
     }
