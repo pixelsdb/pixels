@@ -78,7 +78,7 @@ Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
-To use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
+Optionally, to use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
 ```bash
 sudo mkdir -p /mnt/ramfs
 sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramfs
@@ -86,9 +86,11 @@ sudo mount -t tmpfs -o size=1g tmpfs /mnt/ramfs
 The path `/mnt/ramfs` is determined by `cache.location` and `index.location` in `PIXELS_HOME/pixels.properties`.
 The `size` parameter of the mount command should be larger than or equal to the sum of `cache.size` and `index.size` in 
 `PIXELS_HOME/pixels.properties`. And it must be smaller than the physical memory size.
-Also ensure that `cache.enabled` and `cache.read.direct` are set to `true` in `PIXELS_HOME/pixels.properties`.
-Set `cache.enabled` to `false` if you don't want to use pixels-cache. 
-But **NOTE** that the path `/mnt/ramfs` must exist even if pixels-cache is disabled, as Pixels checks this path when starts.
+Set the schema name and table name of the cached table using `cache.schema` and `cache.table`, respectively.
+Set `cache.storage.scheme` to be the name of the storage system where the cached table is stored.
+**Finally**, set `cache.enabled` and `cache.read.direct` to `true` in `PIXELS_HOME/pixels.properties`.
+
+Set `cache.enabled` to `false` if you don't use pixels-cache.
 
 ### Install MySQL
 MySQL and etcd are used to store the metadata and states of Pixels. To install MySQL:
@@ -226,13 +228,22 @@ Then we get three dashboards `Cluster Exporter`, `JVM Exporter`, and `Node Expor
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
-Enter `PIXELS_HOME` and start the daemons of Pixels using:
+Enter `PIXELS_HOME`.
+If pixels-cache is enabled, setup the cache before starting Pixels:
 ```bash
 ./sbin/reset-cache.sh
+sudo ./sbin/pin-cache.sh
+```
+`reset-cache.sh` is only needed for the first time of using pixels-cache. 
+It initializes some states in etcd for the cache.
+
+Then, start the daemons of Pixels using:
+```bash
 ./sbin/start-pixels.sh
 ```
-`reset-cache.sh` is only needed for the first time of starting Pixels. It initializes some states in etcd for Pixels.
-Then, enter the home of presto-server and start Presto:
+The metadata server, coordinator, node manager, and metrics server, are running in the daemons.
+
+After starting Pixels, enter the home of presto-server and start Presto:
 ```bash
 ./bin/launcher start
 ```
@@ -252,9 +263,13 @@ Run `SHOW SCHEMAS` in presto-cli, the result should be as follows if everything 
 By now, Pixels has been installed in the EC2 instance. The aforementioned instructions should also
 work in other kinds of VMs or physical servers.
 
-Use the script `stop-pixels.sh` to stop Pixels when needed.
+Run the script `$PIXELS_HOME/sbin/stop-pixels.sh` to stop Pixels when needed.
+If pixels-cache is used, also run the `$PIXELS_HOME/sbin/unpin-cache.sh` to release the memory that is 
+pinned by the cache.
 
 ## TPC-H Evaluation
+
+After starting Pixels and Presto, we can evaluate the performance of Pixels using TPC-H.
 
 ### Prepare TPC-H
 
@@ -299,7 +314,12 @@ LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 
 LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
 ```
-This may take a few hours.
+This may take a few hours. As we don't use pixels-cache for TPC-H, there is no need to load the cache.
+Otherwise, we can load the cached table into pixels-cache using:
+```bash
+./sbin/load-cache.sh layout_version
+```
+`layout_version` is the version of the table's layout that specifies the columns we want to cache.
 
 ### Run Queries
 Connect to presto-cli:

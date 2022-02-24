@@ -85,7 +85,7 @@ public class CacheCoordinator
     private final EtcdUtil etcdUtil;
     private final PixelsCacheConfig cacheConfig;
     private final ScheduledExecutorService scheduledExecutor;
-    private final MetadataService metadataService;
+    private MetadataService metadataService = null;
     private String hostName;
     private Storage storage = null;
     // coordinator status: 0: init, 1: ready; -1: dead
@@ -99,7 +99,6 @@ public class CacheCoordinator
         this.etcdUtil = EtcdUtil.Instance();
         this.cacheConfig = new PixelsCacheConfig();
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-        this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
         this.hostName = System.getenv("HOSTNAME");
         logger.debug("HostName from system env: " + hostName);
         if (hostName == null) {
@@ -122,6 +121,10 @@ public class CacheCoordinator
      * 2. register the coordinator.
      * 3. create the storage instance that is used to get the metadata of the storage.
      * 4. check the local and the global cache versions, update the cache plan if needed.
+     *
+     * <p>
+     *     3 and 4 are only executed when the cache is enabled.
+     * </p>
      */
     private void initialize()
     {
@@ -157,23 +160,31 @@ public class CacheCoordinator
             this.cacheCoordinatorRegister = new CacheCoordinatorRegister(leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(cacheCoordinatorRegister,
                     0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
-            // 3. create the storage instance.
-            if (storage == null) {
-                storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
-            }
-            // 4. check version consistency
-            int cache_version = 0, layout_version = 0;
-            KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
-            if (null != cacheVersionKV) {
-                cache_version = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
-            }
-            KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
-            if (null != layoutVersionKV) {
-                layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
-            }
-            if (cache_version < layout_version) {
-                logger.debug("Current cache version is left behind of current layout version, update the cache...");
-                updateCachePlan(layout_version);
+            if (cacheConfig.isCacheEnabled())
+            {
+                // 3. create the storage instance.
+                if (storage == null)
+                {
+                    storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
+                }
+                // 4. check version consistency
+                int cache_version = 0, layout_version = 0;
+                this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
+                KeyValue cacheVersionKV = etcdUtil.getKeyValue(Constants.CACHE_VERSION_LITERAL);
+                if (null != cacheVersionKV)
+                {
+                    cache_version = Integer.parseInt(cacheVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                }
+                KeyValue layoutVersionKV = etcdUtil.getKeyValue(Constants.LAYOUT_VERSION_LITERAL);
+                if (null != layoutVersionKV)
+                {
+                    layout_version = Integer.parseInt(layoutVersionKV.getValue().toString(StandardCharsets.UTF_8));
+                }
+                if (cache_version < layout_version)
+                {
+                    logger.debug("Current cache version is left behind of current layout version, update the cache...");
+                    updateCachePlan(layout_version);
+                }
             }
             coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
             initializeSuccess = true;
@@ -194,42 +205,47 @@ public class CacheCoordinator
             return;
         }
         runningLatch = new CountDownLatch(1);
-        // watch layout version change, and update cache distribution and cache version
-        Watch.Watcher watcher = etcdUtil.getClient().getWatchClient().watch(
-                ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
-                WatchOption.DEFAULT, watchResponse ->
+
+        // watch layout version change, and update the cache plan and the local cache version
+        Watch.Watcher watcher = null;
+        if (cacheConfig.isCacheEnabled())
         {
-            for (WatchEvent event : watchResponse.getEvents())
-            {
-                if (event.getEventType() == WatchEvent.EventType.PUT)
-                {
-                    // listen to the PUT even on the LAYOUT VERSION, which can be changed by rainbow.
-                    if (coordinatorStatus.get() == CoordinatorStatus.READY.StatusCode)
+            watcher = etcdUtil.getClient().getWatchClient().watch(
+                    ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
+                    WatchOption.DEFAULT, watchResponse ->
                     {
-                        try
+                        for (WatchEvent event : watchResponse.getEvents())
                         {
-                            // this coordinator is ready.
-                            logger.debug("Update cache distribution");
-                            // update the cache distribution
-                            int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
-                            updateCachePlan(layoutVersion);
-                            // update cache version, notify cache managers on each node to update cache.
-                            logger.debug("Update cache version to " + layoutVersion);
-                            etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
-                        } catch (IOException | MetadataException e)
-                        {
-                            logger.error(e.getMessage());
-                            e.printStackTrace();
+                            if (event.getEventType() == WatchEvent.EventType.PUT)
+                            {
+                                // listen to the PUT even on the LAYOUT VERSION that can be changed by rainbow.
+                                if (coordinatorStatus.get() == CoordinatorStatus.READY.StatusCode)
+                                {
+                                    try
+                                    {
+                                        // this coordinator is ready.
+                                        logger.debug("Update cache distribution");
+                                        // update the cache distribution
+                                        int layoutVersion = Integer.parseInt(event.getKeyValue().getValue().toString(StandardCharsets.UTF_8));
+                                        updateCachePlan(layoutVersion);
+                                        // update cache version, notify cache managers on each node to update cache.
+                                        logger.debug("Update cache version to " + layoutVersion);
+                                        etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
+                                    } catch (IOException | MetadataException e)
+                                    {
+                                        logger.error(e.getMessage());
+                                        e.printStackTrace();
+                                    }
+                                } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
+                                {
+                                    // coordinator is shutdown.
+                                    runningLatch.countDown();
+                                }
+                                break;
+                            }
                         }
-                    } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
-                    {
-                        // coordinator is shutdown.
-                        runningLatch.countDown();
-                    }
-                    break;
-                }
-            }
-        });
+                    });
+        }
         try
         {
             // Wait for this coordinator to be shutdown.
@@ -240,7 +256,10 @@ public class CacheCoordinator
             e.printStackTrace();
         } finally
         {
-            watcher.close();
+            if (watcher != null)
+            {
+                watcher.close();
+            }
         }
     }
 
@@ -325,7 +344,7 @@ public class CacheCoordinator
     }
 
     /**
-     * get the HDFS file paths under the compact path of the first layout.
+     * get the file paths under the compact path of the first layout.
      * @param layout
      * @return the file paths
      * @throws IOException
