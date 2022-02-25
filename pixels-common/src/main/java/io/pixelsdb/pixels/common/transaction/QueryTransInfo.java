@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.transaction;
 
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 
@@ -31,7 +32,7 @@ public class QueryTransInfo
 {
     private long queryId;
     private long queryTimestamp;
-    private Status queryStatus;
+    private AtomicReference<Status> queryStatus;
     private Properties queryProperties;
 
     public enum Status
@@ -43,7 +44,7 @@ public class QueryTransInfo
     {
         this.queryId = queryId;
         this.queryTimestamp = queryTimestamp;
-        this.queryStatus = Status.PENDING;
+        this.queryStatus = new AtomicReference<>(Status.PENDING);
         this.queryProperties = new Properties();
     }
 
@@ -59,12 +60,12 @@ public class QueryTransInfo
 
     public Status getQueryStatus()
     {
-        return queryStatus;
+        return queryStatus.get();
     }
 
     public void setQueryStatus(Status status)
     {
-        this.queryStatus = status;
+        this.queryStatus.set(status);
     }
 
     public Properties getQueryProperties()
@@ -78,7 +79,7 @@ public class QueryTransInfo
         return toStringHelper(this)
                 .add("queryId", queryId)
                 .add("queryTimestamp", queryTimestamp)
-                .add("queryStatus", queryStatus)
+                .add("queryStatus", queryStatus.get())
                 .toString();
     }
 }

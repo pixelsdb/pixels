@@ -47,11 +47,13 @@ public interface Scheduler
 
     class Request implements Comparable<Request>
     {
-        public long start;
-        public int length;
+        public final long queryId;
+        public final long start;
+        public final int length;
 
-        public Request(long start, int length)
+        public Request(long queryId, long start, int length)
         {
+            this.queryId = queryId;
             this.start = start;
             this.length = length;
         }
@@ -105,9 +107,14 @@ public interface Scheduler
             this.size = 0;
         }
 
-        public CompletableFuture<ByteBuffer> add(long start, int length)
+        public CompletableFuture<ByteBuffer> add(long queryId, long start, int length)
         {
-            return add(new Request(start, length));
+            Request request = new Request(queryId, start, length);
+            CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
+            requests.add(request);
+            futures.add(future);
+            size++;
+            return future;
         }
 
         public CompletableFuture<ByteBuffer> add(Request request)

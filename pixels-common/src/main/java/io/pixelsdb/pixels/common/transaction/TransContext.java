@@ -82,4 +82,11 @@ public class TransContext
     {
         return this.queryTransContext.get(queryId);
     }
+
+    public boolean isTerminated(long queryId)
+    {
+        QueryTransInfo info =  this.queryTransContext.get(queryId);
+        return info == null || info.getQueryStatus() == QueryTransInfo.Status.COMMIT ||
+                info.getQueryStatus() == QueryTransInfo.Status.ROLLBACK;
+    }
 }

@@ -444,7 +444,7 @@ public class PixelsRecordReaderImpl
                 long footerOffset = rowGroupInformation.getFooterOffset();
                 long footerLength = rowGroupInformation.getFooterLength();
                 int fi = i;
-                actionFutures.add(requestBatch.add(footerOffset, (int) footerLength).thenAccept(resp ->
+                actionFutures.add(requestBatch.add(queryId, footerOffset, (int) footerLength).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
@@ -728,7 +728,7 @@ public class PixelsRecordReaderImpl
                  * readCost.setMs(readTimeMs);
                  * readPerfMetrics.addSeqRead(readCost);
                  */
-                actionFutures.add(requestBatch.add(new Scheduler.Request(chunk.offset, (int)chunk.length))
+                actionFutures.add(requestBatch.add(queryId, chunk.offset, (int)chunk.length)
                         .thenAccept(resp ->
                 {
                     if (resp != null)
