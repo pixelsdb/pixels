@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,10 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
@@ -65,7 +63,8 @@ public class SortMergeScheduler implements Scheduler
         this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (this.enableRetry)
         {
-            this.retryPolicy = new RetryPolicy(1000);
+            int interval = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.retry.interval.ms"));
+            this.retryPolicy = new RetryPolicy(interval);
         }
     }
 
@@ -184,11 +183,12 @@ public class SortMergeScheduler implements Scheduler
 
     protected class MergedRequest
     {
-        private long start;
+        private final long queryId;
+        private final long start;
         private long end;
-        private int position;
+        private int position; // the position of the last merged sub-request.
         private int size;
-        private List<Integer> positions;
+        private List<Integer> positions; // the positions of the merged sub-requests.
         private List<Integer> lengths;
         private List<CompletableFuture<ByteBuffer>> futures;
         // fields used by the retry policy.
@@ -198,6 +198,7 @@ public class SortMergeScheduler implements Scheduler
 
         public MergedRequest(RequestFuture first)
         {
+            this.queryId = first.request.queryId;
             this.start = first.request.start;
             this.end = first.request.start + first.request.length;
             this.positions = new ArrayList<>();
@@ -216,6 +217,10 @@ public class SortMergeScheduler implements Scheduler
             {
                 throw new IllegalArgumentException("Can not merge backward request.");
             }
+            if (curr.request.queryId != this.queryId)
+            {
+                throw new IllegalArgumentException("Can not merge requests from different queries (transactions).");
+            }
             int gap = (int) (curr.request.start - this.end);
             if (gap <= MaxGap)
             {
@@ -228,6 +233,11 @@ public class SortMergeScheduler implements Scheduler
                 return this;
             }
             return new MergedRequest(curr);
+        }
+
+        public long getQueryId()
+        {
+            return queryId;
         }
 
         public long getStart()
@@ -298,8 +308,8 @@ public class SortMergeScheduler implements Scheduler
      */
     protected class RetryPolicy
     {
-        private int maxRetryNum;
-        private int intervalMs;
+        private final int maxRetryNum;
+        private final int intervalMs;
         private final ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
         ThreadGroup monitorThreadGroup;
         private final ExecutorService monitorService;
@@ -307,6 +317,11 @@ public class SortMergeScheduler implements Scheduler
         private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
         private static final int TRANSFER_RATE_BPMS = 10240; // 10KB/ms
 
+        /**
+         * Create a retry policy, which is running as a daemon thread, for retrying the timed out requests.
+         * The policy will periodically check the request queue and find requests to retry.
+         * @param intervalMs the interval in milliseconds of two subsequent request queue checks.
+         */
         protected RetryPolicy(int intervalMs)
         {
             this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
@@ -339,9 +354,19 @@ public class SortMergeScheduler implements Scheduler
                             it.remove();
                         } else if (currentTimeMs - request.startTimeMs > timeoutMs(request.getLength()))
                         {
-                            if (request.retried >= 3)
+                            if (request.retried >= maxRetryNum)
                             {
-                                // give up retry.
+                                // give up retrying.
+                                it.remove();
+                                continue;
+                            }
+                            if (TransContext.Instance().isTerminated(request.queryId))
+                            {
+                                /**
+                                 * Issue #139:
+                                 * The query has been terminated (e.g., canceled or completed),
+                                 * give up retrying.
+                                 */
                                 it.remove();
                                 continue;
                             }
@@ -385,7 +410,7 @@ public class SortMergeScheduler implements Scheduler
                     try
                     {
                         // sleep for some time, to release the cpu.
-                        Thread.sleep(intervalMs);
+                        Thread.sleep(this.intervalMs);
                     } catch (InterruptedException e)
                     {
                         logger.error("Retry policy is interrupted during sleep.", e);

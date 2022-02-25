@@ -103,7 +103,8 @@ public class RateLimitedScheduler extends SortMergeScheduler
         this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (this.enableRetry)
         {
-            this.retryPolicy = new RetryPolicy(1000);
+            int interval = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.retry.interval.ms"));
+            this.retryPolicy = new RetryPolicy(interval);
         }
     }
 
