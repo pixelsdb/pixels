@@ -37,6 +37,7 @@
         <module>pixels-listener</module>
         <module>pixels-hive</module>
         <module>pixels-tools</module>
+        <module>pixels-lambda</module>
     </modules>
 
     <packaging>pom</packaging>
