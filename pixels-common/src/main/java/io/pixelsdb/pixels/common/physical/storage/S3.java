@@ -464,7 +464,7 @@ public class S3 implements Storage
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
                 try
                 {
-                    s3Async.deleteObject(request).get();
+                    s3.deleteObject(request);
                 } catch (Exception e)
                 {
                     throw new IOException("Failed to delete object '" + sub.bucket + "/" + sub.key + "' from S3.", e);
@@ -476,7 +476,7 @@ public class S3 implements Storage
             DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(p.bucket).key(p.key).build();
             try
             {
-                s3Async.deleteObject(request).get();
+                s3.deleteObject(request);
             } catch (Exception e)
             {
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
@@ -503,7 +503,7 @@ public class S3 implements Storage
                 .build();
         try
         {
-            s3Async.copyObject(copyReq).join();
+            s3.copyObject(copyReq);
             return true;
         }
         catch (RuntimeException e)
