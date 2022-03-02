@@ -140,6 +140,21 @@ public class PixelsMetadataProxy
         return metadataService.existTable(schemaName, tableName);
     }
 
+    public boolean createView (String schemaName, String viewName, String viewData) throws MetadataException
+    {
+        return metadataService.createView(schemaName, viewName, viewData);
+    }
+
+    public boolean dropView (String schemaName, String viewName) throws MetadataException
+    {
+        return metadataService.dropView(schemaName, viewName);
+    }
+
+    public boolean existView (String schemaName, String viewName) throws MetadataException
+    {
+        return metadataService.existView(schemaName, viewName);
+    }
+
     public boolean existSchema (String schemaName) throws MetadataException
     {
         return metadataService.existSchema(schemaName);

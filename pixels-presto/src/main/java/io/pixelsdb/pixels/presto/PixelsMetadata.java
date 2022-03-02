@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
 import javax.inject.Inject;
 import java.util.*;
 
+import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -372,47 +373,53 @@ public class PixelsMetadata
         }
     }
 
-    /**
-     * Create the specified view. The data for the view is opaque to the connector.
-     *
-     * @param session
-     * @param viewName
-     * @param viewData
-     * @param replace
-     */
     @Override
     public void createView(ConnectorSession session, SchemaTableName viewName, String viewData, boolean replace)
     {
-
+        logger.info("view name: " + viewName.toString());
+        logger.info("view data: " +viewData);
+        logger.debug("is replace: " + replace);
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support creating views");
     }
 
-    /**
-     * Drop the specified view.
-     *
-     * @param session
-     * @param viewName
-     */
+    @Override
+    public boolean schemaExists(ConnectorSession session, String schemaName)
+    {
+        try
+        {
+            return this.pixelsMetadataProxy.existSchema(schemaName);
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
     @Override
     public void dropView(ConnectorSession session, SchemaTableName viewName)
     {
-
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.dropView(viewName.getSchemaName(), viewName.getTableName());
+            if (res == false)
+            {
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "View '" + viewName.getSchemaName() + "." + viewName.getTableName() + "' does not exist.");
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
     }
 
     @Override
     public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
     {
-        return null;
+        return ConnectorMetadata.super.listViews(session, schemaName);
     }
 
-    /**
-     * Gets the view data for views that match the specified table prefix.
-     *
-     * @param session
-     * @param prefix
-     */
     @Override
     public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        return null;
+        return ConnectorMetadata.super.getViews(session, prefix);
     }
 }

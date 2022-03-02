@@ -44,7 +44,11 @@ public class ErrorCode
     public static final int METADATA_UPDATE_LAYOUT_FAILED = (ERROR_BASE_METADATA + 12);
     public static final int METADATA_ADD_LAYOUT_FAILED = (ERROR_BASE_METADATA + 13);
     public static final int METADATA_ADD_SCHEMA_FAILED = (ERROR_BASE_METADATA + 14);
-    public static final int METADATA_GET_SCHEMA_FAILED = (ERROR_BASE_METADATA + 15);
+    public static final int METADATA_ADD_TABLE_FAILED = (ERROR_BASE_METADATA + 15);
+    public static final int METADATA_VIEW_NOT_FOUND = (ERROR_BASE_METADATA + 16);
+    public static final int METADATA_VIEW_EXIST = (ERROR_BASE_METADATA + 17);
+    public static final int METADATA_ADD_VIEW_FAILED = (ERROR_BASE_METADATA + 18);
+    public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
