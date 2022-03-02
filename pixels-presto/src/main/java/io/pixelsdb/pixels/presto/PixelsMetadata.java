@@ -59,6 +59,18 @@ public class PixelsMetadata
     }
 
     @Override
+    public boolean schemaExists(ConnectorSession session, String schemaName)
+    {
+        try
+        {
+            return this.pixelsMetadataProxy.existSchema(schemaName);
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
     public List<String> listSchemaNames(ConnectorSession session)
     {
         return listSchemaNamesInternal();
@@ -356,18 +368,6 @@ public class PixelsMetadata
                 throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
                         "Failed to create view '" + viewName + "'.");
             }
-        } catch (MetadataException e)
-        {
-            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
-        }
-    }
-
-    @Override
-    public boolean schemaExists(ConnectorSession session, String schemaName)
-    {
-        try
-        {
-            return this.pixelsMetadataProxy.existSchema(schemaName);
         } catch (MetadataException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
