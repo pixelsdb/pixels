@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.View;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
@@ -414,12 +415,60 @@ public class PixelsMetadata
     @Override
     public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
     {
-        return ConnectorMetadata.super.listViews(session, schemaName);
+        try
+        {
+            List<String> schemaNames;
+            if (schemaName.isPresent())
+            {
+                schemaNames = ImmutableList.of(schemaName.get());
+            } else
+            {
+                schemaNames = pixelsMetadataProxy.getSchemaNames();
+            }
+
+            ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
+            for (String schema : schemaNames)
+            {
+                /**
+                 * Issue #194:
+                 * Only try to get view names if the schema exists.
+                 * 'show tables' in information_schema also invokes this method.
+                 * In this case, information_schema does not exist in the metadata,
+                 * we should return an empty list without throwing an exception.
+                 * Presto will add the system tables by itself.
+                 */
+                if (pixelsMetadataProxy.existSchema(schema))
+                {
+                    for (String table : pixelsMetadataProxy.getViewNames(schema))
+                    {
+                        builder.add(new SchemaTableName(schema, table));
+                    }
+                }
+            }
+            return builder.build();
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
     }
 
     @Override
     public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        return ConnectorMetadata.super.getViews(session, prefix);
+        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> builder = ImmutableMap.builder();
+        try
+        {
+            String schemaName = prefix.getSchemaName();
+            List<View> views = this.pixelsMetadataProxy.getViews(schemaName);
+            for (View view : views)
+            {
+                SchemaTableName stName = new SchemaTableName(schemaName, view.getName());
+                builder.put(stName, new ConnectorViewDefinition(stName, Optional.empty(), view.getData()));
+            }
+            return builder.build();
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
     }
 }
