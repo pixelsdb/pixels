@@ -140,11 +140,6 @@ public class PixelsMetadata
         return new ConnectorTableMetadata(new SchemaTableName(schemaName, tableName), columns);
     }
 
-    private ConnectorTableMetadata getTableMetadataInternal(SchemaTableName schemaTableName)
-    {
-        return getTableMetadataInternal(schemaTableName.getSchemaName(), schemaTableName.getTableName());
-    }
-
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
@@ -220,8 +215,9 @@ public class PixelsMetadata
     {
         requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
-        for (SchemaTableName tableName : listTablesInternal(session, prefix))
+        if (prefix.getSchemaName() != null)
         {
+            SchemaTableName tableName = new SchemaTableName(prefix.getSchemaName(), prefix.getTableName());
             try
             {
                 /**
@@ -231,7 +227,8 @@ public class PixelsMetadata
                  */
                 if (pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
                 {
-                    ConnectorTableMetadata tableMetadata = getTableMetadataInternal(tableName);
+                    ConnectorTableMetadata tableMetadata = getTableMetadataInternal(
+                            tableName.getSchemaName(), tableName.getTableName());
                     // table can disappear during listing operation
                     if (tableMetadata != null)
                     {
@@ -244,15 +241,6 @@ public class PixelsMetadata
             }
         }
         return columns.build();
-    }
-
-    private List<SchemaTableName> listTablesInternal(ConnectorSession session, SchemaTablePrefix prefix)
-    {
-        if (prefix.getSchemaName() == null)
-        {
-            return listTables(session, prefix.getSchemaName());
-        }
-        return ImmutableList.of(new SchemaTableName(prefix.getSchemaName(), prefix.getTableName()));
     }
 
     @Override
