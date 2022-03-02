@@ -371,4 +371,48 @@ public class PixelsMetadata
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
         }
     }
+
+    /**
+     * Create the specified view. The data for the view is opaque to the connector.
+     *
+     * @param session
+     * @param viewName
+     * @param viewData
+     * @param replace
+     */
+    @Override
+    public void createView(ConnectorSession session, SchemaTableName viewName, String viewData, boolean replace)
+    {
+
+    }
+
+    /**
+     * Drop the specified view.
+     *
+     * @param session
+     * @param viewName
+     */
+    @Override
+    public void dropView(ConnectorSession session, SchemaTableName viewName)
+    {
+
+    }
+
+    @Override
+    public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
+    {
+        return null;
+    }
+
+    /**
+     * Gets the view data for views that match the specified table prefix.
+     *
+     * @param session
+     * @param prefix
+     */
+    @Override
+    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, SchemaTablePrefix prefix)
+    {
+        return null;
+    }
 }
