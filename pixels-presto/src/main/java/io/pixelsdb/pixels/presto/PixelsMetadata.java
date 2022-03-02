@@ -290,22 +290,6 @@ public class PixelsMetadata
         }
     }
 
-    /**
-     * Begin the atomic creation of a table with data.
-     *
-     * @param session
-     * @param tableMetadata
-     * @param layout
-     */
-    @Override
-    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session,
-                                                       ConnectorTableMetadata tableMetadata,
-                                                       Optional<ConnectorNewTableLayout> layout)
-    {
-        throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
-                "Create table with data is currently not supported.");
-    }
-
     @Override
     public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
