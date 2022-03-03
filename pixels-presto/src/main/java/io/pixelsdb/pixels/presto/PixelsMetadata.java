@@ -235,7 +235,7 @@ public class PixelsMetadata
                 /**
                  * Issue #183:
                  * Return an empty result if the table does not exist.
-                 * This is possible when reading the columns of information_schema tables.
+                 * This is possible when reading the content of information_schema tables.
                  */
                 if (pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
                 {
@@ -438,11 +438,20 @@ public class PixelsMetadata
         try
         {
             String schemaName = prefix.getSchemaName();
-            List<View> views = this.pixelsMetadataProxy.getViews(schemaName);
-            for (View view : views)
+            if (this.pixelsMetadataProxy.existSchema(schemaName))
             {
-                SchemaTableName stName = new SchemaTableName(schemaName, view.getName());
-                builder.put(stName, new ConnectorViewDefinition(stName, Optional.empty(), view.getData()));
+                /**
+                 * Issue #194:
+                 * Only try to get views if the schema exists.
+                 * Otherwise, return an empty set, which is required by Presto
+                 * when reading the content of information_schema tables.
+                 */
+                List<View> views = this.pixelsMetadataProxy.getViews(schemaName);
+                for (View view : views)
+                {
+                    SchemaTableName stName = new SchemaTableName(schemaName, view.getName());
+                    builder.put(stName, new ConnectorViewDefinition(stName, Optional.empty(), view.getData()));
+                }
             }
             return builder.build();
         } catch (MetadataException e)
