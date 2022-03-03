@@ -42,6 +42,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private TableDao tableDao = DaoFactory.Instance().getTableDao("rdb");
     private ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
     private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
+    private ViewDao viewDao = DaoFactory.Instance().getViewDao("rdb");
 
     public MetadataServiceImpl () { }
 
@@ -493,18 +494,24 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            boolean res = tableDao.insert(table);
-            List<MetadataProto.Column> columns = request.getColumnsList();
-            // to get table id from database.
-            table = tableDao.getByNameAndSchema(table.getName(), schema);
-            if (res && columns.size() == columnDao.insertBatch(table, columns))
+            if (tableDao.insert(table))
             {
-                headerBuilder.setErrorCode(0).setErrorMsg("");
+                List<MetadataProto.Column> columns = request.getColumnsList();
+                // to get table id from database.
+                table = tableDao.getByNameAndSchema(table.getName(), schema);
+                if (columns.size() == columnDao.insertBatch(table, columns))
+                {
+                    headerBuilder.setErrorCode(0).setErrorMsg("");
+                } else
+                {
+                    tableDao.deleteByNameAndSchema(table.getName(), schema);
+                    headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns to table '" +
+                            request.getSchemaName() + "." + request.getTableName() + "'");
+                }
             }
             else
             {
-                tableDao.deleteByNameAndSchema(table.getName(), schema);
-                headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns to table '" +
+                headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg("failed to add table '" +
                         request.getSchemaName() + "." + request.getTableName() + "'");
             }
         }
@@ -559,7 +566,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         {
             /**
              * Issue #183:
-             * We should firstly check the existence of the schema.
+             * We firstly check the existence of the schema.
              */
             schema = MetadataProto.Schema.newBuilder().setId(-1).setName(request.getSchemaName()).build();
             if (!schemaDao.exists(schema))
@@ -568,7 +575,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             }
             else
             {
-                headerBuilder.setErrorCode(METADATA_GET_SCHEMA_FAILED).setErrorMsg(
+                headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg(
                         "failed to get schema '" + request.getSchemaName() + "'");
             }
             response = MetadataProto.ExistTableResponse.newBuilder()
@@ -624,6 +631,155 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             response = MetadataProto.ExistSchemaResponse.newBuilder()
                     .setExists(false).setHeader(headerBuilder.build()).build();
         }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void createView(MetadataProto.CreateViewRequest request, StreamObserver<MetadataProto.CreateViewResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        MetadataProto.View view = MetadataProto.View.newBuilder()
+                .setName(request.getViewName())
+                .setType("user")
+                .setData(request.getViewData())
+                .setSchemaId(schema.getId()).build();
+        if (viewDao.exists(view))
+        {
+            headerBuilder.setErrorCode(METADATA_VIEW_EXIST).setErrorMsg("view '" +
+                    request.getSchemaName() + "." + request.getViewName() + "' already exist");
+        }
+        else
+        {
+            if (viewDao.insert(view))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_ADD_VIEW_FAILED).setErrorMsg("failed to add view '" +
+                        request.getSchemaName() + "." + request.getViewName() + "'");
+            }
+        }
+
+        MetadataProto.CreateViewResponse response = MetadataProto.CreateViewResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void existView(MetadataProto.ExistViewRequest request, StreamObserver<MetadataProto.ExistViewResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.ExistViewResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        if (schema == null)
+        {
+            schema = MetadataProto.Schema.newBuilder().setId(-1).setName(request.getSchemaName()).build();
+            if (!schemaDao.exists(schema))
+            {
+                headerBuilder.setErrorCode(0).setErrorMsg("");
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg(
+                        "failed to get schema '" + request.getSchemaName() + "'");
+            }
+            response = MetadataProto.ExistViewResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+            return;
+        }
+        MetadataProto.View view = MetadataProto.View.newBuilder()
+                .setId(-1)
+                .setName(request.getViewName())
+                .setSchemaId(schema.getId()).build();
+
+        if (viewDao.exists(view))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistViewResponse.newBuilder()
+                    .setExists(true).setHeader(headerBuilder.build()).build();
+        }
+        else
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.ExistViewResponse.newBuilder()
+                    .setExists(false).setHeader(headerBuilder.build()).build();
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getViews(MetadataProto.GetViewsRequest request, StreamObserver<MetadataProto.GetViewsResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetViewsResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        List<MetadataProto.View> views;
+
+        if(schema != null)
+        {
+            views = viewDao.getBySchema(schema);
+            /**
+             * views.isEmpty() is normal for a schema without any views.
+             */
+            if (views == null)
+            {
+                header = headerBuilder.setErrorCode(METADATA_VIEW_NOT_FOUND)
+                        .setErrorMsg("metadata server failed to get views").build();
+                response = MetadataProto.GetViewsResponse.newBuilder()
+                        .setHeader(header).build();
+            }
+            else
+            {
+                header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                response = MetadataProto.GetViewsResponse.newBuilder()
+                        .setHeader(header)
+                        .addAllViews(views).build();
+            }
+        }
+        else
+        {
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found").build();
+            response = MetadataProto.GetViewsResponse.newBuilder().setHeader(header).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void dropView(MetadataProto.DropViewRequest request, StreamObserver<MetadataProto.DropViewResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        if (viewDao.deleteByNameAndSchema(request.getViewName(), schema))
+        {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_DELETE_VIEW_FAILED).setErrorMsg("failed to delete view '" +
+                    request.getSchemaName() + "." + request.getViewName() + "'");
+        }
+        MetadataProto.DropViewResponse response = MetadataProto.DropViewResponse.newBuilder()
+                .setHeader(headerBuilder.build()).build();
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();

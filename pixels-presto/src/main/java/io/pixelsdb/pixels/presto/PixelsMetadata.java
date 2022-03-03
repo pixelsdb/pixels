@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.View;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsMetadataProxy;
@@ -55,6 +56,18 @@ public class PixelsMetadata
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.pixelsMetadataProxy = requireNonNull(pixelsMetadataProxy, "pixelsMetadataProxy is null");
+    }
+
+    @Override
+    public boolean schemaExists(ConnectorSession session, String schemaName)
+    {
+        try
+        {
+            return this.pixelsMetadataProxy.existSchema(schemaName);
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
     }
 
     @Override
@@ -139,11 +152,6 @@ public class PixelsMetadata
         return new ConnectorTableMetadata(new SchemaTableName(schemaName, tableName), columns);
     }
 
-    private ConnectorTableMetadata getTableMetadataInternal(SchemaTableName schemaTableName)
-    {
-        return getTableMetadataInternal(schemaTableName.getSchemaName(), schemaTableName.getTableName());
-    }
-
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
@@ -219,18 +227,20 @@ public class PixelsMetadata
     {
         requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> columns = ImmutableMap.builder();
-        for (SchemaTableName tableName : listTablesInternal(session, prefix))
+        if (prefix.getSchemaName() != null)
         {
+            SchemaTableName tableName = new SchemaTableName(prefix.getSchemaName(), prefix.getTableName());
             try
             {
                 /**
                  * Issue #183:
                  * Return an empty result if the table does not exist.
-                 * This is possible when reading the columns of information_schema tables.
+                 * This is possible when reading the content of information_schema tables.
                  */
                 if (pixelsMetadataProxy.existTable(tableName.getSchemaName(), tableName.getTableName()))
                 {
-                    ConnectorTableMetadata tableMetadata = getTableMetadataInternal(tableName);
+                    ConnectorTableMetadata tableMetadata = getTableMetadataInternal(
+                            tableName.getSchemaName(), tableName.getTableName());
                     // table can disappear during listing operation
                     if (tableMetadata != null)
                     {
@@ -243,15 +253,6 @@ public class PixelsMetadata
             }
         }
         return columns.build();
-    }
-
-    private List<SchemaTableName> listTablesInternal(ConnectorSession session, SchemaTablePrefix prefix)
-    {
-        if (prefix.getSchemaName() == null)
-        {
-            return listTables(session, prefix.getSchemaName());
-        }
-        return ImmutableList.of(new SchemaTableName(prefix.getSchemaName(), prefix.getTableName()));
     }
 
     @Override
@@ -293,28 +294,12 @@ public class PixelsMetadata
             if (res == false && ignoreExisting == false)
             {
                 throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
-                        "Table " + schemaTableName.toString() + " already exists.");
+                        "Table '" + schemaTableName + "' might already exist, failed to create it.");
             }
         } catch (MetadataException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
         }
-    }
-
-    /**
-     * Begin the atomic creation of a table with data.
-     *
-     * @param session
-     * @param tableMetadata
-     * @param layout
-     */
-    @Override
-    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session,
-                                                       ConnectorTableMetadata tableMetadata,
-                                                       Optional<ConnectorNewTableLayout> layout)
-    {
-        throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
-                "Create table with data is currently not supported.");
     }
 
     @Override
@@ -366,6 +351,109 @@ public class PixelsMetadata
                 throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
                         "Schema " + schemaName + " does not exist.");
             }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public void createView(ConnectorSession session, SchemaTableName viewName, String viewData, boolean replace)
+    {
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.createView(viewName.getSchemaName(), viewName.getTableName(), viewData);
+            if (res == false)
+            {
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "Failed to create view '" + viewName + "'.");
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public void dropView(ConnectorSession session, SchemaTableName viewName)
+    {
+        try
+        {
+            boolean res = this.pixelsMetadataProxy.dropView(viewName.getSchemaName(), viewName.getTableName());
+            if (res == false)
+            {
+                throw  new PrestoException(PixelsErrorCode.PIXELS_SQL_EXECUTE_ERROR,
+                        "View '" + viewName.getSchemaName() + "." + viewName.getTableName() + "' does not exist.");
+            }
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
+    {
+        try
+        {
+            List<String> schemaNames;
+            if (schemaName.isPresent())
+            {
+                schemaNames = ImmutableList.of(schemaName.get());
+            } else
+            {
+                schemaNames = pixelsMetadataProxy.getSchemaNames();
+            }
+
+            ImmutableList.Builder<SchemaTableName> builder = ImmutableList.builder();
+            for (String schema : schemaNames)
+            {
+                /**
+                 * Issue #194:
+                 * Only try to get view names if the schema exists.
+                 * 'show tables' in information_schema also invokes this method.
+                 * In this case, information_schema does not exist in the metadata,
+                 * we should return an empty list without throwing an exception.
+                 * Presto will add the system tables by itself.
+                 */
+                if (pixelsMetadataProxy.existSchema(schema))
+                {
+                    for (String table : pixelsMetadataProxy.getViewNames(schema))
+                    {
+                        builder.add(new SchemaTableName(schema, table));
+                    }
+                }
+            }
+            return builder.build();
+        } catch (MetadataException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);
+        }
+    }
+
+    @Override
+    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, SchemaTablePrefix prefix)
+    {
+        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> builder = ImmutableMap.builder();
+        try
+        {
+            String schemaName = prefix.getSchemaName();
+            if (this.pixelsMetadataProxy.existSchema(schemaName))
+            {
+                /**
+                 * Issue #194:
+                 * Only try to get views if the schema exists.
+                 * Otherwise, return an empty set, which is required by Presto
+                 * when reading the content of information_schema tables.
+                 */
+                List<View> views = this.pixelsMetadataProxy.getViews(schemaName);
+                for (View view : views)
+                {
+                    SchemaTableName stName = new SchemaTableName(schemaName, view.getName());
+                    builder.put(stName, new ConnectorViewDefinition(stName, Optional.empty(), view.getData()));
+                }
+            }
+            return builder.build();
         } catch (MetadataException e)
         {
             throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR, e);

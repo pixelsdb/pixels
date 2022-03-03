@@ -30,21 +30,26 @@ package metadata.proto;
 
 // The metadata services definition.
 service MetadataService {
+    rpc CreateSchema (CreateSchemaRequest) returns (CreateSchemaResponse);
+    rpc ExistSchema (ExistSchemaRequest) returns (ExistSchemaResponse);
     rpc GetSchemas (GetSchemasRequest) returns (GetSchemasResponse);
+    rpc DropSchema (DropSchemaRequest) returns (DropSchemaResponse);
+    rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
+    rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
     rpc GetTable (GetTableRequest) returns (GetTableResponse);
     rpc GetTables (GetTablesRequest) returns (GetTablesResponse);
+    rpc DropTable (DropTableRequest) returns (DropTableResponse);
+    rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
-    rpc AddLayout (AddLayoutRequest) returns (AddLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
     rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
-    rpc CreateSchema (CreateSchemaRequest) returns (CreateSchemaResponse);
-    rpc DropSchema (DropSchemaRequest) returns (DropSchemaResponse);
-    rpc CreateTable (CreateTableRequest) returns (CreateTableResponse);
-    rpc DropTable (DropTableRequest) returns (DropTableResponse);
-    rpc ExistTable (ExistTableRequest) returns (ExistTableResponse);
-    rpc ExistSchema (ExistSchemaRequest) returns (ExistSchemaResponse);
+    rpc CreateView (CreateViewRequest) returns (CreateViewResponse);
+    rpc ExistView (ExistViewRequest) returns (ExistViewResponse);
+    rpc GetViews (GetViewsRequest) returns (GetViewsResponse);
+    rpc DropView (DropViewRequest) returns (DropViewResponse);
+
 }
 
 // begin domain objects definition
@@ -90,6 +95,14 @@ message Layout {
     string projections = 10;
     uint64 tableId = 11;
 }
+
+message View {
+    uint64 id = 1;
+    string name = 2;
+    string type = 3;
+    string data = 4;
+    uint64 schemaId = 5;
+}
 // end domain objects definitions
 
 // begin request/response definition for rpc services
@@ -123,6 +136,16 @@ message CreateSchemaRequest {
 
 message CreateSchemaResponse {
     ResponseHeader header = 1;
+}
+
+message ExistSchemaRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+}
+
+message ExistSchemaResponse {
+    ResponseHeader header = 1;
+    bool exists = 2;
 }
 
 message DropSchemaRequest {
@@ -163,16 +186,6 @@ message ExistTableRequest {
 }
 
 message ExistTableResponse {
-    ResponseHeader header = 1;
-    bool exists = 2;
-}
-
-message ExistSchemaRequest {
-    RequestHeader header = 1;
-    string schemaName = 2;
-}
-
-message ExistSchemaResponse {
     ResponseHeader header = 1;
     bool exists = 2;
 }
@@ -268,4 +281,46 @@ message UpdateLayoutResponse {
     ResponseHeader header = 1;
 }
 
+// view
+message GetViewsRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+}
+
+message GetViewsResponse {
+    ResponseHeader header = 1;
+    repeated View views = 2;
+}
+
+message ExistViewRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string viewName = 3;
+}
+
+message ExistViewResponse {
+    ResponseHeader header = 1;
+    bool exists = 2;
+}
+
+message CreateViewRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string viewName = 3;
+    string viewData = 4;
+}
+
+message CreateViewResponse {
+    ResponseHeader header = 1;
+}
+
+message DropViewRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string viewName = 3;
+}
+
+message DropViewResponse {
+    ResponseHeader header = 1;
+}
 // end request/response definition for rpc services

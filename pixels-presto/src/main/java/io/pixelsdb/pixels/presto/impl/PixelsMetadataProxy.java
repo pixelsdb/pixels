@@ -25,10 +25,7 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.metadata.domain.Column;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Schema;
-import io.pixelsdb.pixels.common.metadata.domain.Table;
+import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.presto.PixelsColumnHandle;
 import io.pixelsdb.pixels.presto.PixelsTypeManager;
@@ -85,6 +82,16 @@ public class PixelsMetadataProxy
         return tableList;
     }
 
+    public List<String> getViewNames(String schemaName) throws MetadataException
+    {
+        List<String> viewList = new ArrayList<String>();
+        List<View> views = metadataService.getViews(schemaName);
+        for (View t : views) {
+            viewList.add(t.getName());
+        }
+        return viewList;
+    }
+
     public Table getTable(String schemaName, String tableName) throws MetadataException
     {
         return metadataService.getTable(schemaName, tableName);
@@ -138,6 +145,26 @@ public class PixelsMetadataProxy
     public boolean existTable (String schemaName, String tableName) throws MetadataException
     {
         return metadataService.existTable(schemaName, tableName);
+    }
+
+    public boolean createView (String schemaName, String viewName, String viewData) throws MetadataException
+    {
+        return metadataService.createView(schemaName, viewName, viewData);
+    }
+
+    public boolean dropView (String schemaName, String viewName) throws MetadataException
+    {
+        return metadataService.dropView(schemaName, viewName);
+    }
+
+    public boolean existView (String schemaName, String viewName) throws MetadataException
+    {
+        return metadataService.existView(schemaName, viewName);
+    }
+
+    public List<View> getViews (String schemaName) throws MetadataException
+    {
+        return metadataService.getViews(schemaName);
     }
 
     public boolean existSchema (String schemaName) throws MetadataException
