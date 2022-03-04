@@ -28,7 +28,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.presto.PixelsColumnHandle;
-import io.pixelsdb.pixels.presto.PixelsTypeManager;
+import io.pixelsdb.pixels.presto.PixelsTypeParser;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
 import java.util.ArrayList;
@@ -103,11 +103,11 @@ public class PixelsMetadataProxy
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
-            Type columnType = PixelsTypeManager.getColumnType(c);
+            Type columnType = PixelsTypeParser.getColumnType(c);
             if (columnType == null)
             {
                 throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR,
-                        "columnType '" + c.getType() + "' is not defined.");
+                        "columnType '" + c.getType() + "' is not supported.");
             }
             String name = c.getName();
             PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);

@@ -55,6 +55,7 @@ public interface ColumnWriter
             case FLOAT:
                 return new FloatColumnWriter(schema, pixelStride, isEncoding);
             case DOUBLE:
+            case DECIMAL: // TODO: precision and scale are not enforced for decimal.
                 return new DoubleColumnWriter(schema, pixelStride, isEncoding);
             case STRING:
                 return new StringColumnWriter(schema, pixelStride, isEncoding);
@@ -63,7 +64,9 @@ public interface ColumnWriter
             case VARCHAR:
                 return new VarcharColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
             case BINARY:
-                return new BinaryColumnWriter(schema, pixelStride, isEncoding);
+                return new BinaryColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
+            case VARBINARY:
+                return new VarbinaryColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
             case DATE:
                 return new DateColumnWriter(schema, pixelStride, isEncoding);
             case TIME:

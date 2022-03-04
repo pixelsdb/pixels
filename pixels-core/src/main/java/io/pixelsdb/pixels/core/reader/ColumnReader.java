@@ -44,22 +44,23 @@ public abstract class ColumnReader implements Closeable
     {
         switch (type.getCategory())
         {
-            case BINARY:
-                return new BinaryColumnReader(type);
             case BOOLEAN:
                 return new BooleanColumnReader(type);
             case BYTE:
                 return new ByteColumnReader(type);
-            case CHAR:
-                return new CharColumnReader(type);
             case SHORT:
             case INT:
             case LONG:
                 return new IntegerColumnReader(type);
             case DOUBLE:
+            case DECIMAL:
                 return new DoubleColumnReader(type);
             case FLOAT:
                 return new FloatColumnReader(type);
+            case CHAR:
+                return new CharColumnReader(type);
+            case VARCHAR:
+                return new VarcharColumnReader(type);
             case STRING:
                 return new StringColumnReader(type);
             case DATE:
@@ -68,8 +69,10 @@ public abstract class ColumnReader implements Closeable
                 return new TimeColumnReader(type);
             case TIMESTAMP:
                 return new TimestampColumnReader(type);
-            case VARCHAR:
-                return new VarcharColumnReader(type);
+            case BINARY:
+                return new BinaryColumnReader(type);
+            case VARBINARY:
+                return new VarbinaryColumnReader(type);
             default:
                 throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }

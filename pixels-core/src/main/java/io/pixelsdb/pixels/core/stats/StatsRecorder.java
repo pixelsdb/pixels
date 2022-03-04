@@ -193,6 +193,7 @@ public class StatsRecorder
                 return new IntegerStatsRecorder();
             case FLOAT:
             case DOUBLE:
+            case DECIMAL:
                 return new DoubleStatsRecorder();
             case STRING:
             case CHAR:
@@ -205,6 +206,7 @@ public class StatsRecorder
             case TIMESTAMP:
                 return new TimestampStatsRecorder();
             case BINARY:
+            case VARBINARY:
                 return new BinaryStatsRecorder();
             default:
                 return new StatsRecorder();
@@ -224,6 +226,7 @@ public class StatsRecorder
                 return new IntegerStatsRecorder(statistic);
             case FLOAT:
             case DOUBLE:
+            case DECIMAL:
                 return new DoubleStatsRecorder(statistic);
             case STRING:
             case CHAR:
@@ -236,6 +239,7 @@ public class StatsRecorder
             case TIMESTAMP:
                 return new TimestampStatsRecorder(statistic);
             case BINARY:
+            case VARBINARY:
                 return new BinaryStatsRecorder(statistic);
             default:
                 return new StatsRecorder(statistic);

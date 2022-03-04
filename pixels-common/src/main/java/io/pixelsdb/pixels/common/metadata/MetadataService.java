@@ -446,7 +446,8 @@ public class MetadataService
         for (Column column : columns)
         {
             columnList.add(MetadataProto.Column.newBuilder()
-                    .setId(column.getId()).setName(column.getName()).setType(column.getType())
+                    .setId(column.getId()).setName(column.getName())
+                    .setType(column.getType().replaceAll("\\s", ""))
                     .setSize(column.getSize()).build()); // no need to set table id.
         }
         MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()

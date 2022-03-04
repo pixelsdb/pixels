@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.presto;
 
-import io.pixelsdb.pixels.common.metadata.domain.Column;
-import com.facebook.presto.spi.function.OperatorType;
-import com.facebook.presto.spi.type.*;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 
-import java.lang.invoke.MethodHandle;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -33,24 +34,23 @@ import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.RealType.REAL;
+import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
+import static com.facebook.presto.spi.type.TinyintType.TINYINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * This class is derived from com.facebook.presto.spi.type.TestingTypeManager
- *
- * We replace the loop lookup implementation of getType with a hashMap lookup.
+ * Parse Pixels Column to Presto Type.
  *
  * Created at: 19-6-1
  * Author: hank
  */
-public class PixelsTypeManager
-        implements TypeManager
+public class PixelsTypeParser
 {
-    private static final PixelsTypeManager typeManager = new PixelsTypeManager();
+    private static final PixelsTypeParser typeManager = new PixelsTypeParser();
 
     public static Type getColumnType (Column column)
     {
@@ -73,11 +73,11 @@ public class PixelsTypeManager
 
     static
     {
-        // Important: these are the data types we support int pixels-presto.
-        // TODO: support more data types.
-        // TODO: map presto data type to pixels data type more gracefully.
-        // currently we do this by hard code in PixelsPageSource
-        supportedTypes = ImmutableList.of(BOOLEAN, INTEGER, BIGINT, DOUBLE, REAL, VARCHAR, TIMESTAMP, DATE, TIME);
+        // Important: these are the data types we support in pixels-presto.
+        // The types supported here should be consistent with the switch..case in PixelsPageSource.
+        supportedTypes = ImmutableList.of(
+                BOOLEAN, TINYINT, SMALLINT, INTEGER, BIGINT,
+                DOUBLE, REAL, VARCHAR, TIMESTAMP, DATE, TIME);
         signatureToType = new HashMap<>();
         for (Type type : supportedTypes)
         {
@@ -94,7 +94,7 @@ public class PixelsTypeManager
         signatureToType.put("char", VARCHAR);
     }
 
-    private PixelsTypeManager () {}
+    private PixelsTypeParser() {}
 
     public Type getType(String signature)
     {
@@ -110,59 +110,5 @@ public class PixelsTypeManager
             signature = signature.substring(0, index);
         }
         return signatureToType.get(signature.toLowerCase());
-    }
-
-    @Override
-    public Type getType(TypeSignature signature)
-    {
-        return getType(signature.toString());
-    }
-
-    @Override
-    public Type getParameterizedType(String baseTypeName, List<TypeSignatureParameter> typeParameters)
-    {
-        return getType(new TypeSignature(baseTypeName, typeParameters));
-    }
-
-    @Override
-    public List<Type> getTypes()
-    {
-        return supportedTypes;
-    }
-
-    @Override
-    public Collection<ParametricType> getParametricTypes()
-    {
-        return ImmutableList.of();
-    }
-
-    @Override
-    public Optional<Type> getCommonSuperType(Type firstType, Type secondType)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean canCoerce(Type actualType, Type expectedType)
-    {
-        return false;
-    }
-
-    @Override
-    public boolean isTypeOnlyCoercion(Type actualType, Type expectedType)
-    {
-        return false;
-    }
-
-    @Override
-    public Optional<Type> coerceTypeBase(Type sourceType, String resultTypeBase)
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public MethodHandle resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes)
-    {
-        throw new UnsupportedOperationException();
     }
 }
