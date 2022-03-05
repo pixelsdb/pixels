@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.daemon.metadata;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import io.pixelsdb.pixels.daemon.metadata.dao.*;
@@ -494,25 +495,48 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            if (tableDao.insert(table))
+            List<MetadataProto.Column> columns = request.getColumnsList();
+            /**
+             * Issue #196:
+             * Check the data types before inserting the table into metadata.
+             */
+            boolean typesValid = true;
+            String invalidType = "";
+            for (MetadataProto.Column column : columns)
             {
-                List<MetadataProto.Column> columns = request.getColumnsList();
-                // to get table id from database.
-                table = tableDao.getByNameAndSchema(table.getName(), schema);
-                if (columns.size() == columnDao.insertBatch(table, columns))
+                if (!TypeDescription.validate(column.getType()))
                 {
-                    headerBuilder.setErrorCode(0).setErrorMsg("");
+                    typesValid = false;
+                    invalidType = column.getType();
+                    break;
+                }
+            }
+            if (typesValid)
+            {
+                if (tableDao.insert(table))
+                {
+                    // to get table id from database.
+                    table = tableDao.getByNameAndSchema(table.getName(), schema);
+                    if (columns.size() == columnDao.insertBatch(table, columns))
+                    {
+                        headerBuilder.setErrorCode(0).setErrorMsg("");
+                    } else
+                    {
+                        tableDao.deleteByNameAndSchema(table.getName(), schema);
+                        headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg(
+                                "failed to add columns to table '" +
+                                        request.getSchemaName() + "." + request.getTableName() + "'");
+                    }
                 } else
                 {
-                    tableDao.deleteByNameAndSchema(table.getName(), schema);
-                    headerBuilder.setErrorCode(METADATA_ADD_COUMNS_FAILED).setErrorMsg("failed to add columns to table '" +
+                    headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg("failed to add table '" +
                             request.getSchemaName() + "." + request.getTableName() + "'");
                 }
             }
             else
             {
-                headerBuilder.setErrorCode(METADATA_ADD_TABLE_FAILED).setErrorMsg("failed to add table '" +
-                        request.getSchemaName() + "." + request.getTableName() + "'");
+                headerBuilder.setErrorCode(METADATA_UNKNOWN_DATA_TYPE).setErrorMsg(
+                        "unknown data type '" + invalidType + "'");
             }
         }
 

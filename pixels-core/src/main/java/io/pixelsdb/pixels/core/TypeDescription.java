@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.core;
 
+import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * TypeDescription derived from org.apache.orc
@@ -117,41 +118,64 @@ public final class TypeDescription
 
     public enum Category
     {
-        BOOLEAN("boolean", true),
-        BYTE("tinyint", true),
-        SHORT("smallint", true),
-        INT("int", true),
-        LONG("bigint", true),
-        FLOAT("float", true),
-        DOUBLE("double", true),
-        DECIMAL("decimal", true),
-        STRING("string", true),
-        DATE("date", true),
-        TIME("time", true),
-        TIMESTAMP("timestamp", true),
-        VARBINARY("varbinary", true),
-        BINARY("binary", true),
-        VARCHAR("varchar", true),
-        CHAR("char", true),
-        STRUCT("struct", false);
+        /*
+         * Issue #196:
+         * Support alias of data types.
+         */
+        BOOLEAN(true, "boolean"),
+        BYTE(true, "tinyint", "byte"),
+        SHORT(true, "smallint", "short"),
+        INT(true, "integer", "int"),
+        LONG(true, "bigint", "long"),
+        FLOAT(true, "float", "real"),
+        DOUBLE(true, "double"),
+        DECIMAL(true, "decimal"),
+        STRING(true, "string"),
+        DATE(true, "date"),
+        TIME(true, "time"),
+        TIMESTAMP(true, "timestamp"),
+        VARBINARY(true, "varbinary"),
+        BINARY(true, "binary"),
+        VARCHAR(true, "varchar"),
+        CHAR(true, "char"),
+        STRUCT(false, "struct");
 
-        Category(String name, boolean isPrimitive)
+        /**
+         * Ensure that all elements in names are in <b>lowercase</b>.
+         * @param isPrimitive
+         * @param names
+         */
+        Category(boolean isPrimitive, String... names)
         {
-            this.name = name;
+            checkArgument(names != null && names.length > 0,
+                    "names is null or empty");
+            this.primaryName = names[0];
             this.isPrimitive = isPrimitive;
+            this.allNames.addAll(Arrays.asList(names));
         }
 
         final boolean isPrimitive;
-        final String name;
+        final String primaryName;
+        final Set<String> allNames = new HashSet<>();
 
         public boolean isPrimitive()
         {
             return isPrimitive;
         }
 
-        public String getName()
+        public String getPrimaryName()
         {
-            return name;
+            return primaryName;
+        }
+
+        public Set<String> getAllNames()
+        {
+            return ImmutableSet.copyOf(this.allNames);
+        }
+
+        public boolean match(String name)
+        {
+            return this.allNames.contains(name.toLowerCase(Locale.ENGLISH));
         }
     }
 
@@ -356,13 +380,13 @@ public final class TypeDescription
             String word = source.value.substring(start, source.position).toLowerCase();
             for (Category cat : Category.values())
             {
-                if (cat.getName().equals(word))
+                if (cat.match(word))
                 {
                     return cat;
                 }
             }
         }
-        throw new IllegalArgumentException("Can't parse category at " + source);
+        throw new IllegalArgumentException("Can't parse type category at " + source);
     }
 
     /**
@@ -587,6 +611,23 @@ public final class TypeDescription
     }
 
     /**
+     * Check if the typeName can be parsed to a valid type description.
+     * @param typeName
+     * @return
+     */
+    public static boolean validate(String typeName)
+    {
+        try
+        {
+            TypeDescription type = fromString(typeName);
+            return type != null;
+        } catch (IllegalArgumentException e)
+        {
+            return false;
+        }
+    }
+
+    /**
      * Write the schema into the Pixels footer builder.
      * @param builder
      * @param schema
@@ -709,7 +750,7 @@ public final class TypeDescription
         category != Category.BINARY && category != Category.VARBINARY)
         {
             throw new IllegalArgumentException("maxLength is only allowed on char" +
-                    ", varchar, binary, and varbinary, but not " + category.name);
+                    ", varchar, binary, and varbinary, but not " + category.primaryName);
         }
         this.maxLength = maxLength;
         return this;
@@ -1068,7 +1109,7 @@ public final class TypeDescription
 
     public void printToBuffer(StringBuilder buffer)
     {
-        buffer.append(category.name);
+        buffer.append(category.primaryName);
         switch (category)
         {
             case BINARY:
@@ -1121,7 +1162,7 @@ public final class TypeDescription
         }
         buffer.append(prefix);
         buffer.append("{\"category\": \"");
-        buffer.append(category.name);
+        buffer.append(category.primaryName);
         buffer.append("\", \"id\": ");
         buffer.append(getId());
         buffer.append(", \"maxId\": ");

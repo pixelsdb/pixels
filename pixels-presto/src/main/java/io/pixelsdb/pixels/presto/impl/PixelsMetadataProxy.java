@@ -27,12 +27,15 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.presto.PixelsColumnHandle;
 import io.pixelsdb.pixels.presto.PixelsTypeParser;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created by hank on 18-6-18.
@@ -41,10 +44,13 @@ public class PixelsMetadataProxy
 {
     private static final Logger log = Logger.get(PixelsMetadataProxy.class);
     private final MetadataService metadataService;
+    private final PixelsTypeParser typeParser;
 
     @Inject
-    public PixelsMetadataProxy(PixelsPrestoConfig config)
+    public PixelsMetadataProxy(PixelsPrestoConfig config, PixelsTypeParser typeParser)
     {
+        requireNonNull(config, "config is null");
+        this.typeParser = requireNonNull(typeParser, "typeParser is null");
         ConfigFactory configFactory = config.getConfigFactory();
         String host = configFactory.getProperty("metadata.server.host");
         int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
@@ -103,14 +109,16 @@ public class PixelsMetadataProxy
         List<Column> columnsList = metadataService.getColumns(schemaName, tableName);
         for (int i = 0; i < columnsList.size(); i++) {
             Column c = columnsList.get(i);
-            Type columnType = PixelsTypeParser.getColumnType(c);
-            if (columnType == null)
+            Type prestoType = typeParser.parsePrestoType(c.getType());
+            TypeDescription pixelsType = typeParser.parsePixelsType(c.getType());
+            if (prestoType == null || pixelsType == null)
             {
                 throw new PrestoException(PixelsErrorCode.PIXELS_METASTORE_ERROR,
-                        "columnType '" + c.getType() + "' is not supported.");
+                        "column type '" + c.getType() + "' is not supported.");
             }
             String name = c.getName();
-            PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name, columnType, "", i);
+            PixelsColumnHandle pixelsColumnHandle = new PixelsColumnHandle(connectorId, name,
+                    prestoType, pixelsType.getCategory(), "", i);
             columns.add(pixelsColumnHandle);
         }
         return columns;

@@ -19,96 +19,56 @@
  */
 package io.pixelsdb.pixels.presto;
 
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.Type;
-import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.metadata.domain.Column;
+import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.TypeSignature;
+import com.google.inject.Inject;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
-import static com.facebook.presto.spi.type.DateType.DATE;
-import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
-import static com.facebook.presto.spi.type.IntegerType.INTEGER;
-import static com.facebook.presto.spi.type.RealType.REAL;
-import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
-import static com.facebook.presto.spi.type.TimeType.TIME;
-import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
-import static com.facebook.presto.spi.type.TinyintType.TINYINT;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Parse Pixels Column to Presto Type.
+ * Parse column type signature to Presto or Pixels data type.
  *
  * Created at: 19-6-1
  * Author: hank
  */
 public class PixelsTypeParser
 {
-    private static final PixelsTypeParser typeManager = new PixelsTypeParser();
+    private final TypeManager baseRegistry;
 
-    public static Type getColumnType (Column column)
+    @Inject
+    public PixelsTypeParser(TypeManager typeRegistry)
     {
-        return typeManager.getType(column.getType());
+        this.baseRegistry = requireNonNull(typeRegistry, "typeRegistry is null");
     }
 
-    /**
-     * refers to org.apache.carbondata.presto.Types
-     */
-    public static <A, B extends A> B checkObjectType(A value, Class<B> target, String name)
+    public TypeDescription parsePixelsType(String signature)
     {
-        requireNonNull(value, String.format(Locale.ENGLISH, "%s is null", name));
-        checkArgument(target.isInstance(value), "%s must be of type %s, not %s", name, target.getName(),
-                value.getClass().getName());
-        return target.cast(value);
-    }
-
-    private static final Map<String, Type> signatureToType;
-    private static final List<Type> supportedTypes;
-
-    static
-    {
-        // Important: these are the data types we support in pixels-presto.
-        // The types supported here should be consistent with the switch..case in PixelsPageSource.
-        supportedTypes = ImmutableList.of(
-                BOOLEAN, TINYINT, SMALLINT, INTEGER, BIGINT,
-                DOUBLE, REAL, VARCHAR, TIMESTAMP, DATE, TIME);
-        signatureToType = new HashMap<>();
-        for (Type type : supportedTypes)
+        try
         {
-            /**
-             * Issue #163:
-             * Register the lowercase of the type's display name.
-             */
-            signatureToType.put(type.getDisplayName().toLowerCase(), type);
+            return TypeDescription.fromString(signature);
         }
-        /**
-         * Issue #163:
-         * Support char(n) using varchar.
-         */
-        signatureToType.put("char", VARCHAR);
+        catch (RuntimeException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_DATA_TYPE_ERROR,
+                    "failed to parse Pixels data type '" + signature + "'", e);
+        }
+
     }
 
-    private PixelsTypeParser() {}
-
-    public Type getType(String signature)
+    public Type parsePrestoType(String signature)
     {
-        /**
-         * Issue #163:
-         * The signature in signatureToType is the prefix in lowercase of the type's display name.
-         * Fore example, varchar or char instead of varchar(10) or char(10). Therefore we use the
-         * lowercase of the prefix of the parameter to do the matching.
-         */
-        int index = signature.indexOf("(");
-        if (index > 0)
+        try
         {
-            signature = signature.substring(0, index);
+            return this.baseRegistry.getType(TypeSignature.parseTypeSignature(signature));
         }
-        return signatureToType.get(signature.toLowerCase());
+        catch (RuntimeException e)
+        {
+            throw new PrestoException(PixelsErrorCode.PIXELS_DATA_TYPE_ERROR,
+                    "failed to parse Presto data type '" + signature + "'", e);
+        }
     }
 }

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.presto;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.predicate.Domain;
-import com.facebook.presto.spi.type.*;
+import com.facebook.presto.spi.type.Type;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -32,6 +32,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.TypeDescription.Category.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -108,7 +110,8 @@ public class PixelsRecordCursor implements RecordCursor
         {
             logger.error("create record reader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR,
+                    "create record reader error.", e);
         }
         this.BatchSize = PixelsPrestoConfig.getBatchSize();
         this.rowIndex = -1;
@@ -116,7 +119,8 @@ public class PixelsRecordCursor implements RecordCursor
         this.rowBatchSize = 0;
     }
 
-    private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader, PixelsFooterCache pixelsFooterCache)
+    private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader,
+                                         PixelsFooterCache pixelsFooterCache)
     {
         String[] cols = new String[columns.size()];
         for (int i = 0; i < columns.size(); i++)
@@ -129,7 +133,8 @@ public class PixelsRecordCursor implements RecordCursor
         {
             domains = split.getConstraint().getDomains().get();
         }
-        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
+        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences =
+                new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet())
         {
             PixelsColumnHandle column = entry.getKey();
@@ -173,7 +178,7 @@ public class PixelsRecordCursor implements RecordCursor
         {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, "create Pixels reader error.", e);
         }
     }
 
@@ -210,7 +215,7 @@ public class PixelsRecordCursor implements RecordCursor
         {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, "read next path error.", e);
         }
     }
 
@@ -290,7 +295,7 @@ public class PixelsRecordCursor implements RecordCursor
             } catch (IOException e)
             {
                 closeWithSuppression(e);
-                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, "read row batch error.", e);
             }
         } else
         {
@@ -315,7 +320,7 @@ public class PixelsRecordCursor implements RecordCursor
             } catch (IOException e)
             {
                 closeWithSuppression(e);
-                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, "prepare row batch error.", e);
             }
         }
     }
@@ -330,25 +335,25 @@ public class PixelsRecordCursor implements RecordCursor
     @Override
     public long getLong(int field)
     {
-        Type type = this.columns.get(field).getColumnType();
-        if (type.equals(IntegerType.INTEGER) || type.equals(BigintType.BIGINT))
+        TypeDescription.Category typeCategory = this.columns.get(field).getTypeCategory();
+        switch (typeCategory)
         {
-            return ((LongColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex];
+            case INT:
+            case LONG:
+                return ((LongColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex];
+            case DECIMAL:
+                // Issue #196: Presto call getLong for decimal type.
+                return ((DoubleColumnVector) this.rowBatch.cols[field]).vector[this.rowIndex];
+            case DATE:
+                return ((DateColumnVector) this.rowBatch.cols[field]).dates[this.rowIndex];
+            case TIME:
+                return ((TimeColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
+            case TIMESTAMP:
+                return ((TimestampColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
+            default:
+                throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
+                        "Column type '" + typeCategory.getPrimaryName() + "' is not Long based.");
         }
-        else if (type.equals(DateType.DATE))
-        {
-            return ((DateColumnVector) this.rowBatch.cols[field]).dates[this.rowIndex];
-        }
-        else if (type.equals(TimeType.TIME))
-        {
-            return ((TimeColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
-        }
-        else if (type.equals(TimestampType.TIMESTAMP))
-        {
-            return ((TimestampColumnVector) this.rowBatch.cols[field]).times[this.rowIndex];
-        }
-        throw new PrestoException(PixelsErrorCode.PIXELS_CURSOR_ERROR,
-                "Column type '" + type.getDisplayName() + "' is not Long/Integer based.");
     }
 
     @Override
@@ -360,9 +365,10 @@ public class PixelsRecordCursor implements RecordCursor
     @Override
     public Slice getSlice(int field)
     {
-        Type type = this.columns.get(field).getColumnType();
-        checkArgument (type.equals(VarcharType.VARCHAR),
-                "Column type '" + type.getDisplayName() + "' is not Slice based.");
+        TypeDescription.Category typeCategory = this.columns.get(field).getTypeCategory();
+        checkArgument (typeCategory == VARCHAR || typeCategory == CHAR ||
+                typeCategory == STRING || typeCategory == VARBINARY || typeCategory == BINARY,
+                "Column type '" + typeCategory.getPrimaryName() + "' is not Slice based.");
         BinaryColumnVector columnVector = (BinaryColumnVector)this.rowBatch.cols[field];
         return Slices.wrappedBuffer(columnVector.vector[this.rowIndex],
                 columnVector.start[this.rowIndex], columnVector.lens[this.rowIndex]);
@@ -417,7 +423,7 @@ public class PixelsRecordCursor implements RecordCursor
         } catch (Exception e)
         {
             logger.error("close error: " + e.getMessage());
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, "close reader error.", e);
         }
     }
 
@@ -435,7 +441,7 @@ public class PixelsRecordCursor implements RecordCursor
             {
                 throwable.addSuppressed(e);
             }
-            throw new PrestoException(PixelsErrorCode.PIXELS_CLIENT_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_CLIENT_ERROR, "close page source error.", e);
         }
     }
 

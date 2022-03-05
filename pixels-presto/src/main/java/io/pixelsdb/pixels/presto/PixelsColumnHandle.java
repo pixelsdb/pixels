@@ -24,6 +24,7 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.type.Type;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.pixelsdb.pixels.core.TypeDescription;
 
 import java.util.Objects;
 
@@ -36,6 +37,7 @@ public final class PixelsColumnHandle
     private final String connectorId;
     private final String columnName;
     private final Type columnType;
+    private final TypeDescription.Category typeCategory;
     private final String columnComment;
     private final int ordinalPosition;
 
@@ -44,11 +46,13 @@ public final class PixelsColumnHandle
             @JsonProperty("connectorId") String connectorId,
             @JsonProperty("columnName") String columnName,
             @JsonProperty("columnType") Type columnType,
+            @JsonProperty("typeCategory") TypeDescription.Category typeCategory,
             @JsonProperty("columnComment") String columnComment, @JsonProperty("ordinalPosition") int ordinalPosition)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.columnName = requireNonNull(columnName, "columnName is null");
         this.columnType = requireNonNull(columnType, "columnType is null");
+        this.typeCategory = requireNonNull(typeCategory, "typeCategory is null");
         this.columnComment = requireNonNull(columnComment, "columnComment is null");
         this.ordinalPosition = ordinalPosition;
     }
@@ -69,6 +73,12 @@ public final class PixelsColumnHandle
     public Type getColumnType()
     {
         return columnType;
+    }
+
+    @JsonProperty
+    public TypeDescription.Category getTypeCategory()
+    {
+        return typeCategory;
     }
 
     @JsonProperty

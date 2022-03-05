@@ -49,6 +49,7 @@ public class ErrorCode
     public static final int METADATA_VIEW_EXIST = (ERROR_BASE_METADATA + 17);
     public static final int METADATA_ADD_VIEW_FAILED = (ERROR_BASE_METADATA + 18);
     public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
+    public static final int METADATA_UNKNOWN_DATA_TYPE = (ERROR_BASE_METADATA + 20);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue
