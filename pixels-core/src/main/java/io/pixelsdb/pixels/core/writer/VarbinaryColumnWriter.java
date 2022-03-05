@@ -27,8 +27,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
  */
 public class VarbinaryColumnWriter extends BinaryColumnWriter
 {
-    public VarbinaryColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLength)
+    public VarbinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding, maxLength);
+        super(type, pixelStride, isEncoding);
     }
 }

@@ -416,19 +416,23 @@ class PixelsPageSource implements ConnectorPageSource
                     break;
                 case DOUBLE:
                 case FLOAT:
-                case DECIMAL:
                     /**
                      * According to TypeDescription.createColumn(),
                      * both float and double type use DoubleColumnVector, while they use
                      * FloatColumnReader and DoubleColumnReader respectively according to
                      * io.pixelsdb.pixels.reader.ColumnReader.newColumnReader().
-                     * TODO: these two column should also support reading to LongColumnVector,
-                     * without conversions like longBitsToDouble, so that we can directly create
-                     * LongArrayBlock here without writeDouble (in which double is converted to long).
-                     * With this optimization, CPU and GC pressure can be greatly reduced.
                      */
-                    DoubleColumnVector dcv = (DoubleColumnVector) vector;
-                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dcv.isNull), dcv.vector);
+                    DoubleColumnVector dbcv = (DoubleColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dbcv.isNull), dbcv.vector);
+                    break;
+                case DECIMAL:
+                    /**
+                     * Issue #196:
+                     * Presto reads the unscaled values for decimal type here.
+                     * The precision and scale of decimal are automatically processed by Presto.
+                     */
+                    DecimalColumnVector dccv = (DecimalColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dccv.isNull), dccv.vector);
                     break;
                 case CHAR:
                 case VARCHAR:

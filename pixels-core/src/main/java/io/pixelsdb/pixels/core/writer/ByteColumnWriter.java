@@ -36,9 +36,9 @@ public class ByteColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public ByteColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public ByteColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         encoder = new RunLenByteEncoder();
     }
 

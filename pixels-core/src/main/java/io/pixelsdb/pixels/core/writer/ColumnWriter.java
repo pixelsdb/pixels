@@ -35,46 +35,48 @@ public interface ColumnWriter
 {
     /**
      * Create a column writer according to the data type.
-     * @param schema the data type.
+     * @param type the data type.
      * @param pixelStride
      * @param isEncoding set true if enable data encoding.
      * @return
      */
-    public static ColumnWriter newColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public static ColumnWriter newColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        switch (schema.getCategory())
+        switch (type.getCategory())
         {
             case BOOLEAN:
-                return new BooleanColumnWriter(schema, pixelStride, isEncoding);
+                return new BooleanColumnWriter(type, pixelStride, isEncoding);
             case BYTE:
-                return new ByteColumnWriter(schema, pixelStride, isEncoding);
+                return new ByteColumnWriter(type, pixelStride, isEncoding);
             case SHORT:
             case INT:
             case LONG:
-                return new IntegerColumnWriter(schema, pixelStride, isEncoding);
+                return new IntegerColumnWriter(type, pixelStride, isEncoding);
             case FLOAT:
-                return new FloatColumnWriter(schema, pixelStride, isEncoding);
+                return new FloatColumnWriter(type, pixelStride, isEncoding);
             case DOUBLE:
-            case DECIMAL: // TODO: precision and scale are not enforced for decimal.
-                return new DoubleColumnWriter(schema, pixelStride, isEncoding);
+                return new DoubleColumnWriter(type, pixelStride, isEncoding);
+            case DECIMAL: // Issue #196: precision and scale are passed through type.
+                return new DecimalColumnWriter(type, pixelStride, isEncoding);
             case STRING:
-                return new StringColumnWriter(schema, pixelStride, isEncoding);
+                return new StringColumnWriter(type, pixelStride, isEncoding);
+            // Issue #196: max length of char, varchar, binary, and varbinary, are passed through type.
             case CHAR:
-                return new CharColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
+                return new CharColumnWriter(type, pixelStride, isEncoding);
             case VARCHAR:
-                return new VarcharColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
+                return new VarcharColumnWriter(type, pixelStride, isEncoding);
             case BINARY:
-                return new BinaryColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
+                return new BinaryColumnWriter(type, pixelStride, isEncoding);
             case VARBINARY:
-                return new VarbinaryColumnWriter(schema, pixelStride, isEncoding, schema.getMaxLength());
+                return new VarbinaryColumnWriter(type, pixelStride, isEncoding);
             case DATE:
-                return new DateColumnWriter(schema, pixelStride, isEncoding);
+                return new DateColumnWriter(type, pixelStride, isEncoding);
             case TIME:
-                return new TimeColumnWriter(schema, pixelStride, isEncoding);
+                return new TimeColumnWriter(type, pixelStride, isEncoding);
             case TIMESTAMP:
-                return new TimestampColumnWriter(schema, pixelStride, isEncoding);
+                return new TimestampColumnWriter(type, pixelStride, isEncoding);
             default:
-                throw new IllegalArgumentException("Bad schema type: " + schema.getCategory());
+                throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
         }
     }
 

@@ -40,10 +40,10 @@ public class BinaryColumnWriter extends BaseColumnWriter
     private final int maxLength;
     private int numTruncated;
 
-    public BinaryColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLength)
+    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
-        this.maxLength = maxLength;
+        super(type, pixelStride, isEncoding);
+        this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }
 

@@ -38,29 +38,35 @@ public final class TypeDescription
 {
     private static final long serialVersionUID = 4270695889340023552L;
     /**
-     * It is a standard that the max precision of decimal is 38.
+     * Issue #196:
+     * In SQL standard, the max precision of decimal is 38.
+     * However, we only support short decimal of which the max precision is 18.
      */
-    private static final int MAX_PRECISION = 38;
+    public static final int MAX_PRECISION = 18;
     /**
-     * It is a standard that the max scale of decimal is 38.
+     * Issue #196:
+     * In SQL standard, the max scale of decimal is 38.
+     * However, we only support short decimal of which the max scale is 18.
      */
-    private static final int MAX_SCALE = 38;
+    public static final int MAX_SCALE = 18;
     /**
-     * It is a standard that the default precision of decimal is 38.
+     * Issue #196:
+     * In SQL standard, the default precision of decimal is 38.
+     * However, we only support short decimal of which the default precision is 18.
      */
-    private static final int DEFAULT_PRECISION = 38;
+    public static final int DEFAULT_PRECISION = 18;
     /**
      * It is a standard that the default scale of decimal is 0.
      */
-    private static final int DEFAULT_SCALE = 0;
+    public static final int DEFAULT_SCALE = 0;
     /**
      * The default length of varchar, binary, and varbinary.
      */
-    private static final int DEFAULT_LENGTH = 256;
+    public static final int DEFAULT_LENGTH = 65535;
     /**
      * It is a standard that the default length of char is 1.
      */
-    private static final int DEFAULT_CHAR_LENGTH = 1;
+    public static final int DEFAULT_CHAR_LENGTH = 1;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     @Override
@@ -296,12 +302,16 @@ public final class TypeDescription
                     break;
                 case DECIMAL:
                     fieldType = TypeDescription.createDecimal();
+                    fieldType.precision = type.getPrecision();
+                    fieldType.scale = type.getScale();
                     break;
                 case VARCHAR:
                     fieldType = TypeDescription.createVarchar();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 case CHAR:
                     fieldType = TypeDescription.createChar();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 case STRING:
                     fieldType = TypeDescription.createString();
@@ -317,9 +327,11 @@ public final class TypeDescription
                     break;
                 case VARBINARY:
                     fieldType = TypeDescription.createVarbinary();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 case BINARY:
                     fieldType = TypeDescription.createBinary();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
@@ -615,7 +627,7 @@ public final class TypeDescription
      * @param typeName
      * @return
      */
-    public static boolean validate(String typeName)
+    public static boolean isValid(String typeName)
     {
         try
         {
@@ -669,10 +681,11 @@ public final class TypeDescription
                     break;
                 case DECIMAL:
                     tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
+                    tmpType.setPrecision(schema.precision);
+                    tmpType.setScale(schema.scale);
                     break;
                 case STRING:
                     tmpType.setKind(PixelsProto.Type.Kind.STRING);
-                    tmpType.setMaximumLength(schema.getMaxLength());
                     break;
                 case CHAR:
                     tmpType.setKind(PixelsProto.Type.Kind.CHAR);
@@ -684,9 +697,11 @@ public final class TypeDescription
                     break;
                 case BINARY:
                     tmpType.setKind(PixelsProto.Type.Kind.BINARY);
+                    tmpType.setMaximumLength(schema.getMaxLength());
                     break;
                 case VARBINARY:
                     tmpType.setKind(PixelsProto.Type.Kind.VARBINARY);
+                    tmpType.setMaximumLength(schema.getMaxLength());
                     break;
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
@@ -713,10 +728,19 @@ public final class TypeDescription
      */
     public TypeDescription withPrecision(int precision)
     {
-        if (precision < 1 || precision > MAX_PRECISION || scale > precision)
+        if (precision < 1)
+        {
+            throw new IllegalArgumentException("precision " + precision + " is negative");
+        }
+        else if (precision > MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of range 1 .. " + scale);
+                    " is out of the max precision " + MAX_PRECISION);
+        }
+        else if (scale > precision)
+        {
+            throw new IllegalArgumentException("precision " + precision +
+                    " is smaller that scale " + scale);
         }
         this.precision = precision;
         return this;
@@ -730,9 +754,19 @@ public final class TypeDescription
      */
     public TypeDescription withScale(int scale)
     {
-        if (scale < 0 || scale > MAX_SCALE || scale > precision)
+        if (scale < 0)
         {
-            throw new IllegalArgumentException("scale " + scale + " is out of range 0 .. " + precision);
+            throw new IllegalArgumentException("scale " + scale + " is negative");
+        }
+        else if (scale > MAX_SCALE)
+        {
+            throw new IllegalArgumentException("scale " + scale +
+                    " is out of the max scale " + MAX_SCALE);
+        }
+        else if (scale > precision)
+        {
+            throw new IllegalArgumentException("scale " + scale +
+                    " is out of range 0 .. " + precision);
         }
         this.scale = scale;
         return this;
@@ -921,8 +955,9 @@ public final class TypeDescription
                 return new TimestampColumnVector(maxSize);
             case FLOAT:
             case DOUBLE:
-            case DECIMAL:
                 return new DoubleColumnVector(maxSize);
+            case DECIMAL:
+                return new DecimalColumnVector(maxSize, precision, scale);
             case STRING:
             case BINARY:
             case VARBINARY:

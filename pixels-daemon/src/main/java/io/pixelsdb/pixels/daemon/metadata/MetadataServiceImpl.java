@@ -504,7 +504,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             String invalidType = "";
             for (MetadataProto.Column column : columns)
             {
-                if (!TypeDescription.validate(column.getType()))
+                if (!TypeDescription.isValid(column.getType()))
                 {
                     typesValid = false;
                     invalidType = column.getType();

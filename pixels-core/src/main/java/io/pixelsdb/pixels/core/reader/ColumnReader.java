@@ -27,6 +27,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * pixels column reader.
  * Read from file, and decode column values
@@ -35,7 +37,7 @@ import java.nio.ByteBuffer;
  */
 public abstract class ColumnReader implements Closeable
 {
-    private final TypeDescription type;
+    final TypeDescription type;
 
     int elementIndex = 0;
     boolean hasNull = true;
@@ -53,8 +55,9 @@ public abstract class ColumnReader implements Closeable
             case LONG:
                 return new IntegerColumnReader(type);
             case DOUBLE:
-            case DECIMAL:
                 return new DoubleColumnReader(type);
+            case DECIMAL: // Issue #196: precision and scale are passed through type.
+                return new DecimalColumnReader(type);
             case FLOAT:
                 return new FloatColumnReader(type);
             case CHAR:
@@ -74,7 +77,7 @@ public abstract class ColumnReader implements Closeable
             case VARBINARY:
                 return new VarbinaryColumnReader(type);
             default:
-                throw new IllegalArgumentException("Bad schema type: " + type.getCategory());
+                throw new IllegalArgumentException("bad column type: " + type.getCategory());
         }
     }
 
@@ -99,12 +102,7 @@ public abstract class ColumnReader implements Closeable
 
     public ColumnReader(TypeDescription type)
     {
-        this.type = type;
-    }
-
-    public TypeDescription getType()
-    {
-        return type;
+        this.type = requireNonNull(type, "type is null");
     }
 
     /**

@@ -60,9 +60,9 @@ public class StringColumnWriter extends BaseColumnWriter
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
 
-    public StringColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public StringColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         this.futureUseDictionaryEncoding = isEncoding;
         this.currentUseDictionaryEncoding = isEncoding;
         encoder = new RunLenIntEncoder(false, true);

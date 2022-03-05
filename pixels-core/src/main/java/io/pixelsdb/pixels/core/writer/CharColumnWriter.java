@@ -30,8 +30,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
  */
 public class CharColumnWriter extends VarcharColumnWriter
 {
-    public CharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLength)
+    public CharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding, maxLength);
+        super(type, pixelStride, isEncoding);
     }
 }
