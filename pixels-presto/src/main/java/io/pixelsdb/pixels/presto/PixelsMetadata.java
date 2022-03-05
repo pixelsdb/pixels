@@ -289,7 +289,6 @@ public class PixelsMetadata
         }
         try
         {
-            logger.debug("create table: column number=" + columns.size());
             boolean res = this.pixelsMetadataProxy.createTable(schemaName, tableName, storageScheme, columns);
             if (res == false && ignoreExisting == false)
             {

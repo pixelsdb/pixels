@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,21 +17,19 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.writer;
+package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.TypeDescription;
 
 /**
- * pixels column writer for <code>Char</code>
- * It is the same as VarcharColumnWriter, which means it never pads zero
- * at the end when writing a value. This is for performance reasons.
- * @author guodong
- * @author hank
+ * Created at: 04/03/2022
+ * Author: hank
  */
-public class CharColumnWriter extends VarcharColumnWriter
+public class VarbinaryColumnReader
+        extends BinaryColumnReader
 {
-    public CharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    VarbinaryColumnReader(TypeDescription type)
     {
-        super(type, pixelStride, isEncoding);
+        super(type);
     }
 }

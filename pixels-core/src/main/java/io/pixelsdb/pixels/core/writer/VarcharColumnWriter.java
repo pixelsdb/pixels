@@ -38,13 +38,13 @@ public class VarcharColumnWriter extends StringColumnWriter
     /**
      * Max length of varchar. It is recorded in the file footer's schema.
      */
-    private final int maxLenght;
+    private final int maxLength;
     private int numTruncated;
 
-    public VarcharColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding, int maxLenght)
+    public VarcharColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
-        this.maxLenght = maxLenght;
+        super(type, pixelStride, isEncoding);
+        this.maxLength = type.getMaxLength();
         this.numTruncated = 0;
     }
 
@@ -56,9 +56,9 @@ public class VarcharColumnWriter extends StringColumnWriter
 
         for (int i = 0; i < vLens.length; ++i)
         {
-            if (vLens[i] > maxLenght)
+            if (vLens[i] > maxLength)
             {
-                vLens[i] = maxLenght;
+                vLens[i] = maxLength;
                 this.numTruncated++;
             }
         }

@@ -29,6 +29,8 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * pixels
  *
@@ -43,6 +45,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
     private final PixelsProto.ColumnStatistic.Builder columnChunkStat;
 
     final StatsRecorder pixelStatRecorder;
+    final TypeDescription type;
     private final StatsRecorder columnChunkStatRecorder;
 
     private int lastPixelPosition = 0;                 // ending offset of last pixel in the column chunk
@@ -60,6 +63,7 @@ public abstract class BaseColumnWriter implements ColumnWriter
 
     public BaseColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
+        this.type = requireNonNull(type, "type is null");
         this.pixelStride = pixelStride;
         this.isEncoding = isEncoding;
         this.isNull = new boolean[pixelStride];

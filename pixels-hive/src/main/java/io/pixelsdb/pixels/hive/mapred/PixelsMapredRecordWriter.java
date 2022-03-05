@@ -169,6 +169,7 @@ public class PixelsMapredRecordWriter
         {
             switch (schema.getCategory())
             {
+                // TODO: TIME and TIMESTAMP are currently not supported in Hive.
                 case BOOLEAN:
                     setLongValue(vector, row, ((BooleanWritable) value).get() ? 1 : 0);
                     break;
@@ -201,6 +202,7 @@ public class PixelsMapredRecordWriter
                     setBinaryValue(vector, row, (Text) value, schema.getMaxLength());
                     break;
                 case BINARY:
+                case VARBINARY:
                     setBinaryValue(vector, row, (BytesWritable) value);
                     break;
                 case DATE:

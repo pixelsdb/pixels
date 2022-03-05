@@ -30,6 +30,7 @@ import java.sql.Timestamp;
  * This is a base class for recording (updating) all kinds of column statistics during file writing.
  *
  * @author guodong
+ * @author hank
  */
 public class StatsRecorder
         implements ColumnStats
@@ -193,6 +194,7 @@ public class StatsRecorder
                 return new IntegerStatsRecorder();
             case FLOAT:
             case DOUBLE:
+            case DECIMAL: // Issue #196: use DoubleColumnStats for decimal.
                 return new DoubleStatsRecorder();
             case STRING:
             case CHAR:
@@ -205,6 +207,7 @@ public class StatsRecorder
             case TIMESTAMP:
                 return new TimestampStatsRecorder();
             case BINARY:
+            case VARBINARY:
                 return new BinaryStatsRecorder();
             default:
                 return new StatsRecorder();
@@ -224,10 +227,11 @@ public class StatsRecorder
                 return new IntegerStatsRecorder(statistic);
             case FLOAT:
             case DOUBLE:
+            case DECIMAL:
                 return new DoubleStatsRecorder(statistic);
             case STRING:
             case CHAR:
-            case VARCHAR:
+            case VARCHAR: // Issue #196: use DoubleColumnStats for decimal.
                 return new StringStatsRecorder(statistic);
             case DATE:
                 return new DateStatsRecorder(statistic);
@@ -236,6 +240,7 @@ public class StatsRecorder
             case TIMESTAMP:
                 return new TimestampStatsRecorder(statistic);
             case BINARY:
+            case VARBINARY:
                 return new BinaryStatsRecorder(statistic);
             default:
                 return new StatsRecorder(statistic);

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
+ * TODO: unimplemented.
  * @author guodong
  */
 public class BinaryColumnReader
