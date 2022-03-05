@@ -43,8 +43,8 @@ public class DecimalColumnVector extends ColumnVector
 {
     public static final long DEFAULT_UNSCALED_VALUE = 0;
     public long[] vector;
-    public final int precision;
-    public final int scale;
+    public int precision;
+    public int scale;
 
     public DecimalColumnVector(int precision, int scale)
     {
@@ -193,7 +193,7 @@ public class DecimalColumnVector extends ColumnVector
         {
             isNull[outElementNum] = false;
             vector[outElementNum] =
-                    ((DoubleColumnVector) inputVector).vector[inputElementNum];
+                    ((DecimalColumnVector) inputVector).vector[inputElementNum];
         }
         else
         {
@@ -205,14 +205,16 @@ public class DecimalColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof DoubleColumnVector)
+        if (inputVector instanceof DecimalColumnVector)
         {
-            DoubleColumnVector srcVector = (DoubleColumnVector) inputVector;
+            DecimalColumnVector srcVector = (DecimalColumnVector) inputVector;
             this.vector = srcVector.vector;
             this.isNull = srcVector.isNull;
             this.writeIndex = srcVector.writeIndex;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
+            this.precision = srcVector.precision;
+            this.scale = srcVector.scale;
         }
     }
 
