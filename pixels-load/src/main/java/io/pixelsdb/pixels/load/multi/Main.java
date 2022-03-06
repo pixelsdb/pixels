@@ -43,8 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 
 /**
  * @author tao
@@ -75,7 +74,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3
  * </p>
  * <p>
- * COMPACT -s pixels -t test_105 -l 3 -n yes
+ * COMPACT -s pixels -t test_105 -l 3 -n yes -c 8
  * </p>
  */
 public class Main
@@ -166,7 +165,7 @@ public class Main
                     String regex = ns.getString("row_regex");
                     String loadingDataPath = ns.getString("loading_data_path");
 
-                    int threadNum = Integer.valueOf(ns.getString("consumer_thread_num"));
+                    int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
                     Storage storage = StorageFactory.Instance().getStorage(origin);
@@ -202,7 +201,8 @@ public class Main
                         }
 
                         long endTime = System.currentTimeMillis();
-                        System.out.println("Files in Source " + origin + " is loaded into " + format + " format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
+                        System.out.println("Text files in '" + origin + "' are loaded into '" + format +
+                                "' format by " + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
 
                     } else
                     {
@@ -416,6 +416,10 @@ public class Main
                         .help("Specify the id of the layout to compact.");
                 argumentParser.addArgument("-n", "--naive").required(true)
                         .help("Specify whether or not to create naive compact layout.");
+                argumentParser.addArgument("-c", "--concurrency")
+                        .setDefault("4").required(true)
+                        .help("specify the number of threads used for data compaction");
+
 
                 Namespace ns = null;
                 try
@@ -434,6 +438,8 @@ public class Main
                     String table = ns.getString("table");
                     int layoutId = Integer.parseInt(ns.getString("layout"));
                     String naive = ns.getString("naive");
+                    int threadNum = Integer.parseInt(ns.getString("concurrency"));
+                    ExecutorService compactExecutor = Executors.newFixedThreadPool(threadNum);
 
                     String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
                     int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
@@ -475,6 +481,7 @@ public class Main
                     List<Status> statuses = orderStorage.listStatus(layout.getOrderPath());
 
                     // compact
+                    long startTime = System.currentTimeMillis();
                     for (int i = 0; i < statuses.size(); i+=numRowGroupInBlock)
                     {
                         if (i + numRowGroupInBlock > statuses.size())
@@ -502,14 +509,21 @@ public class Main
                             sourcePaths.add(statuses.get(i+j).getPath());
                         }
 
-                        long start = System.currentTimeMillis();
-
                         String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/") +
                                 DateUtil.getCurTime() +
                                 ".compact.pxl";
                         PixelsCompactor pixelsCompactor =
                                 PixelsCompactor.newBuilder()
                                         .setSourcePaths(sourcePaths)
+                                        /**
+                                         * Issue #192:
+                                         * No need to deep copy compactLayout as it is never modified in-place
+                                         * (e.g., call setters to change some members). Thus it is safe to use
+                                         * the current reference of compactLayout even if the compactors will
+                                         * be running multiple threads.
+                                         *
+                                         * Deep copy it if it is in-place modified in the future.
+                                         */
                                         .setCompactLayout(compactLayout)
                                         .setStorage(compactStorage)
                                         .setFilePath(filePath)
@@ -517,21 +531,27 @@ public class Main
                                         .setReplication(replication)
                                         .setBlockPadding(false)
                                         .build();
-                        pixelsCompactor.compact();
-                        pixelsCompactor.close();
 
-                        System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
+                        long threadStart = System.currentTimeMillis();
+                        compactExecutor.execute(() -> {
+                            // Issue #192: run compaction in threads.
+                            pixelsCompactor.compact();
+                            pixelsCompactor.close();
+                            System.out.println(((System.currentTimeMillis() - threadStart) / 1000.0) +
+                                    " s for [" + filePath + "]");
+                        });
                     }
-                } catch (MetadataException e)
-                {
-                    e.printStackTrace();
-                } catch (FileNotFoundException e)
-                {
-                    e.printStackTrace();
-                } catch (IOException e)
-                {
-                    e.printStackTrace();
-                } catch (InterruptedException e)
+
+                    // Issue #192: wait for the compaction to complete.
+                    compactExecutor.shutdown();
+                    while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
+
+                    long endTime = System.currentTimeMillis();
+                    System.out.println("Pixels files in '" + layout.getOrderPath() + "' are compacted into '" +
+                            layout.getCompactPath() + "' by " + threadNum + " threads in " +
+                            (endTime - startTime) / 1000 + "s.");
+                }
+                catch (MetadataException | IOException | InterruptedException e)
                 {
                     e.printStackTrace();
                 }

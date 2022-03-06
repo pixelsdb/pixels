@@ -314,7 +314,12 @@ LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 
 LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
 ```
-This may take a few hours. As we don't use pixels-cache for TPC-H, there is no need to load the cache.
+This may take a few hours. The last parameter `-c` of the `LOAD` command is the maximum number
+of threads used for loading data. It only effects when the input directory (specified by `-o`)
+contains multiple input files. In case that the TPC-H table has multiple parts, you can set 
+`-c` to the number of parts to improve the data loading performance.
+
+As we don't use pixels-cache for TPC-H, there is no need to load the cache.
 Otherwise, we can load the cached table into pixels-cache using:
 ```bash
 ./sbin/load-cache.sh layout_version
@@ -333,15 +338,17 @@ Execute the TPC-H queries in presto-cli.
 This is optional. It is only needed if we want to test the query performance on the compact layout.
 In pixels-load, use the following command to compact the files in the ordered path of each table:
 ```bash
-COMPACT -s tpch -t customer -l 1 -n no
-COMPACT -s tpch -t lineitem -l 2 -n no
-COMPACT -s tpch -t orders -l 4 -n no
-COMPACT -s tpch -t part -l 5 -n no
-COMPACT -s tpch -t partsupp -l 6 -n no
-COMPACT -s tpch -t supplier -l 8 -n no
+COMPACT -s tpch -t customer -l 1 -n no -c 2
+COMPACT -s tpch -t lineitem -l 2 -n no -c 16
+COMPACT -s tpch -t orders -l 4 -n no -c 8
+COMPACT -s tpch -t part -l 5 -n no -c 1
+COMPACT -s tpch -t partsupp -l 6 -n no -c 8
+COMPACT -s tpch -t supplier -l 8 -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
-Compaction is faster than loading.
+The last parameter `-c` of `COMPACT` command is the maximum number
+of threads used for data compaction. For large tables such as `lineitem`, you can increase `-c` to 
+improve the compaction performance. Compaction is normally faster than loading with same number of threads.
 
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database
