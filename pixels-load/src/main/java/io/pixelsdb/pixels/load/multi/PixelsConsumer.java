@@ -149,9 +149,11 @@ public class PixelsConsumer extends Consumer
                         for (int i = 0; i < columnVectors.length; i++)
                         {
                             int valueIdx = orderMapping[i];
-                            if (colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                            if (colsInLine[valueIdx].isEmpty() ||
+                                    colsInLine[valueIdx].equalsIgnoreCase("\\N"))
                             {
                                 columnVectors[i].isNull[rowId] = true;
+                                columnVectors[i].noNulls = false;
                             } else
                             {
                                 columnVectors[i].add(colsInLine[valueIdx]);

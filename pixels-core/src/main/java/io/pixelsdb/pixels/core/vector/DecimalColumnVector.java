@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.Arrays;
 
 import static io.pixelsdb.pixels.core.TypeDescription.MAX_PRECISION;
@@ -56,7 +57,7 @@ public class DecimalColumnVector extends ColumnVector
         super(len);
         vector = new long[len];
         Arrays.fill(vector, DEFAULT_UNSCALED_VALUE);
-        memoryUsage += Long.BYTES * len;
+        memoryUsage += Long.BYTES * len + Integer.BYTES * 2;
 
         if (precision < 1)
         {
@@ -137,7 +138,8 @@ public class DecimalColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        BigDecimal decimal = new BigDecimal(value);
+        // Convert to a BigDecimal with unlimited precision and HALF_UP rounding.
+        BigDecimal decimal = new BigDecimal(value, MathContext.UNLIMITED);
         if (decimal.scale() != scale)
         {
             decimal = decimal.setScale(scale, ROUND_HALF_UP);
@@ -146,11 +148,8 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
-        /**
-         * Issue #196:
-         * As we only support max precision 18, it is safe to convert decimal to long.
-         */
-        vector[writeIndex++] = decimal.longValue();
+        // As we only support max precision 18, it is safe to convert unscaled value to long.
+        vector[writeIndex++] = decimal.unscaledValue().longValue();
     }
 
     @Override
@@ -166,6 +165,7 @@ public class DecimalColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
+        // Decimal.valueOf converts double to Decimal with unlimited precision and HALF_UP rounding.
         BigDecimal decimal = BigDecimal.valueOf(value);
         if (decimal.scale() != scale)
         {
@@ -175,11 +175,8 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
-        /**
-         * Issue #196:
-         * As we only support max precision 18, it is safe to convert decimal to long.
-         */
-        vector[writeIndex++] = decimal.longValue();
+        // As we only support max precision 18, it is safe to convert unscaled value to long.
+        vector[writeIndex++] = decimal.unscaledValue().longValue();
     }
 
     @Override
