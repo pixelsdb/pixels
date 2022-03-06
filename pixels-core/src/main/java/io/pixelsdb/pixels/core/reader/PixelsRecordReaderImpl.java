@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -559,8 +558,7 @@ public class PixelsRecordReaderImpl
             for (int colId : targetColumns)
             {
                 // direct cache read is just for debug, so we just get this parameter here for simplicity.
-                // TODO: remove this line when debug is finished.
-                boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
+                // boolean direct = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.read.direct"));
                 for (int rgIdx = 0; rgIdx < targetRGNum; rgIdx++)
                 {
                     /**
@@ -574,11 +572,10 @@ public class PixelsRecordReaderImpl
                     // if cached, read from cache files
                     if (cacheOrder.contains(cacheIdentifier))
                     {
-                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId, direct);
+                        ColumnletId chunkId = new ColumnletId((short) rgId, (short) colId, true/*direct*/);
                         cacheChunks.add(chunkId);
                     }
                     // if cache miss, add chunkId to be read from disks
-//                    /*
                     else
                     {
                         PixelsProto.RowGroupIndex rowGroupIndex =
@@ -596,7 +593,6 @@ public class PixelsRecordReaderImpl
                                 chunkIndex.getChunkLength());
                         diskChunks.add(chunk);
                     }
-//                    */
                 }
             }
             // read cached chunks
