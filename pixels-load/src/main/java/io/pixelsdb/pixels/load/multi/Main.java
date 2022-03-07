@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author tao
@@ -337,6 +338,9 @@ public class Main
                         .help("Specify the destination directory");
                 argumentParser.addArgument("-n", "--number").required(true)
                         .help("Specify the number of copies");
+                argumentParser.addArgument("-c", "--concurrency")
+                        .setDefault("4").required(true)
+                        .help("specify the number of threads used for data compaction");
 
                 Namespace ns = null;
                 try
@@ -355,6 +359,8 @@ public class Main
                     String source = ns.getString("source");
                     String destination = ns.getString("destination");
                     int n = Integer.parseInt(ns.getString("number"));
+                    int threadNum = Integer.parseInt(ns.getString("concurrency"));
+                    ExecutorService copyExecutor = Executors.newFixedThreadPool(threadNum);
 
                     if (!destination.endsWith("/"))
                     {
@@ -370,34 +376,57 @@ public class Main
                     long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
+                    // copy
+                    long startTime = System.currentTimeMillis();
+                    AtomicInteger copiedNum = new AtomicInteger(0);
                     for (int i = 0; i < n; ++i)
                     {
-                        for (Status s : files)
-                        {
-                            String sourceName = s.getName();
-                            if (!sourceName.contains(postfix))
+                        String destination_ = destination;
+                        int i_ = i;
+                        // Issue #192: make copy multi-threaded.
+                        copyExecutor.execute(() -> {
+                            try
                             {
-                                continue;
-                            }
-                            String destPath = destination +
-                                    sourceName.substring(0, sourceName.indexOf(postfix)) +
-                                    "_copy_" + DateUtil.getCurTime() + postfix;
-                            if (sourceStorage.getScheme() == destStorage.getScheme() &&
-                                    destStorage.supportDirectCopy())
+                                System.out.println("Copying thread (" + i_ + ") is started.");
+                                for (Status s : files)
+                                {
+                                    String sourceName = s.getName();
+                                    if (!sourceName.contains(postfix))
+                                    {
+                                        continue;
+                                    }
+                                    String destPath = destination_ +
+                                            sourceName.substring(0, sourceName.indexOf(postfix)) +
+                                            "_copy_" + DateUtil.getCurTime() + postfix;
+                                    if (sourceStorage.getScheme() == destStorage.getScheme() &&
+                                            destStorage.supportDirectCopy())
+                                    {
+                                        destStorage.directCopy(s.getPath(), destPath);
+                                    } else
+                                    {
+                                        DataInputStream inputStream = sourceStorage.open(s.getPath());
+                                        DataOutputStream outputStream = destStorage.create(destPath, false,
+                                                Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+                                        IOUtils.copyBytes(inputStream, outputStream,
+                                                Constants.HDFS_BUFFER_SIZE, true);
+                                    }
+                                    copiedNum.incrementAndGet();
+                                }
+                            } catch (IOException e)
                             {
-                                destStorage.directCopy(s.getPath(), destPath);
+                                e.printStackTrace();
                             }
-                            else
-                            {
-                                DataInputStream inputStream = sourceStorage.open(s.getPath());
-                                DataOutputStream outputStream = destStorage.create(destPath, false,
-                                        Constants.HDFS_BUFFER_SIZE, replication, blockSize);
-                                IOUtils.copyBytes(inputStream, outputStream, Constants.HDFS_BUFFER_SIZE, true);
-                            }
-                        }
+                        });
                     }
+
+                    copyExecutor.shutdown();
+                    while (!copyExecutor.awaitTermination(100, TimeUnit.SECONDS));
+
+                    long endTime = System.currentTimeMillis();
+                    System.out.println((copiedNum.get()/n) + " file(s) are copied " + n + " time(s) by "
+                            + threadNum + " threads in " + (endTime - startTime) / 1000 + "s.");
                 }
-                catch (IOException e)
+                catch (IOException | InterruptedException e)
                 {
                     e.printStackTrace();
                 }
@@ -461,11 +490,11 @@ public class Main
 
                     Compact compact = layout.getCompactObject();
                     int numRowGroupInBlock = compact.getNumRowGroupInBlock();
+                    int numColumn = compact.getNumColumn();
                     CompactLayout compactLayout;
                     if (naive.equalsIgnoreCase("yes") || naive.equalsIgnoreCase("y"))
                     {
-                        compactLayout = CompactLayout.buildNaive(
-                                compact.getNumRowGroupInBlock(), compact.getNumColumn());
+                        compactLayout = CompactLayout.buildNaive(numRowGroupInBlock, numColumn);
                     }
                     else
                     {
@@ -498,8 +527,7 @@ public class Main
                              * compactLayout in metadata does not work for the tail files.
                              */
                             numRowGroupInBlock = statuses.size() - i;
-                            compactLayout = CompactLayout.buildPure(
-                                    numRowGroupInBlock, compact.getNumColumn());
+                            compactLayout = CompactLayout.buildPure(numRowGroupInBlock, numColumn);
                         }
 
                         List<String> sourcePaths = new ArrayList<>();
@@ -512,7 +540,11 @@ public class Main
                         String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/") +
                                 DateUtil.getCurTime() +
                                 ".compact.pxl";
-                        PixelsCompactor pixelsCompactor =
+
+                        System.out.println("(" + i + ") " + sourcePaths.size() +
+                                " ordered files to be compacted into '" + filePath + "'.");
+
+                        PixelsCompactor.Builder compactorBuilder =
                                 PixelsCompactor.newBuilder()
                                         .setSourcePaths(sourcePaths)
                                         /**
@@ -529,16 +561,23 @@ public class Main
                                         .setFilePath(filePath)
                                         .setBlockSize(blockSize)
                                         .setReplication(replication)
-                                        .setBlockPadding(false)
-                                        .build();
+                                        .setBlockPadding(false);
 
                         long threadStart = System.currentTimeMillis();
                         compactExecutor.execute(() -> {
                             // Issue #192: run compaction in threads.
-                            pixelsCompactor.compact();
-                            pixelsCompactor.close();
-                            System.out.println(((System.currentTimeMillis() - threadStart) / 1000.0) +
-                                    " s for [" + filePath + "]");
+                            try
+                            {
+                                // build() spends some time to read file footers and should be called inside sub-thread.
+                                PixelsCompactor pixelsCompactor = compactorBuilder.build();
+                                pixelsCompactor.compact();
+                                pixelsCompactor.close();
+                            } catch (IOException e)
+                            {
+                                e.printStackTrace();
+                            }
+                            System.out.println("Compact file '" + filePath + "' is built in " +
+                                    ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
                         });
                     }
 

@@ -322,7 +322,7 @@ public class PixelsSplitManager
                                         PixelsSplit pixelsSplit = new PixelsSplit(connectorId,
                                                 tableHandle.getSchemaName(), tableHandle.getTableName(),
                                                 table.getStorageScheme(), Arrays.asList(path),
-                                                transHandle.getTransId(),curFileRGIdx, splitSize,
+                                                transHandle.getTransId(), curFileRGIdx, splitSize,
                                                 true, compactAddresses, order.getColumnOrder(),
                                                 cacheColumnletOrders, constraint);
                                         pixelsSplits.add(pixelsSplit);

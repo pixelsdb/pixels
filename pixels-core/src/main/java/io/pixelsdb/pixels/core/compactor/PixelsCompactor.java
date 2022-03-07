@@ -241,6 +241,7 @@ public class PixelsCompactor
 
                 if (fileTail == null)
                 {
+                    fsReader.close();
                     throw new IOException("read file tail failed.");
                 }
 
@@ -250,10 +251,12 @@ public class PixelsCompactor
                 String fileMagic = postScript.getMagic();
                 if (!PixelsVersion.matchVersion(fileVersion))
                 {
+                    fsReader.close();
                     throw new PixelsFileVersionInvalidException(fileVersion);
                 }
                 if (!fileMagic.contentEquals(Constants.MAGIC))
                 {
+                    fsReader.close();
                     throw new PixelsFileMagicInvalidException(fileMagic);
                 }
 
@@ -301,6 +304,7 @@ public class PixelsCompactor
                             .add(rowGroupFooter.toBuilder()); // chunkOffset to be updated when compacting
                     rowGroupPaths.add(path);
                 }
+                fsReader.close();
             }
 
             fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderStorage, builderFilePath, builderBlockSize,
@@ -334,7 +338,7 @@ public class PixelsCompactor
     {
         this.writeColumnChunks();
         this.writeRowGroupFooters();
-        writeFileTail();
+        this.writeFileTail();
     }
 
     private void writeColumnChunks()
@@ -362,7 +366,7 @@ public class PixelsCompactor
                 fsWriter.prepare((int) columnChunkLength);
                 long offset = this.fsWriter.append(chunkBuffer, 0, (int) columnChunkLength);
                 columnChunkIndexBuilder.setChunkOffset(offset);
-                this.fsWriter.flush();
+                // this.fsWriter.flush(); // Issue #192: no need to flush as writing has not finished.
             }
             catch (IOException e)
             {
@@ -381,8 +385,9 @@ public class PixelsCompactor
             rowGroupFooterBuffer.put(rowGroupFooter.toByteArray());
             try
             {
+                fsWriter.prepare(rowGroupFooter.getSerializedSize());
                 long rowGroupFooterOffset = fsWriter.append(rowGroupFooterBuffer);
-                fsWriter.flush();
+                // fsWriter.flush(); // Issue #192: no need to flush as writing has not finished.
                 this.rowGroupInfoBuilderList.get(i).setFooterOffset(rowGroupFooterOffset);
                 this.rowGroupInfoBuilderList.get(i).setFooterLength(rowGroupFooter.getSerializedSize());
             }
