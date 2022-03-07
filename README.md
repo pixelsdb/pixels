@@ -6,8 +6,7 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK 8.0.
-Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
+Install JDK 8.0, and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
@@ -19,7 +18,7 @@ It may take about one minute to complete. After that, find the following jar/zip
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Login the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. 8GB or larger memory is recommended. Login the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
@@ -237,6 +236,7 @@ sudo ./sbin/pin-cache.sh
 `reset-cache.sh` is only needed for the first time of using pixels-cache. 
 It initializes some states in etcd for the cache.
 
+Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
 ```bash
 ./sbin/start-pixels.sh
