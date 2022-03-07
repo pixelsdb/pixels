@@ -28,9 +28,9 @@ public final class Constants
     public static final String MAGIC = "PIXELS";
 
     public static final int DEFAULT_HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
-    public static final int HDFS_BUFFER_SIZE = 256 * 1024;
-    public static final int LOCAL_BUFFER_SIZE = 256 * 1024;
-    public static final int S3_BUFFER_SIZE = 256 * 1024;
+    public static final int HDFS_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int LOCAL_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int S3_BUFFER_SIZE = 8 * 1024 * 1024;
 
     public static final int MIN_REPEAT = 3;
     public static final int MAX_SCOPE = 512;
