@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PIXELS_HOME="/home/ubuntu/opt/pixels/"
+PIXELS_HOME="$HOME/opt/pixels/"
 
 # start coodrinator
 echo "Starting Coordinator..."
