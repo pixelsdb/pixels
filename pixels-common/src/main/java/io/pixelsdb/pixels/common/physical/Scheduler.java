@@ -79,7 +79,7 @@ public interface Scheduler
         @Override
         public int compareTo(Request o)
         {
-            return (int) (this.start - o.start);
+            return Long.compare(this.start, o.start);
         }
     }
 

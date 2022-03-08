@@ -186,11 +186,17 @@ public class SortMergeScheduler implements Scheduler
         private final long queryId;
         private final long start;
         private long end;
-        private int position; // the position of the last merged sub-request.
-        private int size;
-        private List<Integer> positions; // the positions of the merged sub-requests.
-        private List<Integer> lengths;
-        private List<CompletableFuture<ByteBuffer>> futures;
+        private int length; // the length of merged request.
+        private int size; // the number of sub-requests.
+        /**
+         * The starting offset of the sub-requests in the response of the merged request.
+         */
+        private final List<Integer> offsets;
+        /**
+         * The length of the sub-requests,
+         */
+        private final List<Integer> lengths;
+        private final List<CompletableFuture<ByteBuffer>> futures;
         // fields used by the retry policy.
         protected volatile long startTimeMs = -1;
         protected volatile long completeTimeMs = -1;
@@ -201,12 +207,12 @@ public class SortMergeScheduler implements Scheduler
             this.queryId = first.request.queryId;
             this.start = first.request.start;
             this.end = first.request.start + first.request.length;
-            this.positions = new ArrayList<>();
+            this.offsets = new ArrayList<>();
             this.lengths = new ArrayList<>();
             this.futures = new ArrayList<>();
-            this.positions.add(0);
+            this.offsets.add(0);
             this.lengths.add(first.request.length);
-            this.position = first.request.length;
+            this.length = first.request.length;
             this.futures.add(first.future);
             this.size = 1;
         }
@@ -221,12 +227,12 @@ public class SortMergeScheduler implements Scheduler
             {
                 throw new IllegalArgumentException("Can not merge requests from different queries (transactions).");
             }
-            int gap = (int) (curr.request.start - this.end);
-            if (gap <= MaxGap)
+            long gap = (curr.request.start - this.end);
+            if (gap <= MaxGap && (this.length + gap + curr.request.length) <= Integer.MAX_VALUE)
             {
-                this.positions.add(this.position + gap);
+                this.offsets.add(this.length + (int) gap);
                 this.lengths.add(curr.request.length);
-                this.position += (gap + curr.request.length);
+                this.length += (gap + curr.request.length);
                 this.end = curr.request.start + curr.request.length;
                 this.futures.add(curr.future);
                 this.size ++;
@@ -251,7 +257,7 @@ public class SortMergeScheduler implements Scheduler
          */
         public int getLength()
         {
-            return (int) (end - start);
+            return this.length;
         }
 
         /**
@@ -275,8 +281,8 @@ public class SortMergeScheduler implements Scheduler
                  * Issue #114:
                  * Limit should be set before position.
                  */
-                buffer.limit(positions.get(i) + lengths.get(i));
-                buffer.position(positions.get(i));
+                buffer.limit(offsets.get(i) + lengths.get(i));
+                buffer.position(offsets.get(i));
                 futures.get(i).complete(buffer.slice());
             }
         }
