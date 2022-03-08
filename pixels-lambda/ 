@@ -1,0 +1,1 @@
+{"errorMessage":"java.lang.NullPointerException","errorType":"java.lang.NullPointerException","stackTrace":["Worker.scanFile(Worker.java:44)","Worker.handleRequest(Worker.java:29)","Worker.handleRequest(Worker.java:19)"]}

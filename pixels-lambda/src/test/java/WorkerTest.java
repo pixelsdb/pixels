@@ -4,11 +4,11 @@ import org.junit.Test;
 public class WorkerTest {
     Worker worker = new Worker();
     //'{ "bucketName":"pixels-tpch-customer-v-0-order", "fileName": "20220213140252_0.pxl" }'
-    String[] cols = {"n_nationkey", "n_name", "n_regionkey", "n_comment"};
+    String[] cols = {"o_orderkey", "o_custkey", "o_orderstatus", "o_totalprice", "o_orderdate"};
 
     @Test
     public void testScanFileCanGrabColumnWithCorrectType() {
-        String result =  worker.scanFile("20220213140252_0.pxl", 1024, cols);
+        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, null);
         String expected = "success";
         Assert.assertEquals(result, expected);
     }
