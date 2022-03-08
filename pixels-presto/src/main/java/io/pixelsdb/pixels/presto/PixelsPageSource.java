@@ -32,6 +32,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -45,7 +46,6 @@ import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
 import java.io.IOException;
 import java.util.*;
 
-import static com.facebook.presto.spi.type.StandardTypes.*;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +74,8 @@ class PixelsPageSource implements ConnectorPageSource
     private int batchId;
 
     public PixelsPageSource(PixelsSplit split, List<PixelsColumnHandle> columnHandles, Storage storage,
-                            MemoryMappedFile cacheFile, MemoryMappedFile indexFile, PixelsFooterCache pixelsFooterCache,
+                            MemoryMappedFile cacheFile, MemoryMappedFile indexFile,
+                            PixelsFooterCache pixelsFooterCache,
                             String connectorId)
     {
         this.split = split;
@@ -100,12 +101,14 @@ class PixelsPageSource implements ConnectorPageSource
         {
             logger.error("create record reader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR,
+                    "create record reader error.", e);
         }
         this.BatchSize = PixelsPrestoConfig.getBatchSize();
     }
 
-    private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader, PixelsFooterCache pixelsFooterCache)
+    private void getPixelsReaderBySchema(PixelsSplit split, PixelsCacheReader pixelsCacheReader,
+                                         PixelsFooterCache pixelsFooterCache)
     {
         String[] cols = new String[columns.size()];
         for (int i = 0; i < columns.size(); i++)
@@ -118,7 +121,8 @@ class PixelsPageSource implements ConnectorPageSource
         {
             domains = split.getConstraint().getDomains().get();
         }
-        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences = new ArrayList<>(domains.size());
+        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences =
+                new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet())
         {
             PixelsColumnHandle column = entry.getKey();
@@ -162,7 +166,8 @@ class PixelsPageSource implements ConnectorPageSource
         {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR,
+                    "create Pixels reader error.", e);
         }
     }
 
@@ -199,7 +204,7 @@ class PixelsPageSource implements ConnectorPageSource
         {
             logger.error("pixelsReader error: " + e.getMessage());
             closeWithSuppression(e);
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_ERROR, "read next path error.", e);
         }
     }
 
@@ -276,13 +281,15 @@ class PixelsPageSource implements ConnectorPageSource
                 for (int fieldId = 0; fieldId < blocks.length; ++fieldId)
                 {
                     Type type = columns.get(fieldId).getColumnType();
+                    TypeDescription.Category typeCategory = columns.get(fieldId).getTypeCategory();
                     ColumnVector vector = rowBatch.cols[fieldId];
-                    blocks[fieldId] = new LazyBlock(rowBatchSize, new PixelsBlockLoader(vector, type, rowBatchSize));
+                    blocks[fieldId] = new LazyBlock(rowBatchSize, new PixelsBlockLoader(
+                            vector, type, typeCategory, rowBatchSize));
                 }
             } catch (IOException e)
             {
                 closeWithSuppression(e);
-                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, "read row batch error.", e);
             }
         }
         else
@@ -305,7 +312,7 @@ class PixelsPageSource implements ConnectorPageSource
             } catch (IOException e)
             {
                 closeWithSuppression(e);
-                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, e);
+                throw new PrestoException(PixelsErrorCode.PIXELS_BAD_DATA, "prepare row batch error.", e);
             }
         }
 
@@ -349,7 +356,7 @@ class PixelsPageSource implements ConnectorPageSource
         } catch (Exception e)
         {
             logger.error("close error: " + e.getMessage());
-            throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_READER_CLOSE_ERROR, "close reader error.", e);
         }
     }
 
@@ -367,7 +374,7 @@ class PixelsPageSource implements ConnectorPageSource
             {
                 throwable.addSuppressed(e);
             }
-            throw new PrestoException(PixelsErrorCode.PIXELS_CLIENT_ERROR, e);
+            throw new PrestoException(PixelsErrorCode.PIXELS_CLIENT_ERROR, "close page source error.", e);
         }
     }
 
@@ -380,12 +387,15 @@ class PixelsPageSource implements ConnectorPageSource
         private final int expectedBatchId = batchId;
         private final ColumnVector vector;
         private final Type type;
+        private final TypeDescription.Category typeCategory;
         private final int batchSize;
 
-        public PixelsBlockLoader(ColumnVector vector, Type type, int batchSize)
+        public PixelsBlockLoader(ColumnVector vector, Type type,
+                                 TypeDescription.Category typeCategory, int batchSize)
         {
-            this.vector = vector;
+            this.vector = requireNonNull(vector, "vector is null");
             this.type = requireNonNull(type, "type is null");
+            this.typeCategory = requireNonNull(typeCategory, "typeCategory is null");
             this.batchSize = batchSize;
         }
 
@@ -395,29 +405,40 @@ class PixelsPageSource implements ConnectorPageSource
             checkState(batchId == expectedBatchId);
             Block block;
 
-            switch (type.getDisplayName())
+            switch (typeCategory)
             {
-                case INTEGER:
-                case BIGINT:
+                case BYTE:
+                case SHORT:
+                case INT:
+                case LONG:
                     LongColumnVector lcv = (LongColumnVector) vector;
                     block = new LongArrayBlock(batchSize, Optional.ofNullable(lcv.isNull), lcv.vector);
                     break;
                 case DOUBLE:
-                case REAL:
+                case FLOAT:
                     /**
                      * According to TypeDescription.createColumn(),
                      * both float and double type use DoubleColumnVector, while they use
                      * FloatColumnReader and DoubleColumnReader respectively according to
                      * io.pixelsdb.pixels.reader.ColumnReader.newColumnReader().
-                     * TODO: these two column should also support reading to LongColumnVector,
-                     * without conversions like longBitsToDouble, so that we can directly create
-                     * LongArrayBlock here without writeDouble (in which double is converted to long).
-                     * With this optimization, CPU and GC pressure can be greatly reduced.
                      */
-                    DoubleColumnVector dcv = (DoubleColumnVector) vector;
-                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dcv.isNull), dcv.vector);
+                    DoubleColumnVector dbcv = (DoubleColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dbcv.isNull), dbcv.vector);
                     break;
+                case DECIMAL:
+                    /**
+                     * Issue #196:
+                     * Presto reads the unscaled values for decimal type here.
+                     * The precision and scale of decimal are automatically processed by Presto.
+                     */
+                    DecimalColumnVector dccv = (DecimalColumnVector) vector;
+                    block = new LongArrayBlock(batchSize, Optional.ofNullable(dccv.isNull), dccv.vector);
+                    break;
+                case CHAR:
                 case VARCHAR:
+                case STRING:
+                case BINARY:
+                case VARBINARY:
                     BinaryColumnVector scv = (BinaryColumnVector) vector;
                     /*
                     int vectorContentLen = 0;

@@ -1,9 +1,6 @@
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.RdbColumnDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.RdbLayoutDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.RdbSchemaDao;
-import io.pixelsdb.pixels.daemon.metadata.dao.impl.RdbTableDao;
+import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,6 +26,7 @@ public class DaoFactory
     private Map<String, LayoutDao> layoutDaoMap = new HashMap<>();
     private Map<String, SchemaDao> schemaDaoMap = new HashMap<>();
     private Map<String, TableDao> tableDaoMap = new HashMap<>();
+    private Map<String, ViewDao> viewDaoMap = new HashMap<>();
 
     private DaoFactory ()
     {
@@ -36,6 +34,7 @@ public class DaoFactory
         this.layoutDaoMap.put("rdb", new RdbLayoutDao());
         this.schemaDaoMap.put("rdb", new RdbSchemaDao());
         this.tableDaoMap.put("rdb", new RdbTableDao());
+        this.viewDaoMap.put("rdb", new RdbViewDao());
     }
 
     public ColumnDao getColumnDao (String type)
@@ -56,5 +55,10 @@ public class DaoFactory
     public TableDao getTableDao(String type)
     {
         return this.tableDaoMap.get(type);
+    }
+
+    public ViewDao getViewDao(String type)
+    {
+        return this.viewDaoMap.get(type);
     }
 }

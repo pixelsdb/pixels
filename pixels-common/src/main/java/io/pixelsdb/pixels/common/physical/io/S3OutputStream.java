@@ -41,9 +41,9 @@ public class S3OutputStream extends OutputStream
 {
 
     /**
-     * Default chunk size is 10MB
+     * Default chunk size is 256MB
      */
-    protected static final int BUFFER_SIZE = 10 * 1024 * 1024;
+    protected static final int BUFFER_SIZE = 256 * 1024 * 1024;
 
     /**
      * The bucket-name on Amazon S3

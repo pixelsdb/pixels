@@ -98,8 +98,11 @@ message Type {
         STRING = 7;
         BINARY = 8;
         TIMESTAMP = 9;
+        ARRAY = 10;
         MAP = 11;
         STRUCT = 12;
+        VARBINARY = 13;
+        DECIMAL = 14;
         DATE = 15;
         VARCHAR = 16;
         CHAR = 17;

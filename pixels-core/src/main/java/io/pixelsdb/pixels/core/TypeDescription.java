@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.core;
 
+import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * TypeDescription derived from org.apache.orc
@@ -36,11 +37,36 @@ public final class TypeDescription
         implements Comparable<TypeDescription>, Serializable, Cloneable
 {
     private static final long serialVersionUID = 4270695889340023552L;
-    private static final int MAX_PRECISION = 38;
-    private static final int MAX_SCALE = 38;
-    private static final int DEFAULT_PRECISION = 38;
-    private static final int DEFAULT_SCALE = 10;
-    private static final int DEFAULT_LENGTH = 256;
+    /**
+     * Issue #196:
+     * In SQL standard, the max precision of decimal is 38.
+     * However, we only support short decimal of which the max precision is 18.
+     */
+    public static final int MAX_PRECISION = 18;
+    /**
+     * Issue #196:
+     * In SQL standard, the max scale of decimal is 38.
+     * However, we only support short decimal of which the max scale is 18.
+     */
+    public static final int MAX_SCALE = 18;
+    /**
+     * Issue #196:
+     * In SQL standard, the default precision of decimal is 38.
+     * However, we only support short decimal of which the default precision is 18.
+     */
+    public static final int DEFAULT_PRECISION = 18;
+    /**
+     * It is a standard that the default scale of decimal is 0.
+     */
+    public static final int DEFAULT_SCALE = 0;
+    /**
+     * The default length of varchar, binary, and varbinary.
+     */
+    public static final int DEFAULT_LENGTH = 65535;
+    /**
+     * It is a standard that the default length of char is 1.
+     */
+    public static final int DEFAULT_CHAR_LENGTH = 1;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     @Override
@@ -61,9 +87,19 @@ public final class TypeDescription
             {
                 switch (category)
                 {
+                    case BINARY:
+                    case VARBINARY:
                     case CHAR:
                     case VARCHAR:
-                        return maxLength - other.maxLength;
+                        result = maxLength - other.maxLength;
+                        break;
+                    case DECIMAL:
+                        result = precision - other.precision;
+                        if (result == 0)
+                        {
+                            result = scale = other.scale;
+                        }
+                        break;
                     case STRUCT:
                         if (children.size() != other.children.size())
                         {
@@ -88,39 +124,64 @@ public final class TypeDescription
 
     public enum Category
     {
-        BOOLEAN("boolean", true),
-        BYTE("tinyint", true),
-        SHORT("smallint", true),
-        INT("int", true),
-        LONG("bigint", true),
-        FLOAT("float", true),
-        DOUBLE("double", true),
-        STRING("string", true),
-        DATE("date", true),
-        TIME("time", true),
-        TIMESTAMP("timestamp", true),
-        BINARY("binary", true),
-        VARCHAR("varchar", true),
-        CHAR("char", true),
-        STRUCT("struct", false);
+        /*
+         * Issue #196:
+         * Support alias of data types.
+         */
+        BOOLEAN(true, "boolean"),
+        BYTE(true, "tinyint", "byte"),
+        SHORT(true, "smallint", "short"),
+        INT(true, "integer", "int"),
+        LONG(true, "bigint", "long"),
+        FLOAT(true, "float", "real"),
+        DOUBLE(true, "double"),
+        DECIMAL(true, "decimal"),
+        STRING(true, "string"),
+        DATE(true, "date"),
+        TIME(true, "time"),
+        TIMESTAMP(true, "timestamp"),
+        VARBINARY(true, "varbinary"),
+        BINARY(true, "binary"),
+        VARCHAR(true, "varchar"),
+        CHAR(true, "char"),
+        STRUCT(false, "struct");
 
-        Category(String name, boolean isPrimitive)
+        /**
+         * Ensure that all elements in names are in <b>lowercase</b>.
+         * @param isPrimitive
+         * @param names
+         */
+        Category(boolean isPrimitive, String... names)
         {
-            this.name = name;
+            checkArgument(names != null && names.length > 0,
+                    "names is null or empty");
+            this.primaryName = names[0];
             this.isPrimitive = isPrimitive;
+            this.allNames.addAll(Arrays.asList(names));
         }
 
         final boolean isPrimitive;
-        final String name;
+        final String primaryName;
+        final Set<String> allNames = new HashSet<>();
 
         public boolean isPrimitive()
         {
             return isPrimitive;
         }
 
-        public String getName()
+        public String getPrimaryName()
         {
-            return name;
+            return primaryName;
+        }
+
+        public Set<String> getAllNames()
+        {
+            return ImmutableSet.copyOf(this.allNames);
+        }
+
+        public boolean match(String name)
+        {
+            return this.allNames.contains(name.toLowerCase(Locale.ENGLISH));
         }
     }
 
@@ -159,6 +220,11 @@ public final class TypeDescription
         return new TypeDescription(Category.DOUBLE);
     }
 
+    public static TypeDescription createDecimal()
+    {
+        return new TypeDescription(Category.DECIMAL);
+    }
+
     public static TypeDescription createString()
     {
         return new TypeDescription(Category.STRING);
@@ -179,9 +245,29 @@ public final class TypeDescription
         return new TypeDescription(Category.TIMESTAMP);
     }
 
+    public static TypeDescription createVarbinary()
+    {
+        return new TypeDescription(Category.VARBINARY);
+    }
+
     public static TypeDescription createBinary()
     {
         return new TypeDescription(Category.BINARY);
+    }
+
+    public static TypeDescription createVarchar()
+    {
+        return new TypeDescription(Category.VARCHAR);
+    }
+
+    public static TypeDescription createChar()
+    {
+        return new TypeDescription(Category.CHAR);
+    }
+
+    public static TypeDescription createStruct()
+    {
+        return new TypeDescription(Category.STRUCT);
     }
 
     public static TypeDescription createSchema(List<PixelsProto.Type> types)
@@ -193,14 +279,42 @@ public final class TypeDescription
             TypeDescription fieldType;
             switch (type.getKind())
             {
+                case BOOLEAN:
+                    fieldType = TypeDescription.createBoolean();
+                    break;
+                case LONG:
+                    fieldType = TypeDescription.createLong();
+                    break;
                 case INT:
                     fieldType = TypeDescription.createInt();
+                    break;
+                case SHORT:
+                    fieldType = TypeDescription.createShort();
                     break;
                 case BYTE:
                     fieldType = TypeDescription.createByte();
                     break;
+                case FLOAT:
+                    fieldType = TypeDescription.createFloat();
+                    break;
+                case DOUBLE:
+                    fieldType = TypeDescription.createDouble();
+                    break;
+                case DECIMAL:
+                    fieldType = TypeDescription.createDecimal();
+                    fieldType.precision = type.getPrecision();
+                    fieldType.scale = type.getScale();
+                    break;
+                case VARCHAR:
+                    fieldType = TypeDescription.createVarchar();
+                    fieldType.maxLength = type.getMaximumLength();
+                    break;
                 case CHAR:
                     fieldType = TypeDescription.createChar();
+                    fieldType.maxLength = type.getMaximumLength();
+                    break;
+                case STRING:
+                    fieldType = TypeDescription.createString();
                     break;
                 case DATE:
                     fieldType = TypeDescription.createDate();
@@ -208,32 +322,16 @@ public final class TypeDescription
                 case TIME:
                     fieldType = TypeDescription.createTime();
                     break;
-                case LONG:
-                    fieldType = TypeDescription.createLong();
+                case TIMESTAMP:
+                    fieldType = TypeDescription.createTimestamp();
                     break;
-                case FLOAT:
-                    fieldType = TypeDescription.createFloat();
-                    break;
-                case SHORT:
-                    fieldType = TypeDescription.createShort();
+                case VARBINARY:
+                    fieldType = TypeDescription.createVarbinary();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 case BINARY:
                     fieldType = TypeDescription.createBinary();
-                    break;
-                case DOUBLE:
-                    fieldType = TypeDescription.createDouble();
-                    break;
-                case STRING:
-                    fieldType = TypeDescription.createString();
-                    break;
-                case BOOLEAN:
-                    fieldType = TypeDescription.createBoolean();
-                    break;
-                case VARCHAR:
-                    fieldType = TypeDescription.createVarchar();
-                    break;
-                case TIMESTAMP:
-                    fieldType = TypeDescription.createTimestamp();
+                    fieldType.maxLength = type.getMaximumLength();
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown type: " +
@@ -270,6 +368,13 @@ public final class TypeDescription
         }
     }
 
+    /**
+     * Parse the category from the source.
+     * For example, if the source is 'varchar(16)' with position = 0,
+     * the returned category will be VARCHAR.
+     * @param source the type name
+     * @return
+     */
     private static Category parseCategory(StringPosition source)
     {
         int start = source.position;
@@ -287,15 +392,22 @@ public final class TypeDescription
             String word = source.value.substring(start, source.position).toLowerCase();
             for (Category cat : Category.values())
             {
-                if (cat.getName().equals(word))
+                if (cat.match(word))
                 {
                     return cat;
                 }
             }
         }
-        throw new IllegalArgumentException("Can't parse category at " + source);
+        throw new IllegalArgumentException("Can't parse type category at " + source);
     }
 
+    /**
+     * Parse an integer parameter from the source.
+     * For example, if the source is 'varchar(16)' with position = 8,
+     * the returned parameter will be 16.
+     * @param source the type name
+     * @return
+     */
     private static int parseInt(StringPosition source)
     {
         int start = source.position;
@@ -317,6 +429,13 @@ public final class TypeDescription
         return result;
     }
 
+    /**
+     * Parse the field name, i.e., user-defined identifier, from the source.
+     * For example, if the source is 'a:int' with position = 0,
+     * the returned name will be 'a'.
+     * @param source
+     * @return
+     */
     private static String parseName(StringPosition source)
     {
         if (source.position == source.length)
@@ -421,7 +540,6 @@ public final class TypeDescription
         TypeDescription result = new TypeDescription(parseCategory(source));
         switch (result.getCategory())
         {
-            case BINARY:
             case BOOLEAN:
             case BYTE:
             case DATE:
@@ -434,11 +552,41 @@ public final class TypeDescription
             case STRING:
             case TIMESTAMP:
                 break;
+            case BINARY:
+            case VARBINARY:
             case CHAR:
             case VARCHAR:
-                requireChar(source, '(');
-                result.withMaxLength(parseInt(source));
-                requireChar(source, ')');
+                if (consumeChar(source, '('))
+                {
+                    // with length specified.
+                    result.withMaxLength(parseInt(source));
+                    requireChar(source, ')');
+                }
+                else if (result.getCategory() == Category.CHAR)
+                {
+                    // It is a standard that the default length of char is 1.
+                    result.withMaxLength(DEFAULT_CHAR_LENGTH);
+                }
+                break;
+            case DECIMAL:
+                if (consumeChar(source, '('))
+                {
+                    int precision = parseInt(source);
+                    // It is a standard that scale is 0 by default.
+                    int scale = 0;
+                    if (consumeChar(source, ','))
+                    {
+                        scale = parseInt(source);
+                    }
+                    requireChar(source, ')');
+                    if (scale > precision)
+                    {
+                        throw new IllegalArgumentException("Decimal's scale " + scale +
+                                " is larger than its precision " + precision);
+                    }
+                    result.withPrecision(precision);
+                    result.withScale(scale);
+                } // precision is 38 by default, while scale is 0 by default.
                 break;
             case STRUCT:
                 parseStruct(result, source);
@@ -451,7 +599,7 @@ public final class TypeDescription
     }
 
     /**
-     * Parse TypeDescription from the Hive type names. This is the inverse
+     * Parse TypeDescription from the type name. This is the inverse
      * of TypeDescription.toString()
      *
      * @param typeName the name of the type
@@ -464,13 +612,31 @@ public final class TypeDescription
         {
             return null;
         }
-        StringPosition source = new StringPosition(typeName);
+        StringPosition source = new StringPosition( // remove whitespaces (if any)
+                typeName.replaceAll("\\s", ""));
         TypeDescription result = parseType(source);
         if (source.position != source.length)
         {
             throw new IllegalArgumentException("Extra characters at " + source);
         }
         return result;
+    }
+
+    /**
+     * Check if the typeName can be parsed to a valid type description.
+     * @param typeName
+     * @return
+     */
+    public static boolean isValid(String typeName)
+    {
+        try
+        {
+            TypeDescription type = fromString(typeName);
+            return type != null;
+        } catch (IllegalArgumentException e)
+        {
+            return false;
+        }
     }
 
     /**
@@ -513,9 +679,13 @@ public final class TypeDescription
                 case DOUBLE:
                     tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
                     break;
+                case DECIMAL:
+                    tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
+                    tmpType.setPrecision(schema.precision);
+                    tmpType.setScale(schema.scale);
+                    break;
                 case STRING:
                     tmpType.setKind(PixelsProto.Type.Kind.STRING);
-                    tmpType.setMaximumLength(schema.getMaxLength());
                     break;
                 case CHAR:
                     tmpType.setKind(PixelsProto.Type.Kind.CHAR);
@@ -527,6 +697,11 @@ public final class TypeDescription
                     break;
                 case BINARY:
                     tmpType.setKind(PixelsProto.Type.Kind.BINARY);
+                    tmpType.setMaximumLength(schema.getMaxLength());
+                    break;
+                case VARBINARY:
+                    tmpType.setKind(PixelsProto.Type.Kind.VARBINARY);
+                    tmpType.setMaximumLength(schema.getMaxLength());
                     break;
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
@@ -553,10 +728,19 @@ public final class TypeDescription
      */
     public TypeDescription withPrecision(int precision)
     {
-        if (precision < 1 || precision > MAX_PRECISION || scale > precision)
+        if (precision < 1)
+        {
+            throw new IllegalArgumentException("precision " + precision + " is negative");
+        }
+        else if (precision > MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of range 1 .. " + scale);
+                    " is out of the max precision " + MAX_PRECISION);
+        }
+        else if (scale > precision)
+        {
+            throw new IllegalArgumentException("precision " + precision +
+                    " is smaller that scale " + scale);
         }
         this.precision = precision;
         return this;
@@ -570,44 +754,40 @@ public final class TypeDescription
      */
     public TypeDescription withScale(int scale)
     {
-        if (scale < 0 || scale > MAX_SCALE || scale > precision)
+        if (scale < 0)
         {
-            throw new IllegalArgumentException("scale is out of range at " + scale);
+            throw new IllegalArgumentException("scale " + scale + " is negative");
+        }
+        else if (scale > MAX_SCALE)
+        {
+            throw new IllegalArgumentException("scale " + scale +
+                    " is out of the max scale " + MAX_SCALE);
+        }
+        else if (scale > precision)
+        {
+            throw new IllegalArgumentException("scale " + scale +
+                    " is out of range 0 .. " + precision);
         }
         this.scale = scale;
         return this;
     }
 
-    public static TypeDescription createVarchar()
-    {
-        return new TypeDescription(Category.VARCHAR);
-    }
-
-    public static TypeDescription createChar()
-    {
-        return new TypeDescription(Category.CHAR);
-    }
-
     /**
-     * Set the maximum length for char and varchar types.
+     * Set the maximum length for char/binary and varchar/varbinary types.
      *
      * @param maxLength the maximum value
      * @return this
      */
     public TypeDescription withMaxLength(int maxLength)
     {
-        if (category != Category.VARCHAR && category != Category.CHAR)
+        if (category != Category.VARCHAR && category != Category.CHAR &&
+        category != Category.BINARY && category != Category.VARBINARY)
         {
             throw new IllegalArgumentException("maxLength is only allowed on char" +
-                    " and varchar, but not " + category.name);
+                    ", varchar, binary, and varbinary, but not " + category.primaryName);
         }
         this.maxLength = maxLength;
         return this;
-    }
-
-    public static TypeDescription createStruct()
-    {
-        return new TypeDescription(Category.STRUCT);
     }
 
     /**
@@ -622,7 +802,7 @@ public final class TypeDescription
         if (category != Category.STRUCT)
         {
             throw new IllegalArgumentException("Can only add fields to struct type" +
-                    " and not " + category);
+                    " but not " + category);
         }
         fieldNames.add(field);
         children.add(fieldType);
@@ -776,8 +956,11 @@ public final class TypeDescription
             case FLOAT:
             case DOUBLE:
                 return new DoubleColumnVector(maxSize);
+            case DECIMAL:
+                return new DecimalColumnVector(maxSize, precision, scale);
             case STRING:
             case BINARY:
+            case VARBINARY:
             case CHAR:
             case VARCHAR:
                 return new BinaryColumnVector(maxSize);
@@ -961,13 +1144,22 @@ public final class TypeDescription
 
     public void printToBuffer(StringBuilder buffer)
     {
-        buffer.append(category.name);
+        buffer.append(category.primaryName);
         switch (category)
         {
+            case BINARY:
+            case VARBINARY:
             case CHAR:
             case VARCHAR:
                 buffer.append('(');
                 buffer.append(maxLength);
+                buffer.append(')');
+                break;
+            case DECIMAL:
+                buffer.append('(');
+                buffer.append(precision);
+                buffer.append(',');
+                buffer.append(scale);
                 buffer.append(')');
                 break;
             case STRUCT:
@@ -1005,17 +1197,25 @@ public final class TypeDescription
         }
         buffer.append(prefix);
         buffer.append("{\"category\": \"");
-        buffer.append(category.name);
+        buffer.append(category.primaryName);
         buffer.append("\", \"id\": ");
         buffer.append(getId());
         buffer.append(", \"maxId\": ");
         buffer.append(maxId);
         switch (category)
         {
+            case BINARY:
+            case VARBINARY:
             case CHAR:
             case VARCHAR:
                 buffer.append(", \"maxLength\": ");
                 buffer.append(maxLength);
+                break;
+            case DECIMAL:
+                buffer.append(", \"precision\": ");
+                buffer.append(precision);
+                buffer.append(", \"scale\": ");
+                buffer.append(scale);
                 break;
             case STRUCT:
                 buffer.append(", \"fields\": [");

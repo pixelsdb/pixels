@@ -30,12 +30,21 @@ import java.io.IOException;
  * each element consists of content length and content binary.
  *
  * @author guodong
+ * @author hank
  */
 public class BinaryColumnWriter extends BaseColumnWriter
 {
-    public BinaryColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    /**
+     * Max length of binary. It is recorded in the file footer's schema.
+     */
+    private final int maxLength;
+    private int numTruncated;
+
+    public BinaryColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
+        this.maxLength = type.getMaxLength();
+        this.numTruncated = 0;
     }
 
     @Override
@@ -77,8 +86,17 @@ public class BinaryColumnWriter extends BaseColumnWriter
             else
             {
                 byte[] bytes = values[curPartOffset + i];
-                outputStream.write(bytes.length);
-                outputStream.write(bytes);
+                if (bytes.length <= maxLength)
+                {
+                    outputStream.write(bytes.length);
+                    outputStream.write(bytes);
+                }
+                else
+                {
+                    outputStream.write(maxLength);
+                    outputStream.write(bytes, 0, maxLength);
+                    numTruncated++;
+                }
                 pixelStatRecorder.updateBinary(bytes, 0, bytes.length, 1);
             }
         }

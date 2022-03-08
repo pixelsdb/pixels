@@ -39,9 +39,9 @@ public class TimestampColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];
 
-    public TimestampColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public TimestampColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         // Issue #94: time can be negative if it is before 1970-1-1 0:0:0.
         encoder = new RunLenIntEncoder(true, true);
     }

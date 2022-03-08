@@ -36,9 +36,9 @@ public class BooleanColumnWriter extends BaseColumnWriter
 {
     private final byte[] curPixelVector = new byte[pixelStride];
 
-    public BooleanColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public BooleanColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
     }
 
     @Override

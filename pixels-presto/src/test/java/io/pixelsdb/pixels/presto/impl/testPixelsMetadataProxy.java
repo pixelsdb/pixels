@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.presto.impl;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
-import io.pixelsdb.pixels.presto.PixelsColumnHandle;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
@@ -41,7 +40,7 @@ public class testPixelsMetadataProxy
     public void init ()
     {
         PixelsPrestoConfig config = new PixelsPrestoConfig().setPixelsHome("");
-        this.pixelsMetadataProxy = new PixelsMetadataProxy(config);
+        this.pixelsMetadataProxy = new PixelsMetadataProxy(config, null);
     }
 
     @Test
@@ -57,13 +56,6 @@ public class testPixelsMetadataProxy
     {
         List<String> tablelist = pixelsMetadataProxy.getTableNames("pixels");
         System.out.println(tablelist.toString());
-    }
-
-    @Test
-    public void testGetTableColumns () throws MetadataException
-    {
-        List<PixelsColumnHandle> columnHandleList = pixelsMetadataProxy.getTableColumn("", "pixels", "test30g_pixels");
-        System.out.println(columnHandleList.toString());
     }
 
     @Test

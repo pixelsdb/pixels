@@ -35,9 +35,9 @@ public class FloatColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public FloatColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public FloatColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         encodingUtils = new EncodingUtils();
     }
 

@@ -40,11 +40,11 @@ public class IntegerColumnWriter extends BaseColumnWriter
     private final long[] curPixelVector = new long[pixelStride];        // current pixel value vector haven't written out yet
     private final boolean isLong;                                       // current column type is long or int
 
-    public IntegerColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public IntegerColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         encoder = new RunLenIntEncoder();
-        this.isLong = schema.getCategory() == TypeDescription.Category.LONG;
+        this.isLong = type.getCategory() == TypeDescription.Category.LONG;
     }
 
     @Override
@@ -74,7 +74,7 @@ public class IntegerColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartLong(LongColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
+    private void writeCurPartLong(ColumnVector columnVector, long[] values, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {

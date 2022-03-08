@@ -181,6 +181,7 @@ final public class PixelsStruct implements Writable
     {
         switch (type.getCategory())
         {
+            // TODO: TIME and TIMESTAMP are currently not supported in Hive.
             case BOOLEAN:
                 return new BooleanWritable();
             case BYTE:
@@ -194,8 +195,10 @@ final public class PixelsStruct implements Writable
             case FLOAT:
                 return new FloatWritable();
             case DOUBLE:
+            case DECIMAL: // TODO: precision and scale are ignored.
                 return new DoubleWritable();
             case BINARY:
+            case VARBINARY:
                 return new BytesWritable();
             case CHAR:
             case VARCHAR:

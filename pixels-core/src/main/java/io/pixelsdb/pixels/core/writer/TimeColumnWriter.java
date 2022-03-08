@@ -39,9 +39,9 @@ public class TimeColumnWriter extends BaseColumnWriter
 {
     private final int[] curPixelVector = new int[pixelStride];
 
-    public TimeColumnWriter(TypeDescription schema, int pixelStride, boolean isEncoding)
+    public TimeColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
-        super(schema, pixelStride, isEncoding);
+        super(type, pixelStride, isEncoding);
         // time is likely to be negative according to different time zone.
         encoder = new RunLenIntEncoder(true, true);
     }

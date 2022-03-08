@@ -342,6 +342,7 @@ public class PixelsValue
     {
         switch (schema.getCategory())
         {
+            // TODO: TIME and TIMESTAMP are currently not supported in Hive.
             case BOOLEAN:
                 return nextBoolean(vector, row, previous);
             case BYTE:
@@ -355,12 +356,14 @@ public class PixelsValue
             case FLOAT:
                 return nextFloat(vector, row, previous);
             case DOUBLE:
+            case DECIMAL: // TODO: precision and scale are ignored.
                 return nextDouble(vector, row, previous);
             case STRING:
             case CHAR:
             case VARCHAR:
                 return nextString(vector, row, previous);
             case BINARY:
+            case VARBINARY:
                 return nextBinary(vector, row, previous);
             case DATE:
                 return nextDate(vector, row, previous);

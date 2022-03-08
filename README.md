@@ -6,8 +6,7 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK 8.0.
-Open Pixels as maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
+Install JDK 8.0, and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
@@ -19,7 +18,7 @@ It may take about one minute to complete. After that, find the following jar/zip
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. Memory of 8GB or larger is recommended. Login the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. 8GB or larger memory is recommended. Login the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
@@ -237,6 +236,7 @@ sudo ./sbin/pin-cache.sh
 `reset-cache.sh` is only needed for the first time of using pixels-cache. 
 It initializes some states in etcd for the cache.
 
+Even if pixels-cache is disabled, `reset-cache.sh` is needed for the first time of starting Pixels.
 Then, start the daemons of Pixels using:
 ```bash
 ./sbin/start-pixels.sh
@@ -314,7 +314,12 @@ LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 
 LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
 ```
-This may take a few hours. As we don't use pixels-cache for TPC-H, there is no need to load the cache.
+This may take a few hours. The last parameter `-c` of the `LOAD` command is the maximum number
+of threads used for loading data. It only effects when the input directory (specified by `-o`)
+contains multiple input files. In case that the TPC-H table has multiple parts, you can set 
+`-c` to the number of parts to improve the data loading performance.
+
+As we don't use pixels-cache for TPC-H, there is no need to load the cache.
 Otherwise, we can load the cached table into pixels-cache using:
 ```bash
 ./sbin/load-cache.sh layout_version
@@ -333,15 +338,17 @@ Execute the TPC-H queries in presto-cli.
 This is optional. It is only needed if we want to test the query performance on the compact layout.
 In pixels-load, use the following command to compact the files in the ordered path of each table:
 ```bash
-COMPACT -s tpch -t customer -l 1 -n no
-COMPACT -s tpch -t lineitem -l 2 -n no
-COMPACT -s tpch -t orders -l 4 -n no
-COMPACT -s tpch -t part -l 5 -n no
-COMPACT -s tpch -t partsupp -l 6 -n no
-COMPACT -s tpch -t supplier -l 8 -n no
+COMPACT -s tpch -t customer -l 1 -n no -c 2
+COMPACT -s tpch -t lineitem -l 2 -n no -c 16
+COMPACT -s tpch -t orders -l 4 -n no -c 8
+COMPACT -s tpch -t part -l 5 -n no -c 1
+COMPACT -s tpch -t partsupp -l 6 -n no -c 8
+COMPACT -s tpch -t supplier -l 8 -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
-Compaction is faster than loading.
+The last parameter `-c` of `COMPACT` command is the maximum number
+of threads used for data compaction. For large tables such as `lineitem`, you can increase `-c` to 
+improve the compaction performance. Compaction is normally faster than loading with same number of threads.
 
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database

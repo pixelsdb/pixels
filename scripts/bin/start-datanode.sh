@@ -9,7 +9,7 @@ if [ "xPIXELS_HOME" = "x" ]; then
   export PIXELS_HOME="${base_dir}/../"
 fi
 
-EXTRA_ARGS="-role main -name PixelsCoordinator"
+EXTRA_ARGS="-role main -name PixelsDataNode"
 OPTS="datanode"
 COMMAND=$1
 case ${COMMAND} in

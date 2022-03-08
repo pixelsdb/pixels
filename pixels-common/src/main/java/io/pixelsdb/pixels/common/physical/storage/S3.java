@@ -330,7 +330,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.exists(path))
+        if (!this.existsOrGenIdSucc(p))
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -352,14 +352,16 @@ public class S3 implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
-        if (kv == null)
+        Path p = new Path(path);
+        if (!p.valid)
         {
-            // the file id does not exist, register a new id for this file.
-            long id = GenerateId(S3_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-            return id;
+            throw new IOException("Path '" + path + "' is not valid.");
         }
+        if (!this.existsOrGenIdSucc(p))
+        {
+            throw new IOException("Path '" + path + "' does not exist.");
+        }
+        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
         return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
     }
 
@@ -403,7 +405,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.exists(path))
+        if (!this.existsOrGenIdSucc(p))
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -428,12 +430,12 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (this.exists(path))
+        if (this.existsId(p) || this.existsInS3(p))
         {
             throw new IOException("Path '" + path + "' already exists.");
         }
         long id = GenerateId(S3_ID_KEY);
-        EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+        EtcdUtil.Instance().putKeyValue(getPathKey(p.toString()), Long.toString(id));
         return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
     }
 
@@ -451,7 +453,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.exists(path))
+        if (!this.existsId(p))
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -464,7 +466,7 @@ public class S3 implements Storage
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
                 try
                 {
-                    s3Async.deleteObject(request).get();
+                    s3.deleteObject(request);
                 } catch (Exception e)
                 {
                     throw new IOException("Failed to delete object '" + sub.bucket + "/" + sub.key + "' from S3.", e);
@@ -476,7 +478,7 @@ public class S3 implements Storage
             DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(p.bucket).key(p.key).build();
             try
             {
-                s3Async.deleteObject(request).get();
+                s3.deleteObject(request);
             } catch (Exception e)
             {
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
@@ -496,6 +498,22 @@ public class S3 implements Storage
     {
         Path srcPath = new Path(src);
         Path destPath = new Path(dest);
+        if (!srcPath.valid)
+        {
+            throw new IOException("Path '" + src + "' is not valid.");
+        }
+        if (!destPath.valid)
+        {
+            throw new IOException("Path '" + dest + "' is not valid.");
+        }
+        if (!this.existsOrGenIdSucc(srcPath))
+        {
+            throw new IOException("Path '" + src + "' does not exist.");
+        }
+        if (this.existsId(destPath) || this.existsInS3(destPath))
+        {
+            throw new IOException("Path '" + dest + "' already exists.");
+        }
         CopyObjectRequest copyReq = CopyObjectRequest.builder()
                 .copySource(srcPath.toString())
                 .destinationBucket(destPath.bucket)
@@ -503,7 +521,10 @@ public class S3 implements Storage
                 .build();
         try
         {
-            s3Async.copyObject(copyReq).join();
+            s3.copyObject(copyReq);
+            // generate id for the new copy.
+            long id = GenerateId(S3_ID_KEY);
+            EtcdUtil.Instance().putKeyValue(getPathKey(destPath.toString()), Long.toString(id));
             return true;
         }
         catch (RuntimeException e)
@@ -534,9 +555,61 @@ public class S3 implements Storage
     }
 
     @Override
-    public boolean exists(String path)
+    public boolean exists(String path) throws IOException
     {
-        return EtcdUtil.Instance().getKeyValue(getPathKey(path)) != null;
+        return this.existsId(new Path(path));
+    }
+
+    public boolean existsId(Path path) throws IOException
+    {
+        if (!path.valid)
+        {
+            throw new IOException("Path '" + path.toString() + "' is not valid.");
+        }
+        return EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null;
+    }
+
+    private boolean existsInS3(Path path) throws IOException
+    {
+        if (!path.valid)
+        {
+            throw new IOException("Path '" + path.toString() + "' is not valid.");
+        }
+        HeadObjectRequest request = HeadObjectRequest.builder().bucket(path.bucket).key(path.key).build();
+        try
+        {
+            s3.headObject(request);
+            return true;
+        } catch (Exception e)
+        {
+            if (e instanceof NoSuchKeyException)
+            {
+                return false;
+            }
+            throw new IOException("Failed to check the existence of '" + path + "'", e);
+        }
+    }
+
+    private boolean existsOrGenIdSucc(Path path) throws IOException
+    {
+        if (!path.valid)
+        {
+            throw new IOException("Path '" + path.toString() + "' is not valid.");
+        }
+        String pathStr = path.toString();
+        boolean exists = EtcdUtil.Instance().getKeyValue(getPathKey(pathStr)) != null;
+        if (exists)
+        {
+            return true;
+        }
+        if (this.existsInS3(path))
+        {
+            // the file id does not exist, register a new id for this file.
+            long id = GenerateId(S3_ID_KEY);
+            EtcdUtil.Instance().putKeyValue(getPathKey(pathStr), Long.toString(id));
+            return true;
+        }
+        return false;
     }
 
     @Override

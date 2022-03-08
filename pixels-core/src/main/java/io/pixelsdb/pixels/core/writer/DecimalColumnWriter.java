@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -22,20 +22,22 @@ package io.pixelsdb.pixels.core.writer;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
 /**
- * pixels
+ * The column writer of decimals.
+ * <p><b>Note: it only supports short decimals with max precision and scale 18.</b></p>
  *
- * @author guodong
+ * @author hank
  */
-public class DoubleColumnWriter extends BaseColumnWriter
+public class DecimalColumnWriter extends BaseColumnWriter
 {
     private final EncodingUtils encodingUtils;
 
-    public DoubleColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
+    public DecimalColumnWriter(TypeDescription type, int pixelStride, boolean isEncoding)
     {
         super(type, pixelStride, isEncoding);
         encodingUtils = new EncodingUtils();
@@ -45,7 +47,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
     public int write(ColumnVector vector, int length)
             throws IOException
     {
-        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        DecimalColumnVector columnVector = (DecimalColumnVector) vector;
         long[] values = columnVector.vector;
         for (int i = 0; i < length; i++)
         {
@@ -59,7 +61,7 @@ public class DoubleColumnWriter extends BaseColumnWriter
             else
             {
                 encodingUtils.writeLongLE(outputStream, values[i]);
-                pixelStatRecorder.updateDouble(Double.longBitsToDouble(values[i]));
+                pixelStatRecorder.updateDouble(BigDecimal.valueOf(values[i], type.getScale()).doubleValue());
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)
