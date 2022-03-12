@@ -34,7 +34,6 @@ import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
-import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.*;
@@ -42,6 +41,7 @@ import io.pixelsdb.pixels.presto.block.TimeArrayBlock;
 import io.pixelsdb.pixels.presto.block.VarcharArrayBlock;
 import io.pixelsdb.pixels.presto.exception.PixelsErrorCode;
 import io.pixelsdb.pixels.presto.impl.PixelsPrestoConfig;
+import io.pixelsdb.pixels.presto.impl.PixelsTupleDomainPredicate;
 
 import java.io.IOException;
 import java.util.*;
@@ -121,7 +121,7 @@ class PixelsPageSource implements ConnectorPageSource
         {
             domains = split.getConstraint().getDomains().get();
         }
-        List<TupleDomainPixelsPredicate.ColumnReference<PixelsColumnHandle>> columnReferences =
+        List<PixelsTupleDomainPredicate.ColumnReference<PixelsColumnHandle>> columnReferences =
                 new ArrayList<>(domains.size());
         for (Map.Entry<PixelsColumnHandle, Domain> entry : domains.entrySet())
         {
@@ -129,12 +129,12 @@ class PixelsPageSource implements ConnectorPageSource
             String columnName = column.getColumnName();
             int columnOrdinal = split.getOrder().indexOf(columnName);
             columnReferences.add(
-                    new TupleDomainPixelsPredicate.ColumnReference<>(
+                    new PixelsTupleDomainPredicate.ColumnReference<>(
                             column,
                             columnOrdinal,
                             column.getColumnType()));
         }
-        PixelsPredicate predicate = new TupleDomainPixelsPredicate<>(split.getConstraint(), columnReferences);
+        PixelsPredicate predicate = new PixelsTupleDomainPredicate<>(split.getConstraint(), columnReferences);
 
         this.option = new PixelsReaderOption();
         this.option.skipCorruptRecords(true);

@@ -17,16 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.predicate;
+package io.pixelsdb.pixels.presto.impl;
 
-import com.facebook.presto.spi.type.*;
-import io.pixelsdb.pixels.core.exception.PixelsReaderException;
-import io.pixelsdb.pixels.core.stats.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
+import com.facebook.presto.spi.type.DateType;
+import com.facebook.presto.spi.type.TimeType;
+import com.facebook.presto.spi.type.TimestampType;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.core.exception.PixelsReaderException;
+import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
+import io.pixelsdb.pixels.core.stats.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -41,18 +45,23 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * Issue #208:
+ * This was originally the io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate in pixels-core.
+ */
+
+/**
  * Predicate implementation mainly for Presto.
  *
  * @author guodong
  * @author hank
  */
-public class TupleDomainPixelsPredicate<C>
+public class PixelsTupleDomainPredicate<C>
         implements PixelsPredicate
 {
     private final TupleDomain<C> predicate;
     public final List<ColumnReference<C>> columnReferences;
 
-    public TupleDomainPixelsPredicate(TupleDomain<C> predicate, List<ColumnReference<C>> columnReferences)
+    public PixelsTupleDomainPredicate(TupleDomain<C> predicate, List<ColumnReference<C>> columnReferences)
     {
         this.predicate = requireNonNull(predicate, "predicate is null");
         this.columnReferences = ImmutableList.copyOf(requireNonNull(columnReferences, "column references is null"));
@@ -417,7 +426,7 @@ public class TupleDomainPixelsPredicate<C>
     @Override
     public String toString()
     {
-        StringBuilder builder = new StringBuilder("TupleDomainPixelsPredicate{isNone=")
+        StringBuilder builder = new StringBuilder("PixelsTupleDomainPredicate{isNone=")
                 .append(predicate.isNone() + ", isAll=")
                 .append(predicate.isAll() + ", ")
                 .append("columnPredicates=[");
