@@ -313,7 +313,7 @@ public class PixelsTupleDomainPredicate<C>
              * Besides integer types, decimal type also goes here as decimal in Presto
              * is backed by long. In Pixels, we also use IntegerColumnStats for decimal
              * columns. If needed in other places, integer statistics can be manually converted
-             * to double using the precision and scale from the schema in the row group footer.
+             * to double using the precision and scale from the schema in the file footer.
              */
             return createDomain(type, hasNullValue, (IntegerColumnStats) columnStats);
         }

@@ -196,7 +196,7 @@ public class StatsRecorder
                  * To be compatible with Presto, use IntegerColumnStats for decimal.
                  * Decimal and its statistics in Presto are represented as long. If
                  * needed in other places, integer statistics can be converted to double
-                 * using the precision and scale from the schema in the row group footer.
+                 * using the precision and scale from the schema in the file footer.
                  */
             case DECIMAL:
                 return new IntegerStatsRecorder();
