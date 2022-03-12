@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.load.rw;
+package io.pixelsdb.pixels.load;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
@@ -33,7 +33,8 @@ import java.sql.Timestamp;
  * @author: tao
  * @date: Create in 2018-11-07 16:05
  **/
-public class PixelsCoreTest {
+public class TestPixelsCore
+{
 
     String hdfsDir = "/home/tao/data/hadoop-2.7.3/etc/hadoop/"; // dbiir10
 

@@ -654,9 +654,10 @@ public final class TypeDescription
         }
         for (int i = 0; i < children.size(); i++)
         {
+            TypeDescription child = children.get(i);
             PixelsProto.Type.Builder tmpType = PixelsProto.Type.newBuilder();
             tmpType.setName(names.get(i));
-            switch (children.get(i).getCategory())
+            switch (child.getCategory())
             {
                 case BOOLEAN:
                     tmpType.setKind(PixelsProto.Type.Kind.BOOLEAN);
@@ -681,27 +682,27 @@ public final class TypeDescription
                     break;
                 case DECIMAL:
                     tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
-                    tmpType.setPrecision(schema.precision);
-                    tmpType.setScale(schema.scale);
+                    tmpType.setPrecision(child.precision);
+                    tmpType.setScale(child.scale);
                     break;
                 case STRING:
                     tmpType.setKind(PixelsProto.Type.Kind.STRING);
                     break;
                 case CHAR:
                     tmpType.setKind(PixelsProto.Type.Kind.CHAR);
-                    tmpType.setMaximumLength(schema.getMaxLength());
+                    tmpType.setMaximumLength(child.getMaxLength());
                     break;
                 case VARCHAR:
                     tmpType.setKind(PixelsProto.Type.Kind.VARCHAR);
-                    tmpType.setMaximumLength(schema.getMaxLength());
+                    tmpType.setMaximumLength(child.getMaxLength());
                     break;
                 case BINARY:
                     tmpType.setKind(PixelsProto.Type.Kind.BINARY);
-                    tmpType.setMaximumLength(schema.getMaxLength());
+                    tmpType.setMaximumLength(child.getMaxLength());
                     break;
                 case VARBINARY:
                     tmpType.setKind(PixelsProto.Type.Kind.VARBINARY);
-                    tmpType.setMaximumLength(schema.getMaxLength());
+                    tmpType.setMaximumLength(child.getMaxLength());
                     break;
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);

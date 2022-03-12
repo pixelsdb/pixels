@@ -449,7 +449,6 @@ public class Main
                         .setDefault("4").required(true)
                         .help("specify the number of threads used for data compaction");
 
-
                 Namespace ns = null;
                 try
                 {
@@ -511,7 +510,7 @@ public class Main
 
                     // compact
                     long startTime = System.currentTimeMillis();
-                    for (int i = 0; i < statuses.size(); i+=numRowGroupInBlock)
+                    for (int i = 0, thdId = 0; i < statuses.size(); i+=numRowGroupInBlock, thdId++)
                     {
                         if (i + numRowGroupInBlock > statuses.size())
                         {
@@ -533,7 +532,6 @@ public class Main
                         List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {
-                            //System.out.println(statuses[i+j].getPath().toString());
                             sourcePaths.add(statuses.get(i+j).getPath());
                         }
 
@@ -541,7 +539,7 @@ public class Main
                                 DateUtil.getCurTime() +
                                 ".compact.pxl";
 
-                        System.out.println("(" + i + ") " + sourcePaths.size() +
+                        System.out.println("(" + thdId + ") " + sourcePaths.size() +
                                 " ordered files to be compacted into '" + filePath + "'.");
 
                         PixelsCompactor.Builder compactorBuilder =
