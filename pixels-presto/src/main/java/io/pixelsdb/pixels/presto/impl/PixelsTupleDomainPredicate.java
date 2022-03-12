@@ -23,10 +23,7 @@ import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
-import com.facebook.presto.spi.type.DateType;
-import com.facebook.presto.spi.type.TimeType;
-import com.facebook.presto.spi.type.TimestampType;
-import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.*;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.core.exception.PixelsReaderException;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
@@ -287,11 +284,7 @@ public class PixelsTupleDomainPredicate<C>
                 return Domain.create(ValueSet.of(BOOLEAN, false), hasNullValue);
             }
         }
-        else if (isCharType(type))
-        {
-            return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
-        }
-        else if (isVarcharType(type))
+        else if (isCharType(type) || isVarcharType(type))
         {
             return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
         }
@@ -315,6 +308,13 @@ public class PixelsTupleDomainPredicate<C>
         }
         else if (type.getJavaType() == long.class)
         {
+            /**
+             * Issue #208:
+             * Besides integer types, decimal type also goes here as decimal in Presto
+             * is backed by long. In Pixels, we also use IntegerColumnStats for decimal
+             * columns. If needed in other places, integer statistics can be manually converted
+             * to double using the precision and scale from the schema in the row group footer.
+             */
             return createDomain(type, hasNullValue, (IntegerColumnStats) columnStats);
         }
         else if (type.getJavaType() == double.class)

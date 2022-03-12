@@ -340,8 +340,8 @@ public class PixelsRecordReaderImpl
                 {
                     /**
                      * Issue #103:
-                     * 1. matches() is fixed in this issue, but it is not sure if there is
-                     * any further problems with it, as the related domain APIs in presto spi is mysterious.
+                     * 1. PixelsTupleDomainPredicate.matches() is fixed in this issue, but there could be
+                     * other problems in it, as the related TupleDomain APIs in presto spi is mysterious.
                      *
                      * 2. Whenever predicate does not match any column statistics, we should not return
                      * false. Instead, we must make sure that includedRGs are filled in by false values.

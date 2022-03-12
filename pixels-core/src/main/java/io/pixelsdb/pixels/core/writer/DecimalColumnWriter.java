@@ -25,7 +25,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 
 /**
  * The column writer of decimals.
@@ -61,7 +60,7 @@ public class DecimalColumnWriter extends BaseColumnWriter
             else
             {
                 encodingUtils.writeLongLE(outputStream, values[i]);
-                pixelStatRecorder.updateDouble(BigDecimal.valueOf(values[i], type.getScale()).doubleValue());
+                pixelStatRecorder.updateInteger(values[i], 1);
             }
             // if current pixel size satisfies the pixel stride, end the current pixel and start a new one
             if (curPixelEleIndex >= pixelStride)
