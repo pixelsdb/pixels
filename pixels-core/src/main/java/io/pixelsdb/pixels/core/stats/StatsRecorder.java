@@ -191,10 +191,17 @@ public class StatsRecorder
             case SHORT:
             case INT:
             case LONG:
+                /**
+                 * Issue #208:
+                 * To be compatible with Presto, use IntegerColumnStats for decimal.
+                 * Decimal and its statistics in Presto are represented as long. If
+                 * needed in other places, integer statistics can be converted to double
+                 * using the precision and scale from the schema in the row group footer.
+                 */
+            case DECIMAL:
                 return new IntegerStatsRecorder();
             case FLOAT:
             case DOUBLE:
-            case DECIMAL: // Issue #196: use DoubleColumnStats for decimal.
                 return new DoubleStatsRecorder();
             case STRING:
             case CHAR:
@@ -224,14 +231,14 @@ public class StatsRecorder
             case SHORT:
             case INT:
             case LONG:
+            case DECIMAL: // Issue #208: use IntegerColumnStats for decimal.
                 return new IntegerStatsRecorder(statistic);
             case FLOAT:
             case DOUBLE:
-            case DECIMAL:
                 return new DoubleStatsRecorder(statistic);
             case STRING:
             case CHAR:
-            case VARCHAR: // Issue #196: use DoubleColumnStats for decimal.
+            case VARCHAR:
                 return new StringStatsRecorder(statistic);
             case DATE:
                 return new DateStatsRecorder(statistic);

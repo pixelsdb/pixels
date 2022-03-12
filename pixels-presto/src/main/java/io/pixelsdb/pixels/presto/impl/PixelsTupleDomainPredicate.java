@@ -17,16 +17,17 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.predicate;
+package io.pixelsdb.pixels.presto.impl;
 
-import com.facebook.presto.spi.type.*;
-import io.pixelsdb.pixels.core.exception.PixelsReaderException;
-import io.pixelsdb.pixels.core.stats.*;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
+import com.facebook.presto.spi.type.*;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.core.exception.PixelsReaderException;
+import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
+import io.pixelsdb.pixels.core.stats.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -41,18 +42,23 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * Issue #208:
+ * This was originally the io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate in pixels-core.
+ */
+
+/**
  * Predicate implementation mainly for Presto.
  *
  * @author guodong
  * @author hank
  */
-public class TupleDomainPixelsPredicate<C>
+public class PixelsTupleDomainPredicate<C>
         implements PixelsPredicate
 {
     private final TupleDomain<C> predicate;
     public final List<ColumnReference<C>> columnReferences;
 
-    public TupleDomainPixelsPredicate(TupleDomain<C> predicate, List<ColumnReference<C>> columnReferences)
+    public PixelsTupleDomainPredicate(TupleDomain<C> predicate, List<ColumnReference<C>> columnReferences)
     {
         this.predicate = requireNonNull(predicate, "predicate is null");
         this.columnReferences = ImmutableList.copyOf(requireNonNull(columnReferences, "column references is null"));
@@ -278,11 +284,7 @@ public class TupleDomainPixelsPredicate<C>
                 return Domain.create(ValueSet.of(BOOLEAN, false), hasNullValue);
             }
         }
-        else if (isCharType(type))
-        {
-            return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
-        }
-        else if (isVarcharType(type))
+        else if (isCharType(type) || isVarcharType(type))
         {
             return createDomain(type, hasNullValue, (StringColumnStats) columnStats);
         }
@@ -306,6 +308,13 @@ public class TupleDomainPixelsPredicate<C>
         }
         else if (type.getJavaType() == long.class)
         {
+            /**
+             * Issue #208:
+             * Besides integer types, decimal type also goes here as decimal in Presto
+             * is backed by long. In Pixels, we also use IntegerColumnStats for decimal
+             * columns. If needed in other places, integer statistics can be manually converted
+             * to double using the precision and scale from the schema in the row group footer.
+             */
             return createDomain(type, hasNullValue, (IntegerColumnStats) columnStats);
         }
         else if (type.getJavaType() == double.class)
@@ -417,7 +426,7 @@ public class TupleDomainPixelsPredicate<C>
     @Override
     public String toString()
     {
-        StringBuilder builder = new StringBuilder("TupleDomainPixelsPredicate{isNone=")
+        StringBuilder builder = new StringBuilder("PixelsTupleDomainPredicate{isNone=")
                 .append(predicate.isNone() + ", isAll=")
                 .append(predicate.isAll() + ", ")
                 .append("columnPredicates=[");

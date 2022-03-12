@@ -17,11 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.presto.impl;
 
-import io.pixelsdb.pixels.core.predicate.TupleDomainPixelsPredicate;
-import io.pixelsdb.pixels.core.stats.ColumnStats;
-import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.BigintType;
@@ -29,6 +26,9 @@ import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slices;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.stats.ColumnStats;
+import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import org.junit.Test;
 
 import java.util.List;
@@ -65,13 +65,13 @@ public class TestPixelsPredicate
         TupleDomain.ColumnDomain<String> colEmpty = new TupleDomain.ColumnDomain<>(COLUMN_A_NAME, emptyColumnDomain);
         TupleDomain<String> emptyEffectivePredicate = TupleDomain.fromColumnDomains(Optional.of(ImmutableList.of(colEmpty)));
 
-        List<TupleDomainPixelsPredicate.ColumnReference<String>> columnReferences = ImmutableList.<TupleDomainPixelsPredicate.ColumnReference<String>>builder()
-                .add(new TupleDomainPixelsPredicate.ColumnReference<>(COLUMN_A_NAME, COLUMN_A_ORDINAL, BIGINT))
+        List<PixelsTupleDomainPredicate.ColumnReference<String>> columnReferences = ImmutableList.<PixelsTupleDomainPredicate.ColumnReference<String>>builder()
+                .add(new PixelsTupleDomainPredicate.ColumnReference<>(COLUMN_A_NAME, COLUMN_A_ORDINAL, BIGINT))
                 .build();
 
-        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
+        PixelsTupleDomainPredicate<String> predicate = new PixelsTupleDomainPredicate<>(effectivePredicate,
                 columnReferences);
-        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
+        PixelsTupleDomainPredicate<String> emptyPredicate = new PixelsTupleDomainPredicate<>(emptyEffectivePredicate,
                 columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createInt();
@@ -101,13 +101,13 @@ public class TestPixelsPredicate
         TupleDomain<String> effectivePredicate = TupleDomain.fromColumnDomains(Optional.of(ImmutableList.of(colb)));
         TupleDomain<String> emptyEffectivePredicate = TupleDomain.all();
 
-        List<TupleDomainPixelsPredicate.ColumnReference<String>> columnReferences = ImmutableList.<TupleDomainPixelsPredicate.ColumnReference<String>>builder()
-                .add(new TupleDomainPixelsPredicate.ColumnReference<>(COLUMN_B_NAME, COLUMN_B_ORDINAL, VARCHAR))
+        List<PixelsTupleDomainPredicate.ColumnReference<String>> columnReferences = ImmutableList.<PixelsTupleDomainPredicate.ColumnReference<String>>builder()
+                .add(new PixelsTupleDomainPredicate.ColumnReference<>(COLUMN_B_NAME, COLUMN_B_ORDINAL, VARCHAR))
                 .build();
 
-        TupleDomainPixelsPredicate<String> predicate = new TupleDomainPixelsPredicate<>(effectivePredicate,
+        PixelsTupleDomainPredicate<String> predicate = new PixelsTupleDomainPredicate<>(effectivePredicate,
                 columnReferences);
-        TupleDomainPixelsPredicate<String> emptyPredicate = new TupleDomainPixelsPredicate<>(emptyEffectivePredicate,
+        PixelsTupleDomainPredicate<String> emptyPredicate = new PixelsTupleDomainPredicate<>(emptyEffectivePredicate,
                 columnReferences);
 
         TypeDescription typeDescription = TypeDescription.createVarchar();
