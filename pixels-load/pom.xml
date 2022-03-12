@@ -14,7 +14,7 @@
     <properties>
         <jdk.version>1.8</jdk.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>io.pixelsdb.pixels.load.multi.Main</mainClass>
+        <mainClass>io.pixelsdb.pixels.load.Main</mainClass>
     </properties>
 
     <dependencies>
