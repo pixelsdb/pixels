@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Removing logs of pixels-cache..."
-rm /home/ubuntu/opt/pixels/logs/pixels-cache.log
+rm $HOME/opt/pixels/logs/pixels-cache.log
 
 echo "Removing backed files of pixels-cache..."
 rm /mnt/ramfs/pixels.cache && rm /mnt/ramfs/pixels.index
