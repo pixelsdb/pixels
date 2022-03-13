@@ -239,7 +239,7 @@ public class LocalFS implements Storage
     }
 
     @Override
-    public String[] getHosts(String path) throws IOException
+    public String[] getHosts(String path)
     {
         List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
         String[] hosts = new String[kvs.size()];
@@ -250,6 +250,22 @@ public class LocalFS implements Storage
             hosts[i++] = getHostFromPathKey(key);
         }
         return hosts;
+    }
+
+    @Override
+    public boolean mkdirs(String path) throws IOException
+    {
+        Path p = new Path(path);
+        File file = new File(p.realPath);
+        if (!file.isDirectory())
+        {
+            throw new IOException("Path '" + p.realPath + "' is not a directory.");
+        }
+        if (file.exists())
+        {
+            throw new IOException("Directory '" + p.realPath + "' already exists.");
+        }
+        return file.mkdirs();
     }
 
     @Override
@@ -303,8 +319,6 @@ public class LocalFS implements Storage
                 throw new IOException("File '" + p.realPath + "' already exists.");
             }
         }
-        long id = GenerateId(LOCAL_FS_ID_KEY);
-        EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
         if (!file.createNewFile())
         {
             throw new IOException("Failed to create local file '" + p.realPath + "'.");
@@ -346,7 +360,7 @@ public class LocalFS implements Storage
         /**
          * Attempt to delete the key, but it does not need to be exist.
          */
-        EtcdUtil.Instance().delete(getPathKey(path));
+        EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
         return subDeleted && new File(path).delete();
     }
 

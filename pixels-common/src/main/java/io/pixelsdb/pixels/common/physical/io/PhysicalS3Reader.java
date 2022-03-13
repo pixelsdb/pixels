@@ -150,7 +150,8 @@ public class PhysicalS3Reader implements PhysicalReader
             position.set(desired);
             return;
         }
-        throw new IOException("Desired offset is out of bound.");
+        throw new IOException("Desired offset " + desired +
+                " is out of bound (" + 0 + "," + length + ")");
     }
 
     @Override

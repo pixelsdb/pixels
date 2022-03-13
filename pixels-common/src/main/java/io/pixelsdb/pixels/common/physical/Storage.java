@@ -137,6 +137,15 @@ public interface Storage
     String[] getHosts(String path) throws IOException;
 
     /**
+     * Create the directory named by this abstract pathname,
+     * including any necessary but nonexistent parent directories.
+     * @param path
+     * @return
+     * @throws IOException
+     */
+    boolean mkdirs(String path) throws IOException;
+
+    /**
      * For local fs, path is considered as local.
      * @param path
      * @return

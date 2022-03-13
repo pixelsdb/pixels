@@ -269,6 +269,12 @@ public class HDFS implements Storage
     }
 
     @Override
+    public boolean mkdirs(String path) throws IOException
+    {
+        return fs.mkdirs(new Path(path));
+    }
+
+    @Override
     public DataInputStream open(String path) throws IOException
     {
         return fs.open(new Path(path), Constants.HDFS_BUFFER_SIZE);

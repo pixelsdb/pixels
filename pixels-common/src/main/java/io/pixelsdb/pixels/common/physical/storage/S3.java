@@ -31,11 +31,13 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -203,11 +205,18 @@ public class S3 implements Storage
         public String bucket = null;
         public String key = null;
         public boolean valid = false;
-        public boolean isBucket = false;
+        /**
+         * True if this path is folder.
+         * In S3, 'folder' is an empty object with its name ends with '/'.
+         * Besides that, we also consider the path that only contains a
+         * bucket name as a folder.
+         */
+        public boolean isFolder = false;
 
         public Path(String path)
         {
             requireNonNull(path);
+            // remove the scheme header.
             if (path.contains("://"))
             {
                 path = path.substring(path.indexOf("://") + 3);
@@ -216,6 +225,7 @@ public class S3 implements Storage
             {
                 path = path.substring(1);
             }
+            // the substring before the first '/' is the bucket name.
             int slash = path.indexOf("/");
             if (slash > 0)
             {
@@ -223,18 +233,36 @@ public class S3 implements Storage
                 if (slash < path.length()-1)
                 {
                     this.key = path.substring(slash + 1);
+                    this.isFolder = this.key.endsWith("/");
                 }
                 else
                 {
-                    isBucket = true;
+                    // this is a bucket.
+                    this.isFolder = true;
                 }
                 this.valid = true;
             }
             else if (path.length() > 0)
             {
+                // this is a bucket.
                 this.bucket = path;
-                this.isBucket = true;
+                this.isFolder = true;
                 this.valid = true;
+            }
+        }
+
+        public Path(String bucket, String key)
+        {
+            this.bucket = requireNonNull(bucket, "bucket is null");
+            this.key = key;
+            this.valid = true;
+            if (key != null)
+            {
+                this.isFolder = key.endsWith("/");
+            }
+            else
+            {
+                this.isFolder = true;
             }
         }
 
@@ -245,7 +273,7 @@ public class S3 implements Storage
             {
                 return null;
             }
-            if (this.isBucket)
+            if (this.key == null)
             {
                 return this.bucket;
             }
@@ -274,6 +302,16 @@ public class S3 implements Storage
         return SchemePrefix + path;
     }
 
+    /**
+     * List status of a file or directory.
+     * Note that S3 does not support real directories, a directory / folder is
+     * an empty object with its name ends with '/'. So that of we want to list the
+     * status of the objects in a 'folder', the path must ends with '/', otherwise
+     * we can not filter out the status of the 'folder' itself from the returned result.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
@@ -282,29 +320,31 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!p.isBucket)
+        ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder().bucket(p.bucket);
+        if (p.key != null)
         {
-            throw new IOException("Path '" + path + "' is not a directory (bucket).");
+            builder.prefix(p.key);
         }
-        ListObjectsV2Request request = ListObjectsV2Request.builder()
-                .bucket(p.bucket).build();
+        ListObjectsV2Request request = builder.build();
         ListObjectsV2Response response = s3.listObjectsV2(request);
         List<S3Object> objects = new ArrayList<>(response.keyCount());
         while (response.isTruncated())
         {
             objects.addAll(response.contents());
-            request = ListObjectsV2Request.builder().bucket(p.bucket)
-                    .continuationToken(response.nextContinuationToken()).build();
+            request = builder.continuationToken(response.nextContinuationToken()).build();
             response = s3.listObjectsV2(request);
         }
         objects.addAll(response.contents());
         List<Status> statuses = new ArrayList<>();
         Path op = new Path(path);
-        op.isBucket = false;
         for (S3Object object : objects)
         {
+            if (object.key().equals(p.key))
+            {
+                continue;
+            }
             op.key = object.key();
-            statuses.add(new Status(op.toString(), object.size(), false, 1));
+            statuses.add(new Status(op.toString(), object.size(), op.key.endsWith("/"), 1));
         }
         return statuses;
     }
@@ -330,14 +370,11 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.existsOrGenIdSucc(p))
-        {
-            throw new IOException("Path '" + path + "' does not exist.");
-        }
-        if (p.isBucket)
+        if (p.isFolder)
         {
             return new Status(p.toString(), 0, true, 1);
         }
+
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(p.bucket).key(p.key).build();
         try
         {
@@ -357,6 +394,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
+        // try to generate the id in etcd if it does not exist.
         if (!this.existsOrGenIdSucc(p))
         {
             throw new IOException("Path '" + path + "' does not exist.");
@@ -389,6 +427,47 @@ public class S3 implements Storage
         return allHosts;
     }
 
+    @Override
+    public boolean mkdirs(String path) throws IOException
+    {
+        Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("Path '" + path + "' is not valid.");
+        }
+        if (!p.isFolder)
+        {
+            throw new IOException("Path '" + path + "' is a directory, " +
+                    "the key for S3 directory (folder) must ends with '/'.");
+        }
+        if (this.existsInS3(p))
+        {
+            throw new IOException("Path '" + path + "' already exists.");
+        }
+
+        if (!this.existsInS3(new Path(p.bucket)))
+        {
+            CreateBucketRequest request = CreateBucketRequest.builder().bucket(p.bucket).build();
+            s3.createBucket(request);
+            S3Waiter waiter = s3.waiter();
+            HeadBucketRequest requestWait = HeadBucketRequest.builder()
+                    .bucket(p.bucket).build();
+            waiter.waitUntilBucketExists(requestWait);
+        }
+
+        if (p.key != null)
+        {
+            PutObjectRequest request = PutObjectRequest.builder().bucket(p.bucket).key(p.key).build();
+            s3.putObject(request, RequestBody.empty());
+
+            S3Waiter waiter = s3.waiter();
+            HeadObjectRequest requestWait = HeadObjectRequest.builder()
+                    .bucket(p.bucket).key(p.key).build();
+            waiter.waitUntilObjectExists(requestWait);
+        }
+        return true;
+    }
+
     /**
      * For S3, this open method is only used to read the data object
      * fully and sequentially. And it will load the whole object into
@@ -405,7 +484,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.existsOrGenIdSucc(p))
+        if (!this.existsInS3(p))
         {
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -430,12 +509,10 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (this.existsId(p) || this.existsInS3(p))
+        if (this.existsInS3(p))
         {
             throw new IOException("Path '" + path + "' already exists.");
         }
-        long id = GenerateId(S3_ID_KEY);
-        EtcdUtil.Instance().putKeyValue(getPathKey(p.toString()), Long.toString(id));
         return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
     }
 
@@ -453,16 +530,19 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (!this.existsId(p))
+        if (!this.existsInS3(p))
         {
+            EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
             throw new IOException("Path '" + path + "' does not exist.");
         }
-        if (p.isBucket)
+        if (p.isFolder)
         {
-            List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKey(p.bucket));
-            for (KeyValue kv : kvs)
+            List<Status> statuses = this.listStatus(path);
+            for (Status status : statuses)
             {
-                Path sub = new Path(getPathFrom(kv.getKey().toString(StandardCharsets.UTF_8)));
+                // ListObjects, which is used by listStatus, is already recursive.
+
+                Path sub = new Path(status.getPath());
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
                 try
                 {
@@ -484,6 +564,8 @@ public class S3 implements Storage
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
             }
         }
+        // delete the ids
+        EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
         return true;
     }
 
@@ -506,11 +588,11 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + dest + "' is not valid.");
         }
-        if (!this.existsOrGenIdSucc(srcPath))
+        if (!this.existsInS3(srcPath))
         {
             throw new IOException("Path '" + src + "' does not exist.");
         }
-        if (this.existsId(destPath) || this.existsInS3(destPath))
+        if (this.existsInS3(destPath))
         {
             throw new IOException("Path '" + dest + "' already exists.");
         }
@@ -522,9 +604,6 @@ public class S3 implements Storage
         try
         {
             s3.copyObject(copyReq);
-            // generate id for the new copy.
-            long id = GenerateId(S3_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(destPath.toString()), Long.toString(id));
             return true;
         }
         catch (RuntimeException e)
@@ -557,10 +636,10 @@ public class S3 implements Storage
     @Override
     public boolean exists(String path) throws IOException
     {
-        return this.existsId(new Path(path));
+        return this.existsInS3(new Path(path));
     }
 
-    public boolean existsId(Path path) throws IOException
+    private boolean existsId(Path path) throws IOException
     {
         if (!path.valid)
         {
@@ -569,21 +648,38 @@ public class S3 implements Storage
         return EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null;
     }
 
+    /**
+     * If a file or directory exists in S3.
+     * @param path
+     * @return
+     * @throws IOException
+     */
     private boolean existsInS3(Path path) throws IOException
     {
         if (!path.valid)
         {
             throw new IOException("Path '" + path.toString() + "' is not valid.");
         }
-        HeadObjectRequest request = HeadObjectRequest.builder().bucket(path.bucket).key(path.key).build();
+
         try
         {
-            s3.headObject(request);
+            if (path.key == null)
+            {
+                HeadBucketRequest request = HeadBucketRequest.builder().bucket(path.bucket).build();
+                s3.headBucket(request);
+            }
+            else
+            {
+                HeadObjectRequest request = HeadObjectRequest.builder().bucket(path.bucket).key(path.key).build();
+                s3.headObject(request);
+            }
             return true;
         } catch (Exception e)
         {
-            if (e instanceof NoSuchKeyException)
+            if (e instanceof NoSuchKeyException ||
+            e instanceof NoSuchBucketException)
             {
+
                 return false;
             }
             throw new IOException("Failed to check the existence of '" + path + "'", e);
@@ -596,9 +692,7 @@ public class S3 implements Storage
         {
             throw new IOException("Path '" + path.toString() + "' is not valid.");
         }
-        String pathStr = path.toString();
-        boolean exists = EtcdUtil.Instance().getKeyValue(getPathKey(pathStr)) != null;
-        if (exists)
+        if (this.existsId(path))
         {
             return true;
         }
@@ -606,22 +700,22 @@ public class S3 implements Storage
         {
             // the file id does not exist, register a new id for this file.
             long id = GenerateId(S3_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(pathStr), Long.toString(id));
+            EtcdUtil.Instance().putKeyValue(getPathKey(path.toString()), Long.toString(id));
             return true;
         }
         return false;
     }
 
     @Override
-    public boolean isFile(String path)
+    public boolean isFile(String path) throws IOException
     {
-        return !(new Path(path).isBucket);
+        return !(new Path(path).isFolder);
     }
 
     @Override
-    public boolean isDirectory(String path)
+    public boolean isDirectory(String path) throws IOException
     {
-        return new Path(path).isBucket;
+        return new Path(path).isFolder;
     }
 
     public S3Client getClient()
