@@ -294,9 +294,11 @@ to create the table layouts for the tables in the TPC-H database in Pixels. Actu
 should be created by the storage layout optimizer ([Rainbow](https://ieeexplore.ieee.org/document/8509421)).
 However, we directly load the layouts here for simplicity.
 
-Create the containers for the tables layouts in S3. The container name is the same as the hostname
-(e.g., `pixels-tpch-customer-v-0-order`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
-Change the paths in the table layouts if the container names are already used.
+Create the container to store the tables in S3. The container name is the same as the hostname
+(e.g., `pixels-tpch`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
+Change the bucket name if it already exists.
+
+During data loading, Pixels will automatically create the folders in the bucket to store the files in each table.
 
 ### Load Data
 Under `PIXELS_HOME`, run pixels-load:
