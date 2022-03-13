@@ -20,11 +20,7 @@
 package io.pixelsdb.pixels.common;
 
 import io.pixelsdb.pixels.common.physical.*;
-import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
-import io.pixelsdb.pixels.common.physical.Status;
-import io.pixelsdb.pixels.common.physical.Storage;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -50,7 +46,7 @@ public class TestS3
     @Test
     public void testS3Writer() throws IOException
     {
-        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(Storage.Scheme.s3, "pixels-01/object-4",
+        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(Storage.Scheme.s3, "pixels-dias-empty/object-4",
                 0, (short) 1, false);
         ByteBuffer buffer = ByteBuffer.allocate(10240);
         buffer.putLong(1);
@@ -76,35 +72,43 @@ public class TestS3
     public void testS3OutputStream() throws IOException
     {
         S3Client s3 = S3Client.builder().build();
-        InputStream input = new FileInputStream("/home/hank/test.csv");
-        OutputStream output = new S3OutputStream(s3, "pixels-01", "object-6");
+        InputStream input = new FileInputStream("/home/hank/Downloads/pixels/20220306043329_1.pxl");
+        OutputStream output = new S3OutputStream(s3, "pixels-dias-empty", "object-6");
         IOUtils.copyBytes(input, output, 1024*1024, true);
     }
 
     @Test
     public void testS3Download() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/test.pxl");
-        InputStream input = storage.open("s3://pixels-01/test.pxl");
-        OutputStream output = new FileOutputStream("test.pxl");
+        Storage storage = StorageFactory.Instance().getStorage("s3://parquet-tpch/customer/000000_0");
+        InputStream input = storage.open("s3://parquet-tpch/customer/000000_0");
+        OutputStream output = new FileOutputStream("000000.0");
         IOUtils.copyBytes(input, output, 1024*1024, true);
+    }
+
+    @Test
+    public void testIsDirectory() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+        System.out.println(storage.isDirectory("/parquet-tpch/test/"));
+        System.out.println(storage.isDirectory("/parquet-tpch/test"));
     }
 
     @Test
     public void testGetStatus() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-01/test.pxl");
-        Status status = storage.getStatus("s3://pixels-01/test.pxl");
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+        Status status = storage.getStatus("/parquet-tpch/test/123/");
         System.out.println(status.getLength());
         System.out.println(status.getName());
         System.out.println(status.getPath());
     }
 
     @Test
-    public void testlistStatus() throws IOException, InterruptedException
+    public void testListStatus() throws IOException, InterruptedException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00");
-        List<Status> statuses = storage.listStatus("s3://pixels-00");
+        Storage storage = StorageFactory.Instance().getStorage("s3://parquet-tpch");
+        List<Status> statuses = storage.listStatus("s3://parquet-tpch");
         System.out.println(statuses.size());
         for (Status status : statuses)
         {
@@ -113,7 +117,7 @@ public class TestS3
     }
 
     @Test
-    public void testGetPaths() throws IOException
+    public void testListPaths() throws IOException
     {
         Storage storage = StorageFactory.Instance().getStorage("s3://pixels-00");
         List<String> paths = storage.listPaths("s3://pixels-00");
@@ -129,9 +133,19 @@ public class TestS3
     }
 
     @Test
+    public void testListPathsInFolder() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+        for (String path : storage.listPaths("/parquet-tpch/nation/000"))
+        {
+            System.out.println(path);
+        }
+    }
+
+    @Test
     public void testS3Reader() throws IOException
     {
-        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-01/object-4");
+        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(Storage.Scheme.s3, "pixels-dias-empty/object-4");
         CompletableFuture<ByteBuffer> future = reader.readAsync(0, 8);
         future.whenComplete((resp, err) ->
         {
