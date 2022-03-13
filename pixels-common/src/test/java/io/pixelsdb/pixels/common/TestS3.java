@@ -87,6 +87,14 @@ public class TestS3
     }
 
     @Test
+    public void testMkdirs() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+        boolean res = storage.mkdirs("/pixels-hank-123/test/");
+        System.out.println(res);
+    }
+
+    @Test
     public void testIsDirectory() throws IOException
     {
         Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -105,10 +113,10 @@ public class TestS3
     }
 
     @Test
-    public void testListStatus() throws IOException, InterruptedException
+    public void testListStatus() throws IOException
     {
-        Storage storage = StorageFactory.Instance().getStorage("s3://parquet-tpch");
-        List<Status> statuses = storage.listStatus("s3://parquet-tpch");
+        Storage storage = StorageFactory.Instance().getStorage("s3://pixels-tpch/customer/");
+        List<Status> statuses = storage.listStatus("s3://pixels-tpch/nation/v-0-order");
         System.out.println(statuses.size());
         for (Status status : statuses)
         {
