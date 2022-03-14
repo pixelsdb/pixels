@@ -8,7 +8,7 @@ public class WorkerTest {
 
     @Test
     public void testScanFileCanGrabColumnWithCorrectType() {
-        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, null, "aaaaid123asdjjkhj88");
+        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols,"aaaaid123asdjjkhj88");
         String expected = "success";
         Assert.assertEquals(result, expected);
     }

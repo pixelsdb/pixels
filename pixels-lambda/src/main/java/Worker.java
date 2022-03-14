@@ -21,6 +21,10 @@ import java.io.ObjectOutputStream;
 import java.util.*;
 
 // Handler value: example.Handler
+
+/**
+ * response is a list of files read and then written to s3
+ */
 public class Worker implements RequestHandler<Map<String,ArrayList<String>>, String>
 {
     private static final Logger LOGGER = LogManager.getLogger(Worker.class);
@@ -29,21 +33,50 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
     public String handleRequest(Map<String,ArrayList<String>> event, Context context)
     {
         String requestId = context.getAwsRequestId();
-        // use a logger to debug
-        LambdaLogger logger = context.getLogger();
 
-        // aws lambda auto parse json to Map<String,Object>
-        //TODO make worker create a thread for each file, and each thread uses a pixelsReader
-        String fileName = event.get("fileNames").get(0);
+        // each worker create a thread for each file, and each thread uses a pixelsReader
+        ArrayList<String> fileNames = event.get("fileNames");
         //https://stackoverflow.com/questions/4042434/converting-arrayliststring-to-string-in-java
         String[] cols = event.get("cols").toArray(new String[0]);
+        Runnable[] runnables = new Runnable[fileNames.size()];
+        for (int i=0; i<runnables.length; i++) {
+            int finalI = i;
+            runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
+        }
+        Thread[] threads = new Thread[runnables.length];
+        for (int i=0; i< runnables.length; i++) {
+            threads[i] = new Thread(runnables[i]);
+            threads[i].start();
+        }
+        for (Thread t:threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
-        scanFile(fileName, 1024, cols, logger, requestId);
-        String response = requestId;
+        // create response to inform invoker which are the s3 paths of files written
+        String response = "";
+        for (int i=0; i< threads.length; i++) {
+            if (i<threads.length-1) {
+                response = response + requestId + "file" + i + ",";
+            } else {
+                response = response + requestId + "file" + i;
+            }
+        }
         return response;
     }
 
-    public String scanFile(String fileName, int batchSize, String[] cols, LambdaLogger logger, String requestId)
+    /**
+     *
+     * @param fileName
+     * @param batchSize
+     * @param cols
+     * @param resultFile fileName on s3 to store pixels readers' results
+     * @return
+     */
+    public String scanFile(String fileName, int batchSize, String[] cols, String resultFile)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
@@ -52,7 +85,7 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
 
         VectorizedRowBatch rowBatch;
 
-        try (PixelsReader pixelsReader = getReader(fileName, logger);
+        try (PixelsReader pixelsReader = getReader(fileName);
              PixelsRecordReader recordReader = pixelsReader.read(option))
         {
             TypeDescription allSchema = pixelsReader.getFileSchema();
@@ -68,20 +101,10 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
                 queriedSchema.addField(cols[i], allColTypes.get(fieldNames.indexOf(cols[i])));
             }
 
-            String s3Path = "tiannan-test/" + requestId;
+            String s3Path = "tiannan-test/" + resultFile;
             PixelsWriter pixelsWriter = getWriter(queriedSchema, s3Path);
             int batch = 0;
-            // create two maps col->vecs, col->colType
-//            Map<String, TypeDescription> colNameToType = new HashMap<String, TypeDescription>();
-//            Map<String, ArrayList<ColumnVector>> colNameToVecs = new HashMap<String, ArrayList<ColumnVector>>();
-//            for (int i=0; i<cols.length; i++) {
-//                colNameToVecs.put(cols[i], new ArrayList<ColumnVector>());
-//            }
-//            for (int i=0; i< fieldNames.size(); i++) {
-//                colNameToType.put(fieldNames.get(i), colTypes.get(i));
-//            }
-            // read the file batch by batch, then write the batch to s3
-            // add each col vec to colnameToVec
+
             while (true)
             {
                 LOGGER.info(" ****** batch number: " + batch + "*******");
@@ -99,9 +122,7 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
                 }
                 batch += 1;
             }
-            // now we've read everything we need from the file, wrap two maps and send to s3
-//            ColToVecsAndTypes colToVecsAndTypes = new ColToVecsAndTypes(colNameToType, colNameToVecs);
-//            writeToS3(colToVecsAndTypes, requestId);
+;
 
         }
         catch (IOException e)
@@ -111,7 +132,7 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
         return "success";
     }
 
-    private PixelsReader getReader(String fileName, LambdaLogger logger)
+    private PixelsReader getReader(String fileName)
     {
         PixelsReader pixelsReader = null;
         try
