@@ -1,6 +1,4 @@
-import junit.framework.TestCase;
-import junit.framework.TestResult;
-import org.junit.Assert;
+import io.pixelsdb.pixels.lambda.Scan;
 import org.junit.Test;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.lambda.LambdaClient;
@@ -17,7 +15,7 @@ public class ScanTest {
             add("pixels-tpch-orders-v-0-order/20220312072707_0.pxl");
             add("pixels-tpch-orders-v-0-order/20220312072714_1.pxl");
             add("pixels-tpch-orders-v-0-order/20220312072720_2.pxl");
-            add("pixels-tpch-orders-v-0-order/20220312072727_3.pxlgit");
+            add("pixels-tpch-orders-v-0-order/20220312072727_3.pxl");
         }
     };
 
@@ -30,8 +28,11 @@ public class ScanTest {
         }
     };
 
+    /**
+     * use four lambda workers to each scan one different file
+     */
     @Test
-    public void testScan() {
+    public void testScan4files4workers() {
         scan.scan(1, filesToScan, cols);
     }
 

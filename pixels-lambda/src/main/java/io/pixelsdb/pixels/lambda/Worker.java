@@ -1,5 +1,6 @@
+package io.pixelsdb.pixels.lambda;
+
 import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.core.*;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -38,16 +39,15 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
         ArrayList<String> fileNames = event.get("fileNames");
         //https://stackoverflow.com/questions/4042434/converting-arrayliststring-to-string-in-java
         String[] cols = event.get("cols").toArray(new String[0]);
-        Runnable[] runnables = new Runnable[fileNames.size()];
-        for (int i=0; i<runnables.length; i++) {
+
+        // for each file to read, create a thread which uses a reader to read one file and writes the results to s3
+        Thread[] threads = new Thread[fileNames.size()];
+        for (int i=0; i<threads.length; i++) {
             int finalI = i;
-            runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
+            threads[i] = new Thread(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI));
+//            runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
         }
-        Thread[] threads = new Thread[runnables.length];
-        for (int i=0; i< runnables.length; i++) {
-            threads[i] = new Thread(runnables[i]);
-            threads[i].start();
-        }
+        for (Thread t:threads) t.start();
         for (Thread t:threads) {
             try {
                 t.join();
@@ -109,20 +109,15 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
             {
                 LOGGER.info(" ****** batch number: " + batch + "*******");
                 rowBatch = recordReader.readBatch(batchSize);
-//                for (String col:cols) { // col: column name
-//                    LOGGER.info(" column name: " + col);
-//                    ColumnVector colVec = readColumnInBatch(col, fieldNames, colTypes, rowBatch);
-////                    colNameToVecs.get(col).add(colVec);
-//                }
                 pixelsWriter.addRowBatch(rowBatch);
                 if (rowBatch.endOfFile)
                 {
+                    pixelsReader.close();
                     pixelsWriter.close();
                     break;
                 }
                 batch += 1;
             }
-;
 
         }
         catch (IOException e)
@@ -137,17 +132,15 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
         PixelsReader pixelsReader = null;
         try
         {
-            //TODO make this dot dot dot, this was for debug
             Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-            PixelsReaderImpl.Builder builder1 = PixelsReaderImpl.newBuilder();
-            PixelsReaderImpl.Builder builder2 = builder1.setStorage(storage);
-            PixelsReaderImpl.Builder builder3 = builder2.setPath(fileName);
-            PixelsReaderImpl.Builder builder4 = builder3.setEnableCache(false);
-            PixelsReaderImpl.Builder builder5 = builder4.setCacheOrder(new ArrayList<>());
-            PixelsReaderImpl.Builder builder6 = builder5.setPixelsCacheReader(null);
-            PixelsReaderImpl.Builder builder7 = builder6.setPixelsFooterCache(new PixelsFooterCache());
-
-            pixelsReader = builder7.build();
+            PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
+                    .setStorage(storage)
+                    .setPath(fileName)
+                    .setEnableCache(false)
+                    .setCacheOrder(new ArrayList<>())
+                    .setPixelsCacheReader(null)
+                    .setPixelsFooterCache(new PixelsFooterCache());
+            pixelsReader = builder.build();
 
         }
         catch (IOException e)

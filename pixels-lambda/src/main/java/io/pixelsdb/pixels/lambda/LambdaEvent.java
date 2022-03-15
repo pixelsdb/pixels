@@ -1,3 +1,5 @@
+package io.pixelsdb.pixels.lambda;
+
 import java.util.ArrayList;
 
 public class LambdaEvent {

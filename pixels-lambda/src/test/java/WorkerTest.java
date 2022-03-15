@@ -1,3 +1,4 @@
+import io.pixelsdb.pixels.lambda.Worker;
 import org.junit.Assert;
 import org.junit.Test;
 
