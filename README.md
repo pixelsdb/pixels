@@ -1,7 +1,7 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine for data lakes. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
+Pixels is a columnar storage engine for data lakes and warehouses. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
