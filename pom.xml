@@ -39,8 +39,6 @@
         <module>pixels-core</module>
         <module>pixels-daemon</module>
         <module>pixels-load</module>
-        <module>pixels-presto</module>
-        <module>pixels-listener</module>
         <module>pixels-tools</module>
     </modules>
 
