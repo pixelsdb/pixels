@@ -2,12 +2,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <artifactId>pixels</artifactId>
         <groupId>io.pixelsdb</groupId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>pixels-hive</artifactId>
 
@@ -96,17 +98,6 @@
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-codec-http2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-handler-proxy</artifactId>
-                </exclusion>
-            </exclusions>
-            <optional>true</optional>
         </dependency>
 
     </dependencies>
@@ -136,7 +127,7 @@
                                     <include>org.apache.logging.log4j:*</include>
                                     <include>com.google.protobuf:*</include>
                                     <include>com.alibaba:fastjson</include>
-                                    <include>com.coreos:jetcd-core</include>
+                                    <include>io.etcd:jetcd-core</include>
                                     <include>io.grpc:*</include>
                                     <include>io.netty:*</include>
                                     <include>io.opencensus:*</include>
