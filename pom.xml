@@ -15,17 +15,23 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <groupId>io.pixelsdb</groupId>
     <artifactId>pixels</artifactId>
     <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <description>Pixels</description>
+    <url>https://github.com/pixelsdb/pixels</url>
 
-    <repositories>
-        <repository>
-            <id>central</id>
-            <name>Maven Central</name>
-            <url>https://repo1.maven.org/maven2/</url>
-        </repository>
-    </repositories>
+    <inceptionYear>2017</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>GNU Affero General Public License 3.0</name>
+            <url>https://www.gnu.org/licenses/agpl-3.0.en.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <modules>
         <module>pixels-core</module>
@@ -38,20 +44,6 @@
         <module>pixels-hive</module>
         <module>pixels-tools</module>
     </modules>
-
-    <packaging>pom</packaging>
-
-    <licenses>
-        <license>
-            <name>Apache License 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
-
-    <prerequisites>
-        <maven>3.3.9</maven>
-    </prerequisites>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -99,6 +91,14 @@
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
 
     </properties>
+
+    <repositories>
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2/</url>
+        </repository>
+    </repositories>
 
     <distributionManagement>
         <repository>
