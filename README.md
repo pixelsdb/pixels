@@ -1,20 +1,29 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine for data lakes. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
+Pixels is a columnar storage engine for data lakes and warehouses. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK 8.0, and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
+Install JDK (8.0 is recommended), and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
-Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
-It may take about one minute to complete. After that, find the following jar/zip files that will be used in the installation:
+The build may take tens of seconds to complete. After that, find the following jar files that will be used in the installation:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
-* `pixels-listener-*.zip` in `pixels-listener/target`, this is the listener plugin for Presto;
-* `pixels-presto-*.zip` in `pixels-presto/target`, this is the connector for Presto;
 * `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
+
+Pixels is compatible with different query engines, such as Presto, Trino, and Hive.
+However, for simplicity, we use Presto as an example here to illustrate how Pixels works with query engines in the data lakes.
+
+To use Pixels in Presto, download [pixels-presto](https://github.com/pixelsdb/pixels-presto),
+and use `mvn package` to build it.
+Find the following zip files in the build target directories:
+* `pixels-listener-*.zip`, this is the event listener plugin for Presto.
+* `pixels-presto-*.zip`, this is the connector for Presto.
+
+**Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
+using JDK 8.0.
 
 ## Installation in AWS
 
@@ -163,7 +172,7 @@ Decompress `pixels-listener-*.zip` and `pixels-presto-*.zip` into the `plugin` d
 The `etc` directory contains the configuration files of Presto.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
-* Create the listener config file named `event-listener.properties` with the following content:
+* Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
 enabled=true
@@ -173,9 +182,9 @@ listened.query.type=SELECT
 log.dir=/home/ubuntu/opt/pixels/listener/
 ```
 `log-dir` should point to
-an existing directory where the listener logs will appear
+an existing directory where the listener logs will appear.
 
-* Create the catalog config file named `pixels.properties` for Pixels in the `catalog` subdirectory,
+* Create the catalog config file named `pixels.properties` for Pixels in the `etc/catalog` directory,
 with the following content:
 ```properties
 connector.name=pixels

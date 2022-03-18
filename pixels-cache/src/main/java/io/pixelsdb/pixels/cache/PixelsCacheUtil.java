@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.cache;
 
 import io.pixelsdb.pixels.common.exception.CacheException;
 import io.pixelsdb.pixels.common.utils.Constants;
-import org.apache.directory.api.util.Strings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -146,7 +145,7 @@ public class PixelsCacheUtil
     {
         byte[] magic = new byte[6];
         file.getBytes(0, magic, 0, 6);
-        return Strings.getString(magic, StandardCharsets.UTF_8.displayName());
+        return new String(magic, StandardCharsets.UTF_8);
     }
 
     public static boolean checkMagic(MemoryMappedFile file)

@@ -28,6 +28,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
@@ -92,7 +93,8 @@ public class PhysicalS3Writer implements PhysicalWriter
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        buffer.flip();
+        // Issue #217: for compatibility reasons if this is compiled in jdk>=9 and used in jdk8.
+        ((Buffer)buffer).flip();
         int length = buffer.remaining();
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }

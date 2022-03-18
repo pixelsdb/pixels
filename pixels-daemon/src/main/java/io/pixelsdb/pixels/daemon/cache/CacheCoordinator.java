@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
-import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
@@ -31,6 +30,7 @@ import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
 import io.pixelsdb.pixels.common.balance.Balancer;
+import io.pixelsdb.pixels.common.balance.HostAddress;
 import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
