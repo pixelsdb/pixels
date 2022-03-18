@@ -19,7 +19,6 @@
     <groupId>io.pixelsdb</groupId>
     <artifactId>pixels</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
     <description>Pixels</description>
     <url>https://github.com/pixelsdb/pixels</url>
     <inceptionYear>2017</inceptionYear>
@@ -31,6 +30,8 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <packaging>pom</packaging>
 
     <modules>
         <module>pixels-common</module>
