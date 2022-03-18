@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.balance;
 
-import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableMap;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 
