@@ -13,6 +13,7 @@
     <properties>
         <mainClass>io.pixelsdb.pixels.test.CacheIndexPerf</mainClass>
         <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.install.skip>true</maven.install.skip>
     </properties>
 
     <dependencies>
