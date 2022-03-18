@@ -95,14 +95,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!--
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <optional>true</optional>
-        </dependency>
-        -->
-
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>
@@ -199,29 +191,10 @@
             <scope>provided</scope>
         </dependency>
 
-        <!--
-        <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-jdbc</artifactId>
-        </dependency>
-        -->
-
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
             <optional>true</optional>
-            <!--
-            <exclusions>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-codec-http2</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty-handler-proxy</artifactId>
-                </exclusion>
-            </exclusions>
-            -->
         </dependency>
     </dependencies>
 
