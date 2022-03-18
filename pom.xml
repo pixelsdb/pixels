@@ -44,17 +44,12 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
 
         <!-- query engines -->
         <dep.presto.version>0.215</dep.presto.version>
-        <dep.airlift.version>0.177</dep.airlift.version>
-        <dep.airlift.units.version>1.3</dep.airlift.units.version>
-        <dep.jackson.version>2.9.7</dep.jackson.version>
-        <dep.google.inject.version>4.2.0</dep.google.inject.version>
-        <dep.javax.inject.version>1</dep.javax.inject.version>
-        <dep.javax.validation.version>1.1.0.Final</dep.javax.validation.version>
-        <dep.google.jrs305.version>3.0.2</dep.google.jrs305.version>
 
         <!-- storage systems -->
         <dep.hadoop.version>2.7.3</dep.hadoop.version>
@@ -80,7 +75,6 @@
         <!-- testing -->
         <dep.junit.version>4.13.1</dep.junit.version>
         <dep.junit.platform.version>1.6.2</dep.junit.platform.version>
-
     </properties>
 
     <repositories>
@@ -131,94 +125,9 @@
             <!-- presto -->
             <dependency>
                 <groupId>com.facebook.presto</groupId>
-                <artifactId>presto-spi</artifactId>
-                <version>${dep.presto.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-jdbc</artifactId>
                 <version>${dep.presto.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.facebook.presto</groupId>
-                <artifactId>presto-parser</artifactId>
-                <version>${dep.presto.version}</version>
-            </dependency>
-
-            <!-- airlift -->
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>concurrent</artifactId>
-                <version>${dep.airlift.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>bootstrap</artifactId>
-                <version>${dep.airlift.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>configuration</artifactId>
-                <version>${dep.airlift.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>json</artifactId>
-                <version>${dep.airlift.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>log</artifactId>
-                <version>${dep.airlift.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.airlift</groupId>
-                <artifactId>units</artifactId>
-                <version>${dep.airlift.units.version}</version>
-            </dependency>
-
-            <!-- validation -->
-            <dependency>
-                <groupId>javax.validation</groupId>
-                <artifactId>validation-api</artifactId>
-                <version>${dep.javax.validation.version}</version>
-            </dependency>
-
-            <!-- findbugs -->
-            <dependency>
-                <groupId>com.google.code.findbugs</groupId>
-                <artifactId>jsr305</artifactId>
-                <version>${dep.google.jrs305.version}</version>
-            </dependency>
-
-            <!-- guice -->
-            <dependency>
-                <groupId>com.google.inject</groupId>
-                <artifactId>guice</artifactId>
-                <version>${dep.google.inject.version}</version>
-            </dependency>
-
-            <!-- javax.inject -->
-            <dependency>
-                <groupId>javax.inject</groupId>
-                <artifactId>javax.inject</artifactId>
-                <version>${dep.javax.inject.version}</version>
-            </dependency>
-
-            <!-- jackson -->
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>${dep.jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>${dep.jackson.version}</version>
-            </dependency>
-
-
-
 
             <!-- prometheus -->
             <dependency>

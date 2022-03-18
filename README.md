@@ -22,6 +22,9 @@ Find the following zip files in the build target directory:
 * `pixels-listener-*.zip` in `pixels-listener/target`, this is the event listener plugin for Presto.
 * `pixels-presto-*.zip` in `pixels-presto/target`, this is the connector for Presto.
 
+**Note** that the Presto version we use only supports Java 8, thus pixels-presto should also be built
+using JDK 8.0.
+
 ## Installation in AWS
 
 Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. 8GB or larger memory is recommended. Login the instance as `ubuntu` user, 
