@@ -41,7 +41,6 @@
         <module>pixels-cache</module>
         <module>pixels-load</module>
         <module>pixels-listener</module>
-        <module>pixels-hive</module>
         <module>pixels-tools</module>
     </modules>
 
