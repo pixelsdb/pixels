@@ -12,6 +12,7 @@
     <artifactId>pixels-tools</artifactId>
     <properties>
         <mainClass>io.pixelsdb.pixels.test.CacheIndexPerf</mainClass>
+        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
     <dependencies>

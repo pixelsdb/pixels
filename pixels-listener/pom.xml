@@ -13,6 +13,10 @@
     <description>Presto - Pixels Event Listener</description>
     <packaging>presto-plugin</packaging>
 
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.pixelsdb</groupId>

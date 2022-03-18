@@ -9,6 +9,7 @@ target
 .DS_Store
 *.class
 .mvn
+/mvn
 TestParams.java
 core-site.xml
 hdfs-site.xml
@@ -19,7 +20,6 @@ package-info.java
 *.sql
 *.log
 *.txt
-test30G_pixels/
 *.csv
 resources/*.xml
 *.so
