@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
@@ -53,16 +54,22 @@ public class TestPixelsReaderBasic
     @Test
     public void testMetadata()
     {
-        String path = "hdfs://dbiir10:9000/pixels/pixels/test_105/old3_v_order/20181109162236_1437.pxl";
+        String path = "file:///home/hank/Downloads/pixels/20220306043329_1.pxl";
         PixelsReader reader;
         try
         {
-            Storage storage = StorageFactory.Instance().getStorage("hdfs");
+            Storage storage = StorageFactory.Instance().getStorage("file");
             reader = PixelsReaderImpl.newBuilder()
                     .setStorage(storage)
                     .setPath(path)
+                    .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
             List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getFooter().getRowGroupInfosList();
+            List<PixelsProto.Type> types = reader.getFooter().getTypesList();
+            for (PixelsProto.Type type : types)
+            {
+                System.out.println(type);
+            }
             System.out.println(reader.getRowGroupStats().size());
         }
         catch (IOException e)

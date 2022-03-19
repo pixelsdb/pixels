@@ -1,20 +1,29 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine for data lakes. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
+Pixels is a columnar storage engine for data lakes and warehouses. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK 8.0, and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
+Install JDK (8.0 is recommended), and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
-Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
-It may take about one minute to complete. After that, find the following jar/zip files that will be used in the installation:
+The build may take tens of seconds to complete. After that, find the following jar files that will be used in the installation:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
-* `pixels-listener-*.zip` in `pixels-listener/target`, this is the listener plugin for Presto;
-* `pixels-presto-*.zip` in `pixels-presto/target`, this is the connector for Presto;
 * `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
+
+Pixels is compatible with different query engines, such as Presto, Trino, and Hive.
+However, for simplicity, we use Presto as an example here to illustrate how Pixels works with query engines in the data lakes.
+
+To use Pixels in Presto, download [pixels-presto](https://github.com/pixelsdb/pixels-presto),
+and use `mvn package` to build it.
+Find the following zip files in the build target directories:
+* `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
+* `pixels-presto-connector-*.zip`, this is the connector for Presto.
+
+**Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
+using JDK 8.0.
 
 ## Installation in AWS
 
@@ -135,16 +144,17 @@ You can use `screen` or `nohup` to run it in the background.
 
 ### Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
+
+**NOTICE: Even if HDFS is not used, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
+is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
+exist in `hdfs.config.dir`.**
+
 Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
 Follow the official docs to install Hadoop if needed.
 
 Note that some default ports used by Hadoop
 may conflict with the default ports used by Presto. In this case, modify the default port configuration
 of either system.
-
-However, **even if HDFS is not used**, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
-exist in `hdfs.config.dir`.
 
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
@@ -158,11 +168,11 @@ Then download [presto-cli](https://prestodb.io/docs/0.215/installation/cli.html)
 and give executable permission to it.
 
 There are two important directories in the home of presto-server: `etc` and `plugin`.
-Decompress `pixels-listener-*.zip` and `pixels-presto-*.zip` into the `plugin` directory.
+Decompress `pixels-presto-listener-*.zip` and `pixels-presto-connector-*.zip` into the `plugin` directory.
 The `etc` directory contains the configuration files of Presto.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
-* Create the listener config file named `event-listener.properties` with the following content:
+* Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
 enabled=true
@@ -172,9 +182,9 @@ listened.query.type=SELECT
 log.dir=/home/ubuntu/opt/pixels/listener/
 ```
 `log-dir` should point to
-an existing directory where the listener logs will appear
+an existing directory where the listener logs will appear.
 
-* Create the catalog config file named `pixels.properties` for Pixels in the `catalog` subdirectory,
+* Create the catalog config file named `pixels.properties` for Pixels in the `etc/catalog` directory,
 with the following content:
 ```properties
 connector.name=pixels
@@ -293,9 +303,11 @@ to create the table layouts for the tables in the TPC-H database in Pixels. Actu
 should be created by the storage layout optimizer ([Rainbow](https://ieeexplore.ieee.org/document/8509421)).
 However, we directly load the layouts here for simplicity.
 
-Create the containers for the tables layouts in S3. The container name is the same as the hostname
-(e.g., `pixels-tpch-customer-v-0-order`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
-Change the paths in the table layouts if the container names are already used.
+Create the container to store the tables in S3. The container name is the same as the hostname
+(e.g., `pixels-tpch`) in the `LAYOUT_ORDER_PATH` and `LAYOUT_COMPACT_PATH` of each table layout.
+Change the bucket name if it already exists.
+
+During data loading, Pixels will automatically create the folders in the bucket to store the files in each table.
 
 ### Load Data
 Under `PIXELS_HOME`, run pixels-load:

@@ -12,6 +12,8 @@
     <artifactId>pixels-tools</artifactId>
     <properties>
         <mainClass>io.pixelsdb.pixels.test.CacheIndexPerf</mainClass>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.install.skip>true</maven.install.skip>
     </properties>
 
     <dependencies>
@@ -35,11 +37,7 @@
             <artifactId>pixels-cache</artifactId>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-spi</artifactId>
-            <optional>true</optional>
-        </dependency>
+
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>

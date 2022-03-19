@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common;
 
-import com.facebook.presto.spi.HostAddress;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
 import io.pixelsdb.pixels.common.balance.Balancer;
+import io.pixelsdb.pixels.common.balance.HostAddress;
 import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 import org.junit.Test;
