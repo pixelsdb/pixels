@@ -7,26 +7,17 @@ We also include a copy of Apache License Version 2.0 at the end of this NOTICE f
 1. MappedBus
 Copyright 2015 Caplogic AB.
 Licensed under the Apache License, Version 2.0.
-
-Memory mapped file and memory message queue in pixels-cache mainly come from MappedBus.
+* Memory mapped file in pixels-cache is derived from MappedBus.
 
 
 2. Apache ORC
 Licensed under the Apache License, Version 2.0.
+* Column vectors and TypeDescription in pixels-core are derived from the corresponding implementations in Apache ORC.
 
-Column vectors and TypeDescription in pixels-core refer to corresponding implementations in Apache ORC.
 
-
-3. Apache Hive
+3. Facebook Presto
 Licensed under the Apache License, Version 2.0.
-
-A part of classes in pixels-hive refer to OrcSerde in Apache Hive.
-
-
-4. Facebook Presto
-Licensed under the Apache License, Version 2.0.
-
-Implementation of VarcharArrayBlock in pixels-presto is derived from VariableWidthBlock in Presto.
+* HostAddress in pixels-common is derived from the HostAddress in Presto SPI.
 
 
 According to the requirement of Apache License Version 2.0 (Apache 2.0), we include a copy of Apache 2.0 here:
