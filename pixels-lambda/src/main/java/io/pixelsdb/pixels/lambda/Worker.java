@@ -20,6 +20,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 // Handler value: example.Handler
 
@@ -30,9 +33,13 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
 {
     private static final Logger LOGGER = LogManager.getLogger(Worker.class);
     //Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
     @Override
     public String handleRequest(Map<String,ArrayList<String>> event, Context context)
     {
+        ExecutorService threadPool = Executors.newFixedThreadPool(8);
+        LOGGER.info("enter handleRequest");
+        long lambdaStartTime = System.nanoTime();
         String requestId = context.getAwsRequestId();
 
         // each worker create a thread for each file, and each thread uses a pixelsReader
@@ -41,30 +48,42 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
         String[] cols = event.get("cols").toArray(new String[0]);
 
         // for each file to read, create a thread which uses a reader to read one file and writes the results to s3
-        Thread[] threads = new Thread[fileNames.size()];
-        for (int i=0; i<threads.length; i++) {
+//        Thread[] threads = new Thread[fileNames.size()];
+        LOGGER.debug("start submitting tasks to thread pool");
+        for (int i=0; i<fileNames.size(); i++) {
             int finalI = i;
-            threads[i] = new Thread(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI));
+            threadPool.submit(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI));
 //            runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
         }
-        for (Thread t:threads) t.start();
-        for (Thread t:threads) {
-            try {
-                t.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        threadPool.shutdown();
+        try {
+            threadPool.awaitTermination(300, TimeUnit.SECONDS);//TODO maybe threadpool shouldn't be class method as that might be shared between lambda instances. and shut down one threadpool would shut down all? maybe after shutdown can restart?
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
+        LOGGER.debug("thread pool shut down");
+//        for (Thread t:threads) t.start();
+//        for (Thread t:threads) {
+//            try {
+//                t.join();
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+
 
         // create response to inform invoker which are the s3 paths of files written
         String response = "";
-        for (int i=0; i< threads.length; i++) {
-            if (i<threads.length-1) {
+        for (int i=0; i< fileNames.size(); i++) {
+            if (i<fileNames.size()-1) {
                 response = response + requestId + "file" + i + ",";
             } else {
                 response = response + requestId + "file" + i;
             }
         }
+        long lambdaEndTime = System.nanoTime();
+        double lambdaDurationMs = 1.0 * (lambdaEndTime - lambdaStartTime) / Math.pow(10,6);
+        LOGGER.debug("lambda requestid " + requestId + " duration: " + lambdaDurationMs);
         return response;
     }
 
@@ -88,6 +107,7 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
         try (PixelsReader pixelsReader = getReader(fileName);
              PixelsRecordReader recordReader = pixelsReader.read(option))
         {
+            LOGGER.debug("start scan file: " + fileName );
             TypeDescription allSchema = pixelsReader.getFileSchema();
             List<TypeDescription> allColTypes =  allSchema.getChildren();
             List<String> fieldNames = allSchema.getFieldNames();
@@ -107,7 +127,6 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
 
             while (true)
             {
-                LOGGER.info(" ****** batch number: " + batch + "*******");
                 rowBatch = recordReader.readBatch(batchSize);
                 pixelsWriter.addRowBatch(rowBatch);
                 if (rowBatch.endOfFile)
@@ -118,12 +137,12 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
                 }
                 batch += 1;
             }
-
         }
         catch (IOException e)
         {
             e.printStackTrace();
         }
+        LOGGER.debug("finish scanning file: " + fileName );
         return "success";
     }
 

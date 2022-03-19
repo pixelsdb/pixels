@@ -1,12 +1,16 @@
 import io.pixelsdb.pixels.lambda.Scan;
 import org.junit.Test;
+import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.lambda.LambdaAsyncClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 
 import java.util.ArrayList;
 
 public class ScanTest {
-    LambdaClient lambdaClient = LambdaClient.builder()
+    LambdaAsyncClient lambdaClient = LambdaAsyncClient.builder()
+            .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
+                    .maxConcurrency(4000))
             .region(Region.US_EAST_2)
             .build();
     Scan scan = new Scan();
