@@ -19,8 +19,8 @@ However, for simplicity, we use Presto as an example here to illustrate how Pixe
 To use Pixels in Presto, download [pixels-presto](https://github.com/pixelsdb/pixels-presto),
 and use `mvn package` to build it.
 Find the following zip files in the build target directories:
-* `pixels-listener-*.zip`, this is the event listener plugin for Presto.
-* `pixels-presto-*.zip`, this is the connector for Presto.
+* `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
+* `pixels-presto-connector-*.zip`, this is the connector for Presto.
 
 **Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
 using JDK 8.0.
@@ -168,7 +168,7 @@ Then download [presto-cli](https://prestodb.io/docs/0.215/installation/cli.html)
 and give executable permission to it.
 
 There are two important directories in the home of presto-server: `etc` and `plugin`.
-Decompress `pixels-listener-*.zip` and `pixels-presto-*.zip` into the `plugin` directory.
+Decompress `pixels-presto-listener-*.zip` and `pixels-presto-connector-*.zip` into the `plugin` directory.
 The `etc` directory contains the configuration files of Presto.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:

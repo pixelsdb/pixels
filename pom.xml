@@ -19,7 +19,7 @@
     <groupId>io.pixelsdb</groupId>
     <artifactId>pixels</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <description>Pixels</description>
+    <description>Pixels Main Project</description>
     <url>https://github.com/pixelsdb/pixels</url>
     <inceptionYear>2017</inceptionYear>
 
@@ -61,7 +61,7 @@
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.42.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
-        <dep.guava.version>24.1-jre</dep.guava.version>
+        <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.6.1</dep.protobuf.version>
         <dep.grpc.version>1.27.1</dep.grpc.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
@@ -103,7 +103,7 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-daemon</artifactId>
+                <artifactId>pixels-cache</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -113,12 +113,7 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-cache</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-presto</artifactId>
+                <artifactId>pixels-daemon</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -276,11 +271,6 @@
                 <artifactId>log4j-api</artifactId>
                 <version>${dep.log4j.version}</version>
             </dependency>
-            <!--<dependency>-->
-                <!--<groupId>org.slf4j</groupId>-->
-                <!--<artifactId>slf4j-log4j12</artifactId>-->
-                <!--<version>1.7.22</version>-->
-            <!--</dependency>-->
 
             <!-- testing -->
             <dependency>
