@@ -75,7 +75,7 @@ public class LocalFS implements Storage
                 return;
             }
         }
-        logger.debug("Local FS created on host: " + hostName);
+        logger.debug("LocalFS instance is created on host: " + hostName);
     }
 
     private String getPathKey(String path)

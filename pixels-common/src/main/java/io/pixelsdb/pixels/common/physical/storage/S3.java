@@ -39,9 +39,12 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 
+import javax.activity.InvalidActivityException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -78,11 +81,23 @@ public class S3 implements Storage
     private static S3AsyncClient s3Async;
     private static S3AsyncClient s3Async1M;
     private static S3AsyncClient s3Async10M;
+    private final static boolean enableCache;
     private final static boolean enableRequestDiversion;
 
     static
     {
-        InitId(S3_ID_KEY);
+        enableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+
+        if (enableCache)
+        {
+            /**
+             * Issue #222:
+             * The etcd file id is only used for cache coordination.
+             * Thus we do not initialize the id key when cache is disabled.
+             */
+
+            InitId(S3_ID_KEY);
+        }
 
         connectionTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
@@ -177,12 +192,42 @@ public class S3 implements Storage
 
     public S3()
     {
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(CACHE_NODE_STATUS_LITERAL);
-        allHosts = new String[kvs.size()];
-        for (int i = 0; i < kvs.size(); ++i)
+        if (enableCache)
         {
-            String key = kvs.get(i).getKey().toString(StandardCharsets.UTF_8);
-            allHosts[i] = key.substring(CACHE_NODE_STATUS_LITERAL.length());
+            List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(CACHE_NODE_STATUS_LITERAL);
+            allHosts = new String[kvs.size()];
+            for (int i = 0; i < kvs.size(); ++i)
+            {
+                String key = kvs.get(i).getKey().toString(StandardCharsets.UTF_8);
+                allHosts[i] = key.substring(CACHE_NODE_STATUS_LITERAL.length());
+            }
+        }
+        else
+        {
+            /**
+             * Issue #222:
+             * The hosts of storage are only used by the cache coordinator,
+             * thus we use the local host name, which might do not match the host name of
+             * a valid cache node, if cache is disabled.
+             */
+            allHosts = new String[1];
+            String hostName = System.getenv("HOSTNAME");
+            logger.debug("HostName from system env: " + hostName);
+            if (hostName == null)
+            {
+                try
+                {
+                    hostName = InetAddress.getLocalHost().getHostName();
+                    logger.debug("HostName from InetAddress: " + hostName);
+                }
+                catch (UnknownHostException e)
+                {
+                    logger.debug("Hostname is null. Exit");
+                    return;
+                }
+            }
+            logger.debug("S3 (storage) instance w/o cache is created on host: " + hostName);
+            allHosts[0] = hostName;
         }
     }
 
@@ -389,18 +434,27 @@ public class S3 implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
+        requireNonNull(path, "path is null");
+        if (enableCache)
         {
-            throw new IOException("Path '" + path + "' is not valid.");
+            Path p = new Path(path);
+            if (!p.valid)
+            {
+                throw new IOException("Path '" + path + "' is not valid.");
+            }
+            // try to generate the id in etcd if it does not exist.
+            if (!this.existsOrGenIdSucc(p))
+            {
+                throw new IOException("Path '" + path + "' does not exist.");
+            }
+            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
+            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
-        // try to generate the id in etcd if it does not exist.
-        if (!this.existsOrGenIdSucc(p))
+        else
         {
-            throw new IOException("Path '" + path + "' does not exist.");
+            // Issue #222: return an arbitrary id when cache is disable.
+            return path.hashCode();
         }
-        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
-        return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
     }
 
     @Override
@@ -532,6 +586,7 @@ public class S3 implements Storage
         }
         if (!this.existsInS3(p))
         {
+            // Issue #222: try to delete the file ids even if cache is disabled.
             EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -540,7 +595,7 @@ public class S3 implements Storage
             List<Status> statuses = this.listStatus(path);
             for (Status status : statuses)
             {
-                // ListObjects, which is used by listStatus, is already recursive.
+                // The ListObjects S3 API, which is used by listStatus, is already recursive.
 
                 Path sub = new Path(status.getPath());
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
@@ -564,7 +619,7 @@ public class S3 implements Storage
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
             }
         }
-        // delete the ids
+        // Issue #222: try to delete the file ids even if cache is disabled.
         EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
         return true;
     }
@@ -639,15 +694,6 @@ public class S3 implements Storage
         return this.existsInS3(new Path(path));
     }
 
-    private boolean existsId(Path path) throws IOException
-    {
-        if (!path.valid)
-        {
-            throw new IOException("Path '" + path.toString() + "' is not valid.");
-        }
-        return EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null;
-    }
-
     /**
      * If a file or directory exists in S3.
      * @param path
@@ -688,11 +734,15 @@ public class S3 implements Storage
 
     private boolean existsOrGenIdSucc(Path path) throws IOException
     {
+        if (!enableCache)
+        {
+            throw new InvalidActivityException("Should not check or generate file id when cache is disabled");
+        }
         if (!path.valid)
         {
             throw new IOException("Path '" + path.toString() + "' is not valid.");
         }
-        if (this.existsId(path))
+        if (EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null)
         {
             return true;
         }
