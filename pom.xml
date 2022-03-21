@@ -61,7 +61,7 @@
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
         <dep.netty.version>4.1.42.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
-        <dep.guava.version>29.0-jre</dep.guava.version>
+        <dep.guava.version>24.1-jre</dep.guava.version>
         <dep.protobuf.version>3.6.1</dep.protobuf.version>
         <dep.grpc.version>1.27.1</dep.grpc.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
