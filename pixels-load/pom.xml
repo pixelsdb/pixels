@@ -92,7 +92,7 @@
         <!-- hdfs -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
+            <artifactId>hadoop-hdfs-client</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>asm</groupId>
