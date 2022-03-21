@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
@@ -28,10 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -56,42 +52,11 @@ public class LocalFS implements Storage
     private static Logger logger = LogManager.getLogger(LocalFS.class);
     private static String SchemePrefix = Scheme.file.name() + "://";
 
-    private String hostName;
-
-    public LocalFS()
-    {
-        this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
-        if (hostName == null)
-        {
-            try
-            {
-                this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
-            }
-            catch (UnknownHostException e)
-            {
-                logger.debug("Hostname is null. Exit");
-                return;
-            }
-        }
-        logger.debug("LocalFS instance is created on host: " + hostName);
-    }
+    public LocalFS() { }
 
     private String getPathKey(String path)
     {
-        return LOCAL_FS_META_PREFIX + path + ":" + hostName;
-    }
-
-    private String getPathKeyPrefix(String path)
-    {
-        return LOCAL_FS_META_PREFIX + path + ":";
-    }
-
-    private String getHostFromPathKey(String pathKey)
-    {
-        int last = pathKey.lastIndexOf(":");
-        return pathKey.substring(last + 1);
+        return LOCAL_FS_META_PREFIX + path;
     }
 
     public static class Path
@@ -225,34 +190,6 @@ public class LocalFS implements Storage
     }
 
     @Override
-    public List<Location> getLocations(String path)
-    {
-        List<Location> locations = new ArrayList<>();
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
-        for (KeyValue kv : kvs)
-        {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            String host = getHostFromPathKey(key);
-            locations.add(new Location(new String[]{host}));
-        }
-        return locations;
-    }
-
-    @Override
-    public String[] getHosts(String path)
-    {
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
-        String[] hosts = new String[kvs.size()];
-        int i = 0;
-        for (KeyValue kv : kvs)
-        {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            hosts[i++] = getHostFromPathKey(key);
-        }
-        return hosts;
-    }
-
-    @Override
     public boolean mkdirs(String path) throws IOException
     {
         Path p = new Path(path);
@@ -358,7 +295,7 @@ public class LocalFS implements Storage
             }
         }
         /**
-         * Attempt to delete the key, but it does not need to be exist.
+         * Attempt to delete the key, but it does not need to be existed.
          */
         EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
         return subDeleted && new File(path).delete();

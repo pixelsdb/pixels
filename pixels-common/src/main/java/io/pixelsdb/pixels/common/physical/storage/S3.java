@@ -19,9 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical.storage;
 
-import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.io.S3InputStream;
@@ -43,8 +41,6 @@ import javax.activity.InvalidActivityException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -53,7 +49,8 @@ import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static io.pixelsdb.pixels.common.utils.Constants.S3_ID_KEY;
+import static io.pixelsdb.pixels.common.utils.Constants.S3_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -187,49 +184,7 @@ public class S3 implements Storage
         return enableRequestDiversion;
     }
 
-    private String[] allHosts;
-    private int hostIndex = 0;
-
-    public S3()
-    {
-        if (enableCache)
-        {
-            List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(CACHE_NODE_STATUS_LITERAL);
-            allHosts = new String[kvs.size()];
-            for (int i = 0; i < kvs.size(); ++i)
-            {
-                String key = kvs.get(i).getKey().toString(StandardCharsets.UTF_8);
-                allHosts[i] = key.substring(CACHE_NODE_STATUS_LITERAL.length());
-            }
-        }
-        else
-        {
-            /**
-             * Issue #222:
-             * The hosts of storage are only used by the cache coordinator,
-             * thus we use the local host name, which might do not match the host name of
-             * a valid cache node, if cache is disabled.
-             */
-            allHosts = new String[1];
-            String hostName = System.getenv("HOSTNAME");
-            logger.debug("HostName from system env: " + hostName);
-            if (hostName == null)
-            {
-                try
-                {
-                    hostName = InetAddress.getLocalHost().getHostName();
-                    logger.debug("HostName from InetAddress: " + hostName);
-                }
-                catch (UnknownHostException e)
-                {
-                    logger.debug("Hostname is null. Exit");
-                    return;
-                }
-            }
-            logger.debug("S3 (storage) instance w/o cache is created on host: " + hostName);
-            allHosts[0] = hostName;
-        }
-    }
+    public S3() { }
 
     private String getPathKey(String path)
     {
@@ -458,30 +413,6 @@ public class S3 implements Storage
     }
 
     @Override
-    public List<Location> getLocations(String path)
-    {
-        String host = allHosts[hostIndex++];
-        if (hostIndex >= allHosts.length)
-        {
-            hostIndex = 0;
-        }
-        return ImmutableList.of(new Location(new String[]{host}));
-    }
-
-    /**
-     * For S3, we do not have the concept host.
-     * When S3 is used as the storage, disable enable.absolute.balancer.
-     * @param path
-     * @return
-     * @throws IOException
-     */
-    @Override
-    public String[] getHosts(String path) throws IOException
-    {
-        return allHosts;
-    }
-
-    @Override
     public boolean mkdirs(String path) throws IOException
     {
         Path p = new Path(path);
@@ -546,8 +477,7 @@ public class S3 implements Storage
     }
 
     /**
-     * As S3 does not support append, we do not create object,
-     * only create the file id and metadata in etcd.
+     * Open an output stream to write a file into S3.
      * @param path
      * @param overwrite
      * @param bufferSize

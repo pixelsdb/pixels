@@ -411,18 +411,22 @@ public class CacheCoordinator
         Balancer replicaBalancer = new ReplicaBalancer(cacheNodes);
         for (String path : paths)
         {
-            // get a set of nodes where the blocks of the file is located (location_set)
-            Set<HostAddress> addresses = new HashSet<>();
-            List<Location> locations = storage.getLocations(path);
-            for (Location location : locations)
+            if (storage.hasLocality())
             {
-                addresses.addAll(toHostAddress(location.getHosts()));
+                // get a set of nodes where the blocks of the file is located (location_set)
+                Set<HostAddress> addresses = new HashSet<>();
+                List<Location> locations = storage.getLocations(path);
+                for (Location location : locations)
+                {
+                    addresses.addAll(toHostAddress(location.getHosts()));
+                }
+                // addresses should not be empty.
+                replicaBalancer.put(path, addresses);
             }
-            if (addresses.size() == 0)
+            else
             {
-                continue;
+                replicaBalancer.autoSelect(path);
             }
-            replicaBalancer.put(path, addresses);
         }
         try
         {

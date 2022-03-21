@@ -357,9 +357,9 @@ public class PixelsCacheWriter
         outer_loop:
         for (String file : files)
         {
-            if (enableAbsoluteBalancer)
+            if (enableAbsoluteBalancer && storage.hasLocality())
             {
-                // this is used for experimental purpose only.
+                // TODO: this is used for experimental purpose only.
                 // may be removed later.
                 file = ensureLocality(file);
             }
@@ -524,9 +524,9 @@ public class PixelsCacheWriter
         outer_loop:
         for (String file : files)
         {
-            if (enableAbsoluteBalancer)
+            if (enableAbsoluteBalancer && storage.hasLocality())
             {
-                // this is used for experimental purpose only.
+                // TODO: this is used for experimental purpose only.
                 // may be removed later.
                 file = ensureLocality(file);
             }
