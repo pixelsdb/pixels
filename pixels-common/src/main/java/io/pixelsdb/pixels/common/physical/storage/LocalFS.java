@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical.storage;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -44,9 +45,21 @@ import static java.util.Objects.requireNonNull;
  */
 public class LocalFS implements Storage
 {
+    private final static boolean enableCache;
+
     static
     {
-        InitId(LOCAL_FS_ID_KEY);
+        enableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+
+        if (enableCache)
+        {
+            /**
+             * Issue #222:
+             * The etcd file id is only used for cache coordination.
+             * Thus, we do not initialize the id key when cache is disabled.
+             */
+            InitId(LOCAL_FS_ID_KEY);
+        }
     }
 
     private static Logger logger = LogManager.getLogger(LocalFS.class);
@@ -175,18 +188,27 @@ public class LocalFS implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
-        if (kv == null)
+        requireNonNull(path, "path is null");
+        if (enableCache)
         {
-            /**
-             * Issue #158:
-             * Create an id for this file if it does not exist in etcd.
-             */
-            long id = GenerateId(LOCAL_FS_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-            return id;
+            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
+            if (kv == null)
+            {
+                /**
+                 * Issue #158:
+                 * Create an id for this file if it does not exist in etcd.
+                 */
+                long id = GenerateId(LOCAL_FS_ID_KEY);
+                EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+                return id;
+            }
+            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
-        return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
+        else
+        {
+            // Issue #222: return an arbitrary id when cache is disable.
+            return path.hashCode();
+        }
     }
 
     @Override

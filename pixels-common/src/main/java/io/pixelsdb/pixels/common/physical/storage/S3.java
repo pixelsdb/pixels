@@ -90,7 +90,7 @@ public class S3 implements Storage
             /**
              * Issue #222:
              * The etcd file id is only used for cache coordination.
-             * Thus we do not initialize the id key when cache is disabled.
+             * Thus, we do not initialize the id key when cache is disabled.
              */
 
             InitId(S3_ID_KEY);
