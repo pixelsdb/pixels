@@ -19,9 +19,13 @@
  */
 package io.pixelsdb.pixels.common.balance;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.*;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 19-7-28
@@ -30,6 +34,8 @@ import java.util.*;
 public class ReplicaBalancer extends Balancer
 {
     private boolean balanced = false;
+    private int roundIndex = 0;
+    private List<HostAddress> nodes;
     private Map<HostAddress, Integer> nodesCacheStats = new HashMap<>();
     private Map<String, Set<HostAddress>> origin = new HashMap<>();
     private Map<String, HostAddress> result = new HashMap<>();
@@ -40,28 +46,26 @@ public class ReplicaBalancer extends Balancer
      */
     public ReplicaBalancer(List<HostAddress> nodes)
     {
-        if (nodes == null)
-        {
-            return;
-        }
+        requireNonNull(nodes, "nodes is null");
+        checkArgument(!nodes.isEmpty(), "nodes is empty");
         for (HostAddress node : nodes) {
             nodesCacheStats.put(node, 0);
         }
+        this.nodes = ImmutableList.copyOf(nodes);
     }
 
     @Override
     public void put(String path, HostAddress address)
     {
-        if (path == null || address == null)
-        {
-            return;
-        }
+        requireNonNull(path, "path is null");
+        requireNonNull(address, "address is null");
         if (this.origin.containsKey(path))
         {
             this.origin.get(path).add(address);
         }
         else
         {
+            // in most cases, each file has no more than 3 locations.
             Set<HostAddress> value = new HashSet<>(3);
             value.add(address);
             this.origin.put(path, value);
@@ -72,17 +76,24 @@ public class ReplicaBalancer extends Balancer
     @Override
     public void put(String path, Set<HostAddress> addresses)
     {
-        if (path == null || addresses == null || addresses.isEmpty())
-        {
-            return;
-        }
+        requireNonNull(path, "path is null");
+        requireNonNull(addresses, "addresses is null");
+        checkArgument(!addresses.isEmpty(), "addresses is empty");
         for (HostAddress address : addresses)
         {
             // do not directly put address into origin,
-            // for it may be modified from out scope.
+            // for it may be modified outside this method.
             this.put(path, address);
         }
         balanced = false;
+    }
+
+    @Override
+    public void autoSelect(String path)
+    {
+        HostAddress selected = nodes.get(roundIndex++);
+        roundIndex %= nodes.size();
+        this.put(path, selected);
     }
 
     @Override
@@ -101,9 +112,9 @@ public class ReplicaBalancer extends Balancer
     @Override
     public void balance()
     {
-        if (balanced == false)
+        if (!balanced)
         {
-            if (result.isEmpty() == false)
+            if (!result.isEmpty())
             {
                 result.clear();
             }
@@ -116,7 +127,7 @@ public class ReplicaBalancer extends Balancer
                 // find a node in the location_set with the least number of caching files
                 for (HostAddress location : locations)
                 {
-                    if (nodesCacheStats.get(location) != null)
+                    if (nodesCacheStats.containsKey(location))
                     {
                         int count = nodesCacheStats.get(location);
                         if (count < leastCounter)

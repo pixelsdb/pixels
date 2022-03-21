@@ -19,9 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical.storage;
 
-import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.io.S3InputStream;
@@ -39,6 +37,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 
+import javax.activity.InvalidActivityException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -50,7 +49,8 @@ import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static io.pixelsdb.pixels.common.utils.Constants.S3_ID_KEY;
+import static io.pixelsdb.pixels.common.utils.Constants.S3_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -78,11 +78,23 @@ public class S3 implements Storage
     private static S3AsyncClient s3Async;
     private static S3AsyncClient s3Async1M;
     private static S3AsyncClient s3Async10M;
+    private final static boolean enableCache;
     private final static boolean enableRequestDiversion;
 
     static
     {
-        InitId(S3_ID_KEY);
+        enableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+
+        if (enableCache)
+        {
+            /**
+             * Issue #222:
+             * The etcd file id is only used for cache coordination.
+             * Thus, we do not initialize the id key when cache is disabled.
+             */
+
+            InitId(S3_ID_KEY);
+        }
 
         connectionTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
@@ -172,19 +184,7 @@ public class S3 implements Storage
         return enableRequestDiversion;
     }
 
-    private String[] allHosts;
-    private int hostIndex = 0;
-
-    public S3()
-    {
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(CACHE_NODE_STATUS_LITERAL);
-        allHosts = new String[kvs.size()];
-        for (int i = 0; i < kvs.size(); ++i)
-        {
-            String key = kvs.get(i).getKey().toString(StandardCharsets.UTF_8);
-            allHosts[i] = key.substring(CACHE_NODE_STATUS_LITERAL.length());
-        }
-    }
+    public S3() { }
 
     private String getPathKey(String path)
     {
@@ -389,42 +389,27 @@ public class S3 implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
+        requireNonNull(path, "path is null");
+        if (enableCache)
         {
-            throw new IOException("Path '" + path + "' is not valid.");
+            Path p = new Path(path);
+            if (!p.valid)
+            {
+                throw new IOException("Path '" + path + "' is not valid.");
+            }
+            // try to generate the id in etcd if it does not exist.
+            if (!this.existsOrGenIdSucc(p))
+            {
+                throw new IOException("Path '" + path + "' does not exist.");
+            }
+            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
+            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
-        // try to generate the id in etcd if it does not exist.
-        if (!this.existsOrGenIdSucc(p))
+        else
         {
-            throw new IOException("Path '" + path + "' does not exist.");
+            // Issue #222: return an arbitrary id when cache is disable.
+            return path.hashCode();
         }
-        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(p.toString()));
-        return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
-    }
-
-    @Override
-    public List<Location> getLocations(String path)
-    {
-        String host = allHosts[hostIndex++];
-        if (hostIndex >= allHosts.length)
-        {
-            hostIndex = 0;
-        }
-        return ImmutableList.of(new Location(new String[]{host}));
-    }
-
-    /**
-     * For S3, we do not have the concept host.
-     * When S3 is used as the storage, disable enable.absolute.balancer.
-     * @param path
-     * @return
-     * @throws IOException
-     */
-    @Override
-    public String[] getHosts(String path) throws IOException
-    {
-        return allHosts;
     }
 
     @Override
@@ -492,8 +477,7 @@ public class S3 implements Storage
     }
 
     /**
-     * As S3 does not support append, we do not create object,
-     * only create the file id and metadata in etcd.
+     * Open an output stream to write a file into S3.
      * @param path
      * @param overwrite
      * @param bufferSize
@@ -532,6 +516,7 @@ public class S3 implements Storage
         }
         if (!this.existsInS3(p))
         {
+            // Issue #222: try to delete the file ids even if cache is disabled.
             EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
             throw new IOException("Path '" + path + "' does not exist.");
         }
@@ -540,7 +525,7 @@ public class S3 implements Storage
             List<Status> statuses = this.listStatus(path);
             for (Status status : statuses)
             {
-                // ListObjects, which is used by listStatus, is already recursive.
+                // The ListObjects S3 API, which is used by listStatus, is already recursive.
 
                 Path sub = new Path(status.getPath());
                 DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
@@ -564,7 +549,7 @@ public class S3 implements Storage
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
             }
         }
-        // delete the ids
+        // Issue #222: try to delete the file ids even if cache is disabled.
         EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
         return true;
     }
@@ -639,15 +624,6 @@ public class S3 implements Storage
         return this.existsInS3(new Path(path));
     }
 
-    private boolean existsId(Path path) throws IOException
-    {
-        if (!path.valid)
-        {
-            throw new IOException("Path '" + path.toString() + "' is not valid.");
-        }
-        return EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null;
-    }
-
     /**
      * If a file or directory exists in S3.
      * @param path
@@ -688,11 +664,15 @@ public class S3 implements Storage
 
     private boolean existsOrGenIdSucc(Path path) throws IOException
     {
+        if (!enableCache)
+        {
+            throw new InvalidActivityException("Should not check or generate file id when cache is disabled");
+        }
         if (!path.valid)
         {
             throw new IOException("Path '" + path.toString() + "' is not valid.");
         }
-        if (this.existsId(path))
+        if (EtcdUtil.Instance().getKeyValue(getPathKey(path.toString())) != null)
         {
             return true;
         }
