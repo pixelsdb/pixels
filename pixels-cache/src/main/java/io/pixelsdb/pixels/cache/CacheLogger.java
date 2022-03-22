@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Created at: 19-5-12
- * Author: hank
+ * @author hank
  */
 public class CacheLogger implements Runnable
 {

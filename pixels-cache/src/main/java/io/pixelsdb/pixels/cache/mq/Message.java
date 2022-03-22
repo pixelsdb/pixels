@@ -36,6 +36,13 @@ public interface Message
     int size ();
 
     /**
+     * Set the message size. When reading a message from the message queue,
+     * this method is called to set the message size for this.read().
+     * @param messageSize
+     */
+    void ensureSize (int messageSize);
+
+    /**
      * Read the content of this message from the given pos in sharedMemory.
      * @param mem the shared memory to read this message from.
      * @param pos the byte position in the shared memory.

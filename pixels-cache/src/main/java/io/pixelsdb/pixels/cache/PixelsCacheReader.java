@@ -132,7 +132,7 @@ public class PixelsCacheReader
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
         // search index file for columnlet id
-        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         // check the rwFlag and increase readCount.
         long lease = 0;
@@ -198,7 +198,7 @@ public class PixelsCacheReader
      */
     public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
-        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         return search(keyBuffer);
     }
