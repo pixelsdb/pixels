@@ -19,10 +19,15 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import com.google.common.collect.ImmutableList;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -128,13 +133,60 @@ public interface Storage
      * file id is the id of this block.
      * @param path
      * @return
-     * @throws IOException if HDFS file has more than one blocks.
+     * @throws IOException if HDFS file has more than one block.
      */
     long getFileId(String path) throws IOException;
 
-    List<Location> getLocations(String path) throws IOException;
+    /**
+     * Whether the storage system provides data locality. For example,
+     * on-premise HDFS provides the locality for each file, however,
+     * S3 and local file systems can not provide meaningful locality
+     * information for data-locality scheduling of computation tasks.
+     * By default, this method returns false.
+     *
+     * <p><b>Note:</b> if this method returns true, then getLocations
+     * and getHosts must be override to return the physical locality
+     * information of the given path.</p>
+     * @return
+     */
+    default boolean hasLocality()
+    {
+        return false;
+    }
 
-    String[] getHosts(String path) throws IOException;
+    /**
+     * Get the network locations of the given file. Each file may
+     * have multiple locations if it is replicated or partitioned
+     * in the storage system.
+     *
+     * <p>The default implementation simply parses the location
+     * from the URI of the path.</p>
+     * @param path the path of the file.
+     * @return
+     * @throws IOException
+     */
+    default List<Location> getLocations(String path) throws IOException
+    {
+        requireNonNull(path, "path is null");
+        return ImmutableList.of(new Location(URI.create(ensureSchemePrefix(path))));
+    }
+
+    /**
+     * Get the hostnames of the storage node where the file replicas
+     * or partitions are located in. It is similar to getLocations()
+     * however only returns the hostname information.
+     *
+     * <p>The default implementation simply parses the host from the
+     * URI of the path.</p>
+     * @param path the path of the file.
+     * @return
+     * @throws IOException
+     */
+    default String[] getHosts(String path) throws IOException
+    {
+        requireNonNull(path, "path is null");
+        return new String[]{URI.create(ensureSchemePrefix(path)).getHost()};
+    }
 
     /**
      * Create the directory named by this abstract pathname,

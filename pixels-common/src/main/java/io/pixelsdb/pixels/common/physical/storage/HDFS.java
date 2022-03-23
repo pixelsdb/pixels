@@ -215,6 +215,12 @@ public class HDFS implements Storage
     }
 
     @Override
+    public boolean hasLocality()
+    {
+        return true;
+    }
+
+    @Override
     public List<Location> getLocations(String path) throws IOException
     {
         List<Location> addresses = new ArrayList<>();

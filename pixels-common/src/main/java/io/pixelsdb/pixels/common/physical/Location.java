@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import org.apache.hadoop.fs.BlockLocation;
 
 import java.io.IOException;
+import java.net.URI;
 
 /**
  * In Pixels, we assume that each file or object has its locations.
@@ -37,7 +38,7 @@ import java.io.IOException;
 public class Location
 {
     private String[] hosts; // Datanode hostnames
-    private String[] names; // Datanode IP:Port for accessing the block
+    private String[] names; // Datanode IP:Port, i.e., authority, for accessing the block.
     private boolean corrupt;
 
     private static final String[] EMPTY_STR_ARRAY = new String[0];
@@ -65,6 +66,13 @@ public class Location
         this.hosts = blockLocation.getHosts();
         this.names = blockLocation.getNames();
         this.corrupt = blockLocation.isCorrupt();
+    }
+
+    public Location(URI uri)
+    {
+        this.hosts = new String[]{uri.getHost()};
+        this.names = new String[]{uri.getAuthority()};
+        this.corrupt = false;
     }
 
     /**

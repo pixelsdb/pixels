@@ -24,6 +24,9 @@ import io.pixelsdb.pixels.common.exception.BalancerException;
 import java.util.Map;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * Created at: 19-7-28
  * Author: hank
@@ -32,26 +35,33 @@ public abstract class Balancer
 {
     abstract public void put (String path, HostAddress address);
     abstract public void put (String path, Set<HostAddress> addresses);
+
+    /**
+     * Automatically select a location for the given path, using policies such as round-robin.
+     * This method can be used the select the cache location for the storage systems that do
+     * not provide data locality.
+     * @param path
+     */
+    abstract public void autoSelect (String path); // Added in Issue #222.
     abstract public HostAddress get (String path);
     abstract public Map<String, HostAddress> getAll();
     abstract public void balance () throws BalancerException;
     abstract public boolean isBalanced ();
 
-    public void cascade(Balancer balancer)
+    /**
+     * Pass the balanced path-locations of this balancer to the other balancer.
+     * @param other
+     */
+    public void cascade(Balancer other)
     {
-        if (balancer == null)
-        {
-            return;
-        }
-
+        requireNonNull(other, "the other balancer is null");
         Map<String, HostAddress> all = this.getAll();
+        checkArgument(all != null && !all.isEmpty(),
+                "the current balancer has no path-locations to be balanced");
 
-        if (all != null)
+        for (Map.Entry<String, HostAddress> entry : all.entrySet())
         {
-            for (Map.Entry<String, HostAddress> entry : all.entrySet())
-            {
-                balancer.put(entry.getKey(), entry.getValue());
-            }
+            other.put(entry.getKey(), entry.getValue());
         }
     }
 }
