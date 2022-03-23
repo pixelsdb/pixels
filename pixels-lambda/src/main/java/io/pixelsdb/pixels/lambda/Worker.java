@@ -62,14 +62,6 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
             e.printStackTrace();
         }
         LOGGER.debug("thread pool shut down");
-//        for (Thread t:threads) t.start();
-//        for (Thread t:threads) {
-//            try {
-//                t.join();
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
 
 
         // create response to inform invoker which are the s3 paths of files written

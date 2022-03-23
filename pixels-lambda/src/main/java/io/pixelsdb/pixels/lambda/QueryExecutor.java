@@ -40,10 +40,10 @@ public class QueryExecutor {
         S3Client s3 = S3Client.builder()
                 .region(region)
                 .build();
-//        filesToScan = listBucketObjects(s3, bucketName);
-        for (String obj:listBucketObjects(s3, bucketName).subList(0,128)) {
-            filesToScan.add(obj);
-        }
+        filesToScan = listBucketObjects(s3, bucketName);
+//        for (String obj:listBucketObjects(s3, bucketName).subList(0,128)) {
+//            filesToScan.add(obj);
+//        }
         String[] filesToScanArr = filesToScan.toArray(new String[0]);
         s3.close();
         System.out.println(Arrays.toString(filesToScanArr));
@@ -55,13 +55,13 @@ public class QueryExecutor {
         if (args.length==1) numFilePerWorker = Integer.parseInt(args[0]);
 
         /* use Pixels reader to scan tables directly */
-        System.out.println("begin scan tables directly without using lambda");
-        long startTimeNoLambda = System.nanoTime();
-
-        scanNoLambda.readersReadFiles(filesToScanArr, colsArr);
-
-        long endTimeNoLambda = System.nanoTime();
-        double scanTimeNoLambda = 1.0*(endTimeNoLambda - startTimeNoLambda)/Math.pow(10, 9);
+//        System.out.println("begin scan tables directly without using lambda");
+//        long startTimeNoLambda = System.nanoTime();
+//
+//        scanNoLambda.readersReadFiles(filesToScanArr, colsArr);
+//
+//        long endTimeNoLambda = System.nanoTime();
+//        double scanTimeNoLambda = 1.0*(endTimeNoLambda - startTimeNoLambda)/Math.pow(10, 9);
 
         /* use lambda function to do the scan */
         System.out.println("begin using lambda to scan files");

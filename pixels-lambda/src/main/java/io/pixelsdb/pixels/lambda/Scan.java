@@ -23,10 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 public class Scan {
     String res = "";
@@ -53,7 +50,7 @@ public class Scan {
                 .build();
 
         // invoke numWorker lambda workers to each scan one or more files
-        CompletableFuture<InvokeResponse>[] lambdaFutures = new CompletableFuture[numWorker];
+        CompletableFuture<Void>[] lambdaFutures = new CompletableFuture[numWorker];
         for (int i=0; i<numWorker; i++) {
             List<String> filesForThisWorker;
             if (i<numWorker-1) {
@@ -63,7 +60,7 @@ public class Scan {
                 filesForThisWorker = files.subList(i*numFilePerWorker, files.size());
             }
 
-            lambdaFutures[i] = invokeLambda(lambdaClient, "Worker", filesForThisWorker, cols);
+            lambdaFutures[i] = invokeLambda(lambdaClient, "Worker", filesForThisWorker, cols).thenAccept((invokeResponse)->readersReadFiles(responseToStrArr(invokeResponse), colsArr));
 
             // async invoke lambda functions each reads some files and then write results to s3
             // Each worker's response are result files s3 links.
@@ -75,19 +72,24 @@ public class Scan {
 
         try {
             CompletableFuture.allOf(lambdaFutures).get();
+            LOGGER.info("all responses have been received and reader thread for each result file has been created.");
             for (int i=0; i<lambdaFutures.length; i++) {
-                LOGGER.info("lambdaFutures[i]:");
-                LOGGER.info(lambdaFutures[i].get().payload().asUtf8String());
+                LOGGER.info("lambdaFutures["+i+"].isDone: "+lambdaFutures[i].isDone());
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
-        double durationTillCreatedAllThreads = 1.0 * (System.nanoTime() - scanStart) / Math.pow(10,9);
-        LOGGER.info("fired off all threads to read result files on s3");
-        LOGGER.info("durationTillCreatedAllThreads: " +
-                durationTillCreatedAllThreads);
+        threadPool.shutdown();
+        try {
+            threadPool.awaitTermination(300, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        double durationScan = 1.0 * (System.nanoTime() - scanStart) / Math.pow(10,9);
+        LOGGER.info("durationScan: " +
+                durationScan);
 
 //        for (Thread t:readS3ResultsThreads) {
 //            try {
@@ -203,6 +205,7 @@ public class Scan {
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
+//        option.predicate();
 
         VectorizedRowBatch rowBatch;
 
@@ -257,9 +260,8 @@ public class Scan {
         this.res +="store";
         for (int j=0; j<files.length; j++) {
             int finalJ = j;
-            Thread thread = new Thread(()->scanFile(files[finalJ], 1024, colsArr));
-            thread.start();
-            readS3ResultsThreads.add(thread);
+            //Thread thread = new Thread(()->scanFile(files[finalJ], 1024, colsArr));
+            threadPool.submit(()->scanFile(files[finalJ], 1024, colsArr));
         }
         // wait for all threads to finish, then we finished reading all files
 //        for (Thread t:threads) {
