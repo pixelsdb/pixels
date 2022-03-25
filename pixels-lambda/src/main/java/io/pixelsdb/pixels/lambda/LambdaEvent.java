@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,20 +17,17 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cache;
 
-import java.nio.ByteBuffer;
+package io.pixelsdb.pixels.lambda;
 
-/**
- * @author guodong
- */
-public class PixelsCacheKeyUtil
-{
-    public static void getBytes(ByteBuffer keyBuffer, long blockId, short rowGroupId, short columnId)
-    {
-        keyBuffer.clear();
-        keyBuffer.putLong(blockId);
-        keyBuffer.putShort(rowGroupId);
-        keyBuffer.putShort(columnId);
+import java.util.ArrayList;
+
+public class LambdaEvent {
+    ArrayList<String> fileNames;
+    ArrayList<String> cols;
+
+    public LambdaEvent(ArrayList<String> fileNames, ArrayList<String> cols) {
+        this.fileNames = fileNames;
+        this.cols = cols;
     }
 }

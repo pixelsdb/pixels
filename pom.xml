@@ -40,6 +40,7 @@
         <module>pixels-daemon</module>
         <module>pixels-load</module>
         <module>pixels-tools</module>
+        <module>pixels-lambda</module>
     </modules>
 
     <properties>

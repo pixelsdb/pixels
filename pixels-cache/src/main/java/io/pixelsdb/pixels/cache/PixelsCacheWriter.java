@@ -304,7 +304,7 @@ public class PixelsCacheWriter
         PixelsCacheIdx cacheIdx = new PixelsCacheIdx(cacheOffset, value.length);
         cacheFile.setBytes(cacheOffset, value);
         cacheOffset += value.length;
-        radix.put(key.blockId, key.rowGroupId, key.columnId, cacheIdx);
+        radix.put(key, cacheIdx);
     }
 
     /**
@@ -385,7 +385,7 @@ public class PixelsCacheWriter
                 }
                 else
                 {
-                    radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
+                    radix.put(new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
                             new PixelsCacheIdx(currCacheOffset, physicalLen));
                     byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
                     cacheFile.setBytes(currCacheOffset, columnlet);
@@ -449,7 +449,7 @@ public class PixelsCacheWriter
         }
         this.cachedColumnlets.clear();
         PixelsRadix oldRadix = radix;
-        List<PixelsCacheKeyIdx> survivedIdxes = new ArrayList<>(survivedColumnlets.size()*files.length);
+        List<PixelsCacheEntry> survivedIdxes = new ArrayList<>(survivedColumnlets.size()*files.length);
         for (String file : files)
         {
             PixelsPhysicalReader physicalReader = new PixelsPhysicalReader(storage, file);
@@ -463,8 +463,8 @@ public class PixelsCacheWriter
                 short columnId = Short.parseShort(columnletIdStr[1]);
                 PixelsCacheIdx curCacheIdx = oldRadix.get(blockId, rowGroupId, columnId);
                 survivedIdxes.add(
-                        new PixelsCacheKeyIdx(curCacheIdx,
-                                physicalReader.getCurrentBlockId(), rowGroupId, columnId));
+                        new PixelsCacheEntry(new PixelsCacheKey(
+                                physicalReader.getCurrentBlockId(), rowGroupId, columnId), curCacheIdx));
             }
         }
         // ascending order according to the offset in cache file.
@@ -492,11 +492,10 @@ public class PixelsCacheWriter
             logger.error("Failed to get write permission on index.", e);
             return status;
         }
-        for (PixelsCacheKeyIdx survivedIdx : survivedIdxes)
+        for (PixelsCacheEntry survivedIdx : survivedIdxes)
         {
             cacheFile.copyMemory(survivedIdx.idx.offset, newCacheOffset, survivedIdx.idx.length);
-            newRadix.put(survivedIdx.blockId, survivedIdx.rowGroupId, survivedIdx.columnId,
-                    new PixelsCacheIdx(newCacheOffset, survivedIdx.idx.length));
+            newRadix.put(survivedIdx.key, new PixelsCacheIdx(newCacheOffset, survivedIdx.idx.length));
             newCacheOffset += survivedIdx.idx.length;
         }
         this.radix = newRadix;
@@ -518,7 +517,7 @@ public class PixelsCacheWriter
          * Start phase 2: load and append new cache elements to the cache file.
          */
         logger.debug("Start cache append...");
-        List<PixelsCacheKeyIdx> newIdxes = new ArrayList<>();
+        List<PixelsCacheEntry> newIdxes = new ArrayList<>();
         boolean enableAbsoluteBalancer = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("enable.absolute.balancer"));
         outer_loop:
@@ -552,8 +551,9 @@ public class PixelsCacheWriter
                 }
                 else
                 {
-                    newIdxes.add(new PixelsCacheKeyIdx(new PixelsCacheIdx(newCacheOffset, physicalLen),
-                            pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId));
+                    newIdxes.add(new PixelsCacheEntry(
+                            new PixelsCacheKey(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId),
+                            new PixelsCacheIdx(newCacheOffset, physicalLen)));
                     // Do not put into radix, because it is using by other concurrent readers.
                     //radix.put(pixelsPhysicalReader.getCurrentBlockId(), rowGroupId, columnId,
                     //        new PixelsCacheIdx(newCacheOffset, physicalLen));
@@ -588,9 +588,9 @@ public class PixelsCacheWriter
             // TODO: recovery needed here.
             return status;
         }
-        for (PixelsCacheKeyIdx newIdx : newIdxes)
+        for (PixelsCacheEntry newIdx : newIdxes)
         {
-            radix.put(newIdx.blockId, newIdx.rowGroupId, newIdx.columnId, newIdx.idx);
+            radix.put(newIdx.key, newIdx.idx);
         }
         // flush index
         flushIndex();
@@ -688,16 +688,16 @@ public class PixelsCacheWriter
     }
 
     /**
-     * Traverse radix to get all cached values, and put them into cacheColumnlets list.
+     * Traverse radix to get all cached values, and put them into cachedColumnlets list.
      */
-    private void traverseRadix(List<ColumnletId> cacheColumnlets)
+    private void traverseRadix(List<PixelsCacheIdx> cacheIdxes)
     {
         RadixNode root = radix.getRoot();
         if (root.getSize() == 0)
         {
             return;
         }
-        visitRadix(cacheColumnlets, root);
+        visitRadix(cacheIdxes, root);
     }
 
     /**
@@ -705,19 +705,17 @@ public class PixelsCacheWriter
      * Maybe considering using a stack to store edge values along the visitation path.
      * Push edges in as going deeper, and pop out as going shallower.
      */
-    private void visitRadix(List<ColumnletId> cacheColumnlets, RadixNode node)
+    private void visitRadix(List<PixelsCacheIdx> cacheIdxes, RadixNode node)
     {
         if (node.isKey())
         {
             PixelsCacheIdx value = node.getValue();
-            ColumnletId columnletId = new ColumnletId();
-            columnletId.cacheOffset = value.offset;
-            columnletId.cacheLength = value.length;
-            cacheColumnlets.add(columnletId);
+            PixelsCacheIdx idx = new PixelsCacheIdx(value.offset, value.length);
+            cacheIdxes.add(idx);
         }
         for (RadixNode n : node.getChildren().values())
         {
-            visitRadix(cacheColumnlets, n);
+            visitRadix(cacheIdxes, n);
         }
     }
 
