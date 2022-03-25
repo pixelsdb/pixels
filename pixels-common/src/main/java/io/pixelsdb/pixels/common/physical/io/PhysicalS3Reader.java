@@ -78,16 +78,16 @@ public class PhysicalS3Reader implements PhysicalReader
         Runtime.getRuntime().addShutdownHook(new Thread(clientService::shutdownNow));
     }
 
-    private S3 s3;
-    private S3.Path path;
-    private String pathStr;
-    private long id;
-    private AtomicLong position;
-    private long length;
-    private S3Client client;
-    private S3AsyncClient asyncClient;
-    private S3AsyncClient asyncClient1M;
-    private S3AsyncClient asyncClient10M;
+    private final S3 s3;
+    private final S3.Path path;
+    private final String pathStr;
+    private final long id;
+    private final AtomicLong position;
+    private final long length;
+    private final S3Client client;
+    private final S3AsyncClient asyncClient;
+    private final S3AsyncClient asyncClient1M;
+    private final S3AsyncClient asyncClient10M;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
@@ -321,7 +321,7 @@ public class PhysicalS3Reader implements PhysicalReader
     @Override
     public long getBlockId() throws IOException
     {
-        return s3.getFileId(pathStr);
+        return this.id;
     }
 
     /**

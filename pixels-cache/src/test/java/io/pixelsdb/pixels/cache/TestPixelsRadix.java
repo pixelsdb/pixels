@@ -35,16 +35,20 @@ public class TestPixelsRadix
     {
         PixelsRadix radix = new PixelsRadix();
         PixelsCacheIdx cacheIdx0 = new PixelsCacheIdx(0, 0);
-        radix.put(0, (short) 0, (short) 0, cacheIdx0);
+        PixelsCacheKey cacheKey0 = new PixelsCacheKey(0, (short) 0, (short) 0);
+        radix.put(cacheKey0, cacheIdx0);
         // MATCH_END_AT_END_EDGE
         PixelsCacheIdx cacheIdx1 = new PixelsCacheIdx(1, 1);
-        radix.put(1, (short) 0, (short) 0, cacheIdx1);
+        PixelsCacheKey cacheKey1 = new PixelsCacheKey(1, (short) 0, (short) 0);
+        radix.put(cacheKey1, cacheIdx1);
         // EXACT_MATCH
         PixelsCacheIdx cacheIdx2 = new PixelsCacheIdx(2, 2);
-        radix.put(1, (short) 0, (short) 0, cacheIdx2);
+        PixelsCacheKey cacheKey2 = new PixelsCacheKey(1, (short) 0, (short) 0);
+        radix.put(cacheKey2, cacheIdx2);
         // MATCH_END_AT_MID_EDGE
         PixelsCacheIdx cacheIdx3 = new PixelsCacheIdx(3, 3);
-        radix.put(1, (short) 0, (short) 1, cacheIdx3);
+        PixelsCacheKey cacheKey3 = new PixelsCacheKey(1, (short) 0, (short) 1);
+        radix.put(cacheKey3, cacheIdx3);
 
         assertEquals(cacheIdx0, radix.get(0, (short) 0, (short) 0));
         assertEquals(cacheIdx2, radix.get(1, (short) 0, (short) 0));
@@ -62,7 +66,8 @@ public class TestPixelsRadix
         for (int i = 0; i < TEST_NUM; i++)
         {
             PixelsCacheIdx cacheIdx = new PixelsCacheIdx(i, i);
-            radix.put(i, (short) i, (short) i, cacheIdx);
+            PixelsCacheKey cacheKey = new PixelsCacheKey(i, (short) i, (short) i);
+            radix.put(cacheKey, cacheIdx);
         }
         for (int i = 0; i < TEST_NUM; i++)
         {
