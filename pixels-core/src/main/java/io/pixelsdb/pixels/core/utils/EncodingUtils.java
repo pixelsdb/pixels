@@ -1085,11 +1085,13 @@ public class EncodingUtils
         }
     }
 
+    /** Derived from org.apache.hadoop.io.Text.ENCODER_FACTORY */
     private static ThreadLocal<CharsetEncoder> ENCODER_FACTORY =
             ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newEncoder().
                     onMalformedInput(CodingErrorAction.REPORT).
                     onUnmappableCharacter(CodingErrorAction.REPORT));
 
+    /** Derived from org.apache.hadoop.io.Text.DECODER_FACTORY */
     private static ThreadLocal<CharsetDecoder> DECODER_FACTORY =
             ThreadLocal.withInitial(() -> Charset.forName("UTF-8").newDecoder().
                     onMalformedInput(CodingErrorAction.REPORT).

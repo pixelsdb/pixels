@@ -25,8 +25,7 @@ import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
 import io.etcd.jetcd.options.WatchOption;
 import io.etcd.jetcd.watch.WatchEvent;
-import org.apache.curator.utils.PathUtils;
-import org.apache.curator.utils.ZKPaths;
+import io.pixelsdb.pixels.common.utils.StringUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -60,9 +59,9 @@ public class LockInternals
     public LockInternals(Client client, String path, String lockName)
     {
         this.client = client;
-        this.basePath = PathUtils.validatePath(path);
+        this.basePath = StringUtil.validatePath(path);
         this.lockName = lockName;
-        this.path = ZKPaths.makePath(path, lockName);
+        this.path = StringUtil.makePath(path, lockName);
         Lease leaseClient = client.getLeaseClient();
         try
         {
@@ -118,10 +117,10 @@ public class LockInternals
      */
     public synchronized String createsTheLock(Client client, String path) throws Exception
     {
-        ZKPaths.PathAndNode pathAndNode = ZKPaths.getPathAndNode(path);
-        String name = UUID.randomUUID().toString() + pathAndNode.getNode();
+        path = StringUtil.validatePath(path);
+        String name = UUID.randomUUID() + path;
 
-        String ourPath = ZKPaths.makePath(pathAndNode.getPath(), name) + count.getAndIncrement();
+        String ourPath = StringUtil.makePath(path, name) + count.getAndIncrement();
 
         try
         {
