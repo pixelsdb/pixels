@@ -124,6 +124,8 @@ public class StorageFactory
 
     public synchronized Storage getStorage(Storage.Scheme scheme) throws IOException
     {
+        checkArgument(this.enabledSchemes.contains(scheme), "storage scheme '" +
+                scheme.toString() + "' is not enabled.");
         if (storageImpls.containsKey(scheme))
         {
             return storageImpls.get(scheme);
