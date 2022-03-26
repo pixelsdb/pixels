@@ -17,17 +17,6 @@
         <mainClass>io.pixelsdb.pixels.lambda.QueryExecutor</mainClass>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>2.17.61</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -102,19 +91,14 @@
 <!--            <optional>true</optional>-->
 <!--        </dependency>-->
         <!-- https://mvnrepository.com/artifact/org.apache.curator/curator-client -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
             <version>5.2.0</version>
-        </dependency>
+        </dependency>-->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>aws-crt-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

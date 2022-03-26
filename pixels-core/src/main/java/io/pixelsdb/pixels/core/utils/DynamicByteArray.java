@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.core.utils;
 
-import org.apache.hadoop.io.Text;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -239,6 +237,8 @@ public final class DynamicByteArray
     public void setText(Text result, int offset, int length)
     {
         result.clear();
+        StringBuilder builder = new StringBuilder();
+        builder.append(new String());
         int currentChunk = offset / chunkSize;
         int currentOffset = offset % chunkSize;
         int currentLength = Math.min(length, chunkSize - currentOffset);
