@@ -62,14 +62,6 @@ public class StorageFactory
         return instance;
     }
 
-    public synchronized void reload() throws IOException
-    {
-        this.storageImpls.clear();
-        storageImpls.put(Storage.Scheme.hdfs, new HDFS());
-        storageImpls.put(Storage.Scheme.file, new LocalFS());
-        storageImpls.put(Storage.Scheme.s3, new S3());
-    }
-
     /**
      * Get the storage instance from a scheme name or a scheme prefixed path.
      * @param schemeOrPath

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.io.IOException;
@@ -79,6 +80,13 @@ public interface PixelsRecordReader
      */
     VectorizedRowBatch readBatch()
             throws IOException;
+
+    /**
+     * Get the schema of the included columns in the read option.
+     *
+     * @return result schema, null if PixelsRecordReader is not initialized successfully.
+     */
+    TypeDescription getResultSchema();
 
     /**
      * This method is valid after calling prepareBatch or readBatch.
