@@ -145,12 +145,12 @@ You can use `screen` or `nohup` to run it in the background.
 ### Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
 
-**NOTICE: Even if HDFS is not used, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
-exist in `hdfs.config.dir`.**
-
 Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop if needed.
+Follow the official docs to install Hadoop.
+
+Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
+and point it to the `etc/hadoop` directory under the home of Hadoop.
+Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
 Note that some default ports used by Hadoop
 may conflict with the default ports used by Presto. In this case, modify the default port configuration

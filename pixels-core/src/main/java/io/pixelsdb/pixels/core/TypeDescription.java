@@ -600,7 +600,9 @@ public final class TypeDescription
 
     /**
      * Parse TypeDescription from the type name. This is the inverse
-     * of TypeDescription.toString()
+     * of TypeDescription.toString().
+     * An example of the type name is:
+     * <pre>{@code struct<a:int,b:decimal(15,2),c:timestamp,d:varchar(16)>}</pre>
      *
      * @param typeName the name of the type
      * @return a new TypeDescription or null if typeName was null

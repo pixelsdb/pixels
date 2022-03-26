@@ -87,7 +87,7 @@ public interface PixelsReader
     String getWriterTimeZone();
 
     /**
-     * Get schema of this file
+     * Get the schema of this file
      *
      * @return schema
      */
