@@ -68,8 +68,8 @@ public class PixelsRecordReaderImpl
     private final String fileName;
     private final List<PixelsProto.Type> includedColumnTypes;
 
-    private TypeDescription fileSchema;
-    private TypeDescription resultSchema;
+    private TypeDescription fileSchema = null;
+    private TypeDescription resultSchema = null;
     private boolean checkValid = false;
     private boolean everPrepared = false;
     private boolean everRead = false;
@@ -1005,6 +1005,12 @@ public class PixelsRecordReaderImpl
             throws IOException
     {
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
+    }
+
+    @Override
+    public TypeDescription getResultSchema()
+    {
+        return this.resultSchema;
     }
 
     /**
