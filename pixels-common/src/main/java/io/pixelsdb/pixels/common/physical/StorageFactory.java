@@ -19,15 +19,19 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
 import io.pixelsdb.pixels.common.physical.storage.S3;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -37,8 +41,20 @@ public class StorageFactory
 {
     private static Logger logger = LogManager.getLogger(StorageFactory.class);
     private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
+    private Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
 
-    private StorageFactory() { }
+    private StorageFactory()
+    {
+        String value = ConfigFactory.Instance().getProperty("enabled.storage.schemes");
+        requireNonNull(value, "enabled.storage.schemes is not configured");
+        String[] schemeNames = value.trim().split(",");
+        checkArgument(schemeNames.length > 0,
+                "at lease one storage scheme must be enabled");
+        for (String name : schemeNames)
+        {
+            enabledSchemes.add(Storage.Scheme.from(name));
+        }
+    }
 
     private static StorageFactory instance = null;
 
@@ -62,6 +78,24 @@ public class StorageFactory
         return instance;
     }
 
+    public List<Storage.Scheme> getEnabledSchemes()
+    {
+        return ImmutableList.copyOf(this.enabledSchemes);
+    }
+
+    /**
+     * Recreate the Storage instances. This is only needed in the Presto connector.
+     * @throws IOException
+     */
+    public synchronized void reload() throws IOException
+    {
+        this.storageImpls.clear();
+        for (Storage.Scheme scheme : enabledSchemes)
+        {
+            Storage storage = this.getStorage(scheme);
+            requireNonNull(storage, "failed to create Storage instance");
+        }
+    }
     /**
      * Get the storage instance from a scheme name or a scheme prefixed path.
      * @param schemeOrPath
