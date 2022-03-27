@@ -9,9 +9,7 @@ Thus, it does not affect the maintainability and portability of the storage laye
 Install JDK (8.0 is recommended), and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 
-The build may take tens of seconds to complete. After that, find the following jar files that will be used in the installation:
-* `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
-* `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
+The build may take tens of seconds to complete.
 
 Pixels is compatible with different query engines, such as Presto, Trino, and Hive.
 However, for simplicity, we use Presto as an example here to illustrate how Pixels works with query engines in the data lakes.
@@ -62,34 +60,20 @@ Therefore, we have to configure these credentials using
 
 ### Install Pixels
 Here, we install Pixels and other binary packages into the `~/opt` directory:
-```bash
-mkdir ~/opt
-```
 
-Create the home `~/opt/pixels` for Pixels:
-```bash
-cd ~/opt
-mkdir pixels
-```
 Append this line into `~/.bashrc` and source it:
 ```bash
 export PIXELS_HOME=$HOME/opt/pixels/
 ```
-Create the following directories in `PIXELS_HOME`:
+
+Then in the same directory of the README, run 
 ```bash
-cd $PIXELS_HOME
-mkdir bin
-mkdir lib
-mkdir listener
-mkdir logs
-mkdir sbin
-mkdir var
+./install.sh
 ```
-Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin` respectively.
-Put `pixels-daemon-*-full.jar` into `PIXELS_HOME` and `pixels-load-*-full.jar` into `PIXELS_HOME/sbin`.
-Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
-Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
-Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
+
+You still need to:
+- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 Leave the other config parameters as default.
 
 Optionally, to use the columnar cache in Pixels (i.e., pixels-cache), create and mount an in-memory file system:
