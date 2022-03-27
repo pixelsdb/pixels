@@ -22,8 +22,14 @@ Find the following zip files in the build target directories:
 * `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
 * `pixels-presto-connector-*.zip`, this is the connector for Presto.
 
-**Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
-using JDK 8.0.
+> **Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
+> using JDK 8.0.
+
+> If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
+> variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
+> Ensure that `PIXELS_HOME` exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
+> the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
+》 written.
 
 ## Installation in AWS
 
@@ -152,9 +158,9 @@ Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
 and point it to the `etc/hadoop` directory under the home of Hadoop.
 Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
-Note that some default ports used by Hadoop
-may conflict with the default ports used by Presto. In this case, modify the default port configuration
-of either system.
+> Note that some default ports used by Hadoop
+> may conflict with the default ports used by Presto. In this case, modify the default port configuration
+> of either system.
 
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
@@ -191,7 +197,8 @@ connector.name=pixels
 pixels.home=/home/ubuntu/opt/pixels/
 ```
 `pixels.home` should be the same as `PIXELS_HOME`.
-**Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
+
+> **Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
 
 Some scripts in Presto may also require python:
 ```bash
@@ -293,7 +300,7 @@ The file(s) of each table are stored in a separate directory named by the table 
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
 Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the 
 underlying storage system instead of S3.
-Note that presto-cli can execute only one SQL statement at each time.
+> Note that presto-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.
