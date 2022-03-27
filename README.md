@@ -27,9 +27,9 @@ Find the following zip files in the build target directories:
 
 > If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
-> Ensure that `PIXELS_HOME` exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
+> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
 > the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
-》 written.
+> written.
 
 ## Installation in AWS
 
