@@ -1,7 +1,7 @@
 ## pixels-tools
 
-This module contains tools for performing experiments.
+This module contains tools for micro-benchmark evaluations.
 
-It has no connection with the core codebase, and will be removed from this project after experiments.
+It will be removed from this project after the experiments.
 
 Tools that need run as jar files reside in `src/main`, and others run locally reside in `src/test`.
