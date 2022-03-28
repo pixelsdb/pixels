@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import org.apache.hadoop.fs.BlockLocation;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 
 /**
@@ -70,7 +71,17 @@ public class Location
 
     public Location(URI uri)
     {
-        this.hosts = new String[]{uri.getHost()};
+        String host = uri.getHost();
+        if (host == null)
+        {
+            try {
+                host = InetAddress.getLocalHost().getHostName();
+            } catch (Exception e) {
+                host = "localhost";
+            }
+        }
+
+        this.hosts = new String[]{host};
         this.names = new String[]{uri.getAuthority()};
         this.corrupt = false;
     }
