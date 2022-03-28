@@ -81,7 +81,7 @@ public class Location
             }
         }
 
-        this.hosts = new String[]{};
+        this.hosts = new String[]{host};
         this.names = new String[]{uri.getAuthority()};
         this.corrupt = false;
     }
