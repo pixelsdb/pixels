@@ -1,0 +1,16 @@
+<Configuration status="DEBUG" name="pixels-lambda">
+    <Appenders>
+        <Lambda name="Lambda">
+            <PatternLayout>
+                <pattern>%-d{yyyy-MM-dd HH:mm:ss,SSS} [%X{AWSRequestId}] [%c]-[%p] %m%n</pattern>
+            </PatternLayout>
+        </Lambda>
+    </Appenders>
+    <Loggers>
+        <Root level="DEBUG">
+            <AppenderRef ref="Lambda"/>
+        </Root>
+        <Logger name="software.amazon.awssdk" level="DEBUG" />
+        <Logger name="software.amazon.awssdk.request" level="DEBUG" />
+    </Loggers>
+</Configuration>

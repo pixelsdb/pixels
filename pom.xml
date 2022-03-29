@@ -60,7 +60,7 @@
 
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
-        <dep.netty.version>4.1.42.Final</dep.netty.version>
+        <dep.netty.version>4.1.68.Final</dep.netty.version>
         <dep.fastjson.version>1.2.58</dep.fastjson.version>
         <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.6.1</dep.protobuf.version>
@@ -345,6 +345,11 @@
                 <artifactId>netty-all</artifactId>
                 <version>${dep.netty.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-buffer</artifactId>
+                <version>${dep.netty.version}</version>
+            </dependency>
 
             <!-- apache-httpclient -->
             <dependency>
@@ -362,6 +367,11 @@
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-api</artifactId>
+                <version>${dep.log4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-slf4j18-impl</artifactId>
                 <version>${dep.log4j.version}</version>
             </dependency>
 

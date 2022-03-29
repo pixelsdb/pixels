@@ -28,8 +28,8 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -48,15 +48,14 @@ import java.util.concurrent.TimeUnit;
 /**
  * response is a list of files read and then written to s3
  */
-public class Worker implements RequestHandler<Map<String, ArrayList<String>>, String>
+public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>, String>
 {
     // slf4j is used in the official example java-blank.
-    private static final Logger logger = LogManager.getLogger(Worker.class);
+    private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
 
     @Override
     public String handleRequest(Map<String, ArrayList<String>> event, Context context)
     {
-
         ExecutorService threadPool = Executors.newFixedThreadPool(8);
         logger.info("enter handleRequest");
         long lambdaStartTime = System.nanoTime();
@@ -73,7 +72,7 @@ public class Worker implements RequestHandler<Map<String, ArrayList<String>>, St
         for (int i = 0; i < fileNames.size(); i++)
         {
             int finalI = i;
-            threadPool.submit(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId + "file" + finalI));
+            threadPool.execute(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId + "file" + finalI));
             // runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
         }
         threadPool.shutdown();
@@ -158,6 +157,7 @@ public class Worker implements RequestHandler<Map<String, ArrayList<String>>, St
         } catch (IOException e)
         {
             e.printStackTrace();
+            logger.error("failed to scan", e);
         }
         logger.debug("finish scanning file: " + fileName);
         return "success";
@@ -188,6 +188,7 @@ public class Worker implements RequestHandler<Map<String, ArrayList<String>>, St
 
     private PixelsWriter getWriter(TypeDescription schema, String filePath)
     {
+        logger.debug("try to create storage.");
         Storage storage = null;
         try
         {
@@ -195,24 +196,33 @@ public class Worker implements RequestHandler<Map<String, ArrayList<String>>, St
         } catch (IOException e)
         {
             e.printStackTrace();
+            logger.error("failed to get storage", e);
         }
         int pixelStride = 10000;
         int rowGroupSize = 256 * 1024 * 1024;
         long blockSize = 2048l * 1024l * 1024l;
         short replication = (short) 1;
-        PixelsWriter pixelsWriter =
-                PixelsWriterImpl.newBuilder()
-                        .setSchema(schema)
-                        .setPixelStride(pixelStride)
-                        .setRowGroupSize(rowGroupSize)
-                        .setStorage(storage)
-                        .setFilePath(filePath)
-                        .setBlockSize(blockSize)
-                        .setReplication(replication)
-                        .setBlockPadding(true)
-                        .setEncoding(true)
-                        .setCompressionBlockSize(1)
-                        .build();
+        logger.debug("start create writer");
+        PixelsWriter pixelsWriter = null;
+        try
+        {
+            pixelsWriter = PixelsWriterImpl.newBuilder()
+                    .setSchema(schema)
+                    .setPixelStride(pixelStride)
+                    .setRowGroupSize(rowGroupSize)
+                    .setStorage(storage)
+                    .setFilePath(filePath)
+                    .setBlockSize(blockSize)
+                    .setReplication(replication)
+                    .setBlockPadding(true)
+                    .setEncoding(true)
+                    .setCompressionBlockSize(1)
+                    .build();
+        } catch (Exception e)
+        {
+            e.printStackTrace();
+            logger.error("failed to create writer", e);
+        }
 
         return pixelsWriter;
     }

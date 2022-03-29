@@ -17,7 +17,7 @@
         <maven.compiler.target>8</maven.compiler.target>
 
         <dep.lambda.java.core.version>1.2.1</dep.lambda.java.core.version>
-        <dep.lambda.java.log4j2.version>1.5.0</dep.lambda.java.log4j2.version>
+        <dep.lambda.java.log4j2.version>1.5.1</dep.lambda.java.log4j2.version>
         <dep.gson.version>2.8.6</dep.gson.version>
     </properties>
 
@@ -40,6 +40,13 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
+            <exclusions>
+                <!-- We use aws-crt-client instead of netty-nio-client. -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -56,10 +63,25 @@
             <version>${dep.lambda.java.log4j2.version}</version>
         </dependency>
 
+        <!-- TODO: remove netty-buffer dependency from pixels-core -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-buffer</artifactId>
+        </dependency>
+
+        <!-- google -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>${dep.gson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
         </dependency>
 
         <!-- logging -->
@@ -70,6 +92,10 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j18-impl</artifactId>
         </dependency>
     </dependencies>
 
@@ -90,11 +116,21 @@
                         </goals>
                         <configuration>
                             <outputDirectory>${project.parent.basedir}/pixels-lambda/target</outputDirectory>
+                            <transformers>
+                                <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer">
+                                </transformer>
+                            </transformers>
                         </configuration>
                     </execution>
                 </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.github.edwgiz</groupId>
+                        <artifactId>maven-shade-plugin.log4j2-cachefile-transformer</artifactId>
+                        <version>2.13.0</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>
-
 </project>
