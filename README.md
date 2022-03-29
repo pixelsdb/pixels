@@ -61,6 +61,23 @@ Therefore, we have to configure these credentials using
 [credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
 ### Install Pixels
+
+To build Pixels from source and install it locally, you can simply run:
+
+```bash 
+# You may also want to append this line into `~/.bashrc`
+export PIXELS_HOME=$HOME/opt/pixels/
+./install.sh
+```
+
+But you still need to:
+- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
+
+To install it step-by-step, or to install on EC2, please see the guidance below.
+
+---
+
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
 mkdir ~/opt
