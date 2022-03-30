@@ -30,8 +30,9 @@ public class ScanScanWorkerTest
     ExprTree filter = new ExprTree("o_orderkey", ExprTree.Operator.GT, "3000");
 
     @Test
-    public void testScanFileCanGrabColumnWithCorrectType() {
-        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, filter, "aaaaid123asdjjkhj88");
+    public void testScanFileCanGrabColumnWithCorrectType()
+    {
+        String result = worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, filter, "aaaaid123asdjjkhj88");
         String expected = "success";
         Assert.assertEquals(result, expected);
     }
