@@ -21,24 +21,25 @@ package io.pixelsdb.pixels.cache;
 
 import java.util.Objects;
 
-/**
- * CompareTo method of this class only compares the offset in cache file.
- * Created at: 2020/9/6
- * Author: hank
- */
-public class PixelsCacheKeyIdx implements Comparable<PixelsCacheKeyIdx>
-{
-    public PixelsCacheIdx idx;
-    public long blockId;
-    public short rowGroupId;
-    public short columnId;
+import static java.util.Objects.requireNonNull;
 
-    public PixelsCacheKeyIdx(PixelsCacheIdx idx, long blockId, short rowGroupId, short columnId)
+/**
+ * This is the combination of PixelsCacheKey and PixelsCacheIdx.
+ *
+ * <p><b>Note: </b>The CompareTo method of this class only compares the offset in cache file.</p>
+ *
+ * Created at: 2020/9/6
+ * @author: hank
+ */
+public class PixelsCacheEntry implements Comparable<PixelsCacheEntry>
+{
+    public PixelsCacheKey key;
+    public PixelsCacheIdx idx;
+
+    public PixelsCacheEntry(PixelsCacheKey key, PixelsCacheIdx idx)
     {
-        this.idx = idx;
-        this.blockId = blockId;
-        this.rowGroupId = rowGroupId;
-        this.columnId = columnId;
+        this.key = requireNonNull(key, "key is null");
+        this.idx = requireNonNull(idx, "idx is null");
     }
 
     @Override
@@ -46,22 +47,20 @@ public class PixelsCacheKeyIdx implements Comparable<PixelsCacheKeyIdx>
     {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        PixelsCacheKeyIdx that = (PixelsCacheKeyIdx) o;
-        return Objects.equals(idx, that.idx) &&
-                this.blockId == that.blockId &&
-                this.rowGroupId == that.rowGroupId &&
-                this.columnId == that.columnId;
+        PixelsCacheEntry that = (PixelsCacheEntry) o;
+        return Objects.equals(key, that.key) &&
+                Objects.equals(idx, that.idx);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(idx, blockId, rowGroupId, columnId);
+        return Objects.hash(key, idx);
     }
 
     /**
-     * Compares this cache index with the specified cache index for order.  Returns a
-     * negative integer, zero, or a positive integer as this object is less
+     * Compares this cache entry with the specified cache entry for sorting.
+     * Returns a negative integer, zero, or a positive integer if this object is less
      * than, equal to, or greater than the specified object.
      *
      * <p>
@@ -76,7 +75,7 @@ public class PixelsCacheKeyIdx implements Comparable<PixelsCacheKeyIdx>
      *                              from being compared to this object.
      */
     @Override
-    public int compareTo(PixelsCacheKeyIdx o)
+    public int compareTo(PixelsCacheEntry o)
     {
         if (o == null)
         {

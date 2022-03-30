@@ -111,7 +111,7 @@ public class ExprTreeTest {
     @Test
     public void testLambdaEventToAndFromJson() {
         Gson gson = new Gson();
-        LambdaEvent lambdaEvent = new LambdaEvent(filesToScan, cols, gson.toJson(bigintFilter));
+//        LambdaEvent lambdaEvent = new LambdaEvent(filesToScan, cols, gson.toJson(bigintFilter));
 //        ExprTree filter = lambdaEvent.
 //        VectorizedRowBatch newRowBatch = filter.filter(oldRowBatch, schema);
 //        System.out.println("newRowBatch");

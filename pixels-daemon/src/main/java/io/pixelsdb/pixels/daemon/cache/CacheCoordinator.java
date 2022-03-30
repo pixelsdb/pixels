@@ -391,7 +391,7 @@ public class CacheCoordinator
     }
 
     /**
-     * assign hdfs files to cache manager nodes randomly, guaranty load balance.
+     * assign files / objects to cache manager nodes randomly, guaranty load balance.
      * @param paths
      * @param nodes
      * @param size

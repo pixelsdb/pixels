@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.common.lock;
 
-import io.etcd.jetcd.Client;
 import com.google.common.collect.Maps;
-import org.apache.curator.utils.PathUtils;
+import io.etcd.jetcd.Client;
+import io.pixelsdb.pixels.common.utils.StringUtil;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentMap;
@@ -59,7 +59,7 @@ public class EtcdMutex implements InterProcessLock
     EtcdMutex(Client client, String path, String lockName)
     {
         this.threadData = Maps.newConcurrentMap();
-        this.basePath = PathUtils.validatePath(path);
+        this.basePath = StringUtil.validatePath(path);
         internals = new LockInternals(client, path, lockName);
     }
 

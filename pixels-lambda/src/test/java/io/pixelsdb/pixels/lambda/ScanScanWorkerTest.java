@@ -17,17 +17,22 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
 package io.pixelsdb.pixels.lambda;
 
-import java.util.ArrayList;
+import org.junit.Assert;
+import org.junit.Test;
 
-public class LambdaEvent {
-    ArrayList<String> fileNames;
-    ArrayList<String> cols;
+public class ScanScanWorkerTest
+{
+    ScanWorker worker = new ScanWorker();
+    //'{ "bucketName":"pixels-tpch-customer-v-0-order", "fileName": "20220213140252_0.pxl" }'
+    String[] cols = {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"};
+    ExprTree filter = new ExprTree("o_orderkey", ExprTree.Operator.GT, "3000");
 
-    public LambdaEvent(ArrayList<String> fileNames, ArrayList<String> cols) {
-        this.fileNames = fileNames;
-        this.cols = cols;
+    @Test
+    public void testScanFileCanGrabColumnWithCorrectType() {
+        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, filter, "aaaaid123asdjjkhj88");
+        String expected = "success";
+        Assert.assertEquals(result, expected);
     }
 }

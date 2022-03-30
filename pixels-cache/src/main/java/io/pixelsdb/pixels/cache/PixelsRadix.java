@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * a radix tree implementation
@@ -65,14 +65,14 @@ public class PixelsRadix
         return nodes.get(0);
     }
 
-    public void put(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheItem)
+    public void put(PixelsCacheKey key, PixelsCacheIdx idx)
     {
-        putInternal(blockId, rowGroupId, columnId, cacheItem, true);
+        putInternal(key, idx, true);
     }
 
-    public void putIfAbsent(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheItem)
+    public void putIfAbsent(PixelsCacheKey key, PixelsCacheIdx idx)
     {
-        putInternal(blockId, rowGroupId, columnId, cacheItem, false);
+        putInternal(key, idx, false);
     }
 
     /**
@@ -108,10 +108,10 @@ public class PixelsRadix
      * -> |st|
      * </p>
      */
-    private void putInternal(long blockId, short rowGroupId, short columnId, PixelsCacheIdx cacheIdx, boolean overwrite)
+    private void putInternal(PixelsCacheKey key, PixelsCacheIdx cacheIdx, boolean overwrite)
     {
-        checkArgument(cacheIdx != null, "cache index item is null");
-        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+        requireNonNull(cacheIdx, "cache index item is null");
+        PixelsCacheKey.getBytes(keyBuffer, key);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchingType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;
@@ -220,7 +220,7 @@ public class PixelsRadix
         {
             return null;
         }
-        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         if (searchResult.matchType.equals(SearchResult.Type.EXACT_MATCH))
         {
@@ -235,7 +235,7 @@ public class PixelsRadix
      */
     public boolean remove(long blockId, short rowGroupId, short columnId)
     {
-        PixelsCacheKeyUtil.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
         SearchResult searchResult = searchInternal(keyBuffer.duplicate());
         SearchResult.Type matchType = searchResult.matchType;
         RadixNode nodeFound = searchResult.nodeFound;

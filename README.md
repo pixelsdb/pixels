@@ -22,8 +22,14 @@ Find the following zip files in the build target directories:
 * `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
 * `pixels-presto-connector-*.zip`, this is the connector for Presto.
 
-**Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
-using JDK 8.0.
+> **Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
+> using JDK 8.0.
+
+> If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
+> variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
+> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
+> the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
+> written.
 
 ## Installation in AWS
 
@@ -55,6 +61,23 @@ Therefore, we have to configure these credentials using
 [credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
 ### Install Pixels
+
+To build Pixels from source and install it locally, you can simply run:
+
+```bash 
+# You may also want to append this line into `~/.bashrc`
+export PIXELS_HOME=$HOME/opt/pixels/
+./install.sh
+```
+
+But you still need to:
+- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
+
+To install it step-by-step, or to install on EC2, please see the guidance below.
+
+---
+
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
 mkdir ~/opt
@@ -145,16 +168,16 @@ You can use `screen` or `nohup` to run it in the background.
 ### Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
 
-**NOTICE: Even if HDFS is not used, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
-exist in `hdfs.config.dir`.**
-
 Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop if needed.
+Follow the official docs to install Hadoop.
 
-Note that some default ports used by Hadoop
-may conflict with the default ports used by Presto. In this case, modify the default port configuration
-of either system.
+Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
+and point it to the `etc/hadoop` directory under the home of Hadoop.
+Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
+
+> Note that some default ports used by Hadoop
+> may conflict with the default ports used by Presto. In this case, modify the default port configuration
+> of either system.
 
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
@@ -191,7 +214,8 @@ connector.name=pixels
 pixels.home=/home/ubuntu/opt/pixels/
 ```
 `pixels.home` should be the same as `PIXELS_HOME`.
-**Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
+
+> **Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
 
 Some scripts in Presto may also require python:
 ```bash
@@ -293,7 +317,7 @@ The file(s) of each table are stored in a separate directory named by the table 
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
 Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the 
 underlying storage system instead of S3.
-Note that presto-cli can execute only one SQL statement at each time.
+> Note that presto-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.

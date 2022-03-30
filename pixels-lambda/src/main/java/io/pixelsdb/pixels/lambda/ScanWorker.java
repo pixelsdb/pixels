@@ -50,9 +50,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * response is a list of files read and then written to s3
  */
-public class Worker implements RequestHandler<Map<String,ArrayList<String>>, String>
+public class ScanWorker implements RequestHandler<Map<String,ArrayList<String>>, String>
 {
-    private static final Logger LOGGER = LogManager.getLogger(Worker.class);
+    private static final Logger LOGGER = LogManager.getLogger(ScanWorker.class);
     Gson gson = new Gson();
 
     @Override

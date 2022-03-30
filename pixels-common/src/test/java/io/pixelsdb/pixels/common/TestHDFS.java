@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core;
+package io.pixelsdb.pixels.common;
 
-import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -48,7 +47,6 @@ public class TestHDFS
         Configuration conf = new Configuration();
         conf.set("fs.hdfs.impl", org.apache.hadoop.hdfs.DistributedFileSystem.class.getName());
         conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         FileSystem fs = FileSystem.get(URI.create("hdfs://node01:9000/"), conf);
         System.out.println(fs.getScheme());
 
