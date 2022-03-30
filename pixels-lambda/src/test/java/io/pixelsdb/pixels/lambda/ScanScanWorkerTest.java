@@ -22,16 +22,16 @@ package io.pixelsdb.pixels.lambda;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class ScanWorkerTest
+public class ScanScanWorkerTest
 {
-    ScanWorker scanWorker = new ScanWorker();
+    ScanWorker worker = new ScanWorker();
     //'{ "bucketName":"pixels-tpch-customer-v-0-order", "fileName": "20220213140252_0.pxl" }'
     String[] cols = {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"};
+    ExprTree filter = new ExprTree("o_orderkey", ExprTree.Operator.GT, "3000");
 
     @Test
-    public void testScanFileCanGrabColumnWithCorrectType()
-    {
-        String result = scanWorker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, "aaaaid123asdjjkhj88");
+    public void testScanFileCanGrabColumnWithCorrectType() {
+        String result =  worker.scanFile("pixels-tpch-orders-v-0-order/20220306043322_0.pxl", 1024, cols, filter, "aaaaid123asdjjkhj88");
         String expected = "success";
         Assert.assertEquals(result, expected);
     }
