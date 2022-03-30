@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.google.gson.Gson;
 import io.pixelsdb.pixels.core.*;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -52,7 +53,7 @@ import java.util.concurrent.TimeUnit;
 public class Worker implements RequestHandler<Map<String,ArrayList<String>>, String>
 {
     private static final Logger LOGGER = LogManager.getLogger(Worker.class);
-    //Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    Gson gson = new Gson();
 
     @Override
     public String handleRequest(Map<String,ArrayList<String>> event, Context context)
@@ -64,20 +65,21 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
 
         // each worker create a thread for each file, and each thread uses a pixelsReader
         ArrayList<String> fileNames = event.get("fileNames");
-        //https://stackoverflow.com/questions/4042434/converting-arrayliststring-to-string-in-java
+        // https://stackoverflow.com/questions/4042434/converting-arrayliststring-to-string-in-java
         String[] cols = event.get("cols").toArray(new String[0]);
+        ExprTree filter = gson.fromJson(event.get("filterJsonStr").get(0), ExprTree.class);
 
         // for each file to read, create a thread which uses a reader to read one file and writes the results to s3
 //        Thread[] threads = new Thread[fileNames.size()];
         LOGGER.debug("start submitting tasks to thread pool");
         for (int i=0; i<fileNames.size(); i++) {
             int finalI = i;
-            threadPool.submit(() -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI));
+            threadPool.submit(() -> scanFile(fileNames.get(finalI), 1024, cols, filter, requestId+"file"+finalI));
 //            runnables[i] = () -> scanFile(fileNames.get(finalI), 1024, cols, requestId+"file"+finalI);
         }
         threadPool.shutdown();
         try {
-            threadPool.awaitTermination(300, TimeUnit.SECONDS);//TODO maybe threadpool shouldn't be class method as that might be shared between lambda instances. and shut down one threadpool would shut down all? maybe after shutdown can restart?
+            threadPool.awaitTermination(300, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -107,7 +109,7 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
      * @param resultFile fileName on s3 to store pixels readers' results
      * @return
      */
-    public String scanFile(String fileName, int batchSize, String[] cols, String resultFile)
+    public String scanFile(String fileName, int batchSize, String[] cols, ExprTree filter, String resultFile)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
@@ -125,22 +127,41 @@ public class Worker implements RequestHandler<Map<String,ArrayList<String>>, Str
             List<String> fieldNames = allSchema.getFieldNames();
             System.out.println(allColTypes);
             System.out.println(fieldNames);
-            TypeDescription queriedSchema = TypeDescription.createStruct();
+
+            TypeDescription rowBatchSchema = TypeDescription.createStruct();
             // for each queried col find its type
             ArrayList<TypeDescription> queriedColTypes = new ArrayList<>();
             for (int i=0; i<cols.length; i++) {
                 // here assume fieldNames and colTypes are in same order
-                queriedSchema.addField(cols[i], allColTypes.get(fieldNames.indexOf(cols[i])));
+                rowBatchSchema.addField(cols[i], allColTypes.get(fieldNames.indexOf(cols[i])));
             }
 
             String s3Path = "tiannan-test/" + resultFile;
-            PixelsWriter pixelsWriter = getWriter(queriedSchema, s3Path);
+            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, s3Path);
+            if (!filter.isEmpty) {
+                filter.prepare(rowBatchSchema);
+            }
             int batch = 0;
-
             while (true)
             {
                 rowBatch = recordReader.readBatch(batchSize);
-                pixelsWriter.addRowBatch(rowBatch);
+                if (batch==0) {
+                    LOGGER.info("rowBatch.size before filter");
+                    LOGGER.info(rowBatch.size);
+                }
+                VectorizedRowBatch newRowBatch;
+                if (!filter.isEmpty) {
+                    newRowBatch = filter.filter(rowBatch, rowBatchSchema);
+                } else {
+                    newRowBatch = rowBatch;
+                }
+                if (batch==0) {
+                    LOGGER.info("rowBatch.size after filter");
+                    LOGGER.info(newRowBatch.size);
+                }
+                if (newRowBatch.size>0) {
+                    pixelsWriter.addRowBatch(newRowBatch);
+                }
                 if (rowBatch.endOfFile)
                 {
                     pixelsReader.close();
