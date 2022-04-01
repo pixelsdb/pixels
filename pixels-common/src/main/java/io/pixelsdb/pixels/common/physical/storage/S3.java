@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.exception.StorageException;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.io.S3InputStream;
@@ -37,7 +38,6 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.waiters.S3Waiter;
 
-import javax.activity.InvalidActivityException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -666,7 +666,7 @@ public class S3 implements Storage
     {
         if (!enableCache)
         {
-            throw new InvalidActivityException("Should not check or generate file id when cache is disabled");
+            throw new StorageException("Should not check or generate file id when cache is disabled");
         }
         if (!path.valid)
         {
