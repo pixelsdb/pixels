@@ -215,13 +215,12 @@ an existing directory where the listener logs will appear.
 with the following content:
 ```properties
 connector.name=pixels
-pixels.home=/home/ubuntu/opt/pixels/
+pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 ```
-`pixels.home` should be the same as `PIXELS_HOME`.
+`pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
+**Note** that `etc/catalog/pixels.proterties` under Presto's home is different from `PIXELS_HOME/pixels.properties`.
 
-> **Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
-
-Some scripts in Presto may also require python:
+Some scripts in Presto may require python:
 ```bash
 sudo apt-get install python
 ```
