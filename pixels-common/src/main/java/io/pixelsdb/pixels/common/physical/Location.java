@@ -42,6 +42,19 @@ public class Location
     private String[] names; // Datanode IP:Port, i.e., authority, for accessing the block.
     private boolean corrupt;
 
+    private static String localhost;
+
+    static
+    {
+        try
+        {
+            localhost = InetAddress.getLocalHost().getHostName();
+        } catch (Exception e)
+        {
+            localhost = "localhost";
+        }
+    }
+
     private static final String[] EMPTY_STR_ARRAY = new String[0];
 
     /**
@@ -74,11 +87,7 @@ public class Location
         String host = uri.getHost();
         if (host == null)
         {
-            try {
-                host = InetAddress.getLocalHost().getHostName();
-            } catch (Exception e) {
-                host = "localhost";
-            }
+            host = localhost;
         }
 
         this.hosts = new String[]{host};

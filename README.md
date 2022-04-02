@@ -74,6 +74,10 @@ But you still need to:
 - Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 - Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
 
+> **Note:** optionally, you can also set the `PIXEL_CONFIG` system environment variable
+> to specify a different location of `pixels.properties`. This can be a http or https URL
+> to a remote location.
+
 To install it step-by-step, or to install on EC2, please see the guidance below.
 
 ---

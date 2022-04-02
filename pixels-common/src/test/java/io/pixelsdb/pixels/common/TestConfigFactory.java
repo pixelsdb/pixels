@@ -27,6 +27,6 @@ public class TestConfigFactory
     @Test
     public void test()
     {
-        System.out.println(ConfigFactory.Instance().getProperty("hello"));
+        System.out.println(ConfigFactory.Instance().getProperty("metadata.server.host"));
     }
 }

@@ -20,9 +20,9 @@
 package io.pixelsdb.pixels.common.utils;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -48,8 +48,8 @@ public class ConfigFactory
         return instance;
     }
 
-    // Properties is thread safe, so we do not put synchronization on it.
-    private Properties prop = null;
+    // Properties is thread safe, so we do not add synchronization to it.
+    private final Properties prop;
 
     /**
      * Issue #114:
@@ -69,24 +69,50 @@ public class ConfigFactory
     {
         prop = new Properties();
         callbacks = new HashMap<>();
+        // firstly try to get the config file path from PIXELS_CONFIG.
+        String pixelsConfig = System.getenv("PIXELS_CONFIG");
         String pixelsHome = System.getenv("PIXELS_HOME");
-        InputStream in = null;
-        if (pixelsHome == null)
+        if (pixelsHome != null)
         {
-            in = this.getClass().getResourceAsStream("/pixels.properties");
+            prop.setProperty("pixels.home", pixelsHome);
         }
-        else
+        if (pixelsConfig == null && pixelsHome != null)
         {
+            // try to get the config file under PIXELS_HOME if PIXELS_CONFIG is not set.
             if (!(pixelsHome.endsWith("/") || pixelsHome.endsWith("\\")))
             {
                 pixelsHome += "/";
             }
-            prop.setProperty("pixels.home", pixelsHome);
+            pixelsConfig = pixelsHome + "pixels.properties";
+        }
+
+        InputStream in = null;
+        if (pixelsConfig == null)
+        {
+            // neither PIXELS_CONFIG nor PIXELS_HOME is found, use the config file under CLASS_PATH.
+            in = this.getClass().getResourceAsStream("/pixels.properties");
+        }
+        else
+        {
             try
             {
-                in = new FileInputStream(pixelsHome + "pixels.properties");
-            }
-            catch (FileNotFoundException e)
+                /**
+                 * Issue #245:
+                 * I have not found a simple and graceful way to validate a URL string.
+                 * Catching the exception from new URL() is equivalent to startWith().
+                 *
+                 * Currently, we do not support other protocols such as ftp.
+                 */
+                if (pixelsConfig.startsWith("https://") || pixelsConfig.startsWith("http://"))
+                {
+                    URL url = new URL(pixelsConfig);
+                    in = url.openStream();
+                }
+                else
+                {
+                    in = new FileInputStream(pixelsConfig);
+                }
+            } catch (IOException e)
             {
                 e.printStackTrace();
             }
@@ -111,10 +137,23 @@ public class ConfigFactory
 
     public synchronized void loadProperties(String propFilePath) throws IOException
     {
-        FileInputStream in = null;
+        InputStream in = null;
         try
         {
-            in = new FileInputStream(propFilePath);
+            /**
+             * Issue #245:
+             * Refer to the comments in the above constructor.
+             * Currently, we do not support other protocols such as ftp.
+             */
+            if (propFilePath.startsWith("https://") || propFilePath.startsWith("http://"))
+            {
+                URL url = new URL(propFilePath);
+                in = url.openStream();
+            }
+            else
+            {
+                in = new FileInputStream(propFilePath);
+            }
             this.prop.load(in);
             for (Map.Entry<String, UpdateCallback> entry : this.callbacks.entrySet())
             {
