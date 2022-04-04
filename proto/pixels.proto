@@ -32,8 +32,8 @@ option java_outer_classname = "PixelsProto";
 //            chunk for each column in the dataset.
 // Column Chunk: A chunk of the data for a particular column. These live in a particular row group and is guaranteed to
 //               be contiguous in the file.
-// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an samllest indivisible unit in terms
-//        of indexing. Each pixel contains a fixed num (like 10000) of values inside.
+// Pixel: A column chunk is divided into several pixels. A pixel is conceptually an smallest indivisible unit in terms
+//        of indexing. Each pixel contains a fixed num (e.g., 10000) of values inside.
 
 // The contents of the file tail that must be serialized.
 message FileTail {

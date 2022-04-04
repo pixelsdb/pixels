@@ -145,7 +145,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
             String s3Path = "tiannan-test/" + resultFile;
             PixelsWriter pixelsWriter = getWriter(rowBatchSchema, s3Path);
-            if (!filter.isEmpty)
+            //if (!filter.isEmpty)
             {
                 //filter.prepare(rowBatchSchema);
             }
@@ -160,7 +160,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                 VectorizedRowBatch newRowBatch;
                 //if (!filter.isEmpty)
                 {
-                    //newRowBatch = filter.filter(rowBatch, rowBatchSchema);
+                    //newRowBatch = filter.filter(rowBatch, rowBatchSchema.createRowBatch(batchSize));
                 } //else
                 {
                     newRowBatch = rowBatch;
@@ -181,7 +181,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                 }
                 batch += 1;
             }
-        } catch (IOException e)
+        } catch (Exception e)
         {
             logger.error("failed to scan the file and output the result.", e);
         }
@@ -203,7 +203,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                     .setPixelsFooterCache(footerCache);
             pixelsReader = builder.build();
 
-        } catch (IOException e)
+        } catch (Exception e)
         {
             e.printStackTrace();
         }
@@ -218,7 +218,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
     private PixelsWriter getWriter(TypeDescription schema, String filePath)
     {
-
         PixelsWriter pixelsWriter =
                 PixelsWriterImpl.newBuilder()
                         .setSchema(schema)
@@ -229,7 +228,8 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                         .setBlockSize(blockSize)
                         .setReplication(replication)
                         .setBlockPadding(true)
-                        .setEncoding(true)
+                        .setOverwrite(true) // set overwrite to true to avoid existence checking.
+                        .setEncoding(true) // it is worth to do encoding
                         .setCompressionBlockSize(1)
                         .build();
         return pixelsWriter;

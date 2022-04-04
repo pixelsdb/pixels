@@ -152,15 +152,14 @@ public class ExprTree
      * Filter a given row batch
      *
      * @param rowBatch the rowBatch to be filtered.
-     * @param schema   the schema of this rowBatch.
+     * @param newRowBatch the filtered rowBatch.
      * @return the filtered rowBatch.
      */
-    public VectorizedRowBatch filter(VectorizedRowBatch rowBatch, TypeDescription schema)
+    public VectorizedRowBatch filter(VectorizedRowBatch rowBatch, VectorizedRowBatch newRowBatch)
     {
         assert (readyToFilter) : "not ready to filter: you need to call prepare(schema) first";
         if (this.isEmpty) return rowBatch;
 
-        VectorizedRowBatch newRowBatch = schema.createRowBatch();
         // loop through row batch row by row
         for (int rowId = 0; rowId < rowBatch.size; rowId++)
         {

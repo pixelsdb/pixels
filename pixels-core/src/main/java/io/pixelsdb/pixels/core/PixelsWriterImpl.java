@@ -133,6 +133,7 @@ public class PixelsWriterImpl
         private long builderBlockSize;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
+        private boolean builderOverwrite = false;
         private boolean encoding = true;
 
         private Builder()
@@ -218,6 +219,13 @@ public class PixelsWriterImpl
             return this;
         }
 
+        public Builder setOverwrite(boolean overwrite)
+        {
+            this.builderOverwrite = overwrite;
+
+            return this;
+        }
+
         public Builder setEncoding(boolean encoding)
         {
             this.encoding = encoding;
@@ -233,7 +241,7 @@ public class PixelsWriterImpl
             {
                 fsWriter = PhysicalWriterUtil.newPhysicalWriter(
                         this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
-                        this.builderBlockPadding);
+                        this.builderBlockPadding, this.builderOverwrite);
             } catch (IOException e)
             {
                 LOGGER.error("Failed to create PhysicalWriter");
@@ -310,6 +318,12 @@ public class PixelsWriterImpl
     public boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException
     {
+        /**
+         * Issue #170:
+         * ColumnWriter.write() returns the total size of the current column chunk,
+         * thus we should set curRowGroupDataLength = 0 here at the beginning.
+         */
+        curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
         for (int i = 0; i < cvs.length; i++)
@@ -322,7 +336,6 @@ public class PixelsWriterImpl
         {
             writeRowGroup();
             curRowGroupNumOfRows = 0L;
-            curRowGroupDataLength = 0;
             return false;
         }
         return true;
@@ -371,7 +384,7 @@ public class PixelsWriterImpl
         // reset each column writer and get current row group content size in bytes
         for (ColumnWriter writer : columnWriters)
         {
-            // new chunk for each writer
+            // flush writes the isNull bit map into the internal output stream.
             writer.flush();
             rowGroupDataLength += writer.getColumnChunkSize();
         }

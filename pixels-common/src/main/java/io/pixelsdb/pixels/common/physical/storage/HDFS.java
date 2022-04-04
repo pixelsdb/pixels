@@ -286,6 +286,22 @@ public class HDFS implements Storage
         return fs.open(new Path(path), Constants.HDFS_BUFFER_SIZE);
     }
 
+    /**
+     * For local fs, path is considered as local.
+     *
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @return
+     * @throws IOException if path is a directory.
+     */
+    @Override
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
+    {
+        Path fsPath = new Path(path);
+        return fs.create(fsPath, overwrite, bufferSize, fs.getDefaultReplication(fsPath), fs.getDefaultBlockSize(fsPath));
+    }
+
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
     {
