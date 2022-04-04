@@ -73,7 +73,6 @@ public class PixelsWriterImpl
     private long fileContentLength;
     private int fileRowNum;
 
-    private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
@@ -304,19 +303,13 @@ public class PixelsWriterImpl
     }
 
     /**
-     * Add a row batch
+     * Add a row batch.
      * Repeating is not supported currently in ColumnVector
      */
     @Override
     public boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException
     {
-        if (isNewRowGroup)
-        {
-            this.isNewRowGroup = false;
-            this.curRowGroupNumOfRows = 0L;
-        }
-        curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
         for (int i = 0; i < cvs.length; i++)
@@ -328,6 +321,7 @@ public class PixelsWriterImpl
         if (curRowGroupDataLength >= rowGroupSize)
         {
             writeRowGroup();
+            curRowGroupNumOfRows = 0L;
             curRowGroupDataLength = 0;
             return false;
         }
@@ -335,7 +329,7 @@ public class PixelsWriterImpl
     }
 
     /**
-     * Close PixelsWriterImpl, indicating the end of file
+     * Close PixelsWriterImpl, indicating the end of file.
      */
     @Override
     public void close()
@@ -363,7 +357,6 @@ public class PixelsWriterImpl
     private void writeRowGroup()
             throws IOException
     {
-        this.isNewRowGroup = true;
         int rowGroupDataLength = 0;
 
         PixelsProto.RowGroupStatistic.Builder curRowGroupStatistic =
