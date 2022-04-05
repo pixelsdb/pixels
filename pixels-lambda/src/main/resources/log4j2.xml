@@ -1,4 +1,4 @@
-<Configuration status="DEBUG" name="pixels-lambda">
+<Configuration status="INFO" name="pixels-lambda">
     <Appenders>
         <Lambda name="Lambda">
             <PatternLayout>
@@ -7,10 +7,10 @@
         </Lambda>
     </Appenders>
     <Loggers>
-        <Root level="DEBUG">
+        <Root level="INFO">
             <AppenderRef ref="Lambda"/>
         </Root>
         <Logger name="software.amazon.awssdk" level="WARN" />
-        <Logger name="software.amazon.awssdk.request" level="DEBUG" />
+        <Logger name="software.amazon.awssdk.request" level="INFO" />
     </Loggers>
 </Configuration>

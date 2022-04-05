@@ -210,12 +210,26 @@ public interface Storage
      * @param path
      * @param overwrite
      * @param bufferSize
-     * @param replication
      * @return
      * @throws IOException if path is a directory.
      */
     DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication) throws IOException;
+                            int bufferSize) throws IOException;
+
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @param replication is ignored by default, if the storage does not have explicit replication.
+     * @return
+     * @throws IOException if path is a directory.
+     */
+    default DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication) throws IOException
+    {
+        return create(path, overwrite, bufferSize);
+    }
 
     /**
      * This method is for the compatability of block-based storage like HDFS.
@@ -224,12 +238,15 @@ public interface Storage
      * @param overwrite
      * @param bufferSize
      * @param replication
-     * @param blockSize
+     * @param blockSize is ignored by default, except in HDFS.
      * @return
      * @throws IOException if path is a directory.
      */
-    DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication, long blockSize) throws IOException;
+    default DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication, long blockSize) throws IOException
+    {
+        return create(path, overwrite, bufferSize, replication);
+    }
 
     /**
      * For local fs, path is considered as local.

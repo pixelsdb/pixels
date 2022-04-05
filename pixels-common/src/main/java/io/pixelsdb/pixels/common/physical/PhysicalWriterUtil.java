@@ -37,8 +37,21 @@ public class PhysicalWriterUtil
     {
     }
 
+    /**
+     * Get a physical file system writer.
+     *
+     * @param storage
+     * @param path
+     * @param blockSize
+     * @param replication
+     * @param addBlockPadding
+     * @param overwrite true if overwrite the existing file with the same path.
+     * @return
+     * @throws IOException
+     */
     public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
-                                                   short replication, boolean addBlockPadding) throws IOException
+                                                   short replication, boolean addBlockPadding,
+                                                   boolean overwrite) throws IOException
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
@@ -47,19 +60,37 @@ public class PhysicalWriterUtil
         switch (storage.getScheme())
         {
             case hdfs:
-                writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize);
+                writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize, overwrite);
                 break;
             case file:
                 writer = new PhysicalLocalWriter(storage, path);
                 break;
             case s3:
-                writer = new PhysicalS3Writer(storage, path);
+                writer = new PhysicalS3Writer(storage, path, overwrite);
                 break;
             default:
                 throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
         }
 
         return writer;
+    }
+
+    /**
+     * Get a physical file system writer. If the file with the same path already exists, this method
+     * should throw an IOException.
+     *
+     * @param storage
+     * @param path
+     * @param blockSize
+     * @param replication
+     * @param addBlockPadding
+     * @return
+     * @throws IOException
+     */
+    public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
+                                                   short replication, boolean addBlockPadding) throws IOException
+    {
+        return newPhysicalWriter(storage, path, blockSize, replication, addBlockPadding, false);
     }
 
     /**
@@ -70,13 +101,37 @@ public class PhysicalWriterUtil
      * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
+     * @param overwrite       true if overwrite the existing file with the same path.
      * @return physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
-            Storage.Scheme scheme, String path, long blockSize, short replication, boolean addBlockPadding) throws IOException
+            Storage.Scheme scheme, String path, long blockSize, short replication,
+            boolean addBlockPadding, boolean overwrite) throws IOException
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path, blockSize, replication, addBlockPadding);
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path,
+                blockSize, replication, addBlockPadding, overwrite);
+    }
+
+    /**
+     * Get a physical file system writer. If the file with the same path already exists,
+     * this method should throw an IOException.
+     *
+     * @param scheme          name of the scheme
+     * @param path            write file path
+     * @param blockSize       hdfs block size
+     * @param replication     hdfs block replication num
+     * @param addBlockPadding add block padding or not
+     * @return physical writer
+     */
+    public static PhysicalWriter newPhysicalWriter(
+            Storage.Scheme scheme, String path, long blockSize, short replication,
+            boolean addBlockPadding) throws IOException
+    {
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path, blockSize,
+                replication, addBlockPadding, false);
     }
 }

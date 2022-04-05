@@ -103,7 +103,7 @@ public class ExprTreeTest
     public void testBigIntFilterRowBatch()
     {
 
-        VectorizedRowBatch newRowBatch = bigintFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = bigintFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
     }
@@ -111,10 +111,10 @@ public class ExprTreeTest
     @Test
     public void testExprTreeFilterRowBatchWithAndOr()
     {
-        VectorizedRowBatch newRowBatchAnd = exprTree3.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatchAnd = exprTree3.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatchAnd");
         System.out.println(newRowBatchAnd);
-        VectorizedRowBatch newRowBatchOr = exprTree4.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatchOr = exprTree4.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatchOr");
         System.out.println(newRowBatchOr);
     }
@@ -125,7 +125,7 @@ public class ExprTreeTest
         Gson gson = new Gson();
         String jsonStr = gson.toJson(bigintFilter);
         ExprTree tree = gson.fromJson(jsonStr, ExprTree.class);
-        VectorizedRowBatch newRowBatch = tree.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = tree.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
 
@@ -146,7 +146,7 @@ public class ExprTreeTest
     public void testEmptyFilter()
     {
         emptyFilter.prepare(schema);
-        VectorizedRowBatch newRowBatch = emptyFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = emptyFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
     }
@@ -155,17 +155,17 @@ public class ExprTreeTest
     public void testStrFilter()
     {
         strFilter.prepare(schema);
-        VectorizedRowBatch newRowBatch = strFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = strFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
 
         strFilter2.prepare(schema);
-        VectorizedRowBatch newRowBatch2 = strFilter2.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch2 = strFilter2.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch2");
         System.out.println(newRowBatch2);
 
         strFilter3.prepare(schema);
-        VectorizedRowBatch newRowBatch3 = strFilter3.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch3 = strFilter3.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch3");
         System.out.println(newRowBatch3);
     }
@@ -175,7 +175,7 @@ public class ExprTreeTest
     {
         ExprTree dateFilter = new ExprTree("ddd", ExprTree.Operator.GT, "1981-03-01");
         dateFilter.prepare(schema);
-        VectorizedRowBatch newRowBatch = dateFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = dateFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
     }
@@ -185,7 +185,7 @@ public class ExprTreeTest
     {
 
         twoLevelFilter.prepare(schema);
-        VectorizedRowBatch newRowBatch = twoLevelFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = twoLevelFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
     }
@@ -196,7 +196,7 @@ public class ExprTreeTest
 
         ExprTree dateFilter = new ExprTree("eee", ExprTree.Operator.GE, "5.30");
         dateFilter.prepare(schema);
-        VectorizedRowBatch newRowBatch = dateFilter.filter(oldRowBatch, schema);
+        VectorizedRowBatch newRowBatch = dateFilter.filter(oldRowBatch, schema.createRowBatch());
         System.out.println("newRowBatch");
         System.out.println(newRowBatch);
     }

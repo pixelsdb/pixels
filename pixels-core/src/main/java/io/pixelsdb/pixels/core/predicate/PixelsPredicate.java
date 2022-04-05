@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.stats.ColumnStats;
 import java.util.Map;
 
 /**
- * The Predicate interface of Pixels, for filtering tuples.
+ * The Predicate interface of Pixels, for filtering the column statistics at file, row group, or pixel level.
  *
  * @author guodong
  * @author hank

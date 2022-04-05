@@ -33,7 +33,7 @@ public interface PixelsWriter
         extends Closeable
 {
     /**
-     * add row batch into the file
+     * Add row batch into the file.
      *
      * @return if the file adds a new row group, return false. Else, return true.
      */
@@ -41,7 +41,7 @@ public interface PixelsWriter
             throws IOException;
 
     /**
-     * Get schema of this file
+     * Get schema of this file.
      *
      * @return schema
      */

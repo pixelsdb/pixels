@@ -137,7 +137,6 @@ public class VectorizedRowBatch implements AutoCloseable
                 b.append('\n');
             }
         }
-        memoryUsage += b.length();
         return b.toString();
     }
 

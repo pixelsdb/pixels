@@ -243,23 +243,17 @@ public class LocalFS implements Storage
         return new DataInputStream(new FileInputStream(file));
     }
 
-    public RandomAccessFile openRaf(String path) throws IOException
-    {
-        Path p = new Path(path);
-        File file = new File(p.realPath);
-        if (file.isDirectory())
-        {
-            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
-        }
-        if (!file.exists())
-        {
-            throw new IOException("File '" + p.realPath + "' doesn't exists.");
-        }
-        return new RandomAccessFile(file, "r");
-    }
-
+    /**
+     * For local fs, path is considered as local.
+     *
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @return
+     * @throws IOException if path is a directory.
+     */
     @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         Path p = new Path(path);
         File file = new File(p.realPath);
@@ -285,10 +279,19 @@ public class LocalFS implements Storage
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
-    @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    public RandomAccessFile openRaf(String path) throws IOException
     {
-        return this.create(path, overwrite, bufferSize, replication);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
+        }
+        if (!file.exists())
+        {
+            throw new IOException("File '" + p.realPath + "' doesn't exists.");
+        }
+        return new RandomAccessFile(file, "r");
     }
 
     @Override

@@ -124,6 +124,7 @@ public class PixelsCompactor
         private long builderBlockSize = Constants.DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
+        private boolean builderOverwrite = false;
         private PixelsProto.CompressionKind compressionKind = null;
         private int compressionBlockSize = 0;
         private int pixelStride = 0;
@@ -205,6 +206,13 @@ public class PixelsCompactor
         public PixelsCompactor.Builder setBlockPadding(boolean blockPadding)
         {
             this.builderBlockPadding = blockPadding;
+
+            return this;
+        }
+
+        public Builder setOverwrite(boolean overwrite)
+        {
+            this.builderOverwrite = overwrite;
 
             return this;
         }
@@ -308,7 +316,7 @@ public class PixelsCompactor
             }
 
             fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderStorage, builderFilePath, builderBlockSize,
-                    builderReplication, builderBlockPadding);
+                    builderReplication, builderBlockPadding, builderOverwrite);
 
             return new PixelsCompactor(
                     schema,

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.lambda;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class ScanScanWorkerTest
+public class ScanWorkerTest
 {
     ScanWorker worker = new ScanWorker();
     //'{ "bucketName":"pixels-tpch-customer-v-0-order", "fileName": "20220213140252_0.pxl" }'

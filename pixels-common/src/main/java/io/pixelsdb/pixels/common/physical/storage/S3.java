@@ -478,32 +478,28 @@ public class S3 implements Storage
 
     /**
      * Open an output stream to write a file into S3.
+     * The access latency of cloud storage, such as S3, is high. If we are sure that the file path
+     * does not exist (e.g., the file name a UUID), we can skip file existence checking by setting
+     * overwrite to true.
      * @param path
      * @param overwrite
      * @param bufferSize
-     * @param replication
      * @return
      * @throws IOException
      */
     @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         Path p = new Path(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
         }
-        if (this.existsInS3(p))
+        if (!overwrite && this.existsInS3(p))
         {
             throw new IOException("Path '" + path + "' already exists.");
         }
-        return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key));
-    }
-
-    @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
-    {
-        return this.create(path, overwrite, bufferSize, replication);
+        return new DataOutputStream(new S3OutputStream(s3, p.bucket, p.key, bufferSize));
     }
 
     @Override

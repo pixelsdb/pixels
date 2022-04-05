@@ -29,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
+
 /**
  * <p>
  * Referenced the implementation from
@@ -39,12 +41,6 @@ import java.util.List;
  */
 public class S3OutputStream extends OutputStream
 {
-
-    /**
-     * Default chunk size is 256MB
-     */
-    protected static final int BUFFER_SIZE = 256 * 1024 * 1024;
-
     /**
      * The bucket-name on Amazon S3
      */
@@ -94,10 +90,23 @@ public class S3OutputStream extends OutputStream
      */
     public S3OutputStream(S3Client s3Client, String bucket, String key)
     {
+        this(s3Client, bucket, key, S3_BUFFER_SIZE);
+    }
+
+    /**
+     * Creates a new S3 OutputStream. Buffer size is specified.
+     *
+     * @param s3Client the AmazonS3 client.
+     * @param bucket   name of the bucket.
+     * @param key      path (key) within the bucket.
+     * @param bufferSize the buffer size.
+     */
+    public S3OutputStream(S3Client s3Client, String bucket, String key, int bufferSize)
+    {
         this.s3Client = s3Client;
         this.bucket = bucket;
         this.key = key;
-        this.buffer = new byte[BUFFER_SIZE];
+        this.buffer = new byte[bufferSize];
         this.position = 0;
         this.parts = new ArrayList<>();
         this.open = true;

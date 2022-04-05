@@ -48,7 +48,7 @@ public class PhysicalS3Writer implements PhysicalWriter
     private S3Client client;
     private OutputStream out;
 
-    public PhysicalS3Writer(Storage storage, String path) throws IOException
+    public PhysicalS3Writer(Storage storage, String path, boolean overwrite) throws IOException
     {
         if (storage instanceof S3)
         {
@@ -67,14 +67,13 @@ public class PhysicalS3Writer implements PhysicalWriter
         this.pathStr = path;
         this.position = 0L;
         this.client = s3.getClient();
-        this.s3.create(path, false, S3_BUFFER_SIZE, (short)1);
-        this.out = new S3OutputStream(this.client, this.path.bucket, this.path.key);
+        this.out = this.s3.create(path, overwrite, S3_BUFFER_SIZE);
     }
 
     /**
      * Prepare the writer to ensure the length can fit into current block.
      *
-     * @param length length of content
+     * @param length length of content.
      * @return starting offset after preparing. If -1, means prepare has failed,
      * due to the specified length cannot fit into current block.
      */
@@ -87,13 +86,19 @@ public class PhysicalS3Writer implements PhysicalWriter
     /**
      * Append content to the file.
      *
-     * @param buffer content buffer
+     * @param buffer content buffer.
      * @return start offset of content in the file.
      */
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        // Issue #217: for compatibility reasons if this is compiled in jdk>=9 and used in jdk8.
+        /**
+         * Issue #217:
+         * For compatibility reasons if this code is compiled by jdk>=9 but executed in jvm8.
+         *
+         * In jdk8, ByteBuffer.flip() is extended from Buffer.flip(), but in jdk11, different kind of ByteBuffer
+         * has its own flip implementation and may lead to errors.
+         */
         ((Buffer)buffer).flip();
         int length = buffer.remaining();
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
