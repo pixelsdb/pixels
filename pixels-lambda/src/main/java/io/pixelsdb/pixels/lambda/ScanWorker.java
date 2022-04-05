@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -65,18 +64,13 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
     {
         try
         {
-            ExecutorService threadPool = Executors.newFixedThreadPool(8);
-            logger.info("enter handleRequest");
-            long lambdaStartTime = System.nanoTime();
+            ExecutorService threadPool = Executors.newFixedThreadPool(12);
             String requestId = context.getAwsRequestId();
 
-            // each worker create a thread for each file, and each thread uses a pixelsReader
             ArrayList<String> fileNames = event.get("fileNames");
             String[] cols = event.get("cols").toArray(new String[0]);
             ExprTree filter = gson.fromJson(event.get("filterJsonStr").get(0), ExprTree.class);
 
-            // for each file to read, create a thread which uses a reader to read one file and writes the results to s3
-            logger.debug("start submitting tasks to thread pool");
             for (int i = 0; i < fileNames.size(); i++)
             {
                 int finalI = i;
@@ -85,12 +79,11 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             threadPool.shutdown();
             try
             {
-                while (!threadPool.awaitTermination(300, TimeUnit.SECONDS));
+                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of scan.", e);
             }
-            logger.debug("thread pool shut down");
 
             // create response to inform invoker which are the s3 paths of files written
             String response = "";
@@ -104,9 +97,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                     response = response + requestId + "file" + i;
                 }
             }
-            long lambdaEndTime = System.nanoTime();
-            double lambdaDurationMs = 1.0 * (lambdaEndTime - lambdaStartTime) / Math.pow(10, 6);
-            logger.debug("lambda request id " + requestId + " duration: " + lambdaDurationMs);
             return response;
         } catch (Exception e)
         {
@@ -134,13 +124,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
         try (PixelsReader pixelsReader = getReader(fileName);
              PixelsRecordReader recordReader = pixelsReader.read(option))
         {
-            logger.debug("start scan file: " + fileName);
-            TypeDescription allSchema = pixelsReader.getFileSchema();
-            List<TypeDescription> allColTypes = allSchema.getChildren();
-            List<String> fieldNames = allSchema.getFieldNames();
-            System.out.println(allColTypes);
-            System.out.println(fieldNames);
-
             TypeDescription rowBatchSchema = recordReader.getResultSchema();
 
             String s3Path = "tiannan-test/" + resultFile;
@@ -153,10 +136,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             while (true)
             {
                 rowBatch = recordReader.readBatch(batchSize);
-                if (batch == 0)
-                {
-                    logger.info("rowBatch.size before filter: " + rowBatch.size);
-                }
                 VectorizedRowBatch newRowBatch;
                 //if (!filter.isEmpty)
                 {
@@ -164,10 +143,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                 } //else
                 {
                     newRowBatch = rowBatch;
-                }
-                if (batch == 0)
-                {
-                    logger.info("rowBatch.size after filter: " + newRowBatch.size);
                 }
                 if (newRowBatch.size > 0)
                 {
@@ -213,7 +188,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
     private static final int pixelStride = 10000;
     private static final int rowGroupSize = 256 * 1024 * 1024;
-    private static final long blockSize = 2048l * 1024l * 1024l;
+    private static final long blockSize = 2048L * 1024L * 1024L;
     private static final short replication = (short) 1;
 
     private PixelsWriter getWriter(TypeDescription schema, String filePath)
