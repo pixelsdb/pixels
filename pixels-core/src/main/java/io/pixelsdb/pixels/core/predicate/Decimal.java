@@ -30,8 +30,20 @@ public class Decimal implements Comparable<Decimal>
     public int precision;
     public int scale;
 
+    public Decimal(long value, int precision, int scale)
+    {
+        this.value = value;
+        this.precision = precision;
+        this.scale = scale;
+    }
+
     @Override
     public int compareTo(Decimal o)
+    {
+        return 0;
+    }
+
+    public int compareTo(long value, int precision, int scale)
     {
         return 0;
     }

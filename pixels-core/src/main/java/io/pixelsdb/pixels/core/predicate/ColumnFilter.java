@@ -445,13 +445,13 @@ public class ColumnFilter<T extends Comparable<T>>
             for (Range<T> range : this.filter.ranges)
             {
                 Decimal lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
-                        (Decimal) range.lowerBound.value : null;
+                        (Decimal) range.lowerBound.value : new Decimal(Long.MIN_VALUE, 18, 0);
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
                     lowerBound.value ++;
                 }
                 Decimal upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
-                        (Decimal) range.upperBound.value : null;
+                        (Decimal) range.upperBound.value : new Decimal(Long.MAX_VALUE, 18, 0);
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
                     upperBound.value --;
@@ -464,8 +464,9 @@ public class ColumnFilter<T extends Comparable<T>>
                         {
                             continue;
                         }
-                        if (vector[i] < lowerBound.value || vector[i] > upperBound.value)
-                        {//TODO: fix
+                        if (lowerBound.compareTo(vector[i], precision, scale) > 0 ||
+                                upperBound.compareTo(vector[i], precision, scale) < 0)
+                        {
                             result.clear(i);
                         }
                     }
@@ -473,8 +474,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 else
                 {
                     for (int i = start; i < start + length; ++i)
-                    {//TODO: fix
-                        if (vector[i] < lowerBound.value || vector[i] > upperBound.value)
+                    {
+                        if (lowerBound.compareTo(vector[i], precision, scale) > 0 ||
+                                upperBound.compareTo(vector[i], precision, scale) < 0)
                         {
                             result.clear(i);
                         }
