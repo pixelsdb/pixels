@@ -128,8 +128,8 @@ public class ColumnFilter<T extends Comparable<T>>
      * Filter the values in the column vector and set the bits in result for
      * matched values.
      * <br/>
-     * <b>Notice 1:</b> this method only clears the unmatched bits
-     * whereas other bits are not modified. All the implementation of this method
+     * <b>Notice 1:</b> this method sets the matched bits,
+     * whereas other bits are cleared. All the implementation of this method
      * must follow this regulation.
      * <br/>
      * <b>Notice 2:</b> the bitset must be as long (number of bits) as the column vector.
@@ -137,18 +137,20 @@ public class ColumnFilter<T extends Comparable<T>>
      * @param columnVector the column vector.
      * @param start the start offset in the column vector.
      * @param length the length to filter in the column vector
-     * @param result the filtered result, in which the ith bit is cleared if the ith
-     *               value in the column vector does not match the filter.
+     * @param result the filtered result, in which the ith bit is set if the ith
+     *               value in the column vector matches the filter.
      */
     public void doFilter(ColumnVector columnVector, int start, int length, BitSet result)
     {
         if (this.filter.isAll)
         {
+            result.set(start, start+length);
             return;
         }
+        // start filtering, set the bits of all matched rows.
+        result.clear(start, start+length);
         if (this.filter.isNone)
         {
-            result.clear(start, start+length);
             return;
         }
         switch (this.columnType)
@@ -225,13 +227,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            continue;
-                        }
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -239,9 +237,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        if (vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -269,13 +267,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || includes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (!includes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -283,9 +277,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!includes.contains(vector[i]))
+                        if (includes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -296,13 +290,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || !excludes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (excludes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -310,9 +300,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (excludes.contains(vector[i]))
+                        if (!excludes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -343,13 +333,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            continue;
-                        }
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -357,9 +343,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        if (vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -387,13 +373,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || includes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (!includes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -401,9 +383,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!includes.contains(vector[i]))
+                        if (includes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -414,13 +396,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || !excludes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (excludes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -428,9 +406,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (excludes.contains(vector[i]))
+                        if (!excludes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -462,14 +440,10 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || lowerBound.compareTo(vector[i], precision, scale) <= 0 &&
+                                upperBound.compareTo(vector[i], precision, scale) >= 0)
                         {
-                            continue;
-                        }
-                        if (lowerBound.compareTo(vector[i], precision, scale) > 0 ||
-                                upperBound.compareTo(vector[i], precision, scale) < 0)
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -477,10 +451,10 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (lowerBound.compareTo(vector[i], precision, scale) > 0 ||
-                                upperBound.compareTo(vector[i], precision, scale) < 0)
+                        if (lowerBound.compareTo(vector[i], precision, scale)<= 0 ||
+                                upperBound.compareTo(vector[i], precision, scale) >= 0)
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -508,13 +482,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || includes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (!includes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -522,9 +492,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!includes.contains(vector[i]))
+                        if (includes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -535,13 +505,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || !excludes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (excludes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -549,9 +515,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (excludes.contains(vector[i]))
+                        if (!excludes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -598,15 +564,16 @@ public class ColumnFilter<T extends Comparable<T>>
                     {
                         if (isNull[i])
                         {
+                            result.set(i);
                             continue;
                         }
                         int cmp1 = lowerBounded ?
                                 byteArrayCmp(vector[i], starts[i], lens[i], lowerBound, 0, lowerBound.length) : 1;
                         int cmp2 = upperBounded ?
                                 byteArrayCmp(vector[i], starts[i], lens[i], upperBound, 0, upperBound.length) : -1;
-                        if ((lowerIncluded ? cmp1 < 0 : cmp1 <= 0) || (upperIncluded ? cmp2 > 0 : cmp2 >= 0))
+                        if ((lowerIncluded ? cmp1 >= 0 : cmp1 > 0) && (upperIncluded ? cmp2 <= 0 : cmp2 < 0))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -618,9 +585,9 @@ public class ColumnFilter<T extends Comparable<T>>
                                 byteArrayCmp(vector[i], starts[i], lens[i], lowerBound, 0, lowerBound.length) : 1;
                         int cmp2 = upperBounded ?
                                 byteArrayCmp(vector[i], starts[i], lens[i], upperBound, 0, upperBound.length) : -1;
-                        if ((lowerIncluded ? cmp1 < 0 : cmp1 <= 0) || (upperIncluded ? cmp2 > 0 : cmp2 >= 0))
+                        if ((lowerIncluded ? cmp1 >= 0 : cmp1 > 0) && (upperIncluded ? cmp2 <= 0 : cmp2 < 0))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -652,9 +619,9 @@ public class ColumnFilter<T extends Comparable<T>>
                         {
                             continue;
                         }
-                        if (!includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -662,9 +629,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -675,13 +642,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || !excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
                         {
-                            continue;
-                        }
-                        if (excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -689,9 +652,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (!excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -722,13 +685,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            continue;
-                        }
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -736,9 +695,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        if (vector[i] >= lowerBound && vector[i] <= upperBound)
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -766,13 +725,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || includes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (!includes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -780,9 +735,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!includes.contains(vector[i]))
+                        if (includes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -793,13 +748,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i])
+                        if (isNull[i] || !excludes.contains(vector[i]))
                         {
-                            continue;
-                        }
-                        if (excludes.contains(vector[i]))
-                        {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }
@@ -807,9 +758,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (excludes.contains(vector[i]))
+                        if (!excludes.contains(vector[i]))
                         {
-                            result.clear(i);
+                            result.set(i);
                         }
                     }
                 }

@@ -20,9 +20,19 @@
 package io.pixelsdb.pixels.core.predicate;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.BitSet;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -40,7 +50,7 @@ public class TestPredicate
     }
 
     @Test
-    public void testColumnFilter()
+    public void testSerializationAndDeserialization()
     {
         Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false);
         longFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
@@ -66,5 +76,48 @@ public class TestPredicate
         System.out.println(columnFilter1.getFilter().getJavaType());
         System.out.println(columnFilter1.getFilter().getRangeCount());
         System.out.println(columnFilter1.getFilter().getDiscreteValueCount());
+    }
+
+    @Test
+    public void testFilter() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
+        PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                .setStorage(storage)
+                .setEnableCache(false)
+                .setPixelsFooterCache(new PixelsFooterCache())
+                .setPath("file:///home/hank/20220312072707_0.pxl").build();
+        PixelsReaderOption readerOption = new PixelsReaderOption();
+        readerOption.queryId(1);
+        readerOption.rgRange(0, 1);
+        readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate"});
+        PixelsRecordReader recordReader = pixelsReader.read(readerOption);
+
+        Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false);
+        longFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
+                new Bound<>(Bound.Type.INCLUDED, 100L));
+        longFilter.addRange(new Bound<>(Bound.Type.EXCLUDED, 200L),
+                new Bound<>(Bound.Type.UNBOUNDED, null));
+        ColumnFilter<Long> columnFilter = new ColumnFilter<>("o_orderkey", TypeDescription.Category.LONG, longFilter);
+        SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
+        columnFilters.put(1, columnFilter);
+        TableScanFilters tableScanFilters = new TableScanFilters("tpch", "orders", columnFilters);
+
+        BitSet filtered = new BitSet(1024);
+        BitSet columnFiltered = new BitSet(1024);
+
+        while (true)
+        {
+            VectorizedRowBatch rowBatch = recordReader.readBatch(1024);
+            tableScanFilters.doFilter(rowBatch, filtered, columnFiltered);
+            System.out.println("cardinality: " + filtered.cardinality());
+            if (rowBatch.endOfFile)
+            {
+                break;
+            }
+        }
+
+        recordReader.close();
+        pixelsReader.close();
     }
 }

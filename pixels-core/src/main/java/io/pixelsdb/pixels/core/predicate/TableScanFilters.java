@@ -84,7 +84,7 @@ public class TableScanFilters
      * @param rowBatch the row batch.
      * @param result the filter result.
      */
-    void doFilter(VectorizedRowBatch rowBatch, BitSet result)
+    void doFilter(VectorizedRowBatch rowBatch, BitSet result, BitSet columnResult)
     {
         // set all bits to true.
         result.set(0, rowBatch.size, true);
@@ -92,7 +92,8 @@ public class TableScanFilters
         {
             int columnId = entry.getKey();
             ColumnFilter columnFilter = entry.getValue();
-            columnFilter.doFilter(rowBatch.cols[columnId], 0, rowBatch.size, result);
+            columnFilter.doFilter(rowBatch.cols[columnId], 0, rowBatch.size, columnResult);
+            result.and(columnResult);
         }
     }
 }
