@@ -28,7 +28,10 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created at: 07/04/2022
@@ -83,6 +86,10 @@ public class ColumnFilter<T extends Comparable<T>>
         else if (columnJavaType == byte[].class)
         {
             filterType = new TypeToken<Filter<String>>(){}.getType();
+        }
+        else if (columnJavaType == Decimal.class)
+        {
+            filterType = new TypeToken<Filter<Decimal>>(){}.getType();
         }
         else
         {
@@ -147,35 +154,45 @@ public class ColumnFilter<T extends Comparable<T>>
         {
             case BOOLEAN:
             case BYTE:
-                doFilter((ByteColumnVector) columnVector, start, length, result);
+                ByteColumnVector bcv = (ByteColumnVector) columnVector;
+                doFilter(bcv.vector, bcv.noNulls ? null : bcv.isNull, start, length, result);
                 return;
             case SHORT:
             case INT:
             case LONG:
-                doFilter((LongColumnVector) columnVector, start, length, result);
+                LongColumnVector lcv = (LongColumnVector) columnVector;
+                doFilter(lcv.vector, lcv.noNulls ? null : lcv.isNull, start, length, result);
                 return;
             case DECIMAL:
-                doFilter((DecimalColumnVector) columnVector, start, length, result);
+                DecimalColumnVector decv = (DecimalColumnVector) columnVector;
+                doFilter(decv.vector, decv.noNulls ? null : decv.isNull, start, length, result);
                 return;
             case FLOAT:
             case DOUBLE:
-                doFilter((DoubleColumnVector) columnVector, start, length, result);
+                DoubleColumnVector dcv = (DoubleColumnVector) columnVector;
+                doFilter(dcv.vector, dcv.noNulls ? null : dcv.isNull, start, length, result);
                 return;
+
             case STRING:
             case VARCHAR:
             case CHAR:
             case VARBINARY:
             case BINARY:
-                doFilter((BinaryColumnVector) columnVector, start, length, result);
+                BinaryColumnVector bicv = (BinaryColumnVector) columnVector;
+                doFilter(bicv.vector, bicv.start, bicv.lens, bicv.noNulls ? null :
+                        bicv.isNull, start, length, result);
                 return;
             case DATE:
-                doFilter((DateColumnVector) columnVector, start, length, result);
+                DateColumnVector dacv = (DateColumnVector) columnVector;
+                doFilter(dacv.dates, dacv.noNulls ? null : dacv.isNull, start, length, result);
                 return;
             case TIME:
-                doFilter((TimeColumnVector) columnVector, start, length, result);
+                TimeColumnVector tcv = (TimeColumnVector) columnVector;
+                doFilter(tcv.times, tcv.noNulls ? null : tcv.isNull, start, length, result);
                 return;
             case TIMESTAMP:
-                doFilter((TimestampColumnVector) columnVector, start, length, result);
+                TimestampColumnVector tscv = (TimestampColumnVector) columnVector;
+                doFilter(tscv.times, tscv.noNulls ? null : tscv.isNull, start, length, result);
                 return;
             default:
                 throw new UnsupportedOperationException("column type (" +
@@ -183,22 +200,36 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
-    private void doFilter(ByteColumnVector columnVector, int start, int length, BitSet result)
+    private void doFilter(byte[] vector, boolean[] isNull, int start, int length, BitSet result)
     {
+        boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
         {
             for (Range<T> range : this.filter.ranges)
             {
-                boolean match = false;
-                byte lowerBound = (Byte) range.lowerBound.value;
-                byte upperBound = (Byte) range.lowerBound.value;
-                if (this.filter.allowNull && !columnVector.noNulls)
+                byte lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                        (Byte) range.lowerBound.value : Byte.MIN_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    lowerBound ++;
+                }
+                byte upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (Byte) range.upperBound.value : Byte.MAX_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    upperBound--;
+                }
+                if (this.filter.allowNull && !noNulls)
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (range.lowerBound.type == Bound.Type.INCLUDED)
+                        if (isNull[i])
                         {
-                            //match = range.lowerBound.value.compareTo(columnVector.vector[i]);
+                            continue;
+                        }
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
                         }
                     }
                 }
@@ -206,6 +237,10 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
+                        }
                     }
                 }
 
@@ -213,91 +248,567 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-
+            Set<Byte> includes = new HashSet<>();
+            Set<Byte> excludes = new HashSet<>();
+            for (Bound<T> discrete : this.filter.discreteValues)
+            {
+                if (discrete.type == Bound.Type.INCLUDED)
+                {
+                    includes.add((Byte) discrete.value);
+                }
+                else
+                {
+                    excludes.add((Byte) discrete.value);
+                }
+            }
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private void doFilter(LongColumnVector columnVector, int start, int length, BitSet result)
+    private void doFilter(long[] vector, boolean[] isNull, int start, int length, BitSet result)
     {
+        boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
         {
+            for (Range<T> range : this.filter.ranges)
+            {
+                long lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                        (Long) range.lowerBound.value : Long.MIN_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    lowerBound ++;
+                }
+                long upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (Long) range.upperBound.value : Long.MAX_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    upperBound--;
+                }
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
 
+            }
         }
         else
         {
-
+            Set<Long> includes = new HashSet<>();
+            Set<Long> excludes = new HashSet<>();
+            for (Bound<T> discrete : this.filter.discreteValues)
+            {
+                if (discrete.type == Bound.Type.INCLUDED)
+                {
+                    includes.add((Long) discrete.value);
+                }
+                else
+                {
+                    excludes.add((Long) discrete.value);
+                }
+            }
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private void doFilter(DecimalColumnVector columnVector, int start, int length, BitSet result)
+    private void doFilter(long[] vector, boolean[] isNull, int precision, int scale,
+                          int start, int length, BitSet result)
     {
+        boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
         {
+            for (Range<T> range : this.filter.ranges)
+            {
+                Decimal lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                        (Decimal) range.lowerBound.value : null;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    lowerBound.value ++;
+                }
+                Decimal upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (Decimal) range.upperBound.value : null;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    upperBound.value --;
+                }
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (vector[i] < lowerBound.value || vector[i] > upperBound.value)
+                        {//TODO: fix
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {//TODO: fix
+                        if (vector[i] < lowerBound.value || vector[i] > upperBound.value)
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
 
+            }
         }
         else
         {
-
+            Set<Decimal> includes = new HashSet<>();
+            Set<Decimal> excludes = new HashSet<>();
+            for (Bound<T> discrete : this.filter.discreteValues)
+            {
+                if (discrete.type == Bound.Type.INCLUDED)
+                {
+                    includes.add((Decimal) discrete.value);
+                }
+                else
+                {
+                    excludes.add((Decimal) discrete.value);
+                }
+            }
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private void doFilter(DoubleColumnVector columnVector, int start, int length, BitSet result)
+    private int byteArrayCmp(byte[] b1, int start1, int len1, byte[] b2, int start2, int len2)
     {
+        int lim = Math.min(len1, len2);
+        byte c1, c2;
+        int k = 0;
+        while (k < lim) {
+            c1 = b1[k];
+            c2 = b2[k];
+            if (c1 != c2) {
+                return c1 - c2;
+            }
+            k++;
+        }
+        return len1 - len2;
+    }
+
+    private void doFilter(byte[][] vector, int[] starts, int[] lens, boolean[] isNull,
+                          int start, int length, BitSet result)
+    {
+        boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
         {
+            for (Range<T> range : this.filter.ranges)
+            {
+                boolean lowerBounded = range.lowerBound.type != Bound.Type.UNBOUNDED;
+                boolean lowerIncluded = range.lowerBound.type == Bound.Type.INCLUDED;
+                byte[] lowerBound =  (lowerBounded ?
+                        (String) range.lowerBound.value : "").getBytes(StandardCharsets.UTF_8);
+                boolean upperBounded = range.upperBound.type != Bound.Type.UNBOUNDED;
+                boolean upperIncluded = range.upperBound.type == Bound.Type.INCLUDED;
+                byte[] upperBound = (range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (String) range.upperBound.value : "").getBytes(StandardCharsets.UTF_8);
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        int cmp1 = lowerBounded ?
+                                byteArrayCmp(vector[i], starts[i], lens[i], lowerBound, 0, lowerBound.length) : 1;
+                        int cmp2 = upperBounded ?
+                                byteArrayCmp(vector[i], starts[i], lens[i], upperBound, 0, upperBound.length) : -1;
+                        if ((lowerIncluded ? cmp1 < 0 : cmp1 <= 0) || (upperIncluded ? cmp2 > 0 : cmp2 >= 0))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        int cmp1 = lowerBounded ?
+                                byteArrayCmp(vector[i], starts[i], lens[i], lowerBound, 0, lowerBound.length) : 1;
+                        int cmp2 = upperBounded ?
+                                byteArrayCmp(vector[i], starts[i], lens[i], upperBound, 0, upperBound.length) : -1;
+                        if ((lowerIncluded ? cmp1 < 0 : cmp1 <= 0) || (upperIncluded ? cmp2 > 0 : cmp2 >= 0))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
 
+            }
         }
         else
         {
-
+            Set<String> includes = new HashSet<>();
+            Set<String> excludes = new HashSet<>();
+            for (Bound<T> discrete : this.filter.discreteValues)
+            {
+                if (discrete.type == Bound.Type.INCLUDED)
+                {
+                    includes.add((String) discrete.value);
+                }
+                else
+                {
+                    excludes.add((String) discrete.value);
+                }
+            }
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (!includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    private void doFilter(BinaryColumnVector columnVector, int start, int length, BitSet result)
+    private void doFilter(int[] vector, boolean[] isNull, int start, int length, BitSet result)
     {
+        boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
         {
+            for (Range<T> range : this.filter.ranges)
+            {
+                int lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                        (Integer) range.lowerBound.value : Integer.MIN_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    lowerBound ++;
+                }
+                int upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (Integer) range.upperBound.value : Integer.MAX_VALUE;
+                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                {
+                    upperBound--;
+                }
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (vector[i] < lowerBound || vector[i] > upperBound)
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
 
+            }
         }
         else
         {
-
-        }
-    }
-
-    private void doFilter(DateColumnVector columnVector, int start, int length, BitSet result)
-    {
-        if (!this.filter.ranges.isEmpty())
-        {
-
-        }
-        else
-        {
-
-        }
-    }
-
-    private void doFilter(TimeColumnVector columnVector, int start, int length, BitSet result)
-    {
-        if (!this.filter.ranges.isEmpty())
-        {
-
-        }
-        else
-        {
-
-        }
-    }
-
-    private void doFilter(TimestampColumnVector columnVector, int start, int length, BitSet result)
-    {
-        if (!this.filter.ranges.isEmpty())
-        {
-
-        }
-        else
-        {
-
+            Set<Integer> includes = new HashSet<>();
+            Set<Integer> excludes = new HashSet<>();
+            for (Bound<T> discrete : this.filter.discreteValues)
+            {
+                if (discrete.type == Bound.Type.INCLUDED)
+                {
+                    includes.add((Integer) discrete.value);
+                }
+                else
+                {
+                    excludes.add((Integer) discrete.value);
+                }
+            }
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!includes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            continue;
+                        }
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (excludes.contains(vector[i]))
+                        {
+                            result.clear(i);
+                        }
+                    }
+                }
+            }
         }
     }
 }

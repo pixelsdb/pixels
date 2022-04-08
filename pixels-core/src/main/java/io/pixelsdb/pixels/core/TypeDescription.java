@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
+import io.pixelsdb.pixels.core.predicate.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
@@ -140,7 +141,7 @@ public final class TypeDescription
         LONG(true, long.class, long.class, "bigint", "long"),
         FLOAT(true, float.class, long.class, "float", "real"),
         DOUBLE(true, double.class, long.class, "double"),
-        DECIMAL(true, double.class, long.class, "decimal"),
+        DECIMAL(true, double.class, Decimal.class, "decimal"),
         STRING(true, String.class, byte[].class, "string"),
         DATE(true, Date.class, int.class, "date"),
         TIME(true, Time.class, int.class, "time"),
