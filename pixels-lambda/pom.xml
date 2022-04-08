@@ -95,6 +95,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- alibaba -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- logging -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>

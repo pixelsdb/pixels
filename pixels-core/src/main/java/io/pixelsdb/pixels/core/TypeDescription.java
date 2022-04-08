@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -127,42 +129,49 @@ public final class TypeDescription
         /*
          * Issue #196:
          * Support alias of data types.
+         *
+         * Issue #170:
+         * Add external and internal java types.
          */
-        BOOLEAN(true, "boolean"),
-        BYTE(true, "tinyint", "byte"),
-        SHORT(true, "smallint", "short"),
-        INT(true, "integer", "int"),
-        LONG(true, "bigint", "long"),
-        FLOAT(true, "float", "real"),
-        DOUBLE(true, "double"),
-        DECIMAL(true, "decimal"),
-        STRING(true, "string"),
-        DATE(true, "date"),
-        TIME(true, "time"),
-        TIMESTAMP(true, "timestamp"),
-        VARBINARY(true, "varbinary"),
-        BINARY(true, "binary"),
-        VARCHAR(true, "varchar"),
-        CHAR(true, "char"),
-        STRUCT(false, "struct");
+        BOOLEAN(true, boolean.class, byte.class, "boolean"),
+        BYTE(true, byte.class, byte.class, "tinyint", "byte"),
+        SHORT(true, short.class, long.class, "smallint", "short"),
+        INT(true, int.class, long.class, "integer", "int"),
+        LONG(true, long.class, long.class, "bigint", "long"),
+        FLOAT(true, float.class, long.class, "float", "real"),
+        DOUBLE(true, double.class, long.class, "double"),
+        DECIMAL(true, double.class, long.class, "decimal"),
+        STRING(true, String.class, byte[].class, "string"),
+        DATE(true, Date.class, int.class, "date"),
+        TIME(true, Time.class, int.class, "time"),
+        TIMESTAMP(true, Timestamp.class, long.class, "timestamp"),
+        VARBINARY(true, byte[].class, byte[].class, "varbinary"),
+        BINARY(true, byte[].class, byte[].class, "binary"),
+        VARCHAR(true, byte[].class, byte[].class,"varchar"),
+        CHAR(true, byte[].class, byte[].class,"char"),
+        STRUCT(false, Class.class, Class.class, "struct");
 
         /**
          * Ensure that all elements in names are in <b>lowercase</b>.
          * @param isPrimitive
          * @param names
          */
-        Category(boolean isPrimitive, String... names)
+        Category(boolean isPrimitive, Class<?> externalJavaType, Class<?> internalJavaType, String... names)
         {
             checkArgument(names != null && names.length > 0,
                     "names is null or empty");
             this.primaryName = names[0];
             this.isPrimitive = isPrimitive;
             this.allNames.addAll(Arrays.asList(names));
+            this.externalJavaType = externalJavaType;
+            this.internalJavaType = internalJavaType;
         }
 
         final boolean isPrimitive;
         final String primaryName;
         final Set<String> allNames = new HashSet<>();
+        final Class<?> externalJavaType;
+        final Class<?> internalJavaType;
 
         public boolean isPrimitive()
         {
@@ -177,6 +186,16 @@ public final class TypeDescription
         public Set<String> getAllNames()
         {
             return ImmutableSet.copyOf(this.allNames);
+        }
+
+        public Class<?> getExternalJavaType()
+        {
+            return externalJavaType;
+        }
+
+        public Class<?> getInternalJavaType()
+        {
+            return internalJavaType;
         }
 
         public boolean match(String name)
