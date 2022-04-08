@@ -22,9 +22,9 @@ package io.pixelsdb.pixels.core.predicate;
 import com.alibaba.fastjson.annotation.JSONCreator;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import java.util.BitSet;
 import java.util.Map;
 import java.util.SortedMap;
 
@@ -83,17 +83,18 @@ public class TableScanFilters
      *
      * @param rowBatch the row batch.
      * @param result the filter result.
+     * @param tmp the temporary bitmap to be used in filter.
      */
-    void doFilter(VectorizedRowBatch rowBatch, BitSet result, BitSet columnResult)
+    void doFilter(VectorizedRowBatch rowBatch, Bitmap result, Bitmap tmp)
     {
         // set all bits to true.
-        result.set(0, rowBatch.size, true);
+        result.set(0, rowBatch.size);
         for (Map.Entry<Integer, ColumnFilter> entry : this.columnFilters.entrySet())
         {
             int columnId = entry.getKey();
             ColumnFilter columnFilter = entry.getValue();
-            columnFilter.doFilter(rowBatch.cols[columnId], 0, rowBatch.size, columnResult);
-            result.and(columnResult);
+            columnFilter.doFilter(rowBatch.cols[columnId], 0, rowBatch.size, tmp);
+            result.and(tmp);
         }
     }
 }

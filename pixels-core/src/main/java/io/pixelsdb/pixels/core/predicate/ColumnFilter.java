@@ -25,12 +25,12 @@ import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.google.common.reflect.TypeToken;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -140,7 +140,7 @@ public class ColumnFilter<T extends Comparable<T>>
      * @param result the filtered result, in which the ith bit is set if the ith
      *               value in the column vector matches the filter.
      */
-    public void doFilter(ColumnVector columnVector, int start, int length, BitSet result)
+    public void doFilter(ColumnVector columnVector, int start, int length, Bitmap result)
     {
         if (this.filter.isAll)
         {
@@ -204,7 +204,7 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
-    private void doFilter(byte[] vector, boolean[] isNull, int start, int length, BitSet result)
+    private void doFilter(byte[] vector, boolean[] isNull, int start, int length, Bitmap result)
     {
         boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
@@ -310,7 +310,7 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
-    private void doFilter(long[] vector, boolean[] isNull, int start, int length, BitSet result)
+    private void doFilter(long[] vector, boolean[] isNull, int start, int length, Bitmap result)
     {
         boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
@@ -417,7 +417,7 @@ public class ColumnFilter<T extends Comparable<T>>
     }
 
     private void doFilter(long[] vector, boolean[] isNull, int precision, int scale,
-                          int start, int length, BitSet result)
+                          int start, int length, Bitmap result)
     {
         boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
@@ -543,7 +543,7 @@ public class ColumnFilter<T extends Comparable<T>>
     }
 
     private void doFilter(byte[][] vector, int[] starts, int[] lens, boolean[] isNull,
-                          int start, int length, BitSet result)
+                          int start, int length, Bitmap result)
     {
         boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())
@@ -662,7 +662,7 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
-    private void doFilter(int[] vector, boolean[] isNull, int start, int length, BitSet result)
+    private void doFilter(int[] vector, boolean[] isNull, int start, int length, Bitmap result)
     {
         boolean noNulls = isNull == null;
         if (!this.filter.ranges.isEmpty())

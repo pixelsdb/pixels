@@ -28,11 +28,11 @@ import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.BitSet;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -103,13 +103,13 @@ public class TestPredicate
         columnFilters.put(1, columnFilter);
         TableScanFilters tableScanFilters = new TableScanFilters("tpch", "orders", columnFilters);
 
-        BitSet filtered = new BitSet(1024);
-        BitSet columnFiltered = new BitSet(1024);
+        Bitmap filtered = new Bitmap(1024, true);
+        Bitmap tmp = new Bitmap(1024, false);
 
         while (true)
         {
             VectorizedRowBatch rowBatch = recordReader.readBatch(1024);
-            tableScanFilters.doFilter(rowBatch, filtered, columnFiltered);
+            tableScanFilters.doFilter(rowBatch, filtered, tmp);
             System.out.println("cardinality: " + filtered.cardinality());
             if (rowBatch.endOfFile)
             {
