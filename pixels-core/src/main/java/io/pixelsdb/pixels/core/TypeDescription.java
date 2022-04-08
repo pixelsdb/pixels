@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
-import io.pixelsdb.pixels.core.predicate.Decimal;
+import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;

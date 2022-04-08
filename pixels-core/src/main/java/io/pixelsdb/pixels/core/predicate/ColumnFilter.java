@@ -25,6 +25,7 @@ import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.google.common.reflect.TypeToken;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.lang.reflect.Type;
@@ -165,7 +166,8 @@ public class ColumnFilter<T extends Comparable<T>>
                 return;
             case DECIMAL:
                 DecimalColumnVector decv = (DecimalColumnVector) columnVector;
-                doFilter(decv.vector, decv.noNulls ? null : decv.isNull, start, length, result);
+                doFilter(decv.vector, decv.noNulls ? null : decv.isNull,
+                        decv.precision, decv.scale, start, length, result);
                 return;
             case FLOAT:
             case DOUBLE:
@@ -559,16 +561,17 @@ public class ColumnFilter<T extends Comparable<T>>
 
     private int byteArrayCmp(byte[] b1, int start1, int len1, byte[] b2, int start2, int len2)
     {
-        int lim = Math.min(len1, len2);
+        int lim = len1 < len2 ? len1 : len2;
         byte c1, c2;
-        int k = 0;
+        int k = start1, j = start2;
         while (k < lim) {
             c1 = b1[k];
-            c2 = b2[k];
+            c2 = b2[j];
             if (c1 != c2) {
                 return c1 - c2;
             }
             k++;
+            j++;
         }
         return len1 - len2;
     }
