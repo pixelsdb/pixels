@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -38,6 +40,10 @@ import java.util.Arrays;
  */
 public abstract class ColumnVector implements AutoCloseable
 {
+    /**
+     * length is the capacity, i.e., maximum number of values, of this column vector
+     * <b>DO NOT</b> modify it or used it as the number of values in-used.
+     */
     int length;
     int writeIndex = 0;
     long memoryUsage = 0L;
@@ -305,14 +311,22 @@ public abstract class ColumnVector implements AutoCloseable
     public abstract void duplicate(ColumnVector inputVector);
 
     /**
-     * Initialize the column vector. This method can be overridden by specific column vector types.
-     * Use this method only if the individual type of the column vector is not known, otherwise its
-     * preferable to call specific initialization methods.
+     * Initialize the column vector. This method can be overridden by specific column
+     * vector types. Use this method only if the individual type of the column vector
+     * is not known, otherwise it is preferable to call specific initialization methods.
      */
     public void init()
     {
         // Do nothing by default
     }
+
+    /**
+     * Compact all the survived values before the give beforeIndex (exclusive) to the
+     * front of this column vector. The ith value survives if the ith bit in filter is set.
+     * @param filter the filter
+     * @param beforeIndex the exclusive index before which the rows are checked
+     */
+    abstract protected void applyFilter(Bitmap filter, int beforeIndex);
 
     /**
      * Ensure the ColumnVector can hold at least size values.

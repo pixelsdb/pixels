@@ -19,9 +19,12 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.sql.Date;
 import java.util.Arrays;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 
@@ -255,6 +258,33 @@ public class DateColumnVector extends ColumnVector
             this.isRepeating = srcVector.isRepeating;
             this.writeIndex = srcVector.writeIndex;
         }
+    }
+
+    @Override
+    protected void applyFilter(Bitmap filter, int beforeIndex)
+    {
+        checkArgument(!isRepeating,
+                "column vector is repeating, flatten before applying filter");
+
+        boolean noNulls = true;
+        for (int i = filter.nextSetBit(0), j = 0;
+             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        {
+            if (i > j)
+            {
+                this.dates[j] = this.dates[i];
+                this.isNull[j] = this.isNull[i];
+            }
+            if (this.isNull[j])
+            {
+                noNulls = false;
+            }
+            /*
+             * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
+             * Therefore, we do not check overflow here.
+             */
+        }
+        this.noNulls = noNulls;
     }
 
     /**

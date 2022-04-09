@@ -19,8 +19,12 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.sql.Timestamp;
 import java.util.Arrays;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * TimestampColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
@@ -297,6 +301,33 @@ public class TimestampColumnVector extends ColumnVector
             this.isRepeating = srcVector.isRepeating;
             this.writeIndex = srcVector.writeIndex;
         }
+    }
+
+    @Override
+    protected void applyFilter(Bitmap filter, int beforeIndex)
+    {
+        checkArgument(!isRepeating,
+                "column vector is repeating, flatten before applying filter");
+
+        boolean noNulls = true;
+        for (int i = filter.nextSetBit(0), j = 0;
+             i >= 0 && i < this.length; i = filter.nextSetBit(i+1), j++)
+        {
+            if (i > j)
+            {
+                this.times[j] = this.times[i];
+                this.isNull[j] = this.isNull[i];
+            }
+            if (this.isNull[j])
+            {
+                noNulls = false;
+            }
+            /*
+             * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
+             * Therefore, we do not check overflow here.
+             */
+        }
+        this.noNulls = noNulls;
     }
 
     // Simplify vector by brute-force flattening noNulls and isRepeating
