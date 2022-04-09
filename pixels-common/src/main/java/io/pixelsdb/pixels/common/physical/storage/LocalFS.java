@@ -40,10 +40,14 @@ import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * This implementation is used to access all kinds of POSIX file systems that are mounted
+ * on a local directory. The file system does not need to be local physically. For example,
+ * it could be a network file system mounted on a local point such as /mnt/nfs.
+ *
+ * @author hank
  * Created at: 20/08/2021
- * Author: hank
  */
-public class LocalFS implements Storage
+public final class LocalFS implements Storage
 {
     private final static boolean enableCache;
 

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
+import io.pixelsdb.pixels.common.physical.storage.MinIO;
 import io.pixelsdb.pixels.common.physical.storage.S3;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
@@ -106,7 +107,8 @@ public class StorageFactory
     {
         try
         {
-            // 'synchronized' in Java is reentrant, it is fine the call the other getStorage().
+            // 'synchronized' in Java is reentrant,
+            // it is fine to call the other getStorage() from here.
             if (schemeOrPath.contains("://"))
             {
                 return getStorage(Storage.Scheme.fromPath(schemeOrPath));
@@ -131,23 +133,25 @@ public class StorageFactory
             return storageImpls.get(scheme);
         }
 
-        Storage storage = null;
-        if (scheme == Storage.Scheme.hdfs)
+        Storage storage;
+        switch (scheme)
         {
-            storage = new HDFS();
+            case hdfs:
+                storage = new HDFS();
+                break;
+            case file:
+                storage = new LocalFS();
+                break;
+            case s3:
+                storage = new S3();
+                break;
+            case minio:
+                storage = new MinIO();
+                break;
+            default:
+                throw new IOException("Unknown storage scheme: " + scheme.name());
         }
-        else if (scheme == Storage.Scheme.s3)
-        {
-            storage = new S3();
-        }
-        else if (scheme == Storage.Scheme.file)
-        {
-            storage = new LocalFS();
-        }
-        if (storage != null)
-        {
-            storageImpls.put(scheme, storage);
-        }
+        storageImpls.put(scheme, storage);
 
         return storage;
     }

@@ -41,10 +41,11 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
+ * It is tested that this implementation is compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
+ * @author hank
  * Created at: 20/08/2021
- * Author: hank
  */
-public class HDFS implements Storage
+public final class HDFS implements Storage
 {
     private static Logger logger = LogManager.getLogger(HDFS.class);
     private static String SchemePrefix = Scheme.hdfs.name() + "://";
@@ -62,12 +63,14 @@ public class HDFS implements Storage
         {
             if (configDir.exists() && configDir.isDirectory())
             {
-                File[] hdfsConfigFiles = configDir.listFiles((file, s) -> s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
+                File[] hdfsConfigFiles = configDir.listFiles((file, s) ->
+                        s.endsWith("core-site.xml") || s.endsWith("hdfs-site.xml"));
                 if (hdfsConfigFiles != null && hdfsConfigFiles.length == 2)
                 {
                     conf.addResource(hdfsConfigFiles[0].toURI().toURL());
                     conf.addResource(hdfsConfigFiles[1].toURI().toURL());
-                    logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " + hdfsConfigFiles[1].toURI());
+                    logger.debug("add conf file " + hdfsConfigFiles[0].toURI() + ", " +
+                            hdfsConfigFiles[1].toURI());
                 }
                 else
                 {
@@ -76,8 +79,10 @@ public class HDFS implements Storage
             }
             else
             {
-                logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" + configDir.getPath());
-                throw new IOException("can not read hdfs configuration file from hdfs.config.dir=" + configDir.getPath());
+                logger.error("can not read hdfs configuration file in pixels connector. hdfs.config.dir=" +
+                        configDir.getPath());
+                throw new IOException("can not read hdfs configuration file from hdfs.config.dir=" +
+                        configDir.getPath());
             }
             this.fs = FileSystem.get(conf);
         }
@@ -299,18 +304,21 @@ public class HDFS implements Storage
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         Path fsPath = new Path(path);
-        return fs.create(fsPath, overwrite, bufferSize, fs.getDefaultReplication(fsPath), fs.getDefaultBlockSize(fsPath));
+        return fs.create(fsPath, overwrite, bufferSize,
+                fs.getDefaultReplication(fsPath), fs.getDefaultBlockSize(fsPath));
     }
 
     @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize,
+                                   short replication) throws IOException
     {
         Path fsPath = new Path(path);
         return fs.create(fsPath, overwrite, bufferSize, replication, fs.getDefaultBlockSize(fsPath));
     }
 
     @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize,
+                                   short replication, long blockSize) throws IOException
     {
         return fs.create(new Path(path), overwrite, bufferSize, replication, blockSize);
     }

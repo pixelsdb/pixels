@@ -59,4 +59,8 @@ public final class Constants
     // the prefix for keys of s3 metadata (i.e. file path -> file id).
     public static final String S3_META_PREFIX = "pixels_storage_s3_meta:";
 
+    public static final String MINIO_ID_KEY = "pixels_storage_minio_id";
+    // the prefix for keys of minio metadata (i.e. file path -> file id).
+    public static final String MINIO_META_PREFIX = "pixels_storage_minio_meta:";
+
 }

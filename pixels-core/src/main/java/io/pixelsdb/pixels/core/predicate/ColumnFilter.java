@@ -533,15 +533,34 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
+    /**
+     * Notice that we currently only support comparing two Strings that are encoded in ASCII
+     * characters. The code of these characters is in the range of [0, 127], whether using UTF8 or
+     * ISO-8859-1 charset encoding.
+     * <br/>
+     * Therefore, if b1 and b2 represent two Strings, each character in the String is encoded to
+     * only one byte with a positive value. Comparing b1 and b2 per byte, what we do in this method,
+     * is equivalent to comparing the original Strings.
+     *
+     * @param b1 the first byte array
+     * @param start1 the start offset in b1
+     * @param len1 the number of bytes to compare in b1
+     * @param b2 the second byte array
+     * @param start2 the start offset in b2
+     * @param len2 the number of bytes to compare in b2
+     * @return
+     */
     private int byteArrayCmp(byte[] b1, int start1, int len1, byte[] b2, int start2, int len2)
     {
         int lim = len1 < len2 ? len1 : len2;
-        byte c1, c2;
+        byte c1, c2; // We only support ASCII characters, would not overflow.
         int k = start1, j = start2;
-        while (k < lim) {
+        while (k < lim)
+        {
             c1 = b1[k];
             c2 = b2[j];
-            if (c1 != c2) {
+            if (c1 != c2)
+            {
                 return c1 - c2;
             }
             k++;

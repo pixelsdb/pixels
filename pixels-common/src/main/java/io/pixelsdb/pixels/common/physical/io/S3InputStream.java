@@ -33,8 +33,10 @@ import java.io.InputStream;
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
 /**
+ * The input stream for AWS S3 compatible storage systems.
+ *
+ * @author hank
  * Created at: 9/29/21
- * Author: hank
  */
 public class S3InputStream extends InputStream
 {

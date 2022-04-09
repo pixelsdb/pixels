@@ -66,6 +66,7 @@ public class PhysicalWriterUtil
                 writer = new PhysicalLocalWriter(storage, path);
                 break;
             case s3:
+            case minio:
                 writer = new PhysicalS3Writer(storage, path, overwrite);
                 break;
             default:

@@ -32,12 +32,14 @@ import java.util.List;
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
 /**
+ * The output stream for AWS S3 compatible storage systems.
  * <p>
  * Referenced the implementation from
  * <a href="https://gist.github.com/blagerweij/ad1dbb7ee2fff8bcffd372815ad310eb">Barry Lagerweij</a>.
  * </p>
+ *
+ * @author hank
  * Created at: 9/24/21
- * Author: hank
  */
 public class S3OutputStream extends OutputStream
 {

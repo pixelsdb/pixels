@@ -29,7 +29,8 @@ import java.util.Map;
 import java.util.SortedMap;
 
 /**
- * The filters used in table scan.
+ * The filter used in table scan. Calling doFilter() in this class
+ * is thread-safe.
  *
  * Created at: 08/04/2022
  * Author: hank
