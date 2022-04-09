@@ -153,6 +153,14 @@ public class ColumnFilter<T extends Comparable<T>>
         {
             return;
         }
+        if (columnVector.isRepeating)
+        {
+            /*
+             * For simplicity, we flatten the column vector instead of
+             * dealing with the repeating column vector.
+             */
+            columnVector.flatten(false, null, columnVector.getLength());
+        }
         switch (this.columnType)
         {
             case BOOLEAN:

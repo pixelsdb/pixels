@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -313,6 +315,8 @@ public abstract class ColumnVector implements AutoCloseable
     {
         // Do nothing by default
     }
+
+    abstract protected void applyFilter(Bitmap filter);
 
     /**
      * Ensure the ColumnVector can hold at least size values.

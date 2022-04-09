@@ -21,8 +21,19 @@ package io.pixelsdb.pixels.lambda;
 
 import com.alibaba.fastjson.JSON;
 import com.google.gson.Gson;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.ColumnFilter;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
+
+import java.io.IOException;
 
 /**
  * Created at: 07/04/2022
@@ -39,5 +50,42 @@ public class TestColumnFilter
         System.out.println(System.currentTimeMillis()-start);
         ColumnFilter filter0 = JSON.parseObject(json, ColumnFilter.class);
         System.out.println(System.currentTimeMillis()-start);
+    }
+
+    @Test
+    public void testFilter() throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
+        PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                .setStorage(storage)
+                .setEnableCache(false)
+                .setPixelsFooterCache(new PixelsFooterCache())
+                .setPath("file:///home/hank/20220312072707_0.pxl").build();
+        PixelsReaderOption readerOption = new PixelsReaderOption();
+        readerOption.queryId(1);
+        readerOption.rgRange(0, 1);
+        readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate"});
+        PixelsRecordReader recordReader = pixelsReader.read(readerOption);
+
+        ExprTree bigintFilter1 = new ExprTree("o_orderkey", ExprTree.Operator.LE, "100");
+        ExprTree bigintFilter2 = new ExprTree("o_orderkey", ExprTree.Operator.GT, "200");
+        ExprTree filter = new ExprTree(ExprTree.Operator.OR, bigintFilter1, bigintFilter2);
+
+        TypeDescription rowBatchSchema = recordReader.getResultSchema();
+        filter.prepare(rowBatchSchema);
+
+        while (true)
+        {
+            VectorizedRowBatch rowBatch = recordReader.readBatch(1024);
+            VectorizedRowBatch newRowBatch = filter.filter(rowBatch, rowBatchSchema.createRowBatch(1024));
+            System.out.println(newRowBatch.size);
+            if (rowBatch.endOfFile)
+            {
+                break;
+            }
+        }
+
+        recordReader.close();
+        pixelsReader.close();
     }
 }

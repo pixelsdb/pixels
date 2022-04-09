@@ -19,6 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * VectorizedRowBatch derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
@@ -138,6 +143,27 @@ public class VectorizedRowBatch implements AutoCloseable
             }
         }
         return b.toString();
+    }
+
+    public VectorizedRowBatch applyFilter(Bitmap filter)
+    {
+        requireNonNull(filter, "filter is null");
+        checkArgument(filter.capacity() == this.size,
+                "filter is too large or small");
+
+        int cardinality = filter.cardinality();
+        if (cardinality == this.size)
+        {
+            return this;
+        }
+
+        for (ColumnVector columnVector : this.cols)
+        {
+            columnVector.applyFilter(filter);
+        }
+        this.size = cardinality;
+
+        return this;
     }
 
     /**

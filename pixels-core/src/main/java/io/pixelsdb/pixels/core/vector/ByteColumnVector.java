@@ -19,7 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.util.Arrays;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * ByteColumnVector
@@ -130,6 +134,34 @@ public class ByteColumnVector extends ColumnVector
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
         }
+    }
+
+    @Override
+    protected void applyFilter(Bitmap filter)
+    {
+        checkArgument(!isRepeating, "column vector is repeating, flatten before applying filter");
+
+        int j = 0;
+        boolean noNulls = true;
+        for (int i = filter.nextSetBit(0); i >= 0; i = filter.nextSetBit(i+1))
+        {
+            if (i > j)
+            {
+                this.vector[j] = this.vector[i];
+                this.isNull[j] = this.isNull[i];
+                if (this.isNull[j])
+                {
+                    noNulls = false;
+                }
+                j++;
+            }
+            /*
+             * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
+             * Therefore, we do not check overflow here.
+             */
+        }
+        this.noNulls = noNulls;
+        this.length = j;
     }
 
     @Override

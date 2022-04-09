@@ -19,7 +19,11 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 import java.nio.charset.StandardCharsets;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * BinaryColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
@@ -447,7 +451,6 @@ public class BinaryColumnVector extends ColumnVector
             // at position 0 is undefined if the position 0 value is null.
             if (noNulls || !isNull[0])
             {
-
                 // loops start at position 1 because position 0 is already set
                 if (selectedInUse)
                 {
@@ -542,6 +545,36 @@ public class BinaryColumnVector extends ColumnVector
     public void init()
     {
         initBuffer(0);
+    }
+
+    @Override
+    protected void applyFilter(Bitmap filter)
+    {
+        checkArgument(!isRepeating, "column vector is repeating, flatten before applying filter");
+
+        int j = 0;
+        boolean noNulls = true;
+        for (int i = filter.nextSetBit(0); i >= 0; i = filter.nextSetBit(i+1))
+        {
+            if (i > j)
+            {
+                this.vector[j] = this.vector[i];
+                this.isNull[j] = this.isNull[i];
+                if (this.isNull[j])
+                {
+                    noNulls = false;
+                }
+                this.start[j] = this.start[i];
+                this.lens[j] = this.lens[i];
+                j++;
+            }
+            /*
+             * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
+             * Therefore, we do not check overflow here.
+             */
+        }
+        this.noNulls = noNulls;
+        this.length = j;
     }
 
     public String toString(int row)

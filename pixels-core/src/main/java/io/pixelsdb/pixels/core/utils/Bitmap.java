@@ -349,6 +349,8 @@ public class Bitmap
      */
     public int nextSetBit(int fromIndex) {
         int u = wordIndex(fromIndex);
+        if (u >= wordsInUse)
+            return -1;
 
         long word = words[u] & (WORD_MASK << fromIndex);
 

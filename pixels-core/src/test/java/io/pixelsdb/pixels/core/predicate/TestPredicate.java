@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
@@ -110,7 +111,24 @@ public class TestPredicate
         {
             VectorizedRowBatch rowBatch = recordReader.readBatch(1024);
             tableScanFilters.doFilter(rowBatch, filtered, tmp);
-            System.out.println("cardinality: " + filtered.cardinality());
+            if (filtered.cardinality() != 1024)
+            {
+                LongColumnVector columnVector = (LongColumnVector) rowBatch.cols[1];
+                for (int i = 0; i < columnVector.getLength(); ++i)
+                {
+                    System.out.println(columnVector.vector[i]);
+                }
+            }
+            rowBatch.applyFilter(filtered);
+            if (rowBatch.size != 1024)
+            {
+                System.out.println("filtered row batch size: " + rowBatch.size);
+                LongColumnVector columnVector = (LongColumnVector) rowBatch.cols[1];
+                for (int i = 0; i < columnVector.getLength(); ++i)
+                {
+                    System.out.println(columnVector.vector[i]);
+                }
+            }
             if (rowBatch.endOfFile)
             {
                 break;
