@@ -24,6 +24,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -45,22 +46,30 @@ import java.util.concurrent.TimeUnit;
  *
  * @author tiannan
  * @author hank
- * Created in 03.2022
+ * Created in: 03.2022
  */
 public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>, String>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
+    private static final int pixelStride;
+    private static final int rowGroupSize;
+    // blockSize and replication have no effects for S3, therefore we set the default value here.
+    private static final long blockSize = 2048L * 1024L * 1024L;
+    private static final short replication = (short) 1;
     private static Storage storage;
 
     static
     {
+        pixelStride = Integer.parseInt(ConfigFactory.Instance().getProperty("pixel.stride"));
+        rowGroupSize = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.size"));
         try
         {
             storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+
         } catch (IOException e)
         {
-            logger.error("failed to initialize s3 storage", e);
+            logger.error("failed to initialize s3 storage.", e);
         }
     }
 
@@ -72,15 +81,28 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             ExecutorService threadPool = Executors.newFixedThreadPool(12);
             String requestId = context.getAwsRequestId();
 
-            ArrayList<String> fileNames = event.get("fileNames");
+            ArrayList<String> fileNames = event.get("inputs");
+            String outputDir = event.get("outputs").get(0); // currently, we only use one output directory.
+            if (!outputDir.endsWith("/"))
+            {
+                outputDir += "/";
+            }
             String[] cols = event.get("cols").toArray(new String[0]);
+            // currently, we use an integrated table scan filter on each table.
             TableScanFilter filter = JSON.parseObject(event.get("filter").get(0), TableScanFilter.class);
-
+            StringBuilder response = new StringBuilder();
             for (int i = 0; i < fileNames.size(); i++)
             {
-                int finalI = i;
-                threadPool.submit(() -> scanFile(fileNames.get(finalI), 102400, cols, filter,
-                        requestId + "_out_" + finalI));
+                String in = fileNames.get(i);
+                String out = outputDir + requestId + "_out_" + i;
+
+                if (i > 0)
+                {
+                    response.append(",");
+                }
+                response.append(out);
+
+                threadPool.submit(() -> scanFile(in, 102400, cols, filter, out));
             }
             threadPool.shutdown();
             try
@@ -90,20 +112,8 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             {
                 logger.error("interrupted while waiting for the termination of scan.", e);
             }
-
-            // create response to inform invoker which are the s3 paths of files written
-            String response = "";
-            for (int i = 0; i < fileNames.size(); i++)
-            {
-                if (i < fileNames.size() - 1)
-                {
-                    response = response + requestId + "_out_" + i + ",";
-                } else
-                {
-                    response = response + requestId + "_out_" + i;
-                }
-            }
-            return response;
+            // return the output file names in csv format.
+            return response.toString();
         } catch (Exception e)
         {
             logger.error("error during scan.", e);
@@ -112,28 +122,26 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
     }
 
     /**
-     * @param fileName
+     * @param inputPath
      * @param batchSize
      * @param cols
-     * @param resultFile fileName on s3 to store pixels readers' results
+     * @param outputPath fileName on s3 to store pixels readers' results
      * @return
      */
-    public String scanFile(String fileName, int batchSize, String[] cols, TableScanFilter filter, String resultFile)
+    public String scanFile(String inputPath, int batchSize, String[] cols, TableScanFilter filter, String outputPath)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
-
         VectorizedRowBatch rowBatch;
 
-        try (PixelsReader pixelsReader = getReader(fileName);
+        try (PixelsReader pixelsReader = getReader(inputPath);
              PixelsRecordReader recordReader = pixelsReader.read(option))
         {
             TypeDescription rowBatchSchema = recordReader.getResultSchema();
 
-            String s3Path = "tiannan-test/" + resultFile;
-            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, s3Path);
+            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, outputPath);
             Bitmap filtered = new Bitmap(batchSize, true);
             Bitmap tmp = new Bitmap(batchSize, false);
             while (true)
@@ -147,16 +155,14 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                 }
                 if (rowBatch.endOfFile)
                 {
-                    pixelsReader.close();
                     pixelsWriter.close();
                     break;
                 }
             }
         } catch (Exception e)
         {
-            logger.error("failed to scan the file '" + fileName + "' and output the result.", e);
+            logger.error("failed to scan the file '" + inputPath + "' and output the result.", e);
         }
-        logger.debug("finish scanning file: " + fileName);
         return "success";
     }
 
@@ -176,16 +182,10 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
         } catch (Exception e)
         {
-            e.printStackTrace();
+            logger.error("failed to create pixels reader.", e);
         }
-
         return pixelsReader;
     }
-
-    private static final int pixelStride = 10000;
-    private static final int rowGroupSize = 256 * 1024 * 1024;
-    private static final long blockSize = 2048L * 1024L * 1024L;
-    private static final short replication = (short) 1;
 
     private PixelsWriter getWriter(TypeDescription schema, String filePath)
     {
