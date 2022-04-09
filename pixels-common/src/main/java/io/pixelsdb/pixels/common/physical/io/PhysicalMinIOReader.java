@@ -27,6 +27,12 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * The physical reader for MinIO.
+ * <br/>
+ * According to some brief tests, the performance of accessing
+ * MinIO using Amazon S3AsyncClient is much worse than using S3Client.
+ * Therefore, we only support synchronous read here.
+ * <br/>
+ *
  * @author hank
  * Created at: 10/04/2022
  */

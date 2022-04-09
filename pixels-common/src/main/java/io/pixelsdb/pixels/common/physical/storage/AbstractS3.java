@@ -48,6 +48,7 @@ import static java.util.Objects.requireNonNull;
  * (i.e., a prefix or empty object in a bucket). And all the pixels
  * files in this table are stored as individual objects in the folder.
  * <br/>
+ *
  * @author hank
  * Created at: 09/04/2021 23:55
  */

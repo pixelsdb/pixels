@@ -43,6 +43,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.S3_META_PREFIX;
  * (i.e., a prefix or empty object in a bucket). And all the pixels
  * files in this table are stored as individual objects in the folder.
  * <br/>
+ *
  * @author hank
  * Created at: 20/08/2021
  */

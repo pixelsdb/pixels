@@ -38,9 +38,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.MINIO_META_PREFIX;
  * files in this table are stored as individual objects in the folder.
  * <br/>
  * To reduce the size of dependencies, we use AWS S3 SDK to access MinIO.
- * However, according to some brief tests, the performance of accessing
- * MinIO using Amazon S3AsyncClient is much worse than using S3Client.
- * Therefore, we only use the synchronous client currently.
+ * <br/>
  *
  * @author hank
  * Created at: 09/04/2022
