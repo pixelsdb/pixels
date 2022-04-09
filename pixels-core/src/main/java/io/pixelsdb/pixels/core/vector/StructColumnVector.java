@@ -170,7 +170,7 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter)
+    protected void applyFilter(Bitmap filter, int beforeIndex)
     {
         throw new UnsupportedOperationException("filter is not supported on StructColumnVector.");
     }

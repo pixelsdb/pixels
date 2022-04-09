@@ -53,7 +53,8 @@ public class Bitmap
     /**
      * Given a bit index, return word index containing it.
      */
-    private static int wordIndex(int bitIndex) {
+    private static int wordIndex(int bitIndex)
+    {
         return bitIndex >> ADDRESS_BITS_PER_WORD;
     }
 
@@ -63,15 +64,16 @@ public class Bitmap
      * {@code capacity-1}. All bits are initialized to {@code value}.
      *
      * @param capacity the initial size of the bitmap
-     * @param value the initial value ot the bits
+     * @param value    the initial value ot the bits
      * @throws NegativeArraySizeException if the specified initial size
-     *         is negative
+     *                                    is negative
      */
-    public Bitmap(int capacity, boolean value) {
+    public Bitmap(int capacity, boolean value)
+    {
         // nbits can't be negative; size 0 is OK
         if (capacity < 0)
             throw new NegativeArraySizeException("capacity < 0: " + capacity);
-        words = new long[wordIndex(capacity-1) + 1];
+        words = new long[wordIndex(capacity - 1) + 1];
         wordsInUse = words.length;
         this.capacity = capacity;
         if (value)
@@ -80,30 +82,34 @@ public class Bitmap
         }
     }
 
-    public void flip(int bitIndex) {
+    public void flip(int bitIndex)
+    {
         int wordIndex = wordIndex(bitIndex);
         words[wordIndex] ^= (1L << bitIndex);
     }
 
-    public void flip(int fromIndex, int toIndex) {
+    public void flip(int fromIndex, int toIndex)
+    {
         if (fromIndex == toIndex)
             return;
 
         int startWordIndex = wordIndex(fromIndex);
-        int endWordIndex   = wordIndex(toIndex - 1);
+        int endWordIndex = wordIndex(toIndex - 1);
 
         long firstWordMask = WORD_MASK << fromIndex;
-        long lastWordMask  = WORD_MASK >>> -toIndex;
-        if (startWordIndex == endWordIndex) {
+        long lastWordMask = WORD_MASK >>> -toIndex;
+        if (startWordIndex == endWordIndex)
+        {
             // Case 1: One word
             words[startWordIndex] ^= (firstWordMask & lastWordMask);
-        } else {
+        } else
+        {
             // Case 2: Multiple words
             // Handle first word
             words[startWordIndex] ^= firstWordMask;
 
             // Handle intermediate words, if any
-            for (int i = startWordIndex+1; i < endWordIndex; i++)
+            for (int i = startWordIndex + 1; i < endWordIndex; i++)
                 words[i] ^= WORD_MASK;
 
             // Handle last word
@@ -111,31 +117,35 @@ public class Bitmap
         }
     }
 
-    public void set(int bitIndex) {
+    public void set(int bitIndex)
+    {
         int wordIndex = wordIndex(bitIndex);
         words[wordIndex] |= (1L << bitIndex); // Restores invariants
     }
 
-    public void set(int fromIndex, int toIndex) {
+    public void set(int fromIndex, int toIndex)
+    {
         if (fromIndex == toIndex)
             return;
 
         // Increase capacity if necessary
         int startWordIndex = wordIndex(fromIndex);
-        int endWordIndex   = wordIndex(toIndex - 1);
+        int endWordIndex = wordIndex(toIndex - 1);
 
         long firstWordMask = WORD_MASK << fromIndex;
-        long lastWordMask  = WORD_MASK >>> -toIndex;
-        if (startWordIndex == endWordIndex) {
+        long lastWordMask = WORD_MASK >>> -toIndex;
+        if (startWordIndex == endWordIndex)
+        {
             // Case 1: One word
             words[startWordIndex] |= (firstWordMask & lastWordMask);
-        } else {
+        } else
+        {
             // Case 2: Multiple words
             // Handle first word
             words[startWordIndex] |= firstWordMask;
 
             // Handle intermediate words, if any
-            for (int i = startWordIndex+1; i < endWordIndex; i++)
+            for (int i = startWordIndex + 1; i < endWordIndex; i++)
                 words[i] = WORD_MASK;
 
             // Handle last word (restores invariants)
@@ -145,17 +155,20 @@ public class Bitmap
 
     public void setAll()
     {
-        int i = wordsInUse;
+        words[wordsInUse-1] |= (WORD_MASK >>> -this.capacity);
+        int i = wordsInUse-1;
         while (i > 0)
             words[--i] = WORD_MASK;
     }
 
-    public void clear(int bitIndex) {
+    public void clear(int bitIndex)
+    {
         int wordIndex = wordIndex(bitIndex);
         words[wordIndex] &= ~(1L << bitIndex);
     }
 
-    public void clear(int fromIndex, int toIndex) {
+    public void clear(int fromIndex, int toIndex)
+    {
         if (fromIndex == toIndex)
             return;
 
@@ -163,17 +176,19 @@ public class Bitmap
         int endWordIndex = wordIndex(toIndex - 1);
 
         long firstWordMask = WORD_MASK << fromIndex;
-        long lastWordMask  = WORD_MASK >>> -toIndex;
-        if (startWordIndex == endWordIndex) {
+        long lastWordMask = WORD_MASK >>> -toIndex;
+        if (startWordIndex == endWordIndex)
+        {
             // Case 1: One word
             words[startWordIndex] &= ~(firstWordMask & lastWordMask);
-        } else {
+        } else
+        {
             // Case 2: Multiple words
             // Handle first word
             words[startWordIndex] &= ~firstWordMask;
 
             // Handle intermediate words, if any
-            for (int i = startWordIndex+1; i < endWordIndex; i++)
+            for (int i = startWordIndex + 1; i < endWordIndex; i++)
                 words[i] = 0;
 
             // Handle last word
@@ -181,13 +196,15 @@ public class Bitmap
         }
     }
 
-    public void clearAll() {
+    public void clearAll()
+    {
         int i = wordsInUse;
         while (i > 0)
             words[--i] = 0;
     }
 
-    public boolean get(int bitIndex) {
+    public boolean get(int bitIndex)
+    {
         int wordIndex = wordIndex(bitIndex);
         return ((words[wordIndex] & (1L << bitIndex)) != 0);
     }
@@ -201,7 +218,8 @@ public class Bitmap
      *
      * @param set a bitmap
      */
-    public void and(Bitmap set) {
+    public void and(Bitmap set)
+    {
         if (this == set)
             return;
 
@@ -223,7 +241,8 @@ public class Bitmap
      *
      * @param set a bitmap
      */
-    public void or(Bitmap set) {
+    public void or(Bitmap set)
+    {
         if (this == set)
             return;
 
@@ -246,9 +265,10 @@ public class Bitmap
      *     corresponding bit in the argument has the value {@code true}.
      * </ul>
      *
-     * @param  set a bitmap
+     * @param set a bitmap
      */
-    public void xor(Bitmap set) {
+    public void xor(Bitmap set)
+    {
         int wordsInCommon = Math.min(wordsInUse, set.wordsInUse);
 
         // Perform logical XOR on words in common
@@ -260,10 +280,11 @@ public class Bitmap
      * Clears all of the bits in this {@code Bitmap} whose corresponding
      * bit is set in the specified {@code Bitmap}.
      *
-     * @param  set the {@code Bitmap} with which to mask this
-     *         {@code Bitmap}
+     * @param set the {@code Bitmap} with which to mask this
+     *            {@code Bitmap}
      */
-    public void andNot(Bitmap set) {
+    public void andNot(Bitmap set)
+    {
         // Perform logical (a & !b) on words in common
         for (int i = Math.min(wordsInUse, set.wordsInUse) - 1; i >= 0; i--)
             words[i] &= ~set.words[i];
@@ -273,11 +294,12 @@ public class Bitmap
      * Returns true if the specified {@code Bitmap} has any bits set to
      * {@code true} that are also set to {@code true} in this {@code Bitmap}.
      *
-     * @param  set {@code Bitmap} to intersect with
+     * @param set {@code Bitmap} to intersect with
      * @return boolean indicating whether this {@code Bitmap} intersects
-     *         the specified {@code Bitmap}
+     * the specified {@code Bitmap}
      */
-    public boolean intersects(Bitmap set) {
+    public boolean intersects(Bitmap set)
+    {
         for (int i = Math.min(wordsInUse, set.wordsInUse) - 1; i >= 0; i--)
             if ((words[i] & set.words[i]) != 0)
                 return true;
@@ -291,12 +313,29 @@ public class Bitmap
      *
      * @return the logical size of this {@code Bitmap}
      */
-    public int length() {
+    public int length()
+    {
         if (wordsInUse == 0)
             return 0;
 
-        return BITS_PER_WORD * (wordsInUse - 1) +
-                (BITS_PER_WORD - Long.numberOfLeadingZeros(words[wordsInUse - 1]));
+        int i = wordsInUse - 1;
+        while (i >= 0)
+        {
+            if (words[i] == 0)
+            {
+                i--;
+            } else
+            {
+                break;
+            }
+        }
+        if (i < 0)
+        {
+            return 0;
+        }
+
+        return BITS_PER_WORD * i +
+                (BITS_PER_WORD - Long.numberOfLeadingZeros(words[i]));
     }
 
     /**
@@ -313,18 +352,86 @@ public class Bitmap
      *
      * @return boolean indicating whether this {@code Bitmap} is empty
      */
-    public boolean isEmpty() {
-        return wordsInUse == 0;
+    public boolean isEmpty()
+    {
+        int i = 0;
+        while (i < wordsInUse)
+        {
+            if (words[i] != 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if this {@code Bitmap} contains no bits that are set
+     * to {@code false}.
+     *
+     * @return boolean indicating whether this {@code Bitmap} is full
+     */
+    public boolean isFull()
+    {
+        int i = 0;
+        while (i < wordsInUse)
+        {
+            if (words[i] == 0)
+            {
+                return true;
+            }
+        }
+        return true;
     }
 
     /**
      * @return the number of bits set to {@code true} in this {@code Bitmap}
      */
-    public int cardinality() {
+    public int cardinality()
+    {
         int sum = 0;
         for (int i = 0; i < wordsInUse; i++)
             sum += Long.bitCount(words[i]);
         return sum;
+    }
+
+    /**
+     * @param fromIndex from bit, inclusive
+     * @param toIndex to bit, exclusive
+     * @return the number of bits set to {@code true} from fromIndex (inclusive)
+     * to toIndex (exclusive) in this {@code Bitmap}.
+     */
+    public int cardinality(int fromIndex, int toIndex)
+    {
+        if (fromIndex == toIndex)
+            return 0;
+
+        // Increase capacity if necessary
+        int startWordIndex = wordIndex(fromIndex);
+        int endWordIndex = wordIndex(toIndex - 1);
+
+        long firstWordMask = WORD_MASK << fromIndex;
+        long lastWordMask = WORD_MASK >>> -toIndex;
+        if (startWordIndex == endWordIndex)
+        {
+            // Case 1: One word
+            return Long.bitCount(
+                    words[startWordIndex] & (firstWordMask & lastWordMask));
+        } else
+        {
+            // Case 2: Multiple words
+            // Handle first word
+            int sum = Long.bitCount(
+                    words[startWordIndex] & firstWordMask);
+
+            // Handle intermediate words, if any
+            for (int i = startWordIndex + 1; i < endWordIndex; i++)
+                sum += Long.bitCount(words[i]);
+
+            // Handle last word (restores invariants)
+            sum += Long.bitCount(words[endWordIndex] & lastWordMask);
+            return sum;
+        }
     }
 
     /**
@@ -335,7 +442,7 @@ public class Bitmap
      * <p>To iterate over the {@code true} bits in a {@code Bitmap},
      * use the following loop:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * for (int i = bm.nextSetBit(0); i >= 0; i = bb.nextSetBit(i+1)) {
      *     // operate on index i here
      *     if (i == Integer.MAX_VALUE) {
@@ -343,18 +450,20 @@ public class Bitmap
      *     }
      * }}</pre>
      *
-     * @param  fromIndex the index to start checking from (inclusive)
+     * @param fromIndex the index to start checking from (inclusive)
      * @return the index of the next set bit, or {@code -1} if there
-     *         is no such bit
+     * is no such bit
      */
-    public int nextSetBit(int fromIndex) {
+    public int nextSetBit(int fromIndex)
+    {
         int u = wordIndex(fromIndex);
         if (u >= wordsInUse)
             return -1;
 
         long word = words[u] & (WORD_MASK << fromIndex);
 
-        while (true) {
+        while (true)
+        {
             if (word != 0)
                 return (u * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
             if (++u == wordsInUse)
@@ -367,10 +476,11 @@ public class Bitmap
      * Returns the index of the first bit that is set to {@code false}
      * that occurs on or after the specified starting index.
      *
-     * @param  fromIndex the index to start checking from (inclusive)
+     * @param fromIndex the index to start checking from (inclusive)
      * @return the index of the next clear bit
      */
-    public int nextClearBit(int fromIndex) {
+    public int nextClearBit(int fromIndex)
+    {
 
         int u = wordIndex(fromIndex);
         if (u >= wordsInUse)
@@ -378,7 +488,8 @@ public class Bitmap
 
         long word = ~words[u] & (WORD_MASK << fromIndex);
 
-        while (true) {
+        while (true)
+        {
             if (word != 0)
                 return (u * BITS_PER_WORD) + Long.numberOfTrailingZeros(word);
             if (++u == wordsInUse)
@@ -396,19 +507,21 @@ public class Bitmap
      * <p>To iterate over the {@code true} bits in a {@code Bitmap},
      * use the following loop:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * for (int i = bm.length(); (i = bm.previousSetBit(i-1)) >= 0; ) {
      *     // operate on index i here
      * }}</pre>
      *
-     * @param  fromIndex the index to start checking from (inclusive)
+     * @param fromIndex the index to start checking from (inclusive)
      * @return the index of the previous set bit, or {@code -1} if there
-     *         is no such bit
+     * is no such bit
      * @throws IndexOutOfBoundsException if the specified index is less
-     *         than {@code -1}
+     *                                   than {@code -1}
      */
-    public int previousSetBit(int fromIndex) {
-        if (fromIndex < 0) {
+    public int previousSetBit(int fromIndex)
+    {
+        if (fromIndex < 0)
+        {
             if (fromIndex == -1)
                 return -1;
             throw new IndexOutOfBoundsException(
@@ -419,11 +532,12 @@ public class Bitmap
         if (u >= wordsInUse)
             return length() - 1;
 
-        long word = words[u] & (WORD_MASK >>> -(fromIndex+1));
+        long word = words[u] & (WORD_MASK >>> -(fromIndex + 1));
 
-        while (true) {
+        while (true)
+        {
             if (word != 0)
-                return (u+1) * BITS_PER_WORD - 1 - Long.numberOfLeadingZeros(word);
+                return (u + 1) * BITS_PER_WORD - 1 - Long.numberOfLeadingZeros(word);
             if (u-- == 0)
                 return -1;
             word = words[u];
@@ -436,14 +550,16 @@ public class Bitmap
      * If no such bit exists, or if {@code -1} is given as the
      * starting index, then {@code -1} is returned.
      *
-     * @param  fromIndex the index to start checking from (inclusive)
+     * @param fromIndex the index to start checking from (inclusive)
      * @return the index of the previous clear bit, or {@code -1} if there
-     *         is no such bit
+     * is no such bit
      * @throws IndexOutOfBoundsException if the specified index is less
-     *         than {@code -1}
+     *                                   than {@code -1}
      */
-    public int previousClearBit(int fromIndex) {
-        if (fromIndex < 0) {
+    public int previousClearBit(int fromIndex)
+    {
+        if (fromIndex < 0)
+        {
             if (fromIndex == -1)
                 return -1;
             throw new IndexOutOfBoundsException(
@@ -454,11 +570,12 @@ public class Bitmap
         if (u >= wordsInUse)
             return fromIndex;
 
-        long word = ~words[u] & (WORD_MASK >>> -(fromIndex+1));
+        long word = ~words[u] & (WORD_MASK >>> -(fromIndex + 1));
 
-        while (true) {
+        while (true)
+        {
             if (word != 0)
-                return (u+1) * BITS_PER_WORD -1 - Long.numberOfLeadingZeros(word);
+                return (u + 1) * BITS_PER_WORD - 1 - Long.numberOfLeadingZeros(word);
             if (u-- == 0)
                 return -1;
             word = ~words[u];

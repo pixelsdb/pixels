@@ -19,14 +19,16 @@
  */
 package io.pixelsdb.pixels.lambda;
 
+import com.alibaba.fastjson.JSON;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.google.gson.Gson;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,12 +41,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * response is a list of files read and then written to s3
+ * The response is a list of files read and then written to s3.
+ *
+ * @author tiannan
+ * @author hank
+ * Created in 03.2022
  */
 public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>, String>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static final Gson gson = new Gson();
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static Storage storage;
 
@@ -69,12 +74,13 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
             ArrayList<String> fileNames = event.get("fileNames");
             String[] cols = event.get("cols").toArray(new String[0]);
-            ExprTree filter = gson.fromJson(event.get("filterJsonStr").get(0), ExprTree.class);
+            TableScanFilter filter = JSON.parseObject(event.get("filter").get(0), TableScanFilter.class);
 
             for (int i = 0; i < fileNames.size(); i++)
             {
                 int finalI = i;
-                threadPool.submit(() -> scanFile(fileNames.get(finalI), 102400, cols, filter, requestId + "file" + finalI));
+                threadPool.submit(() -> scanFile(fileNames.get(finalI), 102400, cols, filter,
+                        requestId + "_out_" + finalI));
             }
             threadPool.shutdown();
             try
@@ -91,10 +97,10 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             {
                 if (i < fileNames.size() - 1)
                 {
-                    response = response + requestId + "file" + i + ",";
+                    response = response + requestId + "_out_" + i + ",";
                 } else
                 {
-                    response = response + requestId + "file" + i;
+                    response = response + requestId + "_out_" + i;
                 }
             }
             return response;
@@ -112,7 +118,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
      * @param resultFile fileName on s3 to store pixels readers' results
      * @return
      */
-    public String scanFile(String fileName, int batchSize, String[] cols, ExprTree filter, String resultFile)
+    public String scanFile(String fileName, int batchSize, String[] cols, TableScanFilter filter, String resultFile)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
@@ -128,25 +134,16 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 
             String s3Path = "tiannan-test/" + resultFile;
             PixelsWriter pixelsWriter = getWriter(rowBatchSchema, s3Path);
-            //if (!filter.isEmpty)
-            {
-                //filter.prepare(rowBatchSchema);
-            }
-            int batch = 0;
+            Bitmap filtered = new Bitmap(batchSize, true);
+            Bitmap tmp = new Bitmap(batchSize, false);
             while (true)
             {
                 rowBatch = recordReader.readBatch(batchSize);
-                VectorizedRowBatch newRowBatch;
-                //if (!filter.isEmpty)
+                filter.doFilter(rowBatch, filtered, tmp);
+                rowBatch.applyFilter(filtered);
+                if (rowBatch.size > 0)
                 {
-                    //newRowBatch = filter.filter(rowBatch, rowBatchSchema.createRowBatch(batchSize));
-                } //else
-                {
-                    newRowBatch = rowBatch;
-                }
-                if (newRowBatch.size > 0)
-                {
-                    pixelsWriter.addRowBatch(newRowBatch);
+                    pixelsWriter.addRowBatch(rowBatch);
                 }
                 if (rowBatch.endOfFile)
                 {
@@ -154,11 +151,10 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                     pixelsWriter.close();
                     break;
                 }
-                batch += 1;
             }
         } catch (Exception e)
         {
-            logger.error("failed to scan the file and output the result.", e);
+            logger.error("failed to scan the file '" + fileName + "' and output the result.", e);
         }
         logger.debug("finish scanning file: " + fileName);
         return "success";

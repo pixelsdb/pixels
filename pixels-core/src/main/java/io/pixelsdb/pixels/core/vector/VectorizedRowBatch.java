@@ -148,10 +148,11 @@ public class VectorizedRowBatch implements AutoCloseable
     public VectorizedRowBatch applyFilter(Bitmap filter)
     {
         requireNonNull(filter, "filter is null");
-        checkArgument(filter.capacity() == this.size,
-                "filter is too large or small");
+        checkArgument(filter.capacity() >= this.size,
+                "filter is too small, filter capacity (" +
+                        filter.capacity() + "), row batch size (" + this.size + ").");
 
-        int cardinality = filter.cardinality();
+        int cardinality = filter.cardinality(0, this.size);
         if (cardinality == this.size)
         {
             return this;
@@ -159,7 +160,7 @@ public class VectorizedRowBatch implements AutoCloseable
 
         for (ColumnVector columnVector : this.cols)
         {
-            columnVector.applyFilter(filter);
+            columnVector.applyFilter(filter, this.size);
         }
         this.size = cardinality;
 

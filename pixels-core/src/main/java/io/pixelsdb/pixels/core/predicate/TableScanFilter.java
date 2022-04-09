@@ -35,7 +35,7 @@ import java.util.SortedMap;
  * Author: hank
  */
 @JSONType(includes = {"schemaName", "tableName", "columnFilters"})
-public class TableScanFilters
+public class TableScanFilter
 {
     @JSONField(name = "schemaName", ordinal = 0)
     private final String schemaName;
@@ -48,7 +48,7 @@ public class TableScanFilters
     private final SortedMap<Integer, ColumnFilter> columnFilters;
 
     @JSONCreator
-    public TableScanFilters(String schemaName, String tableName, SortedMap<Integer, ColumnFilter> columnFilters)
+    public TableScanFilter(String schemaName, String tableName, SortedMap<Integer, ColumnFilter> columnFilters)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
@@ -85,7 +85,7 @@ public class TableScanFilters
      * @param result the filter result.
      * @param tmp the temporary bitmap to be used in filter.
      */
-    void doFilter(VectorizedRowBatch rowBatch, Bitmap result, Bitmap tmp)
+    public void doFilter(VectorizedRowBatch rowBatch, Bitmap result, Bitmap tmp)
     {
         // set all bits to true.
         result.set(0, rowBatch.size);

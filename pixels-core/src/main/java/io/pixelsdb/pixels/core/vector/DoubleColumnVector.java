@@ -217,23 +217,23 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter)
+    protected void applyFilter(Bitmap filter, int beforeIndex)
     {
-        checkArgument(!isRepeating, "column vector is repeating, flatten before applying filter");
+        checkArgument(!isRepeating,
+                "column vector is repeating, flatten before applying filter");
 
-        int j = 0;
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0); i >= 0; i = filter.nextSetBit(i+1))
+        for (int i = filter.nextSetBit(0), j = 0;
+             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {
                 this.vector[j] = this.vector[i];
                 this.isNull[j] = this.isNull[i];
-                if (this.isNull[j])
-                {
-                    noNulls = false;
-                }
-                j++;
+            }
+            if (this.isNull[j])
+            {
+                noNulls = false;
             }
             /*
              * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
@@ -241,7 +241,6 @@ public class DoubleColumnVector extends ColumnVector
              */
         }
         this.noNulls = noNulls;
-        this.length = j;
     }
 
     @Override

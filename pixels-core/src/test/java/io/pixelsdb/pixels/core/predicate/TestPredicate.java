@@ -22,14 +22,10 @@ package io.pixelsdb.pixels.core.predicate;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
@@ -64,20 +60,25 @@ public class TestPredicate
         SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
         columnFilters.put(0, columnFilter);
 
-        TableScanFilters tableScanFilters = new TableScanFilters("tpch", "orders", columnFilters);
+        TableScanFilter tableScanFilter = new TableScanFilter("tpch", "orders", columnFilters);
 
-        String json = JSON.toJSONString(tableScanFilters);
+        String json = JSON.toJSONString(tableScanFilter);
 
         System.out.println(json);
 
-        TableScanFilters tableScanFilters1 = JSON.parseObject(json, TableScanFilters.class);
-        ColumnFilter columnFilter1 = tableScanFilters1.getColumnFilter(0);
+        TableScanFilter tableScanFilter1 = JSON.parseObject(json, TableScanFilter.class);
+        ColumnFilter columnFilter1 = tableScanFilter1.getColumnFilter(0);
         System.out.println(columnFilter1.getColumnName());
         System.out.println(columnFilter1.getColumnType());
         System.out.println(columnFilter1.getFilter().getJavaType());
         System.out.println(columnFilter1.getFilter().getRangeCount());
         System.out.println(columnFilter1.getFilter().getDiscreteValueCount());
     }
+
+    private static final int pixelStride = 10000;
+    private static final int rowGroupSize = 256 * 1024 * 1024;
+    private static final long blockSize = 2048L * 1024L * 1024L;
+    private static final short replication = (short) 1;
 
     @Test
     public void testFilter() throws IOException
@@ -91,7 +92,7 @@ public class TestPredicate
         PixelsReaderOption readerOption = new PixelsReaderOption();
         readerOption.queryId(1);
         readerOption.rgRange(0, 1);
-        readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate"});
+        readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate", "o_orderstatus"});
         PixelsRecordReader recordReader = pixelsReader.read(readerOption);
 
         Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false);
@@ -102,32 +103,34 @@ public class TestPredicate
         ColumnFilter<Long> columnFilter = new ColumnFilter<>("o_orderkey", TypeDescription.Category.LONG, longFilter);
         SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
         columnFilters.put(1, columnFilter);
-        TableScanFilters tableScanFilters = new TableScanFilters("tpch", "orders", columnFilters);
+        TableScanFilter tableScanFilter = new TableScanFilter("tpch", "orders", columnFilters);
 
-        Bitmap filtered = new Bitmap(1024, true);
-        Bitmap tmp = new Bitmap(1024, false);
+        Bitmap filtered = new Bitmap(102400, true);
+        Bitmap tmp = new Bitmap(102400, false);
+
+        PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
+                .setSchema(recordReader.getResultSchema())
+                .setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize)
+                .setStorage(storage)
+                .setFilePath("file:///home/hank/result_0.pxl")
+                .setBlockSize(blockSize)
+                .setReplication(replication)
+                .setBlockPadding(true)
+                .setOverwrite(true) // set overwrite to true to avoid existence checking.
+                .setEncoding(true) // it is worth to do encoding
+                .setCompressionBlockSize(1)
+                .build();
 
         while (true)
         {
-            VectorizedRowBatch rowBatch = recordReader.readBatch(1024);
-            tableScanFilters.doFilter(rowBatch, filtered, tmp);
-            if (filtered.cardinality() != 1024)
-            {
-                LongColumnVector columnVector = (LongColumnVector) rowBatch.cols[1];
-                for (int i = 0; i < columnVector.getLength(); ++i)
-                {
-                    System.out.println(columnVector.vector[i]);
-                }
-            }
+            VectorizedRowBatch rowBatch = recordReader.readBatch(102400);
+            tableScanFilter.doFilter(rowBatch, filtered, tmp);
+            System.out.println(rowBatch.size + ", " + filtered.cardinality(0, rowBatch.size));
             rowBatch.applyFilter(filtered);
-            if (rowBatch.size != 1024)
+            if (rowBatch.size > 0)
             {
-                System.out.println("filtered row batch size: " + rowBatch.size);
-                LongColumnVector columnVector = (LongColumnVector) rowBatch.cols[1];
-                for (int i = 0; i < columnVector.getLength(); ++i)
-                {
-                    System.out.println(columnVector.vector[i]);
-                }
+                pixelsWriter.addRowBatch(rowBatch);
             }
             if (rowBatch.endOfFile)
             {
@@ -137,5 +140,6 @@ public class TestPredicate
 
         recordReader.close();
         pixelsReader.close();
+        pixelsWriter.close();
     }
 }
