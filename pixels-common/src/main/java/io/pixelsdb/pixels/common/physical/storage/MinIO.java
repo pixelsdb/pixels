@@ -21,16 +21,19 @@ package io.pixelsdb.pixels.common.physical.storage;
 
 import io.pixelsdb.pixels.common.exception.StorageException;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
+import java.net.URI;
 import java.time.Duration;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.MINIO_ID_KEY;
-import static io.pixelsdb.pixels.common.utils.Constants.MINIO_META_PREFIX;
+import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static java.util.Objects.requireNonNull;
 
 /**
  * For MinIO, we assume that each table is stored in a separate folder
@@ -63,12 +66,21 @@ public final class MinIO extends AbstractS3
 
     public MinIO()
     {
-        // TODO: use MinIO endpoint and credentials.
+        String endpoint = requireNonNull(System.getProperty(SYS_MINIO_ENDPOINT),
+                "MinIO endpoint is not set in system properties");
+        String accessKey = requireNonNull(System.getProperty(SYS_MINIO_ACCESS_KEY),
+                "MinIO access key is not set in system properties");
+        String secretKey = requireNonNull(System.getProperty(SYS_MINIO_SECRET_KEY),
+                "MinIO secret key is not set in system properties");
+
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
-                .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                .socketTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
-                .maxConnections(maxRequestConcurrency)).build();
+                .connectionTimeout(Duration.ofSeconds(connTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(connTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
+                .maxConnections(maxRequestConcurrency))
+                .endpointOverride(URI.create(endpoint))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey,secretKey))).build();
     }
 
     @Override

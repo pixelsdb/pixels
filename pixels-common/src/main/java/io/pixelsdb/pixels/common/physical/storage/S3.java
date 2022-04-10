@@ -123,8 +123,8 @@ public final class S3 extends AbstractS3
                 .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                         .maxConcurrency(maxConcurrency))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
-                        .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                        .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                        .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
                         .build()).build();
 
         if (enableRequestDiversion)
@@ -133,16 +133,16 @@ public final class S3 extends AbstractS3
                     .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                             .maxConcurrency(maxConcurrency1M))
                     .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                            .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
                             .build()).build();
 
             s3Async10M = S3AsyncClient.builder()
                     .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                             .maxConcurrency(maxConcurrency10M))
                     .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                            .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
                             .build()).build();
         }
         else
@@ -151,9 +151,9 @@ public final class S3 extends AbstractS3
         }
 
         s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
-                .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                .socketTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
+                .connectionTimeout(Duration.ofSeconds(connTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(connTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
                 .maxConnections(maxRequestConcurrency)).build();
     }
 

@@ -45,6 +45,10 @@ public final class Constants
     public static final String CACHE_LOCATION_LITERAL = "location_";
     public static final int MAX_BLOCK_ID_LEN = 20480;
 
+    public static final String SYS_MINIO_ENDPOINT = "MINIO_ENDPOINT";
+    public static final String SYS_MINIO_ACCESS_KEY = "MINIO_ACCESS_KEY";
+    public static final String SYS_MINIO_SECRET_KEY = "MINIO_SECRET_KEY";
+
     /**
      * Issue #108:
      * The prefix for read-write lock used in etcd auto-increment id.
@@ -62,5 +66,4 @@ public final class Constants
     public static final String MINIO_ID_KEY = "pixels_storage_minio_id";
     // the prefix for keys of minio metadata (i.e. file path -> file id).
     public static final String MINIO_META_PREFIX = "pixels_storage_minio_meta:";
-
 }

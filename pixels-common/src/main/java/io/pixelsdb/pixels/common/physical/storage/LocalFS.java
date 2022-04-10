@@ -24,8 +24,6 @@ import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -66,7 +64,6 @@ public final class LocalFS implements Storage
         }
     }
 
-    private static Logger logger = LogManager.getLogger(LocalFS.class);
     private static String SchemePrefix = Scheme.file.name() + "://";
 
     public LocalFS() { }
