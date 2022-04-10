@@ -74,7 +74,7 @@ public class TestPixelsWriter
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
                 .setStorage(storage)
-                .setFilePath(loadingDataPath + "test_5000_lines.pxl")
+                .setPath(loadingDataPath + "test_5000_lines.pxl")
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)

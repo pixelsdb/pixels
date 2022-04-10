@@ -114,7 +114,7 @@ public class TestPredicate
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
                 .setStorage(storage)
-                .setFilePath("file:///home/hank/result_0.pxl")
+                .setPath("file:///home/hank/result_0.pxl")
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)

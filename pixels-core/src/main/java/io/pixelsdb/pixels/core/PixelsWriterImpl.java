@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 import static io.pixelsdb.pixels.core.TypeDescription.writeTypes;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
@@ -122,15 +123,15 @@ public class PixelsWriterImpl
 
     public static class Builder
     {
-        private TypeDescription builderSchema;
-        private int builderPixelStride;
-        private int builderRowGroupSize;
+        private TypeDescription builderSchema = null;
+        private int builderPixelStride = 0;
+        private int builderRowGroupSize = 0;
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
         private int builderCompressionBlockSize = 0;
         private TimeZone builderTimeZone = TimeZone.getDefault();
-        private Storage builderStorage;
-        private String builderFilePath;
-        private long builderBlockSize;
+        private Storage builderStorage = null;
+        private String builderFilePath = null;
+        private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
@@ -189,7 +190,7 @@ public class PixelsWriterImpl
             return this;
         }
 
-        public Builder setFilePath(String filePath)
+        public Builder setPath(String filePath)
         {
             this.builderFilePath = requireNonNull(filePath);
 
@@ -236,9 +237,18 @@ public class PixelsWriterImpl
         public PixelsWriter build()
                 throws PixelsWriterException
         {
+            requireNonNull(this.builderStorage, "storage is not set");
+            requireNonNull(this.builderFilePath, "file path is not set");
+            requireNonNull(this.builderSchema, "schema is not set");
+            checkArgument(!requireNonNull(builderSchema.getChildren(),
+                            "schema's children is null").isEmpty(), "schema is empty");
+            checkArgument(this.builderPixelStride > 0, "pixels stride size is not set");
+            checkArgument(this.builderRowGroupSize > 0, "row group size is not set");
+
             PhysicalWriter fsWriter = null;
             try
             {
+
                 fsWriter = PhysicalWriterUtil.newPhysicalWriter(
                         this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
                         this.builderBlockPadding, this.builderOverwrite);
@@ -248,8 +258,6 @@ public class PixelsWriterImpl
                 throw new PixelsWriterException(
                         "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
             }
-            checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
-                    "schema is empty");
 
             if (fsWriter == null)
             {

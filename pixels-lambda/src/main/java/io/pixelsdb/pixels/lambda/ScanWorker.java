@@ -54,9 +54,6 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final int pixelStride;
     private static final int rowGroupSize;
-    // blockSize and replication have no effects for S3, therefore we set the default value here.
-    private static final long blockSize = 2048L * 1024L * 1024L;
-    private static final short replication = (short) 1;
     private static Storage storage;
 
     static
@@ -195,13 +192,9 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                         .setPixelStride(pixelStride)
                         .setRowGroupSize(rowGroupSize)
                         .setStorage(storage)
-                        .setFilePath(filePath)
-                        .setBlockSize(blockSize)
-                        .setReplication(replication)
-                        .setBlockPadding(true)
+                        .setPath(filePath)
                         .setOverwrite(true) // set overwrite to true to avoid existence checking.
                         .setEncoding(true) // it is worth to do encoding
-                        .setCompressionBlockSize(1)
                         .build();
         return pixelsWriter;
     }
