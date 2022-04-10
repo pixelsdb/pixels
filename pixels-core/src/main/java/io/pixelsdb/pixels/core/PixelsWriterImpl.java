@@ -127,7 +127,7 @@ public class PixelsWriterImpl
         private int builderPixelStride = 0;
         private int builderRowGroupSize = 0;
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
-        private int builderCompressionBlockSize = 0;
+        private int builderCompressionBlockSize = 1;
         private TimeZone builderTimeZone = TimeZone.getDefault();
         private Storage builderStorage = null;
         private String builderFilePath = null;

@@ -127,7 +127,7 @@ public class PixelsCompactor
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
         private PixelsProto.CompressionKind compressionKind = null;
-        private int compressionBlockSize = 0;
+        private int compressionBlockSize = 1;
         private int pixelStride = 0;
         private long fileContentLength = 0L;
         private int fileRowNum = 0;

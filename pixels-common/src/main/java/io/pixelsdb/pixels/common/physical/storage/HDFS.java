@@ -48,11 +48,11 @@ import java.util.List;
  */
 public final class HDFS implements Storage
 {
-    private static Logger logger = LogManager.getLogger(HDFS.class);
-    private static String SchemePrefix = Scheme.hdfs.name() + "://";
+    private static final Logger logger = LogManager.getLogger(HDFS.class);
+    private static final String SchemePrefix = Scheme.hdfs.name() + "://";
 
-    private FileSystem fs;
-    private Configuration conf;
+    private final FileSystem fs;
+    private final Configuration conf;
 
     public HDFS() throws IOException
     {

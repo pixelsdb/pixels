@@ -49,7 +49,7 @@ import static java.util.Objects.requireNonNull;
 public final class MinIO extends AbstractS3
 {
     // private static Logger logger = LogManager.getLogger(MinIO.class);
-    private static String SchemePrefix = Scheme.minio.name() + "://";
+    private static final String SchemePrefix = Scheme.minio.name() + "://";
 
     static
     {
@@ -62,6 +62,13 @@ public final class MinIO extends AbstractS3
              */
             InitId(MINIO_ID_KEY);
         }
+    }
+
+    public static void ConfigMinIO(String endpoint, String accessKey, String secretKey)
+    {
+        System.getProperties().setProperty(SYS_MINIO_ENDPOINT, endpoint);
+        System.getProperties().setProperty(SYS_MINIO_ACCESS_KEY, accessKey);
+        System.getProperties().setProperty(SYS_MINIO_SECRET_KEY, secretKey);
     }
 
     public MinIO()

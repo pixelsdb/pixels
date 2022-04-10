@@ -41,6 +41,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+
 /**
  * The response is a list of files read and then written to s3.
  *
@@ -52,21 +54,34 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
+    private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static final int pixelStride;
     private static final int rowGroupSize;
-    private static Storage storage;
+    private static Storage s3;
+    private static Storage minio;
 
     static
     {
-        pixelStride = Integer.parseInt(ConfigFactory.Instance().getProperty("pixel.stride"));
-        rowGroupSize = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.size"));
+        pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+
         try
         {
-            storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
 
         } catch (IOException e)
         {
-            logger.error("failed to initialize s3 storage.", e);
+            logger.error("failed to initialize AWS S3 storage.", e);
+        }
+
+        try
+        {
+            ConfigMinIO("http://172.31.32.193:9000", "lambda", "password");
+            minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+
+        } catch (IOException e)
+        {
+            logger.error("failed to initialize MinIO storage.", e);
         }
     }
 
@@ -169,7 +184,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
         try
         {
             PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                    .setStorage(storage)
+                    .setStorage(s3)
                     .setPath(fileName)
                     .setEnableCache(false)
                     .setCacheOrder(new ArrayList<>())
@@ -191,7 +206,7 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                         .setSchema(schema)
                         .setPixelStride(pixelStride)
                         .setRowGroupSize(rowGroupSize)
-                        .setStorage(storage)
+                        .setStorage(minio)
                         .setPath(filePath)
                         .setOverwrite(true) // set overwrite to true to avoid existence checking.
                         .setEncoding(true) // it is worth to do encoding

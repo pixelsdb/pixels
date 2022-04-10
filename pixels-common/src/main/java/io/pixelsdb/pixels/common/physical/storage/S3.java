@@ -53,14 +53,14 @@ public final class S3 extends AbstractS3
      * Most of the methods in this class are moved into AbstractS3.
      */
 
-    private static Logger logger = LogManager.getLogger(S3.class);
-    private static String SchemePrefix = Scheme.s3.name() + "://";
+    private static final Logger logger = LogManager.getLogger(S3.class);
+    private static final String SchemePrefix = Scheme.s3.name() + "://";
 
     private final static boolean enableRequestDiversion;
 
-    private S3AsyncClient s3Async;
-    private S3AsyncClient s3Async1M;
-    private S3AsyncClient s3Async10M;
+    private final S3AsyncClient s3Async;
+    private final S3AsyncClient s3Async1M;
+    private final S3AsyncClient s3Async10M;
 
     static
     {
