@@ -24,7 +24,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 
 /**
  * @author hank
@@ -35,9 +35,7 @@ public class TestMinIO
     @Test
     public void testReadWrite() throws IOException
     {
-        System.getProperties().setProperty(SYS_MINIO_ENDPOINT, "http://localhost:9000");
-        System.getProperties().setProperty(SYS_MINIO_ACCESS_KEY, "minio");
-        System.getProperties().setProperty(SYS_MINIO_SECRET_KEY, "password");
+        ConfigMinIO("http://localhost:9000", "minio", "password");
         Storage minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
         List<String> files = minio.listPaths("test/");
         for (String file : files)

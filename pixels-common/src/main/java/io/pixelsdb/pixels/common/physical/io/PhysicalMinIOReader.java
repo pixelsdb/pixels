@@ -41,7 +41,7 @@ public class PhysicalMinIOReader extends AbstractS3Reader
     public PhysicalMinIOReader(Storage storage, String path) throws IOException
     {
         super(storage, path);
-        enableAsync = false;
+        this.enableAsync = false;
     }
 
     @Override

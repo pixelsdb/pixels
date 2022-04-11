@@ -64,7 +64,7 @@ public final class S3 extends AbstractS3
 
     static
     {
-        if (enableCache)
+        if (EnableCache)
         {
             /**
              * Issue #222:
@@ -108,13 +108,13 @@ public final class S3 extends AbstractS3
         int maxConcurrency, maxConcurrency1M, maxConcurrency10M;
         if (enableRequestDiversion)
         {
-            maxConcurrency = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[0]));
-            maxConcurrency1M = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[1]));
-            maxConcurrency10M = (int) (maxRequestConcurrency/100.0*Integer.parseInt(concurrencyAssign[2]));
+            maxConcurrency = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[0]));
+            maxConcurrency1M = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[1]));
+            maxConcurrency10M = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[2]));
         }
         else
         {
-            maxConcurrency = maxRequestConcurrency;
+            maxConcurrency = MaxRequestConcurrency;
             maxConcurrency1M = 0;
             maxConcurrency10M = 0;
         }
@@ -123,8 +123,8 @@ public final class S3 extends AbstractS3
                 .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                         .maxConcurrency(maxConcurrency))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
-                        .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
-                        .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
+                        .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                         .build()).build();
 
         if (enableRequestDiversion)
@@ -133,16 +133,16 @@ public final class S3 extends AbstractS3
                     .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                             .maxConcurrency(maxConcurrency1M))
                     .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
+                            .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                             .build()).build();
 
             s3Async10M = S3AsyncClient.builder()
                     .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                             .maxConcurrency(maxConcurrency10M))
                     .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(connTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
+                            .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                            .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                             .build()).build();
         }
         else
@@ -151,10 +151,10 @@ public final class S3 extends AbstractS3
         }
 
         s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
-                .connectionTimeout(Duration.ofSeconds(connTimeoutSec))
-                .socketTimeout(Duration.ofSeconds(connTimeoutSec))
-                .connectionAcquisitionTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
-                .maxConnections(maxRequestConcurrency)).build();
+                .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
+                .maxConnections(MaxRequestConcurrency)).build();
     }
 
     @Override
@@ -217,7 +217,7 @@ public final class S3 extends AbstractS3
     @Override
     protected boolean existsOrGenIdSucc(Path path) throws IOException
     {
-        if (!enableCache)
+        if (!EnableCache)
         {
             throw new StorageException("Should not check or generate file id when cache is disabled");
         }

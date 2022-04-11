@@ -46,7 +46,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
      * Most of the methods in this class are moved into AbstractS3Reader.
      */
 
-    private static Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
+    private static final Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
     private final static int LEN_1M = 1024*1024;
     private final static int LEN_10M = 1024*1024*10;
     private final static int ADAPTIVE_READ_TH = 2*1024*1024;

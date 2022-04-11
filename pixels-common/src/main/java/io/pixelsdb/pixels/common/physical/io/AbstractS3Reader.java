@@ -48,8 +48,8 @@ public abstract class AbstractS3Reader implements PhysicalReader
      * The implementations of most methods in this class are from its subclass PhysicalS3Reader.
      */
 
-    protected static boolean enableAsync = false;
-    protected static boolean useAsyncClient = false;
+    protected boolean enableAsync = false;
+    protected boolean useAsyncClient = false;
     protected static final ExecutorService clientService;
 
     static
@@ -106,9 +106,10 @@ public abstract class AbstractS3Reader implements PhysicalReader
         this.length = this.s3.getStatus(path).getLength();
         this.position = new AtomicLong(0);
         this.client = this.s3.getClient();
-
-        enableAsync = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.enable.async"));
-        useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("s3.use.async.client"));
+        this.enableAsync = Boolean.parseBoolean(ConfigFactory.Instance()
+                .getProperty("s3.enable.async"));
+        this.useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance()
+                .getProperty("s3.use.async.client"));
     }
 
     protected String toRange(long start, int length)
@@ -179,7 +180,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     @Override
     public boolean supportsAsync()
     {
-        return enableAsync;
+        return this.enableAsync;
     }
 
     @Override

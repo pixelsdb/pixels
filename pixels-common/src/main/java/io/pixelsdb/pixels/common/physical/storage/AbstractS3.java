@@ -58,26 +58,26 @@ public abstract class AbstractS3 implements Storage
      * The implementations of most methods in this class are from its subclass S3.
      */
 
-    protected static int connTimeoutSec = 3600;
-    protected static int connAcquisitionTimeoutSec = 3600;
+    protected static int ConnTimeoutSec = 3600;
+    protected static int ConnAcquisitionTimeoutSec = 3600;
     protected static int clientServiceThreads = 20;
-    protected static int maxRequestConcurrency = 200;
+    protected static int MaxRequestConcurrency = 200;
     protected static int maxPendingRequests = 50_000;
-    protected final static boolean enableCache;
+    protected final static boolean EnableCache;
 
     protected S3Client s3 = null;
 
     static
     {
-        enableCache = Boolean.parseBoolean(
+        EnableCache = Boolean.parseBoolean(
                 ConfigFactory.Instance().getProperty("cache.enabled"));
-        connTimeoutSec = Integer.parseInt(
+        ConnTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
-        connAcquisitionTimeoutSec = Integer.parseInt(
+        ConnAcquisitionTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.acquisition.timeout.sec"));
         clientServiceThreads = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.client.service.threads"));
-        maxRequestConcurrency = Integer.parseInt(
+        MaxRequestConcurrency = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.request.concurrency"));
         maxPendingRequests = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.pending.requests"));
@@ -267,7 +267,7 @@ public abstract class AbstractS3 implements Storage
     public long getFileId(String path) throws IOException
     {
         requireNonNull(path, "path is null");
-        if (enableCache)
+        if (EnableCache)
         {
             Path p = new Path(path);
             if (!p.valid)

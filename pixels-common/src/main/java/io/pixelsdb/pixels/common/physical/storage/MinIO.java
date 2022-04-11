@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
 import io.pixelsdb.pixels.common.exception.StorageException;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -29,6 +30,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Objects;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
@@ -51,9 +53,13 @@ public final class MinIO extends AbstractS3
     // private static Logger logger = LogManager.getLogger(MinIO.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
+    private static String MinIOEndpoint = null;
+    private static String MinIOAccessKey = null;
+    private static String MinIOSecretKey = null;
+
     static
     {
-        if (enableCache)
+        if (EnableCache)
         {
             /**
              * Issue #222:
@@ -64,30 +70,50 @@ public final class MinIO extends AbstractS3
         }
     }
 
-    public static void ConfigMinIO(String endpoint, String accessKey, String secretKey)
+    /**
+     * Set the configurations for MinIO. If any configuration is different from the default (null) or
+     * previous value, the MinIO storage instance in StorageFactory is reloaded for the configuration
+     * changes to take effect. In this case, the previously MinIO storage instance acquired from
+     * StorageFactory can still be used without any impact.
+     * <br/>
+     * If the configurations are not changed, this method is a no-op.
+     *
+     * @param endpoint the new endpoint of MinIO
+     * @param accessKey the new access key of MinIO
+     * @param secretKey the new secret key of MinIO
+     * @throws IOException
+     */
+    public static void ConfigMinIO(String endpoint, String accessKey, String secretKey) throws IOException
     {
-        System.getProperties().setProperty(SYS_MINIO_ENDPOINT, endpoint);
-        System.getProperties().setProperty(SYS_MINIO_ACCESS_KEY, accessKey);
-        System.getProperties().setProperty(SYS_MINIO_SECRET_KEY, secretKey);
+        requireNonNull(endpoint, "endpoint is null");
+        requireNonNull(accessKey, "accessKey is null");
+        requireNonNull(secretKey, "secretKey is null");
+
+        if (!Objects.equals(MinIOEndpoint, endpoint) ||
+                !Objects.equals(MinIOAccessKey, accessKey) ||
+                !Objects.equals(MinIOSecretKey, secretKey))
+        {
+            MinIOEndpoint = endpoint;
+            MinIOAccessKey = accessKey;
+            MinIOSecretKey = secretKey;
+            StorageFactory.Instance().reload(Scheme.minio);
+        }
     }
 
     public MinIO()
     {
-        String endpoint = requireNonNull(System.getProperty(SYS_MINIO_ENDPOINT),
-                "MinIO endpoint is not set in system properties");
-        String accessKey = requireNonNull(System.getProperty(SYS_MINIO_ACCESS_KEY),
-                "MinIO access key is not set in system properties");
-        String secretKey = requireNonNull(System.getProperty(SYS_MINIO_SECRET_KEY),
-                "MinIO secret key is not set in system properties");
+        requireNonNull(MinIOEndpoint, "MinIO endpoint is not set");
+        requireNonNull(MinIOAccessKey, "MinIO access key is not set");
+        requireNonNull(MinIOSecretKey, "MinIO secret key is not set");
 
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
-                .connectionTimeout(Duration.ofSeconds(connTimeoutSec))
-                .socketTimeout(Duration.ofSeconds(connTimeoutSec))
-                .connectionAcquisitionTimeout(Duration.ofSeconds(connAcquisitionTimeoutSec))
-                .maxConnections(maxRequestConcurrency))
-                .endpointOverride(URI.create(endpoint))
+                .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
+                .maxConnections(MaxRequestConcurrency))
+                .endpointOverride(URI.create(MinIOEndpoint))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey,secretKey))).build();
+                        AwsBasicCredentials.create(MinIOAccessKey, MinIOSecretKey))).build();
     }
 
     @Override
@@ -131,7 +157,7 @@ public final class MinIO extends AbstractS3
     @Override
     protected boolean existsOrGenIdSucc(Path path) throws IOException
     {
-        if (!enableCache)
+        if (!EnableCache)
         {
             throw new StorageException("Should not check or generate file id when cache is disabled");
         }

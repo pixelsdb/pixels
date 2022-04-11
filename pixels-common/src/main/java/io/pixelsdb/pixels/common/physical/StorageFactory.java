@@ -86,6 +86,7 @@ public class StorageFactory
 
     /**
      * Recreate the Storage instances. This is only needed in the Presto connector.
+     *
      * @throws IOException
      */
     public synchronized void reload() throws IOException
@@ -97,6 +98,20 @@ public class StorageFactory
             requireNonNull(storage, "failed to create Storage instance");
         }
     }
+
+    /**
+     * Recreate the Storage instance for the given storage scheme.
+     *
+     * @param scheme the given storage scheme
+     * @throws IOException
+     */
+    public synchronized void reload(Storage.Scheme scheme) throws IOException
+    {
+        this.storageImpls.remove(scheme);
+        Storage storage = this.getStorage(scheme);
+        requireNonNull(storage, "failed to create Storage instance");
+    }
+
     /**
      * Get the storage instance from a scheme name or a scheme prefixed path.
      * @param schemeOrPath
