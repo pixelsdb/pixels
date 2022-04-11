@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -121,12 +122,12 @@ public class PixelsCompactor
         private Storage builderStorage = null;
         private String builderFilePath = null;
         private StatsRecorder[] fileColStatRecorders;
-        private long builderBlockSize = Constants.DEFAULT_HDFS_BLOCK_SIZE;
+        private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
         private PixelsProto.CompressionKind compressionKind = null;
-        private int compressionBlockSize = 0;
+        private int compressionBlockSize = 1;
         private int pixelStride = 0;
         private long fileContentLength = 0L;
         private int fileRowNum = 0;
@@ -175,7 +176,7 @@ public class PixelsCompactor
             return this;
         }
 
-        public PixelsCompactor.Builder setFilePath(String filePath)
+        public PixelsCompactor.Builder setPath(String filePath)
         {
             this.builderFilePath = requireNonNull(filePath);
 
@@ -221,8 +222,8 @@ public class PixelsCompactor
                 throws IOException
         {
             // check arguments
-            if (sourcePaths == null || compactLayout == null || builderTimeZone == null
-                    || builderStorage == null || builderFilePath == null)
+            if (sourcePaths == null || compactLayout == null || builderStorage == null ||
+                    builderFilePath == null || pixelStride <= 0)
             {
                 throw new IllegalArgumentException("Missing argument to build PixelsCompactor");
             }

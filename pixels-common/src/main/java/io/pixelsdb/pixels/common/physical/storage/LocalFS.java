@@ -24,8 +24,6 @@ import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -40,10 +38,14 @@ import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * This implementation is used to access all kinds of POSIX file systems that are mounted
+ * on a local directory. The file system does not need to be local physically. For example,
+ * it could be a network file system mounted on a local point such as /mnt/nfs.
+ *
+ * @author hank
  * Created at: 20/08/2021
- * Author: hank
  */
-public class LocalFS implements Storage
+public final class LocalFS implements Storage
 {
     private final static boolean enableCache;
 
@@ -62,7 +64,6 @@ public class LocalFS implements Storage
         }
     }
 
-    private static Logger logger = LogManager.getLogger(LocalFS.class);
     private static String SchemePrefix = Scheme.file.name() + "://";
 
     public LocalFS() { }

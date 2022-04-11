@@ -26,6 +26,9 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.lambda.ScanInput;
+import io.pixelsdb.pixels.core.lambda.ScanInput.*;
+import io.pixelsdb.pixels.core.lambda.ScanOutput;
 import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
@@ -36,10 +39,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 
 /**
  * The response is a list of files read and then written to s3.
@@ -48,61 +52,68 @@ import java.util.concurrent.TimeUnit;
  * @author hank
  * Created in: 03.2022
  */
-public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>, String>
+public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
+    private static final ConfigFactory configFactory = ConfigFactory.Instance();
+    private static final int rowBatchSize;
     private static final int pixelStride;
     private static final int rowGroupSize;
-    // blockSize and replication have no effects for S3, therefore we set the default value here.
-    private static final long blockSize = 2048L * 1024L * 1024L;
-    private static final short replication = (short) 1;
-    private static Storage storage;
+    private static Storage s3;
+    private static Storage minio;
 
     static
     {
-        pixelStride = Integer.parseInt(ConfigFactory.Instance().getProperty("pixel.stride"));
-        rowGroupSize = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.size"));
+        rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
+        pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
+        rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+
         try
         {
-            storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
 
         } catch (IOException e)
         {
-            logger.error("failed to initialize s3 storage.", e);
+            logger.error("failed to initialize AWS S3 storage", e);
         }
     }
 
     @Override
-    public String handleRequest(Map<String, ArrayList<String>> event, Context context)
+    public ScanOutput handleRequest(ScanInput event, Context context)
     {
         try
         {
             ExecutorService threadPool = Executors.newFixedThreadPool(12);
             String requestId = context.getAwsRequestId();
 
-            ArrayList<String> fileNames = event.get("inputs");
-            String outputDir = event.get("outputs").get(0); // currently, we only use one output directory.
-            if (!outputDir.endsWith("/"))
+            long queryId = event.getQueryId();
+            ArrayList<InputInfo> fileNames = event.getInputs();
+            String outputFolder = event.getOutput().getFolder();
+            if (!outputFolder.endsWith("/"))
             {
-                outputDir += "/";
+                outputFolder += "/";
             }
-            String[] cols = event.get("cols").toArray(new String[0]);
-            // currently, we use an integrated table scan filter on each table.
-            TableScanFilter filter = JSON.parseObject(event.get("filter").get(0), TableScanFilter.class);
-            StringBuilder response = new StringBuilder();
+            boolean encoding = event.getOutput().isEncoding();
+            try
+            {
+                ConfigMinIO(event.getOutput().getEndpoint(),
+                        event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
+                minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+            } catch (IOException e)
+            {
+                logger.error("failed to initialize MinIO storage", e);
+            }
+            String[] cols = event.getCols().toArray(new String[0]);
+            TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
+            ScanOutput scanOutput = new ScanOutput();
             for (int i = 0; i < fileNames.size(); i++)
             {
-                String in = fileNames.get(i);
-                String out = outputDir + requestId + "_out_" + i;
+                InputInfo in = fileNames.get(i);
+                String out = outputFolder + requestId + "_out_" + i;
+                scanOutput.addOutput(out);
 
-                if (i > 0)
-                {
-                    response.append(",");
-                }
-                response.append(out);
-
-                threadPool.submit(() -> scanFile(in, 102400, cols, filter, out));
+                threadPool.submit(() -> scanFile(queryId, in, cols, filter, out, encoding));
             }
             threadPool.shutdown();
             try
@@ -110,43 +121,47 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of scan.", e);
+                logger.error("interrupted while waiting for the termination of scan", e);
             }
-            // return the output file names in csv format.
-            return response.toString();
+
+            return scanOutput;
         } catch (Exception e)
         {
-            logger.error("error during scan.", e);
+            logger.error("error during scan", e);
             return null;
         }
     }
 
     /**
-     * @param inputPath
-     * @param batchSize
-     * @param cols
-     * @param outputPath fileName on s3 to store pixels readers' results
+     * @param queryId the query id used by I/O scheduler
+     * @param inputInfo the information of the file to scan
+     * @param cols the included columns
+     * @param outputPath fileName on s3 to store the scan results
+     * @param encoding whether encode the scan results or not
      * @return
      */
-    public String scanFile(String inputPath, int batchSize, String[] cols, TableScanFilter filter, String outputPath)
+    public String scanFile(long queryId, InputInfo inputInfo, String[] cols,
+                           TableScanFilter filter, String outputPath, boolean encoding)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
+        option.queryId(queryId);
         option.includeCols(cols);
+        option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
         VectorizedRowBatch rowBatch;
 
-        try (PixelsReader pixelsReader = getReader(inputPath);
+        try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
              PixelsRecordReader recordReader = pixelsReader.read(option))
         {
             TypeDescription rowBatchSchema = recordReader.getResultSchema();
 
-            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, outputPath);
-            Bitmap filtered = new Bitmap(batchSize, true);
-            Bitmap tmp = new Bitmap(batchSize, false);
+            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
+            Bitmap filtered = new Bitmap(rowBatchSize, true);
+            Bitmap tmp = new Bitmap(rowBatchSize, false);
             while (true)
             {
-                rowBatch = recordReader.readBatch(batchSize);
+                rowBatch = recordReader.readBatch(rowBatchSize);
                 filter.doFilter(rowBatch, filtered, tmp);
                 rowBatch.applyFilter(filtered);
                 if (rowBatch.size > 0)
@@ -161,7 +176,8 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
             }
         } catch (Exception e)
         {
-            logger.error("failed to scan the file '" + inputPath + "' and output the result.", e);
+            logger.error("failed to scan the file '" +
+                    inputInfo.getFilePath() + "' and output the result", e);
         }
         return "success";
     }
@@ -172,36 +188,31 @@ public class ScanWorker implements RequestHandler<Map<String, ArrayList<String>>
         try
         {
             PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                    .setStorage(storage)
+                    .setStorage(s3)
                     .setPath(fileName)
                     .setEnableCache(false)
                     .setCacheOrder(new ArrayList<>())
                     .setPixelsCacheReader(null)
                     .setPixelsFooterCache(footerCache);
             pixelsReader = builder.build();
-
         } catch (Exception e)
         {
-            logger.error("failed to create pixels reader.", e);
+            logger.error("failed to create pixels reader", e);
         }
         return pixelsReader;
     }
 
-    private PixelsWriter getWriter(TypeDescription schema, String filePath)
+    private PixelsWriter getWriter(TypeDescription schema, String filePath, boolean encoding)
     {
         PixelsWriter pixelsWriter =
                 PixelsWriterImpl.newBuilder()
                         .setSchema(schema)
                         .setPixelStride(pixelStride)
                         .setRowGroupSize(rowGroupSize)
-                        .setStorage(storage)
-                        .setFilePath(filePath)
-                        .setBlockSize(blockSize)
-                        .setReplication(replication)
-                        .setBlockPadding(true)
+                        .setStorage(minio)
+                        .setPath(filePath)
                         .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                        .setEncoding(true) // it is worth to do encoding
-                        .setCompressionBlockSize(1)
+                        .setEncoding(encoding)
                         .build();
         return pixelsWriter;
     }

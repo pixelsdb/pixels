@@ -21,9 +21,7 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.S3;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
@@ -34,15 +32,15 @@ import java.nio.ByteBuffer;
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
 /**
+ * The physical readers for AWS S3 compatible storage systems.
+ *
+ * @author hank
  * Created at: 06/09/2021
- * Author: hank
  */
 public class PhysicalS3Writer implements PhysicalWriter
 {
-    private static Logger logger = LogManager.getLogger(PhysicalS3Writer.class);
-
-    private S3 s3;
-    private S3.Path path;
+    private AbstractS3 s3;
+    private AbstractS3.Path path;
     private String pathStr;
     private long position;
     private S3Client client;
@@ -50,20 +48,20 @@ public class PhysicalS3Writer implements PhysicalWriter
 
     public PhysicalS3Writer(Storage storage, String path, boolean overwrite) throws IOException
     {
-        if (storage instanceof S3)
+        if (storage instanceof AbstractS3)
         {
-            this.s3 = (S3) storage;
+            this.s3 = (AbstractS3) storage;
         }
         else
         {
             throw new IOException("Storage is not S3.");
         }
-        if (path.startsWith("s3://"))
+        if (path.contains("://"))
         {
             // remove the scheme.
-            path = path.substring(5);
+            path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new S3.Path(path);
+        this.path = new AbstractS3.Path(path);
         this.pathStr = path;
         this.position = 0L;
         this.client = s3.getClient();

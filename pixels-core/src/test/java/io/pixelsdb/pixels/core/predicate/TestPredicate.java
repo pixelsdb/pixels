@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -113,7 +114,7 @@ public class TestPredicate
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
                 .setStorage(storage)
-                .setFilePath("file:///home/hank/result_0.pxl")
+                .setPath("file:///home/hank/result_0.pxl")
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)
@@ -141,5 +142,22 @@ public class TestPredicate
         recordReader.close();
         pixelsReader.close();
         pixelsWriter.close();
+    }
+
+    @Test
+    public void testStringDecode()
+    {
+        String str = "hello world";
+        byte[] bytes = str.getBytes(StandardCharsets.UTF_8);
+        assert bytes.length == 11;
+        bytes = str.getBytes(StandardCharsets.ISO_8859_1);
+        assert bytes.length == 11;
+        str = "你好世界";
+        bytes = str.getBytes(StandardCharsets.UTF_8);
+        System.out.println(bytes.length);
+        for (byte b : bytes)
+        {
+            System.out.println(b);
+        }
     }
 }

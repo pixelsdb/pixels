@@ -40,9 +40,10 @@ public interface Storage
      */
     enum Scheme
     {
-        hdfs, // HDFS
-        file, // local fs
-        s3; // Amazon S3
+        hdfs,  // HDFS
+        file,  // local fs
+        s3,    // Amazon S3
+        minio; // MinIO
 
         /**
          * Case insensitive parsing from String to enum value.

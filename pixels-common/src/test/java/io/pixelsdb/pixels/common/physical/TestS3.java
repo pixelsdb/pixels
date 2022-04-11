@@ -17,9 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common;
+package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;

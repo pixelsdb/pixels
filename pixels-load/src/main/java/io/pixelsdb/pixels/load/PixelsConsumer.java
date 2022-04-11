@@ -125,7 +125,7 @@ public class PixelsConsumer extends Consumer
                                     .setPixelStride(pixelStride)
                                     .setRowGroupSize(rowGroupSize)
                                     .setStorage(targetStorage)
-                                    .setFilePath(targetFilePath)
+                                    .setPath(targetFilePath)
                                     .setBlockSize(blockSize)
                                     .setReplication(replication)
                                     .setBlockPadding(true)

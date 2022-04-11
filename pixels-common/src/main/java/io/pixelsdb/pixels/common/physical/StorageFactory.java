@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
+import io.pixelsdb.pixels.common.physical.storage.MinIO;
 import io.pixelsdb.pixels.common.physical.storage.S3;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
@@ -85,6 +86,7 @@ public class StorageFactory
 
     /**
      * Recreate the Storage instances. This is only needed in the Presto connector.
+     *
      * @throws IOException
      */
     public synchronized void reload() throws IOException
@@ -96,6 +98,20 @@ public class StorageFactory
             requireNonNull(storage, "failed to create Storage instance");
         }
     }
+
+    /**
+     * Recreate the Storage instance for the given storage scheme.
+     *
+     * @param scheme the given storage scheme
+     * @throws IOException
+     */
+    public synchronized void reload(Storage.Scheme scheme) throws IOException
+    {
+        this.storageImpls.remove(scheme);
+        Storage storage = this.getStorage(scheme);
+        requireNonNull(storage, "failed to create Storage instance");
+    }
+
     /**
      * Get the storage instance from a scheme name or a scheme prefixed path.
      * @param schemeOrPath
@@ -106,7 +122,8 @@ public class StorageFactory
     {
         try
         {
-            // 'synchronized' in Java is reentrant, it is fine the call the other getStorage().
+            // 'synchronized' in Java is reentrant,
+            // it is fine to call the other getStorage() from here.
             if (schemeOrPath.contains("://"))
             {
                 return getStorage(Storage.Scheme.fromPath(schemeOrPath));
@@ -131,23 +148,25 @@ public class StorageFactory
             return storageImpls.get(scheme);
         }
 
-        Storage storage = null;
-        if (scheme == Storage.Scheme.hdfs)
+        Storage storage;
+        switch (scheme)
         {
-            storage = new HDFS();
+            case hdfs:
+                storage = new HDFS();
+                break;
+            case file:
+                storage = new LocalFS();
+                break;
+            case s3:
+                storage = new S3();
+                break;
+            case minio:
+                storage = new MinIO();
+                break;
+            default:
+                throw new IOException("Unknown storage scheme: " + scheme.name());
         }
-        else if (scheme == Storage.Scheme.s3)
-        {
-            storage = new S3();
-        }
-        else if (scheme == Storage.Scheme.file)
-        {
-            storage = new LocalFS();
-        }
-        if (storage != null)
-        {
-            storageImpls.put(scheme, storage);
-        }
+        storageImpls.put(scheme, storage);
 
         return storage;
     }

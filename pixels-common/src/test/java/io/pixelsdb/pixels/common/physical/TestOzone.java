@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.common;
+package io.pixelsdb.pixels.common.physical;
 
 import org.junit.Test;
 

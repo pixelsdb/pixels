@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.physical.io.PhysicalS3Writer;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 
 /**
  * @author guodong
@@ -40,18 +41,18 @@ public class PhysicalWriterUtil
     /**
      * Get a physical file system writer.
      *
-     * @param storage
-     * @param path
-     * @param blockSize
-     * @param replication
-     * @param addBlockPadding
-     * @param overwrite true if overwrite the existing file with the same path.
+     * @param storage the storage to use
+     * @param path the path of the file to write
+     * @param blockSize the block size of the file
+     * @param replication the replication of the file
+     * @param addBlockPadding add block padding or not
+     * @param overwrite overwrite the existing file with the same path if true
      * @return
      * @throws IOException
      */
-    public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
-                                                   short replication, boolean addBlockPadding,
-                                                   boolean overwrite) throws IOException
+    public static PhysicalWriter newPhysicalWriter(
+            Storage storage, String path, long blockSize, short replication,
+            boolean addBlockPadding, boolean overwrite) throws IOException
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
@@ -60,37 +61,59 @@ public class PhysicalWriterUtil
         switch (storage.getScheme())
         {
             case hdfs:
-                writer = new PhysicalHDFSWriter(storage, path, replication, addBlockPadding, blockSize, overwrite);
+                writer = new PhysicalHDFSWriter(storage, path, replication,
+                        addBlockPadding, blockSize, overwrite);
                 break;
             case file:
                 writer = new PhysicalLocalWriter(storage, path);
                 break;
             case s3:
+            case minio:
                 writer = new PhysicalS3Writer(storage, path, overwrite);
                 break;
             default:
-                throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
+                throw new IOException("Storage scheme '" +
+                        storage.getScheme() + "' is not supported.");
         }
 
         return writer;
     }
 
     /**
-     * Get a physical file system writer. If the file with the same path already exists, this method
-     * should throw an IOException.
+     * Get a physical file system writer. If the file with the same path
+     * already exists, this method should throw an IOException.
      *
-     * @param storage
-     * @param path
-     * @param blockSize
-     * @param replication
-     * @param addBlockPadding
+     * @param storage the storage to use
+     * @param path the path of the file to write
+     * @param blockSize the block size of the file
+     * @param replication the replication of the file
+     * @param addBlockPadding add block padding or not
      * @return
      * @throws IOException
      */
-    public static PhysicalWriter newPhysicalWriter(Storage storage, String path, long blockSize,
-                                                   short replication, boolean addBlockPadding) throws IOException
+    public static PhysicalWriter newPhysicalWriter(
+            Storage storage, String path, long blockSize,
+            short replication, boolean addBlockPadding) throws IOException
     {
-        return newPhysicalWriter(storage, path, blockSize, replication, addBlockPadding, false);
+        return newPhysicalWriter(storage, path, blockSize,
+                replication, addBlockPadding, false);
+    }
+
+    /**
+     * Get a physical file system writer. If the storage is HDFS, default blocks,
+     * one replication, and addBlockPadding=true are used by default.
+     *
+     * @param storage the storage to use
+     * @param path the path of the file to write
+     * @param overwrite overwrite the existing file with the same path if true
+     * @return the physical writer
+     * @throws IOException
+     */
+    public static PhysicalWriter newPhysicalWriter(
+            Storage storage, String path, boolean overwrite) throws IOException
+    {
+        return newPhysicalWriter(storage, path, DEFAULT_HDFS_BLOCK_SIZE,
+                (short) 1, true, overwrite);
     }
 
     /**
@@ -101,8 +124,8 @@ public class PhysicalWriterUtil
      * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
-     * @param overwrite       true if overwrite the existing file with the same path.
-     * @return physical writer
+     * @param overwrite       overwrite the existing file with the same path if true
+     * @return the physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
             Storage.Scheme scheme, String path, long blockSize, short replication,
@@ -123,7 +146,7 @@ public class PhysicalWriterUtil
      * @param blockSize       hdfs block size
      * @param replication     hdfs block replication num
      * @param addBlockPadding add block padding or not
-     * @return physical writer
+     * @return the physical writer
      */
     public static PhysicalWriter newPhysicalWriter(
             Storage.Scheme scheme, String path, long blockSize, short replication,
@@ -131,7 +154,25 @@ public class PhysicalWriterUtil
     {
         checkArgument(scheme != null, "scheme should not be null");
         checkArgument(path != null, "path should not be null");
-        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path, blockSize,
-                replication, addBlockPadding, false);
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path,
+                blockSize, replication, addBlockPadding, false);
+    }
+
+    /**
+     * Get a physical file system writer. If the storage is HDFS, default blocks, one
+     * replication, and addBlockPadding=true are used by default.
+     *
+     * @param scheme          name of the scheme
+     * @param path            write file path
+     * @param overwrite       overwrite the existing file with the same path if true
+     * @return the physical writer
+     */
+    public static PhysicalWriter newPhysicalWriter(
+            Storage.Scheme scheme, String path, boolean overwrite) throws IOException
+    {
+        checkArgument(scheme != null, "scheme should not be null");
+        checkArgument(path != null, "path should not be null");
+        return newPhysicalWriter(StorageFactory.Instance().getStorage(scheme), path,
+                DEFAULT_HDFS_BLOCK_SIZE, (short) 1, true, overwrite);
     }
 }
