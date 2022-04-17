@@ -41,8 +41,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 @JSONType(includes = {"javaType", "lowerBounds", "upperBounds", "discreteValues"})
 public class Filter<T extends Comparable<T>>
 {
+    /**
+     * The java type of T.
+     */
     @JSONField(name = "javaType", ordinal = 0)
-    public final Class<T> javaType;
+    public final Class<?> javaType;
     @JSONField(name = "ranges", ordinal = 4)
     public final ArrayList<Range<T>> ranges;
     @JSONField(name = "discreteValues", ordinal = 5)
@@ -53,8 +56,10 @@ public class Filter<T extends Comparable<T>>
     public final boolean isNone;
     @JSONField(name = "allowNull", ordinal = 3)
     public final boolean allowNull;
+    @JSONField(name = "onlyNull", ordinal = 4)
+    public final boolean onlyNull;
 
-    public Filter(Class<T> javaType, boolean isAll, boolean isNone, boolean allowNull)
+    public Filter(Class<?> javaType, boolean isAll, boolean isNone, boolean allowNull, boolean onlyNull)
     {
         this.javaType = javaType;
         this.ranges = new ArrayList<>();
@@ -62,6 +67,7 @@ public class Filter<T extends Comparable<T>>
         this.isAll = isAll;
         this.isNone = isNone;
         this.allowNull = allowNull;
+        this.onlyNull = onlyNull;
     }
 
     /**
@@ -74,9 +80,9 @@ public class Filter<T extends Comparable<T>>
      * @param allowNull
      */
     @JSONCreator
-    public Filter(Class<T> javaType, ArrayList<Range<T>> ranges,
+    public Filter(Class<?> javaType, ArrayList<Range<T>> ranges,
                   ArrayList<Bound<T>> discreteValues,
-                  boolean isAll, boolean isNone, boolean allowNull)
+                  boolean isAll, boolean isNone, boolean allowNull, boolean onlyNull)
     {
         this.javaType = javaType;
         this.ranges = ranges;
@@ -84,6 +90,7 @@ public class Filter<T extends Comparable<T>>
         this.isAll = isAll;
         this.isNone = isNone;
         this.allowNull = allowNull;
+        this.onlyNull = onlyNull;
     }
 
     public Range<T> getRange(int i)
@@ -118,7 +125,7 @@ public class Filter<T extends Comparable<T>>
         return this.discreteValues.size();
     }
 
-    public Class<T> getJavaType()
+    public Class<?> getJavaType()
     {
         return javaType;
     }
@@ -136,5 +143,10 @@ public class Filter<T extends Comparable<T>>
     public boolean isAllowNull()
     {
         return allowNull;
+    }
+
+    public boolean isOnlyNull()
+    {
+        return onlyNull;
     }
 }

@@ -149,10 +149,28 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         // start filtering, set the bits of all matched rows.
         result.clear(start, start+length);
+
+        if (this.filter.onlyNull)
+        {
+            if (columnVector.noNulls)
+            {
+                return;
+            }
+            for (int i = start; i < start+length; ++i)
+            {
+                if (columnVector.isNull[i])
+                {
+                    result.set(i);
+                }
+            }
+            return;
+        }
+
         if (this.filter.isNone)
         {
             return;
         }
+
         if (columnVector.isRepeating)
         {
             /*
