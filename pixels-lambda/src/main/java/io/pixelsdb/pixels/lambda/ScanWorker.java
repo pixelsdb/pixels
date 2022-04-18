@@ -88,7 +88,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> fileNames = event.getInputs();
+            ArrayList<InputInfo> inputs = event.getInputs();
+            int splitSize = event.getSplitSize();
             String outputFolder = event.getOutput().getFolder();
             if (!outputFolder.endsWith("/"))
             {
@@ -107,13 +108,20 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String[] cols = event.getCols().toArray(new String[0]);
             TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
             ScanOutput scanOutput = new ScanOutput();
-            for (int i = 0; i < fileNames.size(); i++)
+            for (int i = 0; i < inputs.size();)
             {
-                InputInfo in = fileNames.get(i);
+                int numRg = 0;
+                ArrayList<InputInfo> scanInputs = new ArrayList<>();
+                while (numRg < splitSize)
+                {
+                    InputInfo info = inputs.get(i++);
+                    scanInputs.add(info);
+                    numRg += info.getRgLength();
+                }
                 String out = outputFolder + requestId + "_out_" + i;
                 scanOutput.addOutput(out);
 
-                threadPool.submit(() -> scanFile(queryId, in, cols, filter, out, encoding));
+                threadPool.submit(() -> scanFile(queryId, scanInputs, cols, filter, out, encoding));
             }
             threadPool.shutdown();
             try
@@ -133,51 +141,65 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     }
 
     /**
+     * Scan the files in a query split, apply projection and filters, and output the
+     * results to the given path.
      * @param queryId the query id used by I/O scheduler
-     * @param inputInfo the information of the file to scan
+     * @param scanInputs the information of the files to scan
      * @param cols the included columns
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
      * @return
      */
-    public String scanFile(long queryId, InputInfo inputInfo, String[] cols,
+    public String scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
-        PixelsReaderOption option = new PixelsReaderOption();
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.queryId(queryId);
-        option.includeCols(cols);
-        option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
-        VectorizedRowBatch rowBatch;
-
-        try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
-             PixelsRecordReader recordReader = pixelsReader.read(option))
+        PixelsWriter pixelsWriter = null;
+        for (int i = 0; i < scanInputs.size(); ++i)
         {
-            TypeDescription rowBatchSchema = recordReader.getResultSchema();
+            InputInfo inputInfo = scanInputs.get(i);
+            PixelsReaderOption option = new PixelsReaderOption();
+            option.skipCorruptRecords(true);
+            option.tolerantSchemaEvolution(true);
+            option.queryId(queryId);
+            option.includeCols(cols);
+            option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
+            VectorizedRowBatch rowBatch;
 
-            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
-            Bitmap filtered = new Bitmap(rowBatchSize, true);
-            Bitmap tmp = new Bitmap(rowBatchSize, false);
-            while (true)
+            try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
+                 PixelsRecordReader recordReader = pixelsReader.read(option))
             {
-                rowBatch = recordReader.readBatch(rowBatchSize);
-                filter.doFilter(rowBatch, filtered, tmp);
-                rowBatch.applyFilter(filtered);
-                if (rowBatch.size > 0)
+                TypeDescription rowBatchSchema = recordReader.getResultSchema();
+
+                if (pixelsWriter == null)
                 {
-                    pixelsWriter.addRowBatch(rowBatch);
+                    pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
                 }
-                if (rowBatch.endOfFile)
+                Bitmap filtered = new Bitmap(rowBatchSize, true);
+                Bitmap tmp = new Bitmap(rowBatchSize, false);
+                while (true)
                 {
-                    pixelsWriter.close();
-                    break;
+                    rowBatch = recordReader.readBatch(rowBatchSize);
+                    filter.doFilter(rowBatch, filtered, tmp);
+                    rowBatch.applyFilter(filtered);
+                    if (rowBatch.size > 0)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                    if (rowBatch.endOfFile)
+                    {
+                        if (i == scanInputs.size() - 1)
+                        {
+                            // Finished scanning all the files in the split.
+                            pixelsWriter.close();
+                        }
+                        break;
+                    }
                 }
+            } catch (Exception e)
+            {
+                logger.error("failed to scan the file '" +
+                        inputInfo.getFilePath() + "' and output the result", e);
             }
-        } catch (Exception e)
-        {
-            logger.error("failed to scan the file '" +
-                    inputInfo.getFilePath() + "' and output the result", e);
         }
         return "success";
     }

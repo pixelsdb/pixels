@@ -33,9 +33,9 @@ public class TestInput
     @Test
     public void testParseScanInput()
     {
-        String json = "{\"queryId\":123456,\"inputs\":[{\"filePath\":\"pixels-tpch/orders/0.pxl\",\"rgStart\":0," +
+        String json = "{\"queryId\":123456789123456789,\"inputs\":[{\"filePath\":\"pixels-tpch/orders/0.pxl\",\"rgStart\":0," +
                 "\"rgLength\":4}," + "{\"filePath\":\"pixels-tpch/orders/1.pxl\",\"rgStart\":0,\"rgLength\":4}]," +
-                "\"output\":{\"folder\":\"pixels-test/hank/\",\"endpoint\":\"http://hostname:9000\"," +
+                "\"splitSize\":8," + "\"output\":{\"folder\":\"pixels-test/hank/\",\"endpoint\":\"http://hostname:9000\"," +
                 "\"accessKey\":\"test\",\"secretKey\":\"password\",\"encoding\":true}," +
                 "\"cols\":[\"o_orderkey\",\"o_custkey\",\"o_orderstatus\",\"o_orderdate\"]," +
                 "\"filter\":\"{\\\"schemaName\\\":\\\"tpch\\\",\\\"tableName\\\":\\\"orders\\\"," +
@@ -50,6 +50,7 @@ public class TestInput
         Gson gson = new Gson();
         ScanInput scanInput = gson.fromJson(json, ScanInput.class);
         assert scanInput.getInputs().size() == 2;
+        assert scanInput.getSplitSize() == 8;
         assert scanInput.getCols().size() == 4;
         assert scanInput.getOutput().getFolder().equals("pixels-test/hank");
         assert scanInput.getOutput().isEncoding();

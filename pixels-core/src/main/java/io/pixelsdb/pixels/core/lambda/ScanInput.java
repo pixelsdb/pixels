@@ -28,11 +28,19 @@ import java.util.ArrayList;
  */
 public class ScanInput
 {
+    /**
+     * The unique id of the query.
+     */
     private long queryId;
     /**
-     * The path of the files to be scanned from AWS S3.
+     * The information of the input files to be scanned.
+     * rgLength in each input is the number of row groups to be scanned from each file.
      */
     private ArrayList<InputInfo> inputs;
+    /**
+     * The number of row groups to be scanned in each query split.
+     */
+    private int splitSize;
     /**
      * The description of the output folder where the scan results are written into.
      */
@@ -51,10 +59,12 @@ public class ScanInput
      */
     public ScanInput() { }
 
-    public ScanInput(long queryId, ArrayList<InputInfo> inputs, OutputInfo output, ArrayList<String> cols, String filter)
+    public ScanInput(long queryId, ArrayList<InputInfo> inputs, int splitSize,
+                     OutputInfo output, ArrayList<String> cols, String filter)
     {
         this.queryId = queryId;
         this.inputs = inputs;
+        this.splitSize = splitSize;
         this.output = output;
         this.cols = cols;
         this.filter = filter;
@@ -78,6 +88,16 @@ public class ScanInput
     public void setInputs(ArrayList<InputInfo> inputs)
     {
         this.inputs = inputs;
+    }
+
+    public int getSplitSize()
+    {
+        return splitSize;
+    }
+
+    public void setSplitSize(int splitSize)
+    {
+        this.splitSize = splitSize;
     }
 
     public OutputInfo getOutput()
