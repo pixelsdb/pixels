@@ -19,26 +19,35 @@
  */
 package io.pixelsdb.pixels.core.lambda;
 
-import com.google.gson.Gson;
-import org.junit.Test;
+import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
+import software.amazon.awssdk.services.lambda.LambdaAsyncClient;
+
+import java.time.Duration;
 
 /**
  * @author hank
- * Created at: 11/04/2022
+ * @date 4/18/22
  */
-public class TestOutput
+public class Lambda
 {
-    @Test
-    public void testEncodeScanOutput()
+    private static final Lambda instance = new Lambda();
+
+    public static Lambda Instance()
     {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
+        return instance;
+    }
+
+    private final LambdaAsyncClient asyncClient;
+
+    private Lambda()
+    {
+        asyncClient = LambdaAsyncClient.builder().httpClientBuilder(
+                AwsCrtAsyncHttpClient.builder().maxConcurrency(1000)
+                        .connectionMaxIdleTime(Duration.ofSeconds(1000))).build();
+    }
+
+    public LambdaAsyncClient getAsyncClient()
+    {
+        return asyncClient;
     }
 }

@@ -84,7 +84,9 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     {
         try
         {
-            ExecutorService threadPool = Executors.newFixedThreadPool(12);
+            int cores = Runtime.getRuntime().availableProcessors();
+            logger.info("Number of cores available: " + cores);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
@@ -105,7 +107,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
-            String[] cols = event.getCols().toArray(new String[0]);
+            String[] cols = event.getCols();
             TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
             ScanOutput scanOutput = new ScanOutput();
             for (int i = 0; i < inputs.size();)
@@ -119,9 +121,11 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     numRg += info.getRgLength();
                 }
                 String out = outputFolder + requestId + "_out_" + i;
-                scanOutput.addOutput(out);
 
-                threadPool.submit(() -> scanFile(queryId, scanInputs, cols, filter, out, encoding));
+                threadPool.execute(() -> {
+                    int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
+                    scanOutput.addOutput(out, rowGroupNum);
+                });
             }
             threadPool.shutdown();
             try
@@ -148,12 +152,13 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param cols the included columns
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
-     * @return
+     * @return the number of row groups that have been written into the output.
      */
-    public String scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
+    public int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
         PixelsWriter pixelsWriter = null;
+        int rowGroupNum = 0;
         for (int i = 0; i < scanInputs.size(); ++i)
         {
             InputInfo inputInfo = scanInputs.get(i);
@@ -191,6 +196,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         {
                             // Finished scanning all the files in the split.
                             pixelsWriter.close();
+                            rowGroupNum = pixelsWriter.getRowGroupNum();
                         }
                         break;
                     }
@@ -201,7 +207,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         inputInfo.getFilePath() + "' and output the result", e);
             }
         }
-        return "success";
+        return rowGroupNum;
     }
 
     private PixelsReader getReader(String fileName)

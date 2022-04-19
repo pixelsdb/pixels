@@ -679,7 +679,7 @@ public class PixelsRecordReaderImpl
         if (!diskChunks.isEmpty())
         {
             /**
-             * Comments added in Issue #67 (path):
+             * Comments added in Issue #67 (patch):
              * By ordering disk chunks (ascending) according to the start offset and
              * group continuous disk chunks into one group, we can read the continuous
              * disk chunks in only one disk read, this would significantly improve I/O

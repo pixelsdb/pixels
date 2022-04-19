@@ -48,7 +48,7 @@ public class ScanInput
     /**
      * The name of the columns to scan.
      */
-    private ArrayList<String> cols;
+    private String[] cols;
     /**
      * The json string of the filter (i.e., predicates) to be used in scan.
      */
@@ -60,7 +60,7 @@ public class ScanInput
     public ScanInput() { }
 
     public ScanInput(long queryId, ArrayList<InputInfo> inputs, int splitSize,
-                     OutputInfo output, ArrayList<String> cols, String filter)
+                     OutputInfo output, String[] cols, String filter)
     {
         this.queryId = queryId;
         this.inputs = inputs;
@@ -110,12 +110,12 @@ public class ScanInput
         this.output = output;
     }
 
-    public ArrayList<String> getCols()
+    public String[] getCols()
     {
         return cols;
     }
 
-    public void setCols(ArrayList<String> cols)
+    public void setCols(String[] cols)
     {
         this.cols = cols;
     }

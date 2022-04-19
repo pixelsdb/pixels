@@ -51,14 +51,14 @@ public class TestInput
         ScanInput scanInput = gson.fromJson(json, ScanInput.class);
         assert scanInput.getInputs().size() == 2;
         assert scanInput.getSplitSize() == 8;
-        assert scanInput.getCols().size() == 4;
-        assert scanInput.getOutput().getFolder().equals("pixels-test/hank");
+        assert scanInput.getCols().length == 4;
+        assert scanInput.getOutput().getFolder().equals("pixels-test/hank/");
         assert scanInput.getOutput().isEncoding();
         TableScanFilter filter = JSON.parseObject(scanInput.getFilter(), TableScanFilter.class);
         assert filter.getSchemaName().equals("tpch");
         assert filter.getTableName().equals("orders");
         assert filter.getColumnFilters().size() == 1;
-        assert filter.getColumnFilter(0).getFilter().getRangeCount() == 2;
-        assert filter.getColumnFilter(0).getFilter().getDiscreteValueCount() == 0;
+        assert filter.getColumnFilter(1).getFilter().getRangeCount() == 2;
+        assert filter.getColumnFilter(1).getFilter().getDiscreteValueCount() == 0;
     }
 }

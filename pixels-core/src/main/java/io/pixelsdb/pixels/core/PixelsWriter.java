@@ -35,7 +35,7 @@ public interface PixelsWriter
     /**
      * Add row batch into the file.
      *
-     * @return if the file adds a new row group, return false. Else, return true.
+     * @return if the file adds a new row group, returns false. Otherwise, returns true.
      */
     boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException;
@@ -46,4 +46,10 @@ public interface PixelsWriter
      * @return schema
      */
     TypeDescription getSchema();
+
+    /**
+     * Get the number of row groups that have been written into the file.
+     * @return
+     */
+    int getRowGroupNum();
 }
