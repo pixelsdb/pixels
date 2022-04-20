@@ -127,14 +127,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 
                 threadPool.execute(() -> {
                     int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
-                    scanOutput.addOutput(out, rowGroupNum);
+                    if (rowGroupNum > 0)
+                    {
+                        scanOutput.addOutput(out, rowGroupNum);
+                    }
                 });
             }
             threadPool.shutdown();
             try
             {
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-                threadPool.shutdownNow();
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of scan", e);
@@ -177,6 +179,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
                  PixelsRecordReader recordReader = pixelsReader.read(option))
             {
+                if (!recordReader.isValid())
+                {
+                    /*
+                     * If the record reader is invalid, it is likely that the rgRange
+                     * in the read option is out of bound (i.e., this is the last file
+                     * in the table that does not have enough row group to read).
+                     */
+                    break;
+                }
+
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
 
                 if (pixelsWriter == null)
