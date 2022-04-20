@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.core.lambda;
 
 import com.alibaba.fastjson.JSON;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
-import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -45,29 +45,29 @@ public class ScanInvoker
         InvokeRequest request = InvokeRequest.builder()
                 .functionName(SCAN_WORKER_NAME)
                 .payload(payload)
-                //.invocationType(InvocationType.REQUEST_RESPONSE)
+                // using RequestResponse for higher function concurrency.
+                .invocationType(InvocationType.REQUEST_RESPONSE)
                 .build();
 
         return Lambda.Instance().getAsyncClient().invoke(request).handle((response, err) -> {
             if (err == null && response != null)
             {
                 // 200 is the success status for RequestResponse invocation type.
-                if(response.statusCode() == 200)
+                if(response.statusCode() == 200 && response.functionError() == null)
                 {
                     String outputJson = response.payload().asUtf8String();
                     ScanOutput scanOutput = JSON.parseObject(outputJson, ScanOutput.class);
                     if (scanOutput == null)
                     {
-                        throw new RuntimeException("failed to parse response payload: " + response.payload().asByteArray().length + ", " +
-                                response.functionError()
-                                + ", " + new String(Base64.getMimeDecoder().decode(response.payload().asByteArrayUnsafe())));
+                        throw new RuntimeException("failed to parse response payload, length=" +
+                                response.payload().asByteArray().length);
                     }
                     return scanOutput;
                 }
                 else
                 {
-                    throw new RuntimeException(response.functionError(),
-                            new Exception(response.payload().asUtf8String()));
+                    throw new RuntimeException("failed to execute the request, function error="
+                            + response.functionError());
                 }
             }
             throw new RuntimeException("failed to get response", err);

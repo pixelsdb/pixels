@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.lambda.ScanInput;
-import io.pixelsdb.pixels.core.lambda.ScanInput.*;
+import io.pixelsdb.pixels.core.lambda.ScanInput.InputInfo;
 import io.pixelsdb.pixels.core.lambda.ScanOutput;
 import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -100,9 +100,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             boolean encoding = event.getOutput().isEncoding();
             try
             {
-                ConfigMinIO(event.getOutput().getEndpoint(),
-                        event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
-                minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                if (minio == null)
+                {
+                    ConfigMinIO(event.getOutput().getEndpoint(),
+                            event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
+                    minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                }
             } catch (IOException e)
             {
                 logger.error("failed to initialize MinIO storage", e);
@@ -131,6 +134,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             try
             {
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
+                threadPool.shutdownNow();
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of scan", e);
@@ -196,6 +200,21 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         {
                             // Finished scanning all the files in the split.
                             pixelsWriter.close();
+                            while (true)
+                            {
+                                try
+                                {
+                                    if (minio.getStatus(outputPath) != null)
+                                    {
+                                        break;
+                                    }
+                                }
+                                catch (IOException e)
+                                {
+                                    // Wait for 10ms and see if the output file is visible.
+                                    TimeUnit.MILLISECONDS.sleep(10);
+                                }
+                            }
                             rowGroupNum = pixelsWriter.getRowGroupNum();
                         }
                         break;
