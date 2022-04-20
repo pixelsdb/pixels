@@ -232,6 +232,7 @@ public class PixelsCacheReader
         radixLevel++;
 
         // search
+        // it can be more clear with a do while function
         outer_loop:
         while (bytesMatched < keyLen)
         {
@@ -239,12 +240,16 @@ public class PixelsCacheReader
             long matchingChildOffset = 0L;
             childrenBuffer.position(0);
             childrenBuffer.limit(currentNodeChildrenNum * 8);
+            // linearly scan all the children
             for (int i = 0; i < currentNodeChildrenNum; i++)
             {
+                // long is 8 byte, which is 64 bit
                 long child = childrenBuffer.getLong();
+                // first byte is matching byte
                 byte leader = (byte) ((child >>> 56) & 0xFF);
                 if (leader == keyBuffer.get(bytesMatched))
                 {
+                    // child last 7 bytes is grandson's offset, that is, the address is 7-bytes long
                     matchingChildOffset = child & 0x00FFFFFFFFFFFFFFL;
                     break;
                 }
@@ -271,8 +276,12 @@ public class PixelsCacheReader
              */
             bytesMatched++;
             bytesMatchedInNodeFound++;
+            // now we are visiting the edge! rather than children data
+            // it seems between children and edge, there is a one byte gap?
+            // or the first byte of the edge does not matter here anyway
             for (int i = currentNodeChildrenNum * 8 + 1; i < edgeEndOffset && bytesMatched < keyLen; i++)
             {
+                // the edge is shared across this node, so the edge should be fully matched
                 if (this.nodeData[i] != keyBuffer.get(bytesMatched))
                 {
                     break outer_loop;
