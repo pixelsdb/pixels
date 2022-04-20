@@ -198,7 +198,7 @@ public class ColumnFilter<T extends Comparable<T>>
                 //         decv.precision, decv.scale, start, length, result);
                 /*
                  * The values in the Decimal filter are Long.
-                 * For performance considerations, we reuse the doFilter mother for Long columns.
+                 * For performance considerations, we reuse the doFilter method for Long columns.
                  */
                 doFilter(decv.vector, decv.noNulls ? null : decv.isNull, start, length, result);
                 return;
@@ -458,7 +458,7 @@ public class ColumnFilter<T extends Comparable<T>>
      * @param scale the scale of the column vector
      * @param start the offset in the column vector to start comparison
      * @param length the length in the column vector to compare
-     * @param result the result bitmap, all the matched bits corresponding to the [start, start_length)
+     * @param result the result bitmap, all the matched bits corresponding to the [start, start+length)
      *               range are set to true
      */
     private void doFilter(long[] vector, boolean[] isNull, int precision, int scale,

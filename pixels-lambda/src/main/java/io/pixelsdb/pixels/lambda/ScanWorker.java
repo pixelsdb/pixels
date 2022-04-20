@@ -184,7 +184,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     /*
                      * If the record reader is invalid, it is likely that the rgRange
                      * in the read option is out of bound (i.e., this is the last file
-                     * in the table that does not have enough row group to read).
+                     * in the table that does not have enough row groups to read).
                      */
                     break;
                 }
