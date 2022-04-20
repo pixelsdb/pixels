@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
@@ -48,15 +49,73 @@ public class TestPredicate
     }
 
     @Test
-    public void testSerializationAndDeserialization()
+    public void testLongFilterSerDe()
     {
-        Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false);
+        Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false, false);
         longFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
                 new Bound<>(Bound.Type.INCLUDED, 100L));
         longFilter.addRange(new Bound<>(Bound.Type.EXCLUDED, 200L),
                 new Bound<>(Bound.Type.UNBOUNDED, null));
         longFilter.addDiscreteValue(new Bound<>(Bound.Type.INCLUDED, 150L));
         ColumnFilter<Long> columnFilter = new ColumnFilter<>("id", TypeDescription.Category.LONG, longFilter);
+
+        SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
+        columnFilters.put(0, columnFilter);
+
+        TableScanFilter tableScanFilter = new TableScanFilter("tpch", "orders", columnFilters);
+
+        String json = JSON.toJSONString(tableScanFilter);
+
+        System.out.println(json);
+
+        TableScanFilter tableScanFilter1 = JSON.parseObject(json, TableScanFilter.class);
+        ColumnFilter columnFilter1 = tableScanFilter1.getColumnFilter(0);
+        System.out.println(columnFilter1.getColumnName());
+        System.out.println(columnFilter1.getColumnType());
+        System.out.println(columnFilter1.getFilter().getJavaType());
+        System.out.println(columnFilter1.getFilter().getRangeCount());
+        System.out.println(columnFilter1.getFilter().getDiscreteValueCount());
+    }
+
+    @Test
+    public void testStringFilterSerDe()
+    {
+        Filter<String> stringFilter = new Filter<>(String.class, false, false, false, false);
+        stringFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
+                new Bound<>(Bound.Type.INCLUDED, "123"));
+        stringFilter.addRange(new Bound<>(Bound.Type.EXCLUDED, "456"),
+                new Bound<>(Bound.Type.UNBOUNDED, null));
+        stringFilter.addDiscreteValue(new Bound<>(Bound.Type.INCLUDED, "789"));
+        ColumnFilter<String> columnFilter = new ColumnFilter<>("id", TypeDescription.Category.STRING, stringFilter);
+
+        SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
+        columnFilters.put(0, columnFilter);
+
+        TableScanFilter tableScanFilter = new TableScanFilter("tpch", "orders", columnFilters);
+
+        String json = JSON.toJSONString(tableScanFilter);
+
+        System.out.println(json);
+
+        TableScanFilter tableScanFilter1 = JSON.parseObject(json, TableScanFilter.class);
+        ColumnFilter columnFilter1 = tableScanFilter1.getColumnFilter(0);
+        System.out.println(columnFilter1.getColumnName());
+        System.out.println(columnFilter1.getColumnType());
+        System.out.println(columnFilter1.getFilter().getJavaType());
+        System.out.println(columnFilter1.getFilter().getRangeCount());
+        System.out.println(columnFilter1.getFilter().getDiscreteValueCount());
+    }
+
+    @Test
+    public void testDecimalFilterSerDe()
+    {
+        Filter<Decimal> decimalFilter = new Filter<>(Decimal.class, false, false, false, false);
+        decimalFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
+                new Bound<>(Bound.Type.INCLUDED, new Decimal(1234, 15, 2)));
+        decimalFilter.addRange(new Bound<>(Bound.Type.EXCLUDED, new Decimal(4567, 15, 2)),
+                new Bound<>(Bound.Type.UNBOUNDED, null));
+        decimalFilter.addDiscreteValue(new Bound<>(Bound.Type.INCLUDED, new Decimal(7890, 15, 2)));
+        ColumnFilter<Decimal> columnFilter = new ColumnFilter<>("id", TypeDescription.Category.DECIMAL, decimalFilter);
 
         SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
         columnFilters.put(0, columnFilter);
@@ -96,7 +155,7 @@ public class TestPredicate
         readerOption.includeCols(new String[] {"o_custkey", "o_orderkey", "o_orderdate", "o_orderstatus"});
         PixelsRecordReader recordReader = pixelsReader.read(readerOption);
 
-        Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false);
+        Filter<Long> longFilter = new Filter<>(Long.TYPE, false, false, false, false);
         longFilter.addRange(new Bound<>(Bound.Type.UNBOUNDED, null),
                 new Bound<>(Bound.Type.INCLUDED, 100L));
         longFilter.addRange(new Bound<>(Bound.Type.EXCLUDED, 200L),

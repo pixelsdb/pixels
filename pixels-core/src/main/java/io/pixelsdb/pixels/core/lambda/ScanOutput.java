@@ -21,8 +21,6 @@ package io.pixelsdb.pixels.core.lambda;
 
 import java.util.ArrayList;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * @author hank
  * Created at: 11/04/2022
@@ -32,18 +30,13 @@ public class ScanOutput
     /**
      * The path of the scan result files. No need to contain endpoint information.
      */
-    private ArrayList<String> outputs;
+    private ArrayList<String> outputs = new ArrayList<>();
+    private ArrayList<Integer> rowGroupNums = new ArrayList<>();
 
-    public ScanOutput()
-    {
-        this.outputs = new ArrayList<>();
-    }
-
-    public ScanOutput(ArrayList<String> outputs)
-    {
-        requireNonNull(outputs, "outputs is null");
-        this.outputs = outputs;
-    }
+    /**
+     * Default constructor for jackson.
+     */
+    public ScanOutput() { }
 
     public ArrayList<String> getOutputs()
     {
@@ -55,8 +48,19 @@ public class ScanOutput
         this.outputs = outputs;
     }
 
-    public void addOutput(String output)
+    public ArrayList<Integer> getRowGroupNums()
+    {
+        return rowGroupNums;
+    }
+
+    public void setRowGroupNums(ArrayList<Integer> rowGroupNums)
+    {
+        this.rowGroupNums = rowGroupNums;
+    }
+
+    public void addOutput(String output, int rowGroupNum)
     {
         this.outputs.add(output);
+        this.rowGroupNums.add(rowGroupNum);
     }
 }

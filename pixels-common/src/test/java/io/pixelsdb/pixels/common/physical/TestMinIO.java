@@ -22,6 +22,9 @@ package io.pixelsdb.pixels.common.physical;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.List;
 
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
@@ -62,5 +65,15 @@ public class TestMinIO
 
         reader.close();
         writer.close();
+    }
+
+    @Test
+    public void testGetLocalIP() throws IOException
+    {
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress("google.com", 80));
+        System.out.println(socket.getLocalAddress());
+        socket.close();
+        System.out.println(InetAddress.getLocalHost().getHostAddress());
     }
 }

@@ -56,8 +56,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  */
 @NotThreadSafe
-public class PixelsWriterImpl
-        implements PixelsWriter
+public class PixelsWriterImpl implements PixelsWriter
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsWriterImpl.class);
 
@@ -286,6 +285,12 @@ public class PixelsWriterImpl
     public TypeDescription getSchema()
     {
         return schema;
+    }
+
+    @Override
+    public int getRowGroupNum()
+    {
+        return this.rowGroupInfoList.size();
     }
 
     public int getPixelStride()

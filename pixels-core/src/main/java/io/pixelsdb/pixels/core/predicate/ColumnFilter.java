@@ -90,7 +90,7 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else if (columnJavaType == Decimal.class)
         {
-            filterType = new TypeToken<Filter<Decimal>>(){}.getType();
+            filterType = new TypeToken<Filter<Long>>(){}.getType();
         }
         else
         {
@@ -149,10 +149,28 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         // start filtering, set the bits of all matched rows.
         result.clear(start, start+length);
+
+        if (this.filter.onlyNull)
+        {
+            if (columnVector.noNulls)
+            {
+                return;
+            }
+            for (int i = start; i < start+length; ++i)
+            {
+                if (columnVector.isNull[i])
+                {
+                    result.set(i);
+                }
+            }
+            return;
+        }
+
         if (this.filter.isNone)
         {
             return;
         }
+
         if (columnVector.isRepeating)
         {
             /*
@@ -176,8 +194,13 @@ public class ColumnFilter<T extends Comparable<T>>
                 return;
             case DECIMAL:
                 DecimalColumnVector decv = (DecimalColumnVector) columnVector;
-                doFilter(decv.vector, decv.noNulls ? null : decv.isNull,
-                        decv.precision, decv.scale, start, length, result);
+                // doFilter(decv.vector, decv.noNulls ? null : decv.isNull,
+                //         decv.precision, decv.scale, start, length, result);
+                /*
+                 * The values in the Decimal filter are Long.
+                 * For performance considerations, we reuse the doFilter method for Long columns.
+                 */
+                doFilter(decv.vector, decv.noNulls ? null : decv.isNull, start, length, result);
                 return;
             case FLOAT:
             case DOUBLE:
@@ -424,6 +447,20 @@ public class ColumnFilter<T extends Comparable<T>>
         }
     }
 
+    /**
+     * For Decimal, the values in the filter are Long, therefore we create Decimals using the
+     * same precision and scale in the column vector. However, this method is currently not
+     * used. Instead, we reuse the doFilter method for Long type columns, for Decimal columns.
+     *
+     * @param vector the values in the column vector
+     * @param isNull isNull array
+     * @param precision the precision of the column vector
+     * @param scale the scale of the column vector
+     * @param start the offset in the column vector to start comparison
+     * @param length the length in the column vector to compare
+     * @param result the result bitmap, all the matched bits corresponding to the [start, start+length)
+     *               range are set to true
+     */
     private void doFilter(long[] vector, boolean[] isNull, int precision, int scale,
                           int start, int length, Bitmap result)
     {
@@ -433,13 +470,15 @@ public class ColumnFilter<T extends Comparable<T>>
             for (Range<T> range : this.filter.ranges)
             {
                 Decimal lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
-                        (Decimal) range.lowerBound.value : new Decimal(Long.MIN_VALUE, 18, 0);
+                        new Decimal((Long) range.lowerBound.value, precision, scale) :
+                        new Decimal(Long.MIN_VALUE, 18, 0);
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
                     lowerBound.value ++;
                 }
                 Decimal upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
-                        (Decimal) range.upperBound.value : new Decimal(Long.MAX_VALUE, 18, 0);
+                        new Decimal((Long) range.upperBound.value, precision, scale) :
+                        new Decimal(Long.MAX_VALUE, 18, 0);
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
                     upperBound.value --;
@@ -477,11 +516,11 @@ public class ColumnFilter<T extends Comparable<T>>
             {
                 if (discrete.type == Bound.Type.INCLUDED)
                 {
-                    includes.add((Decimal) discrete.value);
+                    includes.add(new Decimal((Long) discrete.value, precision, scale));
                 }
                 else
                 {
-                    excludes.add((Decimal) discrete.value);
+                    excludes.add(new Decimal((Long) discrete.value, precision, scale));
                 }
             }
             if (!includes.isEmpty())

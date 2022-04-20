@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.lambda.ScanInput;
-import io.pixelsdb.pixels.core.lambda.ScanInput.*;
+import io.pixelsdb.pixels.core.lambda.ScanInput.InputInfo;
 import io.pixelsdb.pixels.core.lambda.ScanOutput;
 import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -84,11 +84,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     {
         try
         {
-            ExecutorService threadPool = Executors.newFixedThreadPool(12);
+            int cores = Runtime.getRuntime().availableProcessors();
+            logger.info("Number of cores available: " + cores);
+            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> fileNames = event.getInputs();
+            ArrayList<InputInfo> inputs = event.getInputs();
+            int splitSize = event.getSplitSize();
             String outputFolder = event.getOutput().getFolder();
             if (!outputFolder.endsWith("/"))
             {
@@ -97,23 +100,38 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             boolean encoding = event.getOutput().isEncoding();
             try
             {
-                ConfigMinIO(event.getOutput().getEndpoint(),
-                        event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
-                minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                if (minio == null)
+                {
+                    ConfigMinIO(event.getOutput().getEndpoint(),
+                            event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
+                    minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                }
             } catch (IOException e)
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
-            String[] cols = event.getCols().toArray(new String[0]);
+            String[] cols = event.getCols();
             TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
             ScanOutput scanOutput = new ScanOutput();
-            for (int i = 0; i < fileNames.size(); i++)
+            for (int i = 0; i < inputs.size();)
             {
-                InputInfo in = fileNames.get(i);
+                int numRg = 0;
+                ArrayList<InputInfo> scanInputs = new ArrayList<>();
+                while (numRg < splitSize)
+                {
+                    InputInfo info = inputs.get(i++);
+                    scanInputs.add(info);
+                    numRg += info.getRgLength();
+                }
                 String out = outputFolder + requestId + "_out_" + i;
-                scanOutput.addOutput(out);
 
-                threadPool.submit(() -> scanFile(queryId, in, cols, filter, out, encoding));
+                threadPool.execute(() -> {
+                    int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
+                    if (rowGroupNum > 0)
+                    {
+                        scanOutput.addOutput(out, rowGroupNum);
+                    }
+                });
             }
             threadPool.shutdown();
             try
@@ -133,53 +151,94 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     }
 
     /**
+     * Scan the files in a query split, apply projection and filters, and output the
+     * results to the given path.
      * @param queryId the query id used by I/O scheduler
-     * @param inputInfo the information of the file to scan
+     * @param scanInputs the information of the files to scan
      * @param cols the included columns
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
-     * @return
+     * @return the number of row groups that have been written into the output.
      */
-    public String scanFile(long queryId, InputInfo inputInfo, String[] cols,
+    public int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
-        PixelsReaderOption option = new PixelsReaderOption();
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.queryId(queryId);
-        option.includeCols(cols);
-        option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
-        VectorizedRowBatch rowBatch;
-
-        try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
-             PixelsRecordReader recordReader = pixelsReader.read(option))
+        PixelsWriter pixelsWriter = null;
+        int rowGroupNum = 0;
+        for (int i = 0; i < scanInputs.size(); ++i)
         {
-            TypeDescription rowBatchSchema = recordReader.getResultSchema();
+            InputInfo inputInfo = scanInputs.get(i);
+            PixelsReaderOption option = new PixelsReaderOption();
+            option.skipCorruptRecords(true);
+            option.tolerantSchemaEvolution(true);
+            option.queryId(queryId);
+            option.includeCols(cols);
+            option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
+            VectorizedRowBatch rowBatch;
 
-            PixelsWriter pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
-            Bitmap filtered = new Bitmap(rowBatchSize, true);
-            Bitmap tmp = new Bitmap(rowBatchSize, false);
-            while (true)
+            try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
+                 PixelsRecordReader recordReader = pixelsReader.read(option))
             {
-                rowBatch = recordReader.readBatch(rowBatchSize);
-                filter.doFilter(rowBatch, filtered, tmp);
-                rowBatch.applyFilter(filtered);
-                if (rowBatch.size > 0)
+                if (!recordReader.isValid())
                 {
-                    pixelsWriter.addRowBatch(rowBatch);
-                }
-                if (rowBatch.endOfFile)
-                {
-                    pixelsWriter.close();
+                    /*
+                     * If the record reader is invalid, it is likely that the rgRange
+                     * in the read option is out of bound (i.e., this is the last file
+                     * in the table that does not have enough row groups to read).
+                     */
                     break;
                 }
+
+                TypeDescription rowBatchSchema = recordReader.getResultSchema();
+
+                if (pixelsWriter == null)
+                {
+                    pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
+                }
+                Bitmap filtered = new Bitmap(rowBatchSize, true);
+                Bitmap tmp = new Bitmap(rowBatchSize, false);
+                while (true)
+                {
+                    rowBatch = recordReader.readBatch(rowBatchSize);
+                    filter.doFilter(rowBatch, filtered, tmp);
+                    rowBatch.applyFilter(filtered);
+                    if (rowBatch.size > 0)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                    if (rowBatch.endOfFile)
+                    {
+                        if (i == scanInputs.size() - 1)
+                        {
+                            // Finished scanning all the files in the split.
+                            pixelsWriter.close();
+                            while (true)
+                            {
+                                try
+                                {
+                                    if (minio.getStatus(outputPath) != null)
+                                    {
+                                        break;
+                                    }
+                                }
+                                catch (IOException e)
+                                {
+                                    // Wait for 10ms and see if the output file is visible.
+                                    TimeUnit.MILLISECONDS.sleep(10);
+                                }
+                            }
+                            rowGroupNum = pixelsWriter.getRowGroupNum();
+                        }
+                        break;
+                    }
+                }
+            } catch (Exception e)
+            {
+                logger.error("failed to scan the file '" +
+                        inputInfo.getFilePath() + "' and output the result", e);
             }
-        } catch (Exception e)
-        {
-            logger.error("failed to scan the file '" +
-                    inputInfo.getFilePath() + "' and output the result", e);
         }
-        return "success";
+        return rowGroupNum;
     }
 
     private PixelsReader getReader(String fileName)
