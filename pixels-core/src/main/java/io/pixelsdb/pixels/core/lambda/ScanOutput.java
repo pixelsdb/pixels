@@ -30,14 +30,13 @@ public class ScanOutput
     /**
      * The path of the scan result files. No need to contain endpoint information.
      */
-    private ArrayList<String> outputs;
-    private ArrayList<Integer> rowGroupNums;
+    private ArrayList<String> outputs = new ArrayList<>();
+    private ArrayList<Integer> rowGroupNums = new ArrayList<>();
 
-    public ScanOutput()
-    {
-        this.outputs = new ArrayList<>();
-        this.rowGroupNums = new ArrayList<>();
-    }
+    /**
+     * Default constructor for jackson.
+     */
+    public ScanOutput() { }
 
     public ArrayList<String> getOutputs()
     {

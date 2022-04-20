@@ -73,8 +73,8 @@ public final class MinIO extends AbstractS3
     /**
      * Set the configurations for MinIO. If any configuration is different from the default (null) or
      * previous value, the MinIO storage instance in StorageFactory is reloaded for the configuration
-     * changes to take effect. In this case, the previously MinIO storage instance acquired from
-     * StorageFactory can still be used without any impact.
+     * changes to take effect. In this case, the previous MinIO storage instance acquired from the
+     * StorageFactory can be used without any impact.
      * <br/>
      * If the configurations are not changed, this method is a no-op.
      *

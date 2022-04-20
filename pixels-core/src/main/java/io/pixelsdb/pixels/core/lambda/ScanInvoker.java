@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.core.lambda;
 
 import com.alibaba.fastjson.JSON;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
+import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -45,12 +45,32 @@ public class ScanInvoker
         InvokeRequest request = InvokeRequest.builder()
                 .functionName(SCAN_WORKER_NAME)
                 .payload(payload)
-                .invocationType(InvocationType.REQUEST_RESPONSE)
+                //.invocationType(InvocationType.REQUEST_RESPONSE)
                 .build();
 
         return Lambda.Instance().getAsyncClient().invoke(request).handle((response, err) -> {
-            String outputJson = response.payload().asUtf8String();
-            return JSON.parseObject(outputJson, ScanOutput.class);
+            if (err == null && response != null)
+            {
+                // 200 is the success status for RequestResponse invocation type.
+                if(response.statusCode() == 200)
+                {
+                    String outputJson = response.payload().asUtf8String();
+                    ScanOutput scanOutput = JSON.parseObject(outputJson, ScanOutput.class);
+                    if (scanOutput == null)
+                    {
+                        throw new RuntimeException("failed to parse response payload: " + response.payload().asByteArray().length + ", " +
+                                response.functionError()
+                                + ", " + new String(Base64.getMimeDecoder().decode(response.payload().asByteArrayUnsafe())));
+                    }
+                    return scanOutput;
+                }
+                else
+                {
+                    throw new RuntimeException(response.functionError(),
+                            new Exception(response.payload().asUtf8String()));
+                }
+            }
+            throw new RuntimeException("failed to get response", err);
         });
     }
 }
