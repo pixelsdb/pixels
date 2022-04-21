@@ -685,7 +685,8 @@ public class ColumnFilter<T extends Comparable<T>>
                         {
                             continue;
                         }
-                        if (includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (includes.contains(new String(vector[i],
+                                starts[i], lens[i], StandardCharsets.UTF_8)))
                         {
                             result.set(i);
                         }
@@ -695,7 +696,8 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (includes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (includes.contains(new String(vector[i],
+                                starts[i], lens[i], StandardCharsets.UTF_8)))
                         {
                             result.set(i);
                         }
@@ -708,7 +710,8 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (isNull[i] || !excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (isNull[i] || !excludes.contains(new String(vector[i],
+                                starts[i], lens[i], StandardCharsets.UTF_8)))
                         {
                             result.set(i);
                         }
@@ -718,7 +721,8 @@ public class ColumnFilter<T extends Comparable<T>>
                 {
                     for (int i = start; i < start + length; ++i)
                     {
-                        if (!excludes.contains(new String(vector[i], StandardCharsets.UTF_8)))
+                        if (!excludes.contains(new String(vector[i],
+                                starts[i], lens[i], StandardCharsets.UTF_8)))
                         {
                             result.set(i);
                         }

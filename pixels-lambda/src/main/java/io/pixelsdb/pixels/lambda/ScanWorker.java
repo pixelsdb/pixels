@@ -37,7 +37,6 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -73,7 +72,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         {
             s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
 
-        } catch (IOException e)
+        } catch (Exception e)
         {
             logger.error("failed to initialize AWS S3 storage", e);
         }
@@ -89,6 +88,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             String requestId = context.getAwsRequestId();
 
+            logger.info("input: " + JSON.toJSONString(event));
             long queryId = event.getQueryId();
             ArrayList<InputInfo> inputs = event.getInputs();
             int splitSize = event.getSplitSize();
@@ -106,7 +106,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                             event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
-            } catch (IOException e)
+            } catch (Exception e)
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
@@ -126,10 +126,17 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 String out = outputFolder + requestId + "_out_" + i;
 
                 threadPool.execute(() -> {
-                    int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
-                    if (rowGroupNum > 0)
+                    try
                     {
-                        scanOutput.addOutput(out, rowGroupNum);
+                        int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
+                        if (rowGroupNum > 0)
+                        {
+                            scanOutput.addOutput(out, rowGroupNum);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.error("error during scan", e);
                     }
                 });
             }
@@ -221,7 +228,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                                         break;
                                     }
                                 }
-                                catch (IOException e)
+                                catch (Exception e)
                                 {
                                     // Wait for 10ms and see if the output file is visible.
                                     TimeUnit.MILLISECONDS.sleep(10);
