@@ -11,7 +11,7 @@ import java.util.Random;
 
 public class BenchmarkCacheIndex {
     static int KEYS = 512000;
-    static int READ_COUNT = KEYS * 50;
+    static int READ_COUNT = KEYS * 10;
     MemoryMappedFile indexFile;
     PixelsCacheKey[] pixelsCacheKeys = new PixelsCacheKey[KEYS];
 
@@ -45,7 +45,8 @@ public class BenchmarkCacheIndex {
     @Test
     public void searchAllKeys() throws InterruptedException {
         int threadNum = 8;
-        Random random = new Random(System.nanoTime());
+//        Random random = new Random(System.nanoTime());
+        Random random = new Random(233);
 
         Thread[] threads = new Thread[threadNum];
 
@@ -68,6 +69,82 @@ public class BenchmarkCacheIndex {
             threads[i].join();
         }
 
+    }
+
+    @Test
+    public void nativeSearchAllKeys() throws InterruptedException {
+        int threadNum = 8;
+        Random random = new Random(System.nanoTime());
+
+        Thread[] threads = new Thread[threadNum];
+
+        for (int i = 0; i < threadNum; i++)
+        {
+            int[] accesses = new int[READ_COUNT];
+            for (int k = 0; k < READ_COUNT; k++)
+            {
+                accesses[k] = random.nextInt(READ_COUNT) % KEYS;
+            }
+            threads[i] = new Thread(new NativeCacheSearcher(pixelsCacheKeys, accesses, indexFile));
+        }
+
+        for (int i = 0; i < threadNum; i++)
+        {
+            threads[i].start();
+        }
+        for (int i = 0; i < threadNum; i++)
+        {
+            threads[i].join();
+        }
+
+    }
+
+    static class NativeCacheSearcher implements Runnable
+    {
+        private final int[] idxes;
+        private final MemoryMappedFile indexFile;
+        private final PixelsCacheKey[] pixelsCacheKeys;
+
+        NativeCacheSearcher(PixelsCacheKey[] pixelsCacheKeys, int[] idxes, MemoryMappedFile indexFile)
+        {
+            this.pixelsCacheKeys = pixelsCacheKeys;
+            this.idxes = idxes;
+            this.indexFile = indexFile;
+        }
+
+        @Override
+        public void run()
+        {
+            PixelsNativeCacheReader cacheReader = PixelsNativeCacheReader.newBuilder()
+                    .setCacheFile(null)
+                    .setIndexFile(indexFile)
+                    .build();
+            int totalAcNum = 0;
+            int totalLevel = 0;
+            long searchStart = System.nanoTime();
+            for (int i = 0; i < idxes.length; i++)
+            {
+                PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
+                PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
+                        cacheKey.rowGroupId,
+                        cacheKey.columnId);
+                if (idx == null)
+                {
+                    System.out.println("[error] cannot find " + cacheKey.blockId
+                            + "-" + cacheKey.rowGroupId
+                            + "-" + cacheKey.columnId);
+                }
+                else
+                {
+                    totalAcNum += idx.dramAccessCount;
+                    totalLevel += idx.radixLevel;
+                }
+            }
+            long searchEnd = System.nanoTime();
+            System.out.println("[thread search]: total access=" + totalAcNum +
+                    ", elapsed=" + (double) (searchEnd - searchStart)/1e6 + "ms" +
+                    " kps=" + READ_COUNT / ((double) (searchEnd - searchStart)/1e9)+ " total level=" + totalLevel);
+        }
     }
 
     static class CacheSearcher implements Runnable

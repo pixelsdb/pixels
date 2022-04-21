@@ -10,9 +10,9 @@ extern "C" {
 /*
  * Class:     io_pixelsdb_pixels_cache_PixelsNativeCacheReader
  * Method:    search
- * Signature: (JJJSS)[B
+ * Signature: (JJJSS)[J
  */
-JNIEXPORT jbyteArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_search
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_search
   (JNIEnv *, jobject, jlong, jlong, jlong, jshort, jshort);
 
 #ifdef __cplusplus

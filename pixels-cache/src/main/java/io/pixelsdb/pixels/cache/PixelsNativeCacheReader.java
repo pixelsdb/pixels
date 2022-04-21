@@ -35,6 +35,11 @@ import java.util.List;
 public class PixelsNativeCacheReader
         implements AutoCloseable
 {
+
+    static {
+        System.loadLibrary("reader");
+    }
+
     private static final Logger logger = LogManager.getLogger(PixelsNativeCacheReader.class);
     // private static CacheLogger cacheLogger = new CacheLogger();
 
@@ -126,7 +131,7 @@ public class PixelsNativeCacheReader
     public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
     {
         // search index file for columnlet id
-        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
+//        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
         // check the rwFlag and increase readCount.
         long lease = 0;
@@ -148,7 +153,7 @@ public class PixelsNativeCacheReader
         ByteBuffer content = null;
         // search cache key
 //        long searchBegin = System.nanoTime();
-        PixelsCacheIdx cacheIdx = search(keyBuffer);
+        PixelsCacheIdx cacheIdx = search(blockId, rowGroupId, columnId);
 //        long searchEnd = System.nanoTime();
 //        cacheLogger.addSearchLatency(searchEnd - searchBegin);
 //        logger.debug("[cache search]: " + (searchEnd - searchBegin));
@@ -193,8 +198,12 @@ public class PixelsNativeCacheReader
     public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
         PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
-
-        return search(keyBuffer);
+        long[] result = search(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId);
+        if (result[0] != 1) {
+            return null;
+        } else {
+            return new PixelsCacheIdx(result[1], (int) result[2]);
+        }
     }
 
     /**
@@ -315,7 +324,7 @@ public class PixelsNativeCacheReader
         return null;
     }
 
-    private native byte[] search(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId);
+    private native long[] search(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId);
 
     public void close()
     {
