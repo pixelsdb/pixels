@@ -219,4 +219,28 @@ public class TestPredicate
             System.out.println(b);
         }
     }
+
+    @Test
+    public void testParseDiscrete()
+    {
+        String json = "{\"schemaName\":\"tpch\",\"tableName\":\"customer\"," +
+                "\"columnFilters\":{1:{\"columnName\":\"c_mktsegment\"," +
+                "\"columnType\":\"CHAR\",\"filterJson\":\"{\\\"javaType\\\":" +
+                "\\\"java.lang.String\\\",\\\"isAll\\\":false,\\\"isNone\\\":false," +
+                "\\\"allowNull\\\":false,\\\"onlyNull\\\":false,\\\"ranges\\\":[]," +
+                "\\\"discreteValues\\\":[{\\\"type\\\":\\\"INCLUDED\\\"," +
+                "\\\"value\\\":\\\"BUILDING\\\"}]}\"}}}";
+
+        TableScanFilter filter = JSON.parseObject(json, TableScanFilter.class);
+        assert filter.getColumnFilter(1).getFilter().getRangeCount() == 0;
+        assert filter.getColumnFilter(1).getFilter().getDiscreteValueCount() == 1;
+    }
+
+    @Test
+    public void testParseEmptyFilter()
+    {
+        String json = "{\"schemaName\":\"tpch\",\"tableName\":\"part\",\"columnFilters\":{}}";
+        TableScanFilter filter = JSON.parseObject(json, TableScanFilter.class);
+        assert filter.getColumnFilters().isEmpty();
+    }
 }
