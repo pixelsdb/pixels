@@ -65,6 +65,12 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
       fprintf(out, "%02x", keyBuf[i]);
       // fputc(keyBuf[i], out);
     }
+    fputc(';', out);
+    // parse the block id
+    unsigned long blockId = bswap_64(*((unsigned long *) keyBuf));
+    unsigned short rowGroupId = bswap_16(*((unsigned short *) (keyBuf + 8)));
+    unsigned short columnId = bswap_16(*((unsigned short *) (keyBuf + 10)));
+    fprintf(out, "%lu-%u-%u", blockId, rowGroupId, columnId);
     fputc('\n', out);
     // printf("ptr=%d, key=0x", ptr);
     // for(int i = 0; i < ptr; i++) {
@@ -102,6 +108,12 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
       fprintf(out, "%02x", keyBuf[i]);
 
     }
+    fputc(';', out);
+    // parse the block id
+    unsigned long blockId = bswap_64(*((unsigned long *) keyBuf));
+    unsigned short rowGroupId = bswap_16(*((unsigned short *) (keyBuf + 8)));
+    unsigned short columnId = bswap_16(*((unsigned short *) (keyBuf + 10)));
+    fprintf(out, "%lu-%u-%u", blockId, rowGroupId, columnId);
     fputc('\n', out);
     // printf("ptr=%d, key=0x", ptr);
     // for(int i = 0; i < ptr; i++) {
