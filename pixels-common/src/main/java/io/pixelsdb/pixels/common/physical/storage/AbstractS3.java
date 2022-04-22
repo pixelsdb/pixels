@@ -389,8 +389,10 @@ public abstract class AbstractS3 implements Storage
         }
         if (!this.existsInS3(p))
         {
-            // Issue #222: try to delete the file ids even if cache is disabled.
-            EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
+            if (EnableCache)
+            {
+                EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
+            }
             throw new IOException("Path '" + path + "' does not exist.");
         }
         if (p.isFolder)
@@ -422,8 +424,10 @@ public abstract class AbstractS3 implements Storage
                 throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
             }
         }
-        // Issue #222: try to delete the file ids even if cache is disabled.
-        EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
+        if (EnableCache)
+        {
+            EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
+        }
         return true;
     }
 

@@ -46,6 +46,12 @@ public class Bound<T extends Comparable<T>>
     @JSONField(name = "value", ordinal = 1)
     public final T value;
 
+    /**
+     * Construct a bound that is used in {@link Filter}.
+     *
+     * @param type the type of this bound
+     * @param value the value of this bound, it can be null if the type is {@code UNBOUNDED}
+     */
     @JSONCreator
     public Bound(Type type, T value)
     {

@@ -47,13 +47,13 @@ import static java.util.Objects.requireNonNull;
  */
 public final class LocalFS implements Storage
 {
-    private final static boolean enableCache;
+    private final static boolean EnableCache;
 
     static
     {
-        enableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+        EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
 
-        if (enableCache)
+        if (EnableCache)
         {
             /**
              * Issue #222:
@@ -190,7 +190,7 @@ public final class LocalFS implements Storage
     public long getFileId(String path) throws IOException
     {
         requireNonNull(path, "path is null");
-        if (enableCache)
+        if (EnableCache)
         {
             KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
             if (kv == null)
@@ -320,10 +320,13 @@ public final class LocalFS implements Storage
                 }
             }
         }
-        /**
+        /*
          * Attempt to delete the key, but it does not need to be existed.
          */
-        EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
+        if (EnableCache)
+        {
+            EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
+        }
         return subDeleted && new File(path).delete();
     }
 

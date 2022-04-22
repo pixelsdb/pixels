@@ -88,7 +88,6 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             String requestId = context.getAwsRequestId();
 
-            logger.info("input: " + JSON.toJSONString(event));
             long queryId = event.getQueryId();
             ArrayList<InputInfo> inputs = event.getInputs();
             int splitSize = event.getSplitSize();
