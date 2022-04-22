@@ -393,24 +393,31 @@ public abstract class AbstractS3 implements Storage
             {
                 EtcdUtil.Instance().deleteByPrefix(getPathKey(p.toString()));
             }
-            throw new IOException("Path '" + path + "' does not exist.");
+            // Issue #170: path-not-exist is not an exception for deletion.
+            return false;
         }
         if (p.isFolder)
         {
+            if (!recursive)
+            {
+                throw new IOException("Non-recursive deletion is not supported in S3-like storage.");
+            }
+            // The ListObjects S3 API, which is used by listStatus, is already recursive.
             List<Status> statuses = this.listStatus(path);
+            List<ObjectIdentifier> objectsToDelete = new ArrayList<>(statuses.size());
             for (Status status : statuses)
             {
-                // The ListObjects S3 API, which is used by listStatus, is already recursive.
-
                 Path sub = new Path(status.getPath());
-                DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(sub.bucket).key(sub.key).build();
-                try
-                {
-                    s3.deleteObject(request);
-                } catch (Exception e)
-                {
-                    throw new IOException("Failed to delete object '" + sub.bucket + "/" + sub.key + "' from S3.", e);
-                }
+                objectsToDelete.add(ObjectIdentifier.builder().key(sub.key).build());
+            }
+            try
+            {
+                DeleteObjectsRequest request = DeleteObjectsRequest.builder().bucket(p.bucket)
+                        .delete(Delete.builder().objects(objectsToDelete).build()).build();
+                s3.deleteObjects(request);
+            } catch (Exception e)
+            {
+                throw new IOException("Failed to delete objects under '" + path + "'.", e);
             }
         }
         else
@@ -506,9 +513,9 @@ public abstract class AbstractS3 implements Storage
             }
             else
             {
-                HeadObjectRequest request = HeadObjectRequest.builder()
-                        .bucket(path.bucket).key(path.key).build();
-                s3.headObject(request);
+                ListObjectsV2Request request = ListObjectsV2Request.builder()
+                        .bucket(path.bucket).prefix(path.key).maxKeys(1).build();
+                return s3.listObjectsV2(request).keyCount() > 0;
             }
             return true;
         } catch (Exception e)
