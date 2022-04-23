@@ -251,9 +251,9 @@ public interface Storage
 
     /**
      * For local fs, path is considered as local.
-     * @param path
-     * @param recursive
-     * @return true if the path is deleted successfully
+     * @param path the path to delete
+     * @param recursive whether delete recursively
+     * @return true if the path is deleted successfully, false if the path does not exist
      * @throws IOException
      */
     boolean delete(String path, boolean recursive) throws IOException;
