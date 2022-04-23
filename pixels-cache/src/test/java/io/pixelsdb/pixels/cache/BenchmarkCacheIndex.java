@@ -11,15 +11,17 @@ import java.util.Random;
 
 public class BenchmarkCacheIndex {
     static int KEYS = 512000;
-    static int READ_COUNT = KEYS * 10;
-    MemoryMappedFile indexFile;
+    static int READ_COUNT = KEYS * 50;
+    MemoryMappedFile bigEndianIndexFile;
+    MemoryMappedFile littleEndianIndexFile;
     PixelsCacheKey[] pixelsCacheKeys = new PixelsCacheKey[KEYS];
 
     @Before
     public void init() {
         try {
-            indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
-            BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
+            bigEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
+            littleEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
+            BufferedReader br = new BufferedReader(new FileReader("tmp.txt.bak"));
             String line = br.readLine();
             int ptr = 0;
             while (line != null) {
@@ -57,7 +59,7 @@ public class BenchmarkCacheIndex {
             {
                 accesses[k] = random.nextInt(READ_COUNT) % KEYS;
             }
-            threads[i] = new Thread(new CacheSearcher(pixelsCacheKeys, accesses, indexFile));
+            threads[i] = new Thread(new CacheSearcher(pixelsCacheKeys, accesses, bigEndianIndexFile));
         }
 
         for (int i = 0; i < threadNum; i++)
@@ -85,7 +87,7 @@ public class BenchmarkCacheIndex {
             {
                 accesses[k] = random.nextInt(READ_COUNT) % KEYS;
             }
-            threads[i] = new Thread(new NativeCacheSearcher(pixelsCacheKeys, accesses, indexFile));
+            threads[i] = new Thread(new NativeCacheSearcher(pixelsCacheKeys, accesses, littleEndianIndexFile));
         }
 
         for (int i = 0; i < threadNum; i++)

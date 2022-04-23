@@ -9,7 +9,10 @@ typedef struct
   long size;
 } MemoryMappedFile;
 
-int getInt(const MemoryMappedFile mmap_f, long pos)
+#define GET_INT(mmap_f, pos) ( *((int *)(mmap_f.addr + pos)) )
+#define GET_BYTES(mmap_f, pos) ( (char *)(mmap_f.addr + pos) )
+
+static inline int getInt(const MemoryMappedFile mmap_f, long pos)
 {
   int *addr = (int *)(mmap_f.addr + pos);
   return *addr;

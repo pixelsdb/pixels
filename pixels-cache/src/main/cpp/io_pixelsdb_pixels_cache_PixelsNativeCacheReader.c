@@ -1,34 +1,13 @@
 #include "stdio.h"
 #include "string.h"
 #include "byteswap.h"
+#include "memory_mapped_file.h"
 #include "io_pixelsdb_pixels_cache_PixelsNativeCacheReader.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12       // long + short + short
 #define CACHE_IDX_LEN 12 // long + int
 
-typedef struct
-{
-  char *addr;
-  long size;
-} MemoryMappedFile;
-
-int getInt(const MemoryMappedFile mmap_f, long pos)
-{
-  int *addr = (int *)(mmap_f.addr + pos);
-  return *addr;
-}
-
-int getLong(const MemoryMappedFile mmap_f, long pos)
-{
-  long *addr = (long *)(mmap_f.addr + pos);
-  return *addr;
-}
-
-const char *getBytes(const MemoryMappedFile mmap_f, long pos)
-{
-  return (char *)(mmap_f.addr + pos);
-}
 
 void buildKeyBuf(char *keyBuf, unsigned long blockId, unsigned short rowGroupId, unsigned short columnId)
 {
@@ -75,7 +54,7 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheRead
     for (int i = 0; i < currentNodeChildrenNum; ++i)
     {
       // long has 8 bytes, which is a child's bytes
-      unsigned long child = bswap_64(*((unsigned long *)nodeData));
+      unsigned long child = *((unsigned long *)nodeData);
       nodeData += 8;
       // first byte is matching byte
       char leader = (char)((child >> 56) & 0xFF);
@@ -96,10 +75,10 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheRead
     currentNodeOffset = matchingChildOffset;
     bytesMatchedInNodeFound = 0;
 
-    currentNodeHeader = getInt(indexFile, currentNodeOffset);
+    currentNodeHeader = GET_INT(indexFile, currentNodeOffset);
     currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
     currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >> 9;
-    nodeData = getBytes(indexFile, currentNodeOffset + 4);
+    nodeData = GET_BYTES(indexFile, currentNodeOffset + 4);
     int edgeEndOffset = currentNodeChildrenNum * 8 + currentNodeEdgeSize;
     ++bytesMatched;
     ++bytesMatchedInNodeFound;
