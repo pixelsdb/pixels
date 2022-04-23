@@ -14,6 +14,7 @@ Licensed under the Apache License, Version 2.0.
 Licensed under the Apache License, Version 2.0.
 * Column vectors and TypeDescription in pixels-core are derived from the corresponding implementations in Apache ORC.
 
+
 3. Apache Hadoop
 Licensed under the Apache License, Version 2.0.
 * Text and a part of EncodingUtils in pixels-core are derived from the corresponding implementations in hadoop-common.
