@@ -45,6 +45,8 @@ public class PixelsNativeCacheReader
 
     private final MemoryMappedFile cacheFile;
     private final MemoryMappedFile indexFile;
+    private final ByteBuffer buf;
+
 
     /**
      * <p>
@@ -73,6 +75,7 @@ public class PixelsNativeCacheReader
     {
         this.cacheFile = cacheFile;
         this.indexFile = indexFile;
+        this.buf = ByteBuffer.allocateDirect(16).order(ByteOrder.LITTLE_ENDIAN);
     }
 
     public static class Builder
@@ -197,12 +200,13 @@ public class PixelsNativeCacheReader
      */
     public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
-        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
-        long[] result = search(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId);
-        if (result[0] != 1) {
+        search(indexFile.getAddress(), indexFile.getSize(), buf, blockId, rowGroupId, columnId);
+        long offset = buf.getLong(0);
+        int length = (int) buf.getLong(1);
+        if (offset == -1) {
             return null;
         } else {
-            return new PixelsCacheIdx(result[1], (int) result[2]);
+            return new PixelsCacheIdx(offset, length);
         }
     }
 
@@ -324,7 +328,7 @@ public class PixelsNativeCacheReader
         return null;
     }
 
-    private native long[] search(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId);
+    private native void search(long mmAddress, long mmSize, ByteBuffer retBuf, long blockId, short rowGroupId, short columnId);
 
     public void close()
     {

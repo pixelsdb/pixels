@@ -1,4 +1,5 @@
 #include "stdio.h"
+#include "stdint.h"
 #include "string.h"
 #include "byteswap.h"
 #include "memory_mapped_file.h"
@@ -20,7 +21,7 @@ void buildKeyBuf(char *keyBuf, unsigned long blockId, unsigned short rowGroupId,
   memcpy(keyBuf + 10, &columnId_, 2);
 }
 
-JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_search(JNIEnv *env, jobject obj, jlong addr, jlong size, jlong blockId, jshort rowGroupId, jshort columnId)
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_search(JNIEnv *env, jobject obj, jlong addr, jlong size, jobject retBuf, jlong blockId, jshort rowGroupId, jshort columnId)
 {
   MemoryMappedFile indexFile = (MemoryMappedFile){(char *)addr, size};
   char keyBuf[KEY_LEN] = {0};
@@ -29,9 +30,12 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheRead
   int bytesMatchedInNodeFound = 0;
 
   // init the return value
-  long ret_[3] = {0, -1, -1};
-  jlongArray ret = (*env)->NewLongArray(env, 3); // success, offset, length
-  (*env)->SetLongArrayRegion(env, ret, 0, 3, ret_);
+  long* ret = (*env)->GetDirectBufferAddress(env, retBuf);
+  ret[0] = ret[1] = -1;
+
+  // long ret_[3] = {0, -1, -1};
+  // jlongArray ret = (*env)->NewLongArray(env, 3); // success, offset, length
+  // (*env)->SetLongArrayRegion(env, ret, 0, 3, ret_);
 
   // (*env)->byte
   // (*env)->SetByteArrayRegion(env, cacheIdxBytes, 0, CACHE_IDX_LEN, )
@@ -43,7 +47,7 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheRead
   unsigned int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >> 9;
   if (currentNodeChildrenNum == 0 && currentNodeEdgeSize == 0)
   {
-    return ret;
+    return;
   }
   // printf("currentNodeChildrenNum=%u, currentNodeEdgeSize=%u\n", currentNodeChildrenNum, currentNodeEdgeSize);
   const char *nodeData = getBytes(indexFile, currentNodeOffset + 4);
@@ -107,15 +111,12 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheRead
       // if the current node is leaf node.
       if (((currentNodeHeader >> 31) & 1) > 0) // TODO: why do we need & 1?
       {
-          long ret_[] = {1, -1, -1};
+          // TODO: make it little endian
           const char* cacheIdx = getBytes(indexFile, currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize);
           unsigned long offset = bswap_64(*((unsigned long *) cacheIdx));
           unsigned int length = bswap_32(*((unsigned int *) (cacheIdx + 8)));
-          ret_[1] = offset;
-          ret_[2] = length;
-          (*env)->SetLongArrayRegion(env, ret, 0, 3, ret_);
+          ret[0] = offset;
+          ret[1] = length;
       }
   }
-
-  return ret;
 }
