@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.lambda;
 
 import com.alibaba.fastjson.JSON;
 import com.google.gson.Gson;
-import io.pixelsdb.pixels.core.predicate.ColumnFilter;
+import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
 import org.junit.Test;
 
 /**

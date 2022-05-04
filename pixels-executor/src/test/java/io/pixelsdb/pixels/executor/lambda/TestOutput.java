@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.lambda;
+package io.pixelsdb.pixels.executor.lambda;
 
 import com.google.gson.Gson;
 import org.junit.Test;

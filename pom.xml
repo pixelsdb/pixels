@@ -41,6 +41,7 @@
         <module>pixels-load</module>
         <module>pixels-tools</module>
         <module>pixels-lambda</module>
+        <module>pixels-executor</module>
     </modules>
 
     <properties>
@@ -114,12 +115,12 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-daemon</artifactId>
+                <artifactId>pixels-executor</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-lambda</artifactId>
+                <artifactId>pixels-daemon</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
