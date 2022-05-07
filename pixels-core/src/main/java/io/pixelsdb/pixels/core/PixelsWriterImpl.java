@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -67,6 +68,8 @@ public class PixelsWriterImpl implements PixelsWriter
     private final int compressionBlockSize;
     private final TimeZone timeZone;
     private final boolean encoding;
+    private final boolean partitioned;
+    private final Optional<List<Integer>> partitionColumnIds;
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
@@ -77,6 +80,11 @@ public class PixelsWriterImpl implements PixelsWriter
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
     private int curRowGroupDataLength = 0;
+    /**
+     * Whether any current hash value has been set.
+     */
+    private boolean hashValueIsSet = false;
+    private int currHashValue = 0;
 
     private final List<RowGroupInformation> rowGroupInfoList;    // row group information in footer
     private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
@@ -91,18 +99,22 @@ public class PixelsWriterImpl implements PixelsWriter
             int compressionBlockSize,
             TimeZone timeZone,
             PhysicalWriter physicalWriter,
-            boolean encoding)
+            boolean encoding,
+            boolean partitioned,
+            Optional<List<Integer>> partitionColumnIds)
     {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
         this.pixelStride = pixelStride;
         checkArgument(rowGroupSize > 0, "row group size is not positive");
         this.rowGroupSize = rowGroupSize;
-        this.compressionKind = requireNonNull(compressionKind);
+        this.compressionKind = requireNonNull(compressionKind, "compressionKind is null");
         checkArgument(compressionBlockSize > 0, "compression block size is not positive");
         this.compressionBlockSize = compressionBlockSize;
         this.timeZone = requireNonNull(timeZone);
         this.encoding = encoding;
+        this.partitioned = partitioned;
+        this.partitionColumnIds = requireNonNull(partitionColumnIds, "partitionColumnIds is null");
 
         List<TypeDescription> children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
@@ -134,7 +146,9 @@ public class PixelsWriterImpl implements PixelsWriter
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
         private boolean builderOverwrite = false;
-        private boolean encoding = true;
+        private boolean builderEncoding = true;
+        private boolean builderPartitioned = false;
+        private Optional<List<Integer>> builderPartitionColumnIds = Optional.empty();
 
         private Builder()
         {
@@ -228,7 +242,21 @@ public class PixelsWriterImpl implements PixelsWriter
 
         public Builder setEncoding(boolean encoding)
         {
-            this.encoding = encoding;
+            this.builderEncoding = encoding;
+
+            return this;
+        }
+
+        public Builder setPartitioned(boolean partitioned)
+        {
+            this.builderPartitioned = partitioned;
+
+            return this;
+        }
+
+        public Builder setPartitionColumnIds(List<Integer> partitionColumnIds)
+        {
+            this.builderPartitionColumnIds = Optional.ofNullable(partitionColumnIds);
 
             return this;
         }
@@ -243,6 +271,9 @@ public class PixelsWriterImpl implements PixelsWriter
                             "schema's children is null").isEmpty(), "schema is empty");
             checkArgument(this.builderPixelStride > 0, "pixels stride size is not set");
             checkArgument(this.builderRowGroupSize > 0, "row group size is not set");
+            checkArgument(this.builderPartitioned ==
+                            (this.builderPartitionColumnIds.isPresent() && !this.builderPartitionColumnIds.get().isEmpty()),
+                    "partition column ids are present while partitioned is false, or vice versa");
 
             PhysicalWriter fsWriter = null;
             try
@@ -273,7 +304,9 @@ public class PixelsWriterImpl implements PixelsWriter
                     builderCompressionBlockSize,
                     builderTimeZone,
                     fsWriter,
-                    encoding);
+                    builderEncoding,
+                    builderPartitioned,
+                    builderPartitionColumnIds);
         }
     }
 
@@ -323,14 +356,17 @@ public class PixelsWriterImpl implements PixelsWriter
         return encoding;
     }
 
-    /**
-     * Add a row batch.
-     * Repeating is not supported currently in ColumnVector
-     */
+    public boolean isPartitioned()
+    {
+        return partitioned;
+    }
+
     @Override
     public boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException
     {
+        checkArgument(!partitioned, "this file is hash partitioned, " +
+                "use addRowBatch(rowBatch, hashValue) instead");
         /**
          * Issue #170:
          * ColumnWriter.write() returns the total size of the current column chunk,
@@ -344,7 +380,7 @@ public class PixelsWriterImpl implements PixelsWriter
             ColumnWriter writer = columnWriters[i];
             curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
         }
-        // see if current size has exceeded the row group size. if so, write out current row group
+        // If the current row group size has exceeded the row group size, write current row group.
         if (curRowGroupDataLength >= rowGroupSize)
         {
             writeRowGroup();
@@ -352,6 +388,33 @@ public class PixelsWriterImpl implements PixelsWriter
             return false;
         }
         return true;
+    }
+
+    @Override
+    public void addRowBatch(VectorizedRowBatch rowBatch, int hashValue) throws IOException
+    {
+        checkArgument(partitioned, "this file is not hash partitioned, " +
+                "use addRowBatch(rowBatch) instead");
+        if (hashValueIsSet)
+        {
+            // As the current hash value is set, at lease one row batch has been added.
+            if (currHashValue != hashValue)
+            {
+                // Write the current partition (row group) and add the row batch to a new partition.
+                writeRowGroup();
+                curRowGroupNumOfRows = 0L;
+            }
+        }
+        currHashValue = hashValue;
+        hashValueIsSet = true;
+        curRowGroupDataLength = 0;
+        curRowGroupNumOfRows += rowBatch.size;
+        ColumnVector[] cvs = rowBatch.cols;
+        for (int i = 0; i < cvs.length; i++)
+        {
+            ColumnWriter writer = columnWriters[i];
+            curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
+        }
     }
 
     /**
@@ -473,6 +536,16 @@ public class PixelsWriterImpl implements PixelsWriter
         curRowGroupInfo.setDataLength(rowGroupDataLength);
         curRowGroupInfo.setFooterLength(rowGroupFooter.getSerializedSize());
         curRowGroupInfo.setNumberOfRows(curRowGroupNumOfRows);
+        if (partitioned)
+        {
+
+            PixelsProto.PartitionInformation.Builder partitionInfo =
+                    PixelsProto.PartitionInformation.newBuilder();
+            // partitionColumnIds has been checked to be present in the builder.
+            partitionInfo.addAllColumnIds(partitionColumnIds.orElse(null));
+            partitionInfo.setHashValue(currHashValue);
+            curRowGroupInfo.setPartitionInfo(partitionInfo.build());
+        }
         rowGroupInfoList.add(curRowGroupInfo.build());
         // put curRowGroupStatistic into rowGroupStatisticList
         rowGroupStatisticList.add(curRowGroupStatistic.build());
@@ -503,6 +576,7 @@ public class PixelsWriterImpl implements PixelsWriter
         {
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
+        footerBuilder.setPartitioned(partitioned);
         footer = footerBuilder.build();
 
         // build PostScript
