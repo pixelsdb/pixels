@@ -903,7 +903,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
-            this.resultRowBatch.ensureSize(batchSize);
+            this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
         } else
         {

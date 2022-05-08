@@ -210,6 +210,12 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+
+    }
+
+    @Override
     public int[] accumulateHashCode(int[] hashCode)
     {
         requireNonNull(hashCode, "hashCode is null");

@@ -563,6 +563,12 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+
+    }
+
+    @Override
     public void duplicate(ColumnVector inputVector)
     {
         if (inputVector instanceof BinaryColumnVector)

@@ -19,14 +19,12 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
+import com.google.common.primitives.Ints;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -87,17 +85,51 @@ public class Partitioner
     Map<Integer, VectorizedRowBatch> partition(VectorizedRowBatch input)
     {
         requireNonNull(input, "input is null");
+        checkArgument(input.size <= batchSize, "input is oversize");
         // this.schema.getChildren() has been checked not null.
         checkArgument(input.numCols == this.schema.getChildren().size(),
                 "input.numCols does not match the number of fields in the schema");
         int[] hashCode = getHashCode(input);
-        Map<Integer, VectorizedRowBatch> output = new HashMap<>();
-
+        List<List<Integer>> selectedArrays = new ArrayList<>(numPartition);
+        for (int i = 0; i < numPartition; ++i)
+        {
+            selectedArrays.add(new ArrayList<>());
+        }
         for (int i = 0; i < hashCode.length; ++i)
         {
             int hashKey = Math.abs(hashCode[i]) % this.numPartition;
+            // add the row id to the selected array of the partition.
+            selectedArrays.get(hashKey).add(i);
         }
-        return null;
+
+        Map<Integer, VectorizedRowBatch> output = new HashMap<>();
+        for (int i = 0; i < numPartition; ++i)
+        {
+            int[] selected = Ints.toArray(selectedArrays.get(i));
+            int freeSlots = rowBatches[i].freeSlots();
+            if (freeSlots == 0)
+            {
+                output.put(i, rowBatches[i]);
+                rowBatches[i] = schema.createRowBatch(batchSize);
+                rowBatches[i].addSelected(selected, 0, selected.length, input);
+            }
+            else if (freeSlots <= selected.length)
+            {
+                rowBatches[i].addSelected(selected, 0, freeSlots, input);
+                output.put(i, rowBatches[i]);
+                rowBatches[i] = schema.createRowBatch(batchSize);
+                if (freeSlots < selected.length)
+                {
+                    rowBatches[i].addSelected(selected, freeSlots,
+                            selected.length - freeSlots, input);
+                }
+            }
+            else
+            {
+                rowBatches[i].addSelected(selected, 0, selected.length, input);
+            }
+        }
+        return output;
     }
 
     /**

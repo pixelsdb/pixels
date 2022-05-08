@@ -156,6 +156,17 @@ public abstract class ColumnVector implements AutoCloseable
     public abstract void setElement(int outElementNum, int inputElementNum,
                                     ColumnVector inputVector);
 
+    /**
+     * Add the selected elements in the source column vector into this column vector.
+     *
+     * @param selected the index of the selected elements in src
+     * @param offset the starting offset in selected
+     * @param length the length in selected
+     * @param src the source column vector
+     */
+    public abstract void addSelected(int[] selected, int offset, int length, ColumnVector src);
+    // TODO: implement.
+
     public int getLength()
     {
         return length;

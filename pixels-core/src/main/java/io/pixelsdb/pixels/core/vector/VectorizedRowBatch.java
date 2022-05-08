@@ -37,9 +37,9 @@ public class VectorizedRowBatch implements AutoCloseable
 {
     public int numCols;           // number of columns
     public ColumnVector[] cols;   // a vector for each column
-    public int size;              // number of rows that qualify (i.e. haven't been filtered out)
+    public int size;              // number of rows that qualify, i.e., haven't been filtered out.
     public int projectionSize;
-    public int maxSize;
+    public int maxSize;           // capacity, i.e., the maximum number of rows can be stored in this row batch.
 
     private long memoryUsage = 0L;
 
@@ -74,7 +74,7 @@ public class VectorizedRowBatch implements AutoCloseable
     public VectorizedRowBatch(int numCols, int size)
     {
         this.numCols = numCols;
-        this.size = size;
+        this.size = 0;
         this.maxSize = size;
         this.cols = new ColumnVector[numCols];
 
@@ -101,6 +101,25 @@ public class VectorizedRowBatch implements AutoCloseable
     public int count()
     {
         return size;
+    }
+
+    /**
+     * @return the remaining capacity in this row batch.
+     */
+    public int freeSlots()
+    {
+        return maxSize - size;
+    }
+
+    public void addSelected(int[] selected, int offset, int length, VectorizedRowBatch src)
+    {
+        checkArgument(offset >= 0 && length > 0, "invalid offset or length");
+        checkArgument(size + length <= maxSize, "too many selected rows");
+        for (int i = 0; i < cols.length; ++i)
+        {
+            cols[i].addSelected(selected, offset, length, src.cols[i]);
+        }
+        size += length;
     }
 
     private static String toUTF8(Object o)
@@ -191,17 +210,21 @@ public class VectorizedRowBatch implements AutoCloseable
 
     /**
      * Set the maximum number of rows in the batch.
-     * Data is not preserved.
      */
-    public void ensureSize(int rows)
+    public void ensureSize(int rows, boolean preserveData)
     {
         for (int i = 0; i < cols.length; ++i)
         {
             if (!cols[i].duplicated)
             {
-                cols[i].ensureSize(rows, false);
+                cols[i].ensureSize(rows, preserveData);
             }
         }
+        if (!preserveData)
+        {
+            this.size = 0;
+        }
+        this.maxSize = rows;
     }
 
     /**
