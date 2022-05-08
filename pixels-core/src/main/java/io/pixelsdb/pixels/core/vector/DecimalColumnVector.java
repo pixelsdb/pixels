@@ -214,7 +214,24 @@ public class DecimalColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of DecimalColumnVector.
+        // However, we do not check these for performance considerations.
+        DecimalColumnVector source = (DecimalColumnVector) src;
 
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.vector[thisIndex] = source.vector[srcIndex];
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override

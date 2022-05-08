@@ -420,64 +420,6 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     /**
-     * Copy the current object contents into the output. Only copy selected entries,
-     * as indicated by selectedInUse and the sel array.
-     */
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, BinaryColumnVector output)
-    {
-
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.setVal(0, vector[0], start[0], lens[0]);
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.setVal(i, vector[i], start[i], lens[i]);
-            }
-        }
-        else
-        {
-            for (int i = 0; i < size; i++)
-            {
-                output.setVal(i, vector[i], start[i], lens[i]);
-            }
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
-    }
-
-    /**
      * Simplify vector by brute-force flattening noNulls and isRepeating
      * This can be used to reduce combinatorial explosion of code paths in VectorExpressions
      * with many arguments, at the expense of loss of some performance.
@@ -565,7 +507,24 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of BinaryColumnVector.
+        // However, we do not check these for performance considerations.
+        BinaryColumnVector source = (BinaryColumnVector) src;
 
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.setRef(thisIndex, source.vector[srcIndex], source.start[srcIndex],
+                        source.lens[srcIndex]);
+            }
+        }
     }
 
     @Override

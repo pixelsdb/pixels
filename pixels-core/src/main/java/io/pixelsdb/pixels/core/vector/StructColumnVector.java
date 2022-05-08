@@ -96,7 +96,15 @@ public class StructColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of StructColumnVector.
+        // However, we do not check these for performance considerations.
+        StructColumnVector source = (StructColumnVector) src;
 
+        for (int i = 0; i < fields.length; i++)
+        {
+            this.fields[i].addSelected(selected, offset, length, source.fields[i]);
+        }
+        writeIndex += length;
     }
 
     @Override

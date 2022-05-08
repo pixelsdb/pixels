@@ -278,7 +278,24 @@ public class DateColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of DateColumnVector.
+        // However, we do not check these for performance considerations.
+        DateColumnVector source = (DateColumnVector) src;
 
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.dates[thisIndex] = source.dates[srcIndex];
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override
@@ -448,57 +465,6 @@ public class DateColumnVector extends ColumnVector
         }
         dates[elementNum] = 0;
         isNull[elementNum] = true;
-    }
-
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(boolean selectedInUse, int[] sel, int size, DateColumnVector output)
-    {
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.dates[0] = dates[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.dates[i] = dates[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(dates, 0, output.dates, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
     }
 
     /**

@@ -112,58 +112,6 @@ public class LongColumnVector extends ColumnVector
         return hashCode;
     }
 
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, LongColumnVector output)
-    {
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.vector[0] = vector[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.vector[i] = vector[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(vector, 0, output.vector, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
-    }
-
     // Fill the column vector with the provided value
     public void fill(long value)
     {
@@ -226,7 +174,24 @@ public class LongColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of LongColumnVector.
+        // However, we do not check these for performance considerations.
+        LongColumnVector source = (LongColumnVector) src;
 
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.vector[thisIndex] = source.vector[srcIndex];
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override

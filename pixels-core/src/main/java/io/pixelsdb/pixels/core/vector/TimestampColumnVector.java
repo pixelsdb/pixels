@@ -309,7 +309,7 @@ public class TimestampColumnVector extends ColumnVector
             isNull[elementNum] = false;
             TimestampColumnVector in = (TimestampColumnVector) inputVector;
             times[elementNum] = in.times[inputElementNum];
-            nanos[elementNum] = in.nanos[inputElementNum];
+            // this.nanos is currently not used.
         }
         else
         {
@@ -321,7 +321,25 @@ public class TimestampColumnVector extends ColumnVector
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
+        // isRepeating should be false and src should be an instance of TimestampColumnVector.
+        // However, we do not check these for performance considerations.
+        TimestampColumnVector source = (TimestampColumnVector) src;
 
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.times[thisIndex] = source.times[srcIndex];
+                // this.nanos is currently not used.
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override
@@ -354,6 +372,7 @@ public class TimestampColumnVector extends ColumnVector
             if (i > j)
             {
                 this.times[j] = this.times[i];
+                // this.nanos is currently not used.
                 this.isNull[j] = this.isNull[i];
             }
             if (this.isNull[j])
@@ -467,62 +486,6 @@ public class TimestampColumnVector extends ColumnVector
         times[elementNum] = 0;
         nanos[elementNum] = 0;
         noNulls = false;
-    }
-
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, TimestampColumnVector output)
-    {
-
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.times[0] = times[0];
-            output.nanos[0] = nanos[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.times[i] = times[i];
-                output.nanos[i] = nanos[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(times, 0, output.times, 0, size);
-            System.arraycopy(nanos, 0, output.nanos, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
     }
 
     /**
