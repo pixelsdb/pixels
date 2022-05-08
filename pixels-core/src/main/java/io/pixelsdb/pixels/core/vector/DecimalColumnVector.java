@@ -29,6 +29,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.TypeDescription.MAX_PRECISION;
 import static io.pixelsdb.pixels.core.TypeDescription.MAX_SCALE;
 import static java.math.BigDecimal.ROUND_HALF_UP;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The decimal column vector with precision and scale.
@@ -129,6 +130,7 @@ public class DecimalColumnVector extends ColumnVector
             {
                 Arrays.fill(vector, 0, size, repeatVal);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -151,8 +153,10 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
+        int index = writeIndex++;
         // As we only support max precision 18, it is safe to convert unscaled value to long.
-        vector[writeIndex++] = decimal.unscaledValue().longValue();
+        vector[index] = decimal.unscaledValue().longValue();
+        isNull[index] = false;
     }
 
     @Override
@@ -178,29 +182,48 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
+        int index = writeIndex++;
         // As we only support max precision 18, it is safe to convert unscaled value to long.
-        vector[writeIndex++] = decimal.unscaledValue().longValue();
+        vector[index] = decimal.unscaledValue().longValue();
+        isNull[index] = false;
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (inputVector.isRepeating)
         {
             inputElementNum = 0;
         }
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
-            isNull[outElementNum] = false;
-            vector[outElementNum] =
-                    ((DecimalColumnVector) inputVector).vector[inputElementNum];
+            isNull[elementNum] = false;
+            vector[elementNum] = ((DecimalColumnVector) inputVector).vector[inputElementNum];
         }
         else
         {
-            isNull[outElementNum] = true;
+            isNull[elementNum] = true;
             noNulls = false;
         }
     }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+        }
+        return hashCode;
+    }
+
 
     @Override
     public void duplicate(ColumnVector inputVector)
@@ -219,14 +242,16 @@ public class DecimalColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {

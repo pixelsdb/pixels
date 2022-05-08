@@ -171,7 +171,7 @@ public class ColumnFilter<T extends Comparable<T>>
             return;
         }
 
-        if (columnVector.isRepeating)
+        if (columnVector.isRepeating())
         {
             /*
              * For simplicity, we flatten the column vector instead of

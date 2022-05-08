@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import java.nio.charset.StandardCharsets;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * BinaryColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
@@ -122,9 +123,14 @@ public class BinaryColumnVector extends ColumnVector
      */
     public void setRef(int elementNum, byte[] sourceBuf, int start, int length)
     {
-        vector[elementNum] = sourceBuf;
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        this.vector[elementNum] = sourceBuf;
         this.start[elementNum] = start;
         this.lens[elementNum] = length;
+        this.isNull[elementNum] = sourceBuf == null;
     }
 
     /**
@@ -190,6 +196,10 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void add(byte[] v)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         setVal(writeIndex++, v);
     }
 
@@ -197,6 +207,28 @@ public class BinaryColumnVector extends ColumnVector
     public void add(String value)
     {
         add(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            /**
+             * The same as ByteBuffer.hashCode().
+             */
+            int h = 1;
+            int p = this.start[i];
+            for (int j = this.start[i] + this.lens[i] - 1; j >= p; j--)
+            {
+                h = 31 * h + (int)this.vector[i][j];
+            }
+            hashCode[i] = 31 * hashCode[i] + h;
+        }
+        return hashCode;
     }
 
     /**
@@ -212,14 +244,19 @@ public class BinaryColumnVector extends ColumnVector
      */
     public void setVal(int elementNum, byte[] sourceBuf, int start, int length)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if ((nextFree + length) > buffer.length)
         {
             increaseBufferSpace(length);
         }
         System.arraycopy(sourceBuf, start, buffer, nextFree, length);
-        vector[elementNum] = buffer;
+        this.vector[elementNum] = buffer;
         this.start[elementNum] = nextFree;
         this.lens[elementNum] = length;
+        this.isNull[elementNum] = false;
         nextFree += length;
     }
 
@@ -268,9 +305,14 @@ public class BinaryColumnVector extends ColumnVector
      */
     public void setValPreallocated(int elementNum, int length)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         vector[elementNum] = buffer;
-        this.start[elementNum] = nextFree;
-        this.lens[elementNum] = length;
+        start[elementNum] = nextFree;
+        lens[elementNum] = length;
+        isNull[elementNum] = false;
         nextFree += length;
     }
 
@@ -289,14 +331,19 @@ public class BinaryColumnVector extends ColumnVector
     public void setConcat(int elementNum, byte[] leftSourceBuf, int leftStart, int leftLen,
                           byte[] rightSourceBuf, int rightStart, int rightLen)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         int newLen = leftLen + rightLen;
         if ((nextFree + newLen) > buffer.length)
         {
             increaseBufferSpace(newLen);
         }
         vector[elementNum] = buffer;
-        this.start[elementNum] = nextFree;
-        this.lens[elementNum] = newLen;
+        start[elementNum] = nextFree;
+        lens[elementNum] = newLen;
+        isNull[elementNum] = false;
 
         System.arraycopy(leftSourceBuf, leftStart, buffer, nextFree, leftLen);
         nextFree += leftLen;
@@ -491,22 +538,26 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (inputVector.isRepeating)
         {
             inputElementNum = 0;
         }
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
-            isNull[outElementNum] = false;
+            isNull[elementNum] = false;
             BinaryColumnVector in = (BinaryColumnVector) inputVector;
-            setVal(outElementNum, in.vector[inputElementNum],
+            setVal(elementNum, in.vector[inputElementNum],
                     in.start[inputElementNum], in.lens[inputElementNum]);
         }
         else
         {
-            isNull[outElementNum] = true;
+            isNull[elementNum] = true;
             noNulls = false;
         }
     }
@@ -548,14 +599,16 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {

@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * DoubleColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
@@ -154,6 +155,7 @@ public class DoubleColumnVector extends ColumnVector
             {
                 Arrays.fill(vector, 0, size, repeatVal);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -179,27 +181,45 @@ public class DoubleColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        vector[writeIndex++] = Double.doubleToLongBits(value);
+        int index = writeIndex++;
+        vector[index] = Double.doubleToLongBits(value);
+        isNull[index] = false;
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (inputVector.isRepeating)
         {
             inputElementNum = 0;
         }
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
-            isNull[outElementNum] = false;
-            vector[outElementNum] =
-                    ((DoubleColumnVector) inputVector).vector[inputElementNum];
+            isNull[elementNum] = false;
+            vector[elementNum] = ((DoubleColumnVector) inputVector).vector[inputElementNum];
         }
         else
         {
-            isNull[outElementNum] = true;
+            isNull[elementNum] = true;
             noNulls = false;
         }
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+        }
+        return hashCode;
     }
 
     @Override
@@ -217,14 +237,16 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {

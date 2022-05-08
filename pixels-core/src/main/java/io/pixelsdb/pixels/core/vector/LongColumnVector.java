@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * LongColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
@@ -93,7 +94,22 @@ public class LongColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        vector[writeIndex++] = v;
+        int index = writeIndex++;
+        vector[index] = v;
+        isNull[index] = false;
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+        }
+        return hashCode;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
@@ -178,27 +194,31 @@ public class LongColumnVector extends ColumnVector
             {
                 Arrays.fill(vector, 0, size, repeatVal);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (inputVector.isRepeating)
         {
             inputElementNum = 0;
         }
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
-            isNull[outElementNum] = false;
-            vector[outElementNum] =
-                    ((LongColumnVector) inputVector).vector[inputElementNum];
+            isNull[elementNum] = false;
+            vector[elementNum] = ((LongColumnVector) inputVector).vector[inputElementNum];
         }
         else
         {
-            isNull[outElementNum] = true;
+            isNull[elementNum] = true;
             noNulls = false;
         }
     }
@@ -218,14 +238,16 @@ public class LongColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < this.length; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {

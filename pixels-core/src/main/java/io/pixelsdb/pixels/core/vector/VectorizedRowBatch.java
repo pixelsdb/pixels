@@ -98,7 +98,7 @@ public class VectorizedRowBatch implements AutoCloseable
      *
      * @return number of rows that have not been filtered out
      */
-    public long count()
+    public int count()
     {
         return size;
     }

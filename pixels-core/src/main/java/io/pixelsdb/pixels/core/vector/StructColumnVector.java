@@ -21,6 +21,9 @@ package io.pixelsdb.pixels.core.vector;
 
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * StructColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
@@ -59,30 +62,34 @@ public class StructColumnVector extends ColumnVector
         {
             fields[i].flatten(selectedInUse, sel, size);
         }
+        writeIndex = size;
         flattenNoNulls(selectedInUse, sel, size);
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum,
-                           ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (inputVector.isRepeating)
         {
             inputElementNum = 0;
         }
         if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
         {
-            isNull[outElementNum] = false;
+            isNull[elementNum] = false;
             ColumnVector[] inputFields = ((StructColumnVector) inputVector).fields;
             for (int i = 0; i < inputFields.length; ++i)
             {
-                fields[i].setElement(outElementNum, inputElementNum, inputFields[i]);
+                fields[i].setElement(elementNum, inputElementNum, inputFields[i]);
             }
         }
         else
         {
             noNulls = false;
-            isNull[outElementNum] = true;
+            isNull[elementNum] = true;
         }
     }
 
@@ -136,6 +143,19 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (ColumnVector field : this.fields)
+        {
+            field.accumulateHashCode(hashCode);
+        }
+        return hashCode;
+    }
+
+    @Override
     public void reset()
     {
         super.reset();
@@ -170,9 +190,12 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
-        throw new UnsupportedOperationException("filter is not supported on StructColumnVector.");
+        for (ColumnVector column : this.fields)
+        {
+            column.applyFilter(filter, before);
+        }
     }
 
     @Override
@@ -182,16 +205,6 @@ public class StructColumnVector extends ColumnVector
         for (int i = 0; i < fields.length; ++i)
         {
             fields[i].unFlatten();
-        }
-    }
-
-    @Override
-    public void setRepeating(boolean isRepeating)
-    {
-        super.setRepeating(isRepeating);
-        for (int i = 0; i < fields.length; ++i)
-        {
-            fields[i].setRepeating(isRepeating);
         }
     }
 }

@@ -49,22 +49,14 @@ public abstract class ColumnVector implements AutoCloseable
     long memoryUsage = 0L;
 
     /**
-     * The current kinds of column vectors.
+     * True if same value repeats for whole column vector.
+     * If so, vector[0] holds the repeating value.
+     * <p/>
+     * <b>Note</b> that if isRepeating is true, <b>NONE</b> of the methods in this class,
+     * except flatten/ duplicate/ stringifyValue/ reset/ ensureSize/ getLength/ getMemoryUsage,
+     * should be used before calling flatten().
      */
-    public static enum Type
-    {
-        NONE,    // Useful when the type of column vector has not be determined yet.
-        LONG,
-        DOUBLE,
-        BYTES,
-        DECIMAL,
-        TIMESTAMP,
-        INTERVAL_DAY_TIME,
-        STRUCT,
-        LIST,
-        MAP,
-        UNION
-    }
+    boolean isRepeating;
 
     /**
      * If this column vector is a duplication of another column vector
@@ -85,12 +77,6 @@ public abstract class ColumnVector implements AutoCloseable
 
     // If the whole column vector has no nulls, this is true, otherwise false.
     public boolean noNulls;
-
-    /**
-     * True if same value repeats for whole column vector.
-     * If so, vector[0] holds the repeating value.
-     */
-    public boolean isRepeating;
 
     // Variables to hold state from before flattening so it can be easily restored.
     private boolean preFlattenIsRepeating;
@@ -163,9 +149,26 @@ public abstract class ColumnVector implements AutoCloseable
         throw new UnsupportedOperationException("Adding timestamp is not supported");
     }
 
+    /**
+     * Set the element in this column vector from the given input vector.
+     * This method can assume that the output does not have isRepeating set.
+     */
+    public abstract void setElement(int outElementNum, int inputElementNum,
+                                    ColumnVector inputVector);
+
     public int getLength()
     {
         return length;
+    }
+
+    public boolean isRepeating()
+    {
+        return isRepeating;
+    }
+
+    public int getWriteIndex()
+    {
+        return writeIndex;
     }
 
     /**
@@ -184,6 +187,19 @@ public abstract class ColumnVector implements AutoCloseable
     }
 
     /**
+     * Get the accumulative hash code of the elements in this column vector.
+     * For ith element in this column vector, the hash code is computed as:
+     * <blockquote>
+     *     hashCode[i] = 31 * hashCode[i] + vector[i].hashCode()
+     * </blockquote>
+     * If you need the exact hash code of this vector, fill hashCode by 0;
+     *
+     * @param hashCode the array to store the hash code
+     * @return the same int array in the input
+     */
+    public abstract int[] accumulateHashCode(int[] hashCode);
+
+    /**
      * Resets the column to default state
      * - fills the isNull array with false
      * - sets noNulls to true
@@ -200,17 +216,6 @@ public abstract class ColumnVector implements AutoCloseable
         preFlattenNoNulls = true;
         preFlattenIsRepeating = false;
         writeIndex = 0;
-    }
-
-    /**
-     * Sets the isRepeating flag. Recurses over structs and unions so that the
-     * flags are set correctly.
-     *
-     * @param isRepeating
-     */
-    public void setRepeating(boolean isRepeating)
-    {
-        this.isRepeating = isRepeating;
     }
 
     abstract public void flatten(boolean selectedInUse, int[] sel, int size);
@@ -297,13 +302,6 @@ public abstract class ColumnVector implements AutoCloseable
     }
 
     /**
-     * Set the element in this column vector from the given input vector.
-     * This method can assume that the output does not have isRepeating set.
-     */
-    public abstract void setElement(int outElementNum, int inputElementNum,
-                                    ColumnVector inputVector);
-
-    /**
      * Shallow copy from input vector.
      * This is used for duplicated reference column vector.
      * This method does not provide deep cloning of vector content.
@@ -324,9 +322,9 @@ public abstract class ColumnVector implements AutoCloseable
      * Compact all the survived values before the give beforeIndex (exclusive) to the
      * front of this column vector. The ith value survives if the ith bit in filter is set.
      * @param filter the filter
-     * @param beforeIndex the exclusive index before which the rows are checked
+     * @param before the exclusive index before which the rows are checked
      */
-    abstract protected void applyFilter(Bitmap filter, int beforeIndex);
+    abstract protected void applyFilter(Bitmap filter, int before);
 
     /**
      * Ensure the ColumnVector can hold at least size values.
@@ -363,8 +361,7 @@ public abstract class ColumnVector implements AutoCloseable
      * @param buffer the buffer to print into
      * @param row    the id of the row to print
      */
-    public abstract void stringifyValue(StringBuilder buffer,
-                                        int row);
+    public abstract void stringifyValue(StringBuilder buffer, int row);
 
     @Override
     public void close()

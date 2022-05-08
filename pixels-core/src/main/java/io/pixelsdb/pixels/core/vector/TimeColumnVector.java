@@ -26,6 +26,7 @@ import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.roundSqlTime;
+import static java.util.Objects.requireNonNull;
 
 /**
  * TimeColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
@@ -86,6 +87,19 @@ public class TimeColumnVector extends ColumnVector
     public int getLength()
     {
         return times.length;
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            hashCode[i] = 31 * hashCode[i] + this.times[i];
+        }
+        return hashCode;
     }
 
     /**
@@ -233,11 +247,26 @@ public class TimeColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
     {
-        TimeColumnVector timeColVector = (TimeColumnVector) inputVector;
-
-        times[outElementNum] = timeColVector.times[inputElementNum];
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        if (inputVector.isRepeating)
+        {
+            inputElementNum = 0;
+        }
+        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
+        {
+            isNull[elementNum] = false;
+            times[elementNum] = ((TimeColumnVector) inputVector).times[inputElementNum];
+        }
+        else
+        {
+            isNull[elementNum] = true;
+            noNulls = false;
+        }
     }
 
     @Override
@@ -255,14 +284,16 @@ public class TimeColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < this.length; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {
@@ -308,6 +339,7 @@ public class TimeColumnVector extends ColumnVector
             {
                 Arrays.fill(times, 0, size, repeatFastTime);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -316,12 +348,20 @@ public class TimeColumnVector extends ColumnVector
     @Override
     public void add(Time value)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         set(writeIndex++, value);
     }
 
     @Override
     public void add(String value)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         set(writeIndex++, Time.valueOf(value));
     }
 
@@ -334,6 +374,10 @@ public class TimeColumnVector extends ColumnVector
      */
     public void set(int elementNum, Time t)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (t == null)
         {
             this.noNulls = false;
@@ -341,6 +385,7 @@ public class TimeColumnVector extends ColumnVector
         }
         else
         {
+            this.isNull[elementNum] = false;
             this.times[elementNum] = roundSqlTime(t.getTime());
         }
     }
@@ -354,6 +399,11 @@ public class TimeColumnVector extends ColumnVector
      */
     public void set(int elementNum, int millis)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        this.isNull[elementNum] = false;
         this.times[elementNum] = millis;
     }
 
@@ -364,8 +414,13 @@ public class TimeColumnVector extends ColumnVector
      */
     public void setFromScratchTime(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         // scratchTime may be changed outside this class, so we also mod it by millis in a day.
         this.times[elementNum] = roundSqlTime(scratchTime.getTime());
+        this.isNull[elementNum] = false;
     }
 
     /**
@@ -376,7 +431,13 @@ public class TimeColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         times[elementNum] = 0;
+        isNull[elementNum] = true;
+        noNulls = false;
     }
 
     // Copy the current object contents into the output. Only copy selected entries,
