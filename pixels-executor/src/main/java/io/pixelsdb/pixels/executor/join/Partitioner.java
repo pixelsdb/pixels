@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.google.common.primitives.Ints;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.util.*;
@@ -41,14 +40,15 @@ public class Partitioner
     private final int numPartition;
     private final int batchSize;
     private final TypeDescription schema;
-    private final List<Integer> partColumnIds;
+    private final int numKeyColumns;
     private final VectorizedRowBatch[] rowBatches;
 
     /**
      * Create a partitioner to partition the input row batches into a number of
      * partitions, using the hash function (abs(key.hashCode())%numPartition).
      * <p/>
-     * For combined partition key, the hash code of the key is computed as:
+     * For combined partition key, the key column must be the first numKeyColumns columns
+     * int the input row batches. And the hash code of the key is computed as:
      * <blockquote>
      * col[0].hashCode()*31^(n-1) + col[1].hashCode()*31^(n-2) + ... + col[n-1].hashCode()
      * </blockquote>
@@ -57,19 +57,19 @@ public class Partitioner
      * @param numPartition the number of partitions
      * @param batchSize the number of rows in each output row batches
      * @param schema the schema of the input and output row batches
+     * @param numKeyColumns the number of key columns
      */
-    public Partitioner(int numPartition, int batchSize, TypeDescription schema, List<Integer> partColumnIds)
+    public Partitioner(int numPartition, int batchSize, TypeDescription schema, int numKeyColumns)
     {
         checkArgument(numPartition > 0, "partitionNum must be positive");
         checkArgument(batchSize > 0, "batchSize must be positive");
         requireNonNull(schema, "schema is null");
         requireNonNull(schema.getChildren(), "schema is empty");
-        checkArgument(partColumnIds != null && !partColumnIds.isEmpty(),
-                "partColumnIds must be not null and not empty");
+        checkArgument(numKeyColumns > 0, "numKeyColumns must be positive");
         this.numPartition = numPartition;
         this.batchSize = batchSize;
         this.schema = schema;
-        this.partColumnIds = partColumnIds;
+        this.numKeyColumns = numKeyColumns;
         this.rowBatches = new VectorizedRowBatch[numPartition];
         for (int i = 0; i < numPartition; ++i)
         {
@@ -141,10 +141,9 @@ public class Partitioner
     {
         int[] hashCode = new int[input.size];
         Arrays.fill(hashCode, 0);
-        ColumnVector[] columns = input.cols;
-        for (int columnId : this.partColumnIds)
+        for (int i = 0; i < numKeyColumns; ++i)
         {
-            columns[columnId].accumulateHashCode(hashCode);
+            input.cols[i].accumulateHashCode(hashCode);
         }
         return hashCode;
     }
@@ -152,5 +151,10 @@ public class Partitioner
     public int getNumPartition()
     {
         return numPartition;
+    }
+
+    public VectorizedRowBatch[] getRowBatches()
+    {
+        return rowBatches;
     }
 }
