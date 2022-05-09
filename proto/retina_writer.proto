@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.retina";
+option java_outer_classname = "RetinaWriterProto";
+
+package retina_writer.proto;
+
+service RetinaWriterService {
+  rpc Flush (FlushRequest) returns (FlushResponse);
+}
+
+message FlushRequest {
+  string schemaStr = 1;
+  uint64 pos = 2;
+  string filePath = 3;
+}
+
+message FlushResponse {
+  int32 errorCode = 1;
+  uint64 pos = 2;
+}
+
