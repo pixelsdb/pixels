@@ -217,6 +217,10 @@ public class BinaryColumnVector extends ColumnVector
                 "the length of hashCode is not in the range [1, length]");
         for (int i = 0; i < hashCode.length; ++i)
         {
+            if (this.isNull[i])
+            {
+                continue;
+            }
             /**
              * The same as ByteBuffer.hashCode().
              */
@@ -229,6 +233,29 @@ public class BinaryColumnVector extends ColumnVector
             hashCode[i] = 31 * hashCode[i] + h;
         }
         return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        BinaryColumnVector otherVector = (BinaryColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            if (this.lens[index] != otherVector.lens[otherIndex])
+            {
+                return false;
+            }
+            int start = this.start[index], otherStart = otherVector.start[otherIndex];
+            for (int i = 0; i < this.lens[index]; ++i)
+            {
+                if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
     }
 
     /**
@@ -480,26 +507,19 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        if (elementNum >= writeIndex)
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            writeIndex = elementNum + 1;
-        }
-        if (inputVector.isRepeating)
-        {
-            inputElementNum = 0;
-        }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
-        {
-            isNull[elementNum] = false;
+            isNull[index] = false;
             BinaryColumnVector in = (BinaryColumnVector) inputVector;
-            setVal(elementNum, in.vector[inputElementNum],
-                    in.start[inputElementNum], in.lens[inputElementNum]);
+            setVal(index, in.vector[inputIndex],
+                    in.start[inputIndex], in.lens[inputIndex]);
         }
         else
         {
-            isNull[elementNum] = true;
+            isNull[index] = true;
             noNulls = false;
         }
     }

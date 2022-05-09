@@ -102,9 +102,25 @@ public class DateColumnVector extends ColumnVector
                 "the length of hashCode is not in the range [1, length]");
         for (int i = 0; i < hashCode.length; ++i)
         {
+            if (this.isNull[i])
+            {
+                continue;
+            }
             hashCode[i] = 31 * hashCode[i] + this.dates[i];
         }
         return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        DateColumnVector otherVector = (DateColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return this.dates[index] == otherVector.dates[otherIndex];
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
+
     }
 
     /**
@@ -253,24 +269,17 @@ public class DateColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        if (elementNum >= writeIndex)
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            writeIndex = elementNum + 1;
-        }
-        if (inputVector.isRepeating)
-        {
-            inputElementNum = 0;
-        }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
-        {
-            isNull[elementNum] = false;
-            dates[elementNum] = ((DateColumnVector) inputVector).dates[inputElementNum];
+            isNull[index] = false;
+            dates[index] = ((DateColumnVector) inputVector).dates[inputIndex];
         }
         else
         {
-            isNull[elementNum] = true;
+            isNull[index] = true;
             noNulls = false;
         }
     }

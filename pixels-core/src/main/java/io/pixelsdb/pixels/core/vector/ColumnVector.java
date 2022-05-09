@@ -150,11 +150,10 @@ public abstract class ColumnVector implements AutoCloseable
     }
 
     /**
-     * Set the element in this column vector from the given input vector.
+     * Add the element from the given input vector into this column vector.
      * This method can assume that the output does not have isRepeating set.
      */
-    public abstract void setElement(int outElementNum, int inputElementNum,
-                                    ColumnVector inputVector);
+    public abstract void addElement(int inputIndex, ColumnVector inputVector);
 
     /**
      * Add the selected elements in the source column vector into this column vector.
@@ -165,7 +164,6 @@ public abstract class ColumnVector implements AutoCloseable
      * @param src the source column vector
      */
     public abstract void addSelected(int[] selected, int offset, int length, ColumnVector src);
-    // TODO: implement.
 
     public int getLength()
     {
@@ -209,6 +207,15 @@ public abstract class ColumnVector implements AutoCloseable
      * @return the same int array in the input
      */
     public abstract int[] accumulateHashCode(int[] hashCode);
+
+    /**
+     * Whether the two elements in this and the other column vector equals.
+     * @param index the index in this column vector
+     * @param otherIndex the index in the other column vector
+     * @param other the other column vector
+     * @return true if the two elements equals, otherwise returns false
+     */
+    public abstract boolean elementEquals(int index, int otherIndex, ColumnVector other);
 
     /**
      * Resets the column to default state

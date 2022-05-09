@@ -53,7 +53,7 @@ public class TestColumnVector
         ColumnVector b = new LongColumnVector(100);
         for (int i = 0; i < 100; i++)
         {
-            b.setElement(i, i, a);
+            b.addElement(i, a);
         }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < b.getLength(); i++)

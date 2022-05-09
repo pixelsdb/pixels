@@ -86,10 +86,9 @@ public class Tuple
             Tuple other = (Tuple) obj;
             for (int i = 0; i < this.keyColumns.length; ++i)
             {
-                // TODO: implement elementEquals
-                // if (!this.keyColumns[i].elementEquals(this.rowId, other.keyColumns[i], other.rowId))
+                if (!this.keyColumns[i].elementEquals(this.rowId, other.rowId, other.keyColumns[i]))
                 {
-                    // return false;
+                    return false;
                 }
             }
             return true;
@@ -125,15 +124,13 @@ public class Tuple
         {
             for (int i = 0; i < this.keyColumns.length; ++i)
             {
-                // TODO: implement addElement
-                // rowBatch.cols[i].addElement(this.keyColumns[i], this.rowId);
+                rowBatch.cols[i].addElement(this.rowId, this.keyColumns[i]);
             }
             nextStart += this.keyColumns.length;
         }
         for (int i = 0; i < this.nonKeyColumns.length; ++i)
         {
-            // TODO: implement addElement
-            // rowBatch.cols[start + i].addElement(this.nonKeyColumns[i], this.rowId);
+            rowBatch.cols[start + i].addElement(this.rowId, this.nonKeyColumns[i]);
         }
         nextStart += this.nonKeyColumns.length;
         if (next != null)

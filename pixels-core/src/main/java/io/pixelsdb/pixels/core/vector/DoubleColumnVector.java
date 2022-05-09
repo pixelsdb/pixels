@@ -135,24 +135,17 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int elementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        if (elementNum >= writeIndex)
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            writeIndex = elementNum + 1;
-        }
-        if (inputVector.isRepeating)
-        {
-            inputElementNum = 0;
-        }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
-        {
-            isNull[elementNum] = false;
-            vector[elementNum] = ((DoubleColumnVector) inputVector).vector[inputElementNum];
+            isNull[index] = false;
+            vector[index] = ((DoubleColumnVector) inputVector).vector[inputIndex];
         }
         else
         {
-            isNull[elementNum] = true;
+            isNull[index] = true;
             noNulls = false;
         }
     }
@@ -188,9 +181,24 @@ public class DoubleColumnVector extends ColumnVector
                 "the length of hashCode is not in the range [1, length]");
         for (int i = 0; i < hashCode.length; ++i)
         {
+            if (this.isNull[i])
+            {
+                continue;
+            }
             hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
         }
         return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        DoubleColumnVector otherVector = (DoubleColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return this.vector[index] == otherVector.vector[otherIndex];
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
     }
 
     @Override
