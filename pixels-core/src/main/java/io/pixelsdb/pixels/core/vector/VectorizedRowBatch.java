@@ -104,7 +104,27 @@ public class VectorizedRowBatch implements AutoCloseable
     }
 
     /**
-     * @return the remaining capacity in this row batch.
+     * Whether this row batch is empty, i.e., contains no data.
+     *
+     * @return true if this row batch is empty
+     */
+    public boolean isEmpty()
+    {
+        return this.maxSize > this.size;
+    }
+
+    /**
+     * Whether this row batch is full, i.e., has no free space.
+     *
+     * @return true if this row batch is full
+     */
+    public boolean isFull()
+    {
+        return this.size >= this.maxSize;
+    }
+
+    /**
+     * @return the number of remaining slots in this row batch.
      */
     public int freeSlots()
     {

@@ -149,6 +149,16 @@ public abstract class ColumnVector implements AutoCloseable
         throw new UnsupportedOperationException("Adding timestamp is not supported");
     }
 
+    public void addNull()
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        this.isNull[writeIndex++] = true;
+        this.noNulls = false;
+    }
+
     /**
      * Add the element from the given input vector into this column vector.
      * This method can assume that the output does not have isRepeating set.

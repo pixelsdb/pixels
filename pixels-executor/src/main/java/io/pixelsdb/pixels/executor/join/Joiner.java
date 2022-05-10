@@ -22,16 +22,19 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Use one set of row batches to build a hash map, and join it
- * with the other set of row batches.
- *
+ * Use one set of row batches from the small table to build a hash map, and join it
+ * with the row batches from the big table. In Pixels, we have a default rule that
+ * the left table is the small table, and the right table is the big table.
+ * <p/>
+ * <b>Note</b> that this joiner can not be directly used for left outer broadcast
+ * distributed join, because it does not ensure that the unmatched tuples from the
+ * small table will be returned only once by all the joiners within the join.
  * @author hank
  * @date 07/05/2022
  */
@@ -43,16 +46,20 @@ public class Joiner
     private final TypeDescription bigSchema;
     private final TypeDescription joinedSchema;
     private final int numKeyColumns;
-    private final int batchSize;
-    private VectorizedRowBatch joinedRowBatch;
+    /**
+     * All the tuples from the small table that have been matched during the join.
+     */
+    private final Set<Tuple> matchedSmallTuples = new HashSet<>();
+    private final Tuple smallNullTuple;
+    private final Tuple bigNullTuple;
 
     /**
-     * The joiner to join two tables. Currently, only INNER/LEFT/RIGHT equi-joins are
-     * supported. The first numKeyColumns columns in the two tables are considered as
-     * the join key. The small table is used for hash probing.
+     * The joiner to join two tables. Currently, only NATURE/INNER/LEFT/RIGHT equi-joins
+     * are supported. The first numKeyColumns columns in the two tables are considered as
+     * the join key. The small table, a.k.a., the left table, is hash probed in the join.
      * <p/>
-     * In the join result, the columns from the big table is at the beginning, and is
-     * followed by the non-key columns from the small table.
+     * In the join result, first comes with the columns from the small table, followed by
+     * the columns from the big (a.k.a., right) table.
      *
      * @param joinType the join type
      * @param smallPrefix the prefix for the columns from the small table, e.g., "orders."
@@ -60,50 +67,128 @@ public class Joiner
      * @param bigPrefix the prefix for the columns from the big table, e.e., "lineitem."
      * @param bigSchema the schema of the big table
      * @param numKeyColumns the number of key columns
-     * @param batchSize the row-batch size of the input row batches of the small and big table
-     *                  and the joined result row batches.
      */
     public Joiner(JoinType joinType, String smallPrefix, TypeDescription smallSchema,
                   String bigPrefix, TypeDescription bigSchema,
-                  int numKeyColumns, int batchSize)
+                  int numKeyColumns)
     {
         this.joinType = requireNonNull(joinType, "joinType is null");
+        checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
         this.smallSchema = requireNonNull(smallSchema, "smallSchema is null");
         this.bigSchema = requireNonNull(bigSchema, "bigSchema is null");
         checkArgument(numKeyColumns > 0, "numKeyColumns must be positive");
         this.numKeyColumns = numKeyColumns;
-        checkArgument(batchSize > 0, "batchSize must be positive");
-        this.batchSize = batchSize;
         // build the schema for the join result.
         this.joinedSchema = new TypeDescription(TypeDescription.Category.STRUCT);
-        List<String> bigColumnNames = bigSchema.getFieldNames();
-        List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
-        checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
-                "invalid children of bigSchema");
-        for (int i = 0; i < bigColumnNames.size(); ++i)
-        {
-            this.joinedSchema.addField(bigPrefix.concat(bigColumnNames.get(i)), bigColumnTypes.get(i));
-        }
         List<String> smallColumnNames = smallSchema.getFieldNames();
         List<TypeDescription> smallColumnTypes = smallSchema.getChildren();
         checkArgument(smallColumnTypes != null && smallColumnNames.size() == smallColumnTypes.size(),
                 "invalid children of smallSchema");
-        // duplicate the join key if not nature join.
-        for (int i = joinType == JoinType.NATURE ? numKeyColumns : 0; i < smallColumnNames.size(); ++i)
+        for (int i = 0; i < smallColumnNames.size(); ++i)
         {
             this.joinedSchema.addField(smallPrefix.concat(smallColumnNames.get(i)), smallColumnTypes.get(i));
         }
-        this.joinedRowBatch = this.joinedSchema.createRowBatch();
+        List<String> bigColumnNames = bigSchema.getFieldNames();
+        List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
+        checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
+                "invalid children of bigSchema");
+        // duplicate the join key if not nature join.
+        for (int i = joinType == JoinType.NATURE ? numKeyColumns : 0; i < bigColumnNames.size(); ++i)
+        {
+            this.joinedSchema.addField(bigPrefix.concat(bigColumnNames.get(i)), bigColumnTypes.get(i));
+        }
+        // create the null tuples for outer join.
+        this.smallNullTuple = new NullTuple(numKeyColumns,
+                smallColumnNames.size() - numKeyColumns, joinType);
+        this.bigNullTuple = new NullTuple(numKeyColumns,
+                bigColumnNames.size() - numKeyColumns, joinType);
     }
 
-    public void populateSmall(VectorizedRowBatch smallBatch)
+    /**
+     * Populate the hash table for the left (a.k.a., small) table in the join. This
+     * hash table will be used for probing in the join.
+     *
+     * @param smallBatch a row batch from the smaller table
+     */
+    public void populateLeftTable(VectorizedRowBatch smallBatch)
     {
-        // TODO: implement.
+        requireNonNull(smallBatch, "smallBatch is null");
+        checkArgument(smallBatch.size > 0, "smallBatch is empty");
+        Tuple.Builder builder = new Tuple.Builder(smallBatch, this.numKeyColumns, this.joinType);
+        while (builder.hasNext())
+        {
+            Tuple tuple = builder.next();
+            this.smallTable.put(tuple, tuple);
+        }
     }
 
+    /**
+     * Perform the join for a row batch from the right (a.k.a., big) table in the join.
+     *
+     * @param bigBatch a row batch from the bigger table
+     * @return the row batch of the join result, could be empty
+     */
     public VectorizedRowBatch join(VectorizedRowBatch bigBatch)
     {
-        // TODO: implement.
-        return this.joinedRowBatch;
+        requireNonNull(bigBatch, "bigBatch is null");
+        checkArgument(bigBatch.size > 0, "bigBatch is empty");
+        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+        Tuple.Builder builder = new Tuple.Builder(bigBatch, this.numKeyColumns, this.joinType);
+        while (builder.hasNext())
+        {
+            Tuple big = builder.next(), joined = null;
+            Tuple small = this.smallTable.get(big);
+            if (small == null)
+            {
+                switch (joinType)
+                {
+                    case NATURE:
+                    case EQUI_INNER:
+                    case EQUI_LEFT:
+                        break;
+                    case EQUI_RIGHT:
+                        joined = smallNullTuple.join(big);
+                        break;
+                    default:
+                        throw new UnsupportedOperationException("join type is not supported");
+                }
+            } else
+            {
+                if (joinType == JoinType.EQUI_LEFT)
+                {
+                    this.matchedSmallTuples.add(small);
+                }
+                joined = small.join(big);
+            }
+            if (joined != null)
+            {
+                checkArgument(!joinedRowBatch.isFull(), "joined row batch is too large");
+                joined.writeTo(joinedRowBatch);
+            }
+        }
+        return joinedRowBatch;
+    }
+
+    /**
+     * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
+     */
+    public VectorizedRowBatch getLeftOuter()
+    {
+        checkArgument(this.joinType == JoinType.EQUI_LEFT,
+                "getLeftOuter() is illegal for non-left-outer join");
+        List<Tuple> leftOuterTuples = new ArrayList<>();
+        for (Tuple small : this.smallTable.keySet())
+        {
+            if (!this.matchedSmallTuples.contains(small))
+            {
+                leftOuterTuples.add(small);
+            }
+        }
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(leftOuterTuples.size());
+        for (Tuple small : leftOuterTuples)
+        {
+            small.join(this.bigNullTuple).writeTo(leftOuterBatch);
+        }
+        return leftOuterBatch;
     }
 }

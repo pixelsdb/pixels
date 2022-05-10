@@ -17,19 +17,35 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.common.exception;
 
 /**
- * The join types that are supported in Pixels.
- *
  * @author hank
- * @date 09/05/2022
+ * @date 5/10/22
  */
-public enum JoinType
+public class InvalidArgumentException extends RuntimeException
 {
-    UNKNOWN, // The first enum value is the default value.
-    NATURE,
-    EQUI_INNER,
-    EQUI_LEFT,
-    EQUI_RIGHT
+    public InvalidArgumentException()
+    {
+    }
+
+    public InvalidArgumentException(String message)
+    {
+        super(message);
+    }
+
+    public InvalidArgumentException(String message, Throwable cause)
+    {
+        super(message, cause);
+    }
+
+    public InvalidArgumentException(Throwable cause)
+    {
+        super(cause);
+    }
+
+    public InvalidArgumentException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace)
+    {
+        super(message, cause, enableSuppression, writableStackTrace);
+    }
 }

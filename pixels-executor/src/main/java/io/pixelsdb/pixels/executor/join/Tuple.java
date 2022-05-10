@@ -55,12 +55,12 @@ public class Tuple
      */
     private final ColumnVector[] nonKeyColumns;
 
-    private final JoinType joinType;
+    protected final JoinType joinType;
     /**
      * The next tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
      */
-    private Tuple next;
+    protected Tuple next;
 
     /**
      * For performance considerations, the parameters are not checked.
@@ -101,9 +101,10 @@ public class Tuple
         return false;
     }
 
-    public void Join(Tuple next)
+    public Tuple join(Tuple next)
     {
         this.next = next;
+        return this;
     }
 
     /**
@@ -113,7 +114,7 @@ public class Tuple
      */
     public void writeTo(VectorizedRowBatch rowBatch)
     {
-        writeTo(rowBatch, this.keyColumns.length, true);
+        writeTo(rowBatch, 0, true);
     }
 
     /**
@@ -122,20 +123,20 @@ public class Tuple
      * @param start the index of the column in the row batch to start writing
      * @param includeKey whether write the key columns
      */
-    private void writeTo(VectorizedRowBatch rowBatch, int start, boolean includeKey)
+    protected void writeTo(VectorizedRowBatch rowBatch, int start, boolean includeKey)
     {
         int nextStart = start;
         if (includeKey)
         {
             for (int i = 0; i < this.keyColumns.length; ++i)
             {
-                rowBatch.cols[i].addElement(this.rowId, this.keyColumns[i]);
+                rowBatch.cols[start + i].addElement(this.rowId, this.keyColumns[i]);
             }
             nextStart += this.keyColumns.length;
         }
         for (int i = 0; i < this.nonKeyColumns.length; ++i)
         {
-            rowBatch.cols[start + i].addElement(this.rowId, this.nonKeyColumns[i]);
+            rowBatch.cols[nextStart + i].addElement(this.rowId, this.nonKeyColumns[i]);
         }
         nextStart += this.nonKeyColumns.length;
         if (next != null)
@@ -171,7 +172,7 @@ public class Tuple
             checkArgument(rowBatch.size > 0, "rowBatch is empty");
             checkArgument(numKeyColumns > 0, "numKeyColumns must be positive");
             requireNonNull(joinType, "joinType is null");
-            checkArgument(joinType != JoinType.UNKNOWN, "joinType is unknown");
+            checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
 
             this.rowBatch = rowBatch;
             this.numKeyColumns = numKeyColumns;
