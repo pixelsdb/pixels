@@ -105,10 +105,12 @@ public class Joiner
     }
 
     /**
-     * Populate the hash table for the left (a.k.a., small) table in the join. This
+     * Populate the hash table for the left (a.k.a., small) table in the join. The
      * hash table will be used for probing in the join.
      *
-     * @param smallBatch a row batch from the smaller table
+     * <b>Note</b> this method is not thread safe.
+     *
+     * @param smallBatch a row batch from the small table
      */
     public void populateLeftTable(VectorizedRowBatch smallBatch)
     {
@@ -123,7 +125,8 @@ public class Joiner
     }
 
     /**
-     * Perform the join for a row batch from the right (a.k.a., big) table in the join.
+     * Perform the join for a row batch from the right (a.k.a., big) table.
+     * This method is thread-safe, but should not be called before the small table is populated.
      *
      * @param bigBatch a row batch from the bigger table
      * @return the row batch of the join result, could be empty
@@ -171,6 +174,8 @@ public class Joiner
 
     /**
      * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
+     * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
+     * the join is left outer join.
      */
     public VectorizedRowBatch getLeftOuter()
     {
