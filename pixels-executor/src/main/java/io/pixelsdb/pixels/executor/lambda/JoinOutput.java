@@ -22,26 +22,27 @@ package io.pixelsdb.pixels.executor.lambda;
 import java.util.ArrayList;
 
 /**
- * The output format for table scan.
+ * The output format for both broadcast and hash partitioned join.
+ *
  * @author hank
- * Created at: 11/04/2022
+ * @date 07/05/2022
  */
-public class ScanOutput
+public class JoinOutput
 {
     /**
-     * The path of the scan result files. No need to contain endpoint information.
+     * The path of the join result files. No need to contain endpoint information.
      */
     private ArrayList<String> outputs = new ArrayList<>();
 
     /**
-     * The number of row groups in each scan result files.
+     * The number of row groups in each join result files.
      */
     private ArrayList<Integer> rowGroupNums = new ArrayList<>();
 
     /**
      * Default constructor for jackson.
      */
-    public ScanOutput() { }
+    public JoinOutput() { }
 
     public ArrayList<String> getOutputs()
     {

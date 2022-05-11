@@ -19,10 +19,53 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import java.util.List;
+
 /**
+ * The output format of the hash partitioning.
  * @author hank
  * @date 07/05/2022
  */
 public class PartitionOutput
 {
+    /**
+     * The path of the partitioned file.
+     */
+    private String path;
+
+    /**
+     * The hash value of the partitions that exist in the partitioned file.
+     */
+    private List<Integer> hashValues;
+
+    /**
+     * Default constructor for Jackson.
+     */
+    public PartitionOutput() { }
+
+    public PartitionOutput(String path, List<Integer> hashValues)
+    {
+        this.path = path;
+        this.hashValues = hashValues;
+    }
+
+    public String getPath()
+    {
+        return path;
+    }
+
+    public void setPath(String path)
+    {
+        this.path = path;
+    }
+
+    public List<Integer> getHashValues()
+    {
+        return hashValues;
+    }
+
+    public void setHashValues(List<Integer> hashValues)
+    {
+        this.hashValues = hashValues;
+    }
 }

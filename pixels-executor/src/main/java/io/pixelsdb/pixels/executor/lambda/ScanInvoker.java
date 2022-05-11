@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * The lambda invoker for scan operator.
+ *
  * @author hank
  * @date 4/18/22
  */

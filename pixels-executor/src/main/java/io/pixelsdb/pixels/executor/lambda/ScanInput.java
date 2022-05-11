@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor.lambda;
 import java.util.ArrayList;
 
 /**
- * The input format for ScanWorker.
+ * The input format for table scan.
  * @author hank
  * Created at: 11/04/2022
  */
