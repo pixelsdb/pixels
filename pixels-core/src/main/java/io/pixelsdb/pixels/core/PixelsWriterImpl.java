@@ -69,7 +69,7 @@ public class PixelsWriterImpl implements PixelsWriter
     private final TimeZone timeZone;
     private final boolean encoding;
     private final boolean partitioned;
-    private final Optional<List<Integer>> partitionColumnIds;
+    private final Optional<List<Integer>> partKeyColumnIds;
 
     private final ColumnWriter[] columnWriters;
     private final StatsRecorder[] fileColStatRecorders;
@@ -101,7 +101,7 @@ public class PixelsWriterImpl implements PixelsWriter
             PhysicalWriter physicalWriter,
             boolean encoding,
             boolean partitioned,
-            Optional<List<Integer>> partitionColumnIds)
+            Optional<List<Integer>> partKeyColumnIds)
     {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
@@ -114,7 +114,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.timeZone = requireNonNull(timeZone);
         this.encoding = encoding;
         this.partitioned = partitioned;
-        this.partitionColumnIds = requireNonNull(partitionColumnIds, "partitionColumnIds is null");
+        this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
 
         List<TypeDescription> children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
@@ -148,7 +148,7 @@ public class PixelsWriterImpl implements PixelsWriter
         private boolean builderOverwrite = false;
         private boolean builderEncoding = true;
         private boolean builderPartitioned = false;
-        private Optional<List<Integer>> builderPartitionColumnIds = Optional.empty();
+        private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
 
         private Builder()
         {
@@ -254,9 +254,9 @@ public class PixelsWriterImpl implements PixelsWriter
             return this;
         }
 
-        public Builder setPartitionColumnIds(List<Integer> partitionColumnIds)
+        public Builder setPartKeyColumnIds(List<Integer> partitionColumnIds)
         {
-            this.builderPartitionColumnIds = Optional.ofNullable(partitionColumnIds);
+            this.builderPartKeyColumnIds = Optional.ofNullable(partitionColumnIds);
 
             return this;
         }
@@ -272,7 +272,7 @@ public class PixelsWriterImpl implements PixelsWriter
             checkArgument(this.builderPixelStride > 0, "pixels stride size is not set");
             checkArgument(this.builderRowGroupSize > 0, "row group size is not set");
             checkArgument(this.builderPartitioned ==
-                            (this.builderPartitionColumnIds.isPresent() && !this.builderPartitionColumnIds.get().isEmpty()),
+                            (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
                     "partition column ids are present while partitioned is false, or vice versa");
 
             PhysicalWriter fsWriter = null;
@@ -306,7 +306,7 @@ public class PixelsWriterImpl implements PixelsWriter
                     fsWriter,
                     builderEncoding,
                     builderPartitioned,
-                    builderPartitionColumnIds);
+                    builderPartKeyColumnIds);
         }
     }
 
@@ -542,7 +542,7 @@ public class PixelsWriterImpl implements PixelsWriter
             PixelsProto.PartitionInformation.Builder partitionInfo =
                     PixelsProto.PartitionInformation.newBuilder();
             // partitionColumnIds has been checked to be present in the builder.
-            partitionInfo.addAllColumnIds(partitionColumnIds.orElse(null));
+            partitionInfo.addAllColumnIds(partKeyColumnIds.orElse(null));
             partitionInfo.setHashValue(currHashValue);
             curRowGroupInfo.setPartitionInfo(partitionInfo.build());
         }

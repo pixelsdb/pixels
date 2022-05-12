@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * The tuple of which all the columns are null.
  * This is mainly used in outer join.
@@ -31,26 +33,36 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
  */
 public class NullTuple extends Tuple
 {
-    private static final ColumnVector[] NON_KEY_COLUMNS = new ColumnVector[0];
+    private static final ColumnVector[] EMPTY_COLUMNS = new ColumnVector[0];
     private static final int INVALID_HASH_CODE = Integer.MIN_VALUE;
     private static final int INVALID_ROW_ID = -1;
 
-    private final int numKeyColumns;
-    private final int numNonKeyColumns;
+    private final int[] nonKeyColumnIds;
 
     /**
      * For performance considerations, the parameters are not checked.
      * Must ensure that they are valid.
      *
-     * @param numKeyColumns the number of key columns
-     * @param numNonKeyColumns the number of non-key columns
+     * @param keyColumnIds the ids of the key columns
+     * @param numColumns the number of columns
      * @param joinType the join type
      */
-    public NullTuple(int numKeyColumns, int numNonKeyColumns, JoinType joinType)
+    public NullTuple(int[] keyColumnIds, int numColumns, JoinType joinType)
     {
-        super(INVALID_HASH_CODE, INVALID_ROW_ID, NON_KEY_COLUMNS, NON_KEY_COLUMNS, joinType);
-        this.numKeyColumns = numKeyColumns;
-        this.numNonKeyColumns = numNonKeyColumns;
+        super(INVALID_HASH_CODE, INVALID_ROW_ID, keyColumnIds, EMPTY_COLUMNS, joinType);
+        checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
+                "keyColumnIds is null or empty");
+        checkArgument(keyColumnIds.length <= numColumns, "numColumns is too small");
+        this.nonKeyColumnIds = new int[numColumns - keyColumnIds.length];
+        for (int i = 0, j = 0, k = 0; i < numColumns; ++i)
+        {
+            if (i == keyColumnIds[j])
+            {
+                j++;
+                continue;
+            }
+            this.nonKeyColumnIds[k++] = i;
+        }
     }
 
     @Override
@@ -71,17 +83,17 @@ public class NullTuple extends Tuple
         int nextStart = start;
         if (includeKey)
         {
-            for (int i = start; i < start + numKeyColumns; ++i)
+            for (int id : this.keyColumnIds)
             {
-                rowBatch.cols[i].addNull();
+                rowBatch.cols[start + id].addNull();
             }
-            nextStart += this.numKeyColumns;
+            nextStart += this.keyColumnIds.length;
         }
-        for (int i = nextStart; i < nextStart + this.numNonKeyColumns; ++i)
+        for (int id : this.nonKeyColumnIds)
         {
-            rowBatch.cols[i].addNull();
+            rowBatch.cols[nextStart + id].addNull();
         }
-        nextStart += this.numKeyColumns;
+        nextStart += this.nonKeyColumnIds.length;
         if (next != null)
         {
             next.writeTo(rowBatch, nextStart, this.joinType != JoinType.NATURE);

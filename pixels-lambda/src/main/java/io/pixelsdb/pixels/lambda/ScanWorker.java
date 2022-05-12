@@ -162,6 +162,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param cols the included columns
+     * @param filter the filter for the scan
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
      * @return the number of row groups that have been written into the output.

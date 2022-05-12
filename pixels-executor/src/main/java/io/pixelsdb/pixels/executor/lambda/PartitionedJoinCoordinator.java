@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 /**
+ * Hash partitioned join coordinator.
+ *
  * @author hank
  * @date 07/05/2022
  */

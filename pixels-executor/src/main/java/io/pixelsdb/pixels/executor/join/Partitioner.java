@@ -40,7 +40,7 @@ public class Partitioner
     private final int numPartition;
     private final int batchSize;
     private final TypeDescription schema;
-    private final int numKeyColumns;
+    private final int[] keyColumnIds;
     private final VectorizedRowBatch[] rowBatches;
 
     /**
@@ -57,19 +57,20 @@ public class Partitioner
      * @param numPartition the number of partitions
      * @param batchSize the number of rows in each output row batches
      * @param schema the schema of the input and output row batches
-     * @param numKeyColumns the number of key columns
+     * @param keyColumnIds the ids of the key columns
      */
-    public Partitioner(int numPartition, int batchSize, TypeDescription schema, int numKeyColumns)
+    public Partitioner(int numPartition, int batchSize, TypeDescription schema, int[] keyColumnIds)
     {
         checkArgument(numPartition > 0, "partitionNum must be positive");
         checkArgument(batchSize > 0, "batchSize must be positive");
         requireNonNull(schema, "schema is null");
         requireNonNull(schema.getChildren(), "schema is empty");
-        checkArgument(numKeyColumns > 0, "numKeyColumns must be positive");
+        checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
+                "keyColumnIds is null or empty");
         this.numPartition = numPartition;
         this.batchSize = batchSize;
         this.schema = schema;
-        this.numKeyColumns = numKeyColumns;
+        this.keyColumnIds = keyColumnIds;
         this.rowBatches = new VectorizedRowBatch[numPartition];
         for (int i = 0; i < numPartition; ++i)
         {
@@ -78,11 +79,12 @@ public class Partitioner
     }
 
     /**
-     * Partition the rows in the input row batch.
+     * Partition the rows in the input row batch. This method is not thread-safe.
+     *
      * @param input the input row batch
      * @return the output row batches that are full.
      */
-    Map<Integer, VectorizedRowBatch> partition(VectorizedRowBatch input)
+    public Map<Integer, VectorizedRowBatch> partition(VectorizedRowBatch input)
     {
         requireNonNull(input, "input is null");
         checkArgument(input.size <= batchSize, "input is oversize");
@@ -141,9 +143,9 @@ public class Partitioner
     {
         int[] hashCode = new int[input.size];
         Arrays.fill(hashCode, 0);
-        for (int i = 0; i < numKeyColumns; ++i)
+        for (int columnId : keyColumnIds)
         {
-            input.cols[i].accumulateHashCode(hashCode);
+            input.cols[columnId].accumulateHashCode(hashCode);
         }
         return hashCode;
     }

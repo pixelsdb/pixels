@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.executor.lambda;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * The input format for hash partitioning.
@@ -157,7 +156,7 @@ public class PartitionInput
         /**
          * The column ids of the partition key columns.
          */
-        private List<Integer> keyColumnIds;
+        private int[] keyColumnIds;
 
         /**
          * The number of partitions in the output.
@@ -169,18 +168,18 @@ public class PartitionInput
          */
         public PartitionInfo() { }
 
-        public PartitionInfo(List<Integer> keyColumnIds, int numParition)
+        public PartitionInfo(int[] keyColumnIds, int numParition)
         {
             this.keyColumnIds = keyColumnIds;
             this.numParition = numParition;
         }
 
-        public List<Integer> getKeyColumnIds()
+        public int[] getKeyColumnIds()
         {
             return keyColumnIds;
         }
 
-        public void setKeyColumnIds(List<Integer> keyColumnIds)
+        public void setKeyColumnIds(int[] keyColumnIds)
         {
             this.keyColumnIds = keyColumnIds;
         }
