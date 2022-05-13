@@ -42,6 +42,7 @@
         <module>pixels-tools</module>
         <module>pixels-lambda</module>
         <module>pixels-executor</module>
+        <module>pixels-retina</module>
     </modules>
 
     <properties>

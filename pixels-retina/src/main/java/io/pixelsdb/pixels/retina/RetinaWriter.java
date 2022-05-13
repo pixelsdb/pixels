@@ -14,7 +14,6 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.load.Config;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.Properties;
 
@@ -91,13 +90,13 @@ public class RetinaWriter {
         String targetDirPath = "/tmp/pixels/";
 
         int pixelStride = Integer.parseInt(prop.getProperty("pixel.stride"));
-        int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size")) * 1024 * 1024;
-        long blockSize = Long.parseLong(prop.getProperty("block.size")) * 1024l * 1024l;
+        int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size")) ;
+        long blockSize = Long.parseLong(prop.getProperty("block.size"));
         short replication = Short.parseShort(prop.getProperty("block.replication"));
 
         System.out.printf("prop: %d %d\n", pixelStride, rowGroupSize);
         // TODO get from metadata service and cache schema
-        String schemaStr = "struct<a:long,b:long,c:long,d:long,e:long,f:string,g:string>";
+        String schemaStr = "struct<a:long,b:long,c:long,d:long,e:long,f:string,g:string,version:long>";
         TypeDescription schema = TypeDescription.fromString(schemaStr);
         VectorizedRowBatch rowBatch = schema.createRowBatch(rowNum);
         Storage targetStorage = StorageFactory.Instance().getStorage("file");
@@ -108,14 +107,14 @@ public class RetinaWriter {
                 .setPixelStride(pixelStride)
                 .setRowGroupSize(rowGroupSize)
                 .setStorage(targetStorage)
-                .setFilePath(targetFilePath)
+                .setPath(targetFilePath)
                 .setBlockSize(blockSize)
                 .setReplication(replication)
                 .setBlockPadding(true)
                 .setEncoding(true)
                 .setCompressionBlockSize(1)
                 .build();
-        System.out.println("here2");
+
         for (int i = 0; i < colNum; i++) {
             System.out.println(i);
             short type = memoryMappedFile.getShort(pos);
@@ -128,12 +127,12 @@ public class RetinaWriter {
                     int length = memoryMappedFile.getInt(pos);
                     pos += Integer.BYTES;
                     System.out.printf("length: %d\n", length);
-
                     LongColumnVector longCol = (LongColumnVector) rowBatch.cols[i];
-                    ByteBuffer buffer = memoryMappedFile.getDirectByteBuffer(pos, length);
-                    pos += length;
+                    for (int j = 0; j < rowNum; j++) {
+                        longCol.vector[j] = memoryMappedFile.getLong(pos);
+                        pos += Long.BYTES;
+                    }
 
-                    longCol.vector = buffer.asLongBuffer().array();
                     break;
 
                 case BYTES:
@@ -142,20 +141,21 @@ public class RetinaWriter {
                     System.out.printf("length: %d\n", lenLength);
                     BinaryColumnVector strCol = (BinaryColumnVector) rowBatch.cols[i];
 
-                    ByteBuffer startBuffer = memoryMappedFile.getDirectByteBuffer(pos, lenLength);
-                    pos += lenLength;
-                    strCol.start = startBuffer.asIntBuffer().array();
+                    for (int j = 0; j < rowNum; j++) {
+                        strCol.start[j] = memoryMappedFile.getInt(pos);
+                        pos += Integer.BYTES;
+                    }
 
-                    ByteBuffer lenBuffer = memoryMappedFile.getDirectByteBuffer(pos, lenLength);
-                    pos += lenLength;
-                    strCol.lens = lenBuffer.asIntBuffer().array();
+                    for (int j = 0; j < rowNum; j++) {
+                        strCol.lens[j] = memoryMappedFile.getInt(pos);
+                        pos += Integer.BYTES;
+                    }
 
                     int dataLength = memoryMappedFile.getInt(pos);
                     pos += Integer.BYTES;
 
-                    ByteBuffer dataBuffer = memoryMappedFile.getDirectByteBuffer(pos, dataLength);
+                    memoryMappedFile.getBytes(pos, strCol.buffer, 0, dataLength);
                     pos += dataLength;
-                    strCol.buffer = dataBuffer.array();
 
                     for (int j = 0; j < rowNum; j++) {
                         strCol.vector[j] = strCol.buffer;
@@ -165,16 +165,13 @@ public class RetinaWriter {
             }
         }
 
-        System.out.println("here");
         if (rowBatch.size != 0) {
             pixelsWriter.addRowBatch(rowBatch);
             rowBatch.reset();
         }
-        System.out.println("here2");
 
-
+        // TODO Inform metadata service
 
         pixelsWriter.close();
-
     }
 }
