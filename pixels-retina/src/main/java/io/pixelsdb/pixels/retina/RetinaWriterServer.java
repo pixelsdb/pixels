@@ -75,7 +75,7 @@ public class RetinaWriterServer {
         public void flush(FlushRequest request, StreamObserver<FlushResponse> responseObserver) {
             FlushResponse flushResponse = null;
             try {
-                writer.readAndWrite(request.getSchemaStr(),
+                writer.readAndWrite(request.getSchemaName(), request.getTableName(), request.getRgid(),
                         request.getPos(), request.getFilePath());
                 flushResponse = FlushResponse.newBuilder().setErrorCode(0).setPos(request.getPos()).build();
             } catch (IOException e) {
