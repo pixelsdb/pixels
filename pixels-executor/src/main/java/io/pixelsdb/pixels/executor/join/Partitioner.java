@@ -105,30 +105,35 @@ public class Partitioner
         }
 
         Map<Integer, VectorizedRowBatch> output = new HashMap<>();
-        for (int i = 0; i < numPartition; ++i)
+        for (int hash = 0; hash < numPartition; ++hash)
         {
-            int[] selected = Ints.toArray(selectedArrays.get(i));
-            int freeSlots = rowBatches[i].freeSlots();
+            int[] selected = Ints.toArray(selectedArrays.get(hash));
+            if (selected.length == 0)
+            {
+                // this partition is empty
+                continue;
+            }
+            int freeSlots = rowBatches[hash].freeSlots();
             if (freeSlots == 0)
             {
-                output.put(i, rowBatches[i]);
-                rowBatches[i] = schema.createRowBatch(batchSize);
-                rowBatches[i].addSelected(selected, 0, selected.length, input);
+                output.put(hash, rowBatches[hash]);
+                rowBatches[hash] = schema.createRowBatch(batchSize);
+                rowBatches[hash].addSelected(selected, 0, selected.length, input);
             }
             else if (freeSlots <= selected.length)
             {
-                rowBatches[i].addSelected(selected, 0, freeSlots, input);
-                output.put(i, rowBatches[i]);
-                rowBatches[i] = schema.createRowBatch(batchSize);
+                rowBatches[hash].addSelected(selected, 0, freeSlots, input);
+                output.put(hash, rowBatches[hash]);
+                rowBatches[hash] = schema.createRowBatch(batchSize);
                 if (freeSlots < selected.length)
                 {
-                    rowBatches[i].addSelected(selected, freeSlots,
+                    rowBatches[hash].addSelected(selected, freeSlots,
                             selected.length - freeSlots, input);
                 }
             }
             else
             {
-                rowBatches[i].addSelected(selected, 0, selected.length, input);
+                rowBatches[hash].addSelected(selected, 0, selected.length, input);
             }
         }
         return output;

@@ -38,6 +38,7 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,7 +77,6 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
         }
     }
 
-
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
     {
@@ -85,7 +85,6 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
             ArrayList<InputInfo> inputs = event.getInputs();
@@ -140,20 +139,22 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             PixelsWriter pixelsWriter = getWriter(writerSchema.get(), outputPath,
                     Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()), encoding);
             List<Integer> hashValues = new ArrayList<>(numPartition);
-            for (int i = 0; i < numPartition; ++i)
+            for (int hash = 0; hash < numPartition; ++hash)
             {
-                ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(i);
+                ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())
                 {
                     for (VectorizedRowBatch batch : batches)
                     {
-                        pixelsWriter.addRowBatch(batch, i);
+                        pixelsWriter.addRowBatch(batch, hash);
                     }
-                    hashValues.add(i);
+                    hashValues.add(hash);
                 }
             }
             partitionOutput.setPath(outputPath);
             partitionOutput.setHashValues(hashValues);
+
+            pixelsWriter.close();
 
             return partitionOutput;
         }
@@ -180,9 +181,8 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                              List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                              AtomicReference<TypeDescription> writerSchema)
     {
-        for (int i = 0; i < scanInputs.size(); ++i)
+        for (InputInfo inputInfo : scanInputs)
         {
-            InputInfo inputInfo = scanInputs.get(i);
             PixelsReaderOption option = new PixelsReaderOption();
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
@@ -243,28 +243,21 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             } catch (Exception e)
             {
                 logger.error("failed to scan the file '" +
-                        inputInfo.getFilePath() + "' and output the result", e);
+                        inputInfo.getFilePath() + "' and output the partitioning result", e);
             }
         }
     }
 
-    private PixelsReader getReader(String fileName)
+    private PixelsReader getReader(String fileName) throws IOException
     {
-        PixelsReader pixelsReader = null;
-        try
-        {
-            PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                    .setStorage(s3)
-                    .setPath(fileName)
-                    .setEnableCache(false)
-                    .setCacheOrder(new ArrayList<>())
-                    .setPixelsCacheReader(null)
-                    .setPixelsFooterCache(footerCache);
-            pixelsReader = builder.build();
-        } catch (Exception e)
-        {
-            logger.error("failed to create pixels reader", e);
-        }
+        PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
+                .setStorage(s3)
+                .setPath(fileName)
+                .setEnableCache(false)
+                .setCacheOrder(new ArrayList<>())
+                .setPixelsCacheReader(null)
+                .setPixelsFooterCache(footerCache);
+        PixelsReader pixelsReader = builder.build();
         return pixelsReader;
     }
 

@@ -110,7 +110,7 @@ public class VectorizedRowBatch implements AutoCloseable
      */
     public boolean isEmpty()
     {
-        return this.maxSize > this.size;
+        return this.size == 0;
     }
 
     /**
@@ -131,10 +131,20 @@ public class VectorizedRowBatch implements AutoCloseable
         return maxSize - size;
     }
 
+    /**
+     * Add the selected elements in the src row batch into this row batch.
+     *
+     * @param selected the index of the selected elements in src
+     * @param offset the start offset in selected
+     * @param length the length in selected
+     * @param src the source row batch
+     */
     public void addSelected(int[] selected, int offset, int length, VectorizedRowBatch src)
     {
-        checkArgument(offset >= 0 && length > 0, "invalid offset or length");
-        checkArgument(size + length <= maxSize, "too many selected rows");
+        checkArgument(offset >= 0 && length > 0,
+                "invalid offset(?) or length(?)", offset, length);
+        checkArgument(size + length <= maxSize,
+                "too many selected rows (?)", length);
         for (int i = 0; i < cols.length; ++i)
         {
             cols[i].addSelected(selected, offset, length, src.cols[i]);
