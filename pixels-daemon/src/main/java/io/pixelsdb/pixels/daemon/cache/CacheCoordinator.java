@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.daemon.cache;
 
-import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KeyValue;
@@ -31,6 +30,7 @@ import io.pixelsdb.pixels.cache.CacheLocationDistribution;
 import io.pixelsdb.pixels.cache.PixelsCacheConfig;
 import io.pixelsdb.pixels.common.balance.AbsoluteBalancer;
 import io.pixelsdb.pixels.common.balance.Balancer;
+import io.pixelsdb.pixels.common.balance.HostAddress;
 import io.pixelsdb.pixels.common.balance.ReplicaBalancer;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
@@ -391,7 +391,7 @@ public class CacheCoordinator
     }
 
     /**
-     * assign hdfs files to cache manager nodes randomly, guaranty load balance.
+     * assign files / objects to cache manager nodes randomly, guaranty load balance.
      * @param paths
      * @param nodes
      * @param size
@@ -411,18 +411,22 @@ public class CacheCoordinator
         Balancer replicaBalancer = new ReplicaBalancer(cacheNodes);
         for (String path : paths)
         {
-            // get a set of nodes where the blocks of the file is located (location_set)
-            Set<HostAddress> addresses = new HashSet<>();
-            List<Location> locations = storage.getLocations(path);
-            for (Location location : locations)
+            if (storage.hasLocality())
             {
-                addresses.addAll(toHostAddress(location.getHosts()));
+                // get a set of nodes where the blocks of the file is located (location_set)
+                Set<HostAddress> addresses = new HashSet<>();
+                List<Location> locations = storage.getLocations(path);
+                for (Location location : locations)
+                {
+                    addresses.addAll(toHostAddress(location.getHosts()));
+                }
+                // addresses should not be empty.
+                replicaBalancer.put(path, addresses);
             }
-            if (addresses.size() == 0)
+            else
             {
-                continue;
+                replicaBalancer.autoSelect(path);
             }
-            replicaBalancer.put(path, addresses);
         }
         try
         {

@@ -30,17 +30,16 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import java.io.IOException;
 import java.io.InputStream;
 
+import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
+
 /**
+ * The input stream for AWS S3 compatible storage systems.
+ *
+ * @author hank
  * Created at: 9/29/21
- * Author: hank
  */
 public class S3InputStream extends InputStream
 {
-    /**
-     * Default chunk size is 256MB
-     */
-    protected static final int BUFFER_SIZE = 256 * 1024 * 1024;
-
     /**
      * The bucket-name on Amazon S3
      */
@@ -176,7 +175,7 @@ public class S3InputStream extends InputStream
      */
     protected int populateBuffer() throws IOException
     {
-        int bytesToRead = BUFFER_SIZE;
+        int bytesToRead = S3_BUFFER_SIZE;
         if (this.length - this.position < bytesToRead)
         {
             // Do not exceed EOF.

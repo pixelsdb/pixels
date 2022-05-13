@@ -21,59 +21,57 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.S3;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
 /**
+ * The physical readers for AWS S3 compatible storage systems.
+ *
+ * @author hank
  * Created at: 06/09/2021
- * Author: hank
  */
 public class PhysicalS3Writer implements PhysicalWriter
 {
-    private static Logger logger = LogManager.getLogger(PhysicalS3Writer.class);
-
-    private S3 s3;
-    private S3.Path path;
+    private AbstractS3 s3;
+    private AbstractS3.Path path;
     private String pathStr;
     private long position;
     private S3Client client;
     private OutputStream out;
 
-    public PhysicalS3Writer(Storage storage, String path) throws IOException
+    public PhysicalS3Writer(Storage storage, String path, boolean overwrite) throws IOException
     {
-        if (storage instanceof S3)
+        if (storage instanceof AbstractS3)
         {
-            this.s3 = (S3) storage;
+            this.s3 = (AbstractS3) storage;
         }
         else
         {
             throw new IOException("Storage is not S3.");
         }
-        if (path.startsWith("s3://"))
+        if (path.contains("://"))
         {
             // remove the scheme.
-            path = path.substring(5);
+            path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new S3.Path(path);
+        this.path = new AbstractS3.Path(path);
         this.pathStr = path;
         this.position = 0L;
         this.client = s3.getClient();
-        this.s3.create(path, false, S3_BUFFER_SIZE, (short)1);
-        this.out = new S3OutputStream(this.client, this.path.bucket, this.path.key);
+        this.out = this.s3.create(path, overwrite, S3_BUFFER_SIZE);
     }
 
     /**
      * Prepare the writer to ensure the length can fit into current block.
      *
-     * @param length length of content
+     * @param length length of content.
      * @return starting offset after preparing. If -1, means prepare has failed,
      * due to the specified length cannot fit into current block.
      */
@@ -86,13 +84,20 @@ public class PhysicalS3Writer implements PhysicalWriter
     /**
      * Append content to the file.
      *
-     * @param buffer content buffer
+     * @param buffer content buffer.
      * @return start offset of content in the file.
      */
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
-        buffer.flip();
+        /**
+         * Issue #217:
+         * For compatibility reasons if this code is compiled by jdk>=9 but executed in jvm8.
+         *
+         * In jdk8, ByteBuffer.flip() is extended from Buffer.flip(), but in jdk11, different kind of ByteBuffer
+         * has its own flip implementation and may lead to errors.
+         */
+        ((Buffer)buffer).flip();
         int length = buffer.remaining();
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }

@@ -46,8 +46,7 @@ import java.util.concurrent.CompletableFuture;
  * @author guodong
  * @author hank
  */
-public class PixelsRecordReaderImpl
-        implements PixelsRecordReader
+public class PixelsRecordReaderImpl implements PixelsRecordReader
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
 
@@ -68,8 +67,8 @@ public class PixelsRecordReaderImpl
     private final String fileName;
     private final List<PixelsProto.Type> includedColumnTypes;
 
-    private TypeDescription fileSchema;
-    private TypeDescription resultSchema;
+    private TypeDescription fileSchema = null;
+    private TypeDescription resultSchema = null;
     private boolean checkValid = false;
     private boolean everPrepared = false;
     private boolean everRead = false;
@@ -679,7 +678,7 @@ public class PixelsRecordReaderImpl
         if (!diskChunks.isEmpty())
         {
             /**
-             * Comments added in Issue #67 (path):
+             * Comments added in Issue #67 (patch):
              * By ordering disk chunks (ascending) according to the start offset and
              * group continuous disk chunks into one group, we can read the continuous
              * disk chunks in only one disk read, this would significantly improve I/O
@@ -878,7 +877,8 @@ public class PixelsRecordReaderImpl
         {
             /**
              * Issue #105:
-             * EOF and batch size have been set in prepareRead() and checked in read().
+             * It should be EOF. And the batch size should have been set in prepareRead() and
+             * checked in read().
              */
             if (endOfFile == false)
             {
@@ -1007,11 +1007,18 @@ public class PixelsRecordReaderImpl
         return readBatch(VectorizedRowBatch.DEFAULT_SIZE, false);
     }
 
-    /**
-     * This method is valid after calling prepareBatch or readBatch.
-     * Before that, it will always return false.
-     * @return true if reach EOF.
-     */
+    @Override
+    public TypeDescription getResultSchema()
+    {
+        return this.resultSchema;
+    }
+
+    @Override
+    public boolean isValid()
+    {
+        return this.checkValid;
+    }
+
     @Override
     public boolean isEndOfFile ()
     {

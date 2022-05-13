@@ -1,20 +1,35 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine for data lakes. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
+Pixels is a columnar storage engine for data lakes and warehouses. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
 Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK 8.0, and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
+Install JDK (8.0 is recommended), and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
 use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
-Ensure that Pixels is built using language level 1.8, for the Presto and Hive versions we use are compatible with JDK 8.0 only.
 
-It may take about one minute to complete. After that, find the following jar/zip files that will be used in the installation:
+The build may take tens of seconds to complete. After that, find the following jar files that will be used in the installation:
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
-* `pixels-listener-*.zip` in `pixels-listener/target`, this is the listener plugin for Presto;
-* `pixels-presto-*.zip` in `pixels-presto/target`, this is the connector for Presto;
 * `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
+
+Pixels is compatible with different query engines, such as Presto, Trino, and Hive.
+However, for simplicity, we use Presto as an example here to illustrate how Pixels works with query engines in the data lakes.
+
+To use Pixels in Presto, download [pixels-presto](https://github.com/pixelsdb/pixels-presto),
+and use `mvn package` to build it.
+Find the following zip files in the build target directories:
+* `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
+* `pixels-presto-connector-*.zip`, this is the connector for Presto.
+
+> **Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
+> using JDK 8.0.
+
+> If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
+> variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
+> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
+> the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
+> written.
 
 ## Installation in AWS
 
@@ -46,6 +61,27 @@ Therefore, we have to configure these credentials using
 [credential files](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html).
 
 ### Install Pixels
+
+To build Pixels from source and install it locally, you can simply run:
+
+```bash 
+# You may also want to append this line into `~/.bashrc`
+export PIXELS_HOME=$HOME/opt/pixels/
+./install.sh
+```
+
+But you still need to:
+- Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+- Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
+
+> **Note:** optionally, you can also set the `PIXEL_CONFIG` system environment variable
+> to specify a different location of `pixels.properties`. This can be a http or https URL
+> to a remote location.
+
+To install it step-by-step, or to install on EC2, please see the guidance below.
+
+---
+
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
 mkdir ~/opt
@@ -136,16 +172,16 @@ You can use `screen` or `nohup` to run it in the background.
 ### Install Hadoop*
 Hadoop is optional. It is only needed if you want to use HDFS as an underlying storage.
 
-**NOTICE: Even if HDFS is not used, Pixels has to read Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from the path that
-is specified by `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`. Therefore, make sure these two files
-exist in `hdfs.config.dir`.**
-
 Pixels has been tested to be compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
-Follow the official docs to install Hadoop if needed.
+Follow the official docs to install Hadoop.
 
-Note that some default ports used by Hadoop
-may conflict with the default ports used by Presto. In this case, modify the default port configuration
-of either system.
+Modify `hdfs.config.dir` in `PIXELS_HOME/pixels.properties`
+and point it to the `etc/hadoop` directory under the home of Hadoop.
+Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
+
+> Note that some default ports used by Hadoop
+> may conflict with the default ports used by Presto. In this case, modify the default port configuration
+> of either system.
 
 ### Install Presto
 Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
@@ -159,11 +195,11 @@ Then download [presto-cli](https://prestodb.io/docs/0.215/installation/cli.html)
 and give executable permission to it.
 
 There are two important directories in the home of presto-server: `etc` and `plugin`.
-Decompress `pixels-listener-*.zip` and `pixels-presto-*.zip` into the `plugin` directory.
+Decompress `pixels-presto-listener-*.zip` and `pixels-presto-connector-*.zip` into the `plugin` directory.
 The `etc` directory contains the configuration files of Presto.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
-* Create the listener config file named `event-listener.properties` with the following content:
+* Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
 ```properties
 event-listener.name=pixels-event-listener
 enabled=true
@@ -173,18 +209,18 @@ listened.query.type=SELECT
 log.dir=/home/ubuntu/opt/pixels/listener/
 ```
 `log-dir` should point to
-an existing directory where the listener logs will appear
+an existing directory where the listener logs will appear.
 
-* Create the catalog config file named `pixels.properties` for Pixels in the `catalog` subdirectory,
+* Create the catalog config file named `pixels.properties` for Pixels in the `etc/catalog` directory,
 with the following content:
 ```properties
 connector.name=pixels
-pixels.home=/home/ubuntu/opt/pixels/
+pixels.config=/home/ubuntu/opt/pixels/pixels.properties
 ```
-`pixels.home` should be the same as `PIXELS_HOME`.
-**Note** that this `pixels.properties` is in the `etc/catalog` directory of Presto's home, and is different from `PIXELS_HOME/pixels.properties`.
+`pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
+**Note** that `etc/catalog/pixels.proterties` under Presto's home is different from `PIXELS_HOME/pixels.properties`.
 
-Some scripts in Presto may also require python:
+Some scripts in Presto may require python:
 ```bash
 sudo apt-get install python
 ```
@@ -284,7 +320,7 @@ The file(s) of each table are stored in a separate directory named by the table 
 Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
 Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the 
 underlying storage system instead of S3.
-Note that presto-cli can execute only one SQL statement at each time.
+> Note that presto-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.

@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.utils.Bitmap;
+
 /**
  * StructColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
@@ -165,6 +167,12 @@ public class StructColumnVector extends ColumnVector
         {
             fields[i].init();
         }
+    }
+
+    @Override
+    protected void applyFilter(Bitmap filter, int beforeIndex)
+    {
+        throw new UnsupportedOperationException("filter is not supported on StructColumnVector.");
     }
 
     @Override

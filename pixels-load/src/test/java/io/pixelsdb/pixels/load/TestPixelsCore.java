@@ -88,7 +88,7 @@ public class TestPixelsCore
                             .setPixelStride(10000)
                             .setRowGroupSize(64 * 1024 * 1024)
                             .setStorage(storage)
-                            .setFilePath(pixelsFile)
+                            .setPath(pixelsFile)
                             .setBlockSize(256 * 1024 * 1024)
                             .setReplication((short) 3)
                             .setBlockPadding(true)

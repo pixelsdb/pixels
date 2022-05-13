@@ -19,17 +19,25 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.cache.mq.Message;
+
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
+ * The key to look up the cache index. It is also the cache miss message
+ * that can be written into the cache miss message queue.
+ *
  * @author guodong
+ * @author hank
  */
-public class PixelsCacheKey
+public class PixelsCacheKey implements Message
 {
     final static int SIZE = 2 * Short.BYTES + Long.BYTES;
+
     public long blockId;
     public short rowGroupId;
     public short columnId;
@@ -85,5 +93,89 @@ public class PixelsCacheKey
     public int hashCode()
     {
         return Objects.hash(blockId, rowGroupId, columnId);
+    }
+
+    /**
+     * Return the footprint of this message in the shared memory.
+     *
+     * @return the footprint in bytes.
+     */
+    @Override
+    public int size()
+    {
+        return SIZE;
+    }
+
+    /**
+     * Set the message size. When reading a message from the message queue,
+     * this method is called to set the message size for this.read().
+     *
+     * @param messageSize
+     */
+    @Override
+    public void ensureSize(int messageSize)
+    {
+        checkArgument(messageSize == SIZE, "incorrect message size");
+    }
+
+    /**
+     * Read the content of this message from the given pos in sharedMemory.
+     *
+     * @param mem the shared memory to read this message from.
+     * @param pos the byte position in the shared memory.
+     */
+    @Override
+    public void read(MemoryMappedFile mem, long pos)
+    {
+        blockId = mem.getLong(pos);
+        rowGroupId = mem.getShort(pos + Long.BYTES);
+        columnId = mem.getShort(pos + Long.BYTES + Short.BYTES);
+    }
+
+    /**
+     * Write the content of this message into the given pos in sharedMemory.
+     *
+     * @param mem the shared memory to write this message into.
+     * @param pos the byte position in the shared memory.
+     */
+    @Override
+    public void write(MemoryMappedFile mem, long pos)
+    {
+        mem.setLong(pos, blockId);
+        mem.setShort(pos + Long.BYTES, rowGroupId);
+        mem.setShort(pos + Long.BYTES + Short.BYTES, columnId);
+    }
+
+    /**
+     * This method is only used for debugging.
+     *
+     * @param mem the shared memory to read and print this message.
+     * @param pos the byte position in the shared memory.
+     * @return the content of the message.
+     */
+    @Override
+    public String print(MemoryMappedFile mem, long pos)
+    {
+        return toStringHelper(this)
+                .add("block id", mem.getLong(pos))
+                .add("row group id", mem.getShort(pos + Long.BYTES))
+                .add("column id", mem.getShort(pos + Long.BYTES + Short.BYTES))
+                .toString();
+    }
+
+    public static void getBytes(ByteBuffer keyBuffer, long blockId, short rowGroupId, short columnId)
+    {
+        keyBuffer.clear();
+        keyBuffer.putLong(blockId);
+        keyBuffer.putShort(rowGroupId);
+        keyBuffer.putShort(columnId);
+    }
+
+    public static void getBytes(ByteBuffer keyBuffer, PixelsCacheKey key)
+    {
+        keyBuffer.clear();
+        keyBuffer.putLong(key.blockId);
+        keyBuffer.putShort(key.rowGroupId);
+        keyBuffer.putShort(key.columnId);
     }
 }

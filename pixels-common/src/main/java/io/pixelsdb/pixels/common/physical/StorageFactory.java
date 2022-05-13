@@ -19,15 +19,20 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
+import io.pixelsdb.pixels.common.physical.storage.MinIO;
 import io.pixelsdb.pixels.common.physical.storage.S3;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -37,8 +42,20 @@ public class StorageFactory
 {
     private static Logger logger = LogManager.getLogger(StorageFactory.class);
     private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
+    private Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
 
-    private StorageFactory() { }
+    private StorageFactory()
+    {
+        String value = ConfigFactory.Instance().getProperty("enabled.storage.schemes");
+        requireNonNull(value, "enabled.storage.schemes is not configured");
+        String[] schemeNames = value.trim().split(",");
+        checkArgument(schemeNames.length > 0,
+                "at lease one storage scheme must be enabled");
+        for (String name : schemeNames)
+        {
+            enabledSchemes.add(Storage.Scheme.from(name));
+        }
+    }
 
     private static StorageFactory instance = null;
 
@@ -62,12 +79,37 @@ public class StorageFactory
         return instance;
     }
 
+    public List<Storage.Scheme> getEnabledSchemes()
+    {
+        return ImmutableList.copyOf(this.enabledSchemes);
+    }
+
+    /**
+     * Recreate the Storage instances. This is only needed in the Presto connector.
+     *
+     * @throws IOException
+     */
     public synchronized void reload() throws IOException
     {
         this.storageImpls.clear();
-        storageImpls.put(Storage.Scheme.hdfs, new HDFS());
-        storageImpls.put(Storage.Scheme.file, new LocalFS());
-        storageImpls.put(Storage.Scheme.s3, new S3());
+        for (Storage.Scheme scheme : enabledSchemes)
+        {
+            Storage storage = this.getStorage(scheme);
+            requireNonNull(storage, "failed to create Storage instance");
+        }
+    }
+
+    /**
+     * Recreate the Storage instance for the given storage scheme.
+     *
+     * @param scheme the given storage scheme
+     * @throws IOException
+     */
+    public synchronized void reload(Storage.Scheme scheme) throws IOException
+    {
+        this.storageImpls.remove(scheme);
+        Storage storage = this.getStorage(scheme);
+        requireNonNull(storage, "failed to create Storage instance");
     }
 
     /**
@@ -80,7 +122,8 @@ public class StorageFactory
     {
         try
         {
-            // 'synchronized' in Java is reentrant, it is fine the call the other getStorage().
+            // 'synchronized' in Java is reentrant,
+            // it is fine to call the other getStorage() from here.
             if (schemeOrPath.contains("://"))
             {
                 return getStorage(Storage.Scheme.fromPath(schemeOrPath));
@@ -98,28 +141,32 @@ public class StorageFactory
 
     public synchronized Storage getStorage(Storage.Scheme scheme) throws IOException
     {
+        checkArgument(this.enabledSchemes.contains(scheme), "storage scheme '" +
+                scheme.toString() + "' is not enabled.");
         if (storageImpls.containsKey(scheme))
         {
             return storageImpls.get(scheme);
         }
 
-        Storage storage = null;
-        if (scheme == Storage.Scheme.hdfs)
+        Storage storage;
+        switch (scheme)
         {
-            storage = new HDFS();
+            case hdfs:
+                storage = new HDFS();
+                break;
+            case file:
+                storage = new LocalFS();
+                break;
+            case s3:
+                storage = new S3();
+                break;
+            case minio:
+                storage = new MinIO();
+                break;
+            default:
+                throw new IOException("Unknown storage scheme: " + scheme.name());
         }
-        else if (scheme == Storage.Scheme.s3)
-        {
-            storage = new S3();
-        }
-        else if (scheme == Storage.Scheme.file)
-        {
-            storage = new LocalFS();
-        }
-        if (storage != null)
-        {
-            storageImpls.put(scheme, storage);
-        }
+        storageImpls.put(scheme, storage);
 
         return storage;
     }

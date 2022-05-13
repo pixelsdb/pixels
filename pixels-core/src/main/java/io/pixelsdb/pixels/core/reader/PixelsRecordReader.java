@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.io.IOException;
@@ -81,9 +82,31 @@ public interface PixelsRecordReader
             throws IOException;
 
     /**
+     * Get the schema of the included columns in the read option.
+     *
+     * @return result schema, null if PixelsRecordReader is not initialized successfully.
+     */
+    TypeDescription getResultSchema();
+
+    /**
+     * This method is valid after the construction of the PixelsRecordReader. It can be used
+     * to check whether the record reader is currently readable. If any read-option is illegal,
+     * the file is corrupted, or any fatal error occurred during the read, this method should
+     * return false. In this case, the behavior of all the other methods in this record reader
+     * is undetermined.
+     * <p/>
+     * However, if there is no more data to be read (i.e., EOF), the return value is undetermined.
+     * In this case, {@code isEndOfFile()} should be used to check the EOF.
+     *
+     * @return false if this record reader is invalid
+     */
+    boolean isValid ();
+
+    /**
      * This method is valid after calling prepareBatch or readBatch.
      * Before that, it will always return false.
-     * @return true if reach EOF.
+     *
+     * @return true if reach EOF
      */
     boolean isEndOfFile ();
 

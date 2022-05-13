@@ -556,7 +556,7 @@ public class Main
                                          */
                                         .setCompactLayout(compactLayout)
                                         .setStorage(compactStorage)
-                                        .setFilePath(filePath)
+                                        .setPath(filePath)
                                         .setBlockSize(blockSize)
                                         .setReplication(replication)
                                         .setBlockPadding(false);

@@ -19,11 +19,12 @@
  */
 package io.pixelsdb.pixels.common.balance;
 
-import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableMap;
 import io.pixelsdb.pixels.common.exception.BalancerException;
 
 import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 19-7-28
@@ -38,6 +39,8 @@ public class AbsoluteBalancer extends Balancer
     @Override
     public void put(String path, HostAddress address)
     {
+        requireNonNull(path, "path is null");
+        requireNonNull(address, "address is null");
         if (this.nodeCounters.containsKey(address))
         {
             this.nodeCounters.put(address, this.nodeCounters.get(address)+1);
@@ -52,6 +55,12 @@ public class AbsoluteBalancer extends Balancer
 
     @Override
     public void put(String path, Set<HostAddress> addresses)
+    {
+        throw new UnsupportedOperationException("not supported in AbsoluteBalancer");
+    }
+
+    @Override
+    public void autoSelect(String path)
     {
         throw new UnsupportedOperationException("not supported in AbsoluteBalancer");
     }

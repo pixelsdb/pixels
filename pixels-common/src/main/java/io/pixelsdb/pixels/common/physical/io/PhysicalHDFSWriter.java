@@ -48,7 +48,7 @@ public class PhysicalHDFSWriter
     private final FSDataOutputStream rawWriter;
 
     public PhysicalHDFSWriter(Storage storage, String path, short replication,
-                              boolean addBlockPadding, long blockSize) throws IOException
+                              boolean addBlockPadding, long blockSize, boolean overwrite) throws IOException
     {
         if (storage instanceof HDFS)
         {
@@ -63,7 +63,7 @@ public class PhysicalHDFSWriter
         this.replication = replication;
         this.addBlockPadding = addBlockPadding;
 
-        DataOutputStream dos = hdfs.create(path, false, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
+        DataOutputStream dos = hdfs.create(path, overwrite, Constants.HDFS_BUFFER_SIZE, replication, blockSize);
 
         this.rawWriter = (FSDataOutputStream) dos;
     }

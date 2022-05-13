@@ -19,10 +19,15 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import com.google.common.collect.ImmutableList;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 20/08/2021
@@ -35,9 +40,10 @@ public interface Storage
      */
     enum Scheme
     {
-        hdfs, // HDFS
-        file, // local fs
-        s3; // Amazon S3
+        hdfs,  // HDFS
+        file,  // local fs
+        s3,    // Amazon S3
+        minio; // MinIO
 
         /**
          * Case insensitive parsing from String to enum value.
@@ -128,13 +134,60 @@ public interface Storage
      * file id is the id of this block.
      * @param path
      * @return
-     * @throws IOException if HDFS file has more than one blocks.
+     * @throws IOException if HDFS file has more than one block.
      */
     long getFileId(String path) throws IOException;
 
-    List<Location> getLocations(String path) throws IOException;
+    /**
+     * Whether the storage system provides data locality. For example,
+     * on-premise HDFS provides the locality for each file, however,
+     * S3 and local file systems can not provide meaningful locality
+     * information for data-locality scheduling of computation tasks.
+     * By default, this method returns false.
+     *
+     * <p><b>Note:</b> if this method returns true, then getLocations
+     * and getHosts must be override to return the physical locality
+     * information of the given path.</p>
+     * @return
+     */
+    default boolean hasLocality()
+    {
+        return false;
+    }
 
-    String[] getHosts(String path) throws IOException;
+    /**
+     * Get the network locations of the given file. Each file may
+     * have multiple locations if it is replicated or partitioned
+     * in the storage system.
+     *
+     * <p>The default implementation simply parses the location
+     * from the URI of the path.</p>
+     * @param path the path of the file.
+     * @return
+     * @throws IOException
+     */
+    default List<Location> getLocations(String path) throws IOException
+    {
+        requireNonNull(path, "path is null");
+        return ImmutableList.of(new Location(URI.create(ensureSchemePrefix(path))));
+    }
+
+    /**
+     * Get the hostnames of the storage node where the file replicas
+     * or partitions are located in. It is similar to getLocations()
+     * however only returns the hostname information.
+     *
+     * <p>The default implementation simply parses the host from the
+     * URI of the path.</p>
+     * @param path the path of the file.
+     * @return
+     * @throws IOException
+     */
+    default String[] getHosts(String path) throws IOException
+    {
+        requireNonNull(path, "path is null");
+        return new String[]{URI.create(ensureSchemePrefix(path)).getHost()};
+    }
 
     /**
      * Create the directory named by this abstract pathname,
@@ -158,12 +211,26 @@ public interface Storage
      * @param path
      * @param overwrite
      * @param bufferSize
-     * @param replication
      * @return
      * @throws IOException if path is a directory.
      */
     DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication) throws IOException;
+                            int bufferSize) throws IOException;
+
+    /**
+     * For local fs, path is considered as local.
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @param replication is ignored by default, if the storage does not have explicit replication.
+     * @return
+     * @throws IOException if path is a directory.
+     */
+    default DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication) throws IOException
+    {
+        return create(path, overwrite, bufferSize);
+    }
 
     /**
      * This method is for the compatability of block-based storage like HDFS.
@@ -172,18 +239,21 @@ public interface Storage
      * @param overwrite
      * @param bufferSize
      * @param replication
-     * @param blockSize
+     * @param blockSize is ignored by default, except in HDFS.
      * @return
      * @throws IOException if path is a directory.
      */
-    DataOutputStream create(String path, boolean overwrite,
-                            int bufferSize, short replication, long blockSize) throws IOException;
+    default DataOutputStream create(String path, boolean overwrite,
+                            int bufferSize, short replication, long blockSize) throws IOException
+    {
+        return create(path, overwrite, bufferSize, replication);
+    }
 
     /**
      * For local fs, path is considered as local.
-     * @param path
-     * @param recursive
-     * @return
+     * @param path the path to delete
+     * @param recursive whether delete recursively
+     * @return true if the path is deleted successfully, false if the path does not exist
      * @throws IOException
      */
     boolean delete(String path, boolean recursive) throws IOException;

@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import com.facebook.presto.spi.HostAddress;
+import io.pixelsdb.pixels.common.balance.HostAddress;
 
 import java.util.HashMap;
 import java.util.HashSet;

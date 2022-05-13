@@ -20,18 +20,13 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
 import io.etcd.jetcd.KeyValue;
-import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.*;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -43,55 +38,39 @@ import static io.pixelsdb.pixels.common.utils.Constants.LOCAL_FS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * This implementation is used to access all kinds of POSIX file systems that are mounted
+ * on a local directory. The file system does not need to be local physically. For example,
+ * it could be a network file system mounted on a local point such as /mnt/nfs.
+ *
+ * @author hank
  * Created at: 20/08/2021
- * Author: hank
  */
-public class LocalFS implements Storage
+public final class LocalFS implements Storage
 {
+    private final static boolean EnableCache;
+
     static
     {
-        InitId(LOCAL_FS_ID_KEY);
+        EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+
+        if (EnableCache)
+        {
+            /**
+             * Issue #222:
+             * The etcd file id is only used for cache coordination.
+             * Thus, we do not initialize the id key when cache is disabled.
+             */
+            InitId(LOCAL_FS_ID_KEY);
+        }
     }
 
-    private static Logger logger = LogManager.getLogger(LocalFS.class);
     private static String SchemePrefix = Scheme.file.name() + "://";
 
-    private String hostName;
-
-    public LocalFS()
-    {
-        this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: " + hostName);
-        if (hostName == null)
-        {
-            try
-            {
-                this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: " + hostName);
-            }
-            catch (UnknownHostException e)
-            {
-                logger.debug("Hostname is null. Exit");
-                return;
-            }
-        }
-        logger.debug("Local FS created on host: " + hostName);
-    }
+    public LocalFS() { }
 
     private String getPathKey(String path)
     {
-        return LOCAL_FS_META_PREFIX + path + ":" + hostName;
-    }
-
-    private String getPathKeyPrefix(String path)
-    {
-        return LOCAL_FS_META_PREFIX + path + ":";
-    }
-
-    private String getHostFromPathKey(String pathKey)
-    {
-        int last = pathKey.lastIndexOf(":");
-        return pathKey.substring(last + 1);
+        return LOCAL_FS_META_PREFIX + path;
     }
 
     public static class Path
@@ -210,46 +189,27 @@ public class LocalFS implements Storage
     @Override
     public long getFileId(String path) throws IOException
     {
-        KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
-        if (kv == null)
+        requireNonNull(path, "path is null");
+        if (EnableCache)
         {
-            /**
-             * Issue #158:
-             * Create an id for this file if it does not exist in etcd.
-             */
-            long id = GenerateId(LOCAL_FS_ID_KEY);
-            EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
-            return id;
+            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
+            if (kv == null)
+            {
+                /**
+                 * Issue #158:
+                 * Create an id for this file if it does not exist in etcd.
+                 */
+                long id = GenerateId(LOCAL_FS_ID_KEY);
+                EtcdUtil.Instance().putKeyValue(getPathKey(path), Long.toString(id));
+                return id;
+            }
+            return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
-        return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
-    }
-
-    @Override
-    public List<Location> getLocations(String path)
-    {
-        List<Location> locations = new ArrayList<>();
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
-        for (KeyValue kv : kvs)
+        else
         {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            String host = getHostFromPathKey(key);
-            locations.add(new Location(new String[]{host}));
+            // Issue #222: return an arbitrary id when cache is disable.
+            return path.hashCode();
         }
-        return locations;
-    }
-
-    @Override
-    public String[] getHosts(String path)
-    {
-        List<KeyValue> kvs = EtcdUtil.Instance().getKeyValuesByPrefix(getPathKeyPrefix(path));
-        String[] hosts = new String[kvs.size()];
-        int i = 0;
-        for (KeyValue kv : kvs)
-        {
-            String key = kv.getKey().toString(StandardCharsets.UTF_8);
-            hosts[i++] = getHostFromPathKey(key);
-        }
-        return hosts;
     }
 
     @Override
@@ -284,23 +244,17 @@ public class LocalFS implements Storage
         return new DataInputStream(new FileInputStream(file));
     }
 
-    public RandomAccessFile openRaf(String path) throws IOException
-    {
-        Path p = new Path(path);
-        File file = new File(p.realPath);
-        if (file.isDirectory())
-        {
-            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
-        }
-        if (!file.exists())
-        {
-            throw new IOException("File '" + p.realPath + "' doesn't exists.");
-        }
-        return new RandomAccessFile(file, "r");
-    }
-
+    /**
+     * For local fs, path is considered as local.
+     *
+     * @param path
+     * @param overwrite
+     * @param bufferSize
+     * @return
+     * @throws IOException if path is a directory.
+     */
     @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication) throws IOException
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         Path p = new Path(path);
         File file = new File(p.realPath);
@@ -326,10 +280,19 @@ public class LocalFS implements Storage
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
-    @Override
-    public DataOutputStream create(String path, boolean overwrite, int bufferSize, short replication, long blockSize) throws IOException
+    public RandomAccessFile openRaf(String path) throws IOException
     {
-        return this.create(path, overwrite, bufferSize, replication);
+        Path p = new Path(path);
+        File file = new File(p.realPath);
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
+        }
+        if (!file.exists())
+        {
+            throw new IOException("File '" + p.realPath + "' doesn't exists.");
+        }
+        return new RandomAccessFile(file, "r");
     }
 
     @Override
@@ -357,10 +320,13 @@ public class LocalFS implements Storage
                 }
             }
         }
-        /**
-         * Attempt to delete the key, but it does not need to be exist.
+        /*
+         * Attempt to delete the key, but it does not need to be existed.
          */
-        EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
+        if (EnableCache)
+        {
+            EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
+        }
         return subDeleted && new File(path).delete();
     }
 

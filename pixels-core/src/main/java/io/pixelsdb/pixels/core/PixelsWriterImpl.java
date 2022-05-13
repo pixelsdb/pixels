@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
 import static io.pixelsdb.pixels.core.TypeDescription.writeTypes;
 import static io.pixelsdb.pixels.core.writer.ColumnWriter.newColumnWriter;
 import static java.util.Objects.requireNonNull;
@@ -55,8 +56,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  */
 @NotThreadSafe
-public class PixelsWriterImpl
-        implements PixelsWriter
+public class PixelsWriterImpl implements PixelsWriter
 {
     private static final Logger LOGGER = LogManager.getLogger(PixelsWriterImpl.class);
 
@@ -73,7 +73,6 @@ public class PixelsWriterImpl
     private long fileContentLength;
     private int fileRowNum;
 
-    private boolean isNewRowGroup = true;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
@@ -123,17 +122,18 @@ public class PixelsWriterImpl
 
     public static class Builder
     {
-        private TypeDescription builderSchema;
-        private int builderPixelStride;
-        private int builderRowGroupSize;
+        private TypeDescription builderSchema = null;
+        private int builderPixelStride = 0;
+        private int builderRowGroupSize = 0;
         private CompressionKind builderCompressionKind = CompressionKind.NONE;
-        private int builderCompressionBlockSize = 0;
+        private int builderCompressionBlockSize = 1;
         private TimeZone builderTimeZone = TimeZone.getDefault();
-        private Storage builderStorage;
-        private String builderFilePath;
-        private long builderBlockSize;
+        private Storage builderStorage = null;
+        private String builderFilePath = null;
+        private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
         private short builderReplication = 3;
         private boolean builderBlockPadding = true;
+        private boolean builderOverwrite = false;
         private boolean encoding = true;
 
         private Builder()
@@ -189,7 +189,7 @@ public class PixelsWriterImpl
             return this;
         }
 
-        public Builder setFilePath(String filePath)
+        public Builder setPath(String filePath)
         {
             this.builderFilePath = requireNonNull(filePath);
 
@@ -219,6 +219,13 @@ public class PixelsWriterImpl
             return this;
         }
 
+        public Builder setOverwrite(boolean overwrite)
+        {
+            this.builderOverwrite = overwrite;
+
+            return this;
+        }
+
         public Builder setEncoding(boolean encoding)
         {
             this.encoding = encoding;
@@ -229,20 +236,27 @@ public class PixelsWriterImpl
         public PixelsWriter build()
                 throws PixelsWriterException
         {
+            requireNonNull(this.builderStorage, "storage is not set");
+            requireNonNull(this.builderFilePath, "file path is not set");
+            requireNonNull(this.builderSchema, "schema is not set");
+            checkArgument(!requireNonNull(builderSchema.getChildren(),
+                            "schema's children is null").isEmpty(), "schema is empty");
+            checkArgument(this.builderPixelStride > 0, "pixels stride size is not set");
+            checkArgument(this.builderRowGroupSize > 0, "row group size is not set");
+
             PhysicalWriter fsWriter = null;
             try
             {
+
                 fsWriter = PhysicalWriterUtil.newPhysicalWriter(
                         this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
-                        this.builderBlockPadding);
+                        this.builderBlockPadding, this.builderOverwrite);
             } catch (IOException e)
             {
                 LOGGER.error("Failed to create PhysicalWriter");
                 throw new PixelsWriterException(
                         "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
             }
-            checkArgument(!requireNonNull(builderSchema.getChildren(), "schema is null").isEmpty(),
-                    "schema is empty");
 
             if (fsWriter == null)
             {
@@ -271,6 +285,12 @@ public class PixelsWriterImpl
     public TypeDescription getSchema()
     {
         return schema;
+    }
+
+    @Override
+    public int getRowGroupNum()
+    {
+        return this.rowGroupInfoList.size();
     }
 
     public int getPixelStride()
@@ -304,18 +324,18 @@ public class PixelsWriterImpl
     }
 
     /**
-     * Add a row batch
+     * Add a row batch.
      * Repeating is not supported currently in ColumnVector
      */
     @Override
     public boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException
     {
-        if (isNewRowGroup)
-        {
-            this.isNewRowGroup = false;
-            this.curRowGroupNumOfRows = 0L;
-        }
+        /**
+         * Issue #170:
+         * ColumnWriter.write() returns the total size of the current column chunk,
+         * thus we should set curRowGroupDataLength = 0 here at the beginning.
+         */
         curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
         ColumnVector[] cvs = rowBatch.cols;
@@ -328,14 +348,14 @@ public class PixelsWriterImpl
         if (curRowGroupDataLength >= rowGroupSize)
         {
             writeRowGroup();
-            curRowGroupDataLength = 0;
+            curRowGroupNumOfRows = 0L;
             return false;
         }
         return true;
     }
 
     /**
-     * Close PixelsWriterImpl, indicating the end of file
+     * Close PixelsWriterImpl, indicating the end of file.
      */
     @Override
     public void close()
@@ -363,7 +383,6 @@ public class PixelsWriterImpl
     private void writeRowGroup()
             throws IOException
     {
-        this.isNewRowGroup = true;
         int rowGroupDataLength = 0;
 
         PixelsProto.RowGroupStatistic.Builder curRowGroupStatistic =
@@ -378,7 +397,7 @@ public class PixelsWriterImpl
         // reset each column writer and get current row group content size in bytes
         for (ColumnWriter writer : columnWriters)
         {
-            // new chunk for each writer
+            // flush writes the isNull bit map into the internal output stream.
             writer.flush();
             rowGroupDataLength += writer.getColumnChunkSize();
         }

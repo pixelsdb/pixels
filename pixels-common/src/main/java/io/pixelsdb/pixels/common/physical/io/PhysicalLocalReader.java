@@ -34,10 +34,10 @@ import java.util.concurrent.CompletableFuture;
  */
 public class PhysicalLocalReader implements PhysicalReader
 {
-    private LocalFS local;
-    private String path;
-    private long id;
-    private RandomAccessFile raf;
+    private final LocalFS local;
+    private final String path;
+    private final long id;
+    private final RandomAccessFile raf;
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException
     {
