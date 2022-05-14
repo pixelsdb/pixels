@@ -64,7 +64,7 @@ public class JoinOutput
         this.rowGroupNums = rowGroupNums;
     }
 
-    public void addOutput(String output, int rowGroupNum)
+    public synchronized void addOutput(String output, int rowGroupNum)
     {
         this.outputs.add(output);
         this.rowGroupNums.add(rowGroupNum);

@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutionException;
 public class TestPartitionInvoker
 {
     @Test
-    public void testInvoke() throws ExecutionException, InterruptedException
+    public void testOrders() throws ExecutionException, InterruptedException
     {
         String filter = 
                 "{\"schemaName\":\"tpch\",\"tableName\":\"orders\"," +
@@ -67,6 +67,42 @@ public class TestPartitionInvoker
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/orders_part_0", true));
+        input.setFilter(filter);
+
+        System.out.println(JSON.toJSONString(input));
+
+        PartitionOutput output = PartitionInvoker.invoke(input).get();
+        System.out.println(output.getPath());
+        for (int hashValue : output.getHashValues())
+        {
+            System.out.println(hashValue);
+        }
+    }
+
+    @Test
+    public void testLineitem() throws ExecutionException, InterruptedException
+    {
+        String filter =
+                "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
+        PartitionInput input = new PartitionInput();
+        ArrayList<ScanInput.InputInfo> inputs = new ArrayList<>();
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4));
+        input.setInputs(inputs);
+        input.setQueryId(123456);
+        input.setSplitSize(4);
+        input.setCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        PartitionInput.PartitionInfo partitionInfo = new PartitionInput.PartitionInfo();
+        partitionInfo.setNumParition(40);
+        partitionInfo.setKeyColumnIds(new int[]{0});
+        input.setPartitionInfo(partitionInfo);
+        input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/lineitem_part_0", true));
         input.setFilter(filter);
 
         System.out.println(JSON.toJSONString(input));

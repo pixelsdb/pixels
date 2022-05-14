@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.OutputInfo;
 
@@ -35,6 +36,7 @@ public class BroadcastJoinInput
      */
     private int queryId;
 
+    private String leftTableName;
     /**
      * The scan inputs of the left table.
      */
@@ -48,10 +50,15 @@ public class BroadcastJoinInput
      */
     private String[] leftCols;
     /**
+     * The join-key column ids of the left table.
+     */
+    private int[] leftKeyColumnIds;
+    /**
      * The json string of the filter (i.e., predicates) to be used in scan of the left table.
      */
     private String leftFilter;
 
+    private String rightTableName;
     /**
      * The scan inputs of the right table.
      */
@@ -65,9 +72,18 @@ public class BroadcastJoinInput
      */
     private String[] rightCols;
     /**
+     * The join-key column ids of the right table.
+     */
+    private int[] rightKeyColumnIds;
+    /**
      * The json string of the filter (i.e., predicates) to be used in the scan of the right table.
      */
     private String rightFilter;
+
+    /**
+     * The type of the join.
+     */
+    private JoinType joinType;
 
     /**
      * The output information of the join worker.
@@ -79,22 +95,27 @@ public class BroadcastJoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(int queryId,
+    public BroadcastJoinInput(int queryId, String leftTableName, String rightTableName,
                               ArrayList<InputInfo> leftInputs, int leftSplitSize,
-                              String[] leftCols, String leftFilter,
+                              String[] leftCols, int[] leftKeyColumnIds, String leftFilter,
                               ArrayList<InputInfo> rightInputs, int rightSplitSize,
-                              String[] rightCols, String rightFilter,
-                              OutputInfo output)
+                              String[] rightCols, int[] rightKeyColumnIds, String rightFilter,
+                              JoinType joinType, OutputInfo output)
     {
         this.queryId = queryId;
+        this.leftTableName = leftTableName;
+        this.rightTableName = rightTableName;
         this.leftInputs = leftInputs;
         this.leftSplitSize = leftSplitSize;
         this.leftCols = leftCols;
+        this.leftKeyColumnIds = leftKeyColumnIds;
         this.leftFilter = leftFilter;
         this.rightInputs = rightInputs;
         this.rightSplitSize = rightSplitSize;
         this.rightCols = rightCols;
+        this.rightKeyColumnIds = rightKeyColumnIds;
         this.rightFilter = rightFilter;
+        this.joinType = joinType;
         this.output = output;
     }
 
@@ -106,6 +127,26 @@ public class BroadcastJoinInput
     public void setQueryId(int queryId)
     {
         this.queryId = queryId;
+    }
+
+    public String getLeftTableName()
+    {
+        return leftTableName;
+    }
+
+    public void setLeftTableName(String leftTableName)
+    {
+        this.leftTableName = leftTableName;
+    }
+
+    public String getRightTableName()
+    {
+        return rightTableName;
+    }
+
+    public void setRightTableName(String rightTableName)
+    {
+        this.rightTableName = rightTableName;
     }
 
     public ArrayList<InputInfo> getLeftInputs()
@@ -136,6 +177,16 @@ public class BroadcastJoinInput
     public void setLeftCols(String[] leftCols)
     {
         this.leftCols = leftCols;
+    }
+
+    public int[] getLeftKeyColumnIds()
+    {
+        return leftKeyColumnIds;
+    }
+
+    public void setLeftKeyColumnIds(int[] leftKeyColumnIds)
+    {
+        this.leftKeyColumnIds = leftKeyColumnIds;
     }
 
     public String getLeftFilter()
@@ -178,6 +229,16 @@ public class BroadcastJoinInput
         this.rightCols = rightCols;
     }
 
+    public int[] getRightKeyColumnIds()
+    {
+        return rightKeyColumnIds;
+    }
+
+    public void setRightKeyColumnIds(int[] rightKeyColumnIds)
+    {
+        this.rightKeyColumnIds = rightKeyColumnIds;
+    }
+
     public String getRightFilter()
     {
         return rightFilter;
@@ -186,6 +247,16 @@ public class BroadcastJoinInput
     public void setRightFilter(String rightFilter)
     {
         this.rightFilter = rightFilter;
+    }
+
+    public JoinType getJoinType()
+    {
+        return joinType;
+    }
+
+    public void setJoinType(JoinType joinType)
+    {
+        this.joinType = joinType;
     }
 
     public OutputInfo getOutput()

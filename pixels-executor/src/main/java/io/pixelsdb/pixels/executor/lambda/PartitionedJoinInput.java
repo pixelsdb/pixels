@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.OutputInfo;
 
 import java.util.List;
@@ -34,15 +35,33 @@ public class PartitionedJoinInput
      */
     private int queryId;
 
+    String leftTableName;
     /**
      * The partitioned files of the left (small) table.
      */
     private List<PartitionOutput> leftPartitioned;
+    /**
+     * The column names of the left table.
+     */
+    private String[] leftCols;
+    /**
+     * The ids of the join-key columns of the left table.
+     */
+    private int[] leftKeyColumnIds;
 
+    String rightTableName;
     /**
      * The partitioned files of the right (big) table.
      */
-    private List<PartitionInput> rightPartitioned;
+    private List<PartitionOutput> rightPartitioned;
+    /**
+     * The column names of the right table.
+     */
+    private String[] rightCols;
+    /**
+     * The ids of the join-key columns of the right table.
+     */
+    private int[] rightKeyColumnIds;
 
     /**
      * The information of tasks for the join worker.
@@ -59,13 +78,22 @@ public class PartitionedJoinInput
      */
     public PartitionedJoinInput() { }
 
-    public PartitionedJoinInput(int queryId, List<PartitionOutput> leftPartitioned,
-                                List<PartitionInput> rightPartitioned, JoinInfo joinInfo,
-                                OutputInfo output)
+    public PartitionedJoinInput(int queryId,
+                                String leftTableName, List<PartitionOutput> leftPartitioned,
+                                String[] leftCols, int[] leftKeyColumnIds,
+                                String rightTableName, List<PartitionOutput> rightPartitioned,
+                                String[] rightCols, int[] rightKeyColumnIds,
+                                JoinInfo joinInfo, OutputInfo output)
     {
         this.queryId = queryId;
+        this.leftTableName = leftTableName;
         this.leftPartitioned = leftPartitioned;
+        this.leftCols = leftCols;
+        this.leftKeyColumnIds = leftKeyColumnIds;
+        this.rightTableName = rightTableName;
         this.rightPartitioned = rightPartitioned;
+        this.rightCols = rightCols;
+        this.rightKeyColumnIds = rightKeyColumnIds;
         this.joinInfo = joinInfo;
         this.output = output;
     }
@@ -80,6 +108,16 @@ public class PartitionedJoinInput
         this.queryId = queryId;
     }
 
+    public String getLeftTableName()
+    {
+        return leftTableName;
+    }
+
+    public void setLeftTableName(String leftTableName)
+    {
+        this.leftTableName = leftTableName;
+    }
+
     public List<PartitionOutput> getLeftPartitioned()
     {
         return leftPartitioned;
@@ -90,14 +128,64 @@ public class PartitionedJoinInput
         this.leftPartitioned = leftPartitioned;
     }
 
-    public List<PartitionInput> getRightPartitioned()
+    public String[] getLeftCols()
+    {
+        return leftCols;
+    }
+
+    public void setLeftCols(String[] leftCols)
+    {
+        this.leftCols = leftCols;
+    }
+
+    public String getRightTableName()
+    {
+        return rightTableName;
+    }
+
+    public void setRightTableName(String rightTableName)
+    {
+        this.rightTableName = rightTableName;
+    }
+
+    public List<PartitionOutput> getRightPartitioned()
     {
         return rightPartitioned;
     }
 
-    public void setRightPartitioned(List<PartitionInput> rightPartitioned)
+    public void setRightPartitioned(List<PartitionOutput> rightPartitioned)
     {
         this.rightPartitioned = rightPartitioned;
+    }
+
+    public int[] getLeftKeyColumnIds()
+    {
+        return leftKeyColumnIds;
+    }
+
+    public void setLeftKeyColumnIds(int[] leftKeyColumnIds)
+    {
+        this.leftKeyColumnIds = leftKeyColumnIds;
+    }
+
+    public String[] getRightCols()
+    {
+        return rightCols;
+    }
+
+    public void setRightCols(String[] rightCols)
+    {
+        this.rightCols = rightCols;
+    }
+
+    public int[] getRightKeyColumnIds()
+    {
+        return rightKeyColumnIds;
+    }
+
+    public void setRightKeyColumnIds(int[] rightKeyColumnIds)
+    {
+        this.rightKeyColumnIds = rightKeyColumnIds;
     }
 
     public JoinInfo getJoinInfo()
@@ -123,34 +211,38 @@ public class PartitionedJoinInput
     public static class JoinInfo
     {
         /**
-         * The column ids of the partition key columns.
+         * The total number of partitions.
          */
-        private List<Integer> keyColumnIds;
-
+        int numPartition;
         /**
          * The hash values to be processed by a hash join worker.
          */
         private List<Integer> hashValues;
+        /**
+         * The type of the join.
+         */
+        private JoinType joinType;
 
         /**
          * Default constructor for Jackson.
          */
         public JoinInfo() { }
 
-        public JoinInfo(List<Integer> keyColumnIds, List<Integer> hashValues)
+        public JoinInfo(int numPartition, List<Integer> hashValues, JoinType joinType)
         {
-            this.keyColumnIds = keyColumnIds;
+            this.numPartition = numPartition;
             this.hashValues = hashValues;
+            this.joinType = joinType;
         }
 
-        public List<Integer> getKeyColumnIds()
+        public int getNumPartition()
         {
-            return keyColumnIds;
+            return numPartition;
         }
 
-        public void setKeyColumnIds(List<Integer> keyColumnIds)
+        public void setNumPartition(int numPartition)
         {
-            this.keyColumnIds = keyColumnIds;
+            this.numPartition = numPartition;
         }
 
         public List<Integer> getHashValues()
@@ -161,6 +253,16 @@ public class PartitionedJoinInput
         public void setHashValues(List<Integer> hashValues)
         {
             this.hashValues = hashValues;
+        }
+
+        public JoinType getJoinType()
+        {
+            return joinType;
+        }
+
+        public void setJoinType(JoinType joinType)
+        {
+            this.joinType = joinType;
         }
     }
 }

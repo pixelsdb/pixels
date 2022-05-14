@@ -39,11 +39,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -133,12 +133,12 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of scan", e);
+                logger.error("interrupted while waiting for the termination of partitioning", e);
             }
 
             PixelsWriter pixelsWriter = getWriter(writerSchema.get(), outputPath,
                     Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()), encoding);
-            List<Integer> hashValues = new ArrayList<>(numPartition);
+            Set<Integer> hashValues = new HashSet<>(numPartition);
             for (int hash = 0; hash < numPartition; ++hash)
             {
                 ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
@@ -176,7 +176,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
-    public void partitionFile(long queryId, ArrayList<InputInfo> scanInputs,
+    private void partitionFile(long queryId, ArrayList<InputInfo> scanInputs,
                              String[] cols, TableScanFilter filter, int[] keyColumnIds,
                              List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                              AtomicReference<TypeDescription> writerSchema)

@@ -116,12 +116,12 @@ public class Joiner
     /**
      * Populate the hash table for the left (a.k.a., small) table in the join. The
      * hash table will be used for probing in the join.
-     *
-     * <b>Note</b> this method is not thread safe.
+     * <b>Note</b> this method is thread safe, but it should only be called before
+     * {@link Joiner#join(VectorizedRowBatch) join}.
      *
      * @param smallBatch a row batch from the small table
      */
-    public void populateLeftTable(VectorizedRowBatch smallBatch)
+    public synchronized void populateLeftTable(VectorizedRowBatch smallBatch)
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");

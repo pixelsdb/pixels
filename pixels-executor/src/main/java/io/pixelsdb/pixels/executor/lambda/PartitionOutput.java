@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
-import java.util.List;
+import java.util.Set;
 
 /**
  * The output format of the hash partitioning.
@@ -36,14 +36,14 @@ public class PartitionOutput
     /**
      * The hash value of the partitions that exist in the partitioned file.
      */
-    private List<Integer> hashValues;
+    private Set<Integer> hashValues;
 
     /**
      * Default constructor for Jackson.
      */
     public PartitionOutput() { }
 
-    public PartitionOutput(String path, List<Integer> hashValues)
+    public PartitionOutput(String path, Set<Integer> hashValues)
     {
         this.path = path;
         this.hashValues = hashValues;
@@ -59,12 +59,12 @@ public class PartitionOutput
         this.path = path;
     }
 
-    public List<Integer> getHashValues()
+    public Set<Integer> getHashValues()
     {
         return hashValues;
     }
 
-    public void setHashValues(List<Integer> hashValues)
+    public void setHashValues(Set<Integer> hashValues)
     {
         this.hashValues = hashValues;
     }

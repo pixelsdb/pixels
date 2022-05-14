@@ -167,11 +167,10 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param encoding whether encode the scan results or not
      * @return the number of row groups that have been written into the output.
      */
-    public int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
+    private int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
         PixelsWriter pixelsWriter = null;
-        int rowGroupNum = 0;
         for (int i = 0; i < scanInputs.size(); ++i)
         {
             InputInfo inputInfo = scanInputs.get(i);
@@ -204,7 +203,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 }
                 Bitmap filtered = new Bitmap(rowBatchSize, true);
                 Bitmap tmp = new Bitmap(rowBatchSize, false);
-                while (true)
+                do
                 {
                     rowBatch = recordReader.readBatch(rowBatchSize);
                     filter.doFilter(rowBatch, filtered, tmp);
@@ -213,39 +212,36 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     {
                         pixelsWriter.addRowBatch(rowBatch);
                     }
-                    if (rowBatch.endOfFile)
-                    {
-                        if (i == scanInputs.size() - 1)
-                        {
-                            // Finished scanning all the files in the split.
-                            pixelsWriter.close();
-                            while (true)
-                            {
-                                try
-                                {
-                                    if (minio.getStatus(outputPath) != null)
-                                    {
-                                        break;
-                                    }
-                                }
-                                catch (Exception e)
-                                {
-                                    // Wait for 10ms and see if the output file is visible.
-                                    TimeUnit.MILLISECONDS.sleep(10);
-                                }
-                            }
-                            rowGroupNum = pixelsWriter.getRowGroupNum();
-                        }
-                        break;
-                    }
-                }
+                } while (!rowBatch.endOfFile);
             } catch (Exception e)
             {
                 logger.error("failed to scan the file '" +
                         inputInfo.getFilePath() + "' and output the result", e);
             }
         }
-        return rowGroupNum;
+        // Finished scanning all the files in the split.
+        try
+        {
+            pixelsWriter.close();
+            while (true)
+            {
+                try
+                {
+                    if (minio.getStatus(outputPath) != null)
+                    {
+                        break;
+                    }
+                } catch (Exception e)
+                {
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
+                }
+            }
+        } catch (Exception e)
+        {
+            logger.error("failed finish writing and close the output file '" + outputPath + "'", e);
+        }
+        return pixelsWriter.getRowGroupNum();
     }
 
     private PixelsReader getReader(String fileName)
