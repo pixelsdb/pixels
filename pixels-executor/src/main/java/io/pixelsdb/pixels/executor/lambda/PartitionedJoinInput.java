@@ -138,6 +138,16 @@ public class PartitionedJoinInput
         this.leftCols = leftCols;
     }
 
+    public int[] getLeftKeyColumnIds()
+    {
+        return leftKeyColumnIds;
+    }
+
+    public void setLeftKeyColumnIds(int[] leftKeyColumnIds)
+    {
+        this.leftKeyColumnIds = leftKeyColumnIds;
+    }
+
     public String getRightTableName()
     {
         return rightTableName;
@@ -156,16 +166,6 @@ public class PartitionedJoinInput
     public void setRightPartitioned(List<PartitionOutput> rightPartitioned)
     {
         this.rightPartitioned = rightPartitioned;
-    }
-
-    public int[] getLeftKeyColumnIds()
-    {
-        return leftKeyColumnIds;
-    }
-
-    public void setLeftKeyColumnIds(int[] leftKeyColumnIds)
-    {
-        this.leftKeyColumnIds = leftKeyColumnIds;
     }
 
     public String[] getRightCols()

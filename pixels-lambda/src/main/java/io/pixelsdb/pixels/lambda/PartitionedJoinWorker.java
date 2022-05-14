@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.lambda.JoinOutput;
 import io.pixelsdb.pixels.executor.lambda.PartitionOutput;
@@ -51,7 +52,7 @@ import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
  */
 public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInput, JoinOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
+    private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static final int rowBatchSize;
@@ -87,16 +88,19 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
+
             String leftPrefix = event.getLeftTableName() + ".";
             List<PartitionOutput> leftPartitioned = event.getLeftPartitioned();
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
             String[] leftCols = event.getLeftCols();
             int[] leftKeyColumnIds = event.getLeftKeyColumnIds();
+
             String rightPrefix = event.getRightTableName() + ".";
             List<PartitionOutput> rightPartitioned = event.getRightPartitioned();
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
             String[] rightCols = event.getRightCols();
             int[] rightKeyColumnIds = event.getRightKeyColumnIds();
+
             PartitionedJoinInput.JoinInfo joinInfo = event.getJoinInfo();
             ScanInput.OutputInfo outputInfo = event.getOutput();
             String outputFolder = outputInfo.getFolder();
@@ -154,6 +158,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             {
                 future.get();
             }
+            logger.info("hash table size: " + joiner.getLeftTableSize());
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
             int rightSplitSize = rightPartitioned.size() / (cores * 2);
@@ -193,6 +198,16 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of scan", e);
+            }
+
+            if (joinInfo.getJoinType() == JoinType.EQUI_LEFT)
+            {
+                // output the left-outer tail.
+                String outputPath = outputFolder + requestId + "_join_left_outer";
+                PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), outputPath, encoding);
+                joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
             }
 
             return joinOutput;
@@ -252,8 +267,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             try (PixelsReader pixelsReader = getReader(leftPartitioned.getPath()))
             {
                 checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                checkArgument(leftPartitioned.getHashValues().size() != pixelsReader.getRowGroupNum(),
-                        "the number of partitions (?) in the pixels file is not correct (?)",
+                checkArgument(leftPartitioned.getHashValues().size() == pixelsReader.getRowGroupNum(),
+                        "the number of partitions (%s) in the pixels file is not correct (%s)",
                         pixelsReader.getRowGroupNum(), leftPartitioned.getHashValues().size());
                 for (int hashValue : hashValues)
                 {
@@ -300,14 +315,14 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                                     String[] rightCols, List<Integer> hashValues, int numPartition,
                                     String outputPath, boolean encoding)
     {
-        PixelsWriter pixelsWriter = null;
+        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), outputPath, encoding);
         for (PartitionOutput rightPartitioned : rightParts)
         {
             try (PixelsReader pixelsReader = getReader(rightPartitioned.getPath()))
             {
                 checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                checkArgument(rightPartitioned.getHashValues().size() != pixelsReader.getRowGroupNum(),
-                        "the number of partitions (?) in the pixels file is not correct (?)",
+                checkArgument(rightPartitioned.getHashValues().size() == pixelsReader.getRowGroupNum(),
+                        "the number of partitions (%s) in the pixels file is not correct (%s)",
                         pixelsReader.getRowGroupNum(), rightPartitioned.getHashValues().size());
                 for (int hashValue : hashValues)
                 {
@@ -320,23 +335,23 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    TypeDescription rowBatchSchema = recordReader.getResultSchema();
-                    if (pixelsWriter == null)
-                    {
-                        pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
-                    }
+                    int scannedRows = 0, joinedRows = 0;
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
+                        scannedRows += rowBatch.size;
                         if (rowBatch.size > 0)
                         {
                             VectorizedRowBatch joined = joiner.join(rowBatch);
                             if (!joined.isEmpty())
                             {
                                 pixelsWriter.addRowBatch(joined);
+                                joinedRows += joined.size;
                             }
                         }
                     } while (!rowBatch.endOfFile);
+                    logger.info("number of scanned rows: " + scannedRows +
+                            ", number of joined rows: " + joinedRows);
                 }
             } catch (Exception e)
             {

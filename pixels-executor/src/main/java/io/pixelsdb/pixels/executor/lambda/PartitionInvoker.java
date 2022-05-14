@@ -67,8 +67,8 @@ public class PartitionInvoker
                 }
                 else
                 {
-                    throw new RuntimeException("failed to execute the request, function error="
-                            + response.functionError());
+                    throw new RuntimeException("failed to execute the request, function error (" +
+                            response.statusCode() + "): " + response.functionError());
                 }
             }
             throw new RuntimeException("failed to get response", err);

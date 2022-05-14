@@ -19,9 +19,11 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
+import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
+import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -101,7 +103,7 @@ public class Joiner
         // duplicate the join key if not nature join.
         for (int i = 0, j = 0; i < bigColumnNames.size(); ++i)
         {
-            if (joinType == JoinType.NATURE && i == bigKeyColumnIds[j])
+            if (joinType == JoinType.NATURAL && j < bigKeyColumnIds.length && i == bigKeyColumnIds[j])
             {
                 j++;
                 continue;
@@ -154,12 +156,12 @@ public class Joiner
             {
                 switch (joinType)
                 {
-                    case NATURE:
+                    case NATURAL:
                     case EQUI_INNER:
                     case EQUI_LEFT:
                         break;
                     case EQUI_RIGHT:
-                        joined = smallNullTuple.join(big);
+                        joined = big.concatLeft(smallNullTuple);
                         break;
                     default:
                         throw new UnsupportedOperationException("join type is not supported");
@@ -170,7 +172,7 @@ public class Joiner
                 {
                     this.matchedSmallTuples.add(small);
                 }
-                joined = small.join(big);
+                joined = big.concatLeft(small);
             }
             if (joined != null)
             {
@@ -186,10 +188,13 @@ public class Joiner
      * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
      * the join is left outer join.
      */
-    public VectorizedRowBatch getLeftOuter()
+    public boolean writeLeftOuter(PixelsWriter pixelsWriter, int batchSize) throws IOException
     {
         checkArgument(this.joinType == JoinType.EQUI_LEFT,
                 "getLeftOuter() is illegal for non-left-outer join");
+        checkArgument(batchSize > 0, "batchSize must be positive");
+        requireNonNull(pixelsWriter, "pixelsWriter is null");
+
         List<Tuple> leftOuterTuples = new ArrayList<>();
         for (Tuple small : this.smallTable.keySet())
         {
@@ -198,11 +203,30 @@ public class Joiner
                 leftOuterTuples.add(small);
             }
         }
-        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(leftOuterTuples.size());
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
         for (Tuple small : leftOuterTuples)
         {
-            small.join(this.bigNullTuple).writeTo(leftOuterBatch);
+            if (leftOuterBatch.isFull())
+            {
+                pixelsWriter.addRowBatch(leftOuterBatch);
+                leftOuterBatch.reset();
+            }
+            this.bigNullTuple.concatLeft(small).writeTo(leftOuterBatch);
         }
-        return leftOuterBatch;
+        if (!leftOuterBatch.isEmpty())
+        {
+            pixelsWriter.addRowBatch(leftOuterBatch);
+        }
+        return true;
+    }
+
+    public TypeDescription getJoinedSchema()
+    {
+        return this.joinedSchema;
+    }
+
+    public int getLeftTableSize()
+    {
+        return this.smallTable.size();
     }
 }

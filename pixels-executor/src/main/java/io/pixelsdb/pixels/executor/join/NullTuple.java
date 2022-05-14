@@ -54,9 +54,9 @@ public class NullTuple extends Tuple
                 "keyColumnIds is null or empty");
         checkArgument(keyColumnIds.length <= numColumns, "numColumns is too small");
         this.nonKeyColumnIds = new int[numColumns - keyColumnIds.length];
-        for (int i = 0, j = 0, k = 0; i < numColumns; ++i)
+        for (int i = 0, j = 0, k = 0; i < numColumns && k < this.nonKeyColumnIds.length; ++i)
         {
-            if (i == keyColumnIds[j])
+            if (j < keyColumnIds.length && i == keyColumnIds[j])
             {
                 j++;
                 continue;
@@ -78,8 +78,14 @@ public class NullTuple extends Tuple
     }
 
     @Override
-    protected void writeTo(VectorizedRowBatch rowBatch, int start, boolean includeKey)
+    protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
+        if (left != null)
+        {
+            start = left.writeTo(rowBatch, start);
+        }
+        // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
+        boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
         int nextStart = start;
         if (includeKey)
         {
@@ -91,12 +97,9 @@ public class NullTuple extends Tuple
         }
         for (int id : this.nonKeyColumnIds)
         {
-            rowBatch.cols[nextStart + id].addNull();
+            rowBatch.cols[start + id].addNull();
         }
         nextStart += this.nonKeyColumnIds.length;
-        if (next != null)
-        {
-            next.writeTo(rowBatch, nextStart, this.joinType != JoinType.NATURE);
-        }
+        return nextStart;
     }
 }

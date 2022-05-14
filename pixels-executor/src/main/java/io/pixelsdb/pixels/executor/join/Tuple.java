@@ -57,10 +57,10 @@ public class Tuple
 
     protected final JoinType joinType;
     /**
-     * The next tuple that is joined with this tuple.
+     * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
      */
-    protected Tuple next;
+    protected Tuple left;
 
     /**
      * For performance considerations, the parameters are not checked.
@@ -74,7 +74,7 @@ public class Tuple
         this.keyColumnIds = keyColumnIds;
         this.columns = columns;
         this.joinType = joinType;
-        this.next = null;
+        this.left = null;
     }
 
     @Override
@@ -101,9 +101,16 @@ public class Tuple
         return false;
     }
 
-    public Tuple join(Tuple next)
+    /**
+     * Concat with the tuple from the left table. The concatenation is directly
+     * applied on this tuple.
+     *
+     * @param left the tuple from the left table
+     * @return the concat result, e.i., this tuple
+     */
+    public Tuple concatLeft(Tuple left)
     {
-        this.next = next;
+        this.left = left;
         return this;
     }
 
@@ -114,30 +121,34 @@ public class Tuple
      */
     public void writeTo(VectorizedRowBatch rowBatch)
     {
-        writeTo(rowBatch, 0, true);
+        writeTo(rowBatch, 0);
+        rowBatch.size++;
     }
 
     /**
      * Write the values of the non-key columns into the row batch.
      * @param rowBatch the row batch
      * @param start the index of the column in the row batch to start writing
-     * @param includeKey whether write the key columns
      */
-    protected void writeTo(VectorizedRowBatch rowBatch, int start, boolean includeKey)
+    protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
+
+        if (left != null)
+        {
+            start = left.writeTo(rowBatch, start);
+        }
+        // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
+        boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
         for (int i = 0, j = 0; i < this.columns.length; ++i)
         {
-            if (!includeKey && i == this.keyColumnIds[j])
+            if (!includeKey && j < this.keyColumnIds.length && i == this.keyColumnIds[j])
             {
                 j++;
                 continue;
             }
-            rowBatch.cols[start++] = this.columns[i];
+            rowBatch.cols[start++].addElement(this.rowId, this.columns[i]);
         }
-        if (next != null)
-        {
-            next.writeTo(rowBatch, start, this.joinType != JoinType.NATURE);
-        }
+        return start;
     }
 
     public static class Builder
@@ -172,7 +183,7 @@ public class Tuple
             this.keyColumnIds = keyColumnIds;
             this.columns = rowBatch.cols;
             this.hashCode = new int[rowBatch.size];
-            Arrays.fill(hashCode, 0);
+            Arrays.fill(this.hashCode, 0);
             for (int id : keyColumnIds)
             {
                 this.columns[id].accumulateHashCode(this.hashCode);

@@ -50,14 +50,14 @@ public class TestPartitionInvoker
                 "\\\"discreteValues\\\":[]}\"}}}";
         PartitionInput input = new PartitionInput();
         ArrayList<ScanInput.InputInfo> inputs = new ArrayList<>();
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 0, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 4, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 8, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 12, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 16, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 20, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 24, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_0.compact.pxl", 28, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 0, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 4, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 8, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 12, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 16, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 20, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 24, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 28, 4));
         input.setInputs(inputs);
         input.setQueryId(123456);
         input.setSplitSize(4);
@@ -66,7 +66,7 @@ public class TestPartitionInvoker
         partitionInfo.setNumParition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
-        input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/orders_part_0", true));
+        input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/orders_part_7", true));
         input.setFilter(filter);
 
         System.out.println(JSON.toJSONString(input));
@@ -86,14 +86,14 @@ public class TestPartitionInvoker
                 "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
         PartitionInput input = new PartitionInput();
         ArrayList<ScanInput.InputInfo> inputs = new ArrayList<>();
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4));
-        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 0, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 4, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 8, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 12, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 16, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 20, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 24, 4));
+        inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 28, 4));
         input.setInputs(inputs);
         input.setQueryId(123456);
         input.setSplitSize(4);
@@ -102,7 +102,7 @@ public class TestPartitionInvoker
         partitionInfo.setNumParition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
-        input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/lineitem_part_0", true));
+        input.setOutput(new PartitionInput.OutputInfo("pixels-lambda-test/lineitem_part_1", true));
         input.setFilter(filter);
 
         System.out.println(JSON.toJSONString(input));

@@ -28,7 +28,7 @@ package io.pixelsdb.pixels.executor.join;
 public enum JoinType
 {
     UNKNOWN, // The first enum value is the default value.
-    NATURE,
+    NATURAL,
     EQUI_INNER,
     EQUI_LEFT,
     EQUI_RIGHT
