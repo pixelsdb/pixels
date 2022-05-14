@@ -27,6 +27,7 @@ import java.util.Arrays;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
+import static java.util.Objects.requireNonNull;
 
 /**
  * DateColumnVector derived from io.pixelsdb.pixels.core.vector.TimestampColumnVector.
@@ -91,6 +92,35 @@ public class DateColumnVector extends ColumnVector
     public int getLength()
     {
         return dates.length;
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            if (this.isNull[i])
+            {
+                continue;
+            }
+            hashCode[i] = 31 * hashCode[i] + this.dates[i];
+        }
+        return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        DateColumnVector otherVector = (DateColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return this.dates[index] == otherVector.dates[otherIndex];
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
+
     }
 
     /**
@@ -239,11 +269,42 @@ public class DateColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        DateColumnVector dateColVector = (DateColumnVector) inputVector;
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
+        {
+            isNull[index] = false;
+            dates[index] = ((DateColumnVector) inputVector).dates[inputIndex];
+        }
+        else
+        {
+            isNull[index] = true;
+            noNulls = false;
+        }
+    }
 
-        dates[outElementNum] = dateColVector.dates[inputElementNum];
+    @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+        // isRepeating should be false and src should be an instance of DateColumnVector.
+        // However, we do not check these for performance considerations.
+        DateColumnVector source = (DateColumnVector) src;
+
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.dates[thisIndex] = source.dates[srcIndex];
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override
@@ -261,14 +322,16 @@ public class DateColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {
@@ -314,6 +377,7 @@ public class DateColumnVector extends ColumnVector
             {
                 Arrays.fill(dates, 0, size, repeatFastTime);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -322,12 +386,20 @@ public class DateColumnVector extends ColumnVector
     @Override
     public void add(Date value)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         set(writeIndex++, value);
     }
 
     @Override
     public void add(String value)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         set(writeIndex++, Date.valueOf(value));
     }
 
@@ -340,6 +412,10 @@ public class DateColumnVector extends ColumnVector
      */
     public void set(int elementNum, Date date)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (date == null)
         {
             this.noNulls = false;
@@ -348,6 +424,7 @@ public class DateColumnVector extends ColumnVector
         else
         {
             this.dates[elementNum] = millisToDay(date.getTime());
+            this.isNull[elementNum] = false;
         }
     }
 
@@ -360,7 +437,12 @@ public class DateColumnVector extends ColumnVector
      */
     public void set(int elementNum, int days)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         this.dates[elementNum] = days;
+        this.isNull[elementNum] = false;
     }
 
     /**
@@ -370,7 +452,12 @@ public class DateColumnVector extends ColumnVector
      */
     public void setFromScratchDate(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         this.dates[elementNum] = millisToDay(scratchDate.getTime());
+        this.isNull[elementNum] = false;
     }
 
     /**
@@ -381,59 +468,12 @@ public class DateColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         dates[elementNum] = 0;
-    }
-
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, DateColumnVector output)
-    {
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.dates[0] = dates[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.dates[i] = dates[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(dates, 0, output.dates, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
+        isNull[elementNum] = true;
     }
 
     /**

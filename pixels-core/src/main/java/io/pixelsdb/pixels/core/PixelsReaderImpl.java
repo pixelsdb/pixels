@@ -343,6 +343,12 @@ public class PixelsReaderImpl
         return this.footer.getRowGroupInfosCount();
     }
 
+    @Override
+    public boolean isPartitioned()
+    {
+        return this.footer.hasPartitioned() && this.footer.getPartitioned();
+    }
+
     /**
      * Get file level statistics of each column
      *

@@ -21,6 +21,9 @@ package io.pixelsdb.pixels.core.vector;
 
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * StructColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
  * <p>
@@ -59,31 +62,42 @@ public class StructColumnVector extends ColumnVector
         {
             fields[i].flatten(selectedInUse, sel, size);
         }
+        writeIndex = size;
         flattenNoNulls(selectedInUse, sel, size);
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum,
-                           ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        if (inputVector.isRepeating)
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            inputElementNum = 0;
-        }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
-        {
-            isNull[outElementNum] = false;
+            isNull[index] = false;
             ColumnVector[] inputFields = ((StructColumnVector) inputVector).fields;
             for (int i = 0; i < inputFields.length; ++i)
             {
-                fields[i].setElement(outElementNum, inputElementNum, inputFields[i]);
+                fields[i].addElement(inputIndex, inputFields[i]);
             }
         }
         else
         {
             noNulls = false;
-            isNull[outElementNum] = true;
+            isNull[index] = true;
         }
+    }
+
+    @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+        // isRepeating should be false and src should be an instance of StructColumnVector.
+        // However, we do not check these for performance considerations.
+        StructColumnVector source = (StructColumnVector) src;
+
+        for (int i = 0; i < fields.length; i++)
+        {
+            this.fields[i].addSelected(selected, offset, length, source.fields[i]);
+        }
+        writeIndex += length;
     }
 
     @Override
@@ -136,6 +150,37 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (ColumnVector field : this.fields)
+        {
+            field.accumulateHashCode(hashCode);
+        }
+        return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        StructColumnVector otherVector = (StructColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            for (int i = 0; i < this.fields.length; ++i)
+            {
+                if (!this.fields[i].elementEquals(index, otherIndex, otherVector.fields[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
+    }
+
+    @Override
     public void reset()
     {
         super.reset();
@@ -170,9 +215,12 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
-        throw new UnsupportedOperationException("filter is not supported on StructColumnVector.");
+        for (ColumnVector column : this.fields)
+        {
+            column.applyFilter(filter, before);
+        }
     }
 
     @Override
@@ -182,16 +230,6 @@ public class StructColumnVector extends ColumnVector
         for (int i = 0; i < fields.length; ++i)
         {
             fields[i].unFlatten();
-        }
-    }
-
-    @Override
-    public void setRepeating(boolean isRepeating)
-    {
-        super.setRepeating(isRepeating);
-        for (int i = 0; i < fields.length; ++i)
-        {
-            fields[i].setRepeating(isRepeating);
         }
     }
 }

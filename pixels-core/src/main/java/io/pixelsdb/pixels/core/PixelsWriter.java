@@ -33,12 +33,23 @@ public interface PixelsWriter
         extends Closeable
 {
     /**
-     * Add row batch into the file.
+     * Add row batch into the file that is not hash partitioned.
      *
+     * @param rowBatch the row batch to be written.
      * @return if the file adds a new row group, returns false. Otherwise, returns true.
      */
     boolean addRowBatch(VectorizedRowBatch rowBatch)
             throws IOException;
+
+    /**
+     * Add row batch into the file that is hash partitioned.
+     *
+     * @param rowBatch the row batch to be written.
+     * @param hashValue the hashValue of the partition that the row batch is belong to.
+     */
+    void addRowBatch(VectorizedRowBatch rowBatch, int hashValue)
+            throws IOException;
+
 
     /**
      * Get schema of this file.
@@ -48,7 +59,7 @@ public interface PixelsWriter
     TypeDescription getSchema();
 
     /**
-     * Get the number of row groups that have been written into the file.
+     * Get the number of row groups that have been written into this file.
      * @return
      */
     int getRowGroupNum();

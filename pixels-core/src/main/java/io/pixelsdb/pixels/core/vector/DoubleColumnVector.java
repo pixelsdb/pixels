@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * DoubleColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
@@ -64,58 +65,6 @@ public class DoubleColumnVector extends ColumnVector
         memoryUsage += Long.BYTES * len;
     }
 
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, DoubleColumnVector output)
-    {
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.vector[0] = vector[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.vector[i] = vector[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(vector, 0, output.vector, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
-    }
-
     /**
      * Fill the column vector with the provided value
      * @param value
@@ -154,6 +103,7 @@ public class DoubleColumnVector extends ColumnVector
             {
                 Arrays.fill(vector, 0, size, repeatVal);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -179,27 +129,76 @@ public class DoubleColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        vector[writeIndex++] = Double.doubleToLongBits(value);
+        int index = writeIndex++;
+        vector[index] = Double.doubleToLongBits(value);
+        isNull[index] = false;
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
-        if (inputVector.isRepeating)
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            inputElementNum = 0;
-        }
-        if (inputVector.noNulls || !inputVector.isNull[inputElementNum])
-        {
-            isNull[outElementNum] = false;
-            vector[outElementNum] =
-                    ((DoubleColumnVector) inputVector).vector[inputElementNum];
+            isNull[index] = false;
+            vector[index] = ((DoubleColumnVector) inputVector).vector[inputIndex];
         }
         else
         {
-            isNull[outElementNum] = true;
+            isNull[index] = true;
             noNulls = false;
         }
+    }
+
+    @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+        // isRepeating should be false and src should be an instance of DoubleColumnVector.
+        // However, we do not check these for performance considerations.
+        DoubleColumnVector source = (DoubleColumnVector) src;
+
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.vector[thisIndex] = source.vector[srcIndex];
+                this.isNull[thisIndex] = false;
+            }
+        }
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            if (this.isNull[i])
+            {
+                continue;
+            }
+            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+        }
+        return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        DoubleColumnVector otherVector = (DoubleColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return this.vector[index] == otherVector.vector[otherIndex];
+        }
+        return this.isNull[index] == otherVector.isNull[otherIndex];
     }
 
     @Override
@@ -217,14 +216,16 @@ public class DoubleColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < beforeIndex; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {
