@@ -22,7 +22,8 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * The tuple of which all the columns are null.
@@ -37,32 +38,30 @@ public class NullTuple extends Tuple
     private static final int INVALID_HASH_CODE = Integer.MIN_VALUE;
     private static final int INVALID_ROW_ID = -1;
 
-    private final int[] nonKeyColumnIds;
+    private final int numColumns;
 
     /**
-     * For performance considerations, the parameters are not checked.
-     * Must ensure that they are valid.
+     * Null tuple is mainly used for outer joins. All fields in a null tuple are null.
      *
      * @param keyColumnIds the ids of the key columns
+     * @param keyColumnIdSet the id set of the key columns, used for performance consideration
      * @param numColumns the number of columns
      * @param joinType the join type
      */
-    public NullTuple(int[] keyColumnIds, int numColumns, JoinType joinType)
+    protected NullTuple(int[] keyColumnIds, Set<Integer> keyColumnIdSet, int numColumns, JoinType joinType)
     {
-        super(INVALID_HASH_CODE, INVALID_ROW_ID, keyColumnIds, EMPTY_COLUMNS, joinType);
-        checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
-                "keyColumnIds is null or empty");
-        checkArgument(keyColumnIds.length <= numColumns, "numColumns is too small");
-        this.nonKeyColumnIds = new int[numColumns - keyColumnIds.length];
-        for (int i = 0, j = 0, k = 0; i < numColumns && k < this.nonKeyColumnIds.length; ++i)
+        super(INVALID_HASH_CODE, INVALID_ROW_ID, keyColumnIds, keyColumnIdSet, EMPTY_COLUMNS, joinType);
+        this.numColumns = numColumns;
+    }
+
+    public static NullTuple createNullTuple(int[] keyColumnIds, int numColumns, JoinType joinType)
+    {
+        Set<Integer> keyColumnIdSet = new HashSet<>(keyColumnIds.length);
+        for (int id : keyColumnIds)
         {
-            if (j < keyColumnIds.length && i == keyColumnIds[j])
-            {
-                j++;
-                continue;
-            }
-            this.nonKeyColumnIds[k++] = i;
+            keyColumnIdSet.add(id);
         }
+        return new NullTuple(keyColumnIds, keyColumnIdSet, numColumns, joinType);
     }
 
     @Override
@@ -86,20 +85,11 @@ public class NullTuple extends Tuple
         }
         // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
         boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
-        int nextStart = start;
-        if (includeKey)
+        int numColumnsToWrite = includeKey ? this.numColumns : this.numColumns - this.keyColumnIds.length;
+        for (int i = 0; i < numColumnsToWrite; ++i)
         {
-            for (int id : this.keyColumnIds)
-            {
-                rowBatch.cols[start + id].addNull();
-            }
-            nextStart += this.keyColumnIds.length;
+            rowBatch.cols[start + i].addNull();
         }
-        for (int id : this.nonKeyColumnIds)
-        {
-            rowBatch.cols[start + id].addNull();
-        }
-        nextStart += this.nonKeyColumnIds.length;
-        return nextStart;
+        return start + numColumnsToWrite;
     }
 }

@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.util.Arrays;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -39,22 +40,25 @@ public class Tuple
      * The hashCode of the join key of this tuple.
      */
     private final int hashCode;
-
     /**
      * The index of this tuple in the corresponding row batch.
      */
     private final int rowId;
-
     /**
      * The ids of the join-key columns.
      */
     protected final int[] keyColumnIds;
-
+    /**
+     * The id set of the join-key columns, used for performance consideration.
+     */
+    protected final Set<Integer> keyColumnIdSet;
     /**
      * The column vectors in the row batch.
      */
     private final ColumnVector[] columns;
-
+    /**
+     * The join type that this tuple is used for.
+     */
     protected final JoinType joinType;
     /**
      * The left-table tuple that is joined with this tuple.
@@ -66,12 +70,13 @@ public class Tuple
      * For performance considerations, the parameters are not checked.
      * Must ensure that they are valid.
      */
-    public Tuple(int hashCode, int rowId, int[] keyColumnIds,
-                 ColumnVector[] columns, JoinType joinType)
+    protected Tuple(int hashCode, int rowId, int[] keyColumnIds,
+                 Set<Integer> keyColumnIdSet, ColumnVector[] columns, JoinType joinType)
     {
         this.hashCode = hashCode;
         this.rowId = rowId;
         this.keyColumnIds = keyColumnIds;
+        this.keyColumnIdSet = keyColumnIdSet;
         this.columns = columns;
         this.joinType = joinType;
         this.left = null;
@@ -89,9 +94,14 @@ public class Tuple
         if (obj instanceof Tuple)
         {
             Tuple other = (Tuple) obj;
-            for (int id : this.keyColumnIds)
+            if (this.keyColumnIds.length != other.keyColumnIds.length)
             {
-                if (!this.columns[id].elementEquals(this.rowId, other.rowId, other.columns[id]))
+                return false;
+            }
+            for (int i = 0; i < this.keyColumnIds.length; ++i)
+            {
+                if (!this.columns[this.keyColumnIds[i]].elementEquals(
+                        this.rowId, other.rowId, other.columns[other.keyColumnIds[i]]))
                 {
                     return false;
                 }
@@ -139,11 +149,10 @@ public class Tuple
         }
         // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
         boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
-        for (int i = 0, j = 0; i < this.columns.length; ++i)
+        for (int i = 0; i < this.columns.length; ++i)
         {
-            if (!includeKey && j < this.keyColumnIds.length && i == this.keyColumnIds[j])
+            if (!includeKey && this.keyColumnIdSet.contains(i))
             {
-                j++;
                 continue;
             }
             rowBatch.cols[start++].addElement(this.rowId, this.columns[i]);
@@ -154,6 +163,7 @@ public class Tuple
     public static class Builder
     {
         private final int[] keyColumnIds;
+        private final Set<Integer> keyColumnIdSet;
         private final ColumnVector[] columns;
         private final JoinType joinType;
         private final int numRows;
@@ -166,12 +176,16 @@ public class Tuple
          *
          * @param rowBatch the row batch
          * @param keyColumnIds the ids of the join-key columns
+         * @param keyColumnIdSet the id set of the join-key columns, used for performance consideration
          * @param joinType the join type
          */
-        public Builder(VectorizedRowBatch rowBatch, int[] keyColumnIds, JoinType joinType)
+        public Builder(VectorizedRowBatch rowBatch, int[] keyColumnIds,
+                       Set<Integer> keyColumnIdSet, JoinType joinType)
         {
             checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
                     "keyColumnIds is null or empty");
+            checkArgument(keyColumnIdSet != null && keyColumnIdSet.size() == keyColumnIds.length,
+                    "keyColumnIdSet is null or of an incorrect size");
             requireNonNull(rowBatch, "rowBatch is null");
             checkArgument(rowBatch.numCols >= keyColumnIds.length,
                     "rowBatch does not have enough columns");
@@ -181,6 +195,7 @@ public class Tuple
 
             this.joinType = joinType;
             this.keyColumnIds = keyColumnIds;
+            this.keyColumnIdSet = keyColumnIdSet;
             this.columns = rowBatch.cols;
             this.hashCode = new int[rowBatch.size];
             Arrays.fill(this.hashCode, 0);
@@ -205,7 +220,7 @@ public class Tuple
         public Tuple next()
         {
             int id = this.rowId++;
-            return new Tuple(hashCode[id], id, keyColumnIds, columns, joinType);
+            return new Tuple(hashCode[id], id, keyColumnIds, keyColumnIdSet, columns, joinType);
         }
     }
 }

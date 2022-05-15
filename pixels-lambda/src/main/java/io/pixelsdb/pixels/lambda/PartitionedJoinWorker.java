@@ -23,8 +23,10 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -37,14 +39,17 @@ import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
 /**
  * @author hank
@@ -53,20 +58,11 @@ import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
-    private static final PixelsFooterCache footerCache = new PixelsFooterCache();
-    private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    private static final int rowBatchSize;
-    private static final int pixelStride;
-    private static final int rowGroupSize;
     private static Storage s3;
     private static Storage minio;
 
     static
     {
-        rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
-        pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
-        rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-
         try
         {
             s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -123,7 +119,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getSchema(threadPool, leftSchema, rightSchema,
+            getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0).getPath(), rightPartitioned.get(0).getPath());
             Joiner joiner = new Joiner(joinInfo.getJoinType(),
                     leftPrefix, leftSchema.get(), leftKeyColumnIds,
@@ -166,14 +162,14 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             {
                 rightSplitSize = 1;
             }
-            for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
+            for (int i = 0, outputId = 0; i < rightPartitioned.size(); i += rightSplitSize, ++outputId)
             {
                 List<PartitionOutput> parts = new ArrayList<>(rightSplitSize);
                 for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
                 {
                     parts.add(rightPartitioned.get(i));
                 }
-                String outputPath = outputFolder + requestId + "_join_" + i;
+                String outputPath = outputFolder + requestId + "_join_" + outputId;
                 threadPool.execute(() -> {
                     try
                     {
@@ -197,14 +193,15 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of scan", e);
+                logger.error("interrupted while waiting for the termination of join", e);
             }
 
             if (joinInfo.getJoinType() == JoinType.EQUI_LEFT)
             {
                 // output the left-outer tail.
                 String outputPath = outputFolder + requestId + "_join_left_outer";
-                PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), outputPath, encoding);
+                PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                        encoding, false, null);
                 joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
                 pixelsWriter.close();
                 joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
@@ -213,39 +210,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             return joinOutput;
         } catch (Exception e)
         {
-            logger.error("error during scan", e);
+            logger.error("error during join", e);
             return null;
-        }
-    }
-
-    private void getSchema(ExecutorService executor, AtomicReference<TypeDescription> leftSchema,
-                           AtomicReference<TypeDescription> rightSchema, String leftPath, String rightPath)
-    {
-        Future<?> leftFuture = executor.submit(() -> {
-            try
-            {
-                leftSchema.set(getReader(leftPath).getFileSchema());
-            } catch (IOException e)
-            {
-                logger.error("failed to read the schema of the left table");
-            }
-        });
-        Future<?> rightFuture = executor.submit(() -> {
-            try
-            {
-                rightSchema.set(getReader(rightPath).getFileSchema());
-            } catch (IOException e)
-            {
-                logger.error("failed to read the schema of the right table");
-            }
-        });
-        try
-        {
-            leftFuture.get();
-            rightFuture.get();
-        } catch (Exception e)
-        {
-            logger.error("interrupted while waiting for the termination of schema read", e);
         }
     }
 
@@ -264,7 +230,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     {
         for (PartitionOutput leftPartitioned : leftParts)
         {
-            try (PixelsReader pixelsReader = getReader(leftPartitioned.getPath()))
+            try (PixelsReader pixelsReader = getReader(leftPartitioned.getPath(), s3))
             {
                 checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                 checkArgument(leftPartitioned.getHashValues().size() == pixelsReader.getRowGroupNum(),
@@ -315,10 +281,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                                     String[] rightCols, List<Integer> hashValues, int numPartition,
                                     String outputPath, boolean encoding)
     {
-        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), outputPath, encoding);
+        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                encoding, false, null);
         for (PartitionOutput rightPartitioned : rightParts)
         {
-            try (PixelsReader pixelsReader = getReader(rightPartitioned.getPath()))
+            try (PixelsReader pixelsReader = getReader(rightPartitioned.getPath(), s3))
             {
                 checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                 checkArgument(rightPartitioned.getHashValues().size() == pixelsReader.getRowGroupNum(),
@@ -392,7 +359,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param pixelsReader the reader of the partitioned file
      * @param hashValue the hash value of the given hash partition
      * @param numPartition the total number of partitions
-     * @return
+     * @return the reader option
      */
     private PixelsReaderOption getReaderOption(long queryId, String[] cols, PixelsReader pixelsReader,
                                                int hashValue, int numPartition)
@@ -418,32 +385,5 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
         }
         return option;
-    }
-
-    private PixelsReader getReader(String fileName) throws IOException
-    {
-        PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                .setStorage(s3)
-                .setPath(fileName)
-                .setEnableCache(false)
-                .setCacheOrder(new ArrayList<>())
-                .setPixelsCacheReader(null)
-                .setPixelsFooterCache(footerCache);
-        PixelsReader pixelsReader = builder.build();
-        return pixelsReader;
-    }
-
-    private PixelsWriter getWriter(TypeDescription schema, String filePath, boolean encoding)
-    {
-        PixelsWriter pixelsWriter = PixelsWriterImpl.newBuilder()
-                .setSchema(schema)
-                .setPixelStride(pixelStride)
-                .setRowGroupSize(rowGroupSize)
-                .setStorage(minio)
-                .setPath(filePath)
-                .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                .setEncoding(encoding)
-                .build();
-        return pixelsWriter;
     }
 }

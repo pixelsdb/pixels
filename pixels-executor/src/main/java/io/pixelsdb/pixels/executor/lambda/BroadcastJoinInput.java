@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.OutputInfo;
 
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author hank
@@ -40,7 +40,7 @@ public class BroadcastJoinInput
     /**
      * The scan inputs of the left table.
      */
-    private ArrayList<InputInfo> leftInputs;
+    private List<InputInfo> leftInputs;
     /**
      * The number of row groups to be scanned in each query split of the left table.
      */
@@ -62,7 +62,7 @@ public class BroadcastJoinInput
     /**
      * The scan inputs of the right table.
      */
-    private ArrayList<InputInfo> rightInputs;
+    private List<InputInfo> rightInputs;
     /**
      * The number of row groups to be scanned in each query split of the right table.
      */
@@ -96,9 +96,9 @@ public class BroadcastJoinInput
     public BroadcastJoinInput() { }
 
     public BroadcastJoinInput(int queryId, String leftTableName, String rightTableName,
-                              ArrayList<InputInfo> leftInputs, int leftSplitSize,
+                              List<InputInfo> leftInputs, int leftSplitSize,
                               String[] leftCols, int[] leftKeyColumnIds, String leftFilter,
-                              ArrayList<InputInfo> rightInputs, int rightSplitSize,
+                              List<InputInfo> rightInputs, int rightSplitSize,
                               String[] rightCols, int[] rightKeyColumnIds, String rightFilter,
                               JoinType joinType, OutputInfo output)
     {
@@ -149,12 +149,12 @@ public class BroadcastJoinInput
         this.rightTableName = rightTableName;
     }
 
-    public ArrayList<InputInfo> getLeftInputs()
+    public List<InputInfo> getLeftInputs()
     {
         return leftInputs;
     }
 
-    public void setLeftInputs(ArrayList<InputInfo> leftInputs)
+    public void setLeftInputs(List<InputInfo> leftInputs)
     {
         this.leftInputs = leftInputs;
     }
@@ -199,12 +199,12 @@ public class BroadcastJoinInput
         this.leftFilter = leftFilter;
     }
 
-    public ArrayList<InputInfo> getRightInputs()
+    public List<InputInfo> getRightInputs()
     {
         return rightInputs;
     }
 
-    public void setRightInputs(ArrayList<InputInfo> rightInputs)
+    public void setRightInputs(List<InputInfo> rightInputs)
     {
         this.rightInputs = rightInputs;
     }

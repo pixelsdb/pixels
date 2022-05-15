@@ -24,8 +24,9 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
@@ -38,7 +39,6 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
+
 /**
  * @author hank
  * @date 07/05/2022
@@ -54,19 +56,10 @@ import java.util.stream.Collectors;
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static final PixelsFooterCache footerCache = new PixelsFooterCache();
-    private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    private static final int rowBatchSize;
-    private static final int pixelStride;
-    private static final int rowGroupSize;
     private static Storage s3;
 
     static
     {
-        rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
-        pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
-        rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-
         try
         {
             s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -136,8 +129,8 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 logger.error("interrupted while waiting for the termination of partitioning", e);
             }
 
-            PixelsWriter pixelsWriter = getWriter(writerSchema.get(), outputPath,
-                    Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()), encoding);
+            PixelsWriter pixelsWriter = getWriter(writerSchema.get(), s3, outputPath, encoding,
+                    true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
             Set<Integer> hashValues = new HashSet<>(numPartition);
             for (int hash = 0; hash < numPartition; ++hash)
             {
@@ -191,7 +184,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
             VectorizedRowBatch rowBatch;
 
-            try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
+            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3);
                  PixelsRecordReader recordReader = pixelsReader.read(option))
             {
                 if (!recordReader.isValid())
@@ -243,39 +236,8 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             } catch (Exception e)
             {
                 logger.error("failed to scan the file '" +
-                        inputInfo.getFilePath() + "' and output the partitioning result", e);
+                        inputInfo.getPath() + "' and output the partitioning result", e);
             }
         }
-    }
-
-    private PixelsReader getReader(String fileName) throws IOException
-    {
-        PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                .setStorage(s3)
-                .setPath(fileName)
-                .setEnableCache(false)
-                .setCacheOrder(new ArrayList<>())
-                .setPixelsCacheReader(null)
-                .setPixelsFooterCache(footerCache);
-        PixelsReader pixelsReader = builder.build();
-        return pixelsReader;
-    }
-
-    private PixelsWriter getWriter(TypeDescription schema, String filePath,
-                                   List<Integer> keyColumnIds, boolean encoding)
-    {
-        PixelsWriter pixelsWriter =
-                PixelsWriterImpl.newBuilder()
-                        .setSchema(schema)
-                        .setPixelStride(pixelStride)
-                        .setRowGroupSize(rowGroupSize)
-                        .setStorage(s3)
-                        .setPath(filePath)
-                        .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                        .setEncoding(encoding)
-                        .setPartitioned(true)
-                        .setPartKeyColumnIds(keyColumnIds)
-                        .build();
-        return pixelsWriter;
     }
 }
