@@ -24,8 +24,9 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
@@ -43,6 +44,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
 /**
  * The response is a list of files read and then written to s3.
@@ -54,20 +56,11 @@ import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static final PixelsFooterCache footerCache = new PixelsFooterCache();
-    private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    private static final int rowBatchSize;
-    private static final int pixelStride;
-    private static final int rowGroupSize;
     private static Storage s3;
     private static Storage minio;
 
     static
     {
-        rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
-        pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
-        rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
-
         try
         {
             s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -182,7 +175,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
             VectorizedRowBatch rowBatch;
 
-            try (PixelsReader pixelsReader = getReader(inputInfo.getFilePath());
+            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3);
                  PixelsRecordReader recordReader = pixelsReader.read(option))
             {
                 if (!recordReader.isValid())
@@ -199,7 +192,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 
                 if (pixelsWriter == null)
                 {
-                    pixelsWriter = getWriter(rowBatchSchema, outputPath, encoding);
+                    pixelsWriter = getWriter(rowBatchSchema, minio, outputPath,
+                            encoding, false, null);
                 }
                 Bitmap filtered = new Bitmap(rowBatchSize, true);
                 Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -216,7 +210,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             } catch (Exception e)
             {
                 logger.error("failed to scan the file '" +
-                        inputInfo.getFilePath() + "' and output the result", e);
+                        inputInfo.getPath() + "' and output the result", e);
             }
         }
         // Finished scanning all the files in the split.
@@ -242,40 +236,5 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             logger.error("failed finish writing and close the output file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
-    }
-
-    private PixelsReader getReader(String fileName)
-    {
-        PixelsReader pixelsReader = null;
-        try
-        {
-            PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
-                    .setStorage(s3)
-                    .setPath(fileName)
-                    .setEnableCache(false)
-                    .setCacheOrder(new ArrayList<>())
-                    .setPixelsCacheReader(null)
-                    .setPixelsFooterCache(footerCache);
-            pixelsReader = builder.build();
-        } catch (Exception e)
-        {
-            logger.error("failed to create pixels reader", e);
-        }
-        return pixelsReader;
-    }
-
-    private PixelsWriter getWriter(TypeDescription schema, String filePath, boolean encoding)
-    {
-        PixelsWriter pixelsWriter =
-                PixelsWriterImpl.newBuilder()
-                        .setSchema(schema)
-                        .setPixelStride(pixelStride)
-                        .setRowGroupSize(rowGroupSize)
-                        .setStorage(minio)
-                        .setPath(filePath)
-                        .setOverwrite(true) // set overwrite to true to avoid existence checking.
-                        .setEncoding(encoding)
-                        .build();
-        return pixelsWriter;
     }
 }
