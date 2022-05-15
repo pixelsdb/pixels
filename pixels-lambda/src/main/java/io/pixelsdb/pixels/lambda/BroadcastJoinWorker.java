@@ -121,16 +121,17 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
+
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getSchema(threadPool, s3, leftSchema, rightSchema,
+            getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getPath(), rightInputs.get(0).getPath());
             Joiner joiner = new Joiner(joinType,
-                    leftPrefix, leftSchema.get(), leftKeyColumnIds,
-                    rightPrefix, rightSchema.get(), rightKeyColumnIds);
+                    leftPrefix, getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
+                    rightPrefix, getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
             // build the hash table for the left table.
-            List<Future> leftFutures = new ArrayList<>(leftInputs.size());
+            List<Future> leftFutures = new ArrayList<>();
             for (int i = 0; i < leftInputs.size();)
             {
                 List<ScanInput.InputInfo> inputs = new ArrayList<>();
@@ -163,7 +164,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 List<ScanInput.InputInfo> inputs = new ArrayList<>();
                 int numRg = 0;
-                while (numRg < leftSplitSize)
+                while (numRg < rightSplitSize)
                 {
                     ScanInput.InputInfo info = rightInputs.get(i++);
                     inputs.add(info);
@@ -230,8 +231,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         {
             try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
             {
-                checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                if (input.getRgLength() >= pixelsReader.getRowGroupNum())
+                if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
                     continue;
                 }
@@ -285,8 +285,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         {
             try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
             {
-                checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                if (input.getRgLength() >= pixelsReader.getRowGroupNum())
+                if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
                     continue;
                 }

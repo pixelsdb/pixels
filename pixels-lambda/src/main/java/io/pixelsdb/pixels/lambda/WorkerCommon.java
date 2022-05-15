@@ -26,11 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Some common functions for the lambda workers.
@@ -53,11 +55,28 @@ public class WorkerCommon
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
     }
 
-    public static void getSchema(ExecutorService executor, Storage storage,
-                                 AtomicReference<TypeDescription> leftSchema,
-                                 AtomicReference<TypeDescription> rightSchema,
-                                 String leftPath, String rightPath)
+    /**
+     * Read the schemas of the two joined tables, concurrently using the executor, thus
+     * to reduce the latency of the schema reading.
+     *
+     * @param executor the executor, a.k.a., the thread pool.
+     * @param storage the storage instance
+     * @param leftSchema the atomic reference to return the schema of the left table
+     * @param rightSchema the atomic reference to return the schema of the right table
+     * @param leftPath the path of an input file of the left table
+     * @param rightPath the path of an input file of the right table
+     */
+    public static void getFileSchema(ExecutorService executor, Storage storage,
+                                     AtomicReference<TypeDescription> leftSchema,
+                                     AtomicReference<TypeDescription> rightSchema,
+                                     String leftPath, String rightPath)
     {
+        requireNonNull(executor, "executor is null");
+        requireNonNull(storage, "storage is null");
+        requireNonNull(leftSchema, "leftSchema is null");
+        requireNonNull(rightSchema, "rightSchema is null");
+        requireNonNull(leftPath, "leftPath is null");
+        requireNonNull(rightPath, "rightSchema is null");
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
@@ -86,11 +105,60 @@ public class WorkerCommon
         }
     }
 
-    public static PixelsReader getReader(String fileName, Storage storage) throws IOException
+    /**
+     * Get the schema that only includes the type descriptions of the included columns.
+     * The returned schema can be used for the table scan result.
+     *
+     * @param fileSchema the schema of the file
+     * @param includeCols the name of the included columns
+     * @return the result schema
+     */
+    public static TypeDescription getResultSchema(TypeDescription fileSchema, String[] includeCols)
     {
+        requireNonNull(fileSchema, "fileSchema is null");
+        requireNonNull(includeCols, "includeCols is null");
+        checkArgument(fileSchema.getCategory() == TypeDescription.Category.STRUCT,
+                "fileSchema is not a STRUCT");
+        checkArgument(fileSchema.getFieldNames().size() >= includeCols.length,
+                "fileSchema does not contain enough fields");
+        TypeDescription resultSchema = new TypeDescription(TypeDescription.Category.STRUCT);
+        List<String> fileColumnNames = fileSchema.getFieldNames();
+        List<TypeDescription> fileColumnTypes = fileSchema.getChildren();
+        Map<String, Integer> allColumns = new HashMap<>(fileColumnNames.size());
+        for (int i = 0; i < fileColumnNames.size(); ++i)
+        {
+            /**
+             * According to SQL-92, column names (identifiers) are case-insensitive.
+             * However, in many databases, including Pixels, column names are case-sensitive.
+             */
+            allColumns.put(fileColumnNames.get(i), i);
+        }
+        for (String columnName : includeCols)
+        {
+            if (allColumns.containsKey(columnName))
+            {
+                int i = allColumns.get(columnName);
+                resultSchema.addField(columnName, fileColumnTypes.get(i));
+            }
+        }
+        return resultSchema;
+    }
+
+    /**
+     * Get a Pixels reader.
+     *
+     * @param filePath the file path
+     * @param storage the storage instance
+     * @return the Pixels reader
+     * @throws IOException if failed to build the reader
+     */
+    public static PixelsReader getReader(String filePath, Storage storage) throws IOException
+    {
+        requireNonNull(filePath, "fileName is null");
+        requireNonNull(storage, "storage is null");
         PixelsReaderImpl.Builder builder = PixelsReaderImpl.newBuilder()
                 .setStorage(storage)
-                .setPath(fileName)
+                .setPath(filePath)
                 .setEnableCache(false)
                 .setCacheOrder(new ArrayList<>())
                 .setPixelsCacheReader(null)
@@ -99,10 +167,27 @@ public class WorkerCommon
         return pixelsReader;
     }
 
+    /**
+     * Get a Pixels writer.
+     *
+     * @param schema the schema of the file to write
+     * @param storage the storage instance
+     * @param filePath the file path
+     * @param encoding whether this file is encoded or not
+     * @param isPartitioned whether this file is partitioned or not
+     * @param keyColumnIds the ids of the key columns if this file is partitioned.
+     *                     It can be null if partitioned is false.
+     * @return the Pixels writer
+     */
     public static PixelsWriter getWriter(TypeDescription schema, Storage storage,
                                          String filePath, boolean encoding,
                                          boolean isPartitioned, List<Integer> keyColumnIds)
     {
+        requireNonNull(schema, "schema is null");
+        requireNonNull(filePath, "fileName is null");
+        requireNonNull(storage, "storage is null");
+        checkArgument(!isPartitioned || keyColumnIds != null,
+                "keyColumnIds is null whereas isPartitioned is true");
         PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
                 .setSchema(schema)
                 .setPixelStride(pixelStride)

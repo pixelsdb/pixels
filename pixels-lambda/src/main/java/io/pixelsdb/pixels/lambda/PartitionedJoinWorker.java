@@ -119,7 +119,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getSchema(threadPool, s3, leftSchema, rightSchema,
+            getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0).getPath(), rightPartitioned.get(0).getPath());
             Joiner joiner = new Joiner(joinInfo.getJoinType(),
                     leftPrefix, leftSchema.get(), leftKeyColumnIds,

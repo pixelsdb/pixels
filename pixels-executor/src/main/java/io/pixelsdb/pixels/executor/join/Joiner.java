@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.executor.join.NullTuple.createNullTuple;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -48,7 +49,9 @@ public class Joiner
     private final TypeDescription bigSchema;
     private final TypeDescription joinedSchema;
     private final int[] smallKeyColumnIds;
+    private final Set<Integer> smallKeyColumnIdSet;
     private final int[] bigKeyColumnIds;
+    private final Set<Integer> bigKeyColumnIdSet;
     /**
      * All the tuples from the small table that have been matched during the join.
      */
@@ -85,7 +88,17 @@ public class Joiner
         checkArgument(bigKeyColumnIds != null && bigKeyColumnIds.length > 0,
                 "bigKeyColumnIds is null or empty");
         this.smallKeyColumnIds = smallKeyColumnIds;
+        this.smallKeyColumnIdSet = new HashSet<>(this.smallKeyColumnIds.length);
+        for (int id : this.smallKeyColumnIds)
+        {
+            this.smallKeyColumnIdSet.add(id);
+        }
         this.bigKeyColumnIds = bigKeyColumnIds;
+        this.bigKeyColumnIdSet = new HashSet<>(this.bigKeyColumnIds.length);
+        for (int id : this.bigKeyColumnIds)
+        {
+            this.bigKeyColumnIdSet.add(id);
+        }
         // build the schema for the join result.
         this.joinedSchema = new TypeDescription(TypeDescription.Category.STRUCT);
         List<String> smallColumnNames = smallSchema.getFieldNames();
@@ -94,25 +107,33 @@ public class Joiner
                 "invalid children of smallSchema");
         for (int i = 0; i < smallColumnNames.size(); ++i)
         {
+            /**
+             * Even if this is a natural join, we add the prefix to the key columns of the small table.
+             * Because a non-key column of the big table may have the same name as the key column of the small table.
+             */
             this.joinedSchema.addField(smallPrefix.concat(smallColumnNames.get(i)), smallColumnTypes.get(i));
         }
         List<String> bigColumnNames = bigSchema.getFieldNames();
         List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
         checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
                 "invalid children of bigSchema");
-        // duplicate the join key if not nature join.
-        for (int i = 0, j = 0; i < bigColumnNames.size(); ++i)
+        Set<Integer> bigKeyColumnIdSet = new HashSet<>(bigKeyColumnIds.length);
+        for (int id : bigKeyColumnIds)
         {
-            if (joinType == JoinType.NATURAL && j < bigKeyColumnIds.length && i == bigKeyColumnIds[j])
+            bigKeyColumnIdSet.add(id);
+        }
+        for (int i = 0; i < bigColumnNames.size(); ++i)
+        {
+            // duplicate the join key if not nature join.
+            if (joinType == JoinType.NATURAL && bigKeyColumnIdSet.contains(i))
             {
-                j++;
                 continue;
             }
             this.joinedSchema.addField(bigPrefix.concat(bigColumnNames.get(i)), bigColumnTypes.get(i));
         }
         // create the null tuples for outer join.
-        this.smallNullTuple = new NullTuple(smallKeyColumnIds, smallColumnNames.size(), joinType);
-        this.bigNullTuple = new NullTuple(bigKeyColumnIds, bigColumnNames.size(), joinType);
+        this.smallNullTuple = createNullTuple(smallKeyColumnIds, smallColumnNames.size(), joinType);
+        this.bigNullTuple = createNullTuple(bigKeyColumnIds, bigColumnNames.size(), joinType);
     }
 
     /**
@@ -127,7 +148,8 @@ public class Joiner
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");
-        Tuple.Builder builder = new Tuple.Builder(smallBatch, this.smallKeyColumnIds, this.joinType);
+        Tuple.Builder builder = new Tuple.Builder(smallBatch,
+                this.smallKeyColumnIds, this.smallKeyColumnIdSet, this.joinType);
         while (builder.hasNext())
         {
             Tuple tuple = builder.next();
@@ -147,7 +169,8 @@ public class Joiner
         requireNonNull(bigBatch, "bigBatch is null");
         checkArgument(bigBatch.size > 0, "bigBatch is empty");
         VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
-        Tuple.Builder builder = new Tuple.Builder(bigBatch, this.bigKeyColumnIds, this.joinType);
+        Tuple.Builder builder = new Tuple.Builder(bigBatch,
+                this.bigKeyColumnIds, this.bigKeyColumnIdSet, this.joinType);
         while (builder.hasNext())
         {
             Tuple big = builder.next(), joined = null;

@@ -53,7 +53,7 @@ public class TestScanFile
         {
             String filter =
                     "{\"schemaName\":\"tpch\",\"tableName\":\"orders\"," +
-                            "\"columnFilters\":{1:{\"columnName\":\"o_orderkey\",\"columnType\":\"LONG\"," +
+                            "\"columnFilters\":{1:{\"columnName\":\"o_custkey\",\"columnType\":\"LONG\"," +
                             "\"filterJson\":\"{\\\"javaType\\\":\\\"long\\\",\\\"isAll\\\":false," +
                             "\\\"isNone\\\":false,\\\"allowNull\\\":false,\\\"ranges\\\":[{" +
                             "\\\"lowerBound\\\":{\\\"type\\\":\\\"UNBOUNDED\\\"}," +
