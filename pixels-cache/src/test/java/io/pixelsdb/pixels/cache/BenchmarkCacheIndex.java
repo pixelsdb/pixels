@@ -36,6 +36,8 @@ public class BenchmarkCacheIndex {
             }
             System.out.println(Arrays.toString(Arrays.copyOfRange(pixelsCacheKeys, 0, 10)));
 
+            bigEndianIndexFile.unmap();
+            littleEndianIndexFile.unmap();
 
         } catch (Exception e) {
 

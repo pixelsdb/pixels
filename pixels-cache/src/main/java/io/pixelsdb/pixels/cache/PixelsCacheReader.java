@@ -273,6 +273,7 @@ public class PixelsCacheReader
             /**
              * The first byte is matched in the child leader of the parent node,
              * therefore we start the matching from the second byte in edge.
+             * this is useful for below `bytesMatchedInNodeFound == currentNodeEdgeSize`
              */
             bytesMatched++;
             bytesMatchedInNodeFound++;

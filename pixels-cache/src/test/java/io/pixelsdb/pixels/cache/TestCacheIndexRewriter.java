@@ -11,11 +11,12 @@ public class TestCacheIndexRewriter {
             MemoryMappedFile index = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
             CacheIndexRewriter cir = new CacheIndexRewriter(index);
             cir.rewrite();
-
+            index.unmap();
 
         } catch (Exception e)
         {
             e.printStackTrace();
         }
+
     }
 }
