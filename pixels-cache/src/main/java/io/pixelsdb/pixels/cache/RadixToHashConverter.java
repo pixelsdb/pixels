@@ -112,13 +112,14 @@ public class RadixToHashConverter {
 //            int bucket = hash % tableSize;
             int bucket = hash & (tableSize - 1); // initial bucket
             int offset = bucket * kvSize;
-            hashFile.getBytes(offset, this.kv, 0, this.kvSize);
+            hashFile.getBytes(offset, kv, 0, this.kvSize);
             boolean valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0; // all zero
             for(int i = 1; !valid; ++i) {
                 bucket += i * i;
+//                bucket = bucket % tableSize;
                 bucket &= tableSize - 1;
                 offset = bucket * kvSize;
-                hashFile.getBytes(offset, this.kv, offset, this.kvSize);
+                hashFile.getBytes(offset, kv, 0, this.kvSize);
                 valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0;
             }
             // put the Cachekey
@@ -130,8 +131,7 @@ public class RadixToHashConverter {
                     kv, PixelsCacheKey.SIZE, PixelsCacheIdx.SIZE);
 
             // find a valid position, insert into hashFile
-            hashFile.setBytes(offset, this.kv);
-
+            hashFile.setBytes(offset, kv);
             return;
         }
 

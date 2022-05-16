@@ -334,6 +334,10 @@ public class MemoryMappedFile
         unsafe.copyMemory(null, pos + addr, data, BYTE_ARRAY_OFFSET + offset, length);
     }
 
+    public void getBytes(long pos, byte[] data) {
+        getBytes(pos, data, 0, data.length);
+    }
+
     /**
      * Get a direct byte buffer of data without memory copy.
      * The returned byte buffer is read only. Any read (get)
