@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class RadixToHashConverter {
+    private final int HEADER_OFFSET = 8;
     private final MemoryMappedFile radixFile;
     private MemoryMappedFile hashFile = null;
     private final double loadFactor;
@@ -26,7 +27,7 @@ public class RadixToHashConverter {
         this.loadFactor = loadFactor;
         this.tableSize = roundToTwoPower((int) (numKeys() / this.loadFactor)); // round to 2's power
 
-        long mmapSize = (long) this.tableSize * kvSize;
+        long mmapSize = (long) this.tableSize * kvSize + HEADER_OFFSET;
 //        long mmapSize = 10240000000L;
 
 
@@ -35,7 +36,7 @@ public class RadixToHashConverter {
         try {
             this.hashFile = new MemoryMappedFile(hashFileName, mmapSize);
             this.hashFile.clear(); // set all memory to 0
-
+            this.hashFile.setLong(0, tableSize);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -112,26 +113,26 @@ public class RadixToHashConverter {
 //            int bucket = hash % tableSize;
             int bucket = hash & (tableSize - 1); // initial bucket
             int offset = bucket * kvSize;
-            hashFile.getBytes(offset, kv, 0, this.kvSize);
+            hashFile.getBytes(offset + HEADER_OFFSET, kv, 0, this.kvSize);
             boolean valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0; // all zero
             for(int i = 1; !valid; ++i) {
                 bucket += i * i;
 //                bucket = bucket % tableSize;
                 bucket &= tableSize - 1;
                 offset = bucket * kvSize;
-                hashFile.getBytes(offset, kv, 0, this.kvSize);
+                hashFile.getBytes(offset + HEADER_OFFSET, kv, 0, this.kvSize);
                 valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0;
             }
             // put the Cachekey
             kvBuf.position(0);
             kvBuf.putLong(blockId).putShort(rgId).putShort(columnId);
 
-            // put the CacheIdx, aka value
+            // put the CacheIdx, aka value TODO: big endian or little endian?
             radixFile.getBytes(nodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize,
                     kv, PixelsCacheKey.SIZE, PixelsCacheIdx.SIZE);
 
             // find a valid position, insert into hashFile
-            hashFile.setBytes(offset, kv);
+            hashFile.setBytes(offset + HEADER_OFFSET, kv);
             return;
         }
 
