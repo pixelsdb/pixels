@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.retina;
 
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.retina.RetinaWriterServiceGrpc.RetinaWriterServiceImplBase;
 import io.pixelsdb.pixels.retina.RetinaWriterProto.*;
 
@@ -78,7 +79,7 @@ public class RetinaWriterServer {
                 writer.readAndWrite(request.getSchemaName(), request.getTableName(), request.getRgid(),
                         request.getPos(), request.getFilePath());
                 flushResponse = FlushResponse.newBuilder().setErrorCode(0).setPos(request.getPos()).build();
-            } catch (IOException e) {
+            } catch (IOException | MetadataException e) {
                 flushResponse = FlushResponse.newBuilder().setErrorCode(-1).build();
             } finally {
                 responseObserver.onNext(flushResponse);

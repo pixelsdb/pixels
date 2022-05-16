@@ -1,6 +1,9 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -11,26 +14,24 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.load.Config;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 
 public class RetinaWriter {
 
     MemoryMappedFile memoryMappedFile;
+    MetadataService metadataService;
 
     private Properties prop;
     private Config config;
 
-    {
-        try {
-            memoryMappedFile = new MemoryMappedFile("/dev/shm/flush", 200 * 1024);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    HashMap<String, TypeDescription> schemas;
 
     enum ValueType {
         NONE,  // Useful when the type of column vector has not be determined yet.
@@ -59,19 +60,52 @@ public class RetinaWriter {
     }
 
     RetinaWriter() {
+        try {
+            memoryMappedFile = new MemoryMappedFile("/dev/shm/flush", 200 * 1024);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         ConfigFactory configFactory = ConfigFactory.Instance();
         prop = new Properties();
         prop.setProperty("pixel.stride", configFactory.getProperty("pixel.stride"));
         prop.setProperty("row.group.size", configFactory.getProperty("row.group.size"));
         prop.setProperty("block.size", configFactory.getProperty("block.size"));
         prop.setProperty("block.replication", configFactory.getProperty("block.replication"));
+
+        String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
+        int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
+        metadataService = new MetadataService(metadataHost, metadataPort);
+    }
+
+    TypeDescription getSchema(String schemaName, String tableName) throws MetadataException {
+        String key = schemaName + ":" + tableName;
+        TypeDescription schema = schemas.getOrDefault(key, null);
+        if (schema == null) {
+            List<Column> columns = metadataService.getColumns(schemaName, tableName);
+            StringBuilder builder = new StringBuilder();
+            builder.append("struct<");
+            String prefix = "struct<";
+            for (Column col : columns) {
+                builder.append(prefix);
+                builder.append(col.getName());
+                builder.append(":");
+                builder.append(col.getType());
+                prefix = ",";
+            }
+            builder.append(">");
+            String schemaStr = builder.toString();
+            schema = TypeDescription.fromString(schemaStr);
+            schemas.put(key, schema);
+        }
+        return TypeDescription.fromString("struct<a:long,b:long,c:long,d:long,e:long,f:string,g:string,version:long>");
     }
 
 
     /**
      * Read from shared memory and write to file
      */
-    void readAndWrite(String schemaName, String tableName, int rgid, long pos, String filePath) throws IOException {
+    void readAndWrite(String schemaName, String tableName, int rgid, long pos, String filePath) throws IOException, MetadataException {
         System.out.printf("Request received: %s %s %d %d %s...\n", schemaName, tableName, rgid, pos, filePath);
         int colNum = memoryMappedFile.getInt(pos);
         pos += Integer.BYTES;
@@ -95,9 +129,8 @@ public class RetinaWriter {
         short replication = Short.parseShort(prop.getProperty("block.replication"));
 
         System.out.printf("prop: %d %d\n", pixelStride, rowGroupSize);
-        // TODO get from metadata service and cache schema
-        String schemaStr = "struct<a:long,b:long,c:long,d:long,e:long,f:string,g:string,version:long>";
-        TypeDescription schema = TypeDescription.fromString(schemaStr);
+
+        TypeDescription schema = getSchema(schemaName, tableName);
         VectorizedRowBatch rowBatch = schema.createRowBatch(rowNum);
         Storage targetStorage = StorageFactory.Instance().getStorage("file");
         System.out.println("here");
