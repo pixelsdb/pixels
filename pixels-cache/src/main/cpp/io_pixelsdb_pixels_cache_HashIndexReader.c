@@ -21,12 +21,14 @@ int hashcode(const char* bytes, int size) {
 }
 
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_HashIndexReader_doNativeSearch
-  (JNIEnv *env, jobject this, jlong mmAddr, jlong mmSize, jlong blockId, jshort rowGroupId, jshort columnId, jobject retBuf) {
+  (JNIEnv *env, jobject this, jlong mmAddr, jlong mmSize, jlong blockId, jshort rowGroupId, jshort columnId, jlong retAddr_) {
+  // static variable is not thread-safe!!!
   // static char* retAddr = NULL;
   // if (!retAddr) {
   //   retAddr = (*env)->GetDirectBufferAddress(env, retBuf);
   // }
-  char* retAddr = (*env)->GetDirectBufferAddress(env, retBuf);
+  // char* retAddr = (*env)->GetDirectBufferAddress(env, retBuf);
+  char* retAddr = (char*) retAddr_;
   *(long *)retAddr = -1;
   MemoryMappedFile indexFile = (MemoryMappedFile){(char *)mmAddr, mmSize};
 

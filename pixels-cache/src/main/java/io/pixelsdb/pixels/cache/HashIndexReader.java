@@ -26,13 +26,14 @@ public class HashIndexReader implements AutoCloseable {
 
     private final MemoryMappedFile indexFile;
     private final ByteBuffer cacheIdxBuf = ByteBuffer.allocateDirect(16).order(ByteOrder.LITTLE_ENDIAN);
-//    private final long cacheIdxBufAddr = ((DirectBuffer) this.cacheIdxBuf).address();
+    private final long cacheIdxBufAddr = ((DirectBuffer) this.cacheIdxBuf).address();
 
     HashIndexReader(MemoryMappedFile indexFile)
     {
         this.indexFile = indexFile;
         this.tableSize = (int) indexFile.getLong(0);
         System.out.println("tableSize=" + tableSize);
+        System.out.println("cacheIdxAddr=" + cacheIdxBufAddr);
     }
 
     private int hashcode(byte[] bytes) {
@@ -45,11 +46,11 @@ public class HashIndexReader implements AutoCloseable {
         return var1;
     }
 
-    private native void doNativeSearch(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId, ByteBuffer ret);
+    private native void doNativeSearch(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId, long cacheIdxBufAddr);
 
     public PixelsCacheIdx nativeSearch(long blockId, short rowGroupId, short columnId) {
         cacheIdxBuf.position(0);
-        doNativeSearch(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId, cacheIdxBuf);
+        doNativeSearch(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId, cacheIdxBufAddr);
         long offset = cacheIdxBuf.getLong();
         int length = cacheIdxBuf.getInt();
         if (offset == -1) {

@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     io_pixelsdb_pixels_cache_HashIndexReader
  * Method:    doNativeSearch
- * Signature: (JJJSSLjava/nio/ByteBuffer;)V
+ * Signature: (JJJSSJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_HashIndexReader_doNativeSearch
-  (JNIEnv *, jobject, jlong, jlong, jlong, jshort, jshort, jobject);
+  (JNIEnv *, jobject, jlong, jlong, jlong, jshort, jshort, jlong);
 
 #ifdef __cplusplus
 }
