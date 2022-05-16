@@ -94,6 +94,7 @@ message Layout {
     string splits = 9;
     string projections = 10;
     uint64 tableId = 11;
+    string retinaPath = 12;
 }
 
 message View {

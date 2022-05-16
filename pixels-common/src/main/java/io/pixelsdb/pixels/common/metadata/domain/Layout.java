@@ -39,6 +39,7 @@ public class Layout extends Base
     private String orderPath;
     private String compact;
     private String compactPath;
+    private String retinaPath;
     private String splits;
     private String projections;
     private long tableId;
@@ -78,6 +79,7 @@ public class Layout extends Base
         this.splits = layout.getSplits();
         this.projections = layout.getProjections();
         this.tableId = layout.getTableId();
+        this.retinaPath = layout.getRetinaPath();
     }
 
     public int getVersion()
@@ -227,6 +229,11 @@ public class Layout extends Base
         this.tableId = tableId;
     }
 
+    public String getRetinaPath()
+    {
+        return retinaPath;
+    }
+
     @Override
     public String toString()
     {
@@ -238,6 +245,7 @@ public class Layout extends Base
                 ", orderPath='" + orderPath + '\'' +
                 ", compact='" + compact + '\'' +
                 ", compactPath='" + compactPath + '\'' +
+                ", retinaPath='" + retinaPath + '\'' +
                 ", splits='" + splits + '\'' +
                 ", projections='" + projections + '\'' +
                 ", tableId=" + tableId +
