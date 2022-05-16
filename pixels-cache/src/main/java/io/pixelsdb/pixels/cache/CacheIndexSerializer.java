@@ -7,7 +7,7 @@ public class CacheIndexSerializer {
     private final MemoryMappedFile indexFile;
 
     static {
-        System.loadLibrary("cache");
+        System.loadLibrary("serializer");
     }
 
     CacheIndexSerializer(MemoryMappedFile indexFile) {

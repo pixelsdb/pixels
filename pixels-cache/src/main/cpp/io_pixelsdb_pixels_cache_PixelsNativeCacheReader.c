@@ -112,9 +112,9 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_sea
       if (((currentNodeHeader >> 31) & 1) > 0) // TODO: why do we need & 1?
       {
           // TODO: make it little endian
-          const char* cacheIdx = getBytes(indexFile, currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize);
-          unsigned long offset = bswap_64(*((unsigned long *) cacheIdx));
-          unsigned int length = bswap_32(*((unsigned int *) (cacheIdx + 8)));
+          long pos = currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize;
+          unsigned long offset = getLong(indexFile, pos);
+          unsigned int length = getInt(indexFile, pos + sizeof(offset));
           ret[0] = offset;
           ret[1] = length;
       }

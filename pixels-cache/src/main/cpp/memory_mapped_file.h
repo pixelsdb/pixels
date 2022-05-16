@@ -30,6 +30,12 @@ static inline void writeLong(const MemoryMappedFile mmap_f, long pos, long value
     *addr = value;
 }
 
+static inline void writeInt(const MemoryMappedFile mmap_f, long pos, int value) 
+{
+    int *addr = (int *) (mmap_f.addr + pos);
+    *addr = value;
+}
+
 static inline const char *getBytes(const MemoryMappedFile mmap_f, long pos)
 {
   return (char *)(mmap_f.addr + pos);

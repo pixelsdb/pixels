@@ -61,27 +61,6 @@ MemoryMappedFile build_mmap_f(JNIEnv *env, jobject obj)
 void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyBuf, int ptr, FILE *out)
 {
   if (currentNodeOffset > max_offset) max_offset = currentNodeOffset;
-  // we reach a leaf, truly
-  if (ptr == KEY_LEN) {
-    fputs("0x", out);
-    for(int i = 0; i < ptr; ++i) {
-      fprintf(out, "%02x", keyBuf[i]);
-      // fputc(keyBuf[i], out);
-    }
-    fputc(';', out);
-    // parse the block id
-    unsigned long blockId = bswap_64(*((unsigned long *) keyBuf));
-    unsigned short rowGroupId = bswap_16(*((unsigned short *) (keyBuf + 8)));
-    unsigned short columnId = bswap_16(*((unsigned short *) (keyBuf + 10)));
-    fprintf(out, "%lu-%u-%u", blockId, rowGroupId, columnId);
-    fputc('\n', out);
-    // printf("ptr=%d, key=0x", ptr);
-    // for(int i = 0; i < ptr; i++) {
-    //   printf("%02x", keyBuf[i]);
-    // }    
-    // printf("\n");
-    return;
-  }
 
   // we reach a deadend
   if ((char *) currentNodeOffset == NULL)
@@ -94,6 +73,7 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
   unsigned long currentNodeHeader = getInt(indexFile, currentNodeOffset);
   unsigned int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
   unsigned int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >> 9;
+  int isLeaf = ((currentNodeHeader >> 31) & 1) > 0;
 
   const char *nodeData = getBytes(indexFile, currentNodeOffset + 4);
 
@@ -104,7 +84,13 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
     keyBuf[ptr++] = nodeData[i];
   }
 
+  // we reach a leaf, truly
   if (ptr == KEY_LEN) {
+    if (!isLeaf) {
+      printf("fatal error!!! not leaf but ptr=%d\n", KEY_LEN);
+      return;
+    }
+
     fputs("0x", out);
     for(int i = 0; i < ptr; ++i) {
       // fputc(keyBuf[i], out);
@@ -117,6 +103,12 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
     unsigned short rowGroupId = bswap_16(*((unsigned short *) (keyBuf + 8)));
     unsigned short columnId = bswap_16(*((unsigned short *) (keyBuf + 10)));
     fprintf(out, "%lu-%u-%u", blockId, rowGroupId, columnId);
+    fputc(';', out);
+    // write the cacheIdx
+    long pos = currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize;
+    unsigned long offset = (getLong(indexFile, pos));
+    unsigned int length = (getInt(indexFile, pos + 8));
+    fprintf(out, "%lu-%u", offset, length);
     fputc('\n', out);
     // printf("ptr=%d, key=0x", ptr);
     // for(int i = 0; i < ptr; i++) {

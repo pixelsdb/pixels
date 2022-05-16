@@ -15,7 +15,6 @@ public class TestCacheIndexSerializer {
             CacheIndexSerializer cis = new CacheIndexSerializer(index);
             cis.traverse();
             cis._traverse();
-            index.unmap();
 
         } catch (Exception e)
         {

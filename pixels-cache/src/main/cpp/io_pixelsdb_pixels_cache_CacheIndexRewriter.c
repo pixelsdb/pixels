@@ -11,11 +11,6 @@
 // each key has at most 12 bytes, so sizeof(keyBuf)=12
 void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyBuf, int ptr)
 {
-  // we reach a leaf, truly
-  if (ptr == KEY_LEN) {
-    return;
-  }
-
   // we reach a deadend
   if ((char *) currentNodeOffset == NULL)
   { 
@@ -28,7 +23,7 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
   unsigned int currentNodeChildrenNum = currentNodeHeader & 0x000001FF;
   unsigned int currentNodeEdgeSize = (currentNodeHeader & 0x7FFFFE00) >> 9;
   int childOffset = currentNodeOffset + 4;
-  char *nodeData = getBytes(indexFile, childOffset);
+  const char *nodeData = getBytes(indexFile, childOffset);
 
   // read the edge first
   int edgeEndOffset = currentNodeChildrenNum * 8 + currentNodeEdgeSize;
@@ -37,9 +32,21 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
     keyBuf[ptr++] = nodeData[i];
   }
 
+  // we reach a leaf, truly
   if (ptr == KEY_LEN) {
+    // rewrite the cacheIdx
+    long pos = currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize;
+    const char* cacheIdx = getBytes(indexFile, pos);
+    unsigned long offset = bswap_64(*((unsigned long *) cacheIdx));
+    unsigned int length = bswap_32(*((unsigned int *) (cacheIdx + 8)));
+    writeLong(indexFile, pos, offset);
+    writeInt(indexFile, pos + 8, length);
     return;
   }
+
+  // if (ptr == KEY_LEN) {
+  //   return;
+  // }
 
   if (currentNodeChildrenNum == 0) {
     printf("currentNodeChildrenNum is 0, but ptr=%d(not %d)\n", ptr, KEY_LEN);
@@ -93,10 +100,8 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_CacheIndexRewriter_rewrite(
 
   long currentNodeOffset = INDEX_RADIX_OFFSET;
 
-  FILE* out = fopen("./tmp.txt", "w");
   char keyBuf[12] = {0};
   dfs(indexFile, currentNodeOffset, keyBuf, 0);
-  fclose(out);
 
   // while (1)
   // {

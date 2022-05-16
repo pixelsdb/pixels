@@ -46,17 +46,6 @@ public class BenchmarkCacheIndex {
         }
 
     }
-    @After
-    public void close() {
-        try {
-            bigEndianIndexFile.unmap();
-            littleEndianIndexFile.unmap();
-            hashIndexFile.unmap();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }
 
     @Test
     public void searchAllKeys() throws InterruptedException {
