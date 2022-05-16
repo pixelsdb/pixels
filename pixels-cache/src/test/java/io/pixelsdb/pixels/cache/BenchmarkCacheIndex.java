@@ -204,7 +204,7 @@ public class BenchmarkCacheIndex {
             for (int i = 0; i < idxes.length; i++)
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
-                PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
+                PixelsCacheIdx idx = cacheReader.nativeSearch(cacheKey.blockId,
                         cacheKey.rowGroupId,
                         cacheKey.columnId);
                 if (idx == null)

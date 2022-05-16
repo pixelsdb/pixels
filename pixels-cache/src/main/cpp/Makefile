@@ -1,3 +1,4 @@
+CFLAGS=-Wpedantic
 
 all: c run
 
@@ -7,6 +8,7 @@ clean:
 gen:
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexSerializer
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.PixelsNativeCacheReader
+	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.HashIndexReader
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexRewriter
 
 
@@ -16,11 +18,15 @@ disc:
 
 serialize:
 	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexSerializer.c -o io_pixelsdb_pixels_cache_CacheIndexSerializer.o
-	gcc -shared -fPIC -o ../../../libcache.so io_pixelsdb_pixels_cache_CacheIndexSerializer.o -lc
+	gcc -shared -fPIC -o ../../../libserializer.so io_pixelsdb_pixels_cache_CacheIndexSerializer.o -lc
 
 reader:
 	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_PixelsNativeCacheReader.c -o io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o
 	gcc -shared -fPIC -o ../../../libreader.so io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o -lc
+
+hash_index:
+	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_HashIndexReader.c -o io_pixelsdb_pixels_cache_HashIndexReader.o
+	gcc -shared -fPIC -o ../../../libHashIndexReader.so io_pixelsdb_pixels_cache_HashIndexReader.o -lc
 
 rewriter:
 	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexRewriter.c -o io_pixelsdb_pixels_cache_CacheIndexRewriter.o
