@@ -6,6 +6,8 @@
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12
 
+unsigned long max_offset = 0l;
+
 typedef struct
 {
   char *addr;
@@ -58,6 +60,7 @@ MemoryMappedFile build_mmap_f(JNIEnv *env, jobject obj)
 // each key has at most 12 bytes, so sizeof(keyBuf)=12
 void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyBuf, int ptr, FILE *out)
 {
+  if (currentNodeOffset > max_offset) max_offset = currentNodeOffset;
   // we reach a leaf, truly
   if (ptr == KEY_LEN) {
     fputs("0x", out);
@@ -132,7 +135,7 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
   for (int i = 0; i < currentNodeChildrenNum; ++i)
   {
     // Note: the child is stored in big-endian!
-    unsigned long child = bswap_64(*((unsigned long *)nodeData));
+    unsigned long child = (*((unsigned long *)nodeData));
     nodeData += 8;
     char leader = (char)((child >> 56) & 0xFF);
     long matchingChildOffset = (child & 0x00FFFFFFFFFFFFFF);
@@ -182,6 +185,8 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_CacheIndexSerializer_traver
   char keyBuf[12] = {0};
   dfs(indexFile, currentNodeOffset, keyBuf, 0, out);
   fclose(out);
+
+  printf("max offset=%lu\n", max_offset);
 
   // while (1)
   // {

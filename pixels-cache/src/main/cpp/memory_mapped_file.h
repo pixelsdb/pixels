@@ -18,19 +18,19 @@ static inline int getInt(const MemoryMappedFile mmap_f, long pos)
   return *addr;
 }
 
-int getLong(const MemoryMappedFile mmap_f, long pos)
+static inline int getLong(const MemoryMappedFile mmap_f, long pos)
 {
   long *addr = (long *)(mmap_f.addr + pos);
   return *addr;
 }
 
-void writeLong(const MemoryMappedFile mmap_f, long pos, long value) 
+static inline void writeLong(const MemoryMappedFile mmap_f, long pos, long value) 
 {
     long *addr = (long *) (mmap_f.addr + pos);
     *addr = value;
 }
 
-const char *getBytes(const MemoryMappedFile mmap_f, long pos)
+static inline const char *getBytes(const MemoryMappedFile mmap_f, long pos)
 {
   return (char *)(mmap_f.addr + pos);
 }
