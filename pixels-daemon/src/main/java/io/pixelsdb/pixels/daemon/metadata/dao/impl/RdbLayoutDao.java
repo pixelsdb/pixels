@@ -60,7 +60,7 @@ public class RdbLayoutDao extends LayoutDao
                 .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
                 .setSplits(rs.getString("LAYOUT_SPLITS"))
                 .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setTableId(rs.getInt("TBLS_TBL_ID")).build();
+                .setRegionId(rs.getInt("REGIONS_REGION_ID")).build();
                 return layout;
             }
         } catch (SQLException e)
@@ -71,10 +71,11 @@ public class RdbLayoutDao extends LayoutDao
         return null;
     }
 
-    public MetadataProto.Layout getLatestByTable(MetadataProto.Table table,
+    @Override
+    public MetadataProto.Layout getLatestByRegion(MetadataProto.Region region,
                                                  MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
-        List<MetadataProto.Layout> layouts = this.getByTable(table, -1, permissionRange);
+        List<MetadataProto.Layout> layouts = this.getByRegion(region, -1, permissionRange);
 
         MetadataProto.Layout res = null;
         if (layouts != null)
@@ -95,21 +96,22 @@ public class RdbLayoutDao extends LayoutDao
 
     /**
      * get layout of a table by version and permission range.
-     * @param table
+     * @param region
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
-                                                          MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
+    @Override
+    public List<MetadataProto.Layout> getByRegion (MetadataProto.Region region, int version,
+                                                  MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
-        if(table == null)
+        if(region == null)
         {
             return null;
         }
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            String sql = "SELECT * FROM LAYOUTS WHERE TBLS_TBL_ID=" + table.getId();
+            String sql = "SELECT * FROM LAYOUTS WHERE REGIONS_REGION_ID=" + region.getId();
             if (permissionRange == MetadataProto.GetLayoutRequest.PermissionRange.READABLE)
             {
                 sql += " AND LAYOUT_PERMISSION>=0";
@@ -127,17 +129,17 @@ public class RdbLayoutDao extends LayoutDao
             while (rs.next())
             {
                 MetadataProto.Layout layout = MetadataProto.Layout.newBuilder()
-                .setId(rs.getInt("LAYOUT_ID"))
-                .setVersion(rs.getInt("LAYOUT_VERSION"))
-                .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
-                .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
-                .setOrder(rs.getString("LAYOUT_ORDER"))
-                .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
-                .setCompact(rs.getString("LAYOUT_COMPACT"))
-                .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
-                .setSplits(rs.getString("LAYOUT_SPLITS"))
-                .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
-                .setTableId(table.getId()).build();
+                        .setId(rs.getInt("LAYOUT_ID"))
+                        .setVersion(rs.getInt("LAYOUT_VERSION"))
+                        .setPermission(convertPermission(rs.getShort("LAYOUT_PERMISSION")))
+                        .setCreateAt(rs.getLong("LAYOUT_CREATE_AT"))
+                        .setOrder(rs.getString("LAYOUT_ORDER"))
+                        .setOrderPath(rs.getString("LAYOUT_ORDER_PATH"))
+                        .setCompact(rs.getString("LAYOUT_COMPACT"))
+                        .setCompactPath(rs.getString("LAYOUT_COMPACT_PATH"))
+                        .setSplits(rs.getString("LAYOUT_SPLITS"))
+                        .setProjections(rs.getString("LAYOUT_PROJECTIONS"))
+                        .setRegionId(region.getId()).build();
                 layouts.add(layout);
             }
             return layouts;
@@ -180,7 +182,7 @@ public class RdbLayoutDao extends LayoutDao
                 "`LAYOUT_COMPACT_PATH`," +
                 "`LAYOUT_SPLITS`," +
                 "`LAYOUT_PROJECTIONS`," +
-                "`TBLS_TBL_ID`) VALUES (?,?,?,?,?,?,?,?,?,?)";
+                "`REGIONS_REGION_ID`) VALUES (?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setInt(1, layout.getVersion());
@@ -192,7 +194,7 @@ public class RdbLayoutDao extends LayoutDao
             pst.setString(7, layout.getCompactPath());
             pst.setString(8, layout.getSplits());
             pst.setString(9, layout.getProjections());
-            pst.setLong(10, layout.getTableId());
+            pst.setLong(10, layout.getRegionId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {

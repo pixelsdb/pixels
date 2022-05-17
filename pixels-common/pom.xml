@@ -106,6 +106,13 @@
             <artifactId>jetcd-core</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.24</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -123,9 +130,9 @@
                 <version>0.5.1</version>
                 <configuration>
                     <protoSourceRoot>../proto</protoSourceRoot>
-                    <protocArtifact>com.google.protobuf:protoc:3.6.1:exe:${os.detected.classifier}</protocArtifact>
+                    <protocArtifact>com.google.protobuf:protoc:3.6.1:exe:osx-x86_64</protocArtifact>
                     <pluginId>grpc-java</pluginId>
-                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.9.1:exe:${os.detected.classifier}</pluginArtifact>
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.9.1:exe:osx-x86_64</pluginArtifact>
                 </configuration>
                 <executions>
                     <execution>
