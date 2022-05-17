@@ -255,7 +255,7 @@ public class BinaryColumnVector extends ColumnVector
             }
             return true;
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
     /**

@@ -35,9 +35,14 @@ import static java.util.Objects.requireNonNull;
  * with the row batches from the big table. In Pixels, we have a default rule that
  * the left table is the small table, and the right table is the big table.
  * <p/>
- * <b>Note</b> that this joiner can not be directly used for left outer broadcast
+ * <b>Note 1:</b> this joiner can not be directly used for left outer broadcast
  * distributed join, because it does not ensure that the unmatched tuples from the
  * small table will be returned only once by all the joiners within the join.
+ * <p/>
+ * <b>Note 2:</b> only equi-joins are supported. Semi-join and anti-join are not supported.
+ * Thus, null values are not checked in the join. There is no join result if either or both
+ * side(s) is(are) null.
+ *
  * @author hank
  * @date 07/05/2022
  */

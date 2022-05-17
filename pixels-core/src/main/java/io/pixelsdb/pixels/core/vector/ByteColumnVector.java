@@ -109,7 +109,7 @@ public class ByteColumnVector extends ColumnVector
         {
             return this.vector[index] == otherVector.vector[otherIndex];
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
     @Override

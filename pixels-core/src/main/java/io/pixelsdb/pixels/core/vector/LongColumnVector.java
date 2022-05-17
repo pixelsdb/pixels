@@ -124,7 +124,7 @@ public class LongColumnVector extends ColumnVector
         {
             return this.vector[index] == otherVector.vector[otherIndex];
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
     // Fill the column vector with the provided value
