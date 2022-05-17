@@ -250,9 +250,11 @@ public class DecimalColumnVector extends ColumnVector
         DecimalColumnVector otherVector = (DecimalColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
-            return this.vector[index] == otherVector.vector[otherIndex];
+            return this.vector[index] == otherVector.vector[otherIndex] &&
+                    this.scale == otherVector.scale;
+            // We assume the values never overflow and do not check the precisions.
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
 

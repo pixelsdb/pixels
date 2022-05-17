@@ -119,7 +119,7 @@ public class DateColumnVector extends ColumnVector
         {
             return this.dates[index] == otherVector.dates[otherIndex];
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
 
     }
 

@@ -220,6 +220,8 @@ public abstract class ColumnVector implements AutoCloseable
 
     /**
      * Whether the two elements in this and the other column vector equals.
+     * <b>Note</b> that two elements are not equal if either or both of them is(are) null.
+     *
      * @param index the index in this column vector
      * @param otherIndex the index in the other column vector
      * @param other the other column vector

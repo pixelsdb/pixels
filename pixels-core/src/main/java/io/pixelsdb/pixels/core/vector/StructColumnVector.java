@@ -177,7 +177,7 @@ public class StructColumnVector extends ColumnVector
             }
             return true;
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
     @Override

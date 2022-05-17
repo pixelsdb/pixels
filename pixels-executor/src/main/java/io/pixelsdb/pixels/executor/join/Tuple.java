@@ -100,6 +100,7 @@ public class Tuple
             }
             for (int i = 0; i < this.keyColumnIds.length; ++i)
             {
+                // We only support equi-joins, thus null value is not checked.
                 if (!this.columns[this.keyColumnIds[i]].elementEquals(
                         this.rowId, other.rowId, other.columns[other.keyColumnIds[i]]))
                 {

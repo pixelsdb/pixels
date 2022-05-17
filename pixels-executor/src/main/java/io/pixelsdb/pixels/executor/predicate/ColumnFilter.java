@@ -246,7 +246,7 @@ public class ColumnFilter<T extends Comparable<T>>
                         (Byte) range.lowerBound.value : Byte.MIN_VALUE;
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
-                    lowerBound ++;
+                    lowerBound++;
                 }
                 byte upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Byte) range.upperBound.value : Byte.MAX_VALUE;
@@ -352,7 +352,7 @@ public class ColumnFilter<T extends Comparable<T>>
                         (Long) range.lowerBound.value : Long.MIN_VALUE;
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
-                    lowerBound ++;
+                    lowerBound++;
                 }
                 long upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Long) range.upperBound.value : Long.MAX_VALUE;
@@ -474,7 +474,7 @@ public class ColumnFilter<T extends Comparable<T>>
                         new Decimal(Long.MIN_VALUE, 18, 0);
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
-                    lowerBound.value ++;
+                    lowerBound.value++;
                 }
                 Decimal upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         new Decimal((Long) range.upperBound.value, precision, scale) :
@@ -505,7 +505,6 @@ public class ColumnFilter<T extends Comparable<T>>
                         }
                     }
                 }
-
             }
         }
         else
@@ -743,7 +742,7 @@ public class ColumnFilter<T extends Comparable<T>>
                         (Integer) range.lowerBound.value : Integer.MIN_VALUE;
                 if (range.lowerBound.type == Bound.Type.EXCLUDED)
                 {
-                    lowerBound ++;
+                    lowerBound++;
                 }
                 int upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Integer) range.upperBound.value : Integer.MAX_VALUE;

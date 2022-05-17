@@ -119,7 +119,7 @@ public class TimestampColumnVector extends ColumnVector
             // this.nanos is currently not used.
             return this.times[index] == otherVector.times[otherIndex];
         }
-        return this.isNull[index] == otherVector.isNull[otherIndex];
+        return false;
     }
 
     /**
