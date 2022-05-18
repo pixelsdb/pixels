@@ -196,7 +196,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 logger.error("interrupted while waiting for the termination of join", e);
             }
 
-            if (joinInfo.getJoinType() == JoinType.EQUI_LEFT)
+            if (joinInfo.getJoinType() == JoinType.EQUI_LEFT || joinInfo.getJoinType() == JoinType.EQUI_FULL)
             {
                 // output the left-outer tail.
                 String outputPath = outputFolder + requestId + "_join_left_outer";
