@@ -17,18 +17,24 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.predicate;
+package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInvoker;
 import io.pixelsdb.pixels.executor.lambda.JoinOutput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.predicate.Bound;
+import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
+import io.pixelsdb.pixels.executor.predicate.Filter;
+import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.junit.Test;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 
 import static io.pixelsdb.pixels.executor.predicate.Bound.Type.INCLUDED;

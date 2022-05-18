@@ -50,12 +50,27 @@ public class ColumnFilter<T extends Comparable<T>>
     private String filterJson = null;
     // TODO: automatic initialization of this.filter is not yet implemented for gson.
     private final Filter<T> filter;
+    private final Set<T> includes;
+    private final Set<T> excludes;
 
     public ColumnFilter(String columnName, TypeDescription.Category columnType, Filter<T> filter)
     {
         this.columnName = columnName;
         this.columnType = columnType;
         this.filter = filter;
+        this.includes = new HashSet<>();
+        this.excludes = new HashSet<>();
+        for (Bound<T> discrete : this.filter.discreteValues)
+        {
+            if (discrete.type == Bound.Type.INCLUDED)
+            {
+                includes.add(discrete.value);
+            }
+            else
+            {
+                excludes.add(discrete.value);
+            }
+        }
     }
 
     /**
@@ -98,6 +113,19 @@ public class ColumnFilter<T extends Comparable<T>>
                     ") is not supported in column filter");
         }
         this.filter = JSON.parseObject(filterJson, filterType);
+        this.includes = new HashSet<>();
+        this.excludes = new HashSet<>();
+        for (Bound<T> discrete : this.filter.discreteValues)
+        {
+            if (discrete.type == Bound.Type.INCLUDED)
+            {
+                includes.add(discrete.value);
+            }
+            else
+            {
+                excludes.add(discrete.value);
+            }
+        }
     }
 
     public String getColumnName()
@@ -279,19 +307,6 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-            Set<Byte> includes = new HashSet<>();
-            Set<Byte> excludes = new HashSet<>();
-            for (Bound<T> discrete : this.filter.discreteValues)
-            {
-                if (discrete.type == Bound.Type.INCLUDED)
-                {
-                    includes.add((Byte) discrete.value);
-                }
-                else
-                {
-                    excludes.add((Byte) discrete.value);
-                }
-            }
             if (!includes.isEmpty())
             {
                 if (this.filter.allowNull && !noNulls)
@@ -385,19 +400,6 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-            Set<Long> includes = new HashSet<>();
-            Set<Long> excludes = new HashSet<>();
-            for (Bound<T> discrete : this.filter.discreteValues)
-            {
-                if (discrete.type == Bound.Type.INCLUDED)
-                {
-                    includes.add((Long) discrete.value);
-                }
-                else
-                {
-                    excludes.add((Long) discrete.value);
-                }
-            }
             if (!includes.isEmpty())
             {
                 if (this.filter.allowNull && !noNulls)
@@ -509,19 +511,6 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-            Set<Decimal> includes = new HashSet<>();
-            Set<Decimal> excludes = new HashSet<>();
-            for (Bound<T> discrete : this.filter.discreteValues)
-            {
-                if (discrete.type == Bound.Type.INCLUDED)
-                {
-                    includes.add(new Decimal((Long) discrete.value, precision, scale));
-                }
-                else
-                {
-                    excludes.add(new Decimal((Long) discrete.value, precision, scale));
-                }
-            }
             if (!includes.isEmpty())
             {
                 if (this.filter.allowNull && !noNulls)
@@ -661,19 +650,6 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-            Set<String> includes = new HashSet<>();
-            Set<String> excludes = new HashSet<>();
-            for (Bound<T> discrete : this.filter.discreteValues)
-            {
-                if (discrete.type == Bound.Type.INCLUDED)
-                {
-                    includes.add((String) discrete.value);
-                }
-                else
-                {
-                    excludes.add((String) discrete.value);
-                }
-            }
             if (!includes.isEmpty())
             {
                 if (this.filter.allowNull && !noNulls)
@@ -775,19 +751,6 @@ public class ColumnFilter<T extends Comparable<T>>
         }
         else
         {
-            Set<Integer> includes = new HashSet<>();
-            Set<Integer> excludes = new HashSet<>();
-            for (Bound<T> discrete : this.filter.discreteValues)
-            {
-                if (discrete.type == Bound.Type.INCLUDED)
-                {
-                    includes.add((Integer) discrete.value);
-                }
-                else
-                {
-                    excludes.add((Integer) discrete.value);
-                }
-            }
             if (!includes.isEmpty())
             {
                 if (this.filter.allowNull && !noNulls)

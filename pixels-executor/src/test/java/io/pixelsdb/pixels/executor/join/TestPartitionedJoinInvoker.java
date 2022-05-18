@@ -17,10 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.predicate;
+package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.*;
 import org.junit.Test;
 
