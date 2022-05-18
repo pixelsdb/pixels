@@ -48,7 +48,7 @@ public class TestBroadcastJoinInvoker
     @Test
     public void testPartLineitem() throws ExecutionException, InterruptedException
     {
-        String leftFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\"," +
+        String leftFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"part\"," +
                 "\"columnFilters\":{2:{\"columnName\":\"p_size\",\"columnType\":\"INT\"," +
                 "\"filterJson\":\"{\\\"javaType\\\":\\\"long\\\",\\\"isAll\\\":false," +
                 "\\\"isNone\\\":false,\\\"allowNull\\\":false,\\\"onlyNull\\\":false," +
