@@ -13,7 +13,7 @@ public class RowGroup extends Base {
     private long layoutId;
     @Getter
     @Setter
-    private long fileRgIdx;
+    private int fileRgIdx;
     @Getter
     @Setter
     private boolean isWriteBuffer;

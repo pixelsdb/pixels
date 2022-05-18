@@ -109,7 +109,7 @@ message RowGroup {
     uint64 id = 1;
     uint64 layoutId = 2;
     string filePath = 3;
-    uint64 fileRgIdx = 4;
+    uint32 fileRgIdx = 4;
     bool isWriteBuffer = 5;
 }
 
