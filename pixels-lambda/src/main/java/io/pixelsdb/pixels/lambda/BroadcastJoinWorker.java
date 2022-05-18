@@ -196,7 +196,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 logger.error("interrupted while waiting for the termination of join", e);
             }
 
-            if (joinType == JoinType.EQUI_LEFT)
+            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
             {
                 // output the left-outer tail.
                 String outputPath = outputFolder + requestId + "_join_left_outer";

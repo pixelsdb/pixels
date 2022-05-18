@@ -68,7 +68,7 @@ public class TestPartitionedJoinInvoker
         lineitemPartitioned2.setPath("pixels-lambda-test/lineitem_part_1");
         lineitemPartitioned2.setHashValues(hashValues);
         joinInput.setRightPartitioned(Arrays.asList(lineitemPartitioned1, lineitemPartitioned2));
-        joinInput.setJoinInfo(new PartitionedJoinInput.JoinInfo(40, Arrays.asList(16), JoinType.EQUI_RIGHT));
+        joinInput.setJoinInfo(new PartitionedJoinInput.JoinInfo(40, Arrays.asList(16), JoinType.EQUI_LEFT));
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
 

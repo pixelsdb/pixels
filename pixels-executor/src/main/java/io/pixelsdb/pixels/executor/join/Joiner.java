@@ -189,6 +189,7 @@ public class Joiner
                     case EQUI_LEFT:
                         break;
                     case EQUI_RIGHT:
+                    case EQUI_FULL:
                         joined = big.concatLeft(smallNullTuple);
                         break;
                     default:
@@ -196,7 +197,7 @@ public class Joiner
                 }
             } else
             {
-                if (joinType == JoinType.EQUI_LEFT)
+                if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
                 {
                     this.matchedSmallTuples.add(small);
                 }
@@ -218,8 +219,8 @@ public class Joiner
      */
     public boolean writeLeftOuter(PixelsWriter pixelsWriter, int batchSize) throws IOException
     {
-        checkArgument(this.joinType == JoinType.EQUI_LEFT,
-                "getLeftOuter() is illegal for non-left-outer join");
+        checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
+                "getLeftOuter() can only be used for left or full outer join");
         checkArgument(batchSize > 0, "batchSize must be positive");
         requireNonNull(pixelsWriter, "pixelsWriter is null");
 

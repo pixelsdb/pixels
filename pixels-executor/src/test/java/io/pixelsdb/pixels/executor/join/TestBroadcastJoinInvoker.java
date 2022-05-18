@@ -100,7 +100,7 @@ public class TestBroadcastJoinInvoker
         joinInput.setRightSplitSize(4);
         joinInput.setRightFilter(rightFilter);
 
-        joinInput.setJoinType(JoinType.EQUI_INNER);
+        joinInput.setJoinType(JoinType.EQUI_LEFT);
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
 
