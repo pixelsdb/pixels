@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import io.pixelsdb.pixels.daemon.metadata.dao.*;
+import lombok.val;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,6 +46,8 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     private ColumnDao columnDao = DaoFactory.Instance().getColumnDao("rdb");
     private LayoutDao layoutDao = DaoFactory.Instance().getLayoutDao("rdb");
     private ViewDao viewDao = DaoFactory.Instance().getViewDao("rdb");
+    private RowGroupDao rowGroupDao = DaoFactory.Instance().getRowGroupDao("rdb");
+    private RegionDao regionDao = DaoFactory.Instance().getRegionDao("rdb");
 
     public MetadataServiceImpl () { }
 
@@ -184,11 +188,17 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                layouts = layoutDao.getByTable(table, -1,
-                        MetadataProto.GetLayoutRequest.PermissionRange.READABLE); // version < 0 means get all versions
-                if (layouts == null || layouts.isEmpty())
-                {
-                    headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout for table '" +
+                // TODO: support multiple regions
+                val region = regionDao.getByTable(table).get(0);
+                if (region != null) {
+                    layouts = layoutDao.getByRegion(region, -1,
+                            MetadataProto.GetLayoutRequest.PermissionRange.READABLE); // version < 0 means get all versions
+                    if (layouts == null || layouts.isEmpty()) {
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'");
+                    }
+                } else {
+                    headerBuilder.setErrorCode(METADATA_REGION_NOT_FOUND).setErrorMsg("no region for table '" +
                             request.getSchemaName() + "." + request.getTableName() + "'");
                 }
             }
@@ -236,33 +246,33 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                if (request.getVersion() < 0)
-                {
-                    layout = layoutDao.getLatestByTable(table, request.getPermissionRange());
-                    if (layout == null)
-                    {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of table '" +
-                                request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
-                                request.getPermissionRange().name() + "' not found");
+                // TODO: support multiple regions
+                val region = regionDao.getByTable(table).get(0);
+                if (region != null) {
+                    if (request.getVersion() < 0) {
+                        layout = layoutDao.getLatestByRegion(region, request.getPermissionRange());
+                        if (layout == null) {
+                            headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of table '" +
+                                    request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
+                                    request.getPermissionRange().name() + "' not found");
+                        }
+                    } else {
+                        List<MetadataProto.Layout> layouts = layoutDao.getByRegion(region, request.getVersion(),
+                                request.getPermissionRange());
+                        if (layouts == null || layouts.isEmpty()) {
+                            headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of version '" +
+                                    request.getVersion() + "' for table '" +
+                                    request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
+                                    request.getPermissionRange().name() + "' not found");
+                        } else if (layouts.size() != 1) {
+                            headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicated layouts found");
+                        } else {
+                            layout = layouts.get(0);
+                        }
                     }
-                }
-                else
-                {
-                    List<MetadataProto.Layout> layouts = layoutDao.getByTable(table, request.getVersion(),
-                            request.getPermissionRange());
-                    if (layouts == null || layouts.isEmpty())
-                    {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("layout of version '" +
-                                request.getVersion() + "' for table '" +
-                                request.getSchemaName() + "." + request.getTableName() + "' with permission '" +
-                                request.getPermissionRange().name() + "' not found");
-                    } else if (layouts.size() != 1)
-                    {
-                        headerBuilder.setErrorCode(METADATA_LAYOUT_DUPLICATED).setErrorMsg("duplicated layouts found");
-                    } else
-                    {
-                        layout = layouts.get(0);
-                    }
+                } else {
+                    headerBuilder.setErrorCode(METADATA_REGION_NOT_FOUND).setErrorMsg("region of table '" +
+                            request.getSchemaName() + "." + request.getTableName() + "' not found");
                 }
             }
             else
@@ -807,5 +817,64 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getRowGroups(MetadataProto.GetRowGroupsRequest request, StreamObserver<MetadataProto.GetRowGroupsResponse> responseObserver) {
+        val headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.GetRowGroupsResponse response;
+        List<MetadataProto.RowGroup> rowGroups = null;
+        val schema = schemaDao.getByName(request.getSchemaName());
+        if (schema != null) {
+            val table = tableDao.getByNameAndSchema(request.getTableName(), schema);
+            if (table != null) {
+                // TODO: support multiple regions
+                val region = regionDao.getByTable(table).get(0);
+                if (region != null) {
+                    val layout = layoutDao.getLatestByRegion(region, MetadataProto.GetLayoutRequest.PermissionRange.READABLE); // version < 0 means get all versions
+                    if (layout != null) {
+                        rowGroups = rowGroupDao.getByLayout(layout);
+                        if (rowGroups == null || rowGroups.isEmpty()) {
+                            headerBuilder.setErrorCode(METADATA_ROWGROUP_NOT_FOUND).setErrorMsg("no row group found for table '" +
+                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                        }
+                    } else {
+                        headerBuilder.setErrorCode(METADATA_LAYOUT_NOT_FOUND).setErrorMsg("no layout for table '" +
+                                request.getSchemaName() + "." + request.getTableName() + "'");
+                    }
+                } else {
+                    headerBuilder.setErrorCode(METADATA_REGION_NOT_FOUND).setErrorMsg("no region for table '" +
+                            request.getSchemaName() + "." + request.getTableName() + "'");
+                }
+            } else {
+                headerBuilder.setErrorCode(METADATA_TABLE_NOT_FOUND).setErrorMsg("table '" +
+                        request.getSchemaName() + "." + request.getTableName() + "' not found");
+            }
+        } else {
+            headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" + request.getSchemaName() + "' not found");
+        }
+        if (rowGroups != null && rowGroups.isEmpty() == false) {
+            headerBuilder.setErrorCode(0).setErrorMsg("");
+            response = MetadataProto.GetRowGroupsResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .addAllRowGroups(rowGroups).build();
+        } else {
+            response = MetadataProto.GetRowGroupsResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build();
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addRowGroup(MetadataProto.AddRowGroupRequest request, StreamObserver<MetadataProto.AddRowGroupResponse> responseObserver) {
+        throw new NotImplementedException("addRowGroup");
+    }
+
+    @Override
+    public void updateRowGroup(MetadataProto.UpdateRowGroupRequest request, StreamObserver<MetadataProto.UpdateRowGroupResponse> responseObserver) {
+        throw new NotImplementedException("updateRowGroup");
     }
 }

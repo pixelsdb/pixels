@@ -50,6 +50,8 @@ public class ErrorCode
     public static final int METADATA_ADD_VIEW_FAILED = (ERROR_BASE_METADATA + 18);
     public static final int METADATA_DELETE_VIEW_FAILED = (ERROR_BASE_METADATA + 19);
     public static final int METADATA_UNKNOWN_DATA_TYPE = (ERROR_BASE_METADATA + 20);
+    public static final int METADATA_REGION_NOT_FOUND = (ERROR_BASE_METADATA + 21);
+    public static final int METADATA_ROWGROUP_NOT_FOUND = (ERROR_BASE_METADATA + 22);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue

@@ -25,11 +25,13 @@ import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import lombok.val;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
 
@@ -341,7 +343,7 @@ public class MetadataService
                 .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
                 .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
                 .setVersion(layout.getVersion()).setProjections(layout.getProjections())
-                .setTableId(layout.getTableId()).build();
+                .setRegionId(layout.getRegionId()).build();
         MetadataProto.UpdateLayoutRequest request = MetadataProto.UpdateLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();
@@ -374,7 +376,7 @@ public class MetadataService
                 .setOrder(layout.getOrder()).setOrderPath(layout.getOrderPath())
                 .setCompact(layout.getCompact()).setCompactPath(layout.getCompactPath())
                 .setVersion(layout.getVersion()).setProjections(layout.getProjections())
-                .setTableId(layout.getTableId()).build();
+                .setRegionId(layout.getRegionId()).build();
         MetadataProto.AddLayoutRequest request = MetadataProto.AddLayoutRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setLayout(layoutPb).build();
@@ -397,6 +399,90 @@ public class MetadataService
         }
         return true;
     }
+
+    public boolean addRowGroup(RowGroup rowGroup) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+
+        val request = MetadataProto.AddRowGroupRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRowGroup(rowGroup.toProto()).build();
+        try
+        {
+            val response = this.stub.addRowGroup(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to add row group into metadata", e);
+        }
+        return true;
+    }
+
+    public boolean updateRowGroup(RowGroup rowGroup) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+
+        val request = MetadataProto.UpdateRowGroupRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRowGroup(rowGroup.toProto()).build();
+        try
+        {
+            val response = this.stub.updateRowGroup(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to update row group into metadata", e);
+        }
+        return true;
+    }
+
+    public List<RowGroup> getRowGroups(String schemaName, String tableName) throws MetadataException {
+        String token = UUID.randomUUID().toString();
+
+        val request = MetadataProto.GetRowGroupsRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName)
+                .setTableName(tableName)
+                .build();
+
+        try
+        {
+            val response = this.stub.getRowGroups(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (response.getHeader().getToken().equals(token) == false)
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return response.getRowGroupsList().stream().map(RowGroup::new).collect(Collectors.toList());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get row groups from metadata", e);
+        }
+    }
+
 
     public boolean createSchema(String schemaName) throws MetadataException
     {

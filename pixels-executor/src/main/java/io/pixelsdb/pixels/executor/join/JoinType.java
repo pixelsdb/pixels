@@ -31,5 +31,6 @@ public enum JoinType
     NATURAL,
     EQUI_INNER,
     EQUI_LEFT,
-    EQUI_RIGHT
+    EQUI_RIGHT,
+    EQUI_FULL
 }

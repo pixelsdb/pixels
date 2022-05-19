@@ -120,7 +120,7 @@ public class UpdateCacheLayout
                     .setCompact(JSON.toJSONString(compactv2))
                     .setCompactPath(layoutv1.getCompactPath())
                     .setSplits(layoutv1.getSplits())
-                    .setTableId(layoutv1.getTableId()).build();
+                    .setRegionId(layoutv1.getRegionId()).build();
             layoutDao.save(layoutv2);
             metadataService.shutdown();
         }

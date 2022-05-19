@@ -36,13 +36,20 @@ public class Layout extends Base
     private long createAt;
     private Permission permission;
     private String order;
+    /**
+     * @deprecated use {@link RowGroup#filePath} instead
+     */
+    @Deprecated
     private String orderPath;
     private String compact;
+    /**
+     * @deprecated use {@link RowGroup#filePath} instead
+     */
+    @Deprecated
     private String compactPath;
-    private String retinaPath;
     private String splits;
     private String projections;
-    private long tableId;
+    private long regionId;
     private Order orderObj = null;
     private Compact compactObj = null;
     private Splits splitsObj = null;
@@ -78,8 +85,7 @@ public class Layout extends Base
         this.compactPath = layout.getCompactPath();
         this.splits = layout.getSplits();
         this.projections = layout.getProjections();
-        this.tableId = layout.getTableId();
-        this.retinaPath = layout.getRetinaPath();
+        this.regionId = layout.getRegionId();
     }
 
     public int getVersion()
@@ -219,20 +225,16 @@ public class Layout extends Base
         this.projections = projections;
     }
 
-    public long getTableId()
+    public long getRegionId()
     {
-        return tableId;
+        return regionId;
     }
 
-    public void setTableId(long tableId)
+    public void setRegionId(long regionId)
     {
-        this.tableId = tableId;
+        this.regionId = regionId;
     }
 
-    public String getRetinaPath()
-    {
-        return retinaPath;
-    }
 
     @Override
     public String toString()
@@ -245,10 +247,9 @@ public class Layout extends Base
                 ", orderPath='" + orderPath + '\'' +
                 ", compact='" + compact + '\'' +
                 ", compactPath='" + compactPath + '\'' +
-                ", retinaPath='" + retinaPath + '\'' +
                 ", splits='" + splits + '\'' +
                 ", projections='" + projections + '\'' +
-                ", tableId=" + tableId +
+                ", regionId=" + regionId +
                 '}';
     }
 }

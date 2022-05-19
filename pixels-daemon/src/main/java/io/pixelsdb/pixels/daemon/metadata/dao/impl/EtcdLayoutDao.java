@@ -63,9 +63,9 @@ public class EtcdLayoutDao extends LayoutDao
     }
 
     @Override
-    public MetadataProto.Layout getLatestByTable(MetadataProto.Table table, MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
+    public MetadataProto.Layout getLatestByRegion(MetadataProto.Region region, MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
-        List<MetadataProto.Layout> layouts = this.getByTable(table, -1, permissionRange);
+        List<MetadataProto.Layout> layouts = this.getByRegion(region, -1, permissionRange);
 
         MetadataProto.Layout res = null;
         if (layouts != null)
@@ -87,16 +87,16 @@ public class EtcdLayoutDao extends LayoutDao
     /**
      * get layout of a table by version and permission range.
      *
-     * @param table
+     * @param region
      * @param version         < 0 to get all versions of layouts.
      * @param permissionRange
      * @return
      */
     @Override
-    public List<MetadataProto.Layout> getByTable(MetadataProto.Table table, int version, MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
+    public List<MetadataProto.Layout> getByRegion(MetadataProto.Region region, int version, MetadataProto.GetLayoutRequest.PermissionRange permissionRange)
     {
         List<MetadataProto.Layout> layouts = new ArrayList<>();
-        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.layoutTableIdKeyPrefix + table.getId());
+        List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.layoutTableIdKeyPrefix + region.getId());
         for (KeyValue kv : kvs)
         {
             MetadataProto.Layout layout = null;
@@ -142,7 +142,7 @@ public class EtcdLayoutDao extends LayoutDao
         layout = layout.toBuilder().setId(id).build();
         etcd.putKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + id,
                 layout.toByteArray());
-        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getRegionId() + layout.getId(),
                 layout.toByteArray());
         return true;
     }
@@ -152,7 +152,7 @@ public class EtcdLayoutDao extends LayoutDao
     {
         etcd.putKeyValue(EtcdDaoCommon.layoutPrimaryKeyPrefix + layout.getId(),
                 layout.toByteArray());
-        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getTableId() + layout.getId(),
+        etcd.putKeyValue(EtcdDaoCommon.layoutTableIdKeyPrefix + layout.getRegionId() + layout.getId(),
                 layout.toByteArray());
         return true;
     }
