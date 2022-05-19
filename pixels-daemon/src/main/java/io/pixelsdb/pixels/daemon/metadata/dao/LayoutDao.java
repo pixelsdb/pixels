@@ -53,21 +53,21 @@ public abstract class LayoutDao implements Dao<MetadataProto.Layout>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    abstract public MetadataProto.Layout getLatestByTable(MetadataProto.Table table,
+    abstract public MetadataProto.Layout getLatestByRegion(MetadataProto.Region region,
                                                  MetadataProto.GetLayoutRequest.PermissionRange permissionRange);
 
-    public List<MetadataProto.Layout> getAllByTable (MetadataProto.Table table)
+    public List<MetadataProto.Layout> getAllByRegion (MetadataProto.Region region)
     {
-        return getByTable(table, -1, MetadataProto.GetLayoutRequest.PermissionRange.ALL);
+        return getByRegion(region, -1, MetadataProto.GetLayoutRequest.PermissionRange.ALL);
     }
 
     /**
      * get layout of a table by version and permission range.
-     * @param table
+     * @param region
      * @param version < 0 to get all versions of layouts.
      * @return
      */
-    abstract public List<MetadataProto.Layout> getByTable (MetadataProto.Table table, int version,
+    abstract public List<MetadataProto.Layout> getByRegion (MetadataProto.Region region, int version,
                                                           MetadataProto.GetLayoutRequest.PermissionRange permissionRange);
 
     public boolean save (MetadataProto.Layout layout)
