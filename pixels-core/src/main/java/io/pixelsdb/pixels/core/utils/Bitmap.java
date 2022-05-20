@@ -82,6 +82,13 @@ public class Bitmap
         }
     }
 
+    private Bitmap(long[] words, int wordsInUse, int capacity)
+    {
+        this.words = words;
+        this.wordsInUse = wordsInUse;
+        this.capacity = capacity;
+    }
+
     public void flip(int bitIndex)
     {
         int wordIndex = wordIndex(bitIndex);
@@ -580,5 +587,18 @@ public class Bitmap
                 return -1;
             word = ~words[u];
         }
+    }
+
+    public Bitmap slice(int offset, int length) {
+        if (offset < 0 || length < 0 || offset + length > length())
+            throw new IndexOutOfBoundsException("offset: " + offset + ", length: " + length + ", length(): " + length());
+        if (offset % BITS_PER_WORD != 0 || length % BITS_PER_WORD != 0)
+            throw new IllegalArgumentException("offset and length must be multiple of " + BITS_PER_WORD);
+
+        int wordOffset = wordIndex(offset);
+        int wordLength = wordIndex(length - 1) + 1;
+        long[] newWords = new long[wordLength];
+        System.arraycopy(words, wordOffset, newWords, 0, wordLength);
+        return new Bitmap(newWords, wordLength, length);
     }
 }
