@@ -3,8 +3,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,6 +15,8 @@ public class BenchmarkCacheIndex {
     MemoryMappedFile bigEndianIndexFile;
     MemoryMappedFile littleEndianIndexFile;
     MemoryMappedFile hashIndexFile;
+    RandomAccessFile hashIndexDiskFile;
+
 
     PixelsCacheKey[] pixelsCacheKeys = new PixelsCacheKey[KEYS];
 
@@ -25,6 +26,8 @@ public class BenchmarkCacheIndex {
             bigEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
             littleEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
             hashIndexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
+            hashIndexDiskFile = new RandomAccessFile("/dev/shm/pixels.hash-index", "r");
+
             BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
             String line = br.readLine();
             int ptr = 0;
@@ -133,6 +136,36 @@ public class BenchmarkCacheIndex {
 
     }
 
+    @Test
+    public void hashDiskSearchAllKeys() throws InterruptedException, FileNotFoundException {
+        int threadNum = 8;
+//        Random random = new Random(System.nanoTime());
+        Random random = new Random(233);
+
+        Thread[] threads = new Thread[threadNum];
+
+        for (int i = 0; i < threadNum; i++)
+        {
+            int[] accesses = new int[READ_COUNT];
+            for (int k = 0; k < READ_COUNT; k++)
+            {
+                accesses[k] = random.nextInt(READ_COUNT) % KEYS;
+            }
+            // Note: we have to create a new randomAccessFile per thread, otherwise seek will influence each other
+            threads[i] = new Thread(new HashCacheDiskSearcher(pixelsCacheKeys, accesses, new RandomAccessFile("/dev/shm/pixels.hash-index", "r")));
+        }
+
+        for (int i = 0; i < threadNum; i++)
+        {
+            threads[i].start();
+        }
+        for (int i = 0; i < threadNum; i++)
+        {
+            threads[i].join();
+        }
+
+    }
+
     static class NativeCacheSearcher implements Runnable
     {
         private final int[] idxes;
@@ -223,6 +256,56 @@ public class BenchmarkCacheIndex {
             System.out.println("[thread search]: total access=" + totalAcNum +
                     ", elapsed=" + (double) (searchEnd - searchStart)/1e6 + "ms" +
                     " kps=" + READ_COUNT / ((double) (searchEnd - searchStart)/1e9)+ " total level=" + totalLevel);
+        }
+    }
+
+    static class HashCacheDiskSearcher implements Runnable
+    {
+        private final int[] idxes;
+        private final RandomAccessFile indexFile;
+        private final PixelsCacheKey[] pixelsCacheKeys;
+
+        HashCacheDiskSearcher(PixelsCacheKey[] pixelsCacheKeys, int[] idxes, RandomAccessFile indexFile)
+        {
+            this.pixelsCacheKeys = pixelsCacheKeys;
+            this.idxes = idxes;
+            this.indexFile = indexFile;
+        }
+
+        @Override
+        public void run()
+        {
+            try {
+                HashIndexDiskReader cacheReader = new HashIndexDiskReader(indexFile);
+                int totalAcNum = 0;
+                int totalLevel = 0;
+                long searchStart = System.nanoTime();
+                for (int i = 0; i < idxes.length; i++)
+                {
+                    PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
+                    PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
+                            cacheKey.rowGroupId,
+                            cacheKey.columnId);
+                    if (idx == null)
+                    {
+                        System.out.println("[error] cannot find " + cacheKey.blockId
+                                + "-" + cacheKey.rowGroupId
+                                + "-" + cacheKey.columnId);
+                    }
+                    else
+                    {
+                        totalAcNum += idx.dramAccessCount;
+                        totalLevel += idx.radixLevel;
+                    }
+                }
+                long searchEnd = System.nanoTime();
+                System.out.println("[thread search]: total access=" + totalAcNum +
+                        ", elapsed=" + (double) (searchEnd - searchStart)/1e6 + "ms" +
+                        " kps=" + READ_COUNT / ((double) (searchEnd - searchStart)/1e9)+ " total level=" + totalLevel);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         }
     }
 

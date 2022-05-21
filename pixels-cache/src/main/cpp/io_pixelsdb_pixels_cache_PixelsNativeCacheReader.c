@@ -105,13 +105,12 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_sea
   }
 
   // if matches, node found.
-  // TODO: 终于找到原因为什么中间有一个 byte 的 gap 了. 因为 currentNodeEdgeSize 还包含了和某个 child match 的 byte
+  // 终于找到原因为什么中间有一个 byte 的 gap 了. 因为 currentNodeEdgeSize 还包含了和某个 child match 的 byte
   if (bytesMatched == KEY_LEN && bytesMatchedInNodeFound == currentNodeEdgeSize)
   {
       // if the current node is leaf node.
       if (((currentNodeHeader >> 31) & 1) > 0) // TODO: why do we need & 1?
       {
-          // TODO: make it little endian
           long pos = currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize;
           unsigned long offset = getLong(indexFile, pos);
           unsigned int length = getInt(indexFile, pos + sizeof(offset));
