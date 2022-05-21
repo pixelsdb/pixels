@@ -27,7 +27,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_sea
   char keyBuf[KEY_LEN] = {0};
   buildKeyBuf(keyBuf, blockId, rowGroupId, columnId);
   int bytesMatched = 0;
-  int bytesMatchedInNodeFound = 0;
+  unsigned bytesMatchedInNodeFound = 0;
 
   // init the return value
   long* ret = (*env)->GetDirectBufferAddress(env, retBuf);
@@ -55,7 +55,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_sea
   while (bytesMatched < KEY_LEN && cont)
   {
     long matchingChildOffset = 0;
-    for (int i = 0; i < currentNodeChildrenNum; ++i)
+    for (unsigned i = 0; i < currentNodeChildrenNum; ++i)
     {
       // long has 8 bytes, which is a child's bytes
       unsigned long child = *((unsigned long *)nodeData);
@@ -112,10 +112,10 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_sea
       if (((currentNodeHeader >> 31) & 1) > 0) // TODO: why do we need & 1?
       {
           long pos = currentNodeOffset + 4 + (currentNodeChildrenNum * 8) + currentNodeEdgeSize;
-          unsigned long offset = getLong(indexFile, pos);
-          unsigned int length = getInt(indexFile, pos + sizeof(offset));
+          long offset = getLong(indexFile, pos);
+          int length = getInt(indexFile, pos + sizeof(offset));
           ret[0] = offset;
-          ret[1] = length;
+          ret[1] = (long) length;
       }
   }
 }

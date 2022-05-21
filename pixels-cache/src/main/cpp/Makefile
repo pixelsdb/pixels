@@ -1,4 +1,4 @@
-CFLAGS=-Wpedantic
+CFLAGS=-W
 
 all: c run
 
@@ -17,20 +17,20 @@ disc:
 	javap -s -p target/yeeef/Address.class
 
 serialize:
-	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexSerializer.c -o io_pixelsdb_pixels_cache_CacheIndexSerializer.o
-	gcc -shared -fPIC -o ../../../libserializer.so io_pixelsdb_pixels_cache_CacheIndexSerializer.o -lc
+	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexSerializer.c -o io_pixelsdb_pixels_cache_CacheIndexSerializer.o
+	gcc  ${CFLAGS} -shared -fPIC -o ../../../libserializer.so io_pixelsdb_pixels_cache_CacheIndexSerializer.o -lc
 
 reader:
-	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_PixelsNativeCacheReader.c -o io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o
-	gcc -shared -fPIC -o ../../../libreader.so io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o -lc
+	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_PixelsNativeCacheReader.c -o io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o
+	gcc ${CFLAGS} -shared -fPIC -o ../../../libreader.so io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o -lc
 
 hash_index:
 	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_HashIndexReader.c -o io_pixelsdb_pixels_cache_HashIndexReader.o
-	gcc -shared -fPIC -o ../../../libHashIndexReader.so io_pixelsdb_pixels_cache_HashIndexReader.o -lc
+	gcc ${CFLAGS} -shared -fPIC -o ../../../libHashIndexReader.so io_pixelsdb_pixels_cache_HashIndexReader.o -lc
 
 rewriter:
-	gcc -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexRewriter.c -o io_pixelsdb_pixels_cache_CacheIndexRewriter.o
-	gcc -shared -fPIC -o ../../../librewriter.so io_pixelsdb_pixels_cache_CacheIndexRewriter.o -lc
+	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexRewriter.c -o io_pixelsdb_pixels_cache_CacheIndexRewriter.o
+	gcc ${CFLAGS} -shared -fPIC -o ../../../librewriter.so io_pixelsdb_pixels_cache_CacheIndexRewriter.o -lc
 
 run:
 	java -cp ./target -Djava.library.path=. yeeef.Address

@@ -19,7 +19,7 @@ static inline int getInt(const MemoryMappedFile mmap_f, long pos)
   return *addr;
 }
 
-static inline int getLong(const MemoryMappedFile mmap_f, long pos)
+static inline long getLong(const MemoryMappedFile mmap_f, long pos)
 {
   long *addr = (long *)(mmap_f.addr + pos);
   return *addr;

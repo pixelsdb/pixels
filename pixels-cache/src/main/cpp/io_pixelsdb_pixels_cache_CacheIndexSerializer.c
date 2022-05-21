@@ -20,7 +20,7 @@ int getInt(const MemoryMappedFile mmap_f, long pos)
   return *addr;
 }
 
-int getLong(const MemoryMappedFile mmap_f, long pos)
+long getLong(const MemoryMappedFile mmap_f, long pos)
 {
   long *addr = (long *)(mmap_f.addr + pos);
   return *addr;
