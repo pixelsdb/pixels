@@ -85,17 +85,16 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
 
             long queryId = event.getQueryId();
 
-            String leftPrefix = event.getLeftTableName() + ".";
             List<PartitionOutput> leftPartitioned = event.getLeftPartitioned();
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
             String[] leftCols = event.getLeftCols();
             int[] leftKeyColumnIds = event.getLeftKeyColumnIds();
 
-            String rightPrefix = event.getRightTableName() + ".";
             List<PartitionOutput> rightPartitioned = event.getRightPartitioned();
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
             String[] rightCols = event.getRightCols();
             int[] rightKeyColumnIds = event.getRightKeyColumnIds();
+            String[] joinedCols = event.getJoinedCols();
 
             PartitionedJoinInput.JoinInfo joinInfo = event.getJoinInfo();
             ScanInput.OutputInfo outputInfo = event.getOutput();
@@ -121,9 +120,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0).getPath(), rightPartitioned.get(0).getPath());
-            Joiner joiner = new Joiner(joinInfo.getJoinType(),
-                    leftPrefix, leftSchema.get(), leftKeyColumnIds,
-                    rightPrefix, rightSchema.get(), rightKeyColumnIds);
+            Joiner joiner = new Joiner(joinInfo.getJoinType(), joinedCols,
+                    leftSchema.get(), leftKeyColumnIds, rightSchema.get(), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
             int leftSplitSize = leftPartitioned.size() / (cores * 2);

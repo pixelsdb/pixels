@@ -73,18 +73,19 @@ public class Joiner
      * the columns from the big (a.k.a., right) table.
      *
      * @param joinType the join type
-     * @param smallPrefix the prefix for the columns from the small table, e.g., "orders."
+     * @param joinedCols the column names in the joined schema, in the same order of the columns
+     *                   in small schema and big schema
      * @param smallSchema the schema of the small table
      * @param smallKeyColumnIds the ids of the key columns of the small table
-     * @param bigPrefix the prefix for the columns from the big table, e.e., "lineitem."
      * @param bigSchema the schema of the big table
      * @param bigKeyColumnIds the ids of the key columns of the big table
      */
-    public Joiner(JoinType joinType,
-                  String smallPrefix, TypeDescription smallSchema, int[] smallKeyColumnIds,
-                  String bigPrefix, TypeDescription bigSchema, int[] bigKeyColumnIds)
+    public Joiner(JoinType joinType, String[] joinedCols,
+                  TypeDescription smallSchema, int[] smallKeyColumnIds,
+                  TypeDescription bigSchema, int[] bigKeyColumnIds)
     {
         this.joinType = requireNonNull(joinType, "joinType is null");
+        requireNonNull(joinedCols, "joinedCols is null");
         checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
         this.smallSchema = requireNonNull(smallSchema, "smallSchema is null");
         this.bigSchema = requireNonNull(bigSchema, "bigSchema is null");
@@ -110,18 +111,22 @@ public class Joiner
         List<TypeDescription> smallColumnTypes = smallSchema.getChildren();
         checkArgument(smallColumnTypes != null && smallColumnNames.size() == smallColumnTypes.size(),
                 "invalid children of smallSchema");
+        List<String> bigColumnNames = bigSchema.getFieldNames();
+        List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
+        checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
+                "invalid children of bigSchema");
+        checkArgument(smallColumnNames.size() + bigColumnNames.size() -
+                (joinType == JoinType.NATURAL ? bigKeyColumnIds.length : 0) == joinedCols.length,
+                "joinedCols does not contain correct number of elements");
+        int joinedColId = 0;
         for (int i = 0; i < smallColumnNames.size(); ++i)
         {
             /**
              * Even if this is a natural join, we add the prefix to the key columns of the small table.
              * Because a non-key column of the big table may have the same name as the key column of the small table.
              */
-            this.joinedSchema.addField(smallPrefix.concat(smallColumnNames.get(i)), smallColumnTypes.get(i));
+            this.joinedSchema.addField(joinedCols[joinedColId++], smallColumnTypes.get(i));
         }
-        List<String> bigColumnNames = bigSchema.getFieldNames();
-        List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
-        checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
-                "invalid children of bigSchema");
         Set<Integer> bigKeyColumnIdSet = new HashSet<>(bigKeyColumnIds.length);
         for (int id : bigKeyColumnIds)
         {
@@ -134,7 +139,7 @@ public class Joiner
             {
                 continue;
             }
-            this.joinedSchema.addField(bigPrefix.concat(bigColumnNames.get(i)), bigColumnTypes.get(i));
+            this.joinedSchema.addField(joinedCols[joinedColId++], bigColumnTypes.get(i));
         }
         // create the null tuples for outer join.
         this.smallNullTuple = createNullTuple(smallKeyColumnIds, smallColumnNames.size(), joinType);

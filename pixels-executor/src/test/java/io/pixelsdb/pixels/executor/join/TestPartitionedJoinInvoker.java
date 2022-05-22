@@ -69,6 +69,8 @@ public class TestPartitionedJoinInvoker
         lineitemPartitioned2.setHashValues(hashValues);
         joinInput.setRightPartitioned(Arrays.asList(lineitemPartitioned1, lineitemPartitioned2));
         joinInput.setJoinInfo(new PartitionedJoinInput.JoinInfo(40, Arrays.asList(16), JoinType.EQUI_LEFT));
+        joinInput.setJoinedCols(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate",
+                "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
 

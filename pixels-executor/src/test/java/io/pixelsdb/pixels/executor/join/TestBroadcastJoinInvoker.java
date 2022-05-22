@@ -101,6 +101,8 @@ public class TestBroadcastJoinInvoker
         joinInput.setRightFilter(rightFilter);
 
         joinInput.setJoinType(JoinType.EQUI_LEFT);
+        joinInput.setJoinedCols(new String[]{"p_partkey", "p_name", "p_size",
+                "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
 

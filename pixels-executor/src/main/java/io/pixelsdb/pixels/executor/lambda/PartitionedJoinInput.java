@@ -35,7 +35,7 @@ public class PartitionedJoinInput
      */
     private int queryId;
 
-    String leftTableName;
+    private String leftTableName;
     /**
      * The partitioned files of the left (small) table.
      */
@@ -49,7 +49,7 @@ public class PartitionedJoinInput
      */
     private int[] leftKeyColumnIds;
 
-    String rightTableName;
+    private String rightTableName;
     /**
      * The partitioned files of the right (big) table.
      */
@@ -67,7 +67,10 @@ public class PartitionedJoinInput
      * The information of tasks for the join worker.
      */
     private JoinInfo joinInfo;
-
+    /**
+     * The column names in the join result, in the same order of left/right cols.
+     */
+    private String[] joinedCols;
     /**
      * The output information of the join worker.
      */
@@ -83,7 +86,7 @@ public class PartitionedJoinInput
                                 String[] leftCols, int[] leftKeyColumnIds,
                                 String rightTableName, List<PartitionOutput> rightPartitioned,
                                 String[] rightCols, int[] rightKeyColumnIds,
-                                JoinInfo joinInfo, OutputInfo output)
+                                JoinInfo joinInfo, String[] joinedCols, OutputInfo output)
     {
         this.queryId = queryId;
         this.leftTableName = leftTableName;
@@ -95,6 +98,7 @@ public class PartitionedJoinInput
         this.rightCols = rightCols;
         this.rightKeyColumnIds = rightKeyColumnIds;
         this.joinInfo = joinInfo;
+        this.joinedCols = joinedCols;
         this.output = output;
     }
 
@@ -196,6 +200,16 @@ public class PartitionedJoinInput
     public void setJoinInfo(JoinInfo joinInfo)
     {
         this.joinInfo = joinInfo;
+    }
+
+    public String[] getJoinedCols()
+    {
+        return joinedCols;
+    }
+
+    public void setJoinedCols(String[] joinedCols)
+    {
+        this.joinedCols = joinedCols;
     }
 
     public OutputInfo getOutput()

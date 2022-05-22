@@ -86,7 +86,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            String leftPrefix = event.getLeftTableName() + ".";
             List<ScanInput.InputInfo> leftInputs = event.getLeftInputs();
             checkArgument(leftInputs.size() > 0, "leftPartitioned is empty");
             String[] leftCols = event.getLeftCols();
@@ -94,13 +93,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int leftSplitSize = event.getLeftSplitSize();
             TableScanFilter leftFilter = JSON.parseObject(event.getLeftFilter(), TableScanFilter.class);
 
-            String rightPrefix = event.getRightTableName() + ".";
             List<ScanInput.InputInfo> rightInputs = event.getRightInputs();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
             String[] rightCols = event.getRightCols();
             int[] rightKeyColumnIds = event.getRightKeyColumnIds();
             int rightSplitSize = event.getRightSplitSize();
             TableScanFilter rightFilter = JSON.parseObject(event.getRightFilter(), TableScanFilter.class);
+            String[] joinedCols = event.getJoinedCols();
 
             JoinType joinType = event.getJoinType();
             ScanInput.OutputInfo outputInfo = event.getOutput();
@@ -127,9 +126,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getPath(), rightInputs.get(0).getPath());
-            Joiner joiner = new Joiner(joinType,
-                    leftPrefix, getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
-                    rightPrefix, getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
+            Joiner joiner = new Joiner(joinType, joinedCols,
+                    getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
+                    getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
             for (int i = 0; i < leftInputs.size();)

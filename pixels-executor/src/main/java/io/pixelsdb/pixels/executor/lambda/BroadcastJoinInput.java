@@ -84,7 +84,10 @@ public class BroadcastJoinInput
      * The type of the join.
      */
     private JoinType joinType;
-
+    /**
+     * The column names in the join result, in the same order of left/right cols.
+     */
+    private String[] joinedCols;
     /**
      * The output information of the join worker.
      */
@@ -100,7 +103,7 @@ public class BroadcastJoinInput
                               String[] leftCols, int[] leftKeyColumnIds, String leftFilter,
                               List<InputInfo> rightInputs, int rightSplitSize,
                               String[] rightCols, int[] rightKeyColumnIds, String rightFilter,
-                              JoinType joinType, OutputInfo output)
+                              JoinType joinType, String[] joinedCols, OutputInfo output)
     {
         this.queryId = queryId;
         this.leftTableName = leftTableName;
@@ -116,6 +119,7 @@ public class BroadcastJoinInput
         this.rightKeyColumnIds = rightKeyColumnIds;
         this.rightFilter = rightFilter;
         this.joinType = joinType;
+        this.joinedCols = joinedCols;
         this.output = output;
     }
 
@@ -257,6 +261,16 @@ public class BroadcastJoinInput
     public void setJoinType(JoinType joinType)
     {
         this.joinType = joinType;
+    }
+
+    public String[] getJoinedCols()
+    {
+        return joinedCols;
+    }
+
+    public void setJoinedCols(String[] joinedCols)
+    {
+        this.joinedCols = joinedCols;
     }
 
     public OutputInfo getOutput()
