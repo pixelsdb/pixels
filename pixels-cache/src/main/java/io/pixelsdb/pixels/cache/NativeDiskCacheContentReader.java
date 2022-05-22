@@ -1,14 +1,32 @@
 package io.pixelsdb.pixels.cache;
 
+import com.google.protobuf.Descriptors;
 import sun.nio.ch.DirectBuffer;
 
+import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 
 public class NativeDiskCacheContentReader implements CacheContentReader {
     static {
-        System.loadLibrary("DiskCacheContentReader");
+//        System.loadLibrary("DiskCacheContentReader");
     }
+
+    private final RandomAccessFile content;
+    private final FileDescriptor fileDescriptor;
+    private final int fd;
+
+    NativeDiskCacheContentReader(String loc) throws IOException, NoSuchFieldException, IllegalAccessException {
+        this.content = new RandomAccessFile(loc, "r");
+        this.content.seek(0);
+        fileDescriptor = this.content.getFD();
+        Field fdField = FileDescriptor.class.getDeclaredField("fd");
+        fdField.setAccessible(true);
+        fd = fdField.getInt(fileDescriptor);
+    }
+
     @Override
     public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
         read(idx.offset, idx.length, buf);
