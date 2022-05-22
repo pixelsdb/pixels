@@ -63,7 +63,9 @@ public class FakeCacheGenerator {
     public static void main(String[] args) throws IOException {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
         FakeCacheGenerator gen = new FakeCacheGenerator("pixels-cache/tmp.txt");
-        gen.gen("/mnt/nvme1n1/pixels.cache");
+//        gen.gen("/mnt/nvme1n1/pixels.cache");
+        gen.gen("/scratch/yeeef/pixels-cache/pixels.cache");
+
     }
 
 

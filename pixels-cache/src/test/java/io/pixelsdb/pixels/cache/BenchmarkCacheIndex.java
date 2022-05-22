@@ -152,7 +152,9 @@ public class BenchmarkCacheIndex {
                 accesses[k] = random.nextInt(READ_COUNT) % KEYS;
             }
             // Note: we have to create a new randomAccessFile per thread, otherwise seek will influence each other
-            threads[i] = new Thread(new HashCacheDiskSearcher(pixelsCacheKeys, accesses, new RandomAccessFile("/dev/shm/pixels.hash-index", "r")));
+//            threads[i] = new Thread(new HashCacheDiskSearcher(pixelsCacheKeys, accesses, new RandomAccessFile("/dev/shm/pixels.hash-index", "r")));
+            threads[i] = new Thread(new HashCacheDiskSearcher(pixelsCacheKeys, accesses, new RandomAccessFile("/scratch/yeeef/pixels-indexes/pixels.hash-index", "r")));
+
         }
 
         for (int i = 0; i < threadNum; i++)

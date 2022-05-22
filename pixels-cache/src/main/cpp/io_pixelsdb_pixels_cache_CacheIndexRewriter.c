@@ -83,7 +83,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_CacheIndexRewriter_rewrite(
   jlong addr = (jlong)indexFile.addr;
   jlong size = indexFile.size;
   // parse the index header
-  printf("native ------------------------------ hello cache serializer!\n");
+  printf("native ------------------------------ hello cache rewriter!\n");
   printf("addr=%ld, addr=%p, size=%ld\n", addr, (char *)addr, size);
 
   // parse the header {magic(6)+rw_flag(1)+reader_count(3)+version(4)}

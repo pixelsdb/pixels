@@ -29,10 +29,10 @@ public class NativeDiskCacheContentReader implements CacheContentReader {
 
     @Override
     public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
-        read(idx.offset, idx.length, buf);
+        read(fd, idx.offset, idx.length, buf);
     }
 
-    private native void read(long offset, int length, ByteBuffer buf);
+    private native void read(int fd, long offset, int length, ByteBuffer buf);
 
     @Override
     public void batchRead(PixelsCacheIdx[] idxs, ByteBuffer buf) throws IOException {
