@@ -19,12 +19,18 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.executor.join.JoinType;
+import io.pixelsdb.pixels.executor.lambda.ScanInput.OutputInfo;
+
 /**
- * The output format for both broadcast and hash partitioned join.
- *
  * @author hank
- * @date 07/05/2022
+ * @date 22/05/2022
  */
-public class JoinOutput extends LambdaOutput
+public interface JoinInput
 {
+    public JoinType getJoinType();
+
+    public String[] getJoinedCols();
+
+    public OutputInfo getOutput();
 }

@@ -19,53 +19,11 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
-import java.util.ArrayList;
-
 /**
  * The output format for table scan.
  * @author hank
  * Created at: 11/04/2022
  */
-public class ScanOutput
+public class ScanOutput extends LambdaOutput
 {
-    /**
-     * The path of the scan result files. No need to contain endpoint information.
-     */
-    private ArrayList<String> outputs = new ArrayList<>();
-
-    /**
-     * The number of row groups in each scan result files.
-     */
-    private ArrayList<Integer> rowGroupNums = new ArrayList<>();
-
-    /**
-     * Default constructor for jackson.
-     */
-    public ScanOutput() { }
-
-    public ArrayList<String> getOutputs()
-    {
-        return outputs;
-    }
-
-    public void setOutputs(ArrayList<String> outputs)
-    {
-        this.outputs = outputs;
-    }
-
-    public ArrayList<Integer> getRowGroupNums()
-    {
-        return rowGroupNums;
-    }
-
-    public void setRowGroupNums(ArrayList<Integer> rowGroupNums)
-    {
-        this.rowGroupNums = rowGroupNums;
-    }
-
-    public synchronized void addOutput(String output, int rowGroupNum)
-    {
-        this.outputs.add(output);
-        this.rowGroupNums.add(rowGroupNum);
-    }
 }

@@ -29,12 +29,12 @@ import java.util.List;
  * @author hank
  * @date 07/05/2022
  */
-public class BroadcastJoinInput
+public class BroadcastJoinInput implements JoinInput
 {
     /**
      * The unique id of the query.
      */
-    private int queryId;
+    private long queryId;
 
     private String leftTableName;
     /**
@@ -98,7 +98,7 @@ public class BroadcastJoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(int queryId, String leftTableName, String rightTableName,
+    public BroadcastJoinInput(long queryId, String leftTableName, String rightTableName,
                               List<InputInfo> leftInputs, int leftSplitSize,
                               String[] leftCols, int[] leftKeyColumnIds, String leftFilter,
                               List<InputInfo> rightInputs, int rightSplitSize,
@@ -123,12 +123,12 @@ public class BroadcastJoinInput
         this.output = output;
     }
 
-    public int getQueryId()
+    public long getQueryId()
     {
         return queryId;
     }
 
-    public void setQueryId(int queryId)
+    public void setQueryId(long queryId)
     {
         this.queryId = queryId;
     }

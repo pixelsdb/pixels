@@ -17,14 +17,42 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.core.utils;
 
 /**
- * The output format for both broadcast and hash partitioned join.
- *
  * @author hank
- * @date 07/05/2022
+ * @date 22/05/2022
  */
-public class JoinOutput extends LambdaOutput
+public class Pair<L, R>
 {
+    private L left;
+    private R right;
+
+    public Pair() {}
+
+    public Pair(L left, R right)
+    {
+        this.left = left;
+        this.right = right;
+    }
+
+    public L getLeft()
+    {
+        return left;
+    }
+
+    public void setLeft(L left)
+    {
+        this.left = left;
+    }
+
+    public R getRight()
+    {
+        return right;
+    }
+
+    public void setRight(R right)
+    {
+        this.right = right;
+    }
 }

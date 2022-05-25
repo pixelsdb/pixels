@@ -17,14 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.join;
 
 /**
- * The output format for both broadcast and hash partitioned join.
- *
  * @author hank
- * @date 07/05/2022
+ * @date 22/05/2022
  */
-public class JoinOutput extends LambdaOutput
+public enum JoinAlgorithm
 {
+    UNKNOWN, // The first enum value is the default value.
+    BROADCAST,
+    PARTITIONED
 }

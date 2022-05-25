@@ -96,7 +96,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             int[] rightKeyColumnIds = event.getRightKeyColumnIds();
             String[] joinedCols = event.getJoinedCols();
 
-            PartitionedJoinInput.JoinInfo joinInfo = event.getJoinInfo();
+            JoinType joinType = event.getJoinType();
+            List<Integer> hashValues = event.getHashValues();
+            int numPartition = event.getNumPartition();
             ScanInput.OutputInfo outputInfo = event.getOutput();
             String outputFolder = outputInfo.getFolder();
             if (!outputFolder.endsWith("/"))
@@ -120,7 +122,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0).getPath(), rightPartitioned.get(0).getPath());
-            Joiner joiner = new Joiner(joinInfo.getJoinType(), joinedCols,
+            Joiner joiner = new Joiner(joinType, joinedCols,
                     leftSchema.get(), leftKeyColumnIds, rightSchema.get(), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
@@ -139,8 +141,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, parts, leftCols,
-                                joinInfo.getHashValues(), joinInfo.getNumPartition());
+                        buildHashTable(queryId, joiner, parts, leftCols, hashValues, numPartition);
                     }
                     catch (Exception e)
                     {
@@ -172,8 +173,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     try
                     {
                         int rowGroupNum = joinWithRightTable(queryId, joiner, parts, rightCols,
-                                joinInfo.getHashValues(), joinInfo.getNumPartition(),
-                                outputPath, encoding);
+                                hashValues, numPartition, outputPath, encoding);
                         if (rowGroupNum > 0)
                         {
                             joinOutput.addOutput(outputPath, rowGroupNum);
@@ -194,7 +194,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 logger.error("interrupted while waiting for the termination of join", e);
             }
 
-            if (joinInfo.getJoinType() == JoinType.EQUI_LEFT || joinInfo.getJoinType() == JoinType.EQUI_FULL)
+            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
             {
                 // output the left-outer tail.
                 String outputPath = outputFolder + requestId + "_join_left_outer";

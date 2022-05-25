@@ -28,12 +28,12 @@ import java.util.List;
  * @author hank
  * @date 07/05/2022
  */
-public class PartitionedJoinInput
+public class PartitionedJoinInput implements JoinInput
 {
     /**
      * The unique id of the query.
      */
-    private int queryId;
+    private long queryId;
 
     private String leftTableName;
     /**
@@ -64,9 +64,17 @@ public class PartitionedJoinInput
     private int[] rightKeyColumnIds;
 
     /**
-     * The information of tasks for the join worker.
+     * The total number of partitions.
      */
-    private JoinInfo joinInfo;
+    int numPartition;
+    /**
+     * The hash values to be processed by a hash join worker.
+     */
+    private List<Integer> hashValues;
+    /**
+     * The type of the join.
+     */
+    private JoinType joinType;
     /**
      * The column names in the join result, in the same order of left/right cols.
      */
@@ -81,12 +89,13 @@ public class PartitionedJoinInput
      */
     public PartitionedJoinInput() { }
 
-    public PartitionedJoinInput(int queryId,
+    public PartitionedJoinInput(long queryId,
                                 String leftTableName, List<PartitionOutput> leftPartitioned,
                                 String[] leftCols, int[] leftKeyColumnIds,
                                 String rightTableName, List<PartitionOutput> rightPartitioned,
                                 String[] rightCols, int[] rightKeyColumnIds,
-                                JoinInfo joinInfo, String[] joinedCols, OutputInfo output)
+                                int numPartition, List<Integer> hashValues, JoinType joinType,
+                                String[] joinedCols, OutputInfo output)
     {
         this.queryId = queryId;
         this.leftTableName = leftTableName;
@@ -97,17 +106,19 @@ public class PartitionedJoinInput
         this.rightPartitioned = rightPartitioned;
         this.rightCols = rightCols;
         this.rightKeyColumnIds = rightKeyColumnIds;
-        this.joinInfo = joinInfo;
+        this.numPartition = numPartition;
+        this.hashValues = hashValues;
+        this.joinType = joinType;
         this.joinedCols = joinedCols;
         this.output = output;
     }
 
-    public int getQueryId()
+    public long getQueryId()
     {
         return queryId;
     }
 
-    public void setQueryId(int queryId)
+    public void setQueryId(long queryId)
     {
         this.queryId = queryId;
     }
@@ -192,14 +203,34 @@ public class PartitionedJoinInput
         this.rightKeyColumnIds = rightKeyColumnIds;
     }
 
-    public JoinInfo getJoinInfo()
+    public int getNumPartition()
     {
-        return joinInfo;
+        return numPartition;
     }
 
-    public void setJoinInfo(JoinInfo joinInfo)
+    public void setNumPartition(int numPartition)
     {
-        this.joinInfo = joinInfo;
+        this.numPartition = numPartition;
+    }
+
+    public List<Integer> getHashValues()
+    {
+        return hashValues;
+    }
+
+    public void setHashValues(List<Integer> hashValues)
+    {
+        this.hashValues = hashValues;
+    }
+
+    public JoinType getJoinType()
+    {
+        return joinType;
+    }
+
+    public void setJoinType(JoinType joinType)
+    {
+        this.joinType = joinType;
     }
 
     public String[] getJoinedCols()
@@ -220,63 +251,5 @@ public class PartitionedJoinInput
     public void setOutput(OutputInfo output)
     {
         this.output = output;
-    }
-
-    public static class JoinInfo
-    {
-        /**
-         * The total number of partitions.
-         */
-        int numPartition;
-        /**
-         * The hash values to be processed by a hash join worker.
-         */
-        private List<Integer> hashValues;
-        /**
-         * The type of the join.
-         */
-        private JoinType joinType;
-
-        /**
-         * Default constructor for Jackson.
-         */
-        public JoinInfo() { }
-
-        public JoinInfo(int numPartition, List<Integer> hashValues, JoinType joinType)
-        {
-            this.numPartition = numPartition;
-            this.hashValues = hashValues;
-            this.joinType = joinType;
-        }
-
-        public int getNumPartition()
-        {
-            return numPartition;
-        }
-
-        public void setNumPartition(int numPartition)
-        {
-            this.numPartition = numPartition;
-        }
-
-        public List<Integer> getHashValues()
-        {
-            return hashValues;
-        }
-
-        public void setHashValues(List<Integer> hashValues)
-        {
-            this.hashValues = hashValues;
-        }
-
-        public JoinType getJoinType()
-        {
-            return joinType;
-        }
-
-        public void setJoinType(JoinType joinType)
-        {
-            this.joinType = joinType;
-        }
     }
 }
