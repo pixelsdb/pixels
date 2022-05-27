@@ -43,6 +43,9 @@ service MetadataService {
     rpc GetLayouts (GetLayoutsRequest) returns (GetLayoutsResponse);
     rpc GetLayout (GetLayoutRequest) returns (GetLayoutResponse);
     rpc UpdateLayout (UpdateLayoutRequest) returns (UpdateLayoutResponse);
+    rpc GetRowGroups (GetRowGroupsRequest) returns (GetRowGroupsResponse);
+    rpc AddRowGroup (AddRowGroupRequest) returns (AddRowGroupResponse);
+    rpc UpdateRowGroup (UpdateRowGroupRequest) returns (UpdateRowGroupResponse);
     rpc GetColumns (GetColumnsRequest) returns (GetColumnsResponse);
     rpc UpdateColumn (UpdateColumnRequest) returns (UpdateColumnResponse);
     rpc CreateView (CreateViewRequest) returns (CreateViewResponse);
@@ -77,6 +80,11 @@ message Column {
     uint64 tableId = 5;
 }
 
+message Region {
+    uint64 id = 1;
+    uint64 tableId = 2;
+}
+
 message Layout {
     uint64 id = 1;
     uint32 version = 2;
@@ -93,7 +101,16 @@ message Layout {
     string compactPath = 8;
     string splits = 9;
     string projections = 10;
-    uint64 tableId = 11;
+    uint64 regionId = 11;
+    string retinaPath = 12;
+}
+
+message RowGroup {
+    uint64 id = 1;
+    uint64 layoutId = 2;
+    string filePath = 3;
+    uint32 fileRgIdx = 4;
+    bool isWriteBuffer = 5;
 }
 
 message View {
@@ -279,6 +296,36 @@ message UpdateLayoutRequest {
 
 message UpdateLayoutResponse {
     ResponseHeader header = 1;
+}
+
+// row group
+message GetRowGroupsRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string tableName = 3;
+}
+
+message GetRowGroupsResponse {
+    ResponseHeader header = 1;
+    repeated RowGroup rowGroups = 2;
+}
+
+message AddRowGroupRequest {
+  RequestHeader header = 1;
+  RowGroup rowGroup = 2;
+}
+
+message AddRowGroupResponse {
+  ResponseHeader header = 1;
+}
+
+message UpdateRowGroupRequest {
+  RequestHeader header = 1;
+  RowGroup rowGroup = 2;
+}
+
+message UpdateRowGroupResponse {
+  ResponseHeader header = 1;
 }
 
 // view

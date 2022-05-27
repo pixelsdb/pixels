@@ -101,6 +101,13 @@ public interface PixelsReader
     int getRowGroupNum();
 
     /**
+     * Whether this file is hash partitioned
+     *
+     * @return true if this file is hash partitioned
+     */
+    boolean isPartitioned();
+
+    /**
      * Get file level statistics of each column
      *
      * @return array of column stat

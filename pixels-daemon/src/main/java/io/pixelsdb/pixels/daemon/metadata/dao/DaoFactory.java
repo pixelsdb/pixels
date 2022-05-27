@@ -27,6 +27,8 @@ public class DaoFactory
     private Map<String, SchemaDao> schemaDaoMap = new HashMap<>();
     private Map<String, TableDao> tableDaoMap = new HashMap<>();
     private Map<String, ViewDao> viewDaoMap = new HashMap<>();
+    private Map<String, RegionDao> regionDaoMap = new HashMap<>();
+    private Map<String, RowGroupDao> rowGroupDaoMap = new HashMap<>();
 
     private DaoFactory ()
     {
@@ -35,6 +37,8 @@ public class DaoFactory
         this.schemaDaoMap.put("rdb", new RdbSchemaDao());
         this.tableDaoMap.put("rdb", new RdbTableDao());
         this.viewDaoMap.put("rdb", new RdbViewDao());
+        this.regionDaoMap.put("rdb", new RdbRegionDao());
+        this.rowGroupDaoMap.put("rdb", new RdbRowGroupDao());
     }
 
     public ColumnDao getColumnDao (String type)
@@ -60,5 +64,15 @@ public class DaoFactory
     public ViewDao getViewDao(String type)
     {
         return this.viewDaoMap.get(type);
+    }
+
+    public RegionDao getRegionDao(String type)
+    {
+        return this.regionDaoMap.get(type);
+    }
+
+    public RowGroupDao getRowGroupDao(String type)
+    {
+        return this.rowGroupDaoMap.get(type);
     }
 }

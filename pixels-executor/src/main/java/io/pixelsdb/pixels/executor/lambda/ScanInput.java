@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor.lambda;
 import java.util.ArrayList;
 
 /**
- * The input format for ScanWorker.
+ * The input format for table scan.
  * @author hank
  * Created at: 11/04/2022
  */
@@ -132,7 +132,7 @@ public class ScanInput
 
     public static class InputInfo
     {
-        private String filePath;
+        private String path;
         private int rgStart;
         private int rgLength;
 
@@ -141,21 +141,21 @@ public class ScanInput
          */
         public InputInfo() { }
 
-        public InputInfo(String filePath, int rgStart, int rgLength)
+        public InputInfo(String path, int rgStart, int rgLength)
         {
-            this.filePath = filePath;
+            this.path = path;
             this.rgStart = rgStart;
             this.rgLength = rgLength;
         }
 
-        public String getFilePath()
+        public String getPath()
         {
-            return filePath;
+            return path;
         }
 
-        public void setFilePath(String filePath)
+        public void setPath(String path)
         {
-            this.filePath = filePath;
+            this.path = path;
         }
 
         public int getRgStart()

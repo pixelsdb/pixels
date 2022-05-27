@@ -25,6 +25,7 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * TimestampColumnVector derived from org.apache.hadoop.hive.ql.exec.vector
@@ -89,6 +90,36 @@ public class TimestampColumnVector extends ColumnVector
     public int getLength()
     {
         return times.length;
+    }
+
+    @Override
+    public int[] accumulateHashCode(int[] hashCode)
+    {
+        requireNonNull(hashCode, "hashCode is null");
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+                "the length of hashCode is not in the range [1, length]");
+        for (int i = 0; i < hashCode.length; ++i)
+        {
+            if (this.isNull[i])
+            {
+                continue;
+            }
+            // this.nanos is currently not used.
+            hashCode[i] = 31 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 32));
+        }
+        return hashCode;
+    }
+
+    @Override
+    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    {
+        TimestampColumnVector otherVector = (TimestampColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            // this.nanos is currently not used.
+            return this.times[index] == otherVector.times[otherIndex];
+        }
+        return false;
     }
 
     /**
@@ -279,13 +310,45 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
-    public void setElement(int outElementNum, int inputElementNum, ColumnVector inputVector)
+    public void addElement(int inputIndex, ColumnVector inputVector)
     {
+        int index = writeIndex++;
+        if (inputVector.noNulls || !inputVector.isNull[inputIndex])
+        {
+            isNull[index] = false;
+            TimestampColumnVector in = (TimestampColumnVector) inputVector;
+            times[index] = in.times[inputIndex];
+            // this.nanos is currently not used.
+        }
+        else
+        {
+            isNull[index] = true;
+            noNulls = false;
+        }
+    }
 
-        TimestampColumnVector timestampColVector = (TimestampColumnVector) inputVector;
+    @Override
+    public void addSelected(int[] selected, int offset, int length, ColumnVector src)
+    {
+        // isRepeating should be false and src should be an instance of TimestampColumnVector.
+        // However, we do not check these for performance considerations.
+        TimestampColumnVector source = (TimestampColumnVector) src;
 
-        times[outElementNum] = timestampColVector.times[inputElementNum];
-        nanos[outElementNum] = timestampColVector.nanos[inputElementNum];
+        for (int i = offset; i < offset + length; i++)
+        {
+            int srcIndex = selected[i], thisIndex = writeIndex++;
+            if (source.isNull[srcIndex])
+            {
+                this.isNull[thisIndex] = true;
+                this.noNulls = false;
+            }
+            else
+            {
+                this.times[thisIndex] = source.times[srcIndex];
+                // this.nanos is currently not used.
+                this.isNull[thisIndex] = false;
+            }
+        }
     }
 
     @Override
@@ -304,18 +367,21 @@ public class TimestampColumnVector extends ColumnVector
     }
 
     @Override
-    protected void applyFilter(Bitmap filter, int beforeIndex)
+    protected void applyFilter(Bitmap filter, int before)
     {
         checkArgument(!isRepeating,
                 "column vector is repeating, flatten before applying filter");
-
+        checkArgument(before > 0 && before <= length,
+                "before index is not in the range [1, length]");
         boolean noNulls = true;
-        for (int i = filter.nextSetBit(0), j = 0;
-             i >= 0 && i < this.length; i = filter.nextSetBit(i+1), j++)
+        int j = 0;
+        for (int i = filter.nextSetBit(0);
+             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
         {
             if (i > j)
             {
                 this.times[j] = this.times[i];
+                // this.nanos is currently not used.
                 this.isNull[j] = this.isNull[i];
             }
             if (this.isNull[j])
@@ -355,6 +421,7 @@ public class TimestampColumnVector extends ColumnVector
                 Arrays.fill(times, 0, size, repeatFastTime);
                 Arrays.fill(nanos, 0, size, repeatNanos);
             }
+            writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
@@ -363,6 +430,10 @@ public class TimestampColumnVector extends ColumnVector
     @Override
     public void add(Timestamp value)
     {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
         set(writeIndex++, value);
     }
 
@@ -375,6 +446,10 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void set(int elementNum, Timestamp timestamp)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
         if (timestamp == null)
         {
             this.noNulls = false;
@@ -382,6 +457,7 @@ public class TimestampColumnVector extends ColumnVector
         }
         else
         {
+            this.isNull[elementNum] = false;
             this.times[elementNum] = timestamp.getTime();
             this.nanos[elementNum] = timestamp.getNanos();
         }
@@ -394,6 +470,11 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void setFromScratchTimestamp(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        this.isNull[elementNum] = false;
         this.times[elementNum] = scratchTimestamp.getTime();
         this.nanos[elementNum] = scratchTimestamp.getNanos();
     }
@@ -406,64 +487,14 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void setNullValue(int elementNum)
     {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        isNull[elementNum] = true;
         times[elementNum] = 0;
-        nanos[elementNum] = 1;
-    }
-
-    // Copy the current object contents into the output. Only copy selected entries,
-    // as indicated by selectedInUse and the sel array.
-    public void copySelected(
-            boolean selectedInUse, int[] sel, int size, TimestampColumnVector output)
-    {
-
-        // Output has nulls if and only if input has nulls.
-        output.noNulls = noNulls;
-        output.isRepeating = false;
-
-        // Handle repeating case
-        if (isRepeating)
-        {
-            output.times[0] = times[0];
-            output.nanos[0] = nanos[0];
-            output.isNull[0] = isNull[0];
-            output.isRepeating = true;
-            return;
-        }
-
-        // Handle normal case
-
-        // Copy data values over
-        if (selectedInUse)
-        {
-            for (int j = 0; j < size; j++)
-            {
-                int i = sel[j];
-                output.times[i] = times[i];
-                output.nanos[i] = nanos[i];
-            }
-        }
-        else
-        {
-            System.arraycopy(times, 0, output.times, 0, size);
-            System.arraycopy(nanos, 0, output.nanos, 0, size);
-        }
-
-        // Copy nulls over if needed
-        if (!noNulls)
-        {
-            if (selectedInUse)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    int i = sel[j];
-                    output.isNull[i] = isNull[i];
-                }
-            }
-            else
-            {
-                System.arraycopy(isNull, 0, output.isNull, 0, size);
-            }
-        }
+        nanos[elementNum] = 0;
+        noNulls = false;
     }
 
     /**

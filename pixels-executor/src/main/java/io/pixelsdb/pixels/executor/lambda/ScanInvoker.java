@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * The lambda invoker for scan operator.
+ *
  * @author hank
  * @date 4/18/22
  */
@@ -66,8 +67,8 @@ public class ScanInvoker
                 }
                 else
                 {
-                    throw new RuntimeException("failed to execute the request, function error="
-                            + response.functionError());
+                    throw new RuntimeException("failed to execute the request, function error (" +
+                            response.statusCode() + "): " + response.functionError());
                 }
             }
             throw new RuntimeException("failed to get response", err);

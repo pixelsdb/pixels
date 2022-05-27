@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.executor.lambda;
 import java.util.ArrayList;
 
 /**
+ * The output format for table scan.
  * @author hank
  * Created at: 11/04/2022
  */
@@ -31,6 +32,10 @@ public class ScanOutput
      * The path of the scan result files. No need to contain endpoint information.
      */
     private ArrayList<String> outputs = new ArrayList<>();
+
+    /**
+     * The number of row groups in each scan result files.
+     */
     private ArrayList<Integer> rowGroupNums = new ArrayList<>();
 
     /**
@@ -58,7 +63,7 @@ public class ScanOutput
         this.rowGroupNums = rowGroupNums;
     }
 
-    public void addOutput(String output, int rowGroupNum)
+    public synchronized void addOutput(String output, int rowGroupNum)
     {
         this.outputs.add(output);
         this.rowGroupNums.add(rowGroupNum);
