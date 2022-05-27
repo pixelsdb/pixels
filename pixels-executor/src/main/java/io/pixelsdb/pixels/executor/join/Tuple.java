@@ -49,7 +49,7 @@ public class Tuple
      */
     protected final int[] keyColumnIds;
     /**
-     * The id set of the join-key columns, used for performance consideration.
+     * The ids of the join-key columns, in Set form, used for performance consideration.
      */
     protected final Set<Integer> keyColumnIdSet;
     /**
@@ -143,7 +143,6 @@ public class Tuple
      */
     protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
-
         if (left != null)
         {
             start = left.writeTo(rowBatch, start);

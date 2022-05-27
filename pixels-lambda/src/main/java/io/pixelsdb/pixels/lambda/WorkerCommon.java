@@ -80,7 +80,9 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                leftSchema.set(getReader(leftPath, storage).getFileSchema());
+                PixelsReader reader = getReader(leftPath, storage);
+                leftSchema.set(reader.getFileSchema());
+                reader.close();
             } catch (IOException e)
             {
                 logger.error("failed to read the schema of the left table");
@@ -89,7 +91,9 @@ public class WorkerCommon
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                rightSchema.set(getReader(rightPath, storage).getFileSchema());
+                PixelsReader reader = getReader(rightPath, storage);
+                rightSchema.set(reader.getFileSchema());
+                reader.close();
             } catch (IOException e)
             {
                 logger.error("failed to read the schema of the right table");

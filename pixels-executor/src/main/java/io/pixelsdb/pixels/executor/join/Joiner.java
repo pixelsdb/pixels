@@ -121,10 +121,6 @@ public class Joiner
         int joinedColId = 0;
         for (int i = 0; i < smallColumnNames.size(); ++i)
         {
-            /**
-             * Even if this is a natural join, we add the prefix to the key columns of the small table.
-             * Because a non-key column of the big table may have the same name as the key column of the small table.
-             */
             this.joinedSchema.addField(joinedCols[joinedColId++], smallColumnTypes.get(i));
         }
         Set<Integer> bigKeyColumnIdSet = new HashSet<>(bigKeyColumnIds.length);

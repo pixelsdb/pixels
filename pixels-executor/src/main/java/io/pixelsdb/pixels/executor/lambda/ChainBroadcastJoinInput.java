@@ -20,16 +20,17 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput.TableInfo;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.OutputInfo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * @author hank
- * @date 07/05/2022
+ * @date 26/05/2022
  */
-public class BroadcastJoinInput implements JoinInput
+public class ChainBroadcastJoinInput implements JoinInput
 {
     /**
      * The unique id of the query.
@@ -37,11 +38,17 @@ public class BroadcastJoinInput implements JoinInput
     private long queryId;
 
     /**
-     * The small and broadcast table.
+     * The far left table in the join chain.
      */
     private TableInfo leftTable;
     /**
-     * The right and big table.
+     * The chain of the broadcast tables between the left and the right tables.
+     * These tables are joined following their order in the list.
+     * Start joins are not supported here.
+     */
+    private List<ChainTableInfo> chainTables;
+    /**
+     * The right (big) table.
      */
     private TableInfo rightTable;
 
@@ -61,13 +68,17 @@ public class BroadcastJoinInput implements JoinInput
     /**
      * Default constructor for Jackson.
      */
-    public BroadcastJoinInput() { }
+    public ChainBroadcastJoinInput()
+    {
+        this.chainTables = new ArrayList<>();
+    }
 
-    public BroadcastJoinInput(long queryId, TableInfo leftTable, TableInfo rightTable,
-                              JoinType joinType, String[] joinedCols, OutputInfo output)
+    public ChainBroadcastJoinInput(long queryId, TableInfo leftTable, List<ChainTableInfo> chainTables,
+                                   TableInfo rightTable, JoinType joinType, String[] joinedCols, OutputInfo output)
     {
         this.queryId = queryId;
         this.leftTable = leftTable;
+        this.chainTables = chainTables;
         this.rightTable = rightTable;
         this.joinType = joinType;
         this.joinedCols = joinedCols;
@@ -92,6 +103,21 @@ public class BroadcastJoinInput implements JoinInput
     public void setLeftTable(TableInfo leftTable)
     {
         this.leftTable = leftTable;
+    }
+
+    public List<ChainTableInfo> getChainTables()
+    {
+        return chainTables;
+    }
+
+    public void setChainTables(List<ChainTableInfo> chainTables)
+    {
+        this.chainTables = chainTables;
+    }
+
+    public void addChainTable(ChainTableInfo chainTable)
+    {
+        this.chainTables.add(chainTable);
     }
 
     public TableInfo getRightTable()
@@ -134,104 +160,30 @@ public class BroadcastJoinInput implements JoinInput
         this.output = output;
     }
 
-    public static class TableInfo
+    /**
+     * The chain table between the left and right table.
+     */
+    public static class ChainTableInfo extends TableInfo
     {
-        private String tableName;
-        /**
-         * The scan inputs of the left table.
-         */
-        private List<InputInfo> inputs;
-        /**
-         * The number of row groups to be scanned in each query split of the left table.
-         */
-        private int splitSize;
-        /**
-         * The name of the columns to scan for the left table.
-         */
-        private String[] cols;
-        /**
-         * The join-key column ids of the left table.
-         */
-        private int[] keyColumnIds;
-        /**
-         * The json string of the filter (i.e., predicates) to be used in scan of the left table.
-         */
-        private String filter;
+        private int[] secondKeyColumnIds;
 
-        /**
-         * Default constructor for Jackson.
-         */
-        public TableInfo() { }
+        public ChainTableInfo() { }
 
-        public TableInfo(String tableName, List<InputInfo> inputs, int splitSize, String[] cols,
-                         int[] keyColumnIds, String filter)
+        public ChainTableInfo(String tableName, List<ScanInput.InputInfo> inputs, int splitSize,
+                              String[] cols, int[] keyColumnIds, String filter, int[] secondKeyColumnIds)
         {
-            this.tableName = tableName;
-            this.inputs = inputs;
-            this.splitSize = splitSize;
-            this.cols = cols;
-            this.keyColumnIds = keyColumnIds;
-            this.filter = filter;
+            super(tableName, inputs, splitSize, cols, keyColumnIds, filter);
+            this.secondKeyColumnIds = secondKeyColumnIds;
         }
 
-        public String getTableName()
+        public int[] getSecondKeyColumnIds()
         {
-            return tableName;
+            return secondKeyColumnIds;
         }
 
-        public void setTableName(String tableName)
+        public void setSecondKeyColumnIds(int[] secondKeyColumnIds)
         {
-            this.tableName = tableName;
-        }
-
-        public List<InputInfo> getInputs()
-        {
-            return inputs;
-        }
-
-        public void setInputs(List<InputInfo> inputs)
-        {
-            this.inputs = inputs;
-        }
-
-        public int getSplitSize()
-        {
-            return splitSize;
-        }
-
-        public void setSplitSize(int splitSize)
-        {
-            this.splitSize = splitSize;
-        }
-
-        public String[] getCols()
-        {
-            return cols;
-        }
-
-        public void setCols(String[] cols)
-        {
-            this.cols = cols;
-        }
-
-        public int[] getKeyColumnIds()
-        {
-            return keyColumnIds;
-        }
-
-        public void setKeyColumnIds(int[] keyColumnIds)
-        {
-            this.keyColumnIds = keyColumnIds;
-        }
-
-        public String getFilter()
-        {
-            return filter;
-        }
-
-        public void setFilter(String filter)
-        {
-            this.filter = filter;
+            this.secondKeyColumnIds = secondKeyColumnIds;
         }
     }
 }

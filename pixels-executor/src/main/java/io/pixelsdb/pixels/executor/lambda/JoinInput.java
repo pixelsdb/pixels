@@ -30,7 +30,22 @@ public interface JoinInput
 {
     public JoinType getJoinType();
 
+    /**
+     * Get the alias of the columns in the join result. The order of the alias <b>MUST</b>
+     * follow the order of the left table columns and the right table columns.
+     * <p/>
+     * For example, if the left table L scans 3 column A, B, and C, whereas the right table R
+     * scans 4 columns D, E, F, and G. The join condition is (L inner join R on L.A=R.B).
+     * Then, the joined columns would be A, B, C, D, E, F, and G. And the alias of the joined
+     * columns must follow this order, such as A_0, B_1, C_2, D_3, E_4, F_5, and G_6.
+     *
+     * @return the alias of the columns in the join result
+     */
     public String[] getJoinedCols();
 
+    /**
+     * Get the information of the join output.
+     * @return the join output information
+     */
     public OutputInfo getOutput();
 }

@@ -86,21 +86,23 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            List<ScanInput.InputInfo> leftInputs = event.getLeftInputs();
+            BroadcastJoinInput.TableInfo leftTable = event.getLeftTable();
+            List<ScanInput.InputInfo> leftInputs = leftTable.getInputs();
             checkArgument(leftInputs.size() > 0, "leftPartitioned is empty");
-            String[] leftCols = event.getLeftCols();
-            int[] leftKeyColumnIds = event.getLeftKeyColumnIds();
-            int leftSplitSize = event.getLeftSplitSize();
-            TableScanFilter leftFilter = JSON.parseObject(event.getLeftFilter(), TableScanFilter.class);
+            String[] leftCols = leftTable.getCols();
+            int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
+            int leftSplitSize = leftTable.getSplitSize();
+            TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            List<ScanInput.InputInfo> rightInputs = event.getRightInputs();
+            BroadcastJoinInput.TableInfo rightTable = event.getRightTable();
+            List<ScanInput.InputInfo> rightInputs = rightTable.getInputs();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
-            String[] rightCols = event.getRightCols();
-            int[] rightKeyColumnIds = event.getRightKeyColumnIds();
-            int rightSplitSize = event.getRightSplitSize();
-            TableScanFilter rightFilter = JSON.parseObject(event.getRightFilter(), TableScanFilter.class);
-            String[] joinedCols = event.getJoinedCols();
+            String[] rightCols = rightTable.getCols();
+            int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
+            int rightSplitSize = rightTable.getSplitSize();
+            TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
+            String[] joinedCols = event.getJoinedCols();
             JoinType joinType = event.getJoinType();
             ScanInput.OutputInfo outputInfo = event.getOutput();
             String outputFolder = outputInfo.getFolder();

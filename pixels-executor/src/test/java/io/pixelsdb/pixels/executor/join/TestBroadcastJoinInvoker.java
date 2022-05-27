@@ -68,10 +68,11 @@ public class TestBroadcastJoinInvoker
         BroadcastJoinInput joinInput = new BroadcastJoinInput();
         joinInput.setQueryId(123456);
 
-        joinInput.setLeftCols(new String[]{"p_partkey", "p_name", "p_size"});
-        joinInput.setLeftKeyColumnIds(new int[]{0});
-        joinInput.setLeftTableName("part");
-        joinInput.setLeftInputs(Arrays.asList(
+        BroadcastJoinInput.TableInfo leftTable = new BroadcastJoinInput.TableInfo();
+        leftTable.setCols(new String[]{"p_partkey", "p_name", "p_size"});
+        leftTable.setKeyColumnIds(new int[]{0});
+        leftTable.setTableName("part");
+        leftTable.setInputs(Arrays.asList(
                 new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 0, 4),
                 new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 4, 4),
                 new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 8, 4),
@@ -81,13 +82,15 @@ public class TestBroadcastJoinInvoker
                 new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 24, 4),
                 new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 28, 4)
         ));
-        joinInput.setLeftSplitSize(4);
-        joinInput.setLeftFilter(leftFilter);
+        leftTable.setSplitSize(4);
+        leftTable.setFilter(leftFilter);
+        joinInput.setLeftTable(leftTable);
 
-        joinInput.setRightCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
-        joinInput.setRightKeyColumnIds(new int[]{1});
-        joinInput.setRightTableName("lineitem");
-        joinInput.setRightInputs(Arrays.asList(
+        BroadcastJoinInput.TableInfo rightTable = new BroadcastJoinInput.TableInfo();
+        rightTable.setCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        rightTable.setKeyColumnIds(new int[]{1});
+        rightTable.setTableName("lineitem");
+        rightTable.setInputs(Arrays.asList(
                 new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4),
                 new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4),
                 new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4),
@@ -97,8 +100,9 @@ public class TestBroadcastJoinInvoker
                 new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4),
                 new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)
         ));
-        joinInput.setRightSplitSize(4);
-        joinInput.setRightFilter(rightFilter);
+        rightTable.setSplitSize(4);
+        rightTable.setFilter(rightFilter);
+        joinInput.setRightTable(rightTable);
 
         joinInput.setJoinType(JoinType.EQUI_LEFT);
         joinInput.setJoinedCols(new String[]{"p_partkey", "p_name", "p_size",
