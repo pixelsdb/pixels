@@ -137,7 +137,7 @@ public class BenchmarkCacheContentReader {
 
     @Test
     public void benchmarkMultiThreadDiskContentReader() throws IOException, InterruptedException, ExecutionException {
-        int threadNum = 8;
+        int threadNum = 1;
         benchmarkMultiThreadContentReader(() -> {
             try {
                 return new DiskCacheContentReader("/scratch/yeeef/pixels-cache/pixels.cache");
@@ -145,6 +145,14 @@ public class BenchmarkCacheContentReader {
                 e.printStackTrace();
                 return null;
             }
+        }, threadNum);
+    }
+
+    @Test
+    public void benchmarkMultiThreadFileContentReader() throws IOException, InterruptedException, ExecutionException {
+        int threadNum = 1;
+        benchmarkMultiThreadContentReader(() -> {
+            return new FileCacheContentReader("/scratch/yeeef/pixels-cache/cache_fs");
         }, threadNum);
     }
 
