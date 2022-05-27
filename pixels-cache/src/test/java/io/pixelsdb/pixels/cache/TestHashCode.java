@@ -26,6 +26,88 @@ public class TestHashCode {
         return var1;
     }
     @Test
+    public void testHashPartition() {
+        // read the tmp.txt file
+        int dataSize = 512000;
+        double loadFactor = 0.5f;
+        int partitions = 32;
+        int[] partitionKeys = new int[partitions];
+        long[] partitionSizes = new long[partitions];
+        Map<Integer, Set<Short>> partitionColumns = new HashMap<>(partitions);
+        Map<Integer, Set<Long>> partitionBlks = new HashMap<>(partitions);
+        Map<Integer, Set<Short>> partitionRgs = new HashMap<>(partitions);
+
+
+        for (int i = 0; i < partitions; ++i) {
+            partitionColumns.put(i, new HashSet<>(20));
+            partitionBlks.put(i, new HashSet<>(20));
+            partitionRgs.put(i, new HashSet<>(20));
+        }
+        Arrays.fill(partitionKeys, 0);
+        Arrays.fill(partitionSizes, 0);
+        BufferedReader reader;
+        try {
+            reader = new BufferedReader(new FileReader(
+                    "tmp.txt"));
+            String line = reader.readLine();
+            while (line != null) {
+                String[] keys = line.split(";")[1].split("-");
+                long blockId = Long.parseLong(keys[0]);
+                short rgId = Short.parseShort(keys[1]);
+                short columnId = Short.parseShort(keys[2]);
+                int size = Integer.parseInt(line.split(";")[2].split("-")[1]);
+                ByteBuffer keyBuf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN);
+
+                keyBuf.putLong(blockId);
+                keyBuf.putShort(rgId);
+                keyBuf.putShort(columnId);
+
+                keyBuf.position(0);
+
+//                int hash = keyBuf.hashCode();
+                int hash = hashcode(keyBuf.array()) & 0x7fffffff;
+//                int hash = Hashing.murmur3_128().hashBytes(keyBuf).asInt() & 0x7fffffff; // better than default hashing
+                int partition = hash % partitions;
+                partitionKeys[partition] += 1;
+                partitionSizes[partition] += size;
+                partitionColumns.get(partition).add(columnId);
+                partitionBlks.get(partition).add(blockId);
+                partitionRgs.get(partition).add(rgId);
+
+                line = reader.readLine();
+            }
+            System.out.println(Arrays.toString(partitionKeys));
+            System.out.println(Arrays.toString(partitionSizes));
+            System.out.println("----------------------------------");
+            for (int i = 0; i < partitions; ++i) {
+                Short[] cols = partitionColumns.get(i).toArray(new Short[0]);
+                Arrays.sort(cols);
+                System.out.println(Arrays.toString(cols));
+            }
+            System.out.println("----------------------------------");
+
+            for (int i = 0; i < partitions; ++i) {
+                Long[] cols = partitionBlks.get(i).toArray(new Long[0]);
+                Arrays.sort(cols);
+                System.out.println(Arrays.toString(cols));
+            }
+            System.out.println("----------------------------------");
+
+            for (int i = 0; i < partitions; ++i) {
+                Short[] cols = partitionRgs.get(i).toArray(new Short[0]);
+                Arrays.sort(cols);
+                System.out.println(Arrays.toString(cols));
+            }
+
+
+            reader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    @Test
     public void hashOnKeyBuffer() {
         // read the tmp.txt file
         Map<Integer, Integer> hashCodes = new HashMap<>();
