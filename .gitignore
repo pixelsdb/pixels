@@ -20,9 +20,9 @@ package-info.java
 *.log
 */cmake-build-debug
 */cmake-build-release
-*.txt
 !CMakeLists.txt
 !*/CMakeLists.txt
+#*.txt
 *.csv
 resources/*.xml
 *.so
