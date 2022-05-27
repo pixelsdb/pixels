@@ -31,33 +31,32 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.executor.lambda.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.PartitionOutput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
-import io.pixelsdb.pixels.executor.lambda.ScanOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
-import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
 /**
- * The response is a list of files read and then written to s3.
- *
- * @author tiannan
  * @author hank
- * Created in: 03.2022
+ * @date 07/05/2022
  */
-public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
+public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
     private static Storage s3;
-    private static Storage minio;
 
     static
     {
@@ -72,39 +71,32 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     }
 
     @Override
-    public ScanOutput handleRequest(ScanInput event, Context context)
+    public PartitionOutput handleRequest(PartitionInput event, Context context)
     {
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
             ArrayList<InputInfo> inputs = event.getInputs();
             int splitSize = event.getSplitSize();
-            String outputFolder = event.getOutput().getFolder();
-            if (!outputFolder.endsWith("/"))
-            {
-                outputFolder += "/";
-            }
+            int numPartition = event.getPartitionInfo().getNumParition();
+            int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
+            String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
-            try
-            {
-                if (minio == null)
-                {
-                    ConfigMinIO(event.getOutput().getEndpoint(),
-                            event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
-                    minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
-                }
-            } catch (Exception e)
-            {
-                logger.error("failed to initialize MinIO storage", e);
-            }
+
             String[] cols = event.getCols();
             TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
-            ScanOutput scanOutput = new ScanOutput();
+            PartitionOutput partitionOutput = new PartitionOutput();
+            AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
+            // The partitioned data would be kept in memory.
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
+            for (int i = 0; i < numPartition; ++i)
+            {
+                partitioned.add(new ConcurrentLinkedQueue<>());
+            }
             for (int i = 0; i < inputs.size();)
             {
                 int numRg = 0;
@@ -115,20 +107,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     scanInputs.add(info);
                     numRg += info.getRgLength();
                 }
-                String out = outputFolder + requestId + "_out_" + i;
 
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = scanFile(queryId, scanInputs, cols, filter, out, encoding);
-                        if (rowGroupNum > 0)
-                        {
-                            scanOutput.addOutput(out, rowGroupNum);
-                        }
+                        partitionFile(queryId, scanInputs, cols, filter,
+                                keyColumnIds, partitioned, writerSchema);
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during scan", e);
+                        logger.error("error during partitioning", e);
                     }
                 });
             }
@@ -138,35 +126,56 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of scan", e);
+                logger.error("interrupted while waiting for the termination of partitioning", e);
             }
 
-            return scanOutput;
-        } catch (Exception e)
+            PixelsWriter pixelsWriter = getWriter(writerSchema.get(), s3, outputPath, encoding,
+                    true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
+            Set<Integer> hashValues = new HashSet<>(numPartition);
+            for (int hash = 0; hash < numPartition; ++hash)
+            {
+                ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
+                if (!batches.isEmpty())
+                {
+                    for (VectorizedRowBatch batch : batches)
+                    {
+                        pixelsWriter.addRowBatch(batch, hash);
+                    }
+                    hashValues.add(hash);
+                }
+            }
+            partitionOutput.setPath(outputPath);
+            partitionOutput.setHashValues(hashValues);
+
+            pixelsWriter.close();
+
+            return partitionOutput;
+        }
+        catch (Exception e)
         {
-            logger.error("error during scan", e);
+            logger.error("error during partition", e);
             return null;
         }
     }
 
     /**
-     * Scan the files in a query split, apply projection and filters, and output the
-     * results to the given path.
+     * Scan and partition the files in a query split.
+     *
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param cols the included columns
-     * @param filter the filter for the scan
-     * @param outputPath fileName on s3 to store the scan results
-     * @param encoding whether encode the scan results or not
-     * @return the number of row groups that have been written into the output.
+     * @param filter the filer for the scan
+     * @param keyColumnIds the ids of the partition key columns
+     * @param partitionResult the partition result
+     * @param writerSchema the schema to be used for the partition result writer
      */
-    private int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
-                           TableScanFilter filter, String outputPath, boolean encoding)
+    private void partitionFile(long queryId, ArrayList<InputInfo> scanInputs,
+                             String[] cols, TableScanFilter filter, int[] keyColumnIds,
+                             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
+                             AtomicReference<TypeDescription> writerSchema)
     {
-        PixelsWriter pixelsWriter = null;
-        for (int i = 0; i < scanInputs.size(); ++i)
+        for (InputInfo inputInfo : scanInputs)
         {
-            InputInfo inputInfo = scanInputs.get(i);
             PixelsReaderOption option = new PixelsReaderOption();
             option.skipCorruptRecords(true);
             option.tolerantSchemaEvolution(true);
@@ -190,10 +199,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
 
-                if (pixelsWriter == null)
+                Partitioner partitioner = new Partitioner(partitionResult.size(), rowBatchSize,
+                        rowBatchSchema, keyColumnIds);
+
+                if (writerSchema.get() == null)
                 {
-                    pixelsWriter = getWriter(rowBatchSchema, minio, outputPath,
-                            encoding, false, null);
+                    writerSchema.weakCompareAndSet(null, rowBatchSchema);
                 }
                 Bitmap filtered = new Bitmap(rowBatchSize, true);
                 Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -204,37 +215,29 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     rowBatch.applyFilter(filtered);
                     if (rowBatch.size > 0)
                     {
-                        pixelsWriter.addRowBatch(rowBatch);
+                        Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
+                        if (!result.isEmpty())
+                        {
+                            for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
+                            {
+                                partitionResult.get(entry.getKey()).add(entry.getValue());
+                            }
+                        }
                     }
                 } while (!rowBatch.endOfFile);
+                VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+                for (int hash = 0; hash < tailBatches.length; ++hash)
+                {
+                    if (!tailBatches[hash].isEmpty())
+                    {
+                        partitionResult.get(hash).add(tailBatches[hash]);
+                    }
+                }
             } catch (Exception e)
             {
                 logger.error("failed to scan the file '" +
-                        inputInfo.getPath() + "' and output the result", e);
+                        inputInfo.getPath() + "' and output the partitioning result", e);
             }
         }
-        // Finished scanning all the files in the split.
-        try
-        {
-            pixelsWriter.close();
-            while (true)
-            {
-                try
-                {
-                    if (minio.getStatus(outputPath) != null)
-                    {
-                        break;
-                    }
-                } catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
-            }
-        } catch (Exception e)
-        {
-            logger.error("failed finish writing and close the output file '" + outputPath + "'", e);
-        }
-        return pixelsWriter.getRowGroupNum();
     }
 }

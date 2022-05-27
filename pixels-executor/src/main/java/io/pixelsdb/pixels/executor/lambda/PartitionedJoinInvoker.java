@@ -27,24 +27,24 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The lambda invoker for scan operator.
+ * The lambda invoker for hash partitioned join operator.
  *
  * @author hank
- * @date 4/18/22
+ * @date 07/05/2022
  */
-public class ScanInvoker
+public class PartitionedJoinInvoker
 {
-    private static final String SCAN_WORKER_NAME = "ScanWorker";
+    private static final String PARTITIONED_JOIN_WORKER_NAME = "PartitionedJoinWorker";
 
-    private ScanInvoker() { }
+    private PartitionedJoinInvoker() { }
 
-    public static CompletableFuture<ScanOutput> invoke(ScanInput input)
+    public static CompletableFuture<JoinOutput> invoke(PartitionedJoinInput input)
     {
         String inputJson = JSON.toJSONString(input);
         SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
 
         InvokeRequest request = InvokeRequest.builder()
-                .functionName(SCAN_WORKER_NAME)
+                .functionName(PARTITIONED_JOIN_WORKER_NAME)
                 .payload(payload)
                 // using RequestResponse for higher function concurrency.
                 .invocationType(InvocationType.REQUEST_RESPONSE)
@@ -57,13 +57,13 @@ public class ScanInvoker
                 if(response.statusCode() == 200 && response.functionError() == null)
                 {
                     String outputJson = response.payload().asUtf8String();
-                    ScanOutput scanOutput = JSON.parseObject(outputJson, ScanOutput.class);
-                    if (scanOutput == null)
+                    JoinOutput joinOutput = JSON.parseObject(outputJson, JoinOutput.class);
+                    if (joinOutput == null)
                     {
                         throw new RuntimeException("failed to parse response payload, length=" +
                                 response.payload().asByteArray().length);
                     }
-                    return scanOutput;
+                    return joinOutput;
                 }
                 else
                 {

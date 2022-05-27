@@ -19,14 +19,19 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
+
 import java.util.ArrayList;
 
 /**
- * The input format for table scan.
+ * The input format for hash partitioning.
+ * Hash partitioner is also responsible for projection and filtering, thus
+ * hash partitioning input shares some fields with the scan input.
+ *
  * @author hank
- * Created at: 11/04/2022
+ * @date 07/05/2022
  */
-public class ScanInput
+public class PartitionInput
 {
     /**
      * The unique id of the query.
@@ -55,12 +60,17 @@ public class ScanInput
     private String filter;
 
     /**
+     * The information about the hash partitioning.
+     */
+    private PartitionInfo partitionInfo;
+
+    /**
      * Default constructor for Jackson.
      */
-    public ScanInput() { }
+    public PartitionInput() { }
 
-    public ScanInput(long queryId, ArrayList<InputInfo> inputs, int splitSize,
-                     OutputInfo output, String[] cols, String filter)
+    public PartitionInput(long queryId, ArrayList<InputInfo> inputs, int splitSize,
+                     OutputInfo output, String[] cols, String filter, PartitionInfo partitionInfo)
     {
         this.queryId = queryId;
         this.inputs = inputs;
@@ -68,6 +78,7 @@ public class ScanInput
         this.output = output;
         this.cols = cols;
         this.filter = filter;
+        this.partitionInfo  = partitionInfo;
     }
 
     public long getQueryId()
@@ -130,22 +141,81 @@ public class ScanInput
         this.filter = filter;
     }
 
-    public static class InputInfo
+    public PartitionInfo getPartitionInfo()
     {
-        private String path;
-        private int rgStart;
-        private int rgLength;
+        return partitionInfo;
+    }
+
+    public void setPartitionInfo(PartitionInfo partitionInfo)
+    {
+        this.partitionInfo = partitionInfo;
+    }
+
+    public static class PartitionInfo
+    {
+        /**
+         * The column ids of the partition key columns.
+         */
+        private int[] keyColumnIds;
+
+        /**
+         * The number of partitions in the output.
+         */
+        private int numParition;
 
         /**
          * Default constructor for Jackson.
          */
-        public InputInfo() { }
+        public PartitionInfo() { }
 
-        public InputInfo(String path, int rgStart, int rgLength)
+        public PartitionInfo(int[] keyColumnIds, int numParition)
+        {
+            this.keyColumnIds = keyColumnIds;
+            this.numParition = numParition;
+        }
+
+        public int[] getKeyColumnIds()
+        {
+            return keyColumnIds;
+        }
+
+        public void setKeyColumnIds(int[] keyColumnIds)
+        {
+            this.keyColumnIds = keyColumnIds;
+        }
+
+        public int getNumParition()
+        {
+            return numParition;
+        }
+
+        public void setNumParition(int numParition)
+        {
+            this.numParition = numParition;
+        }
+    }
+
+    public static class OutputInfo
+    {
+        /**
+         * The path of the partitioned file.
+         */
+        private String path;
+
+        /**
+         * Whether we use encoding for the partitioned file.
+         */
+        private boolean encoding;
+
+        /**
+         * Default constructor for Jackson.
+         */
+        public OutputInfo() {}
+
+        public OutputInfo(String path, boolean encoding)
         {
             this.path = path;
-            this.rgStart = rgStart;
-            this.rgLength = rgLength;
+            this.encoding = encoding;
         }
 
         public String getPath()
@@ -156,103 +226,6 @@ public class ScanInput
         public void setPath(String path)
         {
             this.path = path;
-        }
-
-        public int getRgStart()
-        {
-            return rgStart;
-        }
-
-        public void setRgStart(int rgStart)
-        {
-            this.rgStart = rgStart;
-        }
-
-        public int getRgLength()
-        {
-            return rgLength;
-        }
-
-        public void setRgLength(int rgLength)
-        {
-            this.rgLength = rgLength;
-        }
-    }
-
-    public static class OutputInfo
-    {
-        /**
-         * The folder path, i.e., bucket_name/folder, where the scan results are written into.
-         */
-        private String folder;
-        /**
-         * The endpoint of the output storage, e.g., http://hostname:port.
-         */
-        private String endpoint;
-        /**
-         * The access key of the output storage.
-         */
-        private String accessKey;
-        /**
-         * The secret key of the output storage.
-         */
-        private String secretKey;
-
-        private boolean encoding;
-
-        /**
-         * Default constructor for Jackson.
-         */
-        public OutputInfo() { }
-
-        public OutputInfo(String folder, String endpoint, String accessKey,
-                          String secretKey, boolean encoding)
-        {
-            this.folder = folder;
-            this.endpoint = endpoint;
-            this.accessKey = accessKey;
-            this.secretKey = secretKey;
-            this.encoding = encoding;
-        }
-
-        public String getFolder()
-        {
-            return folder;
-        }
-
-        public void setFolder(String folder)
-        {
-            this.folder = folder;
-        }
-
-        public String getEndpoint()
-        {
-            return endpoint;
-        }
-
-        public void setEndpoint(String endpoint)
-        {
-            this.endpoint = endpoint;
-        }
-
-        public String getAccessKey()
-        {
-            return accessKey;
-        }
-
-        public void setAccessKey(String accessKey)
-        {
-            this.accessKey = accessKey;
-        }
-
-        public String getSecretKey()
-        {
-            return secretKey;
-        }
-
-        public void setSecretKey(String secretKey)
-        {
-            this.secretKey = secretKey;
         }
 
         public boolean isEncoding()

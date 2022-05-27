@@ -84,10 +84,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      */
     private int[] targetRGs;
     /**
-     * Target columns to read after matching reader option,
-     * each element represents a column id (column's index in the schema).
-     * Different from resultColumns, the ith column id in targetColumn
-     * corresponds to the ith true value in includedColumns.
+     * The target columns to read after matching reader option.
+     * Each element represents a column id (column's index in the schema).
+     * Different from resultColumns, the ith column id in targetColumns
+     * corresponds to the ith true value in this.includedColumns.
      */
     private int[] targetColumns;
     /**
@@ -154,15 +154,13 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         if (fileColTypes == null || fileColTypes.isEmpty())
         {
             checkValid = false;
-            //throw new IOException("ISSUE-103: type list is empty.");
-            return;
+            throw new IOException("type list is empty.");
         }
         fileSchema = TypeDescription.createSchema(fileColTypes);
         if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty())
         {
             checkValid = false;
-            //throw new IOException("ISSUE-103: file schema is empty.");
-            return;
+            throw new IOException("file schema is empty.");
         }
 
         // check RGStart and RGLen are within the range of actual number of row groups
@@ -170,8 +168,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         if (RGStart >= rgNum)
         {
             checkValid = false;
-            //throw new IOException("ISSUE-103: row group start is out of bound.");
-            return;
+            throw new IOException("row group start (" + RGStart + ") is out of bound (" + rgNum + ").");
         }
         if (RGLen == -1)
         {
@@ -217,9 +214,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
         {
             checkValid = false;
-            //throw new IOException("ISSUE-103: includedColumnsNum is " + includedColumnsNum +
-            //        " while optionIncludedCols.length is " + optionIncludedCols.length);
-            return;
+            throw new IOException("includedColumnsNum is " + includedColumnNum +
+                    " whereas optionIncludedCols.length is " + optionIncludedCols.length);
         }
 
         // create result columns storing result column ids in user specified order
@@ -306,8 +302,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     for (int i = 0; i < RGLen; i++)
                     {
                         includedRGs[i] = true;
+                        includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
                     }
-                    includedRowNum = postScript.getNumberOfRows();
                 }
                 else if (predicate.matchesNone())
                 {
@@ -362,7 +358,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     {
                         // Issue #103: columnStatsMap should be cleared for each row group.
                         columnStatsMap.clear();
-                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(i + RGStart);
+                        PixelsProto.RowGroupStatistic rowGroupStatistic = rowGroupStatistics.get(RGStart + i);
                         List<PixelsProto.ColumnStatistic> rgColumnStatistics =
                                 rowGroupStatistic.getColumnChunkStatsList();
                         for (int id : targetColumns)
@@ -373,7 +369,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                         includedRGs[i] = predicate.matches(footer.getRowGroupInfos(i).getNumberOfRows(), columnStatsMap);
                         if (includedRGs[i] == true)
                         {
-                            includedRowNum += footer.getRowGroupInfos(i).getNumberOfRows();
+                            includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
                         }
                     }
                 }
@@ -384,8 +380,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             for (int i = 0; i < RGLen; i++)
             {
                 includedRGs[i] = true;
+                includedRowNum += footer.getRowGroupInfos(RGStart + i).getNumberOfRows();
             }
-            includedRowNum = postScript.getNumberOfRows();
         }
 
         /**
@@ -790,7 +786,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         if (!everPrepared)
         {
-            if (prepareRead() == false)
+            if (!prepareRead())
             {
                 throw new IOException("Failed to prepare for read.");
             }
@@ -803,7 +799,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
          */
         if (includedColumnNum == 0)
         {
-            if (endOfFile == false)
+            if (!endOfFile)
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
@@ -880,7 +876,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
              * It should be EOF. And the batch size should have been set in prepareRead() and
              * checked in read().
              */
-            if (endOfFile == false)
+            if (!endOfFile)
             {
                 throw new IOException("EOF should be set in case of none projection columns");
             }
@@ -903,7 +899,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
-            this.resultRowBatch.ensureSize(batchSize);
+            this.resultRowBatch.ensureSize(batchSize, false);
             resultRowBatch = this.resultRowBatch;
         } else
         {
