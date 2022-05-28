@@ -307,7 +307,23 @@ public class PixelsPartitionCacheWriter {
             }
             String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
             String[] files = fileStr.split(";");
-            return internalUpdateAll(version, layout, files);
+            Compact compact = layout.getCompactObject();
+            int cacheBorder = compact.getCacheBorder();
+            List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+            return internalUpdateAll(version, cacheColumnletOrders, files);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    // let the files be a dependency
+    public int bulkLoad(int version, List<String> cacheColumnletOrders, String[] files) {
+        try
+        {
+            return internalUpdateAll(version, cacheColumnletOrders, files);
         }
         catch (IOException e)
         {
@@ -343,9 +359,14 @@ public class PixelsPartitionCacheWriter {
         radix.removeAll();
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
 
+        logger.debug("number of files=" + files.length);
+        logger.debug("rgId.size=" + rgIds.size() + " colId.size=" + colIds.size());
+
         for (String file : files)
         {
-            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
+//            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
+            MockPixelsPhysicalReader pixelsPhysicalReader = new MockPixelsPhysicalReader(storage, file);
+
             int physicalLen;
             long physicalOffset;
             // update radix and cache content
@@ -353,12 +374,25 @@ public class PixelsPartitionCacheWriter {
             {
                 short rowGroupId = rgIds.get(i);
                 short columnId = colIds.get(i);
-                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
-                PixelsProto.ColumnChunkIndex chunkIndex =
-                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+//                PixelsProto.RowGroupFooter rowGroupFooter = pixelsPhysicalReader.readRowGroupFooter(rowGroupId);
+//                PixelsProto.ColumnChunkIndex chunkIndex =
+//                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+//                long blockId = pixelsPhysicalReader.getCurrentBlockId();
+//                physicalLen = (int) chunkIndex.getChunkLength();
+//                physicalOffset = chunkIndex.getChunkOffset();
+//                if (currCacheOffset + physicalLen >= cachePartition.getSize())
+//                {
+//                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
+//                    return 2;
+//                }
+//                radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
+//                        new PixelsCacheIdx(currCacheOffset, physicalLen));
+//                // TODO: use another read api
+//                byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
+
                 long blockId = pixelsPhysicalReader.getCurrentBlockId();
-                physicalLen = (int) chunkIndex.getChunkLength();
-                physicalOffset = chunkIndex.getChunkOffset();
+                byte[] columnlet = pixelsPhysicalReader.read(rowGroupId, columnId);
+                physicalLen = columnlet.length;
                 if (currCacheOffset + physicalLen >= cachePartition.getSize())
                 {
                     logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
@@ -366,15 +400,14 @@ public class PixelsPartitionCacheWriter {
                 }
                 radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
-                // TODO: use another read api
-                byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
-                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
-                logger.debug(
+                // TODO: uncomment it! we now test the index write first
+//                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+                logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                 currCacheOffset += physicalLen;
             }
         }
-        logger.debug("Cache writer ends at offset: " + currCacheOffset);
+        logger.debug("Cache writer ends at offset: " + currCacheOffset / 1024.0 / 1024.0 / 1024.0 + "GiB");
 
         // first write to the indexDiskPartition
         RadixSerializer serializer = new RadixSerializer(radix, indexDiskPartition);
@@ -383,7 +416,7 @@ public class PixelsPartitionCacheWriter {
         if (serializeOffset < 0) {
             return 2; // exceed the size
         }
-        logger.debug("index writer ends at offset: " + serializeOffset);
+        logger.debug("index writer ends at offset: " + serializeOffset / 1024.0 / 1024.0 + "MiB");
 
         PixelsCacheUtil.setIndexVersion(indexDiskPartition, version);
         PixelsCacheUtil.setCacheStatus(cachePartition, PixelsCacheUtil.CacheStatus.OK.getId());
@@ -396,8 +429,7 @@ public class PixelsPartitionCacheWriter {
         // then copy the indexDiskPartition to indexPartition in the tmpfs
         // TODO: check what should be write in the header
         // TODO: it might overflow the integer
-        ByteBuffer indexRegion = indexDiskPartition.getDirectByteBuffer(0, (int) serializeOffset);
-        indexPartition.setBytes(0, indexRegion.array());
+        indexPartition.copyMemory(indexDiskPartition.getAddress(), indexPartition.getAddress(), serializeOffset);
         PixelsCacheUtil.setIndexVersion(indexPartition, version);
         PixelsCacheUtil.endIndexWrite(indexPartition);
         return 0;
@@ -405,15 +437,15 @@ public class PixelsPartitionCacheWriter {
     }
 
     // bulk load method, it will write all the partitions at once.
-    private int internalUpdateAll(int version, Layout layout, String[] files)
+    private int internalUpdateAll(int version, List<String> cacheColumnletOrders, String[] files)
             throws IOException
     {
         int status = 0;
         // get the new caching layout
-        Compact compact = layout.getCompactObject();
-        int cacheBorder = compact.getCacheBorder();
-        List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
-        ByteBuffer hashKeyBuf = ByteBuffer.allocate(PixelsCacheKey.SIZE);
+//        Compact compact = layout.getCompactObject();
+//        int cacheBorder = compact.getCacheBorder();
+//        List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+        ByteBuffer hashKeyBuf = ByteBuffer.allocate(2 + 2);
         List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
         for (int i = 0; i < partitions; ++i) {
             partitionRgIds.add(new ArrayList<>());
@@ -422,20 +454,18 @@ public class PixelsPartitionCacheWriter {
         for (int i = 0; i < partitions; ++i) {
             partitionColIds.add(new ArrayList<>());
         }
+        // TODO: what if we partition only on rgId and colId? now it pose a lot of memory cost
         // do a partition on layout+cacheColumnOrders by the hashcode
-        for (long fakeBlkId = 0; fakeBlkId < files.length; ++fakeBlkId) {
-            hashKeyBuf.putLong(0, fakeBlkId);
-            for (int i = 0; i < cacheColumnletOrders.size(); i++) {
-                String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
-                short rowGroupId = Short.parseShort(columnletIdStr[0]);
-                short columnId = Short.parseShort(columnletIdStr[1]);
-                hashKeyBuf.putShort(8, rowGroupId);
-                hashKeyBuf.putShort(10, columnId);
-                int hash = hashcode(hashKeyBuf.array()) & 0x7fffffff;
-                int partition = hash % partitions;
-                partitionRgIds.get(partition).add(rowGroupId);
-                partitionColIds.get(partition).add(columnId);
-            }
+        for (int i = 0; i < cacheColumnletOrders.size(); i++) {
+            String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
+            short rowGroupId = Short.parseShort(columnletIdStr[0]);
+            short columnId = Short.parseShort(columnletIdStr[1]);
+            hashKeyBuf.putShort(0, rowGroupId);
+            hashKeyBuf.putShort(2, columnId);
+            int hash = hashcode(hashKeyBuf.array()) & 0x7fffffff;
+            int partition = hash % partitions;
+            partitionRgIds.get(partition).add(rowGroupId);
+            partitionColIds.get(partition).add(columnId);
         }
         logger.debug("partition counts = " + Arrays.toString(partitionRgIds.stream().map(List::size).toArray()));
 
