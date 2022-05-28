@@ -87,6 +87,9 @@ message Footer {
     repeated RowGroupStatistic rowGroupStats = 4;
     // if the file is hash partitioned, then each row group is a hash partition.
     optional bool partitioned = 5;
+    // Whether the file is from retina. If true, it will have a hidden column `version`: long
+    // in the end
+    optional bool is_retina = 6;
 }
 
 message Type {

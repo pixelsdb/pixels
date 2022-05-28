@@ -69,6 +69,7 @@ public class PixelsWriterImpl implements PixelsWriter
     private final TimeZone timeZone;
     private final boolean encoding;
     private final boolean partitioned;
+    private final boolean isRetina;
     private final Optional<List<Integer>> partKeyColumnIds;
 
     private final ColumnWriter[] columnWriters;
@@ -101,7 +102,8 @@ public class PixelsWriterImpl implements PixelsWriter
             PhysicalWriter physicalWriter,
             boolean encoding,
             boolean partitioned,
-            Optional<List<Integer>> partKeyColumnIds)
+            Optional<List<Integer>> partKeyColumnIds,
+            boolean isRetina)
     {
         this.schema = requireNonNull(schema, "schema is null");
         checkArgument(pixelStride > 0, "pixel stripe is not positive");
@@ -114,6 +116,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.timeZone = requireNonNull(timeZone);
         this.encoding = encoding;
         this.partitioned = partitioned;
+        this.isRetina = isRetina;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
 
         List<TypeDescription> children = schema.getChildren();
@@ -148,6 +151,7 @@ public class PixelsWriterImpl implements PixelsWriter
         private boolean builderOverwrite = false;
         private boolean builderEncoding = true;
         private boolean builderPartitioned = false;
+        private boolean builderIsRetina = false;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
 
         private Builder()
@@ -261,6 +265,13 @@ public class PixelsWriterImpl implements PixelsWriter
             return this;
         }
 
+        public Builder setIsRetina(boolean isRetina)
+        {
+            this.builderIsRetina = isRetina;
+
+            return this;
+        }
+
         public PixelsWriter build()
                 throws PixelsWriterException
         {
@@ -306,7 +317,8 @@ public class PixelsWriterImpl implements PixelsWriter
                     fsWriter,
                     builderEncoding,
                     builderPartitioned,
-                    builderPartKeyColumnIds);
+                    builderPartKeyColumnIds,
+                    builderIsRetina);
         }
     }
 
@@ -359,6 +371,10 @@ public class PixelsWriterImpl implements PixelsWriter
     public boolean isPartitioned()
     {
         return partitioned;
+    }
+
+    public boolean isRetina() {
+        return isRetina;
     }
 
     @Override
@@ -577,6 +593,7 @@ public class PixelsWriterImpl implements PixelsWriter
             footerBuilder.addRowGroupStats(rowGroupStatistic);
         }
         footerBuilder.setPartitioned(partitioned);
+        footerBuilder.setIsRetina(isRetina);
         footer = footerBuilder.build();
 
         // build PostScript
