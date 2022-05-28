@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -136,6 +138,19 @@ public class PixelsCacheUtil
         setCacheSize(cacheFile, 0);
     }
 
+    public static void initializeIndexFile(MemoryMappedFile indexFile) {
+        setMagic(indexFile);
+        clearIndexRWAndCount(indexFile);
+        setIndexVersion(indexFile, 0);
+    }
+
+    public static void initializeCacheFile(MemoryMappedFile cacheFile) {
+        // init cache
+        setMagic(cacheFile);
+        setCacheStatus(cacheFile, CacheStatus.EMPTY.getId());
+        setCacheSize(cacheFile, 0);
+    }
+
     private static void setMagic(MemoryMappedFile file)
     {
         file.setBytes(0, Constants.MAGIC.getBytes(StandardCharsets.UTF_8));
@@ -148,8 +163,20 @@ public class PixelsCacheUtil
         return new String(magic, StandardCharsets.UTF_8);
     }
 
+    public static String getMagic(RandomAccessFile file) throws IOException {
+        byte[] magic = new byte[6];
+        file.seek(0);
+        file.readFully(magic, 0, 6);
+        return new String(magic, StandardCharsets.UTF_8);
+    }
+
     public static boolean checkMagic(MemoryMappedFile file)
     {
+        String magic = getMagic(file);
+        return magic.equalsIgnoreCase(Constants.MAGIC);
+    }
+
+    public static boolean checkMagic(RandomAccessFile file) throws IOException {
         String magic = getMagic(file);
         return magic.equalsIgnoreCase(Constants.MAGIC);
     }
@@ -159,13 +186,14 @@ public class PixelsCacheUtil
         indexFile.setIntVolatile(6, 0);
     }
 
+    // blocking call
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
         indexFile.setByteVolatile(6, (byte) 1);
         final int sleepMs = 10;
         int waitMs = 0;
-        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0)
+        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0) // polling to see if something is finished
         {
             /**
              * Wait for the existing readers to finish.
