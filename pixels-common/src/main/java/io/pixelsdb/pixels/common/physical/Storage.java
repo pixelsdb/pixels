@@ -45,7 +45,8 @@ public interface Storage
         s3,    // Amazon S3
         minio, // Minio
         redis, // Redis
-        gcs;   // google cloud storage
+        gcs,   // google cloud storage
+        mock; // mock
 
         /**
          * Case insensitive parsing from String to enum value.

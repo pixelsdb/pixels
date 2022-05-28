@@ -214,13 +214,17 @@ public class PixelsPartitionCacheWriter {
             MemoryMappedFile[] indexPartitions = new MemoryMappedFile[partitions + 1];
             MemoryMappedFile[] indexDiskPartitions = new MemoryMappedFile[partitions];
 
-            for (int partition = 0; partition < partitions + 1; ++partition) {
+            for (int partition = 0; partition < partitions; ++partition) {
                 long indexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET + partition * indexPartitionSize;
                 long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET + partition * cachePartitionSize;
                 indexPartitions[partition] = indexFile.regionView(indexOffset, indexPartitionSize);
                 indexDiskPartitions[partition] = indexDiskFile.regionView(indexOffset, indexPartitionSize);
                 cachePartitions[partition] = cacheFile.regionView(cacheOffset, cachePartitionSize);
             }
+            indexPartitions[partitions] = indexFile.regionView(PixelsCacheUtil.INDEX_RADIX_OFFSET +
+                    partitions * indexPartitionSize, indexPartitionSize);
+            cachePartitions[partitions] = cacheFile.regionView(PixelsCacheUtil.INDEX_RADIX_OFFSET +
+                    partitions * indexPartitionSize, cachePartitionSize);
 
             PixelsRadix[] radixs = new PixelsRadix[partitions];
             // check if cache and index exists.

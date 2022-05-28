@@ -35,6 +35,8 @@ public class PixelsCacheConfig
         this.configFactory = ConfigFactory.Instance();
     }
 
+    public int getPartitions() { return Integer.parseInt(configFactory.getProperty("cache.partitions")); }
+
     public String getIndexLocation()
     {
         return configFactory.getProperty("index.location");
@@ -43,6 +45,11 @@ public class PixelsCacheConfig
     public long getIndexSize()
     {
         return Long.parseLong(configFactory.getProperty("index.size"));
+    }
+
+    public String getIndexDiskLocation()
+    {
+        return configFactory.getProperty("index.disk.location");
     }
 
     public String getCacheLocation()
