@@ -38,6 +38,16 @@ public class TestMemFile
     String path = "/dev/shm/pixels.cache";
 
     @Test
+    public void testRound4096() {
+        assert (MemoryMappedFile.roundTo4096(0) == 0);
+        assert (MemoryMappedFile.roundTo4096(1) == 4096);
+        assert (MemoryMappedFile.roundTo4096(4097) == 8192);
+        assert (MemoryMappedFile.roundTo4096(4096 * 37 + 2048) == 4096 * 38);
+        assert (MemoryMappedFile.roundTo4096(4096 * 37 - 1453) == 4096 * 37);
+
+    }
+
+    @Test
     public void testEndian () throws Exception
     {
         write(ByteOrder.BIG_ENDIAN, 0xf0ff00008fff0000L);
