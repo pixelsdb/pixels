@@ -9,10 +9,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-public class HashIndexReader implements AutoCloseable {
-    static {
-        System.loadLibrary("HashIndexReader");
-    }
+public class HashIndexReader implements AutoCloseable, CacheIndexReader {
+
     private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
     private final byte[] key = new byte[PixelsCacheKey.SIZE];
     private final ByteBuffer keyBuf = ByteBuffer.wrap(key).order(ByteOrder.LITTLE_ENDIAN);
@@ -46,25 +44,21 @@ public class HashIndexReader implements AutoCloseable {
         return var1;
     }
 
-    private native void doNativeSearch(long mmAddress, long mmSize, long blockId, short rowGroupId, short columnId, long cacheIdxBufAddr);
+    @Override
+    public PixelsCacheIdx read(PixelsCacheKey key) {
+        return search(key.blockId, key.rowGroupId, key.columnId);
+    }
 
-    public PixelsCacheIdx nativeSearch(long blockId, short rowGroupId, short columnId) {
-        cacheIdxBuf.position(0);
-        doNativeSearch(indexFile.getAddress(), indexFile.getSize(), blockId, rowGroupId, columnId, cacheIdxBufAddr);
-        long offset = cacheIdxBuf.getLong();
-        int length = cacheIdxBuf.getInt();
-        if (offset == -1) {
-            return null;
-        } else {
-            return new PixelsCacheIdx(offset, length);
-        }
+    @Override
+    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results) {
+        throw new RuntimeException("not implemented yet");
     }
 
     /**
      * This interface is only used by TESTS, DO NOT USE.
      * It will be removed soon!
      */
-    public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
+    private PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
         keyBuf.position(0);
         keyBuf.putLong(blockId).putShort(rowGroupId).putShort(columnId);

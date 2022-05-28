@@ -239,7 +239,7 @@ public class BenchmarkCacheIndex {
             for (int i = 0; i < idxes.length; i++)
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
-                PixelsCacheIdx idx = cacheReader.nativeSearch(cacheKey.blockId,
+                PixelsCacheIdx idx = cacheReader.read(cacheKey.blockId,
                         cacheKey.rowGroupId,
                         cacheKey.columnId);
                 if (idx == null)
@@ -327,19 +327,18 @@ public class BenchmarkCacheIndex {
         @Override
         public void run()
         {
-            PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
-                    .setCacheFile(null)
-                    .setIndexFile(indexFile)
-                    .build();
+//            PixelsCacheReader cacheReader = PixelsCacheReader.newBuilder()
+//                    .setCacheFile(null)
+//                    .setIndexFile(indexFile)
+//                    .build();
+            RadixIndexReader indexReader = new RadixIndexReader(indexFile);
             int totalAcNum = 0;
             int totalLevel = 0;
             long searchStart = System.nanoTime();
             for (int i = 0; i < idxes.length; i++)
             {
                 PixelsCacheKey cacheKey = pixelsCacheKeys[idxes[i]];
-                PixelsCacheIdx idx = cacheReader.search(cacheKey.blockId,
-                        cacheKey.rowGroupId,
-                        cacheKey.columnId);
+                PixelsCacheIdx idx = indexReader.read(cacheKey);
                 if (idx == null)
                 {
                     System.out.println("[error] cannot find " + cacheKey.blockId
