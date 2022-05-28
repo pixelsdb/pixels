@@ -124,6 +124,11 @@ public class Bitmap
         }
     }
 
+    public void setWord(int wordIndex, long word)
+    {
+        words[wordIndex] = word;
+    }
+
     public void set(int bitIndex)
     {
         int wordIndex = wordIndex(bitIndex);
