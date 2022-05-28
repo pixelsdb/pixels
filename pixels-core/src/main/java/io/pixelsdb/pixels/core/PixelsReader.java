@@ -108,6 +108,12 @@ public interface PixelsReader
     boolean isPartitioned();
 
     /**
+     * Whether the file is from retina. If true, it will have a hidden column `version`: long
+     * in the end
+     */
+    boolean isRetina();
+
+    /**
      * Get file level statistics of each column
      *
      * @return array of column stat

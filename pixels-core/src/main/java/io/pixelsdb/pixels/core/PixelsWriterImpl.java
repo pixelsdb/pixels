@@ -69,6 +69,11 @@ public class PixelsWriterImpl implements PixelsWriter
     private final TimeZone timeZone;
     private final boolean encoding;
     private final boolean partitioned;
+
+    /**
+     * Whether the file is from retina. If true, it will have a hidden column `version`: long
+     * in the end
+     */
     private final boolean isRetina;
     private final Optional<List<Integer>> partKeyColumnIds;
 

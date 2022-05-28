@@ -30,8 +30,10 @@ import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
+import io.pixelsdb.pixels.core.retina.RetinaService;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
@@ -113,6 +115,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private long cacheReadBytes = 0L;
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
+    private final List<Bitmap> visibilities;
 
     public PixelsRecordReaderImpl(PhysicalReader physicalReader,
                                   PixelsProto.PostScript postScript,
@@ -141,6 +144,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
+        // TODO: use visibilities to filter
+        this.visibilities = option.getVisibilities();
+        // TODO: filter by version if footer.getIsRetina() is true
+
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
         //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");
