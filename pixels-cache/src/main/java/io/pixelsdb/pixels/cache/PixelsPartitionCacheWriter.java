@@ -201,12 +201,12 @@ public class PixelsPartitionCacheWriter {
             checkArgument (cachePartitionSize * partitions == builderCacheSize);
             checkArgument (indexPartitionSize * partitions == builderIndexSize);
             // with an additional buffer area, totally (partitions + 1) * cachePartitionSize size
-            MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, builderCacheSize + cachePartitionSize + PixelsCacheUtil.CACHE_DATA_OFFSET);
-            MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, builderIndexSize + indexPartitionSize + PixelsCacheUtil.INDEX_RADIX_OFFSET);
-            MemoryMappedFile indexDiskFile = new MemoryMappedFile(builderIndexDiskLocation, builderIndexSize + indexPartitionSize + PixelsCacheUtil.INDEX_RADIX_OFFSET);
+            MemoryMappedFile cacheFile = new MemoryMappedFile(builderCacheLocation, (partitions + 1) * cachePartitionSize + PixelsCacheUtil.CACHE_DATA_OFFSET);
+            MemoryMappedFile indexFile = new MemoryMappedFile(builderIndexLocation, (partitions + 1) * indexPartitionSize + PixelsCacheUtil.PARTITION_INDEX_META_SIZE);
+            MemoryMappedFile indexDiskFile = new MemoryMappedFile(builderIndexDiskLocation, (partitions + 1) * indexPartitionSize + PixelsCacheUtil.PARTITION_INDEX_META_SIZE);
             checkArgument (cachePartitionSize * (partitions + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET < cacheFile.getSize());
-            checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.INDEX_RADIX_OFFSET < indexFile.getSize());
-            checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.INDEX_RADIX_OFFSET < indexDiskFile.getSize());
+            checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE < indexFile.getSize());
+            checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE < indexDiskFile.getSize());
 
             // TODO: split the cacheFile and indexFile into partitions
             // the last partition serves as the buffer partition
@@ -215,15 +215,16 @@ public class PixelsPartitionCacheWriter {
             MemoryMappedFile[] indexDiskPartitions = new MemoryMappedFile[partitions];
 
             for (int partition = 0; partition < partitions; ++partition) {
-                long indexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET + partition * indexPartitionSize;
+                long indexOffset = PixelsCacheUtil.PARTITION_INDEX_META_SIZE + partition * indexPartitionSize;
                 long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET + partition * cachePartitionSize;
+                logger.debug(String.format("partition=%d, indexOffset=%fMiB, cacheOffset=%fGiB", partition, indexOffset / 1024.0 / 1024.0, cacheOffset / 1024.0 / 1024 / 1024));
                 indexPartitions[partition] = indexFile.regionView(indexOffset, indexPartitionSize);
                 indexDiskPartitions[partition] = indexDiskFile.regionView(indexOffset, indexPartitionSize);
                 cachePartitions[partition] = cacheFile.regionView(cacheOffset, cachePartitionSize);
             }
-            indexPartitions[partitions] = indexFile.regionView(PixelsCacheUtil.INDEX_RADIX_OFFSET +
+            indexPartitions[partitions] = indexFile.regionView(PixelsCacheUtil.PARTITION_INDEX_META_SIZE +
                     partitions * indexPartitionSize, indexPartitionSize);
-            cachePartitions[partitions] = cacheFile.regionView(PixelsCacheUtil.INDEX_RADIX_OFFSET +
+            cachePartitions[partitions] = cacheFile.regionView(PixelsCacheUtil.CACHE_DATA_OFFSET +
                     partitions * indexPartitionSize, cachePartitionSize);
 
             PixelsRadix[] radixs = new PixelsRadix[partitions];
@@ -251,8 +252,10 @@ public class PixelsPartitionCacheWriter {
             else
             {
                 // set the header of the file and each partition
-                PixelsCacheUtil.initializeIndexFile(indexDiskFile);
-                PixelsCacheUtil.initializeIndexFile(indexFile);
+                PixelsCacheUtil.initializePartitionMeta(indexDiskFile, (short) partitions, indexPartitionSize);
+                PixelsCacheUtil.initializePartitionMeta(indexFile, (short) partitions, indexPartitionSize);
+//                PixelsCacheUtil.initializeIndexFile(indexDiskFile);
+//                PixelsCacheUtil.initializeIndexFile(indexFile);
                 PixelsCacheUtil.initializeCacheFile(cacheFile);
                 for (int i = 0; i < partitions; ++i) {
                     radixs[i] = new PixelsRadix();
@@ -395,7 +398,7 @@ public class PixelsPartitionCacheWriter {
                 physicalLen = columnlet.length;
                 if (currCacheOffset + physicalLen >= cachePartition.getSize())
                 {
-                    logger.debug("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
+                    logger.warn("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
                     return 2;
                 }
                 radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
@@ -429,7 +432,8 @@ public class PixelsPartitionCacheWriter {
         // then copy the indexDiskPartition to indexPartition in the tmpfs
         // TODO: check what should be write in the header
         // TODO: it might overflow the integer
-        indexPartition.copyMemory(indexDiskPartition.getAddress(), indexPartition.getAddress(), serializeOffset);
+        // Note: we should not copy serializeOffset bytes, it is not precise and some items might not be copied
+        indexPartition.copyMemory(indexDiskPartition.getAddress(), indexPartition.getAddress(), indexDiskPartition.getSize());
         PixelsCacheUtil.setIndexVersion(indexPartition, version);
         PixelsCacheUtil.endIndexWrite(indexPartition);
         return 0;

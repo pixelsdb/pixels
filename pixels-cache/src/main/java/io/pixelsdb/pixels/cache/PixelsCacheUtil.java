@@ -143,6 +143,14 @@ public class PixelsCacheUtil
 
     }
 
+    public static int retrievePhysicalPartition(MemoryMappedFile partitionedIndexFile, int logicalPartition, int partitions) {
+        // atomically fetch the free + first
+        int freeAndFirst = partitionedIndexFile.getIntVolatile(20);
+        int first = freeAndFirst & 0x0000ffff;
+        int free = freeAndFirst & 0xffff0000 >>> 16;
+        return logicalPartitionToPhyiscal(logicalPartition, free, first, partitions);
+    }
+
     public static int logicalPartitionToPhyiscal(int logicalPartition, int freePhysicalPartition, int startPhysicalPartition, int partitions) {
         if (logicalPartition >= partitions) {
             throw new IndexOutOfBoundsException(String.format("logicalPartition=%d >= partitions=%d",logicalPartition, partitions));
@@ -154,6 +162,12 @@ public class PixelsCacheUtil
         if (add >= freePhysicalPartition) return (add + 1) % (partitions + 1);
         else return add % (partitions + 1);
     }
+
+    // partitions does not count for the additional free partition
+//    public static int partitionBytes(long wholeSize, int partitions) {
+//        long partitionSize = wholeSize / partitions;
+//
+//    }
 
     public static void initialize(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
     {
@@ -441,5 +455,15 @@ public class PixelsCacheUtil
     public static long getCacheSize(MemoryMappedFile cacheFile)
     {
         return cacheFile.getLongVolatile(8);
+    }
+
+    public static int hashcode(byte[] bytes) {
+        int var1 = 1;
+
+        for(int var3 = 0; var3 < bytes.length; ++var3) {
+            var1 = 31 * var1 + bytes[var3];
+        }
+
+        return var1;
     }
 }
