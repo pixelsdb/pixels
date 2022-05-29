@@ -39,4 +39,88 @@ public class TestPixelsCacheUtil
 
         // start writing
     }
+
+    @Test
+    public void testLogicalPartitionToPhyiscal() {
+        int partitions = 4;
+        int free = 4; // initial status
+        int startPhysical = 0;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 2);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 3);
+        try {
+            PixelsCacheUtil.logicalPartitionToPhyiscal(4, free, startPhysical, partitions);
+            assert (false); // should throw before
+        } catch (IndexOutOfBoundsException ignored) {}
+
+        free = 0;
+        startPhysical = 4;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 2);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 3);
+
+        free = 1;
+        startPhysical = 4;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 2);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 3);
+
+        free = 2;
+        startPhysical = 4;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 3);
+
+        free = 3;
+        startPhysical = 4;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 2);
+
+        free = 4;
+        startPhysical = 3;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 3);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 2);
+
+        free = 0;
+        startPhysical = 3;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 3);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 1);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 2);
+
+        free = 1;
+        startPhysical = 3;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 3);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 2);
+
+        free = 2;
+        startPhysical = 3;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 3);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(1, free, startPhysical, partitions) == 4);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(2, free, startPhysical, partitions) == 0);
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(3, free, startPhysical, partitions) == 1);
+
+        partitions = 1;
+        free = 1;
+        startPhysical = 0;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 0);
+
+        free = 0;
+        startPhysical = 1;
+        assert(PixelsCacheUtil.logicalPartitionToPhyiscal(0, free, startPhysical, partitions) == 1);
+
+
+
+
+    }
 }

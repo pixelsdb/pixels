@@ -42,6 +42,11 @@ import java.nio.charset.StandardCharsets;
  * @author guodong
  * @author hank
  */
+
+/**
+ * partition index:
+ *  global_header: MAGIC(6 bytes), PARTITIONS(2 bytes), SUB_REGION_SIZE(8 bytes), VERSION(4 bytes), FREE(2 byte), FIRST_PARTITION(2 byte)
+ */
 public class PixelsCacheUtil
 {
     private final static Logger logger = LogManager.getLogger(PixelsCacheUtil.class);
@@ -70,6 +75,7 @@ public class PixelsCacheUtil
      * for metadata header, but we start radix tree from offset 16 for word alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
+    public static final int PARTITION_INDEX_META_SIZE = 32;
     /**
      * We use the first 16 bytes in the cache file {magic(6)+status(2)+size(8)} for
      * metadata header.
@@ -124,6 +130,29 @@ public class PixelsCacheUtil
         {
             return id;
         }
+    }
+
+    // method on metadata for partitioned cache
+    public static void initializePartitionMeta(MemoryMappedFile indexFile, short partitions, long subRegionBytes) {
+        setMagic(indexFile);
+        indexFile.setShort(6, partitions);
+        indexFile.setLong(8, subRegionBytes);
+        indexFile.setInt(16, 0); // version
+        indexFile.setShort(20, partitions); // free
+        indexFile.setShort(22, (short) 0); // start
+
+    }
+
+    public static int logicalPartitionToPhyiscal(int logicalPartition, int freePhysicalPartition, int startPhysicalPartition, int partitions) {
+        if (logicalPartition >= partitions) {
+            throw new IndexOutOfBoundsException(String.format("logicalPartition=%d >= partitions=%d",logicalPartition, partitions));
+        }
+        int add = startPhysicalPartition + logicalPartition;
+        if (freePhysicalPartition < startPhysicalPartition) {
+            freePhysicalPartition += partitions + 1;
+        }
+        if (add >= freePhysicalPartition) return (add + 1) % (partitions + 1);
+        else return add % (partitions + 1);
     }
 
     public static void initialize(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
