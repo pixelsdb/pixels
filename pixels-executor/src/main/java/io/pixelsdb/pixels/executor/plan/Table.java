@@ -19,58 +19,26 @@
  */
 package io.pixelsdb.pixels.executor.plan;
 
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
-
 /**
  * The table that is used in joins.
  * @author hank
  * @date 26/05/2022
  */
-public class Table
+public interface Table
 {
+
     /**
-     * Whether this is a join pipeline of base tables.
+     * Whether this is a base table or a joined table.
      */
-    private final boolean isBase;
-    private final String schemaName;
-    private final String tableName;
-    private final int[] keyColumnIds;
-    private final String[] includeCols;
-    private final TableScanFilter filter;
+    public boolean isBase();
 
-    public Table(boolean isBase, String schemaName, String tableName, int[] keyColumnIds,
-                 String[] includeCols, TableScanFilter filter)
-    {
-        this.isBase = isBase;
-        this.schemaName = schemaName;
-        this.tableName = tableName;
-        this.keyColumnIds = keyColumnIds;
-        this.includeCols = includeCols;
-        this.filter = filter;
-    }
+    public String getSchemaName();
 
-    public boolean isBase()
-    {
-        return isBase;
-    }
+    public String getTableName();
 
-    public String getSchemaName()
-    {
-        return schemaName;
-    }
+    public String getTableAlias();
 
-    public String getTableName()
-    {
-        return tableName;
-    }
+    public int[] getKeyColumnIds();
 
-    public String[] getIncludeCols()
-    {
-        return includeCols;
-    }
-
-    public TableScanFilter getFilter()
-    {
-        return filter;
-    }
+    public String[] getColumnNames();
 }
