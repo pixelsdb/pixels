@@ -12,7 +12,6 @@ public class JoinedTable implements Table
     private final String schemaName;
     private final String tableName;
     private final String tableAlias;
-    private int[] keyColumnIds;
     private final String[] columnNames;
     private final JoinLink joinLink;
 
@@ -51,17 +50,6 @@ public class JoinedTable implements Table
     }
 
     @Override
-    public int[] getKeyColumnIds()
-    {
-        return keyColumnIds;
-    }
-
-    public void setKeyColumnIds(int[] keyColumnIds)
-    {
-        this.keyColumnIds = keyColumnIds;
-    }
-
-    @Override
     public String[] getColumnNames()
     {
         return columnNames;
@@ -81,7 +69,6 @@ public class JoinedTable implements Table
         return Objects.equal(schemaName, that.schemaName) &&
                 Objects.equal(tableName, that.tableName) &&
                 Objects.equal(tableAlias, that.tableAlias) &&
-                Objects.equal(keyColumnIds, that.keyColumnIds) &&
                 Objects.equal(columnNames, that.columnNames) &&
                 Objects.equal(joinLink, that.joinLink);
     }
@@ -89,7 +76,6 @@ public class JoinedTable implements Table
     @Override
     public int hashCode()
     {
-        return Objects.hashCode(schemaName, tableName, tableAlias,
-                keyColumnIds, columnNames, joinLink);
+        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, joinLink);
     }
 }

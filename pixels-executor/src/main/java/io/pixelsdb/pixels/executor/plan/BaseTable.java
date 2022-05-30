@@ -32,17 +32,15 @@ public class BaseTable implements Table
     private final String schemaName;
     private final String tableName;
     private final String tableAlias;
-    private final int[] keyColumnIds;
     private final String[] columnNames;
     private final TableScanFilter filter;
 
-    public BaseTable(String schemaName, String tableName, String tablAlias,
-                     int[] keyColumnIds, String[] columnNames, TableScanFilter filter)
+    public BaseTable(String schemaName, String tableName, String tableAlias,
+                     String[] columnNames, TableScanFilter filter)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
-        this.tableAlias = tablAlias;
-        this.keyColumnIds = keyColumnIds;
+        this.tableAlias = tableAlias;
         this.columnNames = columnNames;
         this.filter = filter;
     }
@@ -72,12 +70,6 @@ public class BaseTable implements Table
     }
 
     @Override
-    public int[] getKeyColumnIds()
-    {
-        return keyColumnIds;
-    }
-
-    @Override
     public String[] getColumnNames()
     {
         return columnNames;
@@ -97,7 +89,6 @@ public class BaseTable implements Table
         return Objects.equal(schemaName, table.schemaName) &&
                 Objects.equal(tableName, table.tableName) &&
                 Objects.equal(tableAlias, table.tableAlias) &&
-                Objects.equal(keyColumnIds, table.keyColumnIds) &&
                 Objects.equal(columnNames, table.columnNames) &&
                 Objects.equal(filter, table.filter);
     }
@@ -105,7 +96,6 @@ public class BaseTable implements Table
     @Override
     public int hashCode()
     {
-        return Objects.hashCode(schemaName, tableName, tableAlias,
-                keyColumnIds, columnNames, filter);
+        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, filter);
     }
 }

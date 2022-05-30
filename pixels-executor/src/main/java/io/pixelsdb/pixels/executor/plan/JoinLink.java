@@ -34,14 +34,19 @@ public class JoinLink
 {
     private final Table leftTable;
     private final Table rightTable;
+    private final int[] leftKeyColumnIds;
+    private final int[] rightKeyColumnIds;
     private final JoinType joinType;
     private final JoinAlgorithm joinAlgo;
 
     public JoinLink(Table leftTable, Table rightTable,
+                    int[] leftKeyColumnIds, int[] rightKeyColumnIds,
                     JoinType joinType, JoinAlgorithm joinAlgo)
     {
         this.leftTable = leftTable;
         this.rightTable = rightTable;
+        this.leftKeyColumnIds = leftKeyColumnIds;
+        this.rightKeyColumnIds = rightKeyColumnIds;
         this.joinType = joinType;
         this.joinAlgo = joinAlgo;
     }
@@ -54,6 +59,16 @@ public class JoinLink
     public Table getRightTable()
     {
         return rightTable;
+    }
+
+    public int[] getLeftKeyColumnIds()
+    {
+        return leftKeyColumnIds;
+    }
+
+    public int[] getRightKeyColumnIds()
+    {
+        return rightKeyColumnIds;
     }
 
     public JoinType getJoinType()

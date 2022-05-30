@@ -135,26 +135,32 @@ public class JoinGraph
                 if (lastJoined == null)
                 {
                     Table left = baseJoin.getLeftTable();
+                    int[] leftKeyColumnIds = baseJoin.getLeftKeyColumnIds();
                     Table right = baseJoin.getRightTable();
+                    int[] rightKeyColumnIds = baseJoin.getRightKeyColumnIds();
                     if (comparator.compare(left, right) > 0)
                     {
                         Table tmp = left;
                         left = right;
                         right = tmp;
+                        int[] tmpInts = leftKeyColumnIds;
+                        leftKeyColumnIds = rightKeyColumnIds;
+                        rightKeyColumnIds = tmpInts;
                     }
                     // TODO: select join algorithm by the optimizer.
-                    newJoin = new JoinLink(left, right, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
+                    newJoin = new JoinLink(left, right, leftKeyColumnIds, rightKeyColumnIds,
+                            baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
                 else
                 {
                     JoinedTable left = lastJoined;
                     Table right = nextTable;
                     String[] leftColumns = left.getColumnNames();
-                    int[] leftKeyColumnIds = new int[baseJoin.getLeftTable().getKeyColumnIds().length];
-                    for (int i = 0; i < baseJoin.getLeftTable().getKeyColumnIds().length; ++i)
+                    int[] leftKeyColumnIds = new int[baseJoin.getLeftKeyColumnIds().length];
+                    for (int i = 0; i < baseJoin.getLeftKeyColumnIds().length; ++i)
                     {
                         String leftKeyColum = baseJoin.getLeftTable().getColumnNames()
-                                [baseJoin.getLeftTable().getKeyColumnIds()[i]];
+                                [baseJoin.getLeftKeyColumnIds()[i]];
                         for (int j = 0; j < leftColumns.length; ++j)
                         {
                             if (leftColumns[j].equals(leftKeyColum))
@@ -164,9 +170,10 @@ public class JoinGraph
                             }
                         }
                     }
-                    left.setKeyColumnIds(leftKeyColumnIds);
+                    int[] rightKeyColumnIds = baseJoin.getRightKeyColumnIds();
                     // TODO: select join algorithm by the optimizer.
-                    newJoin = new JoinLink(left, right, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
+                    newJoin = new JoinLink(left, right, leftKeyColumnIds, rightKeyColumnIds,
+                            baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
                 String[] joinedColumns = ObjectArrays.concat(newJoin.getLeftTable().getColumnNames(),
                         newJoin.getRightTable().getColumnNames(), String.class);

@@ -38,7 +38,5 @@ public interface Table
 
     public String getTableAlias();
 
-    public int[] getKeyColumnIds();
-
     public String[] getColumnNames();
 }
