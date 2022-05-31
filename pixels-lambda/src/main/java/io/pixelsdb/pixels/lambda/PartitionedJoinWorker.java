@@ -38,10 +38,8 @@ import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -232,40 +230,58 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     private void buildHashTable(long queryId, Joiner joiner, List<String> leftParts,
                                String[] leftCols, List<Integer> hashValues, int numPartition)
     {
-        for (String leftPartitioned : leftParts)
+        while (!leftParts.isEmpty())
         {
-            try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
+            for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
             {
-                checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                Set<Integer> leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                String leftPartitioned = it.next();
+                try
                 {
-                    leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-                }
-                for (int hashValue : hashValues)
-                {
-                    if (!leftHashValues.contains(hashValue))
+                    if (s3.exists(leftPartitioned))
+                    {
+                        it.remove();
+                    } else
                     {
                         continue;
                     }
-                    PixelsReaderOption option = getReaderOption(queryId, leftCols, pixelsReader,
-                            hashValue, numPartition);
-                    VectorizedRowBatch rowBatch;
-                    PixelsRecordReader recordReader = pixelsReader.read(option);
-                    checkArgument(recordReader.isValid(), "failed to get record reader");
-                    do
-                    {
-                        rowBatch = recordReader.readBatch(rowBatchSize);
-                        if (rowBatch.size > 0)
-                        {
-                            joiner.populateLeftTable(rowBatch);
-                        }
-                    } while (!rowBatch.endOfFile);
+                } catch (IOException e)
+                {
+                    logger.error("failed to check the existence of the partitioned file '" +
+                            leftPartitioned + "' of the left table", e);
                 }
-            } catch (Exception e)
-            {
-                logger.error("failed to scan the partitioned file '" +
-                        leftPartitioned + "' and build the hash table", e);
+                try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
+                {
+                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                    Set<Integer> leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                    {
+                        leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                    }
+                    for (int hashValue : hashValues)
+                    {
+                        if (!leftHashValues.contains(hashValue))
+                        {
+                            continue;
+                        }
+                        PixelsReaderOption option = getReaderOption(queryId, leftCols, pixelsReader,
+                                hashValue, numPartition);
+                        VectorizedRowBatch rowBatch;
+                        PixelsRecordReader recordReader = pixelsReader.read(option);
+                        checkArgument(recordReader.isValid(), "failed to get record reader");
+                        do
+                        {
+                            rowBatch = recordReader.readBatch(rowBatchSize);
+                            if (rowBatch.size > 0)
+                            {
+                                joiner.populateLeftTable(rowBatch);
+                            }
+                        } while (!rowBatch.endOfFile);
+                    }
+                } catch (Exception e)
+                {
+                    logger.error("failed to scan the partitioned file '" +
+                            leftPartitioned + "' and build the hash table", e);
+                }
             }
         }
     }
@@ -289,52 +305,70 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     {
         PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
                 encoding, false, null);
-        for (String rightPartitioned : rightParts)
+        while (!rightParts.isEmpty())
         {
-            try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
+            for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
-                checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                String rightPartitioned = it.next();
+                try
                 {
-                    rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-                }
-                for (int hashValue : hashValues)
-                {
-                    if (!rightHashValues.contains(hashValue))
+                    if (s3.exists(rightPartitioned))
+                    {
+                        it.remove();
+                    } else
                     {
                         continue;
                     }
-                    PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
-                            hashValue, numPartition);
-                    VectorizedRowBatch rowBatch;
-                    PixelsRecordReader recordReader = pixelsReader.read(option);
-                    checkArgument(recordReader.isValid(), "failed to get record reader");
-                    int scannedRows = 0, joinedRows = 0;
-                    do
+                } catch (IOException e)
+                {
+                    logger.error("failed to check the existence of the partitioned file '" +
+                            rightPartitioned + "' of the right table", e);
+                }
+                try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
+                {
+                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
+                    Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
                     {
-                        rowBatch = recordReader.readBatch(rowBatchSize);
-                        scannedRows += rowBatch.size;
-                        if (rowBatch.size > 0)
+                        rightHashValues.add(rgInfo.getPartitionInfo().getHashValue());
+                    }
+                    for (int hashValue : hashValues)
+                    {
+                        if (!rightHashValues.contains(hashValue))
                         {
-                            List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                            for (VectorizedRowBatch joined : joinedBatches)
+                            continue;
+                        }
+                        PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
+                                hashValue, numPartition);
+                        VectorizedRowBatch rowBatch;
+                        PixelsRecordReader recordReader = pixelsReader.read(option);
+                        checkArgument(recordReader.isValid(), "failed to get record reader");
+                        int scannedRows = 0, joinedRows = 0;
+                        do
+                        {
+                            rowBatch = recordReader.readBatch(rowBatchSize);
+                            scannedRows += rowBatch.size;
+                            if (rowBatch.size > 0)
                             {
-                                if (!joined.isEmpty())
+                                List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                                for (VectorizedRowBatch joined : joinedBatches)
                                 {
-                                    pixelsWriter.addRowBatch(joined);
-                                    joinedRows += joined.size;
+                                    if (!joined.isEmpty())
+                                    {
+                                        pixelsWriter.addRowBatch(joined);
+                                        joinedRows += joined.size;
+                                    }
                                 }
                             }
-                        }
-                    } while (!rowBatch.endOfFile);
-                    logger.info("number of scanned rows: " + scannedRows +
-                            ", number of joined rows: " + joinedRows);
+                        } while (!rowBatch.endOfFile);
+                        logger.info("number of scanned rows: " + scannedRows +
+                                ", number of joined rows: " + joinedRows);
+                    }
+                } catch (Exception e)
+                {
+                    logger.error("failed to scan the partitioned file '" +
+                            rightPartitioned + "' and do the join", e);
                 }
-            } catch (Exception e)
-            {
-                logger.error("failed to scan the partitioned file '" +
-                        rightPartitioned + "' and do the join", e);
             }
         }
         try

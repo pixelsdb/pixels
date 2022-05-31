@@ -40,7 +40,9 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -221,45 +223,64 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      *
      * @param queryId the query id used by I/O scheduler
      * @param joiner the joiner for which the hash table is built
-     * @param leftInputs the information of input files of the left table
+     * @param leftInputs the information of input files of the left table,
+     *                   the list <b>must be mutable</b>
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
      */
     private void buildHashTable(long queryId, Joiner joiner, List<ScanInput.InputInfo> leftInputs,
                                 String[] leftCols, TableScanFilter leftFilter)
     {
-        for (ScanInput.InputInfo input : leftInputs)
+        while (!leftInputs.isEmpty())
         {
-            try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
+            for (Iterator<ScanInput.InputInfo> it = leftInputs.iterator(); it.hasNext(); )
             {
-                if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                ScanInput.InputInfo input = it.next();
+                try
                 {
-                    continue;
-                }
-                if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
-                {
-                    input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
-                }
-                PixelsReaderOption option = getReaderOption(queryId, leftCols, input);
-                VectorizedRowBatch rowBatch;
-                PixelsRecordReader recordReader = pixelsReader.read(option);
-                checkArgument(recordReader.isValid(), "failed to get record reader");
-                Bitmap filtered = new Bitmap(rowBatchSize, true);
-                Bitmap tmp = new Bitmap(rowBatchSize, false);
-                do
-                {
-                    rowBatch = recordReader.readBatch(rowBatchSize);
-                    leftFilter.doFilter(rowBatch, filtered, tmp);
-                    rowBatch.applyFilter(filtered);
-                    if (rowBatch.size > 0)
+                    if (s3.exists(input.getPath()))
                     {
-                        joiner.populateLeftTable(rowBatch);
+                        it.remove();
+                    } else
+                    {
+                        continue;
                     }
-                } while (!rowBatch.endOfFile);
-            } catch (Exception e)
-            {
-                logger.error("failed to scan the left table input file '" +
-                        input.getPath() + "' and build the hash table", e);
+                } catch (IOException e)
+                {
+                    logger.error("failed to check the existence of the left table input file '" +
+                            input.getPath() + "'", e);
+                }
+                try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
+                {
+                    if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                    {
+                        continue;
+                    }
+                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
+                    {
+                        input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
+                    }
+                    PixelsReaderOption option = getReaderOption(queryId, leftCols, input);
+                    VectorizedRowBatch rowBatch;
+                    PixelsRecordReader recordReader = pixelsReader.read(option);
+                    checkArgument(recordReader.isValid(), "failed to get record reader");
+                    Bitmap filtered = new Bitmap(rowBatchSize, true);
+                    Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    do
+                    {
+                        rowBatch = recordReader.readBatch(rowBatchSize);
+                        leftFilter.doFilter(rowBatch, filtered, tmp);
+                        rowBatch.applyFilter(filtered);
+                        if (rowBatch.size > 0)
+                        {
+                            joiner.populateLeftTable(rowBatch);
+                        }
+                    } while (!rowBatch.endOfFile);
+                } catch (Exception e)
+                {
+                    logger.error("failed to scan the left table input file '" +
+                            input.getPath() + "' and build the hash table", e);
+                }
             }
         }
     }
@@ -269,7 +290,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      *
      * @param queryId the query id used by I/O scheduler
      * @param joiner the joiner for which the hash table is built
-     * @param rightInputs the information of input files of the right table
+     * @param rightInputs the information of input files of the right table,
+     *                    the list <b>must be mutable</b>
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
      * @param outputPath fileName on s3 to store the scan results
@@ -282,50 +304,68 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     {
         PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
                 encoding, false, null);
-        for (ScanInput.InputInfo input : rightInputs)
+        while (!rightInputs.isEmpty())
         {
-            try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
+            for (Iterator<ScanInput.InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
-                if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                ScanInput.InputInfo input = it.next();
+                try
                 {
-                    continue;
-                }
-                if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
-                {
-                    input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
-                }
-                PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
-                VectorizedRowBatch rowBatch;
-                PixelsRecordReader recordReader = pixelsReader.read(option);
-                checkArgument(recordReader.isValid(), "failed to get record reader");
-                int scannedRows = 0, joinedRows = 0;
-                Bitmap filtered = new Bitmap(rowBatchSize, true);
-                Bitmap tmp = new Bitmap(rowBatchSize, false);
-                do
-                {
-                    rowBatch = recordReader.readBatch(rowBatchSize);
-                    rightFilter.doFilter(rowBatch, filtered, tmp);
-                    rowBatch.applyFilter(filtered);
-                    scannedRows += rowBatch.size;
-                    if (rowBatch.size > 0)
+                    if (s3.exists(input.getPath()))
                     {
-                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                        for (VectorizedRowBatch joined : joinedBatches)
+                        it.remove();
+                    } else
+                    {
+                        continue;
+                    }
+                } catch (IOException e)
+                {
+                    logger.error("failed to check the existence of the right table input file '" +
+                            input.getPath() + "'", e);
+                }
+                try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
+                {
+                    if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                    {
+                        continue;
+                    }
+                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
+                    {
+                        input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
+                    }
+                    PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
+                    VectorizedRowBatch rowBatch;
+                    PixelsRecordReader recordReader = pixelsReader.read(option);
+                    checkArgument(recordReader.isValid(), "failed to get record reader");
+                    int scannedRows = 0, joinedRows = 0;
+                    Bitmap filtered = new Bitmap(rowBatchSize, true);
+                    Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    do
+                    {
+                        rowBatch = recordReader.readBatch(rowBatchSize);
+                        rightFilter.doFilter(rowBatch, filtered, tmp);
+                        rowBatch.applyFilter(filtered);
+                        scannedRows += rowBatch.size;
+                        if (rowBatch.size > 0)
                         {
-                            if (!joined.isEmpty())
+                            List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                            for (VectorizedRowBatch joined : joinedBatches)
                             {
-                                pixelsWriter.addRowBatch(joined);
-                                joinedRows += joined.size;
+                                if (!joined.isEmpty())
+                                {
+                                    pixelsWriter.addRowBatch(joined);
+                                    joinedRows += joined.size;
+                                }
                             }
                         }
-                    }
-                } while (!rowBatch.endOfFile);
-                logger.info("number of scanned rows: " + scannedRows +
-                        ", number of joined rows: " + joinedRows);
-            } catch (Exception e)
-            {
-                logger.error("failed to scan the right table input file '" +
-                        input.getPath() + "' and do the join", e);
+                    } while (!rowBatch.endOfFile);
+                    logger.info("number of scanned rows: " + scannedRows +
+                            ", number of joined rows: " + joinedRows);
+                } catch (Exception e)
+                {
+                    logger.error("failed to scan the right table input file '" +
+                            input.getPath() + "' and do the join", e);
+                }
             }
         }
         try
