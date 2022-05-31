@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.layout;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -33,7 +34,7 @@ public class ColumnSet
     {
     }
 
-    public ColumnSet(Set<String> columns)
+    public ColumnSet(Collection<String> columns)
     {
         this.columns.addAll(columns);
     }

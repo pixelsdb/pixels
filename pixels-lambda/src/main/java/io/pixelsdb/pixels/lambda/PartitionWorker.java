@@ -80,7 +80,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> inputs = event.getInputs();
+            List<InputInfo> inputs = event.getInputs();
             int splitSize = event.getSplitSize();
             int numPartition = event.getPartitionInfo().getNumParition();
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();

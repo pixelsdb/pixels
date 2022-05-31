@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * The filter used in table scan. Calling doFilter() in this class
@@ -54,6 +55,11 @@ public class TableScanFilter
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.columnFilters = columnFilters;
+    }
+
+    public static TableScanFilter empty(String schemaName, String tableName)
+    {
+        return new TableScanFilter(schemaName,tableName, new TreeMap<>());
     }
 
     public String getSchemaName()

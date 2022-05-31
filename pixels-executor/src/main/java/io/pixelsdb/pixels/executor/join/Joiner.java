@@ -48,7 +48,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class Joiner
 {
-    private final HashMap<Tuple, Tuple> smallTable = new HashMap<>();
+    private final HashTable smallTable = new HashTable();
     private final JoinType joinType;
     private final TypeDescription smallSchema;
     private final TypeDescription bigSchema;
@@ -159,7 +159,7 @@ public class Joiner
         while (builder.hasNext())
         {
             Tuple tuple = builder.next();
-            this.smallTable.put(tuple, tuple);
+            this.smallTable.put(tuple);
         }
     }
 
@@ -168,20 +168,22 @@ public class Joiner
      * This method is thread-safe, but should not be called before the small table is populated.
      *
      * @param bigBatch a row batch from the bigger table
-     * @return the row batch of the join result, could be empty
+     * @return the row batches of the join result, could be empty. <b>Note: </b> the returned
+     * list is backed by {@link LinkedList}, thus it is not performant to access it randomly.
      */
-    public VectorizedRowBatch join(VectorizedRowBatch bigBatch)
+    public List<VectorizedRowBatch> join(VectorizedRowBatch bigBatch)
     {
         requireNonNull(bigBatch, "bigBatch is null");
         checkArgument(bigBatch.size > 0, "bigBatch is empty");
+        List<VectorizedRowBatch> result = new LinkedList<>();
         VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
         Tuple.Builder builder = new Tuple.Builder(bigBatch,
                 this.bigKeyColumnIds, this.bigKeyColumnIdSet, this.joinType);
         while (builder.hasNext())
         {
-            Tuple big = builder.next(), joined = null;
-            Tuple small = this.smallTable.get(big);
-            if (small == null)
+            Tuple big = builder.next();
+            List<Tuple> smallTuples = this.smallTable.get(big);
+            if (smallTuples == null)
             {
                 switch (joinType)
                 {
@@ -191,7 +193,13 @@ public class Joiner
                         break;
                     case EQUI_RIGHT:
                     case EQUI_FULL:
-                        joined = big.concatLeft(smallNullTuple);
+                        Tuple joined = big.concatLeft(smallNullTuple);
+                        if (joinedRowBatch.isFull())
+                        {
+                            result.add(joinedRowBatch);
+                            joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+                        }
+                        joined.writeTo(joinedRowBatch);
                         break;
                     default:
                         throw new UnsupportedOperationException("join type is not supported");
@@ -200,17 +208,25 @@ public class Joiner
             {
                 if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
                 {
-                    this.matchedSmallTuples.add(small);
+                    this.matchedSmallTuples.addAll(smallTuples);
                 }
-                joined = big.concatLeft(small);
+                for (Tuple small : smallTuples)
+                {
+                    Tuple joined = big.concatLeft(small);
+                    if (joinedRowBatch.isFull())
+                    {
+                        result.add(joinedRowBatch);
+                        joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+                    }
+                    joined.writeTo(joinedRowBatch);
+                }
             }
-            if (joined != null)
+            if (!joinedRowBatch.isEmpty())
             {
-                checkArgument(!joinedRowBatch.isFull(), "joined row batch is too large");
-                joined.writeTo(joinedRowBatch);
+                result.add(joinedRowBatch);
             }
         }
-        return joinedRowBatch;
+        return result;
     }
 
     /**
@@ -226,7 +242,7 @@ public class Joiner
         requireNonNull(pixelsWriter, "pixelsWriter is null");
 
         List<Tuple> leftOuterTuples = new ArrayList<>();
-        for (Tuple small : this.smallTable.keySet())
+        for (Tuple small : this.smallTable)
         {
             if (!this.matchedSmallTuples.contains(small))
             {

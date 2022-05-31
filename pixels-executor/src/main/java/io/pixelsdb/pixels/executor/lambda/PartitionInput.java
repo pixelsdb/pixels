@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.executor.lambda;
 
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
 
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The input format for hash partitioning.
@@ -41,7 +41,7 @@ public class PartitionInput
      * The information of the input files to be scanned.
      * rgLength in each input is the number of row groups to be scanned from each file.
      */
-    private ArrayList<InputInfo> inputs;
+    private List<InputInfo> inputs;
     /**
      * The number of row groups to be scanned in each query split.
      */
@@ -69,7 +69,7 @@ public class PartitionInput
      */
     public PartitionInput() { }
 
-    public PartitionInput(long queryId, ArrayList<InputInfo> inputs, int splitSize,
+    public PartitionInput(long queryId, List<InputInfo> inputs, int splitSize,
                      OutputInfo output, String[] cols, String filter, PartitionInfo partitionInfo)
     {
         this.queryId = queryId;
@@ -91,12 +91,12 @@ public class PartitionInput
         this.queryId = queryId;
     }
 
-    public ArrayList<InputInfo> getInputs()
+    public List<InputInfo> getInputs()
     {
         return inputs;
     }
 
-    public void setInputs(ArrayList<InputInfo> inputs)
+    public void setInputs(List<InputInfo> inputs)
     {
         this.inputs = inputs;
     }

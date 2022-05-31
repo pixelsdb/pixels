@@ -39,7 +39,7 @@ public class PartitionedJoinInput implements JoinInput
     /**
      * The partitioned files of the left (small) table.
      */
-    private List<PartitionOutput> leftPartitioned;
+    private List<String> leftPartitioned;
     /**
      * The column names of the left table.
      */
@@ -53,7 +53,7 @@ public class PartitionedJoinInput implements JoinInput
     /**
      * The partitioned files of the right (big) table.
      */
-    private List<PartitionOutput> rightPartitioned;
+    private List<String> rightPartitioned;
     /**
      * The column names of the right table.
      */
@@ -90,9 +90,9 @@ public class PartitionedJoinInput implements JoinInput
     public PartitionedJoinInput() { }
 
     public PartitionedJoinInput(long queryId,
-                                String leftTableName, List<PartitionOutput> leftPartitioned,
+                                String leftTableName, List<String> leftPartitioned,
                                 String[] leftCols, int[] leftKeyColumnIds,
-                                String rightTableName, List<PartitionOutput> rightPartitioned,
+                                String rightTableName, List<String> rightPartitioned,
                                 String[] rightCols, int[] rightKeyColumnIds,
                                 int numPartition, List<Integer> hashValues, JoinType joinType,
                                 String[] joinedCols, OutputInfo output)
@@ -133,12 +133,12 @@ public class PartitionedJoinInput implements JoinInput
         this.leftTableName = leftTableName;
     }
 
-    public List<PartitionOutput> getLeftPartitioned()
+    public List<String> getLeftPartitioned()
     {
         return leftPartitioned;
     }
 
-    public void setLeftPartitioned(List<PartitionOutput> leftPartitioned)
+    public void setLeftPartitioned(List<String> leftPartitioned)
     {
         this.leftPartitioned = leftPartitioned;
     }
@@ -173,12 +173,12 @@ public class PartitionedJoinInput implements JoinInput
         this.rightTableName = rightTableName;
     }
 
-    public List<PartitionOutput> getRightPartitioned()
+    public List<String> getRightPartitioned()
     {
         return rightPartitioned;
     }
 
-    public void setRightPartitioned(List<PartitionOutput> rightPartitioned)
+    public void setRightPartitioned(List<String> rightPartitioned)
     {
         this.rightPartitioned = rightPartitioned;
     }

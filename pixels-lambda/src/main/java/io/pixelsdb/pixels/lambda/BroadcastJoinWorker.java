@@ -309,11 +309,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     scannedRows += rowBatch.size;
                     if (rowBatch.size > 0)
                     {
-                        VectorizedRowBatch joined = joiner.join(rowBatch);
-                        if (!joined.isEmpty())
+                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                        for (VectorizedRowBatch joined : joinedBatches)
                         {
-                            pixelsWriter.addRowBatch(joined);
-                            joinedRows += joined.size;
+                            if (!joined.isEmpty())
+                            {
+                                pixelsWriter.addRowBatch(joined);
+                                joinedRows += joined.size;
+                            }
                         }
                     }
                 } while (!rowBatch.endOfFile);

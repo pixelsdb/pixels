@@ -49,25 +49,21 @@ public class TestPartitionedJoinInvoker
         joinInput.setLeftKeyColumnIds(new int[]{0});
         joinInput.setLeftTableName("orders");
         joinInput.setLeftPartitioned(Arrays.asList(
-                new PartitionOutput("pixels-lambda-test/orders_part_0", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_1", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_2", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_3", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_4", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_5", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_6", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_7", hashValues)
+                "pixels-lambda-test/orders_part_0",
+                "pixels-lambda-test/orders_part_1",
+                "pixels-lambda-test/orders_part_2",
+                "pixels-lambda-test/orders_part_3",
+                "pixels-lambda-test/orders_part_4",
+                "pixels-lambda-test/orders_part_5",
+                "pixels-lambda-test/orders_part_6",
+                "pixels-lambda-test/orders_part_7"
         ));
         joinInput.setRightCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setRightKeyColumnIds(new int[]{0});
         joinInput.setRightTableName("lineitem");
-        PartitionOutput lineitemPartitioned1 = new PartitionOutput();
-        lineitemPartitioned1.setPath("pixels-lambda-test/lineitem_part_0");
-        lineitemPartitioned1.setHashValues(hashValues);
-        PartitionOutput lineitemPartitioned2 = new PartitionOutput();
-        lineitemPartitioned2.setPath("pixels-lambda-test/lineitem_part_1");
-        lineitemPartitioned2.setHashValues(hashValues);
-        joinInput.setRightPartitioned(Arrays.asList(lineitemPartitioned1, lineitemPartitioned2));
+        joinInput.setRightPartitioned(Arrays.asList(
+                "pixels-lambda-test/lineitem_part_0",
+                "pixels-lambda-test/lineitem_part_1"));
         joinInput.setNumPartition(40);
         joinInput.setHashValues(Arrays.asList(16));
         joinInput.setJoinType(JoinType.EQUI_LEFT);

@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -49,7 +50,7 @@ public class TestPartitionInvoker
                 "\\\"upperBound\\\":{\\\"type\\\":\\\"UNBOUNDED\\\"}}]," +
                 "\\\"discreteValues\\\":[]}\"}}}";
         PartitionInput input = new PartitionInput();
-        ArrayList<ScanInput.InputInfo> inputs = new ArrayList<>();
+        List<ScanInput.InputInfo> inputs = new ArrayList<>();
         inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 0, 4));
         inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 4, 4));
         inputs.add(new ScanInput.InputInfo("pixels-tpch/orders/v-0-compact/20220313171727_7.compact.pxl", 8, 4));
@@ -85,7 +86,7 @@ public class TestPartitionInvoker
         String filter =
                 "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
         PartitionInput input = new PartitionInput();
-        ArrayList<ScanInput.InputInfo> inputs = new ArrayList<>();
+        List<ScanInput.InputInfo> inputs = new ArrayList<>();
         inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 0, 4));
         inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 4, 4));
         inputs.add(new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_1.compact.pxl", 8, 4));
