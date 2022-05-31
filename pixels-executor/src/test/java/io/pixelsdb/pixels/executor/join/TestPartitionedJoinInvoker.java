@@ -66,7 +66,7 @@ public class TestPartitionedJoinInvoker
                 "pixels-lambda-test/lineitem_part_1"));
         joinInput.setNumPartition(40);
         joinInput.setHashValues(Arrays.asList(16));
-        joinInput.setJoinType(JoinType.EQUI_LEFT);
+        joinInput.setJoinType(JoinType.EQUI_INNER);
         joinInput.setJoinedCols(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate",
                 "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",

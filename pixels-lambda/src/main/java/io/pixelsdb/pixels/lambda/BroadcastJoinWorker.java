@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -137,7 +138,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             List<Future> leftFutures = new ArrayList<>();
             for (int i = 0; i < leftInputs.size();)
             {
-                List<ScanInput.InputInfo> inputs = new ArrayList<>();
+                List<ScanInput.InputInfo> inputs = new LinkedList<>();
                 int numRg = 0;
                 while (numRg < leftSplitSize && i < leftInputs.size())
                 {
@@ -165,7 +166,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             JoinOutput joinOutput = new JoinOutput();
             for (int i = 0, outputId = 0; i < rightInputs.size(); ++outputId)
             {
-                List<ScanInput.InputInfo> inputs = new ArrayList<>();
+                List<ScanInput.InputInfo> inputs = new LinkedList<>();
                 int numRg = 0;
                 while (numRg < rightSplitSize && i < rightInputs.size())
                 {
@@ -236,6 +237,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<ScanInput.InputInfo> it = leftInputs.iterator(); it.hasNext(); )
             {
                 ScanInput.InputInfo input = it.next();
+                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(input.getPath()))
@@ -250,6 +252,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     logger.error("failed to check the existence of the left table input file '" +
                             input.getPath() + "'", e);
                 }
+                long end = System.currentTimeMillis();
+                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -309,6 +313,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<ScanInput.InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 ScanInput.InputInfo input = it.next();
+                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(input.getPath()))
@@ -323,6 +328,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     logger.error("failed to check the existence of the right table input file '" +
                             input.getPath() + "'", e);
                 }
+                long end = System.currentTimeMillis();
+                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -391,24 +398,5 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
-    }
-
-    /**
-     * Create the reader option for a record reader of the given input file.
-     *
-     * @param queryId the query id
-     * @param cols the column names in the partitioned file
-     * @param input the information of the input file
-     * @return the reader option
-     */
-    private PixelsReaderOption getReaderOption(long queryId, String[] cols, ScanInput.InputInfo input)
-    {
-        PixelsReaderOption option = new PixelsReaderOption();
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.queryId(queryId);
-        option.includeCols(cols);
-        option.rgRange(input.getRgStart(), input.getRgLength());
-        return option;
     }
 }

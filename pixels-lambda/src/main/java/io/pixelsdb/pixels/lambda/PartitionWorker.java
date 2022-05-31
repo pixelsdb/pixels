@@ -176,28 +176,21 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
     {
         for (InputInfo inputInfo : scanInputs)
         {
-            PixelsReaderOption option = new PixelsReaderOption();
-            option.skipCorruptRecords(true);
-            option.tolerantSchemaEvolution(true);
-            option.queryId(queryId);
-            option.includeCols(cols);
-            option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
-            VectorizedRowBatch rowBatch;
-
-            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3);
-                 PixelsRecordReader recordReader = pixelsReader.read(option))
+            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
-                if (!recordReader.isValid())
+                if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
-                    /*
-                     * If the record reader is invalid, it is likely that the rgRange
-                     * in the read option is out of bound (i.e., this is the last file
-                     * in the table that does not have enough row groups to read).
-                     */
-                    break;
+                    continue;
+                }
+                if (inputInfo.getRgStart() + inputInfo.getRgLength() >= pixelsReader.getRowGroupNum())
+                {
+                    inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
 
+                PixelsReaderOption option = getReaderOption(queryId, cols, inputInfo);
+                PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
+                VectorizedRowBatch rowBatch;
 
                 Partitioner partitioner = new Partitioner(partitionResult.size(), rowBatchSize,
                         rowBatchSchema, keyColumnIds);

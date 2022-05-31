@@ -104,7 +104,7 @@ public class TestBroadcastJoinInvoker
         rightTable.setFilter(rightFilter);
         joinInput.setRightTable(rightTable);
 
-        joinInput.setJoinType(JoinType.EQUI_LEFT);
+        joinInput.setJoinType(JoinType.EQUI_INNER);
         joinInput.setJoinedCols(new String[]{"p_partkey", "p_name", "p_size",
                 "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",

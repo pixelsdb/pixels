@@ -22,11 +22,16 @@ package io.pixelsdb.pixels.lambda;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
@@ -206,5 +211,24 @@ public class WorkerCommon
             builder.setPartKeyColumnIds(keyColumnIds);
         }
         return builder.build();
+    }
+
+    /**
+     * Create the reader option for a record reader of the given input file.
+     *
+     * @param queryId the query id
+     * @param cols the column names in the partitioned file
+     * @param input the information of the input file
+     * @return the reader option
+     */
+    public static PixelsReaderOption getReaderOption(long queryId, String[] cols, ScanInput.InputInfo input)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.queryId(queryId);
+        option.includeCols(cols);
+        option.rgRange(input.getRgStart(), input.getRgLength());
+        return option;
     }
 }

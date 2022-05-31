@@ -132,7 +132,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
             for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
             {
-                List<String> parts = new ArrayList<>(leftSplitSize);
+                List<String> parts = new LinkedList<>();
                 for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
                 {
                     parts.add(leftPartitioned.get(j));
@@ -167,7 +167,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
             for (int i = 0, outputId = 0; i < rightPartitioned.size(); i += rightSplitSize, ++outputId)
             {
-                List<String> parts = new ArrayList<>(rightSplitSize);
+                List<String> parts = new LinkedList<>();
                 for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
                 {
                     parts.add(rightPartitioned.get(j));
@@ -235,6 +235,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
             {
                 String leftPartitioned = it.next();
+                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(leftPartitioned))
@@ -249,6 +250,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             leftPartitioned + "' of the left table", e);
                 }
+                long end = System.currentTimeMillis();
+                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -310,6 +313,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
                 String rightPartitioned = it.next();
+                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(rightPartitioned))
@@ -324,6 +328,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
+                long end = System.currentTimeMillis();
+                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
