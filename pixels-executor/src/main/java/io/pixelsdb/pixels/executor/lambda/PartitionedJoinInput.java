@@ -83,6 +83,14 @@ public class PartitionedJoinInput implements JoinInput
      * The output information of the join worker.
      */
     private OutputInfo output;
+    /**
+     * Whether the output has to be partitioned.
+     */
+    private boolean outputPartitioned = false;
+    /**
+     * The partition information of the output if outputPartitioned is true.
+     */
+    private PartitionInput.PartitionInfo outputPartitionInfo;
 
     /**
      * Default constructor for Jackson.
@@ -95,7 +103,8 @@ public class PartitionedJoinInput implements JoinInput
                                 String rightTableName, List<String> rightPartitioned,
                                 String[] rightCols, int[] rightKeyColumnIds,
                                 int numPartition, List<Integer> hashValues, JoinType joinType,
-                                String[] joinedCols, OutputInfo output)
+                                String[] joinedCols, OutputInfo output, boolean outputPartitioned,
+                                PartitionInput.PartitionInfo outputPartitionInfo)
     {
         this.queryId = queryId;
         this.leftTableName = leftTableName;
@@ -111,6 +120,8 @@ public class PartitionedJoinInput implements JoinInput
         this.joinType = joinType;
         this.joinedCols = joinedCols;
         this.output = output;
+        this.outputPartitioned = outputPartitioned;
+        this.outputPartitionInfo = outputPartitionInfo;
     }
 
     public long getQueryId()
@@ -251,5 +262,25 @@ public class PartitionedJoinInput implements JoinInput
     public void setOutput(OutputInfo output)
     {
         this.output = output;
+    }
+
+    public boolean isOutputPartitioned()
+    {
+        return outputPartitioned;
+    }
+
+    public void setOutputPartitioned(boolean outputPartitioned)
+    {
+        this.outputPartitioned = outputPartitioned;
+    }
+
+    public PartitionInput.PartitionInfo getOutputPartitionInfo()
+    {
+        return outputPartitionInfo;
+    }
+
+    public void setOutputPartitionInfo(PartitionInput.PartitionInfo outputPartitionInfo)
+    {
+        this.outputPartitionInfo = outputPartitionInfo;
     }
 }

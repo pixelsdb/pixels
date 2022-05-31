@@ -139,7 +139,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 List<ScanInput.InputInfo> inputs = new ArrayList<>();
                 int numRg = 0;
-                while (numRg < leftSplitSize)
+                while (numRg < leftSplitSize && i < leftInputs.size())
                 {
                     ScanInput.InputInfo info = leftInputs.get(i++);
                     inputs.add(info);
@@ -167,7 +167,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 List<ScanInput.InputInfo> inputs = new ArrayList<>();
                 int numRg = 0;
-                while (numRg < rightSplitSize)
+                while (numRg < rightSplitSize && i < rightInputs.size())
                 {
                     ScanInput.InputInfo info = rightInputs.get(i++);
                     inputs.add(info);

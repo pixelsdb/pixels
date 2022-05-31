@@ -135,7 +135,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 List<String> parts = new ArrayList<>(leftSplitSize);
                 for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
                 {
-                    parts.add(leftPartitioned.get(i));
+                    parts.add(leftPartitioned.get(j));
                 }
                 leftFutures.add(threadPool.submit(() -> {
                     try
@@ -170,7 +170,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 List<String> parts = new ArrayList<>(rightSplitSize);
                 for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
                 {
-                    parts.add(rightPartitioned.get(i));
+                    parts.add(rightPartitioned.get(j));
                 }
                 String outputPath = outputFolder + requestId + "_join_" + outputId;
                 threadPool.execute(() -> {

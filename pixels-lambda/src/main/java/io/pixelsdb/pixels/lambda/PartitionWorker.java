@@ -101,7 +101,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             {
                 int numRg = 0;
                 ArrayList<InputInfo> scanInputs = new ArrayList<>();
-                while (numRg < splitSize)
+                while (numRg < splitSize && i < inputs.size())
                 {
                     InputInfo info = inputs.get(i++);
                     scanInputs.add(info);
