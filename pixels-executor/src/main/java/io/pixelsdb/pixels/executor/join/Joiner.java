@@ -221,10 +221,10 @@ public class Joiner
                     joined.writeTo(joinedRowBatch);
                 }
             }
-            if (!joinedRowBatch.isEmpty())
-            {
-                result.add(joinedRowBatch);
-            }
+        }
+        if (!joinedRowBatch.isEmpty())
+        {
+            result.add(joinedRowBatch);
         }
         return result;
     }
