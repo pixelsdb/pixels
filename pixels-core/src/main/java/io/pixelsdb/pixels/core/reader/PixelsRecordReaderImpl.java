@@ -56,7 +56,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsReaderOption option;
     private final long queryId;
     private final int RGStart;
-    private int RGLen;
+    private final int RGLen;
     private final boolean enableMetrics;
     private final String metricsDir;
     private final ReadPerfMetrics readPerfMetrics;
@@ -96,7 +96,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      * includedCols may be arbitrary, not related to the column order in schema.
      */
     private final int[] resultColumns;
-    private int includedColumnNum = 0; // the number of columns to read.
+    private final int includedColumnNum; // the number of columns to read.
     private int qualifiedRowNum = 0; // the number of qualified rows in this split.
     private boolean endOfFile = false;
 
@@ -130,7 +130,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.option = option;
         this.queryId = option.getQueryId();
         this.RGStart = option.getRGStart();
-        this.RGLen = option.getRGLen();
+        int RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
@@ -167,9 +167,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             if (RGStart + RGLen > rgNum) {
                 RGLen = rgNum - RGStart;
             }
+            this.RGLen = RGLen;
 
             // filter included columns
-            includedColumnNum = 0;
+            int includedColumnNum = 0;
             String[] optionIncludedCols = option.getIncludedCols();
             // if size of cols is 0, create an empty row batch
             if (optionIncludedCols.length == 0) {
@@ -181,6 +182,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 this.readers = null;
                 //throw new IOException("ISSUE-103: included columns is empty.");
                 this.resultSchema = null;
+                this.includedColumnNum = 0;
                 return;
             }
             List<Integer> optionColsIndices = new ArrayList<>();
@@ -195,6 +197,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     }
                 }
             }
+            this.includedColumnNum = includedColumnNum;
 
             // check included columns
             if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution()) {
