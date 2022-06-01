@@ -60,7 +60,7 @@ public class BroadcastJoinInput implements JoinInput
     /**
      * Whether the output has to be partitioned.
      */
-    private boolean outputPartitioned = false;
+    private boolean partitionOutput = false;
     /**
      * The partition information of the output if outputPartitioned is true.
      */
@@ -73,7 +73,7 @@ public class BroadcastJoinInput implements JoinInput
 
     public BroadcastJoinInput(long queryId, TableInfo leftTable, TableInfo rightTable,
                               JoinType joinType, String[] joinedCols,
-                              OutputInfo output, boolean outputPartitioned,
+                              OutputInfo output, boolean partitionOutput,
                               PartitionInput.PartitionInfo outputPartitionInfo)
     {
         this.queryId = queryId;
@@ -82,7 +82,7 @@ public class BroadcastJoinInput implements JoinInput
         this.joinType = joinType;
         this.joinedCols = joinedCols;
         this.output = output;
-        this.outputPartitioned = outputPartitioned;
+        this.partitionOutput = partitionOutput;
         this.outputPartitionInfo = outputPartitionInfo;
     }
 
@@ -146,14 +146,14 @@ public class BroadcastJoinInput implements JoinInput
         this.output = output;
     }
 
-    public boolean isOutputPartitioned()
+    public boolean isPartitionOutput()
     {
-        return outputPartitioned;
+        return partitionOutput;
     }
 
-    public void setOutputPartitioned(boolean outputPartitioned)
+    public void setPartitionOutput(boolean partitionOutput)
     {
-        this.outputPartitioned = outputPartitioned;
+        this.partitionOutput = partitionOutput;
     }
 
     public PartitionInput.PartitionInfo getOutputPartitionInfo()

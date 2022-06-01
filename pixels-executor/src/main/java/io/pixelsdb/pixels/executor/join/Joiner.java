@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.lambda.PartitionInput;
 
 import java.io.IOException;
 import java.util.*;
@@ -176,7 +177,7 @@ public class Joiner
         requireNonNull(bigBatch, "bigBatch is null");
         checkArgument(bigBatch.size > 0, "bigBatch is empty");
         List<VectorizedRowBatch> result = new LinkedList<>();
-        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
         Tuple.Builder builder = new Tuple.Builder(bigBatch,
                 this.bigKeyColumnIds, this.bigKeyColumnIdSet, this.joinType);
         while (builder.hasNext())
@@ -197,7 +198,7 @@ public class Joiner
                         if (joinedRowBatch.isFull())
                         {
                             result.add(joinedRowBatch);
-                            joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+                            joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
                         }
                         joined.writeTo(joinedRowBatch);
                         break;
@@ -216,7 +217,7 @@ public class Joiner
                     if (joinedRowBatch.isFull())
                     {
                         result.add(joinedRowBatch);
-                        joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
+                        joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
                     }
                     joined.writeTo(joinedRowBatch);
                 }
@@ -263,6 +264,82 @@ public class Joiner
         {
             pixelsWriter.addRowBatch(leftOuterBatch);
         }
+        return true;
+    }
+
+    /**
+     * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
+     * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
+     * the join is left outer join.
+     */
+    public boolean writeLeftOuterAndPartition(PixelsWriter pixelsWriter, int batchSize,
+                                              PartitionInput.PartitionInfo partitionInfo) throws IOException
+    {
+        checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
+                "getLeftOuter() can only be used for left or full outer join");
+        checkArgument(batchSize > 0, "batchSize must be positive");
+        requireNonNull(pixelsWriter, "pixelsWriter is null");
+        requireNonNull(partitionInfo, "partitionInfo is null");
+
+        Partitioner partitioner = new Partitioner(partitionInfo.getNumParition(),
+                batchSize, this.joinedSchema, partitionInfo.getKeyColumnIds());
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(partitionInfo.getNumParition());
+        for (int i = 0; i < partitionInfo.getNumParition(); ++i)
+        {
+            partitioned.add(new LinkedList<>());
+        }
+        List<Tuple> leftOuterTuples = new ArrayList<>();
+        for (Tuple small : this.smallTable)
+        {
+            if (!this.matchedSmallTuples.contains(small))
+            {
+                leftOuterTuples.add(small);
+            }
+        }
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
+        for (Tuple small : leftOuterTuples)
+        {
+            if (leftOuterBatch.isFull())
+            {
+                Map<Integer, VectorizedRowBatch> parts = partitioner.partition(leftOuterBatch);
+                for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                {
+                    partitioned.get(entry.getKey()).add(entry.getValue());
+                }
+                //pixelsWriter.addRowBatch(leftOuterBatch);
+                leftOuterBatch.reset();
+            }
+            this.bigNullTuple.concatLeft(small).writeTo(leftOuterBatch);
+        }
+        if (!leftOuterBatch.isEmpty())
+        {
+            Map<Integer, VectorizedRowBatch> parts = partitioner.partition(leftOuterBatch);
+            for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+            {
+                partitioned.get(entry.getKey()).add(entry.getValue());
+            }
+            //pixelsWriter.addRowBatch(leftOuterBatch);
+        }
+        VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+        for (int hash = 0; hash < tailBatches.length; ++hash)
+        {
+            if (!tailBatches[hash].isEmpty())
+            {
+                partitioned.get(hash).add(tailBatches[hash]);
+            }
+        }
+        for (int hash = 0; hash < partitionInfo.getNumParition(); ++hash)
+        {
+            List<VectorizedRowBatch> batches = partitioned.get(hash);
+            if (!batches.isEmpty())
+            {
+                for (VectorizedRowBatch batch : batches)
+                {
+                    pixelsWriter.addRowBatch(batch, hash);
+                }
+            }
+        }
+        partitioned.clear();
         return true;
     }
 
