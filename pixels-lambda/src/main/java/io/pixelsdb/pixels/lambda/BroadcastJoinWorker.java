@@ -33,27 +33,28 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
+import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.JoinOutput;
+import io.pixelsdb.pixels.executor.lambda.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -64,6 +65,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
     private static Storage s3;
     private static Storage minio;
+    private boolean partitionOutput = false;
+    private PartitionInput.PartitionInfo outputPartitionInfo;
 
     static
     {
@@ -126,6 +129,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 logger.error("failed to initialize MinIO storage", e);
             }
 
+            this.partitionOutput = event.isPartitionOutput();
+            this.outputPartitionInfo = event.getOutputPartitionInfo();
+
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
@@ -178,7 +184,11 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = joinWithRightTable(queryId, joiner, inputs, rightCols,
+                        int rowGroupNum = this.partitionOutput ?
+                                joinWithRightTableAndPartition(
+                                        queryId, joiner, inputs, rightCols,
+                                        rightFilter, outputPath, encoding) :
+                                joinWithRightTable(queryId, joiner, inputs, rightCols,
                                 rightFilter, outputPath, encoding);
                         if (rowGroupNum > 0)
                         {
@@ -204,9 +214,22 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 // output the left-outer tail.
                 String outputPath = outputFolder + requestId + "_join_left_outer";
-                PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
-                        encoding, false, null);
-                joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
+                PixelsWriter pixelsWriter;
+                if (partitionOutput)
+                {
+                    requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                            encoding, true, Arrays.stream(
+                                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    joiner.writeLeftOuterAndPartition(pixelsWriter, rowBatchSize, outputPartitionInfo);
+                }
+                else
+                {
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                            encoding, false, null);
+                    joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
+                }
                 pixelsWriter.close();
                 joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
             }
@@ -398,5 +421,155 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
+    }
+
+    /**
+     * Scan the input files of the right table, do the join, and partition the result.
+     *
+     * @param queryId the query id used by I/O scheduler
+     * @param joiner the joiner for which the hash table is built
+     * @param rightInputs the information of input files of the right table,
+     *                    the list <b>must be mutable</b>
+     * @param rightCols the column names of the right table
+     * @param rightFilter the table scan filter on the right table
+     * @param outputPath fileName on s3 to store the scan results
+     * @param encoding whether encode the scan results or not
+     * @return the number of row groups that have been written into the output.
+     */
+    private int joinWithRightTableAndPartition(
+            long queryId, Joiner joiner, List<ScanInput.InputInfo> rightInputs, String[] rightCols,
+            TableScanFilter rightFilter, String outputPath, boolean encoding)
+    {
+        checkArgument(this.partitionOutput, "partitionOutput is false");
+        requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
+        Partitioner partitioner = new Partitioner(this.outputPartitionInfo.getNumParition(),
+                rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumParition());
+        for (int i = 0; i < outputPartitionInfo.getNumParition(); ++i)
+        {
+            partitioned.add(new LinkedList<>());
+        }
+        int rowGroupNum = 0;
+        while (!rightInputs.isEmpty())
+        {
+            for (Iterator<ScanInput.InputInfo> it = rightInputs.iterator(); it.hasNext(); )
+            {
+                ScanInput.InputInfo input = it.next();
+                long start = System.currentTimeMillis();
+                try
+                {
+                    if (s3.exists(input.getPath()))
+                    {
+                        it.remove();
+                    } else
+                    {
+                        continue;
+                    }
+                } catch (IOException e)
+                {
+                    logger.error("failed to check the existence of the right table input file '" +
+                            input.getPath() + "'", e);
+                }
+                long end = System.currentTimeMillis();
+                logger.info("duration of existence check: " + (end - start));
+                try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
+                {
+                    if (input.getRgStart() >= pixelsReader.getRowGroupNum())
+                    {
+                        continue;
+                    }
+                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
+                    {
+                        input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
+                    }
+                    PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
+                    VectorizedRowBatch rowBatch;
+                    PixelsRecordReader recordReader = pixelsReader.read(option);
+                    checkArgument(recordReader.isValid(), "failed to get record reader");
+                    int scannedRows = 0, joinedRows = 0;
+                    Bitmap filtered = new Bitmap(rowBatchSize, true);
+                    Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    do
+                    {
+                        rowBatch = recordReader.readBatch(rowBatchSize);
+                        rightFilter.doFilter(rowBatch, filtered, tmp);
+                        rowBatch.applyFilter(filtered);
+                        scannedRows += rowBatch.size;
+                        if (rowBatch.size > 0)
+                        {
+                            List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                            for (VectorizedRowBatch joined : joinedBatches)
+                            {
+                                if (!joined.isEmpty())
+                                {
+                                    Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
+                                    for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                                    {
+                                        partitioned.get(entry.getKey()).add(entry.getValue());
+                                    }
+                                    joinedRows += joined.size;
+                                }
+                            }
+                        }
+                    } while (!rowBatch.endOfFile);
+                    logger.info("number of scanned rows: " + scannedRows +
+                            ", number of joined rows: " + joinedRows);
+                } catch (Exception e)
+                {
+                    logger.error("failed to scan the right table input file '" +
+                            input.getPath() + "' and do the join", e);
+                }
+            }
+        }
+        try
+        {
+            VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+            for (int hash = 0; hash < tailBatches.length; ++hash)
+            {
+                if (!tailBatches[hash].isEmpty())
+                {
+                    partitioned.get(hash).add(tailBatches[hash]);
+                }
+            }
+            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                    encoding, true, Arrays.stream(
+                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
+                            collect(Collectors.toList()));
+            int rowNum = 0;
+            for (int hash = 0; hash < outputPartitionInfo.getNumParition(); ++hash)
+            {
+                List<VectorizedRowBatch> batches = partitioned.get(hash);
+                if (!batches.isEmpty())
+                {
+                    for (VectorizedRowBatch batch : batches)
+                    {
+                        pixelsWriter.addRowBatch(batch, hash);
+                        rowNum += batch.size;
+                    }
+                }
+            }
+            logger.info("number of partitioned rows: " + rowNum);
+            pixelsWriter.close();
+            rowGroupNum = pixelsWriter.getRowGroupNum();
+            while (true)
+            {
+                try
+                {
+                    if (minio.getStatus(outputPath) != null)
+                    {
+                        break;
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
+                }
+            }
+        } catch (Exception e)
+        {
+            logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
+        }
+        return rowGroupNum;
     }
 }

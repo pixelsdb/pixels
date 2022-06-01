@@ -21,10 +21,7 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput;
-import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInvoker;
-import io.pixelsdb.pixels.executor.lambda.JoinOutput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.*;
 import io.pixelsdb.pixels.executor.predicate.Bound;
 import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
 import io.pixelsdb.pixels.executor.predicate.Filter;
@@ -109,6 +106,8 @@ public class TestBroadcastJoinInvoker
                 "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
+        //joinInput.setPartitionOutput(true);
+        //joinInput.setOutputPartitionInfo(new PartitionInput.PartitionInfo(new int[] {3}, 100));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = BroadcastJoinInvoker.invoke(joinInput).get();

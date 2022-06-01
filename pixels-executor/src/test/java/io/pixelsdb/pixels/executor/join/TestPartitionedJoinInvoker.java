@@ -72,7 +72,7 @@ public class TestPartitionedJoinInvoker
         joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
                 "http://172.31.32.193:9000", "lambda", "password", true));
         joinInput.setPartitionOutput(true);
-        joinInput.setOutputPartitionInfo(new PartitionInput.PartitionInfo(new int[] {1}, 60));
+        joinInput.setOutputPartitionInfo(new PartitionInput.PartitionInfo(new int[] {1}, 100));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = PartitionedJoinInvoker.invoke(joinInput).get();

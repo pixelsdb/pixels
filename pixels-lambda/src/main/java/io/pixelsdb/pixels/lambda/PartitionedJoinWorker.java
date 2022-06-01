@@ -114,7 +114,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
 
             this.partitionOutput = event.isPartitionOutput();
             this.outputPartitionInfo = event.getOutputPartitionInfo();
-            Partitioner partitioner = null;
 
             try
             {
@@ -184,7 +183,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     parts.add(rightPartitioned.get(j));
                 }
                 String outputPath = outputFolder + requestId + "_join_" + outputId;
-                Partitioner finalPartitioner = partitioner;
                 threadPool.execute(() -> {
                     try
                     {
@@ -264,7 +262,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
             {
                 String leftPartitioned = it.next();
-                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(leftPartitioned))
@@ -279,8 +276,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             leftPartitioned + "' of the left table", e);
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -342,7 +337,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
                 String rightPartitioned = it.next();
-                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(rightPartitioned))
@@ -357,8 +351,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -463,7 +455,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
                 String rightPartitioned = it.next();
-                long start = System.currentTimeMillis();
                 try
                 {
                     if (s3.exists(rightPartitioned))
@@ -478,8 +469,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -499,7 +488,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         VectorizedRowBatch rowBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        int scannedRows = 0, joinedRows = 0, partitionedRows = 0;
+                        int scannedRows = 0, joinedRows = 0;
                         do
                         {
                             rowBatch = recordReader.readBatch(rowBatchSize);
@@ -515,7 +504,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                                         for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
                                         {
                                             partitioned.get(entry.getKey()).add(entry.getValue());
-                                            partitionedRows += entry.getValue().size;
                                         }
                                         joinedRows += joined.size;
                                     }
@@ -523,8 +511,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                             }
                         } while (!rowBatch.endOfFile);
                         logger.info("number of scanned rows: " + scannedRows +
-                                ", number of joined rows: " + joinedRows +
-                                ", number of partitioned rows: " + partitionedRows);
+                                ", number of joined rows: " + joinedRows);
                     }
                 } catch (Exception e)
                 {
@@ -536,16 +523,13 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         try
         {
             VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
-            int tailRowNum = 0;
             for (int hash = 0; hash < tailBatches.length; ++hash)
             {
                 if (!tailBatches[hash].isEmpty())
                 {
                     partitioned.get(hash).add(tailBatches[hash]);
-                    tailRowNum += tailBatches[hash].size;
                 }
             }
-            logger.info("tail partitioned row number: " + tailRowNum);
             PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
                     encoding, true, Arrays.stream(
                             this.outputPartitionInfo.getKeyColumnIds()).boxed().
@@ -563,7 +547,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 }
             }
-            logger.info("output row number: " + rowNum);
+            logger.info("number of partitioned rows: " + rowNum);
             pixelsWriter.close();
             rowGroupNum = pixelsWriter.getRowGroupNum();
             while (true)
