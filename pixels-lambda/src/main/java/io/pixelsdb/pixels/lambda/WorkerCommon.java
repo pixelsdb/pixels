@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,7 +221,7 @@ public class WorkerCommon
      * @param input the information of the input file
      * @return the reader option
      */
-    public static PixelsReaderOption getReaderOption(long queryId, String[] cols, ScanInput.InputInfo input)
+    public static PixelsReaderOption getReaderOption(long queryId, String[] cols, InputInfo input)
     {
         PixelsReaderOption option = new PixelsReaderOption();
         option.skipCorruptRecords(true);

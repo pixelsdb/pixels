@@ -17,13 +17,36 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.domain;
+
+import java.util.List;
 
 /**
- * The output format for table scan.
  * @author hank
- * Created at: 11/04/2022
+ * @date 02/06/2022
  */
-public class ScanOutput extends LambdaOutput
+public class ScanTableInfo extends TableInfo
 {
+    /**
+     * The json string of the filter (i.e., predicates) to be used in scan.
+     */
+    private String filter;
+
+    public ScanTableInfo() { }
+
+    public ScanTableInfo(String tableName, List<InputSplit> inputs, String[] cols, String filter)
+    {
+        super(tableName, inputs, cols);
+        this.filter = filter;
+    }
+
+    public String getFilter()
+    {
+        return filter;
+    }
+
+    public void setFilter(String filter)
+    {
+        this.filter = filter;
+    }
 }

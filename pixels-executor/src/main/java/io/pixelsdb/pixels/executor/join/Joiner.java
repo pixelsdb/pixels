@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.lambda.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
 
 import java.io.IOException;
 import java.util.*;
@@ -273,7 +273,7 @@ public class Joiner
      * the join is left outer join.
      */
     public boolean writeLeftOuterAndPartition(PixelsWriter pixelsWriter, int batchSize,
-                                              PartitionInput.PartitionInfo partitionInfo) throws IOException
+                                              PartitionInfo partitionInfo) throws IOException
     {
         checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
                 "getLeftOuter() can only be used for left or full outer join");

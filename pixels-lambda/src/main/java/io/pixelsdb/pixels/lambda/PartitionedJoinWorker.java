@@ -33,10 +33,10 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.executor.lambda.JoinOutput;
-import io.pixelsdb.pixels.executor.lambda.PartitionInput;
-import io.pixelsdb.pixels.executor.lambda.PartitionedJoinInput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     private static Storage s3;
     private static Storage minio;
     private boolean partitionOutput = false;
-    private PartitionInput.PartitionInfo outputPartitionInfo;
+    private PartitionInfo outputPartitionInfo;
 
     static
     {
@@ -90,34 +90,36 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
 
             long queryId = event.getQueryId();
 
-            List<String> leftPartitioned = event.getLeftPartitioned();
+            List<String> leftPartitioned = event.getLeftTable().getInputFiles();
+            int leftParallelism = event.getLeftTable().getParallelism();
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
-            String[] leftCols = event.getLeftCols();
-            int[] leftKeyColumnIds = event.getLeftKeyColumnIds();
+            String[] leftCols = event.getLeftTable().getColumnsToRead();
+            int[] leftKeyColumnIds = event.getLeftTable().getKeyColumnIds();
 
-            List<String> rightPartitioned = event.getRightPartitioned();
+            List<String> rightPartitioned = event.getRightTable().getInputFiles();
+            int rightParallelism = event.getRightTable().getParallelism();
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
-            String[] rightCols = event.getRightCols();
-            int[] rightKeyColumnIds = event.getRightKeyColumnIds();
-            String[] joinedCols = event.getJoinedCols();
+            String[] rightCols = event.getRightTable().getColumnsToRead();
+            int[] rightKeyColumnIds = event.getRightTable().getKeyColumnIds();
+            String[] joinedCols = event.getJoinInfo().getResultColumns();
 
-            JoinType joinType = event.getJoinType();
-            List<Integer> hashValues = event.getHashValues();
-            int numPartition = event.getNumPartition();
-            ScanInput.OutputInfo outputInfo = event.getOutput();
-            String outputFolder = outputInfo.getFolder();
+            JoinType joinType = event.getJoinInfo().getJoinType();
+            List<Integer> hashValues = event.getJoinInfo().getHashValues();
+            int numPartition = event.getJoinInfo().getNumPartition();
+            MultiOutputInfo outputInfo = event.getOutput();
+            String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
             }
             boolean encoding = outputInfo.isEncoding();
 
-            this.partitionOutput = event.isPartitionOutput();
-            this.outputPartitionInfo = event.getOutputPartitionInfo();
+            this.partitionOutput = event.getJoinInfo().isPostPartition();
+            this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
             try
             {
-                if (minio == null)
+                if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)
                 {
                     ConfigMinIO(outputInfo.getEndpoint(), outputInfo.getAccessKey(), outputInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
@@ -135,10 +137,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     leftSchema.get(), leftKeyColumnIds, rightSchema.get(), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
-            int leftSplitSize = leftPartitioned.size() / (cores * 2);
-            if (leftSplitSize == 0)
+            int leftSplitSize = leftPartitioned.size() / leftParallelism;
+            if (leftPartitioned.size() % leftParallelism > 0)
             {
-                leftSplitSize = 1;
+                leftSplitSize++;
             }
             for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
             {
@@ -170,10 +172,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 return joinOutput;
             }
             // scan the right table and do the join.
-            int rightSplitSize = rightPartitioned.size() / (cores * 2);
-            if (rightSplitSize == 0)
+            int rightSplitSize = rightPartitioned.size() / rightParallelism;
+            if (rightPartitioned.size() % rightParallelism > 0)
             {
-                rightSplitSize = 1;
+                rightSplitSize++;
             }
             for (int i = 0, outputId = 0; i < rightPartitioned.size(); i += rightSplitSize, ++outputId)
             {
@@ -182,16 +184,16 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 {
                     parts.add(rightPartitioned.get(j));
                 }
-                String outputPath = outputFolder + requestId + "_join_" + outputId;
+                String outputPath = outputFolder + outputInfo.getFileNames().get(outputId);
                 threadPool.execute(() -> {
                     try
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, parts, rightCols, hashValues,
-                                        numPartition, outputPath, encoding) :
+                                        numPartition, outputPath, encoding, outputInfo.getScheme()) :
                                 joinWithRightTable(queryId, joiner, parts, rightCols,
-                                hashValues, numPartition, outputPath, encoding);
+                                hashValues, numPartition, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
                             joinOutput.addOutput(outputPath, rowGroupNum);
@@ -215,12 +217,14 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
             {
                 // output the left-outer tail.
-                String outputPath = outputFolder + requestId + "_join_left_outer";
+                String outputPath = outputFolder + outputInfo.getFileNames().get(
+                        outputInfo.getFileNames().size()-1);
                 PixelsWriter pixelsWriter;
                 if (partitionOutput)
                 {
                     requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
                             encoding, true, Arrays.stream(
                                     this.outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -228,7 +232,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
                 else
                 {
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
                             encoding, false, null);
                     joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
                 }
@@ -324,13 +329,15 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param numPartition the total number of partitions
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
+     * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
     private int joinWithRightTable(long queryId, Joiner joiner, List<String> rightParts,
-                                    String[] rightCols, List<Integer> hashValues, int numPartition,
-                                    String outputPath, boolean encoding)
+                                   String[] rightCols, List<Integer> hashValues, int numPartition,
+                                   String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
-        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                 encoding, false, null);
         while (!rightParts.isEmpty())
         {
@@ -401,19 +408,21 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         try
         {
             pixelsWriter.close();
-            while (true)
+            if (outputScheme == Storage.Scheme.minio)
             {
-                try
+                while (true)
                 {
-                    if (minio.getStatus(outputPath) != null)
+                    try
                     {
-                        break;
+                        if (minio.getStatus(outputPath) != null)
+                        {
+                            break;
+                        }
+                    } catch (Exception e)
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
                     }
-                }
-                catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -434,11 +443,13 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param numPartition the total number of partitions
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
+     * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
     private int joinWithRightTableAndPartition(long queryId, Joiner joiner, List<String> rightParts,
                                                String[] rightCols, List<Integer> hashValues,
-                                               int numPartition, String outputPath, boolean encoding)
+                                               int numPartition, String outputPath, boolean encoding,
+                                               Storage.Scheme outputScheme)
     {
         checkArgument(this.partitionOutput, "partitionOutput is false");
         requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
@@ -530,7 +541,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     partitioned.get(hash).add(tailBatches[hash]);
                 }
             }
-            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                    outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
                             this.outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
@@ -550,19 +562,21 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             logger.info("number of partitioned rows: " + rowNum);
             pixelsWriter.close();
             rowGroupNum = pixelsWriter.getRowGroupNum();
-            while (true)
+            if (outputScheme == Storage.Scheme.minio)
             {
-                try
+                while (true)
                 {
-                    if (minio.getStatus(outputPath) != null)
+                    try
                     {
-                        break;
+                        if (minio.getStatus(outputPath) != null)
+                        {
+                            break;
+                        }
+                    } catch (Exception e)
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
                     }
-                }
-                catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)

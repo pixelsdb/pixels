@@ -32,9 +32,10 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.executor.lambda.PartitionInput;
-import io.pixelsdb.pixels.executor.lambda.PartitionOutput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.output.PartitionOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
 /**
@@ -80,15 +82,16 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
-            List<InputInfo> inputs = event.getInputs();
-            int splitSize = event.getSplitSize();
+            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             int numPartition = event.getPartitionInfo().getNumParition();
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
+            checkArgument(event.getOutput().getScheme() == Storage.Scheme.s3,
+                    "the storage scheme for the partition result must be s3");
             String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
 
-            String[] cols = event.getCols();
-            TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
+            String[] cols = event.getTableInfo().getColumnsToRead();
+            TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
             PartitionOutput partitionOutput = new PartitionOutput();
             AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
             // The partitioned data would be kept in memory.
@@ -97,16 +100,9 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             {
                 partitioned.add(new ConcurrentLinkedQueue<>());
             }
-            for (int i = 0; i < inputs.size();)
+            for (InputSplit inputSplit : inputSplits)
             {
-                int numRg = 0;
-                ArrayList<InputInfo> scanInputs = new ArrayList<>();
-                while (numRg < splitSize && i < inputs.size())
-                {
-                    InputInfo info = inputs.get(i++);
-                    scanInputs.add(info);
-                    numRg += info.getRgLength();
-                }
+                List<InputInfo> scanInputs = inputSplit.getInputInfos();
 
                 threadPool.execute(() -> {
                     try
@@ -169,7 +165,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
-    private void partitionFile(long queryId, ArrayList<InputInfo> scanInputs,
+    private void partitionFile(long queryId, List<InputInfo> scanInputs,
                              String[] cols, TableScanFilter filter, int[] keyColumnIds,
                              List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                              AtomicReference<TypeDescription> writerSchema)

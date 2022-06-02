@@ -20,8 +20,12 @@
 package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.executor.lambda.*;
+import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import io.pixelsdb.pixels.executor.predicate.Bound;
 import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
 import io.pixelsdb.pixels.executor.predicate.Filter;
@@ -65,49 +69,49 @@ public class TestBroadcastJoinInvoker
         BroadcastJoinInput joinInput = new BroadcastJoinInput();
         joinInput.setQueryId(123456);
 
-        BroadcastJoinInput.TableInfo leftTable = new BroadcastJoinInput.TableInfo();
-        leftTable.setCols(new String[]{"p_partkey", "p_name", "p_size"});
+        BroadCastJoinTableInfo leftTable = new BroadCastJoinTableInfo();
+        leftTable.setColumnsToRead(new String[]{"p_partkey", "p_name", "p_size"});
         leftTable.setKeyColumnIds(new int[]{0});
         leftTable.setTableName("part");
-        leftTable.setInputs(Arrays.asList(
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 0, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 4, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 8, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 12, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 16, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 20, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 24, 4),
-                new ScanInput.InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 28, 4)
-        ));
-        leftTable.setSplitSize(4);
+        leftTable.setInputSplits(Arrays.asList(
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 0, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 4, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 8, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 12, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 16, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 20, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 24, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 28, 4)))));
         leftTable.setFilter(leftFilter);
         joinInput.setLeftTable(leftTable);
 
-        BroadcastJoinInput.TableInfo rightTable = new BroadcastJoinInput.TableInfo();
-        rightTable.setCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        BroadCastJoinTableInfo rightTable = new BroadCastJoinTableInfo();
+        rightTable.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         rightTable.setKeyColumnIds(new int[]{1});
         rightTable.setTableName("lineitem");
-        rightTable.setInputs(Arrays.asList(
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4),
-                new ScanInput.InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)
-        ));
-        rightTable.setSplitSize(4);
+        rightTable.setInputSplits(Arrays.asList(
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4))),
+                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)))));
         rightTable.setFilter(rightFilter);
         joinInput.setRightTable(rightTable);
 
-        joinInput.setJoinType(JoinType.EQUI_INNER);
-        joinInput.setJoinedCols(new String[]{"p_partkey", "p_name", "p_size",
+        JoinInfo joinInfo = new JoinInfo();
+        joinInfo.setJoinType(JoinType.EQUI_INNER);
+        joinInfo.setResultColumns(new String[]{"p_partkey", "p_name", "p_size",
                 "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
-        joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
-                "http://172.31.32.193:9000", "lambda", "password", true));
-        //joinInput.setPartitionOutput(true);
-        //joinInput.setOutputPartitionInfo(new PartitionInput.PartitionInfo(new int[] {3}, 100));
+        joinInfo.setPostPartition(true);
+        joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 100));
+        joinInput.setJoinInfo(joinInfo);
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
+                "http://172.31.32.193:9000", "lambda", "password", true,
+                Arrays.asList("broadcast-join-0","broadcast-join-1","broadcast-join-2","broadcast-join-3",
+                        "broadcast-join-4","broadcast-join-5","broadcast-join-6","broadcast-join-7")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = BroadcastJoinInvoker.invoke(joinInput).get();

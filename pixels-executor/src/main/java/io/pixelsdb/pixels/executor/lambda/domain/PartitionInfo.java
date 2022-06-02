@@ -17,55 +17,52 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
-
-import java.util.Set;
+package io.pixelsdb.pixels.executor.lambda.domain;
 
 /**
- * The output format of the hash partitioning.
  * @author hank
- * @date 07/05/2022
+ * @date 02/06/2022
  */
-public class PartitionOutput
+public class PartitionInfo
 {
     /**
-     * The path of the partitioned file.
+     * The column ids of the partition key columns.
      */
-    private String path;
+    private int[] keyColumnIds;
 
     /**
-     * The hash value of the partitions that exist in the partitioned file.
+     * The number of partitions in the output.
      */
-    private Set<Integer> hashValues;
+    private int numParition;
 
     /**
      * Default constructor for Jackson.
      */
-    public PartitionOutput() { }
+    public PartitionInfo() { }
 
-    public PartitionOutput(String path, Set<Integer> hashValues)
+    public PartitionInfo(int[] keyColumnIds, int numParition)
     {
-        this.path = path;
-        this.hashValues = hashValues;
+        this.keyColumnIds = keyColumnIds;
+        this.numParition = numParition;
     }
 
-    public String getPath()
+    public int[] getKeyColumnIds()
     {
-        return path;
+        return keyColumnIds;
     }
 
-    public void setPath(String path)
+    public void setKeyColumnIds(int[] keyColumnIds)
     {
-        this.path = path;
+        this.keyColumnIds = keyColumnIds;
     }
 
-    public Set<Integer> getHashValues()
+    public int getNumParition()
     {
-        return hashValues;
+        return numParition;
     }
 
-    public void setHashValues(Set<Integer> hashValues)
+    public void setNumParition(int numParition)
     {
-        this.hashValues = hashValues;
+        this.numParition = numParition;
     }
 }

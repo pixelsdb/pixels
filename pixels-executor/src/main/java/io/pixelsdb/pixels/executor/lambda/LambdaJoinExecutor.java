@@ -31,6 +31,10 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import io.pixelsdb.pixels.executor.plan.BaseTable;
 import io.pixelsdb.pixels.executor.plan.JoinLink;
 import io.pixelsdb.pixels.executor.plan.JoinedTable;
@@ -41,6 +45,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -94,7 +99,7 @@ public class LambdaJoinExecutor
             Table leftTable = join.getLeftTable();
             BaseTable rightTable = (BaseTable) join.getRightTable();
             JoinAlgorithm joinAlgo = join.getJoinAlgo();
-            List<ScanInput.InputInfo> leftInputs = new ArrayList<>();
+            List<InputInfo> leftInputs = new ArrayList<>();
             int leftSplitSize = 0;
             if (leftTable.isBase())
             {
@@ -107,7 +112,7 @@ public class LambdaJoinExecutor
                 {
                     for (int i = 0; i < joinOutput.getOutputs().size(); ++i)
                     {
-                        ScanInput.InputInfo input = new ScanInput.InputInfo(
+                        InputInfo input = new InputInfo(
                                 joinOutput.getOutputs().get(i),
                                 0, joinOutput.getRowGroupNums().get(i));
                         leftInputs.add(input);
@@ -120,46 +125,59 @@ public class LambdaJoinExecutor
                     leftSplitSize = 1;
                 }
             }
-            List<ScanInput.InputInfo> rightInputs = new ArrayList<>();
+            List<InputInfo> rightInputs = new ArrayList<>();
             int rightSplitSize = getInputs(rightTable, rightInputs);
 
             if (joinAlgo == JoinAlgorithm.BROADCAST)
             {
                 List<BroadcastJoinInput> joinInputs = new ArrayList<>();
-                BroadcastJoinInput.TableInfo leftTableInfo = new BroadcastJoinInput.TableInfo();
+                BroadCastJoinTableInfo leftTableInfo = new BroadCastJoinTableInfo();
                 leftTableInfo.setTableName(leftTable.getTableName());
-                leftTableInfo.setInputs(leftInputs);
-                leftTableInfo.setCols(leftTable.getColumnNames());
-                leftTableInfo.setSplitSize(leftSplitSize);
+                List<InputSplit> leftSplits = new ArrayList<>();
+                for (int i = 0; i < leftInputs.size();)
+                {
+                    List<InputInfo> inputInfos = new ArrayList<>();
+                    for (int rgNum = 0; rgNum < leftSplitSize && i < leftInputs.size(); ++i)
+                    {
+                        inputInfos.add(leftInputs.get(i));
+                        rgNum += leftInputs.get(i).getRgLength();
+                    }
+                    leftSplits.add(new InputSplit(inputInfos));
+                }
+                leftTableInfo.setInputSplits(leftSplits);
+                leftTableInfo.setColumnsToRead(leftTable.getColumnNames());
                 leftTableInfo.setFilter(JSON.toJSONString(
                         TableScanFilter.empty(leftTable.getSchemaName(), leftTable.getTableName())));
                 leftTableInfo.setKeyColumnIds(join.getRightKeyColumnIds());
-                for (int i = 0; i < rightInputs.size(); ++i)
+                for (int i = 0, outputId = 0; i < rightInputs.size(); ++outputId)
                 {
-                    List<ScanInput.InputInfo> inputs = new ArrayList<>();
-                    for (int j = 0; j < rightSplitSize && i < rightInputs.size(); ++i)
+                    List<InputInfo> inputs = new ArrayList<>();
+                    for (int numRg = 0; numRg < rightSplitSize && i < rightInputs.size(); ++i)
                     {
                         inputs.add(rightInputs.get(i));
-                        j += rightInputs.get(i).getRgLength();
+                        numRg += rightInputs.get(i).getRgLength();
                     }
-
-                    BroadcastJoinInput.TableInfo rightTableInfo = new BroadcastJoinInput.TableInfo();
+                    BroadCastJoinTableInfo rightTableInfo = new BroadCastJoinTableInfo();
                     rightTableInfo.setTableName(rightTable.getTableName());
-                    rightTableInfo.setInputs(inputs);
-                    rightTableInfo.setCols(rightTable.getColumnNames());
-                    rightTableInfo.setSplitSize(rightSplitSize);
+                    rightTableInfo.setInputSplits(Arrays.asList(new InputSplit(inputs)));
+                    rightTableInfo.setColumnsToRead(rightTable.getColumnNames());
                     rightTableInfo.setFilter(JSON.toJSONString(rightTable.getFilter()));
                     rightTableInfo.setKeyColumnIds(join.getRightKeyColumnIds());
-                    ScanInput.OutputInfo output = new ScanInput.OutputInfo();
+                    MultiOutputInfo output = new MultiOutputInfo();
                     output.setEncoding(true);
-                    output.setEndpoint(Storage.Scheme.s3.name());
-                    output.setFolder("pixels-lambda/" + joinedTable.getTableName());
+                    output.setPath("pixels-lambda/" + joinedTable.getTableName());
+                    output.setScheme(Storage.Scheme.s3);
+                    output.setFileNames(Arrays.asList("join_" + outputId));
                     BroadcastJoinInput joinInput = new BroadcastJoinInput();
                     joinInput.setQueryId(queryId);
                     joinInput.setLeftTable(leftTableInfo);
                     joinInput.setRightTable(rightTableInfo);
-                    joinInput.setJoinedCols(joinedTable.getColumnNames());
-                    joinInput.setJoinType(join.getJoinType());
+                    JoinInfo joinInfo = new JoinInfo();
+                    joinInfo.setResultColumns(joinedTable.getColumnNames());
+                    joinInfo.setJoinType(join.getJoinType());
+                    joinInfo.setPostPartition(true);
+                    // TODO: set post partition info.
+                    joinInput.setJoinInfo(joinInfo);
                     joinInput.setOutput(output);
                     joinInputs.add(joinInput);
                 }
@@ -178,62 +196,66 @@ public class LambdaJoinExecutor
             else if (joinAlgo == JoinAlgorithm.PARTITIONED)
             {
                 int numRowGroups = 0;
-                for (ScanInput.InputInfo input : rightInputs)
+                for (InputInfo input : rightInputs)
                 {
                     numRowGroups += input.getRgLength();
                 }
                 // TODO: calculate numPartitions from configuration.
                 int numPartition = numRowGroups / rightSplitSize / 6;
                 String leftOutputBase = "pixels-lambda/" + joinedTable.getTableName() + "/" +
-                        leftTable.getTableName() + "/part-";
+                        leftTable.getTableName() + "/part_";
                 String rightOutputBase = "pixels-lambda/" + joinedTable.getTableName() + "/" +
-                        rightTable.getTableName() + "/part-";
-                List<PartitionInput> leftPartitionInputs = getPartitionInputs(numPartition,
-                        leftInputs, leftSplitSize, leftTable, leftOutputBase, join.getLeftKeyColumnIds());
-                List<PartitionInput> rightPartitionInputs = getPartitionInputs(numPartition,
-                        rightInputs, rightSplitSize, rightTable, rightOutputBase, join.getRightKeyColumnIds());
+                        rightTable.getTableName() + "/part_";
+                List<PartitionInput> leftPartitionInputs = getPartitionInputs(leftTable.getTableName(),
+                        numPartition, leftInputs, leftSplitSize, leftTable, leftOutputBase,
+                        join.getLeftKeyColumnIds());
+                List<PartitionInput> rightPartitionInputs = getPartitionInputs(rightTable.getTableName(),
+                        numPartition, rightInputs, rightSplitSize, rightTable, rightOutputBase,
+                        join.getRightKeyColumnIds());
                 // TODO: continue implementation.
             }
         }
     }
 
-    private List<PartitionInput> getPartitionInputs(
-            int numPartition, List<ScanInput.InputInfo> inputs, int splitSize,
+    private List<PartitionInput> getPartitionInputs(String tableName,
+            int numPartition, List<InputInfo> inputs, int splitSize,
             Table inputTable, String outputBase, int[] keyColumnIds)
     {
         List<PartitionInput> partitionInputs = new ArrayList<>();
-        for (int i = 0; i < inputs.size(); ++i)
+        for (int i = 0; i < inputs.size();)
         {
-            List<ScanInput.InputInfo> splitInputs = new ArrayList<>();
-            for (int j = 0; j < splitSize && i < inputs.size(); ++i)
+            List<InputInfo> splitInputs = new ArrayList<>();
+            for (int numRg = 0; numRg < splitSize && i < inputs.size(); ++i)
             {
                 splitInputs.add(inputs.get(i));
-                j += inputs.get(i).getRgLength();
+                numRg += inputs.get(i).getRgLength();
             }
             PartitionInput partitionInput = new PartitionInput();
             partitionInput.setQueryId(queryId);
-            partitionInput.setInputs(splitInputs);
-            partitionInput.setCols(inputTable.getColumnNames());
+            ScanTableInfo tableInfo = new ScanTableInfo();
+            tableInfo.setInputSplits(Arrays.asList(new InputSplit(splitInputs)));
+            tableInfo.setColumnsToRead(inputTable.getColumnNames());
+            tableInfo.setTableName(tableName);
             if (inputTable.isBase())
             {
-                partitionInput.setFilter(JSON.toJSONString(((BaseTable) inputTable).getFilter()));
+                tableInfo.setFilter(JSON.toJSONString(((BaseTable) inputTable).getFilter()));
             }
             else
             {
-                partitionInput.setFilter(JSON.toJSONString(
+                tableInfo.setFilter(JSON.toJSONString(
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
             }
-            partitionInput.setSplitSize(splitSize);
-            partitionInput.setOutput(new PartitionInput.OutputInfo(outputBase + i, true));
-            partitionInput.setPartitionInfo(
-                    new PartitionInput.PartitionInfo(keyColumnIds,numPartition));
+            partitionInput.setTableInfo(tableInfo);
+            partitionInput.setOutput(new OutputInfo(outputBase + i, false,
+                    Storage.Scheme.s3, null, null, null, true));
+            partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds,numPartition));
             partitionInputs.add(partitionInput);
         }
 
         return partitionInputs;
     }
 
-    private int getInputs(Table table, List<ScanInput.InputInfo> inputs) throws MetadataException, IOException
+    private int getInputs(Table table, List<InputInfo> inputs) throws MetadataException, IOException
     {
         requireNonNull(table, "table is null");
         checkArgument(table.isBase(), "this is not a base table");
@@ -329,7 +351,7 @@ public class LambdaJoinExecutor
                     int numPath = orderedPaths.size();
                     for (int i = 0; i < numPath; ++i)
                     {
-                        ScanInput.InputInfo input = new ScanInput.InputInfo(orderedPaths.get(i), 0 , 1);
+                        InputInfo input = new InputInfo(orderedPaths.get(i), 0 , 1);
                         inputs.add(input);
                     }
                 }
@@ -344,7 +366,7 @@ public class LambdaJoinExecutor
                         curFileRGIdx = 0;
                         while (curFileRGIdx < rowGroupNum)
                         {
-                            ScanInput.InputInfo input = new ScanInput.InputInfo(path, curFileRGIdx, splitSize);
+                            InputInfo input = new InputInfo(path, curFileRGIdx, splitSize);
                             inputs.add(input);
                             curFileRGIdx += splitSize;
                         }

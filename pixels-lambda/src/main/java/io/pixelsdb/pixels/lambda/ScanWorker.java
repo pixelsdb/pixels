@@ -31,18 +31,20 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
-import io.pixelsdb.pixels.executor.lambda.ScanOutput;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
+import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
@@ -82,9 +84,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> inputs = event.getInputs();
-            int splitSize = event.getSplitSize();
-            String outputFolder = event.getOutput().getFolder();
+            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
+            checkArgument(event.getOutput().getScheme() == Storage.Scheme.minio,
+                    "the storage scheme is not minio");
+            checkArgument(event.getOutput().isRandomFileName(),
+                    "random output file name is not enabled by the caller");
+            String outputFolder = event.getOutput().getPath();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
@@ -102,20 +107,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
-            String[] cols = event.getCols();
-            TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
+            String[] cols = event.getTableInfo().getColumnsToRead();
+            TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
             ScanOutput scanOutput = new ScanOutput();
-            for (int i = 0; i < inputs.size();)
+            int i = 0;
+            for (InputSplit inputSplit : inputSplits)
             {
-                int numRg = 0;
-                ArrayList<InputInfo> scanInputs = new ArrayList<>();
-                while (numRg < splitSize)
-                {
-                    InputInfo info = inputs.get(i++);
-                    scanInputs.add(info);
-                    numRg += info.getRgLength();
-                }
-                String out = outputFolder + requestId + "_out_" + i;
+                List<InputInfo> scanInputs = inputSplit.getInputInfos();
+                String out = outputFolder + requestId + "_scan_" + i++;
 
                 threadPool.execute(() -> {
                     try
@@ -160,7 +159,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param encoding whether encode the scan results or not
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
+    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
         PixelsWriter pixelsWriter = null;

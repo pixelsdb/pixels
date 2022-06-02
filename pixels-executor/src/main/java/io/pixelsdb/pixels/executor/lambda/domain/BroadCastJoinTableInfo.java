@@ -17,29 +17,37 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.domain;
 
-import com.google.gson.Gson;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
-import org.junit.Test;
+import java.util.List;
 
 /**
  * @author hank
- * Created at: 11/04/2022
+ * @date 02/06/2022
  */
-public class TestOutput
+public class BroadCastJoinTableInfo extends ScanTableInfo
 {
-    @Test
-    public void testEncodeScanOutput()
+    /**
+     * The ids of the join-key columns of the table.
+     */
+    private int[] keyColumnIds;
+
+    public BroadCastJoinTableInfo() { }
+
+    public BroadCastJoinTableInfo(String tableName, List<InputSplit> inputs,
+                                  String[] cols, String filter, int[] keyColumnIds)
     {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
+        super(tableName, inputs, cols, filter);
+        this.keyColumnIds = keyColumnIds;
+    }
+
+    public int[] getKeyColumnIds()
+    {
+        return keyColumnIds;
+    }
+
+    public void setKeyColumnIds(int[] keyColumnIds)
+    {
+        this.keyColumnIds = keyColumnIds;
     }
 }

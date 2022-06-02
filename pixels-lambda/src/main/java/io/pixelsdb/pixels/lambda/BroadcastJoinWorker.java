@@ -34,10 +34,9 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput;
-import io.pixelsdb.pixels.executor.lambda.JoinOutput;
-import io.pixelsdb.pixels.executor.lambda.PartitionInput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     private static Storage s3;
     private static Storage minio;
     private boolean partitionOutput = false;
-    private PartitionInput.PartitionInfo outputPartitionInfo;
+    private PartitionInfo outputPartitionInfo;
 
     static
     {
@@ -92,26 +91,24 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            BroadcastJoinInput.TableInfo leftTable = event.getLeftTable();
-            List<ScanInput.InputInfo> leftInputs = leftTable.getInputs();
+            BroadCastJoinTableInfo leftTable = event.getLeftTable();
+            List<InputSplit> leftInputs = leftTable.getInputSplits();
             checkArgument(leftInputs.size() > 0, "leftPartitioned is empty");
-            String[] leftCols = leftTable.getCols();
+            String[] leftCols = leftTable.getColumnsToRead();
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
-            int leftSplitSize = leftTable.getSplitSize();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            BroadcastJoinInput.TableInfo rightTable = event.getRightTable();
-            List<ScanInput.InputInfo> rightInputs = rightTable.getInputs();
+            BroadCastJoinTableInfo rightTable = event.getRightTable();
+            List<InputSplit> rightInputs = rightTable.getInputSplits();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
-            String[] rightCols = rightTable.getCols();
+            String[] rightCols = rightTable.getColumnsToRead();
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
-            int rightSplitSize = rightTable.getSplitSize();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
-            String[] joinedCols = event.getJoinedCols();
-            JoinType joinType = event.getJoinType();
-            ScanInput.OutputInfo outputInfo = event.getOutput();
-            String outputFolder = outputInfo.getFolder();
+            String[] joinedCols = event.getJoinInfo().getResultColumns();
+            JoinType joinType = event.getJoinInfo().getJoinType();
+            MultiOutputInfo outputInfo = event.getOutput();
+            String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
@@ -119,7 +116,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             boolean encoding = outputInfo.isEncoding();
             try
             {
-                if (minio == null)
+                if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)
                 {
                     ConfigMinIO(outputInfo.getEndpoint(), outputInfo.getAccessKey(), outputInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
@@ -129,29 +126,23 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 logger.error("failed to initialize MinIO storage", e);
             }
 
-            this.partitionOutput = event.isPartitionOutput();
-            this.outputPartitionInfo = event.getOutputPartitionInfo();
+            this.partitionOutput = event.getJoinInfo().isPostPartition();
+            this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
-                    leftInputs.get(0).getPath(), rightInputs.get(0).getPath());
+                    leftInputs.get(0).getInputInfos().get(0).getPath(),
+                    rightInputs.get(0).getInputInfos().get(0).getPath());
             Joiner joiner = new Joiner(joinType, joinedCols,
                     getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
                     getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
-            for (int i = 0; i < leftInputs.size();)
+            for (InputSplit inputSplit : leftInputs)
             {
-                List<ScanInput.InputInfo> inputs = new LinkedList<>();
-                int numRg = 0;
-                while (numRg < leftSplitSize && i < leftInputs.size())
-                {
-                    ScanInput.InputInfo info = leftInputs.get(i++);
-                    inputs.add(info);
-                    numRg += info.getRgLength();
-                }
+                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
@@ -170,26 +161,20 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             logger.info("hash table size: " + joiner.getLeftTableSize());
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
-            for (int i = 0, outputId = 0; i < rightInputs.size(); ++outputId)
+            int i = 0;
+            for (InputSplit inputSplit : rightInputs)
             {
-                List<ScanInput.InputInfo> inputs = new LinkedList<>();
-                int numRg = 0;
-                while (numRg < rightSplitSize && i < rightInputs.size())
-                {
-                    ScanInput.InputInfo info = rightInputs.get(i++);
-                    inputs.add(info);
-                    numRg += info.getRgLength();
-                }
-                String outputPath = outputFolder + requestId + "_join_" + outputId;
+                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                String outputPath = outputFolder + outputInfo.getFileNames().get(i++);
                 threadPool.execute(() -> {
                     try
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, rightCols,
-                                        rightFilter, outputPath, encoding) :
+                                        rightFilter, outputPath, encoding, outputInfo.getScheme()) :
                                 joinWithRightTable(queryId, joiner, inputs, rightCols,
-                                rightFilter, outputPath, encoding);
+                                        rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
                             joinOutput.addOutput(outputPath, rowGroupNum);
@@ -213,12 +198,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
             {
                 // output the left-outer tail.
-                String outputPath = outputFolder + requestId + "_join_left_outer";
+                String outputPath = outputFolder + outputInfo.getFileNames().get(
+                        outputInfo.getFileNames().size()-1);
                 PixelsWriter pixelsWriter;
                 if (partitionOutput)
                 {
                     requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
                             encoding, true, Arrays.stream(
                                             this.outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -226,7 +213,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
                 else
                 {
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
                             encoding, false, null);
                     joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
                 }
@@ -252,14 +240,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
      */
-    private void buildHashTable(long queryId, Joiner joiner, List<ScanInput.InputInfo> leftInputs,
+    private void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
                                 String[] leftCols, TableScanFilter leftFilter)
     {
         while (!leftInputs.isEmpty())
         {
-            for (Iterator<ScanInput.InputInfo> it = leftInputs.iterator(); it.hasNext(); )
+            for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
             {
-                ScanInput.InputInfo input = it.next();
+                InputInfo input = it.next();
                 long start = System.currentTimeMillis();
                 try
                 {
@@ -323,19 +311,21 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param rightFilter the table scan filter on the right table
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
+     * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
-    private int joinWithRightTable(long queryId, Joiner joiner, List<ScanInput.InputInfo> rightInputs,
+    private int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
                                    String[] rightCols, TableScanFilter rightFilter,
-                                   String outputPath, boolean encoding)
+                                   String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
-        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                 encoding, false, null);
         while (!rightInputs.isEmpty())
         {
-            for (Iterator<ScanInput.InputInfo> it = rightInputs.iterator(); it.hasNext(); )
+            for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
-                ScanInput.InputInfo input = it.next();
+                InputInfo input = it.next();
                 long start = System.currentTimeMillis();
                 try
                 {
@@ -401,19 +391,21 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         try
         {
             pixelsWriter.close();
-            while (true)
+            if (outputScheme == Storage.Scheme.minio)
             {
-                try
+                while (true)
                 {
-                    if (minio.getStatus(outputPath) != null)
+                    try
                     {
-                        break;
+                        if (minio.getStatus(outputPath) != null)
+                        {
+                            break;
+                        }
+                    } catch (Exception e)
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
                     }
-                }
-                catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -434,11 +426,12 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param rightFilter the table scan filter on the right table
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
+     * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
     private int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<ScanInput.InputInfo> rightInputs, String[] rightCols,
-            TableScanFilter rightFilter, String outputPath, boolean encoding)
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, String[] rightCols,
+            TableScanFilter rightFilter, String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
         checkArgument(this.partitionOutput, "partitionOutput is false");
         requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
@@ -452,9 +445,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         int rowGroupNum = 0;
         while (!rightInputs.isEmpty())
         {
-            for (Iterator<ScanInput.InputInfo> it = rightInputs.iterator(); it.hasNext(); )
+            for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
-                ScanInput.InputInfo input = it.next();
+                InputInfo input = it.next();
                 long start = System.currentTimeMillis();
                 try
                 {
@@ -531,7 +524,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     partitioned.get(hash).add(tailBatches[hash]);
                 }
             }
-            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(), minio, outputPath,
+            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                    outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
                             this.outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
@@ -551,19 +545,21 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             logger.info("number of partitioned rows: " + rowNum);
             pixelsWriter.close();
             rowGroupNum = pixelsWriter.getRowGroupNum();
-            while (true)
+            if (outputScheme == Storage.Scheme.minio)
             {
-                try
+                while (true)
                 {
-                    if (minio.getStatus(outputPath) != null)
+                    try
                     {
-                        break;
+                        if (minio.getStatus(outputPath) != null)
+                        {
+                            break;
+                        }
+                    } catch (Exception e)
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
                     }
-                }
-                catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
