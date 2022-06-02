@@ -187,6 +187,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             checkValid = false;
             throw new IOException("file schema is empty.");
         }
+        if (footer.getIsRetina()) {
+            List<String> fields = fileSchema.getFieldNames();
+            assert fields.get(fields.size() - 1).equals("version");
+        }
 
         // check RGStart and RGLen are within the range of actual number of row groups
         int rgNum = footer.getRowGroupInfosCount();
