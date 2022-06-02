@@ -29,6 +29,9 @@ import io.pixelsdb.pixels.common.physical.SchedulerFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.predicate.Bound;
+import io.pixelsdb.pixels.core.predicate.ColumnFilter;
+import io.pixelsdb.pixels.core.predicate.Filter;
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import io.pixelsdb.pixels.core.retina.RetinaService;
 import io.pixelsdb.pixels.core.stats.ColumnStats;
@@ -43,6 +46,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+
+import static io.pixelsdb.pixels.core.predicate.Bound.Type.INCLUDED;
+import static io.pixelsdb.pixels.core.predicate.Bound.Type.UNBOUNDED;
 
 /**
  * @author guodong
@@ -115,7 +121,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private long cacheReadBytes = 0L;
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
-    private final List<Bitmap> visibilities;
+    /**
+     * Get from retina. Each Bitmap corresponds to a row group in {@link PixelsRecordReaderImpl#targetRGs}.
+     */
+    private final Bitmap[] visibilities;
+    private final ColumnFilter<Long> columnFilter;
 
     public PixelsRecordReaderImpl(PhysicalReader physicalReader,
                                   PixelsProto.PostScript postScript,
@@ -144,9 +154,17 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
-        // TODO: use visibilities to filter
-        this.visibilities = option.getVisibilities();
-        // TODO: filter by version if footer.getIsRetina() is true
+
+        if (option.getVersion() != -1) {
+            assert footer.getIsRetina();
+            this.visibilities = option.getVisibilities();
+            Filter<Long> filter = new Filter<>(Long.TYPE, false, false, false, false);
+            filter.addRange(new Bound<>(UNBOUNDED, 0L), new Bound<>(INCLUDED, option.getVersion()));
+            this.columnFilter = new ColumnFilter<>("version", TypeDescription.Category.LONG, filter);
+        } else {
+            this.visibilities = null;
+            this.columnFilter = null;
+        }
 
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
@@ -946,6 +964,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     readers[i].read(chunkBuffers[index], encoding, curRowInRG, curBatchSize,
                             postScript.getPixelStride(), resultRowBatch.size, columnVectors[i], chunkIndex);
                 }
+            }
+            if (footer.getIsRetina()) {
+                // Filter by visibility & version
+                Bitmap vis = visibilities[curRGIdx].slice(curRowInRG, curBatchSize);
+                Bitmap vis_ = new Bitmap(curBatchSize, false);
+                columnFilter.doFilter(columnVectors[columnVectors.length-1], curRowInRG, curBatchSize, vis_);
+                vis.and(vis_);
+                resultRowBatch.applyFilter(vis);
             }
 
             // update current row index in the row group

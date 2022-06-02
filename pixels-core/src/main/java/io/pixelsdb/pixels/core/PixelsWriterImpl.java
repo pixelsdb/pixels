@@ -122,6 +122,10 @@ public class PixelsWriterImpl implements PixelsWriter
         this.encoding = encoding;
         this.partitioned = partitioned;
         this.isRetina = isRetina;
+        if (isRetina) {
+            List<String> fields = schema.getFieldNames();
+            checkArgument(fields != null && fields.get(fields.size()-1).equals("version"), "should have hidden column `version` in the end");
+        }
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
 
         List<TypeDescription> children = schema.getChildren();

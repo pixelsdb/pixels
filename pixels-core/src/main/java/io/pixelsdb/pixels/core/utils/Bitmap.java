@@ -595,8 +595,8 @@ public class Bitmap
     }
 
     public Bitmap slice(int offset, int length) {
-        if (offset < 0 || length < 0 || offset + length > length())
-            throw new IndexOutOfBoundsException("offset: " + offset + ", length: " + length + ", length(): " + length());
+        if (offset < 0 || length < 0 || offset + length > capacity)
+            throw new IndexOutOfBoundsException("offset: " + offset + ", length: " + length + ", capacity: " + capacity);
         if (offset % BITS_PER_WORD != 0 || length % BITS_PER_WORD != 0)
             throw new IllegalArgumentException("offset and length must be multiple of " + BITS_PER_WORD);
 

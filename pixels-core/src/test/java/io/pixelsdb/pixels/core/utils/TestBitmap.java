@@ -54,4 +54,14 @@ public class TestBitmap
         assert bitmap.cardinality(68, 200) == 100;
         assert bitmap.cardinality() == 112;
     }
+
+    @Test
+    public void testSlice()
+    {
+        Bitmap bitmap = new Bitmap(200, false);
+        bitmap.set(72, 100);
+        bitmap.set(120, 130);
+        Bitmap slice = bitmap.slice(64, 64);
+        assert slice.cardinality() == 100-72 + 128-120;
+    }
 }
