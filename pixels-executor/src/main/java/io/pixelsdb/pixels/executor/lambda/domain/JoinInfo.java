@@ -32,9 +32,15 @@ public class JoinInfo
      */
     private JoinType joinType;
     /**
-     * The column names in the join result, in the same order of left/right cols.
+     * The column names in the join result, in the same order of
+     * left table columns+ right table columns. Join key columns may be ignored if
+     * the {@link #joinType} is NATURAL or {@link #outputJoinKeys} is false.
      */
     private String[] resultColumns;
+    /**
+     * Whether the join result contains the join keys from the left and right tables.
+     */
+    private boolean outputJoinKeys;
     /**
      * Whether the join output has to be partitioned.
      */
@@ -49,11 +55,12 @@ public class JoinInfo
      */
     public JoinInfo() { }
 
-    public JoinInfo(JoinType joinType, String[] resultColumns,
+    public JoinInfo(JoinType joinType, String[] resultColumns, boolean outputJoinKeys,
                     boolean postPartition, PartitionInfo postPartitionInfo)
     {
         this.joinType = joinType;
         this.resultColumns = resultColumns;
+        this.outputJoinKeys = outputJoinKeys;
         this.postPartition = postPartition;
         this.postPartitionInfo = postPartitionInfo;
     }
@@ -87,6 +94,16 @@ public class JoinInfo
     public void setResultColumns(String[] resultColumns)
     {
         this.resultColumns = resultColumns;
+    }
+
+    public boolean isOutputJoinKeys()
+    {
+        return outputJoinKeys;
+    }
+
+    public void setOutputJoinKeys(boolean outputJoinKeys)
+    {
+        this.outputJoinKeys = outputJoinKeys;
     }
 
     public boolean isPostPartition()

@@ -19,10 +19,10 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
+import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -35,6 +35,8 @@ import java.util.Set;
 public class NullTuple extends Tuple
 {
     private static final ColumnVector[] EMPTY_COLUMNS = new ColumnVector[0];
+    private static final int[] EMPTY_KEY_COLUMN_IDS = new int[0];
+    private static final Set<Integer> EMPTY_KEY_COLUMN_ID_SET = ImmutableSet.of();
     private static final int INVALID_HASH_CODE = Integer.MIN_VALUE;
     private static final int INVALID_ROW_ID = -1;
 
@@ -43,25 +45,13 @@ public class NullTuple extends Tuple
     /**
      * Null tuple is mainly used for outer joins. All fields in a null tuple are null.
      *
-     * @param keyColumnIds the ids of the key columns
-     * @param keyColumnIdSet the id set of the key columns, used for performance consideration
-     * @param numColumns the number of columns
-     * @param joinType the join type
+     * @param numColumns the number of columns to be written into the output
      */
-    protected NullTuple(int[] keyColumnIds, Set<Integer> keyColumnIdSet, int numColumns, JoinType joinType)
+    protected NullTuple(int numColumns)
     {
-        super(INVALID_HASH_CODE, INVALID_ROW_ID, keyColumnIds, keyColumnIdSet, EMPTY_COLUMNS, joinType);
+        super(INVALID_HASH_CODE, INVALID_ROW_ID, EMPTY_KEY_COLUMN_IDS, EMPTY_KEY_COLUMN_ID_SET,
+                EMPTY_COLUMNS, false);
         this.numColumns = numColumns;
-    }
-
-    public static NullTuple createNullTuple(int[] keyColumnIds, int numColumns, JoinType joinType)
-    {
-        Set<Integer> keyColumnIdSet = new HashSet<>(keyColumnIds.length);
-        for (int id : keyColumnIds)
-        {
-            keyColumnIdSet.add(id);
-        }
-        return new NullTuple(keyColumnIds, keyColumnIdSet, numColumns, joinType);
     }
 
     @Override
@@ -83,13 +73,10 @@ public class NullTuple extends Tuple
         {
             start = left.writeTo(rowBatch, start);
         }
-        // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
-        boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
-        int numColumnsToWrite = includeKey ? this.numColumns : this.numColumns - this.keyColumnIds.length;
-        for (int i = 0; i < numColumnsToWrite; ++i)
+        for (int i = 0; i < this.numColumns; ++i)
         {
             rowBatch.cols[start + i].addNull();
         }
-        return start + numColumnsToWrite;
+        return start + this.numColumns;
     }
 }

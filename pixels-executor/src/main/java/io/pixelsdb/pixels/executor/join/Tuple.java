@@ -57,9 +57,9 @@ public class Tuple
      */
     private final ColumnVector[] columns;
     /**
-     * The join type that this tuple is used for.
+     * Whether the column vectors of the key columns are written into the output.
      */
-    protected final JoinType joinType;
+    private final boolean writeKeyColumns;
     /**
      * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
@@ -70,15 +70,15 @@ public class Tuple
      * For performance considerations, the parameters are not checked.
      * Must ensure that they are valid.
      */
-    protected Tuple(int hashCode, int rowId, int[] keyColumnIds,
-                 Set<Integer> keyColumnIdSet, ColumnVector[] columns, JoinType joinType)
+    protected Tuple(int hashCode, int rowId, int[] keyColumnIds, Set<Integer> keyColumnIdSet,
+                    ColumnVector[] columns, boolean writeKeyColumns)
     {
         this.hashCode = hashCode;
         this.rowId = rowId;
         this.keyColumnIds = keyColumnIds;
         this.keyColumnIdSet = keyColumnIdSet;
         this.columns = columns;
-        this.joinType = joinType;
+        this.writeKeyColumns = writeKeyColumns;
         this.left = null;
     }
 
@@ -143,15 +143,13 @@ public class Tuple
      */
     protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
-        if (left != null)
+        if (this.left != null)
         {
-            start = left.writeTo(rowBatch, start);
+            start = this.left.writeTo(rowBatch, start);
         }
-        // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
-        boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
         for (int i = 0; i < this.columns.length; ++i)
         {
-            if (!includeKey && this.keyColumnIdSet.contains(i))
+            if (!this.writeKeyColumns && this.keyColumnIdSet.contains(i))
             {
                 continue;
             }
@@ -165,7 +163,7 @@ public class Tuple
         private final int[] keyColumnIds;
         private final Set<Integer> keyColumnIdSet;
         private final ColumnVector[] columns;
-        private final JoinType joinType;
+        private final boolean writeKeyColumns;
         private final int numRows;
         private final int[] hashCode;
         private int rowId = 0;
@@ -177,10 +175,10 @@ public class Tuple
          * @param rowBatch the row batch
          * @param keyColumnIds the ids of the join-key columns
          * @param keyColumnIdSet the id set of the join-key columns, used for performance consideration
-         * @param joinType the join type
+         * @param writeKeyColumns whether the key columns are written into the output
          */
         public Builder(VectorizedRowBatch rowBatch, int[] keyColumnIds,
-                       Set<Integer> keyColumnIdSet, JoinType joinType)
+                       Set<Integer> keyColumnIdSet, boolean writeKeyColumns)
         {
             checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
                     "keyColumnIds is null or empty");
@@ -190,10 +188,8 @@ public class Tuple
             checkArgument(rowBatch.numCols >= keyColumnIds.length,
                     "rowBatch does not have enough columns");
             checkArgument(rowBatch.size > 0, "rowBatch is empty");
-            requireNonNull(joinType, "joinType is null");
-            checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
 
-            this.joinType = joinType;
+            this.writeKeyColumns = writeKeyColumns;
             this.keyColumnIds = keyColumnIds;
             this.keyColumnIdSet = keyColumnIdSet;
             this.columns = rowBatch.cols;
@@ -220,7 +216,7 @@ public class Tuple
         public Tuple next()
         {
             int id = this.rowId++;
-            return new Tuple(hashCode[id], id, keyColumnIds, keyColumnIdSet, columns, joinType);
+            return new Tuple(hashCode[id], id, keyColumnIds, keyColumnIdSet, columns, writeKeyColumns);
         }
     }
 }

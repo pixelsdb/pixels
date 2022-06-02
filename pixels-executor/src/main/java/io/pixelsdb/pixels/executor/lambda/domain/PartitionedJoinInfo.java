@@ -43,11 +43,11 @@ public class PartitionedJoinInfo extends JoinInfo
      */
     public PartitionedJoinInfo() { }
 
-    public PartitionedJoinInfo(JoinType joinType, String[] resultColumns,
+    public PartitionedJoinInfo(JoinType joinType, String[] resultColumns, boolean outputJoinKeys,
                                boolean postPartition, PartitionInfo postPartitionInfo,
                                int numPartition, List<Integer> hashValues)
     {
-        super(joinType, resultColumns, postPartition, postPartitionInfo);
+        super(joinType, resultColumns, outputJoinKeys, postPartition, postPartitionInfo);
         this.numPartition = numPartition;
         this.hashValues = hashValues;
     }

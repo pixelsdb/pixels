@@ -87,7 +87,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getAwsRequestId();
+            // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
 
@@ -106,6 +106,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
             String[] joinedCols = event.getJoinInfo().getResultColumns();
+            boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
             MultiOutputInfo outputInfo = event.getOutput();
             String outputFolder = outputInfo.getPath();
@@ -135,7 +136,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getInputInfos().get(0).getPath(),
                     rightInputs.get(0).getInputInfos().get(0).getPath());
-            Joiner joiner = new Joiner(joinType, joinedCols,
+            Joiner joiner = new Joiner(joinType, joinedCols, includeKeyCols,
                     getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
                     getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
             // build the hash table for the left table.

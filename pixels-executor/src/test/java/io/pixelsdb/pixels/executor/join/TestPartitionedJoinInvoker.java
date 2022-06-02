@@ -81,12 +81,13 @@ public class TestPartitionedJoinInvoker
         joinInfo.setHashValues(Arrays.asList(16));
         joinInfo.setResultColumns(new String[]{"o_orderkey", "o_custkey", "o_orderstatus",
                 "o_orderdate", "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {1}, 100));
         joinInput.setJoinInfo(joinInfo);
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
-                "http://172.31.32.193:9000", "lambda", "password", true,
-                Arrays.asList("partitioned-join-0", "partitioned-join-1")));
+                "http://172.31.32.193:9000", "lambda", "password",
+                true, Arrays.asList("partitioned-join-0", "partitioned-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = PartitionedJoinInvoker.invoke(joinInput).get();

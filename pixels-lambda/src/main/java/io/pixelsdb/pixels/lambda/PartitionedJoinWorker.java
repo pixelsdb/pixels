@@ -86,7 +86,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
-            String requestId = context.getAwsRequestId();
+            // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
 
@@ -101,11 +101,13 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
             String[] rightCols = event.getRightTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getRightTable().getKeyColumnIds();
-            String[] joinedCols = event.getJoinInfo().getResultColumns();
 
+            String[] joinedCols = event.getJoinInfo().getResultColumns();
+            boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
             int numPartition = event.getJoinInfo().getNumPartition();
+
             MultiOutputInfo outputInfo = event.getOutput();
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
@@ -133,7 +135,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0), rightPartitioned.get(0));
-            Joiner joiner = new Joiner(joinType, joinedCols,
+            Joiner joiner = new Joiner(joinType, joinedCols, includeKeyCols,
                     leftSchema.get(), leftKeyColumnIds, rightSchema.get(), rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());

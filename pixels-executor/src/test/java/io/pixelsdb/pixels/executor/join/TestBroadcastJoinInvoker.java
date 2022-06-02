@@ -105,6 +105,7 @@ public class TestBroadcastJoinInvoker
         joinInfo.setJoinType(JoinType.EQUI_INNER);
         joinInfo.setResultColumns(new String[]{"p_partkey", "p_name", "p_size",
                 "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 100));
         joinInput.setJoinInfo(joinInfo);
