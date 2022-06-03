@@ -77,14 +77,18 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             long queryId = event.getQueryId();
 
             List<String> leftPartitioned = event.getLeftTable().getInputFiles();
-            int leftParallelism = event.getLeftTable().getParallelism();
+            requireNonNull(leftPartitioned, "leftPartitioned is null");
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
+            int leftParallelism = event.getLeftTable().getParallelism();
+            checkArgument(leftParallelism > 0, "leftParallelism is not positive");
             String[] leftCols = event.getLeftTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getLeftTable().getKeyColumnIds();
 
             List<String> rightPartitioned = event.getRightTable().getInputFiles();
-            int rightParallelism = event.getRightTable().getParallelism();
+            requireNonNull(rightPartitioned, "rightPartitioned is null");
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
+            int rightParallelism = event.getRightTable().getParallelism();
+            checkArgument(rightParallelism > 0, "rightParallelism is not positive");
             String[] rightCols = event.getRightTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getRightTable().getKeyColumnIds();
 

@@ -121,8 +121,16 @@ public class Joiner
         List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
         checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
                 "invalid children of bigSchema");
-        checkArgument(smallColumnNames.size() + bigColumnNames.size() -
-                (joinType == JoinType.NATURAL ? bigKeyColumnIds.length : 0) == joinedCols.length,
+        int outputColumNum = smallColumnNames.size() + bigColumnNames.size();
+        if (this.includeKeyCols)
+        {
+            outputColumNum -= (joinType == JoinType.NATURAL ? bigKeyColumnIds.length : 0);
+        }
+        else
+        {
+            outputColumNum -= (smallKeyColumnIds.length + bigKeyColumnIds.length);
+        }
+        checkArgument(outputColumNum == joinedCols.length,
                 "joinedCols does not contain correct number of elements");
         int joinedColId = 0;
         for (int i = 0; i < smallColumnNames.size(); ++i)

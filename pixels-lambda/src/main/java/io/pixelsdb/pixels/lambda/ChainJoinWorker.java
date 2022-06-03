@@ -53,6 +53,9 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * Chain join is the combination of a set of broadcast joins.
+ * All the left tables in a chain join are broadcast.
+ *
  * @author hank
  * @date 03/06/2022
  */
@@ -132,9 +135,10 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, rightCols, rightFilter, outputPath, encoding,
-                                        outputInfo.getScheme(), this.partitionOutput, this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, rightCols,
+                                        queryId, joiner, inputs, true, rightCols, rightFilter,
+                                        outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
+                                        this.outputPartitionInfo) :
+                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -191,6 +195,17 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         }
     }
 
+    /**
+     * Build the joiner for the last join, i.e., the join between the join result of
+     * the left tables and the right table.
+     *
+     * @param executor the thread pool
+     * @param leftTables the information of the left tables
+     * @param chainJoinInfos the information of the chain joins between the left tables
+     * @param rightTable the information of the right table, a.k.a., the last table to join with
+     * @param lastJoinInfo the information of the last join
+     * @return the joiner of the last join
+     */
     private Joiner buildJoiner(ExecutorService executor,
                                   List<BroadCastJoinTableInfo> leftTables,
                                   List<ChainJoinInfo> chainJoinInfos,
@@ -201,14 +216,14 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         {
             BroadCastJoinTableInfo t1 = leftTables.get(0);
             BroadCastJoinTableInfo t2 = leftTables.get(1);
-            Joiner currJoiner = joinFirstTwoTables(executor, t1, t2, chainJoinInfos.get(0));
+            Joiner currJoiner = buildFirstJoiner(executor, t1, t2, chainJoinInfos.get(0));
             for (int i = 1; i < leftTables.size() - 1; ++i)
             {
-                ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 BroadCastJoinTableInfo currRightTable = leftTables.get(i);
                 BroadCastJoinTableInfo nextTable = leftTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
                         nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
+                ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 Joiner nextJoiner = new Joiner(nextJoinInfo.getJoinType(), nextJoinInfo.getResultColumns(),
                         nextJoinInfo.isOutputJoinKeys(), currJoiner.getJoinedSchema(), currJoinInfo.getKeyColumnIds(),
@@ -217,12 +232,13 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
                 currJoiner = nextJoiner;
             }
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
+            BroadCastJoinTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
                     rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
             Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(), lastJoinInfo.getResultColumns(),
                     lastJoinInfo.isOutputJoinKeys(), currJoiner.getJoinedSchema(), lastChainJoin.getKeyColumnIds(),
                     getResultSchema(rightTableSchema, rightTable.getColumnsToRead()), rightTable.getKeyColumnIds());
-            chainJoin(executor, currJoiner, finalJoiner, rightTable);
+            chainJoin(executor, currJoiner, finalJoiner, lastLeftTable);
             return finalJoiner;
         } catch (Exception e)
         {
@@ -230,10 +246,21 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         }
     }
 
-    private Joiner joinFirstTwoTables(ExecutorService executor,
-                                      BroadCastJoinTableInfo t1,
-                                      BroadCastJoinTableInfo t2,
-                                      ChainJoinInfo joinInfo) throws ExecutionException, InterruptedException
+    /**
+     * Build the joiner for the join between the first two left tables.
+     *
+     * @param executor the thread pool
+     * @param t1 the information of the first left table
+     * @param t2 the information of the second left table
+     * @param joinInfo the information of the join between t1 and t2
+     * @return the joiner of the first join
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
+    private Joiner buildFirstJoiner(ExecutorService executor,
+                                    BroadCastJoinTableInfo t1,
+                                    BroadCastJoinTableInfo t2,
+                                    ChainJoinInfo joinInfo) throws ExecutionException, InterruptedException
     {
         AtomicReference<TypeDescription> t1Schema = new AtomicReference<>();
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
@@ -251,7 +278,7 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    buildHashTable(queryId, joiner, inputs, t1.getColumnsToRead(), t1Filter);
+                    buildHashTable(queryId, joiner, inputs, true, t1.getColumnsToRead(), t1Filter);
                 }
                 catch (Exception e)
                 {
@@ -263,10 +290,21 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         {
             future.get();
         }
-        logger.info("hash table size: " + joiner.getLeftTableSize());
+        logger.info("first left table: " + t1.getTableName() + ", hash table size: " + joiner.getLeftTableSize());
         return joiner;
     }
 
+    /**
+     * Perform the chain join between two left tables and use the join result to
+     * populate the hash table of the next join.
+     *
+     * @param executor the thread pool
+     * @param currJoiner the joiner of the two left tables
+     * @param nextJoiner the joiner of the next join
+     * @param currRightTable the right table in the two left tables
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
     private void chainJoin(ExecutorService executor, Joiner currJoiner, Joiner nextJoiner,
                            BroadCastJoinTableInfo currRightTable) throws ExecutionException, InterruptedException
     {
@@ -278,7 +316,7 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(currJoiner, nextJoiner, inputs,
+                    chainJoinSplit(currJoiner, nextJoiner, inputs, true,
                             currRightTable.getColumnsToRead(), currRigthFilter);
                 }
                 catch (Exception e)
@@ -294,31 +332,49 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         logger.info("joined with chain table: " + currRightTable.getTableName());
     }
 
+    /**
+     * Perform the join of two left tables on one split of the right one.
+     *
+     * @param currJoiner the joiner of the two left tables
+     * @param nextJoiner the joiner of the next join
+     * @param rightInputs the information of the input files in the split of the right one
+     *                   of the two left tables
+     * @param checkExistence whether check the existence of the input files
+     * @param rightCols the column names of the right one of the two left tables
+     * @param rightFilter the filter of the right one of the two left tables
+     */
     private void chainJoinSplit(Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
-                                    String[] rightCols, TableScanFilter rightFilter)
+                                boolean checkExistence, String[] rightCols, TableScanFilter rightFilter)
     {
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                long start = System.currentTimeMillis();
-                try
+                if (checkExistence)
                 {
-                    if (s3.exists(input.getPath()))
+                    long start = System.currentTimeMillis();
+                    try
                     {
-                        it.remove();
-                    } else
+                        if (s3.exists(input.getPath()))
+                        {
+                            it.remove();
+                        } else
+                        {
+                            continue;
+                        }
+                    } catch (IOException e)
                     {
-                        continue;
+                        logger.error("failed to check the existence of the right table input file '" +
+                                input.getPath() + "'", e);
                     }
-                } catch (IOException e)
-                {
-                    logger.error("failed to check the existence of the right table input file '" +
-                            input.getPath() + "'", e);
+                    long end = System.currentTimeMillis();
+                    logger.info("duration of existence check: " + (end - start));
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
+                else
+                {
+                    it.remove();
+                }
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())

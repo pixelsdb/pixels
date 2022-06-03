@@ -79,6 +79,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             BroadCastJoinTableInfo leftTable = event.getLeftTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
+            requireNonNull(leftInputs, "leftInputs is null");
             checkArgument(leftInputs.size() > 0, "left table is empty");
             String[] leftCols = leftTable.getColumnsToRead();
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
@@ -86,6 +87,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             BroadCastJoinTableInfo rightTable = event.getRightTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
+            requireNonNull(rightInputs, "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "right table is empty");
             String[] rightCols = rightTable.getColumnsToRead();
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
@@ -133,7 +135,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, inputs, leftCols, leftFilter);
+                        buildHashTable(queryId, joiner, inputs, true, leftCols, leftFilter);
                     }
                     catch (Exception e)
                     {
@@ -158,9 +160,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, rightCols, rightFilter, outputPath, encoding,
-                                        outputInfo.getScheme(), this.partitionOutput, this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, rightCols,
+                                        queryId, joiner, inputs, true, rightCols, rightFilter,
+                                        outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
+                                        this.outputPartitionInfo) :
+                                joinWithRightTable(queryId, joiner, inputs, false, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -224,34 +227,42 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param joiner the joiner for which the hash table is built
      * @param leftInputs the information of input files of the left table,
      *                   the list <b>must be mutable</b>
+     * @param checkExistence whether check the existence of the input files
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
      */
     public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
-                                String[] leftCols, TableScanFilter leftFilter)
+                                      boolean checkExistence, String[] leftCols, TableScanFilter leftFilter)
     {
         while (!leftInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                long start = System.currentTimeMillis();
-                try
+                if (checkExistence)
                 {
-                    if (s3.exists(input.getPath()))
+                    long start = System.currentTimeMillis();
+                    try
                     {
-                        it.remove();
-                    } else
+                        if (s3.exists(input.getPath()))
+                        {
+                            it.remove();
+                        } else
+                        {
+                            continue;
+                        }
+                    } catch (IOException e)
                     {
-                        continue;
+                        logger.error("failed to check the existence of the left table input file '" +
+                                input.getPath() + "'", e);
                     }
-                } catch (IOException e)
-                {
-                    logger.error("failed to check the existence of the left table input file '" +
-                            input.getPath() + "'", e);
+                    long end = System.currentTimeMillis();
+                    logger.info("duration of existence check: " + (end - start));
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
+                else
+                {
+                    it.remove();
+                }
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -294,6 +305,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param joiner the joiner for which the hash table is built
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
+     * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
      * @param outputPath fileName on s3 to store the scan results
@@ -302,7 +314,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @return the number of row groups that have been written into the output.
      */
     public static int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
-                                   String[] rightCols, TableScanFilter rightFilter,
+                                   boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
                                    String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
         PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
@@ -313,23 +325,30 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                long start = System.currentTimeMillis();
-                try
+                if (checkExistence)
                 {
-                    if (s3.exists(input.getPath()))
+                    long start = System.currentTimeMillis();
+                    try
                     {
-                        it.remove();
-                    } else
+                        if (s3.exists(input.getPath()))
+                        {
+                            it.remove();
+                        } else
+                        {
+                            continue;
+                        }
+                    } catch (IOException e)
                     {
-                        continue;
+                        logger.error("failed to check the existence of the right table input file '" +
+                                input.getPath() + "'", e);
                     }
-                } catch (IOException e)
-                {
-                    logger.error("failed to check the existence of the right table input file '" +
-                            input.getPath() + "'", e);
+                    long end = System.currentTimeMillis();
+                    logger.info("duration of existence check: " + (end - start));
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
+                else
+                {
+                    it.remove();
+                }
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -409,6 +428,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param joiner the joiner for which the hash table is built
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
+     * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
      * @param outputPath fileName on s3 to store the scan results
@@ -417,7 +437,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @return the number of row groups that have been written into the output.
      */
     public static int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, String[] rightCols,
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence, String[] rightCols,
             TableScanFilter rightFilter, String outputPath, boolean encoding, Storage.Scheme outputScheme,
             boolean partitionOutput, PartitionInfo outputPartitionInfo)
     {
@@ -436,23 +456,30 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                long start = System.currentTimeMillis();
-                try
+                if (checkExistence)
                 {
-                    if (s3.exists(input.getPath()))
+                    long start = System.currentTimeMillis();
+                    try
                     {
-                        it.remove();
-                    } else
+                        if (s3.exists(input.getPath()))
+                        {
+                            it.remove();
+                        } else
+                        {
+                            continue;
+                        }
+                    } catch (IOException e)
                     {
-                        continue;
+                        logger.error("failed to check the existence of the right table input file '" +
+                                input.getPath() + "'", e);
                     }
-                } catch (IOException e)
-                {
-                    logger.error("failed to check the existence of the right table input file '" +
-                            input.getPath() + "'", e);
+                    long end = System.currentTimeMillis();
+                    logger.info("duration of existence check: " + (end - start));
                 }
-                long end = System.currentTimeMillis();
-                logger.info("duration of existence check: " + (end - start));
+                else
+                {
+                    it.remove();
+                }
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())

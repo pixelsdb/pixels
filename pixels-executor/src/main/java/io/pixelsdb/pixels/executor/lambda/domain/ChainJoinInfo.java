@@ -32,6 +32,9 @@ public class ChainJoinInfo extends JoinInfo
      */
     private int[] keyColumnIds;
 
+    /**
+     * Default constructor for Jackson.
+     */
     public ChainJoinInfo() { }
 
     public ChainJoinInfo(JoinType joinType, String[] resultColumns, int[] keyColumnIds,

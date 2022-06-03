@@ -67,6 +67,7 @@ public class TestPartitionedJoinInvoker
                 "pixels-lambda-test/orders_part_7"));
         leftTableInfo.setParallelism(4);
         joinInput.setLeftTable(leftTableInfo);
+
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
         rightTableInfo.setTableName("lineitem");
         rightTableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
@@ -74,20 +75,23 @@ public class TestPartitionedJoinInvoker
         rightTableInfo.setInputFiles(Arrays.asList(
                 "pixels-lambda-test/lineitem_part_0",
                 "pixels-lambda-test/lineitem_part_1"));
+        rightTableInfo.setParallelism(2);
         joinInput.setRightTable(rightTableInfo);
+
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
-        joinInfo.setJoinType(JoinType.EQUI_INNER);
+        joinInfo.setJoinType(JoinType.EQUI_LEFT);
         joinInfo.setNumPartition(40);
         joinInfo.setHashValues(Arrays.asList(16));
-        joinInfo.setResultColumns(new String[]{"o_orderkey", "o_custkey", "o_orderstatus",
-                "o_orderdate", "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setResultColumns(new String[]{"o_custkey", "o_orderstatus",
+                "o_orderdate", "l_partkey", "l_extendedprice", "l_discount"});
         joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
-        joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {1}, 100));
+        joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));
         joinInput.setJoinInfo(joinInfo);
+
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
                 "http://172.31.32.193:9000", "lambda", "password",
-                true, Arrays.asList("partitioned-join-0", "partitioned-join-1")));
+                true, Arrays.asList("partitioned-join-0", "partitioned-join-1", "partitioned-join-left")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = PartitionedJoinInvoker.invoke(joinInput).get();

@@ -32,6 +32,9 @@ public class ScanTableInfo extends TableInfo
      */
     private String filter;
 
+    /**
+     * Default constructor for Jackson.
+     */
     public ScanTableInfo() { }
 
     public ScanTableInfo(String tableName, List<InputSplit> inputs, String[] cols, String filter)

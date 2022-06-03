@@ -60,6 +60,11 @@ public class ChainJoinInput implements JoinInput
      */
     private MultiOutputInfo output;
 
+    /**
+     * Default constructor for Jackson.
+     */
+    public ChainJoinInput() { }
+
     public ChainJoinInput(long queryId, List<BroadCastJoinTableInfo> leftTables,
                           BroadCastJoinTableInfo rightTable, List<ChainJoinInfo> chainJoinInfos,
                           JoinInfo joinInfo, MultiOutputInfo output)

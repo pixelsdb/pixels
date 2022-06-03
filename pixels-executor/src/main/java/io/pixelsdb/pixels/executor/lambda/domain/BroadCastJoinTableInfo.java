@@ -32,6 +32,9 @@ public class BroadCastJoinTableInfo extends ScanTableInfo
      */
     private int[] keyColumnIds;
 
+    /**
+     * Default constructor for Jackson.
+     */
     public BroadCastJoinTableInfo() { }
 
     public BroadCastJoinTableInfo(String tableName, List<InputSplit> inputs,
