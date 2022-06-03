@@ -61,22 +61,8 @@ import static java.util.Objects.requireNonNull;
 public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
-    private static Storage s3;
-    private static Storage minio;
     private boolean partitionOutput = false;
     private PartitionInfo outputPartitionInfo;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
 
     @Override
     public JoinOutput handleRequest(PartitionedJoinInput event, Context context)

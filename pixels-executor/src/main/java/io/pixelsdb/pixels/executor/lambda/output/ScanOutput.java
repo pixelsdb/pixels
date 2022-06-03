@@ -24,6 +24,6 @@ package io.pixelsdb.pixels.executor.lambda.output;
  * @author hank
  * Created at: 11/04/2022
  */
-public class ScanOutput extends LambdaOutput
+public class ScanOutput extends NonPartitionOutput
 {
 }

@@ -58,20 +58,6 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static Storage s3;
-    private static Storage minio;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
 
     @Override
     public ScanOutput handleRequest(ScanInput event, Context context)

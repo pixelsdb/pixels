@@ -26,7 +26,7 @@ import java.util.ArrayList;
  * @author hank
  * Created at: 11/04/2022
  */
-public class LambdaOutput
+public class NonPartitionOutput
 {
     /**
      * The path of the result files. No need to contain endpoint information.
@@ -41,7 +41,7 @@ public class LambdaOutput
     /**
      * Default constructor for jackson.
      */
-    public LambdaOutput() { }
+    public NonPartitionOutput() { }
 
     public ArrayList<String> getOutputs()
     {

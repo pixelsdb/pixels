@@ -61,23 +61,9 @@ import static java.util.Objects.requireNonNull;
  */
 public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
-    private static Storage s3;
-    private static Storage minio;
+    private static final Logger logger = LoggerFactory.getLogger(BroadcastJoinWorker.class);
     private boolean partitionOutput = false;
     private PartitionInfo outputPartitionInfo;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
 
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
@@ -93,14 +79,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             BroadCastJoinTableInfo leftTable = event.getLeftTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
-            checkArgument(leftInputs.size() > 0, "leftPartitioned is empty");
+            checkArgument(leftInputs.size() > 0, "left table is empty");
             String[] leftCols = leftTable.getColumnsToRead();
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
             BroadCastJoinTableInfo rightTable = event.getRightTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
-            checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
+            checkArgument(rightInputs.size() > 0, "right table is empty");
             String[] rightCols = rightTable.getColumnsToRead();
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
@@ -172,8 +158,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, rightCols,
-                                        rightFilter, outputPath, encoding, outputInfo.getScheme()) :
+                                        queryId, joiner, inputs, rightCols, rightFilter, outputPath, encoding,
+                                        outputInfo.getScheme(), this.partitionOutput, this.outputPartitionInfo) :
                                 joinWithRightTable(queryId, joiner, inputs, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
@@ -241,7 +227,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
      */
-    private void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
+    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
                                 String[] leftCols, TableScanFilter leftFilter)
     {
         while (!leftInputs.isEmpty())
@@ -315,7 +301,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
-    private int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
+    public static int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
                                    String[] rightCols, TableScanFilter rightFilter,
                                    String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
@@ -430,13 +416,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
-    private int joinWithRightTableAndPartition(
+    public static int joinWithRightTableAndPartition(
             long queryId, Joiner joiner, List<InputInfo> rightInputs, String[] rightCols,
-            TableScanFilter rightFilter, String outputPath, boolean encoding, Storage.Scheme outputScheme)
+            TableScanFilter rightFilter, String outputPath, boolean encoding, Storage.Scheme outputScheme,
+            boolean partitionOutput, PartitionInfo outputPartitionInfo)
     {
-        checkArgument(this.partitionOutput, "partitionOutput is false");
-        requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(this.outputPartitionInfo.getNumParition(),
+        checkArgument(partitionOutput, "partitionOutput is false");
+        requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
+        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumParition(),
                 rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
         List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumParition());
         for (int i = 0; i < outputPartitionInfo.getNumParition(); ++i)
@@ -528,7 +515,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
                     outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
-                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
+                            outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
             for (int hash = 0; hash < outputPartitionInfo.getNumParition(); ++hash)

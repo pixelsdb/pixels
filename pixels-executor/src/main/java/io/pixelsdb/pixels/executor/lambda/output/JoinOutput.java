@@ -25,6 +25,6 @@ package io.pixelsdb.pixels.executor.lambda.output;
  * @author hank
  * @date 07/05/2022
  */
-public class JoinOutput extends LambdaOutput
+public class JoinOutput extends NonPartitionOutput
 {
 }

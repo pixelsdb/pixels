@@ -23,7 +23,6 @@ import com.alibaba.fastjson.JSON;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -57,20 +56,7 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
  */
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static Storage s3;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
+    private static final Logger logger = LoggerFactory.getLogger(PartitionWorker.class);
 
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
