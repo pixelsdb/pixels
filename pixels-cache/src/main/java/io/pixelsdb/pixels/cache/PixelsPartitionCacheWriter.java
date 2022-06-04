@@ -45,12 +45,6 @@ public class PixelsPartitionCacheWriter {
      * Call beginIndexWrite() before changing radix, which is shared by all threads.
      */
 //    private PixelsRadix radix;
-    private long currentIndexOffset;
-    private long allocatedIndexOffset = PixelsCacheUtil.INDEX_RADIX_OFFSET;
-    private long cacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET; // this is only used in the write() method.
-    private ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
-    private ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
-    private Set<String> cachedColumnlets = new HashSet<>();
 
     // TODO: the cache index algorithm shall be abstracted out, rather than fixed as either radix tree or not
     //       radix tree
@@ -62,7 +56,6 @@ public class PixelsPartitionCacheWriter {
     private final MemoryMappedFile[] indexPartitions; // length=partitions + 1
     // permanent disk copy of the index file
     private final MemoryMappedFile[] indexDiskPartitions; // length = partition
-    private int free; // it can also be used to map the array index to logical partition identifier
 
 
     private PixelsPartitionCacheWriter(MemoryMappedFile cacheFile,
@@ -74,7 +67,6 @@ public class PixelsPartitionCacheWriter {
                               Storage storage,
                               PixelsRadix[] radixs,
                               int partitions,
-                              Set<String> cachedColumnlets,
                               EtcdUtil etcdUtil,
                               String host)
     {
@@ -89,7 +81,6 @@ public class PixelsPartitionCacheWriter {
         this.storage = storage;
         this.radixs = radixs;
         this.partitions = partitions;
-        this.free = this.partitions;
 
         checkArgument(this.cachePartitions.length == this.partitions + 1);
         checkArgument(this.indexPartitions.length == this.partitions + 1);
@@ -99,11 +90,6 @@ public class PixelsPartitionCacheWriter {
 
         this.etcdUtil = etcdUtil;
         this.host = host;
-        this.nodeBuffer.order(ByteOrder.BIG_ENDIAN);
-        if (cachedColumnlets != null && cachedColumnlets.isEmpty() == false)
-        {
-            cachedColumnlets.addAll(cachedColumnlets);
-        }
     }
 
     public static class Builder
@@ -195,8 +181,8 @@ public class PixelsPartitionCacheWriter {
         public PixelsPartitionCacheWriter build()
                 throws Exception
         {
-            // TODO: calculate a decent size of the builderCacheSize and BuilderIndexSize based on the partition
             // TODO: add unit test on it
+            // calculate a decent size of the builderCacheSize and BuilderIndexSize based on the partition
             long cachePartitionSize = builderCacheSize / partitions;
             long indexPartitionSize = builderIndexSize / partitions;
             checkArgument (cachePartitionSize * partitions == builderCacheSize);
@@ -209,7 +195,7 @@ public class PixelsPartitionCacheWriter {
             checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE < indexFile.getSize());
             checkArgument (indexPartitionSize * (partitions + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE < indexDiskFile.getSize());
 
-            // TODO: split the cacheFile and indexFile into partitions
+            // split the cacheFile and indexFile into partitions
             // the last partition serves as the buffer partition
             MemoryMappedFile[] cachePartitions = new MemoryMappedFile[partitions + 1];
             MemoryMappedFile[] indexPartitions = new MemoryMappedFile[partitions + 1];
@@ -230,24 +216,11 @@ public class PixelsPartitionCacheWriter {
 
             PixelsRadix[] radixs = new PixelsRadix[partitions];
             // check if cache and index exists.
-            Set<String> cachedColumnlets = new HashSet<>();
             // if overwrite is not true, and cache and index file already exists, reconstruct radix from existing index.
             if (!builderOverwrite && PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile))
             {
-                // TODO: load the radix region by region
-                throw new OperationNotSupportedException();
-                // cache exists in local cache file and index, reload the index.
-//                radix = PixelsCacheUtil.loadRadixIndex(indexFile);
-//                // build cachedColumnlets for PixelsCacheWriter.
-//                int cachedVersion = PixelsCacheUtil.getIndexVersion(indexFile);
-//                MetadataService metadataService = new MetadataService(
-//                        cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
-//                Layout cachedLayout = metadataService.getLayout(
-//                        cacheConfig.getSchema(), cacheConfig.getTable(), cachedVersion);
-//                Compact compact = cachedLayout.getCompactObject();
-//                int cacheBorder = compact.getCacheBorder();
-//                cachedColumnlets.addAll(compact.getColumnletOrder().subList(0, cacheBorder));
-//                metadataService.shutdown();
+                checkArgument(PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile),
+                        "overwrite=false, but cacheFile and indexFile is polluted");
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else
@@ -255,8 +228,6 @@ public class PixelsPartitionCacheWriter {
                 // set the header of the file and each partition
                 PixelsCacheUtil.initializePartitionMeta(indexDiskFile, (short) partitions, indexPartitionSize);
                 PixelsCacheUtil.initializePartitionMeta(indexFile, (short) partitions, indexPartitionSize);
-//                PixelsCacheUtil.initializeIndexFile(indexDiskFile);
-//                PixelsCacheUtil.initializeIndexFile(indexFile);
                 PixelsCacheUtil.initializeCacheFile(cacheFile);
                 for (int i = 0; i < partitions; ++i) {
                     radixs[i] = new PixelsRadix();
@@ -272,7 +243,7 @@ public class PixelsPartitionCacheWriter {
 
             return new PixelsPartitionCacheWriter(cacheFile, indexFile, indexDiskFile,
                     cachePartitions, indexPartitions, indexDiskPartitions, storage, radixs,
-                    partitions, cachedColumnlets, etcdUtil, builderHostName);
+                    partitions, etcdUtil, builderHostName);
         }
     }
 
@@ -323,7 +294,33 @@ public class PixelsPartitionCacheWriter {
         }
     }
 
-    // let the files be a dependency
+    public int updateIncremental(int version, Layout layout)
+    {
+        try
+        {
+            // get the caching file list
+            String key = Constants.CACHE_LOCATION_LITERAL + version + "_" + host;
+            KeyValue keyValue = etcdUtil.getKeyValue(key);
+            if (keyValue == null)
+            {
+                logger.debug("Found no allocated files. No updates are needed. " + key);
+                return 0;
+            }
+            String fileStr = keyValue.getValue().toString(StandardCharsets.UTF_8);
+            String[] files = fileStr.split(";");
+            Compact compact = layout.getCompactObject();
+            int cacheBorder = compact.getCacheBorder();
+            List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+            return internalUpdateIncremental(version, cacheColumnletOrders, files);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    // let the files be a dependency, better for test
     public int bulkLoad(int version, List<String> cacheColumnletOrders, String[] files) {
         try
         {
@@ -334,6 +331,73 @@ public class PixelsPartitionCacheWriter {
             e.printStackTrace();
             return -1;
         }
+    }
+    // better for test purpose
+    public int incrementalLoad(int version, List<String> cacheColumnletOrders, String[] files) {
+        try
+        {
+            return internalUpdateIncremental(version, cacheColumnletOrders, files);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+            return -1;
+        }
+    }
+
+    public int internalUpdateIncremental(int version, List<String> cacheColumnletOrders, String[] files) throws IOException {
+        // now we need to consider the protocol
+        int status = 0;
+        List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
+        for (int i = 0; i < partitions; ++i) {
+            partitionRgIds.add(new ArrayList<>());
+        }
+        List<List<Short>> partitionColIds = new ArrayList<>(partitions);
+        for (int i = 0; i < partitions; ++i) {
+            partitionColIds.add(new ArrayList<>());
+        }
+        // do a partition on layout+cacheColumnOrders by the hashcode
+        constructPartitionRgAndCols(cacheColumnletOrders, files, partitionRgIds, partitionColIds);
+        logger.debug("partition counts = " + Arrays.toString(partitionRgIds.stream().map(List::size).toArray()));
+
+        // fetch the current free and start
+        int freeAndStartDisk = PixelsCacheUtil.retrieveFirstAndFree(indexDiskBackFile);
+        int freeAndStart = PixelsCacheUtil.retrieveFirstAndFree(indexBackFile);
+        checkArgument(freeAndStart == freeAndStartDisk,
+                String.format("tmpfs freeAndStart(%d) != disk freeAndStart(%d)", freeAndStart, freeAndStartDisk));
+        int free = freeAndStart >>> 16;
+        int start = freeAndStart & 0x0000ffff;
+        int writeLogicalPartition = 0;
+
+
+        while (writeLogicalPartition < partitions) {
+            MemoryMappedFile freeIndexPartition = indexPartitions[free];
+            MemoryMappedFile freeIndexDiskPartition = indexDiskPartitions[free];
+            MemoryMappedFile freeCachePartition = cachePartitions[free];
+
+            // start update, write the update on `writeLogicalPartition` to `free`
+            status = partitionUpdateAll(version, writeLogicalPartition, radixs[writeLogicalPartition],
+                    freeIndexPartition, freeIndexDiskPartition, freeCachePartition,
+                    files, partitionRgIds.get(writeLogicalPartition), partitionColIds.get(writeLogicalPartition));
+            if (status != 0) {
+                return status; // TODO: now a single partition fail will cause a full failure
+            }
+
+            // update free, start and writeLogicalPartition
+            if (writeLogicalPartition == 0) start = free;
+            free = PixelsCacheUtil.retrievePhysicalPartition(indexBackFile, writeLogicalPartition, partitions);
+            writeLogicalPartition = writeLogicalPartition + 1;
+
+            // write the free and start in the meta header
+            PixelsCacheUtil.setFirstAndFree(indexDiskBackFile, (short) free, (short) start);
+            PixelsCacheUtil.setFirstAndFree(indexBackFile, (short) free, (short) start);
+        }
+
+        // TODO: after all the partition has been udpated, update the cache metadata header
+        PixelsCacheUtil.setPartitionedIndexFileVersion(indexDiskBackFile, version);
+        PixelsCacheUtil.setPartitionedIndexFileVersion(indexBackFile, version);
+
+        return status;
     }
 
     private int hashcode(byte[] bytes) {
@@ -405,7 +469,7 @@ public class PixelsPartitionCacheWriter {
                 radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
-                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+            //    cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
                 logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                 currCacheOffset += physicalLen;
@@ -441,26 +505,9 @@ public class PixelsPartitionCacheWriter {
 
     }
 
-    // bulk load method, it will write all the partitions at once.
-    private int internalUpdateAll(int version, List<String> cacheColumnletOrders, String[] files)
-            throws IOException
-    {
-        int status = 0;
-        // get the new caching layout
-//        Compact compact = layout.getCompactObject();
-//        int cacheBorder = compact.getCacheBorder();
-//        List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
+    private void constructPartitionRgAndCols(List<String> cacheColumnletOrders, String[] files,
+                                             List<List<Short>> partitionRgIds, List<List<Short>> partitionColIds) {
         ByteBuffer hashKeyBuf = ByteBuffer.allocate(2 + 2);
-        List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
-        for (int i = 0; i < partitions; ++i) {
-            partitionRgIds.add(new ArrayList<>());
-        }
-        List<List<Short>> partitionColIds = new ArrayList<>(partitions);
-        for (int i = 0; i < partitions; ++i) {
-            partitionColIds.add(new ArrayList<>());
-        }
-        // TODO: what if we partition only on rgId and colId? now it pose a lot of memory cost
-        // do a partition on layout+cacheColumnOrders by the hashcode
         for (int i = 0; i < cacheColumnletOrders.size(); i++) {
             String[] columnletIdStr = cacheColumnletOrders.get(i).split(":");
             short rowGroupId = Short.parseShort(columnletIdStr[0]);
@@ -472,6 +519,24 @@ public class PixelsPartitionCacheWriter {
             partitionRgIds.get(partition).add(rowGroupId);
             partitionColIds.get(partition).add(columnId);
         }
+    }
+
+    // bulk load method, it will write all the partitions at once.
+    private int internalUpdateAll(int version, List<String> cacheColumnletOrders, String[] files)
+            throws IOException
+    {
+        int status = 0;
+        List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
+        for (int i = 0; i < partitions; ++i) {
+            partitionRgIds.add(new ArrayList<>());
+        }
+        List<List<Short>> partitionColIds = new ArrayList<>(partitions);
+        for (int i = 0; i < partitions; ++i) {
+            partitionColIds.add(new ArrayList<>());
+        }
+        // TODO: what if we partition only on rgId and colId? now it pose a lot of memory cost
+        // do a partition on layout+cacheColumnOrders by the hashcode
+        constructPartitionRgAndCols(cacheColumnletOrders, files, partitionRgIds, partitionColIds);
         logger.debug("partition counts = " + Arrays.toString(partitionRgIds.stream().map(List::size).toArray()));
 
         // update region by region
@@ -485,7 +550,6 @@ public class PixelsPartitionCacheWriter {
                 return status; // TODO: now a single partition fail will cause a full failure
             }
         }
-        free = partitions; // free buf region is the last partition
         // TODO: after all the partition has been udpated, update the cache metadata header
         return status;
     }
