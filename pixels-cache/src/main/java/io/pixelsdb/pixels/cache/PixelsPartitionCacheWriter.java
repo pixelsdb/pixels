@@ -166,6 +166,7 @@ public class PixelsPartitionCacheWriter {
         public PixelsPartitionCacheWriter.Builder setIndexSize(long size)
         {
             checkArgument(size > 0, "index size should be positive");
+            // TODO: dont do this rounding, enforce a full division with index.size / partitions
             this.builderIndexSize = MemoryMappedFile.roundTo4096(size);
 
             return this;
@@ -404,7 +405,7 @@ public class PixelsPartitionCacheWriter {
                 radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
-//                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
                 logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                 currCacheOffset += physicalLen;

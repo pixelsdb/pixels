@@ -11,6 +11,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class TestPartitionCacheReader {
@@ -74,7 +75,7 @@ public class TestPartitionCacheReader {
 
     @Test
     public void readSimpleKey() throws Exception {
-        int index = 0;
+        int index = 10000;
         PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
         PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
         PixelsCacheConfig config = new PixelsCacheConfig();
@@ -86,10 +87,11 @@ public class TestPartitionCacheReader {
         // length as an indicator
         assert (cacheIdx.length == reader.read(cacheKey).length);
     }
+
     @Test
     public void readAllKeys() throws Exception {
         PixelsCacheConfig config = new PixelsCacheConfig();
-        long realIndexSize = config.getIndexSize() * (config.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realIndexSize = config.getIndexSize() / (config.getPartitions()) * (config.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
 //        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexDiskLocation(), realIndexSize);
         MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexLocation(), realIndexSize);
 
@@ -112,5 +114,114 @@ public class TestPartitionCacheReader {
 
             }
         }
+    }
+
+    @Test
+    public void readSimpleContent() throws Exception {
+        int index = 400000;
+        PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+        PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+        PixelsCacheConfig config = new PixelsCacheConfig();
+        long realIndexSize = config.getIndexSize() / (config.getPartitions()) * (config.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = config.getCacheSize() / (config.getPartitions()) * (config.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(config.getCacheLocation(), realCacheSize);
+
+        PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
+
+        System.out.println(cacheKey);
+        // the offset is expected to be different. since this offset is based on the original cache, we can use
+        // length as an indicator
+        ByteBuffer buf = reader.get(cacheKey);
+        assert(buf != null);
+        byte ele = buf.get(0);
+        System.out.println(ele);
+        for (int i = 1; i < cacheIdx.length; ++i) {
+            assert(ele == buf.get(i));
+        }
+    }
+
+    @Test
+    public void readContent() throws Exception {
+        PixelsCacheConfig config = new PixelsCacheConfig();
+        long realIndexSize = config.getIndexSize() / (config.getPartitions()) * (config.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = config.getCacheSize() / (config.getPartitions()) * (config.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+//        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexDiskLocation(), realIndexSize);
+        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(config.getCacheLocation(), realCacheSize);
+
+        PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
+
+        // search the key
+        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
+            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+
+            // the offset is expected to be different. since this offset is based on the original cache, we can use
+            // length as an indicator
+            PixelsCacheIdx readCacheIdx = reader.search(cacheKey);
+            if (readCacheIdx != null) {
+                assert (cacheIdx.length == reader.search(cacheKey).length);
+            } else {
+                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                keyBuf.putShort(cacheKey.rowGroupId);
+                keyBuf.putShort(cacheKey.columnId);
+                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % config.getPartitions();
+                System.out.println(partition + " " + index + " " + cacheKey + " " + cacheIdx);
+
+            }
+        }
+
+        // get the value
+//        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
+//            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+//            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+//
+//            // the offset is expected to be different. since this offset is based on the original cache, we can use
+//            // length as an indicator
+//            ByteBuffer buf = reader.get(cacheKey);
+//            if (buf != null) {
+////                byte ele = buf.get(0);
+////                for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
+//
+//            } else {
+//                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+//                keyBuf.putShort(cacheKey.rowGroupId);
+//                keyBuf.putShort(cacheKey.columnId);
+//                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % config.getPartitions();
+//                System.out.println(partition + " " + index + " " + cacheKey + " " + cacheIdx);
+//            }
+//        }
+
+        byte[] readBuf = new byte[4096];
+        int readCnt = pixelsCacheIdxs.size();
+        System.out.println("readCnt=" + readCnt);
+
+        for (int index = 0; index < readCnt; ++index) {
+            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+
+            // the offset is expected to be different. since this offset is based on the original cache, we can use
+            // length as an indicator
+            if (readBuf.length < cacheIdx.length) readBuf = new byte[cacheIdx.length];
+            int readBytes = reader.get(cacheKey, readBuf, cacheIdx.length);
+            if (readBytes != 0) {
+                byte ele = readBuf[0];
+                for (int i = 1; i < readBytes; ++i) assert(readBuf[i] == ele);
+//                byte ele = buf.get(0);
+//                for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
+
+            } else {
+                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                keyBuf.putShort(cacheKey.rowGroupId);
+                keyBuf.putShort(cacheKey.columnId);
+                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % config.getPartitions();
+                System.out.println(partition + " " + index + " " + cacheKey + " " + cacheIdx);
+            }
+
+        }
+
     }
 }
