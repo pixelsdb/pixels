@@ -48,6 +48,14 @@ public class TestMemFile
     }
 
     @Test
+    public void testWriteSize() throws Exception {
+        MemoryMappedFile file = new MemoryMappedFile("/scratch/yeeef/pixels-cache/__test", 4 * 1024 * 1024);
+        file.setInt(2 * 1024 * 1024, 1);
+        System.out.println(file.getInt(2 * 1024 * 1024));
+
+    }
+
+    @Test
     public void testEndian () throws Exception
     {
         write(ByteOrder.BIG_ENDIAN, 0xf0ff00008fff0000L);
