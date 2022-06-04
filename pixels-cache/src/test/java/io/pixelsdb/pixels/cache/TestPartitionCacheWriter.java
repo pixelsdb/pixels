@@ -95,6 +95,24 @@ public class TestPartitionCacheWriter {
     }
 
     @Test
+    public void testNotOverwriteBuild() throws Exception {
+        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
+        String hostName = "diascld34";
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
+                .setPartitions(cacheConfig.getPartitions())
+                .setCacheSize(cacheConfig.getCacheSize())
+                .setIndexLocation(cacheConfig.getIndexLocation())
+                .setIndexSize(cacheConfig.getIndexSize())
+                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setOverwrite(false)
+                .setHostName(hostName)
+                .setCacheConfig(cacheConfig)
+                .build();
+
+    }
+
+    @Test
     public void testBulkLoad() throws Exception {
         PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
         String hostName = "diascld34";
