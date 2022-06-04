@@ -143,6 +143,19 @@ public class PixelsCacheUtil
 
     }
 
+    public static void setPartitionedIndexFileVersion(MemoryMappedFile partitionedIndexFile, int version) {
+        partitionedIndexFile.setIntVolatile(16, version);
+    }
+
+    public static void setFirstAndFree(MemoryMappedFile partitionedIndexFile, short free, short start) {
+        int freeAndStart = ((int) free) << 16 | ((int) start);
+        partitionedIndexFile.setIntVolatile(20, freeAndStart);
+    }
+
+    public static int retrieveFirstAndFree(MemoryMappedFile partitionedIndexFile) {
+        return partitionedIndexFile.getIntVolatile(20);
+    }
+
     public static int retrievePhysicalPartition(MemoryMappedFile partitionedIndexFile, int logicalPartition, int partitions) {
         // atomically fetch the free + first
         int freeAndFirst = partitionedIndexFile.getIntVolatile(20);
