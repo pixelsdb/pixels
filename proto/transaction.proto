@@ -31,7 +31,7 @@ package metadata.proto;
 // The transaction services definition.
 service TransService {
     rpc GetQueryTransInfo (GetQueryTransInfoRequest) returns (GetQueryTransInfoResponse);
-    rpc PushLowWatermark (PushLowWatermarkRequest) returns (PushLowWatermarkResponse);
+    rpc FinishQueryTrans (FinishQueryTransRequest) returns (FinishQueryTransResponse);
     rpc PushHighWatermark (PushHighWatermarkRequest) returns (PushHighWatermarkResponse);
 }
 
@@ -49,12 +49,13 @@ message GetQueryTransInfoResponse {
     uint64 queryTimestamp = 3;
 }
 
-message PushLowWatermarkRequest {
+message FinishQueryTransRequest {
+    uint64 queryId = 2;
     // The timestamp of the terminated (finished or aborted) query.
     uint64 queryTimestamp = 1;
 }
 
-message PushLowWatermarkResponse {
+message FinishQueryTransResponse {
     int32 errorCode = 1;
 }
 

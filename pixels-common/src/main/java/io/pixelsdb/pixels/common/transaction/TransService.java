@@ -69,18 +69,20 @@ public class TransService
         }
     }
 
-    public int pushLowWatermark(long queryTimestamp) throws TransException
+    public int finishQueryTrans(long queryId, long queryTimestamp) throws TransException
     {
-        TransProto.PushLowWatermarkRequest request = TransProto.PushLowWatermarkRequest.newBuilder()
-                .setQueryTimestamp(queryTimestamp).build();
+        TransProto.FinishQueryTransRequest request = TransProto.FinishQueryTransRequest.newBuilder()
+                .setQueryTimestamp(queryTimestamp)
+                .setQueryId(queryId)
+                .build();
         try
         {
-            TransProto.PushLowWatermarkResponse response = this.stub.pushLowWatermark(request);
+            TransProto.FinishQueryTransResponse response = this.stub.finishQueryTrans(request);
             return response.getErrorCode();
         }
         catch (Exception e)
         {
-            throw new TransException("failed to push low watermark", e);
+            throw new TransException("failed to finishQueryTrans", e);
         }
     }
 

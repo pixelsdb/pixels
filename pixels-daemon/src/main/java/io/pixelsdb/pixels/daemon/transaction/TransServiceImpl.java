@@ -26,30 +26,31 @@ import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created at: 20/02/2022
  * Author: hank
  */
-public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
-{
+public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase {
     private static Logger log = LogManager.getLogger(TransServiceImpl.class);
 
-    public static AtomicLong QueryId = new AtomicLong(0);
-    /**
-     * Issue #174:
-     * In this issue, we have not fully implemented the logic related to the watermarks.
-     * So we use two atomic longs to simulate the watermarks.
-     */
-    public static AtomicLong LowWatermark = new AtomicLong(0);
-    public static AtomicLong HighWatermark = new AtomicLong(0);
+    private final AtomicLong QueryId = new AtomicLong(0);
 
-    public TransServiceImpl () { }
+    private final AtomicLong LowWatermark = new AtomicLong(0);
+    private final AtomicLong HighWatermark = new AtomicLong(0);
+
+    /**
+     * The map of timestamp -> queries.
+     */
+    private final SortedMap<Long, Set<Long>> m = Collections.synchronizedSortedMap(new TreeMap<>());
+
+    public TransServiceImpl() {
+    }
 
     @Override
-    public void getQueryTransInfo(TransProto.GetQueryTransInfoRequest request, StreamObserver<TransProto.GetQueryTransInfoResponse> responseObserver)
-    {
+    public void getQueryTransInfo(TransProto.GetQueryTransInfoRequest request, StreamObserver<TransProto.GetQueryTransInfoResponse> responseObserver) {
         TransProto.GetQueryTransInfoResponse response = TransProto.GetQueryTransInfoResponse.newBuilder()
                 .setErrorCode(ErrorCode.SUCCESS)
                 .setQueryId(QueryId.getAndIncrement()) // incremental query id
@@ -59,51 +60,40 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
-    public void pushLowWatermark(TransProto.PushLowWatermarkRequest request, StreamObserver<TransProto.PushLowWatermarkResponse> responseObserver)
-    {
-        long value = LowWatermark.get();
-        int error = ErrorCode.SUCCESS;
-        long queryTimestamp = request.getQueryTimestamp();
-        if (queryTimestamp >= value)
-        {
-            while(LowWatermark.compareAndSet(value, queryTimestamp))
-            {
-                value = LowWatermark.get();
-                if (queryTimestamp < value)
-                {
-                    error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
-                    break;
+    public void finishQueryTrans(TransProto.FinishQueryTransRequest request, StreamObserver<TransProto.FinishQueryTransResponse> responseObserver) {
+        long timestamp = request.getQueryTimestamp();
+        long queryId = request.getQueryId();
+
+        synchronized (m) {
+            Set<Long> queries = m.get(timestamp);
+            queries.remove(queryId);
+            if (queries.isEmpty()) {
+                m.remove(timestamp);
+                if (m.firstKey() > LowWatermark.get()) {
+                    LowWatermark.set(m.firstKey() - 1);
                 }
             }
-        } else
-        {
-            error = ErrorCode.TRANS_LOW_WATERMARK_NOT_PUSHED;
         }
-        TransProto.PushLowWatermarkResponse response = TransProto.PushLowWatermarkResponse.newBuilder()
-                .setErrorCode(error).build();
+        TransProto.FinishQueryTransResponse response = TransProto.FinishQueryTransResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
     @Override
-    public void pushHighWatermark(TransProto.PushHighWatermarkRequest request, StreamObserver<TransProto.PushHighWatermarkResponse> responseObserver)
-    {
+    public void pushHighWatermark(TransProto.PushHighWatermarkRequest request, StreamObserver<TransProto.PushHighWatermarkResponse> responseObserver) {
         long value = HighWatermark.get();
         int error = ErrorCode.SUCCESS;
         long writeTransTimestamp = request.getWriteTransTimestamp();
-        if (writeTransTimestamp >= value)
-        {
-            while(HighWatermark.compareAndSet(value, writeTransTimestamp))
-            {
+        if (writeTransTimestamp >= value) {
+            while (HighWatermark.compareAndSet(value, writeTransTimestamp)) {
                 value = HighWatermark.get();
-                if (writeTransTimestamp < value)
-                {
+                if (writeTransTimestamp < value) {
                     error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
                     break;
                 }
             }
-        } else
-        {
+        } else {
             error = ErrorCode.TRANS_HIGH_WATERMARK_NOT_PUSHED;
         }
         TransProto.PushHighWatermarkResponse response = TransProto.PushHighWatermarkResponse.newBuilder()
