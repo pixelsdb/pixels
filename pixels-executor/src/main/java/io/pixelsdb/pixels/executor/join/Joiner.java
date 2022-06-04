@@ -201,8 +201,8 @@ public class Joiner
         while (builder.hasNext())
         {
             Tuple big = builder.next();
-            List<Tuple> smallTuples = this.smallTable.get(big);
-            if (smallTuples == null)
+            Tuple smallHead = this.smallTable.getHead(big);
+            if (smallHead == null)
             {
                 switch (joinType)
                 {
@@ -227,17 +227,23 @@ public class Joiner
             {
                 if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
                 {
-                    this.matchedSmallTuples.addAll(smallTuples);
+                    Tuple tmpSmallHead = smallHead;
+                    while (tmpSmallHead != null)
+                    {
+                        this.matchedSmallTuples.add(tmpSmallHead);
+                        tmpSmallHead = tmpSmallHead.next;
+                    }
                 }
-                for (Tuple small : smallTuples)
+                while (smallHead != null)
                 {
-                    Tuple joined = big.concatLeft(small);
+                    Tuple joined = big.concatLeft(smallHead);
                     if (joinedRowBatch.isFull())
                     {
                         result.add(joinedRowBatch);
                         joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
                     }
                     joined.writeTo(joinedRowBatch);
+                    smallHead = smallHead.next;
                 }
             }
         }

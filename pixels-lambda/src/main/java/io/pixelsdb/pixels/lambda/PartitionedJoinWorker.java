@@ -99,6 +99,16 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             int numPartition = event.getJoinInfo().getNumPartition();
 
             MultiOutputInfo outputInfo = event.getOutput();
+            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
+            {
+                checkArgument(rightParallelism + 1 == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
+            else
+            {
+                checkArgument(rightParallelism == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {

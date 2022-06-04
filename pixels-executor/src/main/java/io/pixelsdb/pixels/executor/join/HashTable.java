@@ -27,11 +27,11 @@ import java.util.*;
  */
 public class HashTable implements Iterable<Tuple>
 {
-    private final HashMap<Tuple, List<Tuple>> hashTable = new HashMap<>();
+    private final HashMap<Tuple, Tuple> hashTable = new HashMap<>();
     private int size;
 
     /**
-     * The user of this method must ensure the tupe is not null and the same tuple
+     * The user of this method must ensure the tuple is not null and the same tuple
      * is only put once. Different tuples with the same value of join key are put
      * into the same bucket.
      *
@@ -40,18 +40,17 @@ public class HashTable implements Iterable<Tuple>
     public void put(Tuple tuple)
     {
         size++;
-        List<Tuple> bucket = this.hashTable.get(tuple);
-        if (bucket != null)
+        Tuple head = this.hashTable.get(tuple);
+        if (head != null)
         {
-            bucket.add(tuple);
+            tuple.next = head.next;
+            head.next = tuple;
             return;
         }
-        bucket = new LinkedList<>();
-        bucket.add(tuple);
-        this.hashTable.put(tuple, bucket);
+        this.hashTable.put(tuple, tuple);
     }
 
-    public List<Tuple> get(Tuple tuple)
+    public Tuple getHead(Tuple tuple)
     {
         return this.hashTable.get(tuple);
     }
@@ -67,43 +66,44 @@ public class HashTable implements Iterable<Tuple>
         return new TupleIterator();
     }
 
-    public class TupleIterator implements Iterator<Tuple>
+    private class TupleIterator implements Iterator<Tuple>
     {
-        private Iterator<List<Tuple>> mainIterator;
-        private Iterator<Tuple> subIterator;
+        private final Iterator<Tuple> mainIterator;
+        private Tuple currHead = null;
 
         private TupleIterator()
         {
             mainIterator = hashTable.values().iterator();
             if (mainIterator.hasNext())
             {
-                subIterator = mainIterator.next().iterator();
-            }
-            else
-            {
-                subIterator = Collections.emptyIterator();
+                currHead = mainIterator.next();
             }
         }
 
         @Override
         public boolean hasNext()
         {
-            return mainIterator.hasNext() || subIterator.hasNext();
+            return currHead != null || mainIterator.hasNext();
         }
 
         @Override
         public Tuple next()
         {
-            if (subIterator.hasNext())
+            Tuple next;
+            if (currHead != null)
             {
-                return subIterator.next();
+                next = currHead;
+                currHead = currHead.next;
+                return next;
             }
             if (mainIterator.hasNext())
             {
-                subIterator = mainIterator.next().iterator();
-                if (subIterator.hasNext())
+                currHead = mainIterator.next();
+                if (currHead != null)
                 {
-                    return subIterator.next();
+                    next = currHead;
+                    currHead = currHead.next;
+                    return next;
                 }
             }
             throw new NoSuchElementException("no more tuples");

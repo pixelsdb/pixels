@@ -102,7 +102,7 @@ public class TestBroadcastJoinInvoker
         joinInput.setRightTable(rightTable);
 
         JoinInfo joinInfo = new JoinInfo();
-        joinInfo.setJoinType(JoinType.EQUI_LEFT);
+        joinInfo.setJoinType(JoinType.EQUI_INNER);
         joinInfo.setResultColumns(new String[]{"p_name", "p_size", "l_orderkey", "l_extendedprice", "l_discount"});
         joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
@@ -111,8 +111,7 @@ public class TestBroadcastJoinInvoker
         joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
                 "http://172.31.32.193:9000", "lambda", "password", true,
                 Arrays.asList("broadcast-join-0","broadcast-join-1","broadcast-join-2","broadcast-join-3",
-                        "broadcast-join-4","broadcast-join-5","broadcast-join-6","broadcast-join-7",
-                        "broadcast-join-left")));
+                        "broadcast-join-4","broadcast-join-5","broadcast-join-6","broadcast-join-7")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = BroadcastJoinInvoker.invoke(joinInput).get();

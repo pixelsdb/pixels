@@ -64,7 +64,13 @@ public class Tuple
      * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
      */
-    protected Tuple left;
+    protected Tuple left = null;
+    /**
+     * The next tuple in the chain. Tuple chain is mainly used to build the hash
+     * table of the left table in joins. For performance consideration, we let it
+     * be protected instead of private, but be careful when you change it.
+     */
+    protected Tuple next = null;
 
     /**
      * For performance considerations, the parameters are not checked.
@@ -79,7 +85,6 @@ public class Tuple
         this.keyColumnIdSet = keyColumnIdSet;
         this.columns = columns;
         this.writeKeyColumns = writeKeyColumns;
-        this.left = null;
     }
 
     @Override

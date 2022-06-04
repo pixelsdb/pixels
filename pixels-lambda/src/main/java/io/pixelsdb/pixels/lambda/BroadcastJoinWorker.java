@@ -96,13 +96,25 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             String[] joinedCols = event.getJoinInfo().getResultColumns();
             boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
+
             MultiOutputInfo outputInfo = event.getOutput();
+            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
+            {
+                checkArgument(rightInputs.size() + 1 == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
+            else
+            {
+                checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
             }
             boolean encoding = outputInfo.isEncoding();
+
             try
             {
                 if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)

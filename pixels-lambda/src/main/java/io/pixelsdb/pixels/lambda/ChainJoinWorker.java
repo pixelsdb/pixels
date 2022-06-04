@@ -90,15 +90,22 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
             String[] rightCols = rightTable.getColumnsToRead();
-            int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
             JoinInfo lastJoinInfo = event.getJoinInfo();
-            String[] joinedCols = lastJoinInfo.getResultColumns();
-            boolean includeKeyCols = lastJoinInfo.isOutputJoinKeys();
             JoinType joinType = lastJoinInfo.getJoinType();
 
             MultiOutputInfo outputInfo = event.getOutput();
+            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
+            {
+                checkArgument(rightInputs.size() + 1 == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
+            else
+            {
+                checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
+                        "the number of output file names is incorrect");
+            }
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
