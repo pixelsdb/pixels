@@ -19,11 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
-import com.google.common.collect.ImmutableSet;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-
-import java.util.Set;
 
 /**
  * The tuple of which all the columns are null.
@@ -34,10 +30,7 @@ import java.util.Set;
  */
 public class NullTuple extends Tuple
 {
-    private static final ColumnVector[] EMPTY_COLUMNS = new ColumnVector[0];
-    private static final int[] EMPTY_KEY_COLUMN_IDS = new int[0];
-    private static final Set<Integer> EMPTY_KEY_COLUMN_ID_SET = ImmutableSet.of();
-    private static final int INVALID_HASH_CODE = Integer.MIN_VALUE;
+    private static final CommonFields INVALID_COMMON_FIELDS = null;
     private static final int INVALID_ROW_ID = -1;
 
     private final int numColumns;
@@ -49,8 +42,7 @@ public class NullTuple extends Tuple
      */
     protected NullTuple(int numColumns)
     {
-        super(INVALID_HASH_CODE, INVALID_ROW_ID, EMPTY_KEY_COLUMN_IDS, EMPTY_KEY_COLUMN_ID_SET,
-                EMPTY_COLUMNS, false);
+        super(INVALID_ROW_ID, INVALID_COMMON_FIELDS);
         this.numColumns = numColumns;
     }
 
