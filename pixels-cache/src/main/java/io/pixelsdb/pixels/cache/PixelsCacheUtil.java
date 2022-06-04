@@ -138,8 +138,10 @@ public class PixelsCacheUtil
         indexFile.setShort(6, partitions);
         indexFile.setLong(8, subRegionBytes);
         indexFile.setInt(16, 0); // version
-        indexFile.setShort(20, partitions); // free
-        indexFile.setShort(22, (short) 0); // start
+        short free = partitions;
+        short start = 0;
+        int freeAndStart = ((int) free) << 16 | ((int) start);
+        indexFile.setInt(20, freeAndStart);
 
     }
 
@@ -160,7 +162,7 @@ public class PixelsCacheUtil
         // atomically fetch the free + first
         int freeAndFirst = partitionedIndexFile.getIntVolatile(20);
         int first = freeAndFirst & 0x0000ffff;
-        int free = freeAndFirst & 0xffff0000 >>> 16;
+        int free = (freeAndFirst & 0xffff0000) >>> 16;
         return logicalPartitionToPhyiscal(logicalPartition, free, first, partitions);
     }
 
