@@ -169,6 +169,7 @@ public class RetinaWriter {
                 .setBlockPadding(true)
                 .setEncoding(true)
                 .setCompressionBlockSize(1)
+                .setIsRetina(true)
                 .build();
 
         for (int i = 0; i < colNum; i++) {

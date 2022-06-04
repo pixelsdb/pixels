@@ -35,7 +35,7 @@ import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.lambda.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.PartitionOutput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

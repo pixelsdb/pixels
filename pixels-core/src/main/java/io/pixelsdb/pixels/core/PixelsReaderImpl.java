@@ -442,6 +442,11 @@ public class PixelsReaderImpl
         return footer;
     }
 
+    @Override
+    public boolean isRetina() {
+        return footer.getIsRetina();
+    }
+
     /**
      * Cleanup and release resources
      *

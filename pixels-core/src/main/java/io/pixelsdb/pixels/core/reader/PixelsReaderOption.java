@@ -20,7 +20,9 @@
 package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
+import io.pixelsdb.pixels.core.utils.Bitmap;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -35,6 +37,9 @@ public class PixelsReaderOption
     private long queryId = -1L;
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
+    private Bitmap[] visibilities = null;
+    private long version = -1;
+
 
     public PixelsReaderOption()
     {
@@ -108,5 +113,21 @@ public class PixelsReaderOption
     public boolean isTolerantSchemaEvolution()
     {
         return tolerantSchemaEvolution;
+    }
+
+    public void visibilities(Bitmap[] visibilities) {
+        this.visibilities = visibilities;
+    }
+
+    public Bitmap[] getVisibilities() {
+        return visibilities;
+    }
+
+    public void version(long version) {
+        this.version = version;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

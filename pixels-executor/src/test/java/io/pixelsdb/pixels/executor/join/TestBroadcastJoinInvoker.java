@@ -25,10 +25,10 @@ import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.BroadcastJoinInvoker;
 import io.pixelsdb.pixels.executor.lambda.JoinOutput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput;
-import io.pixelsdb.pixels.executor.predicate.Bound;
-import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
-import io.pixelsdb.pixels.executor.predicate.Filter;
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.core.predicate.Bound;
+import io.pixelsdb.pixels.core.predicate.ColumnFilter;
+import io.pixelsdb.pixels.core.predicate.Filter;
+import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -37,7 +37,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 
-import static io.pixelsdb.pixels.executor.predicate.Bound.Type.INCLUDED;
+import static io.pixelsdb.pixels.core.predicate.Bound.Type.INCLUDED;
 
 /**
  * @author hank

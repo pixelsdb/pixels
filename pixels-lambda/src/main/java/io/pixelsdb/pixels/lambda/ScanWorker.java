@@ -34,7 +34,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.lambda.ScanInput;
 import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
 import io.pixelsdb.pixels.executor.lambda.ScanOutput;
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.core.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
