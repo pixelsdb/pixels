@@ -59,7 +59,7 @@ public class TestPartitionCacheWriter {
         // disk cache
         config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
         config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
-        config.addProperty("cache.partitions", "4");
+        config.addProperty("cache.partitions", "32");
 
 
         config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
