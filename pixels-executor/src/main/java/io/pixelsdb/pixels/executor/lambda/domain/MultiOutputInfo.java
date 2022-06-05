@@ -68,7 +68,13 @@ public class MultiOutputInfo extends OutputInfo
      * @param randomFileName
      */
     @Override
-    public void setRandomFileName(boolean randomFileName) { }
+    public void setRandomFileName(boolean randomFileName)
+    {
+        if (randomFileName)
+        {
+            throw new UnsupportedOperationException("can not use random file name on MultiOutputInfo");
+        }
+    }
 
     public List<String> getFileNames()
     {

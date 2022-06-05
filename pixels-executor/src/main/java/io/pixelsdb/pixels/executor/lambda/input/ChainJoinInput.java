@@ -137,4 +137,44 @@ public class ChainJoinInput implements JoinInput
     {
         this.output = output;
     }
+
+    public Builder toBuilder()
+    {
+        return new Builder(this);
+    }
+
+    public static class Builder
+    {
+        private final ChainJoinInput builderInstance;
+
+        private Builder(ChainJoinInput instance)
+        {
+            this.builderInstance = new ChainJoinInput(
+                    instance.queryId, instance.leftTables, instance.rightTable,
+                    instance.chainJoinInfos, instance.joinInfo, instance.output);
+        }
+
+        public Builder setRightTable(BroadCastJoinTableInfo rightTable)
+        {
+            this.builderInstance.setRightTable(rightTable);
+            return this;
+        }
+
+        public Builder setJoinInfo(JoinInfo joinInfo)
+        {
+            this.builderInstance.setJoinInfo(joinInfo);
+            return this;
+        }
+
+        public Builder setOutput(MultiOutputInfo output)
+        {
+            this.builderInstance.setOutput(output);
+            return this;
+        }
+
+        public ChainJoinInput build()
+        {
+            return this.builderInstance;
+        }
+    }
 }

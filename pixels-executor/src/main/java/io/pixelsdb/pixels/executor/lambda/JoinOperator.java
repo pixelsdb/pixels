@@ -17,16 +17,31 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.executor.lambda;
+
+import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author hank
- * @date 22/05/2022
+ * @date 05/06/2022
  */
-public enum JoinAlgorithm
+public interface JoinOperator
 {
-    UNKNOWN, // The first enum value is the default value.
-    BROADCAST,
-    PARTITIONED,
-    CHAIN
+    List<JoinInput> getJoinInputs();
+
+    JoinAlgorithm getJoinAlgo();
+
+    void setChild(JoinOperator child);
+
+    /**
+     * Execute this join operator.
+     *
+     * @return the join outputs.
+     */
+    CompletableFuture<JoinOutput>[] execute();
 }

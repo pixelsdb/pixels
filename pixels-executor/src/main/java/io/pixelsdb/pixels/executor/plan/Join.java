@@ -30,7 +30,7 @@ import io.pixelsdb.pixels.executor.join.JoinType;
  * @author hank
  * @date 29/05/2022
  */
-public class JoinLink
+public class Join
 {
     private final Table leftTable;
     private final Table rightTable;
@@ -39,9 +39,9 @@ public class JoinLink
     private final JoinType joinType;
     private final JoinAlgorithm joinAlgo;
 
-    public JoinLink(Table leftTable, Table rightTable,
-                    int[] leftKeyColumnIds, int[] rightKeyColumnIds,
-                    JoinType joinType, JoinAlgorithm joinAlgo)
+    public Join(Table leftTable, Table rightTable,
+                int[] leftKeyColumnIds, int[] rightKeyColumnIds,
+                JoinType joinType, JoinAlgorithm joinAlgo)
     {
         this.leftTable = leftTable;
         this.rightTable = rightTable;

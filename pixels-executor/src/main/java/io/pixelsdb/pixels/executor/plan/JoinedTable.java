@@ -13,16 +13,21 @@ public class JoinedTable implements Table
     private final String tableName;
     private final String tableAlias;
     private final String[] columnNames;
-    private final JoinLink joinLink;
+    /**
+     * Whether the {@link #columnNames} includes the key columns from each joined table.
+     */
+    private final boolean includeKeyColumns;
+    private final Join join;
 
     public JoinedTable(String schemaName, String tableName, String tableAlias,
-                       String[] columnNames, JoinLink joinLink)
+                       String[] columnNames, boolean includeKeyColumns, Join join)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
         this.columnNames = columnNames;
-        this.joinLink = joinLink;
+        this.includeKeyColumns = includeKeyColumns;
+        this.join = join;
     }
 
     @Override
@@ -55,9 +60,14 @@ public class JoinedTable implements Table
         return columnNames;
     }
 
-    public JoinLink getJoinLink()
+    public boolean isIncludeKeyColumns()
     {
-        return joinLink;
+        return includeKeyColumns;
+    }
+
+    public Join getJoin()
+    {
+        return join;
     }
 
     @Override
@@ -70,12 +80,12 @@ public class JoinedTable implements Table
                 Objects.equal(tableName, that.tableName) &&
                 Objects.equal(tableAlias, that.tableAlias) &&
                 Objects.equal(columnNames, that.columnNames) &&
-                Objects.equal(joinLink, that.joinLink);
+                Objects.equal(join, that.join);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, joinLink);
+        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, join);
     }
 }
