@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.executor.utils;
 
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
@@ -44,6 +44,11 @@ public class NullTuple extends Tuple
     {
         super(INVALID_ROW_ID, INVALID_COMMON_FIELDS);
         this.numColumns = numColumns;
+    }
+
+    public static NullTuple buildNullTuple(int numColumns)
+    {
+        return new NullTuple(numColumns);
     }
 
     @Override

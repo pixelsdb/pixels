@@ -61,7 +61,6 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         {
             this.leftPartitionInputs = ImmutableList.copyOf(leftPartitionInputs);
         }
-        ;
         this.rightPartitionInputs = ImmutableList.copyOf(requireNonNull(rightPartitionInputs,
                 "rightPartitionInputs is null"));
         checkArgument(!this.rightPartitionInputs.isEmpty(), "rightPartitionInputs is empty");

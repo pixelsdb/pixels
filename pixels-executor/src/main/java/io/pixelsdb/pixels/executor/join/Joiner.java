@@ -23,11 +23,14 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
+import io.pixelsdb.pixels.executor.utils.HashTable;
+import io.pixelsdb.pixels.executor.utils.Tuple;
 
 import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.executor.utils.NullTuple.buildNullTuple;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -157,8 +160,8 @@ public class Joiner
                 smallColumnNames.size() : smallColumnNames.size() - smallKeyColumnIds.length;
         int numBigIncludedColumns = this.includeKeyCols && this.joinType != JoinType.NATURAL ?
                 bigColumnNames.size() : bigColumnNames.size() - bigKeyColumnIds.length;
-        this.smallNullTuple = new NullTuple(numSmallIncludedColumns);
-        this.bigNullTuple = new NullTuple(numBigIncludedColumns);
+        this.smallNullTuple = buildNullTuple(numSmallIncludedColumns);
+        this.bigNullTuple = buildNullTuple(numBigIncludedColumns);
     }
 
     /**

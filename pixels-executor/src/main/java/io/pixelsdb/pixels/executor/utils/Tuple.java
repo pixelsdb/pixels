@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.executor.utils;
 
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -88,7 +88,7 @@ public class Tuple
      * table of the left table in joins. For performance consideration, we let it
      * be protected instead of private, but be careful when you change it.
      */
-    protected Tuple next = null;
+    public Tuple next = null;
 
     /**
      * For performance considerations, the parameters are not checked.
