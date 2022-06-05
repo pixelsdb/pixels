@@ -37,6 +37,14 @@ public class InputInfo
      */
     public InputInfo() { }
 
+    /**
+     * Create the input information for a Pixels file.
+     *
+     * @param path the path of the file
+     * @param rgStart the row group id to start reading
+     * @param rgLength the number of row groups to read, if it is non-positive,
+     *                 it means read to the last row group in the file
+     */
     public InputInfo(String path, int rgStart, int rgLength)
     {
         this.path = path;

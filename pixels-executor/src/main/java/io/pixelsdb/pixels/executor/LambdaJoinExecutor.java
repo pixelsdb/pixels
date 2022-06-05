@@ -36,10 +36,7 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.JoinOperator;
 import io.pixelsdb.pixels.executor.lambda.SingleStageJoinOperator;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
-import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
-import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
-import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.input.*;
 import io.pixelsdb.pixels.executor.plan.BaseTable;
 import io.pixelsdb.pixels.executor.plan.Join;
 import io.pixelsdb.pixels.executor.plan.JoinedTable;
@@ -50,7 +47,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -111,6 +107,7 @@ public class LambdaJoinExecutor
         JoinAlgorithm joinAlgo = requireNonNull(join.getJoinAlgo(), "join.joinAlgo is null");
 
         List<InputSplit> leftInputSplits = null;
+        List<String> leftPartitionedFiles = null;
         // get the rightInputSplits from metadata.
         List<InputSplit> rightInputSplits = getInputSplits(rightTable);
         JoinOperator childOperator = null;
@@ -202,7 +199,8 @@ public class LambdaJoinExecutor
 
                         MultiOutputInfo output = new MultiOutputInfo();
                         output.setScheme(Storage.Scheme.s3);
-                        output.setPath("pixels-lambda/" + joinedTable.getTableName());
+                        // TODO: get the path base from config file.
+                        output.setPath("pixels-lambda/" + joinedTable.getTableName() + "/");
                         output.setRandomFileName(false);
                         output.setFileNames(ImmutableList.of("join_" + outputId++));
                         output.setEncoding(true);
@@ -220,14 +218,52 @@ public class LambdaJoinExecutor
                     return joinOperator;
                 }
             }
-            // get the leftInputSplits from leftJoinInputs.
-            ImmutableList.Builder<InputSplit> inputSplitBuilder = ImmutableList.builder();
+            // get the leftInputSplits or leftPartitionedFiles from childJoinInputs.
             List<JoinInput> childJoinInputs = childOperator.getJoinInputs();
-            for (JoinInput joinInput : childJoinInputs)
+            if (joinAlgo == JoinAlgorithm.BROADCAST)
             {
-                // TODO: build the left input splits.
+                ImmutableList.Builder<InputSplit> inputSplits = ImmutableList.builder();
+                for (JoinInput childJoinInput : childJoinInputs)
+                {
+                    MultiOutputInfo childOutput = childJoinInput.getOutput();
+                    String base = childOutput.getPath();
+                    if (!base.endsWith("/"))
+                    {
+                        base += "/";
+                    }
+                    ImmutableList.Builder<InputInfo> inputs = ImmutableList.builder();
+                    for (String fileName : childOutput.getFileNames())
+                    {
+                        InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
+                        inputs.add(inputInfo);
+                    }
+                    inputSplits.add(new InputSplit(inputs.build()));
+                }
+                leftInputSplits = inputSplits.build();
             }
-            leftInputSplits = inputSplitBuilder.build();
+            else if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            {
+                ImmutableList.Builder<String> partitionedFiles = ImmutableList.builder();
+                for (JoinInput childJoinInput : childJoinInputs)
+                {
+                    MultiOutputInfo childOutput = childJoinInput.getOutput();
+                    String base = childOutput.getPath();
+                    if (!base.endsWith("/"))
+                    {
+                        base += "/";
+                    }
+                    for (String fileName : childOutput.getFileNames())
+                    {
+                        partitionedFiles.add(base + fileName);
+                    }
+                }
+                leftPartitionedFiles = partitionedFiles.build();
+            }
+            else
+            {
+                throw new UnsupportedOperationException("join algorithm '" + joinAlgo +
+                        "' is not supported in the joined table constructed by users");
+            }
         }
 
         // generate join inputs and return.
@@ -258,6 +294,7 @@ public class LambdaJoinExecutor
 
                 MultiOutputInfo output = new MultiOutputInfo();
                 output.setScheme(Storage.Scheme.s3);
+                // TODO: get the path base from config file.
                 output.setPath("pixels-lambda/" + joinedTable.getTableName());
                 output.setRandomFileName(false);
                 output.setFileNames(ImmutableList.of("join_" + outputId++));
@@ -282,10 +319,46 @@ public class LambdaJoinExecutor
             if (childOperator != null)
             {
                 // left side is post partitioned, thus only partition the right table.
+
+                PartitionedTableInfo leftTableInfo = new PartitionedTableInfo();
+                leftTableInfo.setTableName(leftTable.getTableName());
+                leftTableInfo.setInputFiles(leftPartitionedFiles);
+                leftTableInfo.setColumnsToRead(leftTable.getColumnNames());
+                leftTableInfo.setKeyColumnIds(leftKeyColumnIds);
+                leftTableInfo.setParallelism(40); // TODO: get parallelism from config file.
+
+                List<PartitionInput> rightPartitionInputs = getPartitionInputs(rightTable, rightInputSplits,
+                    rightKeyColumnIds, 40, "pixels-lambda/" + joinedTable.getTableName() +
+                            "/" + rightTable.getTableName() + "/part-");
+
+                for (PartitionInput partitionInput : rightPartitionInputs)
+                {
+
+                }
+
+                PartitionedJoinInput joinInput = new PartitionedJoinInput();
+                // TODO: finish.
             }
             else
             {
                 // partition both tables. in this case, the operator's child must be null.
+                List<PartitionInput> leftPartitionInputs = getPartitionInputs(leftTable, leftInputSplits,
+                        leftKeyColumnIds, 40, "pixels-lambda/" + joinedTable.getTableName() +
+                                "/" + leftTable.getTableName() + "/part-");
+                for (PartitionInput partitionInput : leftPartitionInputs)
+                {
+
+                }
+
+                List<PartitionInput> rightPartitionInputs = getPartitionInputs(rightTable, rightInputSplits,
+                        rightKeyColumnIds, 40, "pixels-lambda/" + joinedTable.getTableName() +
+                                "/" + rightTable.getTableName() + "/part-");
+                for (PartitionInput partitionInput : rightPartitionInputs)
+                {
+
+                }
+
+                // TODO: finish.
             }
             return null;
         }
@@ -316,25 +389,19 @@ public class LambdaJoinExecutor
         return tableInfo;
     }
 
-    private List<PartitionInput> getPartitionInputs(String tableName,
-            int numPartition, List<InputInfo> inputs, int splitSize,
-            Table inputTable, String outputBase, int[] keyColumnIds)
+    private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits,
+                                                    int[] keyColumnIds,int numPartition, String outputBase)
     {
         List<PartitionInput> partitionInputs = new ArrayList<>();
-        for (int i = 0; i < inputs.size();)
+        int outputId = 0;
+        for (InputSplit inputSplit : inputSplits)
         {
-            List<InputInfo> splitInputs = new ArrayList<>();
-            for (int numRg = 0; numRg < splitSize && i < inputs.size(); ++i)
-            {
-                splitInputs.add(inputs.get(i));
-                numRg += inputs.get(i).getRgLength();
-            }
             PartitionInput partitionInput = new PartitionInput();
             partitionInput.setQueryId(queryId);
             ScanTableInfo tableInfo = new ScanTableInfo();
-            tableInfo.setInputSplits(Arrays.asList(new InputSplit(splitInputs)));
+            tableInfo.setInputSplits(ImmutableList.of(inputSplit));
             tableInfo.setColumnsToRead(inputTable.getColumnNames());
-            tableInfo.setTableName(tableName);
+            tableInfo.setTableName(inputTable.getTableName());
             if (inputTable.isBase())
             {
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) inputTable).getFilter()));
@@ -345,9 +412,9 @@ public class LambdaJoinExecutor
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
             }
             partitionInput.setTableInfo(tableInfo);
-            partitionInput.setOutput(new OutputInfo(outputBase + i, false,
+            partitionInput.setOutput(new OutputInfo(outputBase + outputId++, false,
                     Storage.Scheme.s3, null, null, null, true));
-            partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds,numPartition));
+            partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds, numPartition));
             partitionInputs.add(partitionInput);
         }
 

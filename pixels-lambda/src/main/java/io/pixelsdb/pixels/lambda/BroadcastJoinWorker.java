@@ -281,7 +281,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     {
                         continue;
                     }
-                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
+                    if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum() ||
+                            input.getRgLength() <= 0)
                     {
                         input.setRgLength(pixelsReader.getRowGroupNum() - input.getRgStart());
                     }
