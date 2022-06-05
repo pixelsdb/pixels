@@ -221,6 +221,9 @@ public class PixelsPartitionCacheWriter {
             {
                 checkArgument(PixelsCacheUtil.checkMagic(indexFile) && PixelsCacheUtil.checkMagic(cacheFile),
                         "overwrite=false, but cacheFile and indexFile is polluted");
+                for (int i = 0; i < partitions; ++i) {
+                    radixs[i] = new PixelsRadix();
+                }
             }
             //   else, create a new radix tree, and initialize the index and cache file.
             else
@@ -371,8 +374,10 @@ public class PixelsPartitionCacheWriter {
 
 
         while (writeLogicalPartition < partitions) {
+            logger.debug(String.format("free=%d, start=%d, writeLogicalPartition=%d", free, start, writeLogicalPartition));
+
             MemoryMappedFile freeIndexPartition = indexPartitions[free];
-            MemoryMappedFile freeIndexDiskPartition = indexDiskPartitions[free];
+            MemoryMappedFile freeIndexDiskPartition = indexDiskPartitions[writeLogicalPartition];
             MemoryMappedFile freeCachePartition = cachePartitions[free];
 
             // start update, write the update on `writeLogicalPartition` to `free`
