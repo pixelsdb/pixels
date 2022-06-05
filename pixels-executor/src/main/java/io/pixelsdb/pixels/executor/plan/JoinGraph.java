@@ -37,38 +37,38 @@ public class JoinGraph
     private final List<Join> joins;
     private final Map<Table, List<Join>> joinIndex = new HashMap<>();
 
-    public JoinGraph(List<Join> joinLinks)
+    public JoinGraph(List<Join> joins)
     {
-        requireNonNull(joinLinks, "joins is null");
-        checkArgument(!joinLinks.isEmpty(), "joins is empty");
-        this.joins = ImmutableList.copyOf(joinLinks);
-        for (Join link : this.joins)
+        requireNonNull(joins, "joins is null");
+        checkArgument(!joins.isEmpty(), "joins is empty");
+        this.joins = ImmutableList.copyOf(joins);
+        for (Join join : this.joins)
         {
-            Table left = link.getLeftTable();
-            Table right = link.getRightTable();
+            Table left = join.getLeftTable();
+            Table right = join.getRightTable();
             checkArgument(left.isBase(), "left table in the link is not base table");
             checkArgument(right.isBase(), "right table in the link is not base table");
             this.baseTables.add(left);
             this.baseTables.add(right);
             if (this.joinIndex.containsKey(left))
             {
-                this.joinIndex.get(left).add(link);
+                this.joinIndex.get(left).add(join);
             }
             else
             {
-                List<Join> joins = new ArrayList<>();
-                joins.add(link);
-                this.joinIndex.put(left, joins);
+                List<Join> joinList = new ArrayList<>();
+                joinList.add(join);
+                this.joinIndex.put(left, joinList);
             }
             if (this.joinIndex.containsKey(right))
             {
-                this.joinIndex.get(right).add(link);
+                this.joinIndex.get(right).add(join);
             }
             else
             {
-                List<Join> joins = new ArrayList<>();
-                joins.add(link);
-                this.joinIndex.put(right, joins);
+                List<Join> joinList = new ArrayList<>();
+                joinList.add(join);
+                this.joinIndex.put(right, joinList);
             }
         }
     }
@@ -88,12 +88,11 @@ public class JoinGraph
      * TODO: test and debug.
      *
      * @param comparator the comparator to order the tables.
-     * @return the join plan
+     * @return the root joined table
      */
-    public List<JoinedTable> getJoinPlan(Comparator<Table> comparator)
+    public JoinedTable getJoinRoot(Comparator<Table> comparator)
     {
-        ImmutableList.Builder<JoinedTable> planBuilder = ImmutableList.builder();
-        JoinedTable lastJoined = null;
+        JoinedTable joinRoot = null;
         List<Table> tableOrder = new ArrayList<>(this.baseTables);
         Collections.sort(tableOrder, comparator);
         Set<Table> visited = new HashSet<>();
@@ -132,7 +131,7 @@ public class JoinGraph
                 visited.add(nextTable);
                 Join baseJoin = linkMap.get(nextTable);
                 Join newJoin;
-                if (lastJoined == null)
+                if (joinRoot == null)
                 {
                     Table left = baseJoin.getLeftTable();
                     int[] leftKeyColumnIds = baseJoin.getLeftKeyColumnIds();
@@ -153,7 +152,7 @@ public class JoinGraph
                 }
                 else
                 {
-                    JoinedTable left = lastJoined;
+                    JoinedTable left = joinRoot;
                     Table right = nextTable;
                     String[] leftColumns = left.getColumnNames();
                     int[] leftKeyColumnIds = new int[baseJoin.getLeftKeyColumnIds().length];
@@ -181,9 +180,8 @@ public class JoinGraph
                 String joinedTableName = newJoin.getLeftTable().getTableName() + "_join_" +
                         newJoin.getRightTable().getTableName();
                 // TODO: decide includeKeyColumns.
-                lastJoined = new JoinedTable(joinedSchemaName, joinedTableName, joinedTableName,
+                joinRoot = new JoinedTable(joinedSchemaName, joinedTableName, joinedTableName,
                         joinedColumns, true, newJoin);
-                planBuilder.add(lastJoined);
             }
             else
             {
@@ -191,6 +189,6 @@ public class JoinGraph
             }
         }
 
-        return planBuilder.build();
+        return joinRoot;
     }
 }
