@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.cache;
 
 
+import com.google.common.base.Function;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
@@ -56,7 +57,7 @@ public class PixelsPartitionCacheWriter {
     private final MemoryMappedFile[] indexPartitions; // length=partitions + 1
     // permanent disk copy of the index file
     private final MemoryMappedFile[] indexDiskPartitions; // length = partition
-
+    private final Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory;
 
     private PixelsPartitionCacheWriter(MemoryMappedFile cacheFile,
                               MemoryMappedFile indexFile,
@@ -64,6 +65,7 @@ public class PixelsPartitionCacheWriter {
                               MemoryMappedFile[] cachePartitions,
                               MemoryMappedFile[] indexPartitions,
                               MemoryMappedFile[] indexDiskPartitions,
+                              Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory,
                               Storage storage,
                               PixelsRadix[] radixs,
                               int partitions,
@@ -77,6 +79,8 @@ public class PixelsPartitionCacheWriter {
         this.cachePartitions = cachePartitions;
         this.indexPartitions = indexPartitions;
         this.indexDiskPartitions = indexDiskPartitions;
+
+        this.indexWriterFactory = indexWriterFactory;
 
         this.storage = storage;
         this.radixs = radixs;
@@ -104,6 +108,8 @@ public class PixelsPartitionCacheWriter {
         private String builderHostName = null;
         private PixelsCacheConfig cacheConfig = null;
         private int partitions = 16;
+        // TODO: configure it with pixels.properties
+        private Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory = RadixIndexWriter::new;
 
         private Builder()
         {
@@ -245,7 +251,7 @@ public class PixelsPartitionCacheWriter {
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
             return new PixelsPartitionCacheWriter(cacheFile, indexFile, indexDiskFile,
-                    cachePartitions, indexPartitions, indexDiskPartitions, storage, radixs,
+                    cachePartitions, indexPartitions, indexDiskPartitions, indexWriterFactory, storage, radixs,
                     partitions, etcdUtil, builderHostName);
         }
     }
@@ -381,7 +387,7 @@ public class PixelsPartitionCacheWriter {
             MemoryMappedFile freeCachePartition = cachePartitions[free];
 
             // start update, write the update on `writeLogicalPartition` to `free`
-            status = partitionUpdateAll(version, writeLogicalPartition, radixs[writeLogicalPartition],
+            status = partitionUpdateAll(version, writeLogicalPartition, indexWriterFactory,
                     freeIndexPartition, freeIndexDiskPartition, freeCachePartition,
                     files, partitionRgIds.get(writeLogicalPartition), partitionColIds.get(writeLogicalPartition));
             if (status != 0) {
@@ -417,7 +423,7 @@ public class PixelsPartitionCacheWriter {
 
 
     // the xxxPartition are guranteed by the caller that they are safe to write anything
-    private int partitionUpdateAll(int version, int partition, PixelsRadix radix,
+    private int partitionUpdateAll(int version, int partition, Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory,
                                    MemoryMappedFile indexPartition, MemoryMappedFile indexDiskPartition, MemoryMappedFile cachePartition,
                                    String[] files, List<Short> rgIds, List<Short> colIds) throws IOException {
         try {
@@ -429,7 +435,8 @@ public class PixelsPartitionCacheWriter {
             return -1;
         }
         // write the data
-        radix.removeAll();
+        CacheIndexWriter indexWriter = indexWriterFactory.apply(indexDiskPartition);
+
         long currCacheOffset = PixelsCacheUtil.CACHE_DATA_OFFSET;
 
         logger.debug("number of files=" + files.length);
@@ -471,10 +478,10 @@ public class PixelsPartitionCacheWriter {
                     logger.warn("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
                     return 2;
                 }
-                radix.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
+                indexWriter.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
-            //    cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+//                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
                 logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                 currCacheOffset += physicalLen;
@@ -483,9 +490,8 @@ public class PixelsPartitionCacheWriter {
         logger.debug("Cache writer ends at offset: " + currCacheOffset / 1024.0 / 1024.0 / 1024.0 + "GiB");
 
         // first write to the indexDiskPartition
-        RadixSerializer serializer = new RadixSerializer(radix, indexDiskPartition);
         // write the cache version
-        long serializeOffset = serializer.serialize();
+        long serializeOffset = indexWriter.flush();
         if (serializeOffset < 0) {
             return 2; // exceed the size
         }
@@ -548,7 +554,7 @@ public class PixelsPartitionCacheWriter {
         for (int partition = 0; partition < partitions; ++partition) {
             //
             // write to indexDisk part
-            status = partitionUpdateAll(version, partition, radixs[partition],
+            status = partitionUpdateAll(version, partition, indexWriterFactory,
                     indexPartitions[partition], indexDiskPartitions[partition], cachePartitions[partition],
                     files, partitionRgIds.get(partition), partitionColIds.get(partition));
             if (status != 0) {
