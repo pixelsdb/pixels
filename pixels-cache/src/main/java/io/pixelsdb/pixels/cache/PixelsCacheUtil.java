@@ -265,6 +265,7 @@ public class PixelsCacheUtil
             if (waitMs > CACHE_READ_LEASE_MS)
             {
                 // clear reader count to continue writing.
+                logger.debug(String.format("waitms(%d) > CACHE_READ_LEASE_MS(%d)", waitMs, CACHE_READ_LEASE_MS));
                 indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
                 break;
             }

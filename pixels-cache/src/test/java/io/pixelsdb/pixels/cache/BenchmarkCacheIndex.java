@@ -127,6 +127,14 @@ public class BenchmarkCacheIndex {
     }
 
     @Test
+    public void benchmarkHash() throws ExecutionException, InterruptedException {
+        int threadNum = 8;
+        benchmarkIndexReader(threadNum, () -> {
+            return new HashIndexReader(hashIndexFile);
+        });
+    }
+
+    @Test
     public void benchmarkRadixTree() throws ExecutionException, InterruptedException {
         int threadNum = 8;
         benchmarkIndexReader(threadNum, () -> {
@@ -198,7 +206,48 @@ public class BenchmarkCacheIndex {
         MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
 
         benchmarkIndexReader(threadNum, () -> {
-            CacheReader reader = PartitionCacheReader.newBuilder().setIndexFile(indexFile).setCacheFile(cacheFile).build();
+            CacheReader reader = PartitionCacheReader.newBuilder().setIndexFile(indexFile).setCacheFile(cacheFile)
+                    .setCacheIndexReader(RadixIndexReader::new)
+                    .build();
+            return new CacheReaderAdaptor(reader);
+        });
+
+    }
+
+    @Test // TODO
+    public void benchmarkProtocolPartitionHash() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+        // disk cache
+        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
+        config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
+        config.addProperty("cache.partitions", "32");
+
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
+        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
+        config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
+
+        config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
+        config.addProperty("cache.schema", "pixels");
+        config.addProperty("cache.table", "test_mock");
+        config.addProperty("lease.ttl.seconds", "20");
+        config.addProperty("heartbeat.period.seconds", "10");
+        config.addProperty("enable.absolute.balancer", "false");
+        config.addProperty("cache.enabled", "true");
+        config.addProperty("enabled.storage.schemes", "mock");
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+
+        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+        int threadNum = 8;
+        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
+
+        benchmarkIndexReader(threadNum, () -> {
+            CacheReader reader = PartitionCacheReader.newBuilder().setIndexFile(indexFile).setCacheFile(cacheFile)
+                    .setCacheIndexReader(RadixIndexReader::new)
+                    .build();
             return new CacheReaderAdaptor(reader);
         });
 
