@@ -17,19 +17,11 @@ public class RadixIndexWriter implements CacheIndexWriter {
     private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
-    RadixIndexWriter(PixelsRadix radix, MemoryMappedFile out) {
-        this.radix = radix;
-        this.out = out;
-    }
 
-    public long serialize() {
-        // if root contains nodes, which means the tree is not empty,then write nodes.
-        if (radix.getRoot().getSize() != 0)
-        {
-            if (writeRadix(radix.getRoot())) return currentIndexOffset;
-            else return -1;
-        }
-        return currentIndexOffset;
+
+    RadixIndexWriter(MemoryMappedFile out) {
+        this.radix = new PixelsRadix();
+        this.out = out;
     }
 
     /**
@@ -114,11 +106,23 @@ public class RadixIndexWriter implements CacheIndexWriter {
 
     @Override
     public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx) {
-
+        this.radix.put(cacheKey, cacheIdx);
     }
 
     @Override
-    public void flush() {
+    public void clear() {
+        this.radix.removeAll();
+    }
+
+    @Override
+    public long flush() {
+        // if root contains nodes, which means the tree is not empty,then write nodes.
+        if (radix.getRoot().getSize() != 0)
+        {
+            if (writeRadix(radix.getRoot())) return currentIndexOffset;
+            else return -1;
+        }
+        return currentIndexOffset;
 
     }
 }

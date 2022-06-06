@@ -2,6 +2,7 @@ package io.pixelsdb.pixels.cache;
 
 import java.nio.ByteBuffer;
 
+// dump the radix tree to a txt file
 public class RadixTreeDumper {
 
     private final MemoryMappedFile indexFile;
