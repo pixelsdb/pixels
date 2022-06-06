@@ -2,7 +2,7 @@ package io.pixelsdb.pixels.cache;
 
 import java.nio.ByteBuffer;
 
-public class CacheIndexSerializer {
+public class RadixTreeDumper {
 
     private final MemoryMappedFile indexFile;
 
@@ -10,7 +10,7 @@ public class CacheIndexSerializer {
         System.loadLibrary("serializer");
     }
 
-    CacheIndexSerializer(MemoryMappedFile indexFile) {
+    RadixTreeDumper(MemoryMappedFile indexFile) {
         this.indexFile = indexFile;
     }
 

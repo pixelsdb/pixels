@@ -2,7 +2,7 @@ package io.pixelsdb.pixels.cache;
 
 // convert all big-endian to little-endian
 // inplace rewrite
-public class CacheIndexRewriter {
+public class RadixIndexEndianRewriter {
     private final MemoryMappedFile indexFile;
 
 
@@ -10,7 +10,7 @@ public class CacheIndexRewriter {
         System.loadLibrary("rewriter");
     }
 
-    CacheIndexRewriter(MemoryMappedFile indexFile) {
+    RadixIndexEndianRewriter(MemoryMappedFile indexFile) {
         this.indexFile = indexFile;
     }
 

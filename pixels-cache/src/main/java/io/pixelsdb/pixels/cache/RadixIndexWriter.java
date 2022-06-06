@@ -6,8 +6,8 @@ import org.apache.logging.log4j.Logger;
 import java.nio.ByteBuffer;
 
 // serialize to a memory mapped file
-public class RadixSerializer {
-    private final static Logger logger = LogManager.getLogger(RadixSerializer.class);
+public class RadixIndexWriter implements CacheIndexWriter {
+    private final static Logger logger = LogManager.getLogger(RadixIndexWriter.class);
 
     private final PixelsRadix radix;
     private final MemoryMappedFile out;
@@ -17,7 +17,7 @@ public class RadixSerializer {
     private final ByteBuffer nodeBuffer = ByteBuffer.allocate(8 * 256);
     private final ByteBuffer cacheIdxBuffer = ByteBuffer.allocate(PixelsCacheIdx.SIZE);
 
-    RadixSerializer(PixelsRadix radix, MemoryMappedFile out) {
+    RadixIndexWriter(PixelsRadix radix, MemoryMappedFile out) {
         this.radix = radix;
         this.out = out;
     }
@@ -112,4 +112,13 @@ public class RadixSerializer {
         return true;
     }
 
+    @Override
+    public void put(PixelsCacheKey cacheKey, PixelsCacheIdx cacheIdx) {
+
+    }
+
+    @Override
+    public void flush() {
+
+    }
 }
