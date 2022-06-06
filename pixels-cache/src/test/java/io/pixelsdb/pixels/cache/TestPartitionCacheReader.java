@@ -307,9 +307,8 @@ public class TestPartitionCacheReader {
             Future<Integer> future = readExecutor.submit(() -> {
                 Random random = new Random();
                 int cnt = 0;
-                int index = 0;
                 while(!finish.isDone()) {
-                    index = random.nextInt(pixelsCacheKeys.size());
+                    int index = random.nextInt(pixelsCacheKeys.size());
                     PixelsCacheIdx readed = reader.search(pixelsCacheKeys.get(index));
 
                     if (readed != null) {

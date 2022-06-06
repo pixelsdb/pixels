@@ -32,14 +32,22 @@ public class PixelsCacheIdx
     static final int SIZE = Long.BYTES + Integer.BYTES;
     public final long offset;
     public final int length;
+    public final int partition; // physical
 
     public int dramAccessCount;
     public int radixLevel;
+
+    public PixelsCacheIdx(long offset, int length, int physicalPartition) {
+        this.offset = offset;
+        this.length = length;
+        this.partition = physicalPartition;
+    }
 
     public PixelsCacheIdx(long offset, int length)
     {
         this.offset = offset;
         this.length = length;
+        this.partition = 0;
     }
 
     public PixelsCacheIdx(byte[] content)
@@ -47,6 +55,8 @@ public class PixelsCacheIdx
         ByteBuffer idxBuffer = ByteBuffer.wrap(content);
         this.offset = idxBuffer.getLong();
         this.length = idxBuffer.getInt();
+        this.partition = 0;
+
     }
 
     public void getBytes(ByteBuffer cacheIdxBuffer)

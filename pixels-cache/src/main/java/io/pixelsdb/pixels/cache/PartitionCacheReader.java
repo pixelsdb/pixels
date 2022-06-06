@@ -99,10 +99,28 @@ public class PartitionCacheReader implements CacheReader {
         return cacheIdx;
     }
 
+    static class ReadLease {
+        long startMilis;
+        int physicalPartition;
+        int version;
+        boolean valid;
+        long expireMilis = PixelsCacheUtil.CACHE_READ_LEASE_MS;
+        ReadLease(boolean valid) { this.valid = valid; }
+        ReadLease(long start, int partition, int version) {
+            startMilis = start;
+            physicalPartition = partition;
+            valid = true;
+            this.version = version;
+        }
+        static ReadLease invalid() {
+            return new ReadLease(false);
+        }
+        boolean isValid(int currentVersion) {
+            return valid && version == currentVersion && System.currentTimeMillis() - startMilis <= expireMilis;
+        }
+    }
 
-    // this method is supposed to be used with test
-    public PixelsCacheIdx search(PixelsCacheKey key) {
-        // retrieve freePhysical + startPhysical
+    private ReadLease prepareRead(PixelsCacheKey key) {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
         int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
@@ -111,7 +129,7 @@ public class PartitionCacheReader implements CacheReader {
         int rwflag = 0;
         int readCount = 0;
         int v;
-        long lease;
+        long start;
         do {
             // 0. use free and start to decide the physical partition
             physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
@@ -123,34 +141,26 @@ public class PartitionCacheReader implements CacheReader {
             rwflag = v & PixelsCacheUtil.RW_MASK;
             readCount = (v & PixelsCacheUtil.READER_COUNT_MASK) >> PixelsCacheUtil.READER_COUNT_RIGHT_SHIFT_BITS;
             if (readCount >= PixelsCacheUtil.MAX_READER_COUNT) {
-                return null;
+                return ReadLease.invalid();
             }
-            lease = System.currentTimeMillis();
+            start = System.currentTimeMillis();
 
         } while (rwflag > 0 || !indexSubRegion.compareAndSwapInt(6, v, v + PixelsCacheUtil.READER_COUNT_INC));
-        // the loop will exit if rw_flag=0 and we have increased the rw_count atomically at the same time.
 
-        // now we have the access to the region.
-        int version = PixelsCacheUtil.getIndexVersion(indexSubRegion);
-        logger.trace("physical partition=" + physicalPartition);
-        CacheIndexReader reader = readers[physicalPartition];
-        PixelsCacheIdx cacheIdx = reader.read(key);
+        return new ReadLease(start, physicalPartition, PixelsCacheUtil.getIndexVersion(indexSubRegion));
+    }
 
+    private boolean endRead(ReadLease lease) {
+        MemoryMappedFile indexSubRegion = indexSubRegions[lease.physicalPartition];
         // check the lease, version and read_count
-        v = indexSubRegion.getIntVolatile(6);
-        readCount = (v & PixelsCacheUtil.READER_COUNT_MASK) >>
+        int v = indexSubRegion.getIntVolatile(6);
+        int readCount = (v & PixelsCacheUtil.READER_COUNT_MASK) >>
                 PixelsCacheUtil.READER_COUNT_RIGHT_SHIFT_BITS;
 
-        if (readCount == 0 || PixelsCacheUtil.getIndexVersion(indexSubRegion) != version
-                || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS * 2) {
-            // it is a staggler reader, abort the read
-            logger.debug("read aborted readCount=" + readCount + " " + (System.currentTimeMillis() - lease));
-            return null;
+        if (readCount == 0 || !lease.isValid(PixelsCacheUtil.getIndexVersion(indexSubRegion))) {
+            logger.debug("read aborted readCount=" + readCount + " " + (System.currentTimeMillis() - lease.startMilis));
+            return false;
         }
-
-        // end indexRead, the cacheIdx is a valid thing to return, we just tries to decrease the read_count
-        // it is possible that read_count will be forced to
-        // if reader count is already <= 0, nothing will be done, just return
         while ((v & PixelsCacheUtil.READER_COUNT_MASK) > 0)
         {
             if (indexSubRegion.compareAndSwapInt(6, v, v-PixelsCacheUtil.READER_COUNT_INC))
@@ -160,8 +170,21 @@ public class PartitionCacheReader implements CacheReader {
             }
             v = indexSubRegion.getIntVolatile(6);
         }
+        return true;
+    }
 
-        return cacheIdx;
+    // this method is supposed to be used with test
+    public PixelsCacheIdx search(PixelsCacheKey key) {
+        ReadLease lease = prepareRead(key);
+
+        logger.trace("physical partition=" + lease.physicalPartition);
+        CacheIndexReader reader = readers[lease.physicalPartition];
+        PixelsCacheIdx cacheIdx = reader.read(key);
+
+        if (endRead(lease) && cacheIdx != null)
+            return new PixelsCacheIdx(cacheIdx.offset, cacheIdx.length, lease.physicalPartition);
+        else
+            return null;
     }
 
     // TODO: mmap file shall be closed by the caller, not me?
