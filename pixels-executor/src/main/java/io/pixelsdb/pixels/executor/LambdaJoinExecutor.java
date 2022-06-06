@@ -91,7 +91,7 @@ public class LambdaJoinExecutor
         this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
     }
 
-    private JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
+    protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
         requireNonNull(joinedTable, "joinedTable is null");
@@ -213,8 +213,7 @@ public class LambdaJoinExecutor
                         joinInputs.add(complete);
                     }
                     SingleStageJoinOperator joinOperator =
-                            new SingleStageJoinOperator(joinInputs.build(), joinAlgo);
-                    joinOperator.setChild(childOperator);
+                            new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.CHAIN);
                     return joinOperator;
                 }
             }
