@@ -1,5 +1,6 @@
 package io.pixelsdb.pixels.cache;
 
+import com.google.common.util.concurrent.SettableFuture;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
@@ -13,6 +14,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class TestPartitionCacheReader {
 
@@ -87,6 +92,7 @@ public class TestPartitionCacheReader {
         assert (cacheIdx.length == reader.read(cacheKey).length);
     }
 
+    // TODO: move it to indexReader test class
     @Test
     public void readAllKeys() throws Exception {
         PixelsCacheConfig config = new PixelsCacheConfig();
@@ -277,5 +283,57 @@ public class TestPartitionCacheReader {
 
         }
 
+    }
+
+    @Test
+    public void benchmarkMultipleReaders() throws Exception {
+        int nReaders = 8;
+        String hostName = "diascld34";
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        // 1 reader continuously randomly read all keys
+        // 1 writer write the partitions once
+        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+        MemoryMappedFile indexDiskFile = new MemoryMappedFile(cacheConfig.getIndexDiskLocation(), realIndexSize);
+        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
+
+        SettableFuture<Integer> finish = SettableFuture.create();
+        List<Future<Integer>> futures = new ArrayList<>();
+        for (int i = 0; i < nReaders; ++i) {
+            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
+            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
+            Future<Integer> future = readExecutor.submit(() -> {
+                Random random = new Random();
+                int cnt = 0;
+                int index = 0;
+                while(!finish.isDone()) {
+                    index = random.nextInt(pixelsCacheKeys.size());
+                    PixelsCacheIdx readed = reader.search(pixelsCacheKeys.get(index));
+
+                    if (readed != null) {
+                        assert(readed.length == pixelsCacheIdxs.get(index).length);
+                        cnt++;
+
+                    } else {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(pixelsCacheKeys.get(index).rowGroupId);
+                        keyBuf.putShort(pixelsCacheKeys.get(index).columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println(partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    }
+//                    index = (index + 1) % 512000;
+                }
+                System.out.println("=================================================");
+                System.out.println("read " + cnt + " keys");
+                System.out.println("=================================================");
+                return cnt;
+
+            });
+            futures.add(future);
+        }
+        Thread.sleep(1000 * 25); // 10s
+        finish.set(1);
     }
 }

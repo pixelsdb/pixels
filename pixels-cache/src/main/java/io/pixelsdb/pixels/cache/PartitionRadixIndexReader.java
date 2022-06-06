@@ -43,7 +43,9 @@ public class PartitionRadixIndexReader implements CacheIndexReader {
         logger.trace("physical partition=" + physicalPartition);
         CacheIndexReader reader = readers[physicalPartition];
         // TODO: the protocol part, now we can test the correctness without the protocol
-        return reader.read(key);
+        PixelsCacheIdx cacheIdx = reader.read(key);
+        if (cacheIdx == null) return null;
+        return new PixelsCacheIdx(cacheIdx.offset, cacheIdx.length, physicalPartition);
     }
     // TODO: mmap file shall be closed by the caller, not me.
 
@@ -55,6 +57,7 @@ public class PartitionRadixIndexReader implements CacheIndexReader {
 
         public Builder()
         {
+            subRegionBytes = Long.parseLong(ConfigFactory.Instance().getProperty("index.size")) / partitions;
         }
 
 

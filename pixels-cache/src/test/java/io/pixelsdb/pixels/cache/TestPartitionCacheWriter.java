@@ -228,7 +228,7 @@ public class TestPartitionCacheWriter {
 
     @Test
     public void testDynamicIncrementalLoad() throws Exception {
-        int nReaders = 400;
+        int nReaders = 8;
         String hostName = "diascld34";
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         // 1 reader continuously randomly read all keys

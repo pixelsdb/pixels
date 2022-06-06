@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 
 // TODO: it can be general as PartitionIndexReader regardless of whether radix or hash
 // Protocol is a over-design, dont do this.
-public class PartitionCacheReader {
+public class PartitionCacheReader implements CacheReader {
     private static final Logger logger = LogManager.getLogger(PartitionRadixIndexReader.class);
     private final MemoryMappedFile indexWholeRegion;
     private final MemoryMappedFile cacheWholeRegion;
@@ -21,6 +21,7 @@ public class PartitionCacheReader {
     private final int partitions;
     private final long metaSize = PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
     ByteBuffer partitionHashKeyBuf = ByteBuffer.allocate(2 + 2);
+    // Note: we cannot directly use the PartitionedRadixIndexReader, as the read-write protocol is tightly coupled
     private final CacheIndexReader[] readers; // related to physical partitions, length=partitions+1
 
 
@@ -44,6 +45,60 @@ public class PartitionCacheReader {
 
     // TODO: the verification of whether we can read shall be done where? I think this protocol verifier shall be
     //        decoupled
+
+    public PixelsCacheIdx naiveSearch(PixelsCacheKey key) {
+        partitionHashKeyBuf.putShort(0, key.rowGroupId);
+        partitionHashKeyBuf.putShort(2, key.columnId);
+        int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
+        int physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion, logicalPartition, partitions);
+        logger.trace("physical partition=" + physicalPartition);
+        CacheIndexReader reader = readers[physicalPartition];
+        return reader.read(key);
+    }
+
+    public PixelsCacheIdx simpleSearch(PixelsCacheKey key) {
+        // retrieve freePhysical + startPhysical
+        partitionHashKeyBuf.putShort(0, key.rowGroupId);
+        partitionHashKeyBuf.putShort(2, key.columnId);
+        int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
+        int physicalPartition;
+        MemoryMappedFile indexSubRegion;
+        int rwflag = 0;
+        int readCount = 0;
+        int v;
+        long lease;
+        do {
+            // 0. use free and start to decide the physical partition
+            physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
+                    logicalPartition, partitions);
+            indexSubRegion = indexSubRegions[physicalPartition];
+            // 1. check rw_flag; it is possible that before writer change the free and start, the reader comes in
+            // and routed to the next free physical partition.
+            v = indexSubRegion.getIntVolatile(6);
+            rwflag = v & PixelsCacheUtil.RW_MASK;
+            lease = System.currentTimeMillis();
+
+        } while (rwflag > 0);
+        // the loop will exit if rw_flag=0 and we have increased the rw_count atomically at the same time.
+
+        // now we have the access to the region.
+        logger.trace("physical partition=" + physicalPartition);
+        CacheIndexReader reader = readers[physicalPartition];
+        PixelsCacheIdx cacheIdx = reader.read(key);
+
+        // check the lease, version and read_count
+        if (System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS * 2) {
+            // it is a staggler reader, abort the read
+            logger.debug("read aborted elapsed=" + (System.currentTimeMillis() - lease) + " partition=" + logicalPartition);
+            return null;
+        }
+
+        // end indexRead, the cacheIdx is a valid thing to return, we just tries to decrease the read_count
+        // it is possible that read_count will be forced to
+        // if reader count is already <= 0, nothing will be done, just return
+        return cacheIdx;
+    }
+
 
     // this method is supposed to be used with test
     public PixelsCacheIdx search(PixelsCacheKey key) {
@@ -87,9 +142,9 @@ public class PartitionCacheReader {
                 PixelsCacheUtil.READER_COUNT_RIGHT_SHIFT_BITS;
 
         if (readCount == 0 || PixelsCacheUtil.getIndexVersion(indexSubRegion) != version
-                || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS) {
+                || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS * 2) {
             // it is a staggler reader, abort the read
-            logger.trace("read aborted");
+            logger.debug("read aborted readCount=" + readCount + " " + (System.currentTimeMillis() - lease));
             return null;
         }
 
@@ -123,9 +178,11 @@ public class PartitionCacheReader {
         MemoryMappedFile content = cacheSubRegions[physicalPartition];
         PixelsCacheIdx cacheIdx = reader.read(key);
         if (cacheIdx == null) return null;
+        // TODO: it is unsafe, as the content might be changed after returned
         return content.getDirectByteBuffer(cacheIdx.offset, cacheIdx.length);
     }
 
+    // TODO: what if buf.length is not enough to hold?
     public int get(PixelsCacheKey key, byte[] buf, int size) {
         // 这个是安全的
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
