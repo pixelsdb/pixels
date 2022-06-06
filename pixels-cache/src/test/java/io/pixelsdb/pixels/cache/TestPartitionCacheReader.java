@@ -11,10 +11,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -234,29 +231,8 @@ public class TestPartitionCacheReader {
             }
         }
 
-        // get the value
-//        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
-//            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
-//            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
-//
-//            // the offset is expected to be different. since this offset is based on the original cache, we can use
-//            // length as an indicator
-//            ByteBuffer buf = reader.get(cacheKey);
-//            if (buf != null) {
-////                byte ele = buf.get(0);
-////                for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
-//
-//            } else {
-//                ByteBuffer keyBuf = ByteBuffer.allocate(4);
-//                keyBuf.putShort(cacheKey.rowGroupId);
-//                keyBuf.putShort(cacheKey.columnId);
-//                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % config.getPartitions();
-//                System.out.println(partition + " " + index + " " + cacheKey + " " + cacheIdx);
-//            }
-//        }
-
         byte[] readBuf = new byte[4096];
-        int readCnt = pixelsCacheIdxs.size();
+        int readCnt = 512000;
         System.out.println("readCnt=" + readCnt);
 
         for (int index = 0; index < readCnt; ++index) {
@@ -267,9 +243,15 @@ public class TestPartitionCacheReader {
             // length as an indicator
             if (readBuf.length < cacheIdx.length) readBuf = new byte[cacheIdx.length];
             int readBytes = reader.get(cacheKey, readBuf, cacheIdx.length);
+//            System.out.println(Arrays.toString(readBuf));
             if (readBytes != 0) {
                 byte ele = readBuf[0];
-                for (int i = 1; i < readBytes; ++i) assert(readBuf[i] == ele);
+                for (int i = 1; i < readBytes; ++i) {
+                    if(readBuf[i] != ele) {
+                        System.out.println(index + " " + cacheKey + " " + cacheIdx + " " + ele + " " + readBuf[i]);
+                    }
+                    assert(readBuf[i] == ele);
+                }
 //                byte ele = buf.get(0);
 //                for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
 
@@ -282,6 +264,31 @@ public class TestPartitionCacheReader {
             }
 
         }
+//        for (int index = 0; index < readCnt; ++index) {
+//            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+//            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+//
+//            // the offset is expected to be different. since this offset is based on the original cache, we can use
+//            // length as an indicator
+//            ByteBuffer buf = reader.get(cacheKey);
+//            byte ele = buf.get(0);
+//            for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
+////            System.out.println(Arrays.toString(readBuf));
+////            if (readBytes != 0) {
+////                byte ele = readBuf[0];
+////                for (int i = 1; i < readBytes; ++i) assert(readBuf[i] == ele);
+//////                byte ele = buf.get(0);
+//////                for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
+////
+////            } else {
+////                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+////                keyBuf.putShort(cacheKey.rowGroupId);
+////                keyBuf.putShort(cacheKey.columnId);
+////                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % config.getPartitions();
+////                System.out.println(partition + " " + index + " " + cacheKey + " " + cacheIdx);
+////            }
+//
+//        }
 
     }
 
