@@ -20,7 +20,14 @@
 package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.*;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.executor.lambda.PartitionedJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionedJoinInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionedTableInfo;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -45,32 +52,46 @@ public class TestPartitionedJoinInvoker
 
         PartitionedJoinInput joinInput = new PartitionedJoinInput();
         joinInput.setQueryId(123456);
-        joinInput.setLeftCols(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
-        joinInput.setLeftKeyColumnIds(new int[]{0});
-        joinInput.setLeftTableName("orders");
-        joinInput.setLeftPartitioned(Arrays.asList(
-                new PartitionOutput("pixels-lambda-test/orders_part_0", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_1", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_2", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_3", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_4", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_5", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_6", hashValues),
-                new PartitionOutput("pixels-lambda-test/orders_part_7", hashValues)
-        ));
-        joinInput.setRightCols(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
-        joinInput.setRightKeyColumnIds(new int[]{0});
-        joinInput.setRightTableName("lineitem");
-        PartitionOutput lineitemPartitioned1 = new PartitionOutput();
-        lineitemPartitioned1.setPath("pixels-lambda-test/lineitem_part_0");
-        lineitemPartitioned1.setHashValues(hashValues);
-        PartitionOutput lineitemPartitioned2 = new PartitionOutput();
-        lineitemPartitioned2.setPath("pixels-lambda-test/lineitem_part_1");
-        lineitemPartitioned2.setHashValues(hashValues);
-        joinInput.setRightPartitioned(Arrays.asList(lineitemPartitioned1, lineitemPartitioned2));
-        joinInput.setJoinInfo(new PartitionedJoinInput.JoinInfo(40, Arrays.asList(16), JoinType.EQUI_LEFT));
-        joinInput.setOutput(new ScanInput.OutputInfo("pixels-lambda/",
-                "http://172.31.32.193:9000", "lambda", "password", true));
+        PartitionedTableInfo leftTableInfo = new PartitionedTableInfo();
+        leftTableInfo.setTableName("orders");
+        leftTableInfo.setColumnsToRead(new String[]{"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
+        leftTableInfo.setKeyColumnIds(new int[]{0});
+        leftTableInfo.setInputFiles(Arrays.asList(
+                "pixels-lambda-test/orders_part_0",
+                "pixels-lambda-test/orders_part_1",
+                "pixels-lambda-test/orders_part_2",
+                "pixels-lambda-test/orders_part_3",
+                "pixels-lambda-test/orders_part_4",
+                "pixels-lambda-test/orders_part_5",
+                "pixels-lambda-test/orders_part_6",
+                "pixels-lambda-test/orders_part_7"));
+        leftTableInfo.setParallelism(8);
+        joinInput.setLeftTable(leftTableInfo);
+
+        PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
+        rightTableInfo.setTableName("lineitem");
+        rightTableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        rightTableInfo.setKeyColumnIds(new int[]{0});
+        rightTableInfo.setInputFiles(Arrays.asList(
+                "pixels-lambda-test/lineitem_part_0",
+                "pixels-lambda-test/lineitem_part_1"));
+        rightTableInfo.setParallelism(2);
+        joinInput.setRightTable(rightTableInfo);
+
+        PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
+        joinInfo.setJoinType(JoinType.EQUI_INNER);
+        joinInfo.setNumPartition(40);
+        joinInfo.setHashValues(Arrays.asList(16));
+        joinInfo.setResultColumns(new String[]{"o_custkey", "o_orderstatus",
+                "o_orderdate", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setOutputJoinKeys(false);
+        joinInfo.setPostPartition(true);
+        joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));
+        joinInput.setJoinInfo(joinInfo);
+
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
+                "http://172.31.32.193:9000", "lambda", "password",
+                true, Arrays.asList("partitioned-join-0", "partitioned-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = PartitionedJoinInvoker.invoke(joinInput).get();

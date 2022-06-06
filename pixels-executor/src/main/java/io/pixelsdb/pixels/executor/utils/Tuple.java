@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.executor.utils;
 
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -36,56 +36,74 @@ import static java.util.Objects.requireNonNull;
  */
 public class Tuple
 {
-    /**
-     * The hashCode of the join key of this tuple.
-     */
-    private final int hashCode;
+    protected static class CommonFields
+    {
+        /**
+         * The hashCode of the join key of the tuples.
+         */
+        private final int[] hashCode;
+        /**
+         * The ids of the join-key columns.
+         */
+        protected final int[] keyColumnIds;
+        /**
+         * The ids of the join-key columns, in Set form, used for performance consideration.
+         */
+        protected final Set<Integer> keyColumnIdSet;
+        /**
+         * The column vectors in the row batch.
+         */
+        private final ColumnVector[] columns;
+        /**
+         * Whether the column vectors of the key columns are written into the output.
+         */
+        private final boolean writeKeyColumns;
+
+        protected CommonFields(int[] hashCode, int[] keyColumnIds, Set<Integer> keyColumnIdSet,
+                            ColumnVector[] columns, boolean writeKeyColumns)
+        {
+            this.hashCode = hashCode;
+            this.keyColumnIds = keyColumnIds;
+            this.keyColumnIdSet = keyColumnIdSet;
+            this.columns = columns;
+            this.writeKeyColumns = writeKeyColumns;
+        }
+    }
+
     /**
      * The index of this tuple in the corresponding row batch.
      */
     private final int rowId;
     /**
-     * The ids of the join-key columns.
+     * The common fields that are shared by all the tuples from the same row batch.
      */
-    protected final int[] keyColumnIds;
-    /**
-     * The id set of the join-key columns, used for performance consideration.
-     */
-    protected final Set<Integer> keyColumnIdSet;
-    /**
-     * The column vectors in the row batch.
-     */
-    private final ColumnVector[] columns;
-    /**
-     * The join type that this tuple is used for.
-     */
-    protected final JoinType joinType;
+    private final CommonFields commonFields;
     /**
      * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
      */
-    protected Tuple left;
+    protected Tuple left = null;
+    /**
+     * The next tuple in the chain. Tuple chain is mainly used to build the hash
+     * table of the left table in joins. For performance consideration, we let it
+     * be protected instead of private, but be careful when you change it.
+     */
+    public Tuple next = null;
 
     /**
      * For performance considerations, the parameters are not checked.
      * Must ensure that they are valid.
      */
-    protected Tuple(int hashCode, int rowId, int[] keyColumnIds,
-                 Set<Integer> keyColumnIdSet, ColumnVector[] columns, JoinType joinType)
+    protected Tuple(int rowId, CommonFields commonFields)
     {
-        this.hashCode = hashCode;
         this.rowId = rowId;
-        this.keyColumnIds = keyColumnIds;
-        this.keyColumnIdSet = keyColumnIdSet;
-        this.columns = columns;
-        this.joinType = joinType;
-        this.left = null;
+        this.commonFields = commonFields;
     }
 
     @Override
     public int hashCode()
     {
-        return hashCode;
+        return commonFields.hashCode[rowId];
     }
 
     @Override
@@ -94,15 +112,15 @@ public class Tuple
         if (obj instanceof Tuple)
         {
             Tuple other = (Tuple) obj;
-            if (this.keyColumnIds.length != other.keyColumnIds.length)
+            if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
             {
                 return false;
             }
-            for (int i = 0; i < this.keyColumnIds.length; ++i)
+            for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
             {
                 // We only support equi-joins, thus null value is not checked.
-                if (!this.columns[this.keyColumnIds[i]].elementEquals(
-                        this.rowId, other.rowId, other.columns[other.keyColumnIds[i]]))
+                if (!this.commonFields.columns[this.commonFields.keyColumnIds[i]].elementEquals(
+                        this.rowId, other.rowId, other.commonFields.columns[other.commonFields.keyColumnIds[i]]))
                 {
                     return false;
                 }
@@ -143,32 +161,25 @@ public class Tuple
      */
     protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
-
-        if (left != null)
+        if (this.left != null)
         {
-            start = left.writeTo(rowBatch, start);
+            start = this.left.writeTo(rowBatch, start);
         }
-        // joiner can ensure that all the concatenated (joined) tuples are of the same join type.
-        boolean includeKey = left == null || this.joinType != JoinType.NATURAL;
-        for (int i = 0; i < this.columns.length; ++i)
+        for (int i = 0; i < this.commonFields.columns.length; ++i)
         {
-            if (!includeKey && this.keyColumnIdSet.contains(i))
+            if (!this.commonFields.writeKeyColumns && this.commonFields.keyColumnIdSet.contains(i))
             {
                 continue;
             }
-            rowBatch.cols[start++].addElement(this.rowId, this.columns[i]);
+            rowBatch.cols[start++].addElement(this.rowId, this.commonFields.columns[i]);
         }
         return start;
     }
 
     public static class Builder
     {
-        private final int[] keyColumnIds;
-        private final Set<Integer> keyColumnIdSet;
-        private final ColumnVector[] columns;
-        private final JoinType joinType;
         private final int numRows;
-        private final int[] hashCode;
+        private final CommonFields commonFields;
         private int rowId = 0;
 
         /**
@@ -178,10 +189,10 @@ public class Tuple
          * @param rowBatch the row batch
          * @param keyColumnIds the ids of the join-key columns
          * @param keyColumnIdSet the id set of the join-key columns, used for performance consideration
-         * @param joinType the join type
+         * @param writeKeyColumns whether the key columns are written into the output
          */
         public Builder(VectorizedRowBatch rowBatch, int[] keyColumnIds,
-                       Set<Integer> keyColumnIdSet, JoinType joinType)
+                       Set<Integer> keyColumnIdSet, boolean writeKeyColumns)
         {
             checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
                     "keyColumnIds is null or empty");
@@ -191,20 +202,18 @@ public class Tuple
             checkArgument(rowBatch.numCols >= keyColumnIds.length,
                     "rowBatch does not have enough columns");
             checkArgument(rowBatch.size > 0, "rowBatch is empty");
-            requireNonNull(joinType, "joinType is null");
-            checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
 
-            this.joinType = joinType;
-            this.keyColumnIds = keyColumnIds;
-            this.keyColumnIdSet = keyColumnIdSet;
-            this.columns = rowBatch.cols;
-            this.hashCode = new int[rowBatch.size];
-            Arrays.fill(this.hashCode, 0);
+            ColumnVector[] columns = rowBatch.cols;
+            int[] hashCode = new int[rowBatch.size];
+            Arrays.fill(hashCode, 0);
             for (int id : keyColumnIds)
             {
-                this.columns[id].accumulateHashCode(this.hashCode);
+                columns[id].accumulateHashCode(hashCode);
             }
             this.numRows = rowBatch.size;
+
+            this.commonFields = new CommonFields(hashCode, keyColumnIds,
+                    keyColumnIdSet, columns, writeKeyColumns);
         }
 
         /**
@@ -221,7 +230,7 @@ public class Tuple
         public Tuple next()
         {
             int id = this.rowId++;
-            return new Tuple(hashCode[id], id, keyColumnIds, keyColumnIdSet, columns, joinType);
+            return new Tuple(id, commonFields);
         }
     }
 }

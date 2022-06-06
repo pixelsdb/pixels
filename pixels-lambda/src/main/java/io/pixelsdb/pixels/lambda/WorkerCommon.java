@@ -20,13 +20,19 @@
 package io.pixelsdb.pixels.lambda;
 
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,6 +50,8 @@ public class WorkerCommon
     private static final Logger logger = LoggerFactory.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
+    public static Storage s3;
+    public static Storage minio;
     public static final int rowBatchSize;
     private static final int pixelStride;
     private static final int rowGroupSize;
@@ -53,6 +61,14 @@ public class WorkerCommon
         rowBatchSize = Integer.parseInt(configFactory.getProperty("row.batch.size"));
         pixelStride = Integer.parseInt(configFactory.getProperty("pixel.stride"));
         rowGroupSize = Integer.parseInt(configFactory.getProperty("row.group.size"));
+        try
+        {
+            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+
+        } catch (Exception e)
+        {
+            logger.error("failed to initialize AWS S3 storage", e);
+        }
     }
 
     /**
@@ -76,11 +92,13 @@ public class WorkerCommon
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
         requireNonNull(leftPath, "leftPath is null");
-        requireNonNull(rightPath, "rightSchema is null");
+        requireNonNull(rightPath, "rightPath is null");
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                leftSchema.set(getReader(leftPath, storage).getFileSchema());
+                PixelsReader reader = getReader(leftPath, storage);
+                leftSchema.set(reader.getFileSchema());
+                reader.close();
             } catch (IOException e)
             {
                 logger.error("failed to read the schema of the left table");
@@ -89,7 +107,9 @@ public class WorkerCommon
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                rightSchema.set(getReader(rightPath, storage).getFileSchema());
+                PixelsReader reader = getReader(rightPath, storage);
+                rightSchema.set(reader.getFileSchema());
+                reader.close();
             } catch (IOException e)
             {
                 logger.error("failed to read the schema of the right table");
@@ -103,6 +123,22 @@ public class WorkerCommon
         {
             logger.error("interrupted while waiting for the termination of schema read", e);
         }
+    }
+
+    /**
+     * Read the schemas of the table.
+     *
+     * @param storage the storage instance
+     * @param path the path of an input file of the table
+     */
+    public static TypeDescription getFileSchema(Storage storage, String path) throws IOException
+    {
+        requireNonNull(storage, "storage is null");
+        requireNonNull(path, "path is null");
+        PixelsReader reader = getReader(path, storage);
+        TypeDescription fileSchema = reader.getFileSchema();
+        reader.close();
+        return fileSchema;
     }
 
     /**
@@ -202,5 +238,24 @@ public class WorkerCommon
             builder.setPartKeyColumnIds(keyColumnIds);
         }
         return builder.build();
+    }
+
+    /**
+     * Create the reader option for a record reader of the given input file.
+     *
+     * @param queryId the query id
+     * @param cols the column names in the partitioned file
+     * @param input the information of the input file
+     * @return the reader option
+     */
+    public static PixelsReaderOption getReaderOption(long queryId, String[] cols, InputInfo input)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.queryId(queryId);
+        option.includeCols(cols);
+        option.rgRange(input.getRgStart(), input.getRgLength());
+        return option;
     }
 }

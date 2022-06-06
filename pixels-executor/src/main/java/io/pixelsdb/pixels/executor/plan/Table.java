@@ -17,29 +17,26 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
-
-import com.google.gson.Gson;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
-import org.junit.Test;
+package io.pixelsdb.pixels.executor.plan;
 
 /**
+ * The table that is used in joins.
  * @author hank
- * Created at: 11/04/2022
+ * @date 26/05/2022
  */
-public class TestOutput
+public interface Table
 {
-    @Test
-    public void testEncodeScanOutput()
-    {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
-    }
+
+    /**
+     * Whether this is a base table or a joined table.
+     */
+    public boolean isBase();
+
+    public String getSchemaName();
+
+    public String getTableName();
+
+    public String getTableAlias();
+
+    public String[] getColumnNames();
 }

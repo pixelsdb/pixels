@@ -17,29 +17,35 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.domain;
 
-import com.google.gson.Gson;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
-import org.junit.Test;
+import java.util.List;
 
 /**
  * @author hank
- * Created at: 11/04/2022
+ * @date 02/06/2022
  */
-public class TestOutput
+public class InputSplit
 {
-    @Test
-    public void testEncodeScanOutput()
+    private List<InputInfo> inputInfos;
+
+    /**
+     * Default constructor for Jackson.
+     */
+    public InputSplit() {}
+
+    public InputSplit(List<InputInfo> inputInfos)
     {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
+        this.inputInfos = inputInfos;
+    }
+
+    public List<InputInfo> getInputInfos()
+    {
+        return inputInfos;
+    }
+
+    public void setInputInfos(List<InputInfo> inputInfos)
+    {
+        this.inputInfos = inputInfos;
     }
 }

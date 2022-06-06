@@ -28,11 +28,25 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- aws sdk -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>lambda</artifactId>
             <optional>true</optional>
         </dependency>
+
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>aws-crt-client</artifactId>

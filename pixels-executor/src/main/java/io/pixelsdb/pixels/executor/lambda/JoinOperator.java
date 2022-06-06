@@ -19,12 +19,29 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+
 /**
- * Hash partitioned join coordinator.
- *
  * @author hank
- * @date 07/05/2022
+ * @date 05/06/2022
  */
-public class PartitionedJoinCoordinator
+public interface JoinOperator
 {
+    List<JoinInput> getJoinInputs();
+
+    JoinAlgorithm getJoinAlgo();
+
+    void setChild(JoinOperator child);
+
+    /**
+     * Execute this join operator.
+     *
+     * @return the join outputs.
+     */
+    CompletableFuture<JoinOutput>[] execute();
 }

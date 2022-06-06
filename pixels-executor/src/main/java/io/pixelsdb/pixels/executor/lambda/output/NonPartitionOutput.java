@@ -17,31 +17,31 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.output;
 
 import java.util.ArrayList;
 
 /**
- * The output format for table scan.
+ * The output format for serverless operators.
  * @author hank
  * Created at: 11/04/2022
  */
-public class ScanOutput
+public class NonPartitionOutput
 {
     /**
-     * The path of the scan result files. No need to contain endpoint information.
+     * The path of the result files. No need to contain endpoint information.
      */
     private ArrayList<String> outputs = new ArrayList<>();
 
     /**
-     * The number of row groups in each scan result files.
+     * The number of row groups in each result files.
      */
     private ArrayList<Integer> rowGroupNums = new ArrayList<>();
 
     /**
      * Default constructor for jackson.
      */
-    public ScanOutput() { }
+    public NonPartitionOutput() { }
 
     public ArrayList<String> getOutputs()
     {

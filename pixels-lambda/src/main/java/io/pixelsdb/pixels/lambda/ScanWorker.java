@@ -31,18 +31,20 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.lambda.ScanInput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
-import io.pixelsdb.pixels.executor.lambda.ScanOutput;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
+import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
@@ -56,20 +58,6 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static Storage s3;
-    private static Storage minio;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
 
     @Override
     public ScanOutput handleRequest(ScanInput event, Context context)
@@ -82,9 +70,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> inputs = event.getInputs();
-            int splitSize = event.getSplitSize();
-            String outputFolder = event.getOutput().getFolder();
+            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
+            checkArgument(event.getOutput().getScheme() == Storage.Scheme.minio,
+                    "the storage scheme is not minio");
+            checkArgument(event.getOutput().isRandomFileName(),
+                    "random output file name is not enabled by the caller");
+            String outputFolder = event.getOutput().getPath();
             if (!outputFolder.endsWith("/"))
             {
                 outputFolder += "/";
@@ -102,20 +93,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
-            String[] cols = event.getCols();
-            TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
+            String[] cols = event.getTableInfo().getColumnsToRead();
+            TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
             ScanOutput scanOutput = new ScanOutput();
-            for (int i = 0; i < inputs.size();)
+            int i = 0;
+            for (InputSplit inputSplit : inputSplits)
             {
-                int numRg = 0;
-                ArrayList<InputInfo> scanInputs = new ArrayList<>();
-                while (numRg < splitSize)
-                {
-                    InputInfo info = inputs.get(i++);
-                    scanInputs.add(info);
-                    numRg += info.getRgLength();
-                }
-                String out = outputFolder + requestId + "_out_" + i;
+                List<InputInfo> scanInputs = inputSplit.getInputInfos();
+                String out = outputFolder + requestId + "_scan_" + i++;
 
                 threadPool.execute(() -> {
                     try
@@ -160,35 +145,28 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param encoding whether encode the scan results or not
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long queryId, ArrayList<InputInfo> scanInputs, String[] cols,
+    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] cols,
                            TableScanFilter filter, String outputPath, boolean encoding)
     {
         PixelsWriter pixelsWriter = null;
         for (int i = 0; i < scanInputs.size(); ++i)
         {
             InputInfo inputInfo = scanInputs.get(i);
-            PixelsReaderOption option = new PixelsReaderOption();
-            option.skipCorruptRecords(true);
-            option.tolerantSchemaEvolution(true);
-            option.queryId(queryId);
-            option.includeCols(cols);
-            option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
-            VectorizedRowBatch rowBatch;
-
-            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3);
-                 PixelsRecordReader recordReader = pixelsReader.read(option))
+            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
-                if (!recordReader.isValid())
+                if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
-                    /*
-                     * If the record reader is invalid, it is likely that the rgRange
-                     * in the read option is out of bound (i.e., this is the last file
-                     * in the table that does not have enough row groups to read).
-                     */
-                    break;
+                    continue;
+                }
+                if (inputInfo.getRgStart() + inputInfo.getRgLength() >= pixelsReader.getRowGroupNum())
+                {
+                    inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
 
+                PixelsReaderOption option = getReaderOption(queryId, cols, inputInfo);
+                PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
+                VectorizedRowBatch rowBatch;
 
                 if (pixelsWriter == null)
                 {

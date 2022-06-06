@@ -17,29 +17,42 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
-
-import com.google.gson.Gson;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
-import org.junit.Test;
+package io.pixelsdb.pixels.core.utils;
 
 /**
  * @author hank
- * Created at: 11/04/2022
+ * @date 22/05/2022
  */
-public class TestOutput
+public class Pair<L, R>
 {
-    @Test
-    public void testEncodeScanOutput()
+    private L left;
+    private R right;
+
+    public Pair() {}
+
+    public Pair(L left, R right)
     {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
+        this.left = left;
+        this.right = right;
+    }
+
+    public L getLeft()
+    {
+        return left;
+    }
+
+    public void setLeft(L left)
+    {
+        this.left = left;
+    }
+
+    public R getRight()
+    {
+        return right;
+    }
+
+    public void setRight(R right)
+    {
+        this.right = right;
     }
 }

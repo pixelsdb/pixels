@@ -20,8 +20,8 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
-import io.pixelsdb.pixels.executor.lambda.output.PartitionOutput;
+import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
@@ -29,24 +29,23 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The lambda invoker for hash partitioning operator.
- *
+ * The lambda invoker for chain join operator.
  * @author hank
- * @date 07/05/2022
+ * @date 03/06/2022
  */
-public class PartitionInvoker
+public class ChainJoinInvoker
 {
-    private static final String PARTITION_WORKER_NAME = "PartitionWorker";
+    private static final String CHAIN_JOIN_WORKER_NAME = "ChainJoinWorker";
 
-    private PartitionInvoker() { }
+    private ChainJoinInvoker() { }
 
-    public static CompletableFuture<PartitionOutput> invoke(PartitionInput input)
+    public static CompletableFuture<JoinOutput> invoke(ChainJoinInput input)
     {
         String inputJson = JSON.toJSONString(input);
         SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
 
         InvokeRequest request = InvokeRequest.builder()
-                .functionName(PARTITION_WORKER_NAME)
+                .functionName(CHAIN_JOIN_WORKER_NAME)
                 .payload(payload)
                 // using RequestResponse for higher function concurrency.
                 .invocationType(InvocationType.REQUEST_RESPONSE)
@@ -59,13 +58,13 @@ public class PartitionInvoker
                 if(response.statusCode() == 200 && response.functionError() == null)
                 {
                     String outputJson = response.payload().asUtf8String();
-                    PartitionOutput partitionOutput = JSON.parseObject(outputJson, PartitionOutput.class);
-                    if (partitionOutput == null)
+                    JoinOutput joinOutput = JSON.parseObject(outputJson, JoinOutput.class);
+                    if (joinOutput == null)
                     {
                         throw new RuntimeException("failed to parse response payload, length=" +
                                 response.payload().asByteArray().length);
                     }
-                    return partitionOutput;
+                    return joinOutput;
                 }
                 else
                 {

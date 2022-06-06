@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;

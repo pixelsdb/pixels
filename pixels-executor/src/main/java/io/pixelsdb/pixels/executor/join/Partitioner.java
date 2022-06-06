@@ -95,7 +95,7 @@ public class Partitioner
         List<List<Integer>> selectedArrays = new ArrayList<>(numPartition);
         for (int i = 0; i < numPartition; ++i)
         {
-            selectedArrays.add(new ArrayList<>());
+            selectedArrays.add(new LinkedList<>());
         }
         for (int i = 0; i < hashCode.length; ++i)
         {

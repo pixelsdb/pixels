@@ -22,12 +22,15 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
+import io.pixelsdb.pixels.executor.utils.HashTable;
+import io.pixelsdb.pixels.executor.utils.Tuple;
 
 import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.executor.join.NullTuple.createNullTuple;
+import static io.pixelsdb.pixels.executor.utils.NullTuple.buildNullTuple;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -48,11 +51,15 @@ import static java.util.Objects.requireNonNull;
  */
 public class Joiner
 {
-    private final HashMap<Tuple, Tuple> smallTable = new HashMap<>();
+    private final HashTable smallTable = new HashTable();
     private final JoinType joinType;
     private final TypeDescription smallSchema;
     private final TypeDescription bigSchema;
     private final TypeDescription joinedSchema;
+    /**
+     * Whether the join-key columns should be included in the {@link #joinedSchema}.
+     */
+    private final boolean includeKeyCols;
     private final int[] smallKeyColumnIds;
     private final Set<Integer> smallKeyColumnIdSet;
     private final int[] bigKeyColumnIds;
@@ -73,18 +80,20 @@ public class Joiner
      * the columns from the big (a.k.a., right) table.
      *
      * @param joinType the join type
-     * @param smallPrefix the prefix for the columns from the small table, e.g., "orders."
+     * @param joinedCols the column names in the joined schema, in the same order of the columns
+     *                   in small schema and big schema
+     * @param includeKeyCols whether joinedCols includes the key columns from both tables.
      * @param smallSchema the schema of the small table
      * @param smallKeyColumnIds the ids of the key columns of the small table
-     * @param bigPrefix the prefix for the columns from the big table, e.e., "lineitem."
      * @param bigSchema the schema of the big table
      * @param bigKeyColumnIds the ids of the key columns of the big table
      */
-    public Joiner(JoinType joinType,
-                  String smallPrefix, TypeDescription smallSchema, int[] smallKeyColumnIds,
-                  String bigPrefix, TypeDescription bigSchema, int[] bigKeyColumnIds)
+    public Joiner(JoinType joinType, String[] joinedCols, boolean includeKeyCols,
+                  TypeDescription smallSchema, int[] smallKeyColumnIds,
+                  TypeDescription bigSchema, int[] bigKeyColumnIds)
     {
         this.joinType = requireNonNull(joinType, "joinType is null");
+        requireNonNull(joinedCols, "joinedCols is null");
         checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
         this.smallSchema = requireNonNull(smallSchema, "smallSchema is null");
         this.bigSchema = requireNonNull(bigSchema, "bigSchema is null");
@@ -106,39 +115,53 @@ public class Joiner
         }
         // build the schema for the join result.
         this.joinedSchema = new TypeDescription(TypeDescription.Category.STRUCT);
+        this.includeKeyCols = includeKeyCols;
         List<String> smallColumnNames = smallSchema.getFieldNames();
         List<TypeDescription> smallColumnTypes = smallSchema.getChildren();
         checkArgument(smallColumnTypes != null && smallColumnNames.size() == smallColumnTypes.size(),
                 "invalid children of smallSchema");
-        for (int i = 0; i < smallColumnNames.size(); ++i)
-        {
-            /**
-             * Even if this is a natural join, we add the prefix to the key columns of the small table.
-             * Because a non-key column of the big table may have the same name as the key column of the small table.
-             */
-            this.joinedSchema.addField(smallPrefix.concat(smallColumnNames.get(i)), smallColumnTypes.get(i));
-        }
         List<String> bigColumnNames = bigSchema.getFieldNames();
         List<TypeDescription> bigColumnTypes = bigSchema.getChildren();
         checkArgument(bigColumnTypes != null && bigColumnNames.size() == bigColumnTypes.size(),
                 "invalid children of bigSchema");
-        Set<Integer> bigKeyColumnIdSet = new HashSet<>(bigKeyColumnIds.length);
-        for (int id : bigKeyColumnIds)
+        int outputColumNum = smallColumnNames.size() + bigColumnNames.size();
+        if (this.includeKeyCols)
         {
-            bigKeyColumnIdSet.add(id);
+            outputColumNum -= (joinType == JoinType.NATURAL ? bigKeyColumnIds.length : 0);
+        }
+        else
+        {
+            outputColumNum -= (smallKeyColumnIds.length + bigKeyColumnIds.length);
+        }
+        checkArgument(outputColumNum == joinedCols.length,
+                "joinedCols does not contain correct number of elements");
+        int joinedColId = 0;
+        for (int i = 0; i < smallColumnNames.size(); ++i)
+        {
+            if ((!this.includeKeyCols) && smallKeyColumnIdSet.contains(i))
+            {
+                // ignore the join key columns.
+                continue;
+            }
+            this.joinedSchema.addField(joinedCols[joinedColId++], smallColumnTypes.get(i));
         }
         for (int i = 0; i < bigColumnNames.size(); ++i)
         {
-            // duplicate the join key if not nature join.
-            if (joinType == JoinType.NATURAL && bigKeyColumnIdSet.contains(i))
+            if ((!this.includeKeyCols || joinType == JoinType.NATURAL) && bigKeyColumnIdSet.contains(i))
             {
+                // ignore the join key columns.
+                // for natural join, the key columns of the right table is ignored.
                 continue;
             }
-            this.joinedSchema.addField(bigPrefix.concat(bigColumnNames.get(i)), bigColumnTypes.get(i));
+            this.joinedSchema.addField(joinedCols[joinedColId++], bigColumnTypes.get(i));
         }
         // create the null tuples for outer join.
-        this.smallNullTuple = createNullTuple(smallKeyColumnIds, smallColumnNames.size(), joinType);
-        this.bigNullTuple = createNullTuple(bigKeyColumnIds, bigColumnNames.size(), joinType);
+        int numSmallIncludedColumns = this.includeKeyCols ?
+                smallColumnNames.size() : smallColumnNames.size() - smallKeyColumnIds.length;
+        int numBigIncludedColumns = this.includeKeyCols && this.joinType != JoinType.NATURAL ?
+                bigColumnNames.size() : bigColumnNames.size() - bigKeyColumnIds.length;
+        this.smallNullTuple = buildNullTuple(numSmallIncludedColumns);
+        this.bigNullTuple = buildNullTuple(numBigIncludedColumns);
     }
 
     /**
@@ -147,18 +170,18 @@ public class Joiner
      * <b>Note</b> this method is thread safe, but it should only be called before
      * {@link Joiner#join(VectorizedRowBatch) join}.
      *
-     * @param smallBatch a row batch from the small table
+     * @param smallBatch a row batch from the left (a.k.a., small) table
      */
     public synchronized void populateLeftTable(VectorizedRowBatch smallBatch)
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");
         Tuple.Builder builder = new Tuple.Builder(smallBatch,
-                this.smallKeyColumnIds, this.smallKeyColumnIdSet, this.joinType);
+                this.smallKeyColumnIds, this.smallKeyColumnIdSet, this.includeKeyCols);
         while (builder.hasNext())
         {
             Tuple tuple = builder.next();
-            this.smallTable.put(tuple, tuple);
+            this.smallTable.put(tuple);
         }
     }
 
@@ -167,20 +190,22 @@ public class Joiner
      * This method is thread-safe, but should not be called before the small table is populated.
      *
      * @param bigBatch a row batch from the bigger table
-     * @return the row batch of the join result, could be empty
+     * @return the row batches of the join result, could be empty. <b>Note: </b> the returned
+     * list is backed by {@link LinkedList}, thus it is not performant to access it randomly.
      */
-    public VectorizedRowBatch join(VectorizedRowBatch bigBatch)
+    public List<VectorizedRowBatch> join(VectorizedRowBatch bigBatch)
     {
         requireNonNull(bigBatch, "bigBatch is null");
         checkArgument(bigBatch.size > 0, "bigBatch is empty");
-        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.size);
-        Tuple.Builder builder = new Tuple.Builder(bigBatch,
-                this.bigKeyColumnIds, this.bigKeyColumnIdSet, this.joinType);
+        List<VectorizedRowBatch> result = new LinkedList<>();
+        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
+        Tuple.Builder builder = new Tuple.Builder(bigBatch, this.bigKeyColumnIds, this.bigKeyColumnIdSet,
+                this.includeKeyCols && this.joinType != JoinType.NATURAL);
         while (builder.hasNext())
         {
-            Tuple big = builder.next(), joined = null;
-            Tuple small = this.smallTable.get(big);
-            if (small == null)
+            Tuple big = builder.next();
+            Tuple smallHead = this.smallTable.getHead(big);
+            if (smallHead == null)
             {
                 switch (joinType)
                 {
@@ -190,7 +215,13 @@ public class Joiner
                         break;
                     case EQUI_RIGHT:
                     case EQUI_FULL:
-                        joined = big.concatLeft(smallNullTuple);
+                        Tuple joined = big.concatLeft(smallNullTuple);
+                        if (joinedRowBatch.isFull())
+                        {
+                            result.add(joinedRowBatch);
+                            joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
+                        }
+                        joined.writeTo(joinedRowBatch);
                         break;
                     default:
                         throw new UnsupportedOperationException("join type is not supported");
@@ -199,17 +230,31 @@ public class Joiner
             {
                 if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
                 {
-                    this.matchedSmallTuples.add(small);
+                    Tuple tmpSmallHead = smallHead;
+                    while (tmpSmallHead != null)
+                    {
+                        this.matchedSmallTuples.add(tmpSmallHead);
+                        tmpSmallHead = tmpSmallHead.next;
+                    }
                 }
-                joined = big.concatLeft(small);
-            }
-            if (joined != null)
-            {
-                checkArgument(!joinedRowBatch.isFull(), "joined row batch is too large");
-                joined.writeTo(joinedRowBatch);
+                while (smallHead != null)
+                {
+                    Tuple joined = big.concatLeft(smallHead);
+                    if (joinedRowBatch.isFull())
+                    {
+                        result.add(joinedRowBatch);
+                        joinedRowBatch = this.joinedSchema.createRowBatch(bigBatch.maxSize);
+                    }
+                    joined.writeTo(joinedRowBatch);
+                    smallHead = smallHead.next;
+                }
             }
         }
-        return joinedRowBatch;
+        if (!joinedRowBatch.isEmpty())
+        {
+            result.add(joinedRowBatch);
+        }
+        return result;
     }
 
     /**
@@ -225,7 +270,7 @@ public class Joiner
         requireNonNull(pixelsWriter, "pixelsWriter is null");
 
         List<Tuple> leftOuterTuples = new ArrayList<>();
-        for (Tuple small : this.smallTable.keySet())
+        for (Tuple small : this.smallTable)
         {
             if (!this.matchedSmallTuples.contains(small))
             {
@@ -246,6 +291,82 @@ public class Joiner
         {
             pixelsWriter.addRowBatch(leftOuterBatch);
         }
+        return true;
+    }
+
+    /**
+     * Get the left outer join results for the tuples from the unmatched small (a.k.a., left) table.
+     * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
+     * the join is left outer join.
+     */
+    public boolean writeLeftOuterAndPartition(PixelsWriter pixelsWriter, int batchSize,
+                                              PartitionInfo partitionInfo) throws IOException
+    {
+        checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
+                "getLeftOuter() can only be used for left or full outer join");
+        checkArgument(batchSize > 0, "batchSize must be positive");
+        requireNonNull(pixelsWriter, "pixelsWriter is null");
+        requireNonNull(partitionInfo, "partitionInfo is null");
+
+        Partitioner partitioner = new Partitioner(partitionInfo.getNumParition(),
+                batchSize, this.joinedSchema, partitionInfo.getKeyColumnIds());
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(partitionInfo.getNumParition());
+        for (int i = 0; i < partitionInfo.getNumParition(); ++i)
+        {
+            partitioned.add(new LinkedList<>());
+        }
+        List<Tuple> leftOuterTuples = new ArrayList<>();
+        for (Tuple small : this.smallTable)
+        {
+            if (!this.matchedSmallTuples.contains(small))
+            {
+                leftOuterTuples.add(small);
+            }
+        }
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
+        for (Tuple small : leftOuterTuples)
+        {
+            if (leftOuterBatch.isFull())
+            {
+                Map<Integer, VectorizedRowBatch> parts = partitioner.partition(leftOuterBatch);
+                for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                {
+                    partitioned.get(entry.getKey()).add(entry.getValue());
+                }
+                //pixelsWriter.addRowBatch(leftOuterBatch);
+                leftOuterBatch.reset();
+            }
+            this.bigNullTuple.concatLeft(small).writeTo(leftOuterBatch);
+        }
+        if (!leftOuterBatch.isEmpty())
+        {
+            Map<Integer, VectorizedRowBatch> parts = partitioner.partition(leftOuterBatch);
+            for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+            {
+                partitioned.get(entry.getKey()).add(entry.getValue());
+            }
+            //pixelsWriter.addRowBatch(leftOuterBatch);
+        }
+        VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+        for (int hash = 0; hash < tailBatches.length; ++hash)
+        {
+            if (!tailBatches[hash].isEmpty())
+            {
+                partitioned.get(hash).add(tailBatches[hash]);
+            }
+        }
+        for (int hash = 0; hash < partitionInfo.getNumParition(); ++hash)
+        {
+            List<VectorizedRowBatch> batches = partitioned.get(hash);
+            if (!batches.isEmpty())
+            {
+                for (VectorizedRowBatch batch : batches)
+                {
+                    pixelsWriter.addRowBatch(batch, hash);
+                }
+            }
+        }
+        partitioned.clear();
         return true;
     }
 

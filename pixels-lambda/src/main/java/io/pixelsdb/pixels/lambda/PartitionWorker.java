@@ -23,7 +23,6 @@ import com.alibaba.fastjson.JSON;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -32,9 +31,10 @@ import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.executor.lambda.PartitionInput;
-import io.pixelsdb.pixels.executor.lambda.PartitionOutput;
-import io.pixelsdb.pixels.executor.lambda.ScanInput.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.output.PartitionOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 
 /**
@@ -55,20 +56,7 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
  */
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
-    private static Storage s3;
-
-    static
-    {
-        try
-        {
-            s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
-        } catch (Exception e)
-        {
-            logger.error("failed to initialize AWS S3 storage", e);
-        }
-    }
+    private static final Logger logger = LoggerFactory.getLogger(PartitionWorker.class);
 
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
@@ -80,15 +68,16 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
-            ArrayList<InputInfo> inputs = event.getInputs();
-            int splitSize = event.getSplitSize();
+            List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             int numPartition = event.getPartitionInfo().getNumParition();
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
+            checkArgument(event.getOutput().getScheme() == Storage.Scheme.s3,
+                    "the storage scheme for the partition result must be s3");
             String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
 
-            String[] cols = event.getCols();
-            TableScanFilter filter = JSON.parseObject(event.getFilter(), TableScanFilter.class);
+            String[] cols = event.getTableInfo().getColumnsToRead();
+            TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
             PartitionOutput partitionOutput = new PartitionOutput();
             AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
             // The partitioned data would be kept in memory.
@@ -97,16 +86,9 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             {
                 partitioned.add(new ConcurrentLinkedQueue<>());
             }
-            for (int i = 0; i < inputs.size();)
+            for (InputSplit inputSplit : inputSplits)
             {
-                int numRg = 0;
-                ArrayList<InputInfo> scanInputs = new ArrayList<>();
-                while (numRg < splitSize)
-                {
-                    InputInfo info = inputs.get(i++);
-                    scanInputs.add(info);
-                    numRg += info.getRgLength();
-                }
+                List<InputInfo> scanInputs = inputSplit.getInputInfos();
 
                 threadPool.execute(() -> {
                     try
@@ -169,35 +151,28 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
-    private void partitionFile(long queryId, ArrayList<InputInfo> scanInputs,
+    private void partitionFile(long queryId, List<InputInfo> scanInputs,
                              String[] cols, TableScanFilter filter, int[] keyColumnIds,
                              List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                              AtomicReference<TypeDescription> writerSchema)
     {
         for (InputInfo inputInfo : scanInputs)
         {
-            PixelsReaderOption option = new PixelsReaderOption();
-            option.skipCorruptRecords(true);
-            option.tolerantSchemaEvolution(true);
-            option.queryId(queryId);
-            option.includeCols(cols);
-            option.rgRange(inputInfo.getRgStart(), inputInfo.getRgLength());
-            VectorizedRowBatch rowBatch;
-
-            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3);
-                 PixelsRecordReader recordReader = pixelsReader.read(option))
+            try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
-                if (!recordReader.isValid())
+                if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
-                    /*
-                     * If the record reader is invalid, it is likely that the rgRange
-                     * in the read option is out of bound (i.e., this is the last file
-                     * in the table that does not have enough row groups to read).
-                     */
-                    break;
+                    continue;
+                }
+                if (inputInfo.getRgStart() + inputInfo.getRgLength() >= pixelsReader.getRowGroupNum())
+                {
+                    inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
 
+                PixelsReaderOption option = getReaderOption(queryId, cols, inputInfo);
+                PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
+                VectorizedRowBatch rowBatch;
 
                 Partitioner partitioner = new Partitioner(partitionResult.size(), rowBatchSize,
                         rowBatchSchema, keyColumnIds);

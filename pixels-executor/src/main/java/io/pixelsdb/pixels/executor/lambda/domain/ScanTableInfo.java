@@ -17,29 +17,39 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.domain;
 
-import com.google.gson.Gson;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
-import org.junit.Test;
+import java.util.List;
 
 /**
  * @author hank
- * Created at: 11/04/2022
+ * @date 02/06/2022
  */
-public class TestOutput
+public class ScanTableInfo extends TableInfo
 {
-    @Test
-    public void testEncodeScanOutput()
+    /**
+     * The json string of the filter (i.e., predicates) to be used in scan.
+     */
+    private String filter;
+
+    /**
+     * Default constructor for Jackson.
+     */
+    public ScanTableInfo() { }
+
+    public ScanTableInfo(String tableName, List<InputSplit> inputs, String[] cols, String filter)
     {
-        ScanOutput scanOutput = new ScanOutput();
-        scanOutput.addOutput("pixels-test/0.out", 1);
-        scanOutput.addOutput("pixels-test/1.out", 1);
-        scanOutput.addOutput("pixels-test/2.out", 1);
-        scanOutput.addOutput("pixels-test/3.out", 1);
-        Gson gson = new Gson();
-        String json = gson.toJson(scanOutput);
-        assert json != null && !json.isEmpty();
-        System.out.println(json);
+        super(tableName, inputs, cols);
+        this.filter = filter;
+    }
+
+    public String getFilter()
+    {
+        return filter;
+    }
+
+    public void setFilter(String filter)
+    {
+        this.filter = filter;
     }
 }
