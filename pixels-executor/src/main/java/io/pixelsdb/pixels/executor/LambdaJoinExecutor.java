@@ -138,7 +138,7 @@ public class LambdaJoinExecutor
                 List<BroadCastJoinTableInfo> leftTableInfos = new ArrayList<>();
                 leftTableInfos.add(leftTableInfo);
                 leftTableInfos.add(rightTableInfo);
-                chainJoinInput.setLeftTables(leftTableInfos);
+                chainJoinInput.setSmallTables(leftTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
                 chainJoinInput.setChainJoinInfos(chainJoinInfos);
@@ -168,7 +168,7 @@ public class LambdaJoinExecutor
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
                     ChainJoinInput chainJoinInput = (ChainJoinInput) childOperator.getJoinInputs().get(0);
-                    chainJoinInput.getLeftTables().add(rightTableInfo);
+                    chainJoinInput.getSmallTables().add(rightTableInfo);
                     chainJoinInput.getChainJoinInfos().add(chainJoinInfo);
                     // no need to create a new operator.
                     return childOperator;
@@ -206,7 +206,7 @@ public class LambdaJoinExecutor
                                 ImmutableList.of("join_" + outputId++));
 
                         ChainJoinInput complete = chainJoinInput.toBuilder()
-                                .setRightTable(rightTableInfo)
+                                .setLargeTable(rightTableInfo)
                                 .setJoinInfo(joinInfo)
                                 .setOutput(output).build();
 

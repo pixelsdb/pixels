@@ -36,13 +36,13 @@ public class ChainJoinInput implements JoinInput
 {
     private long queryId;
     /**
-     * The information of the left tables that are broadcast in the chain join.
+     * The information of the small tables that are broadcast in the chain join.
      */
-    private List<BroadCastJoinTableInfo> leftTables;
+    private List<BroadCastJoinTableInfo> smallTables;
     /**
-     * The information of the right table.
+     * The information of the large table.
      */
-    private BroadCastJoinTableInfo rightTable;
+    private BroadCastJoinTableInfo largeTable;
     /**
      * The information of the chain joins. If there is N left tables and 1 right table,
      * there should be N-1 chain join infos.
@@ -65,13 +65,13 @@ public class ChainJoinInput implements JoinInput
      */
     public ChainJoinInput() { }
 
-    public ChainJoinInput(long queryId, List<BroadCastJoinTableInfo> leftTables,
-                          BroadCastJoinTableInfo rightTable, List<ChainJoinInfo> chainJoinInfos,
+    public ChainJoinInput(long queryId, List<BroadCastJoinTableInfo> smallTables,
+                          BroadCastJoinTableInfo largeTable, List<ChainJoinInfo> chainJoinInfos,
                           JoinInfo joinInfo, MultiOutputInfo output)
     {
         this.queryId = queryId;
-        this.leftTables = leftTables;
-        this.rightTable = rightTable;
+        this.smallTables = smallTables;
+        this.largeTable = largeTable;
         this.chainJoinInfos = chainJoinInfos;
         this.joinInfo = joinInfo;
         this.output = output;
@@ -87,24 +87,24 @@ public class ChainJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public List<BroadCastJoinTableInfo> getLeftTables()
+    public List<BroadCastJoinTableInfo> getSmallTables()
     {
-        return leftTables;
+        return smallTables;
     }
 
-    public void setLeftTables(List<BroadCastJoinTableInfo> leftTables)
+    public void setSmallTables(List<BroadCastJoinTableInfo> smallTables)
     {
-        this.leftTables = leftTables;
+        this.smallTables = smallTables;
     }
 
-    public BroadCastJoinTableInfo getRightTable()
+    public BroadCastJoinTableInfo getLargeTable()
     {
-        return rightTable;
+        return largeTable;
     }
 
-    public void setRightTable(BroadCastJoinTableInfo rightTable)
+    public void setLargeTable(BroadCastJoinTableInfo largeTable)
     {
-        this.rightTable = rightTable;
+        this.largeTable = largeTable;
     }
 
     public List<ChainJoinInfo> getChainJoinInfos()
@@ -150,13 +150,13 @@ public class ChainJoinInput implements JoinInput
         private Builder(ChainJoinInput instance)
         {
             this.builderInstance = new ChainJoinInput(
-                    instance.queryId, instance.leftTables, instance.rightTable,
+                    instance.queryId, instance.smallTables, instance.largeTable,
                     instance.chainJoinInfos, instance.joinInfo, instance.output);
         }
 
-        public Builder setRightTable(BroadCastJoinTableInfo rightTable)
+        public Builder setLargeTable(BroadCastJoinTableInfo largeTable)
         {
-            this.builderInstance.setRightTable(rightTable);
+            this.builderInstance.setLargeTable(largeTable);
             return this;
         }
 

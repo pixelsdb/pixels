@@ -76,21 +76,21 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
 
             long queryId = event.getQueryId();
 
-            List<String> leftPartitioned = event.getLeftTable().getInputFiles();
+            List<String> leftPartitioned = event.getSmallTable().getInputFiles();
             requireNonNull(leftPartitioned, "leftPartitioned is null");
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
-            int leftParallelism = event.getLeftTable().getParallelism();
+            int leftParallelism = event.getSmallTable().getParallelism();
             checkArgument(leftParallelism > 0, "leftParallelism is not positive");
-            String[] leftCols = event.getLeftTable().getColumnsToRead();
-            int[] leftKeyColumnIds = event.getLeftTable().getKeyColumnIds();
+            String[] leftCols = event.getSmallTable().getColumnsToRead();
+            int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
 
-            List<String> rightPartitioned = event.getRightTable().getInputFiles();
+            List<String> rightPartitioned = event.getLargeTable().getInputFiles();
             requireNonNull(rightPartitioned, "rightPartitioned is null");
             checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
-            int rightParallelism = event.getRightTable().getParallelism();
+            int rightParallelism = event.getLargeTable().getParallelism();
             checkArgument(rightParallelism > 0, "rightParallelism is not positive");
-            String[] rightCols = event.getRightTable().getColumnsToRead();
-            int[] rightKeyColumnIds = event.getRightTable().getKeyColumnIds();
+            String[] rightCols = event.getLargeTable().getColumnsToRead();
+            int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
 
             String[] joinedCols = event.getJoinInfo().getResultColumns();
             boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
@@ -166,9 +166,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getLeftTableSize());
+            logger.info("hash table size: " + joiner.getSmallTableSize());
             JoinOutput joinOutput = new JoinOutput();
-            if (joiner.getLeftTableSize() == 0)
+            if (joiner.getSmallTableSize() == 0)
             {
                 // the left table is empty, no need to continue the join.
                 return joinOutput;

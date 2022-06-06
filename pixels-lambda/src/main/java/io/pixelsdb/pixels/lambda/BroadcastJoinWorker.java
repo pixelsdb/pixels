@@ -77,7 +77,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            BroadCastJoinTableInfo leftTable = event.getLeftTable();
+            BroadCastJoinTableInfo leftTable = event.getSmallTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
             requireNonNull(leftInputs, "leftInputs is null");
             checkArgument(leftInputs.size() > 0, "left table is empty");
@@ -85,7 +85,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            BroadCastJoinTableInfo rightTable = event.getRightTable();
+            BroadCastJoinTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             requireNonNull(rightInputs, "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "right table is empty");
@@ -159,7 +159,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getLeftTableSize());
+            logger.info("hash table size: " + joiner.getSmallTableSize());
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
             int i = 0;

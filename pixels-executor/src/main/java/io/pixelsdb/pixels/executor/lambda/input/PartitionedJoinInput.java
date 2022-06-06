@@ -34,13 +34,13 @@ public class PartitionedJoinInput implements JoinInput
      */
     private long queryId;
     /**
-     * The information of the left partitioned table.
+     * The information of the small partitioned table.
      */
-    private PartitionedTableInfo leftTable;
+    private PartitionedTableInfo smallTable;
     /**
-     * The information of the right partitioned table.
+     * The information of the large partitioned table.
      */
-    private PartitionedTableInfo rightTable;
+    private PartitionedTableInfo largeTable;
     /**
      * The information of the partitioned join.
      */
@@ -58,13 +58,13 @@ public class PartitionedJoinInput implements JoinInput
      */
     public PartitionedJoinInput() { }
 
-    public PartitionedJoinInput(long queryId, PartitionedTableInfo leftTable,
-                                PartitionedTableInfo rightTable, PartitionedJoinInfo joinInfo,
+    public PartitionedJoinInput(long queryId, PartitionedTableInfo smallTable,
+                                PartitionedTableInfo largeTable, PartitionedJoinInfo joinInfo,
                                 MultiOutputInfo output)
     {
         this.queryId = queryId;
-        this.leftTable = leftTable;
-        this.rightTable = rightTable;
+        this.smallTable = smallTable;
+        this.largeTable = largeTable;
         this.joinInfo = joinInfo;
         this.output = output;
     }
@@ -79,24 +79,24 @@ public class PartitionedJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public PartitionedTableInfo getLeftTable()
+    public PartitionedTableInfo getSmallTable()
     {
-        return leftTable;
+        return smallTable;
     }
 
-    public void setLeftTable(PartitionedTableInfo leftTable)
+    public void setSmallTable(PartitionedTableInfo smallTable)
     {
-        this.leftTable = leftTable;
+        this.smallTable = smallTable;
     }
 
-    public PartitionedTableInfo getRightTable()
+    public PartitionedTableInfo getLargeTable()
     {
-        return rightTable;
+        return largeTable;
     }
 
-    public void setRightTable(PartitionedTableInfo rightTable)
+    public void setLargeTable(PartitionedTableInfo largeTable)
     {
-        this.rightTable = rightTable;
+        this.largeTable = largeTable;
     }
 
     public PartitionedJoinInfo getJoinInfo()

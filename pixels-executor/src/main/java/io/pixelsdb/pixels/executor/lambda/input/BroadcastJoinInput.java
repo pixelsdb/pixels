@@ -35,13 +35,13 @@ public class BroadcastJoinInput implements JoinInput
     private long queryId;
 
     /**
-     * The small and broadcast table.
+     * The small (i.e., broadcast) table.
      */
-    private BroadCastJoinTableInfo leftTable;
+    private BroadCastJoinTableInfo smallTable;
     /**
-     * The right and big table.
+     * The large table.
      */
-    private BroadCastJoinTableInfo rightTable;
+    private BroadCastJoinTableInfo largeTable;
     /**
      * The information of the broadcast join.
      */
@@ -59,13 +59,13 @@ public class BroadcastJoinInput implements JoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(long queryId, BroadCastJoinTableInfo leftTable,
-                              BroadCastJoinTableInfo rightTable, JoinInfo joinInfo,
+    public BroadcastJoinInput(long queryId, BroadCastJoinTableInfo smallTable,
+                              BroadCastJoinTableInfo largeTable, JoinInfo joinInfo,
                               MultiOutputInfo output)
     {
         this.queryId = queryId;
-        this.leftTable = leftTable;
-        this.rightTable = rightTable;
+        this.smallTable = smallTable;
+        this.largeTable = largeTable;
         this.joinInfo = joinInfo;
         this.output = output;
     }
@@ -80,24 +80,24 @@ public class BroadcastJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public BroadCastJoinTableInfo getLeftTable()
+    public BroadCastJoinTableInfo getSmallTable()
     {
-        return leftTable;
+        return smallTable;
     }
 
-    public void setLeftTable(BroadCastJoinTableInfo leftTable)
+    public void setSmallTable(BroadCastJoinTableInfo smallTable)
     {
-        this.leftTable = leftTable;
+        this.smallTable = smallTable;
     }
 
-    public BroadCastJoinTableInfo getRightTable()
+    public BroadCastJoinTableInfo getLargeTable()
     {
-        return rightTable;
+        return largeTable;
     }
 
-    public void setRightTable(BroadCastJoinTableInfo rightTable)
+    public void setLargeTable(BroadCastJoinTableInfo largeTable)
     {
-        this.rightTable = rightTable;
+        this.largeTable = largeTable;
     }
 
     public JoinInfo getJoinInfo()

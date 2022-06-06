@@ -83,7 +83,7 @@ public class TestBroadcastJoinInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 28, 4)))));
         leftTable.setFilter(leftFilter);
-        joinInput.setLeftTable(leftTable);
+        joinInput.setSmallTable(leftTable);
 
         BroadCastJoinTableInfo rightTable = new BroadCastJoinTableInfo();
         rightTable.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
@@ -99,7 +99,7 @@ public class TestBroadcastJoinInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)))));
         rightTable.setFilter(rightFilter);
-        joinInput.setRightTable(rightTable);
+        joinInput.setLargeTable(rightTable);
 
         JoinInfo joinInfo = new JoinInfo();
         joinInfo.setJoinType(JoinType.EQUI_INNER);

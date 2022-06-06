@@ -95,7 +95,7 @@ public class TestChainJoinInvoker
         chainJoinInfo1.setKeyColumnIds(new int[]{2});
         chainJoinInfos.add(chainJoinInfo1);
         
-        joinInput.setLeftTables(leftTables);
+        joinInput.setSmallTables(leftTables);
         joinInput.setChainJoinInfos(chainJoinInfos);
 
         BroadCastJoinTableInfo lineitem = new BroadCastJoinTableInfo();
@@ -112,7 +112,7 @@ public class TestChainJoinInvoker
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)))));
         lineitem.setFilter(lineitemFilter);
-        joinInput.setRightTable(lineitem);
+        joinInput.setLargeTable(lineitem);
 
         JoinInfo joinInfo = new JoinInfo();
         joinInfo.setJoinType(JoinType.EQUI_INNER);

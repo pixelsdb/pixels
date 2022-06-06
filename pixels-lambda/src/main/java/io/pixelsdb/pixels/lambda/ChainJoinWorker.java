@@ -78,7 +78,7 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
 
             this.queryId = event.getQueryId();
 
-            List<BroadCastJoinTableInfo> leftTables = event.getLeftTables();
+            List<BroadCastJoinTableInfo> leftTables = event.getSmallTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(leftTables, "leftTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");
@@ -86,7 +86,7 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
                     "left table num is not consistent with (chain-join info num + 1).");
             checkArgument(leftTables.size() > 1, "there should be at least two left tables");
 
-            BroadCastJoinTableInfo rightTable = event.getRightTable();
+            BroadCastJoinTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
             String[] rightCols = rightTable.getColumnsToRead();
@@ -297,7 +297,7 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         {
             future.get();
         }
-        logger.info("first left table: " + t1.getTableName() + ", hash table size: " + joiner.getLeftTableSize());
+        logger.info("first left table: " + t1.getTableName() + ", hash table size: " + joiner.getSmallTableSize());
         return joiner;
     }
 
