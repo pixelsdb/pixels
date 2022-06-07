@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
 
 /**
  * The executor of a partitioned join.
@@ -41,11 +40,11 @@ import static java.util.Objects.requireNonNull;
  */
 public class PartitionedJoinOperator extends SingleStageJoinOperator
 {
-    private final List<PartitionInput> leftPartitionInputs;
-    private final List<PartitionInput> rightPartitionInputs;
+    private final List<PartitionInput> smallPartitionInputs;
+    private final List<PartitionInput> largePartitionInputs;
 
-    public PartitionedJoinOperator(List<PartitionInput> leftPartitionInputs,
-                                   List<PartitionInput> rightPartitionInputs,
+    public PartitionedJoinOperator(List<PartitionInput> smallPartitionInputs,
+                                   List<PartitionInput> largePartitionInputs,
                                    List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
         super(joinInputs, joinAlgo);
@@ -53,27 +52,34 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is not supported");
         }
-        if (leftPartitionInputs == null)
+        if (smallPartitionInputs == null)
         {
-            this.leftPartitionInputs = ImmutableList.of();
+            this.smallPartitionInputs = ImmutableList.of();
         }
         else
         {
-            this.leftPartitionInputs = ImmutableList.copyOf(leftPartitionInputs);
+            this.smallPartitionInputs = ImmutableList.copyOf(smallPartitionInputs);
         }
-        this.rightPartitionInputs = ImmutableList.copyOf(requireNonNull(rightPartitionInputs,
-                "rightPartitionInputs is null"));
-        checkArgument(!this.rightPartitionInputs.isEmpty(), "rightPartitionInputs is empty");
+        if (largePartitionInputs == null)
+        {
+            this.largePartitionInputs = ImmutableList.of();
+        }
+        else
+        {
+            this.largePartitionInputs = ImmutableList.copyOf(largePartitionInputs);
+        }
+        checkArgument(!this.smallPartitionInputs.isEmpty() || !this.largePartitionInputs.isEmpty(),
+                "both smallPartitionInputs and largePartitionInputs are empty");
     }
 
-    public List<PartitionInput> getLeftPartitionInputs()
+    public List<PartitionInput> getSmallPartitionInputs()
     {
-        return leftPartitionInputs;
+        return smallPartitionInputs;
     }
 
-    public List<PartitionInput> getRightPartitionInputs()
+    public List<PartitionInput> getLargePartitionInputs()
     {
-        return rightPartitionInputs;
+        return largePartitionInputs;
     }
 
     /**
@@ -87,8 +93,8 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         if (child != null)
         {
             CompletableFuture<JoinOutput>[] childOutputs = child.execute();
-            checkArgument(leftPartitionInputs.isEmpty(), "leftPartitionInputs is not empty");
-            for (PartitionInput partitionInput : rightPartitionInputs)
+            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+            for (PartitionInput partitionInput : largePartitionInputs)
             {
                 PartitionInvoker.invoke((partitionInput));
             }
@@ -97,13 +103,13 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         else
         {
             CompletableFuture<PartitionOutput>[] leftPartitionOutputs =
-                    new CompletableFuture[leftPartitionInputs.size()];
+                    new CompletableFuture[smallPartitionInputs.size()];
             int i = 0;
-            for (PartitionInput partitionInput : leftPartitionInputs)
+            for (PartitionInput partitionInput : smallPartitionInputs)
             {
                 leftPartitionOutputs[i++] = PartitionInvoker.invoke((partitionInput));
             }
-            for (PartitionInput partitionInput : leftPartitionInputs)
+            for (PartitionInput partitionInput : smallPartitionInputs)
             {
                 PartitionInvoker.invoke((partitionInput));
             }
