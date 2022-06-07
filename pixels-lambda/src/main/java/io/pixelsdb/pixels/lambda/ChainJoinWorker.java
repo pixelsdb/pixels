@@ -232,9 +232,10 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
                         nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
-                Joiner nextJoiner = new Joiner(nextJoinInfo.getJoinType(), nextJoinInfo.getResultColumns(),
-                        nextJoinInfo.isOutputJoinKeys(), currJoiner.getJoinedSchema(), currJoinInfo.getKeyColumnIds(),
-                        getResultSchema(nextTableSchema, nextTable.getColumnsToRead()), nextTable.getKeyColumnIds());
+                TypeDescription nextResultSchema = getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
+                Joiner nextJoiner = new Joiner(nextJoinInfo.getJoinType(), nextJoinInfo.isOutputJoinKeys(),
+                        currJoiner.getJoinedSchema(), nextJoinInfo.getSmallColumnAlias(), currJoinInfo.getKeyColumnIds(),
+                        nextResultSchema, nextJoinInfo.getLargeColumnAlias(), nextTable.getKeyColumnIds());
                 chainJoin(executor, currJoiner, nextJoiner, currRightTable);
                 currJoiner = nextJoiner;
             }
@@ -242,9 +243,10 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
             BroadCastJoinTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
                     rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
-            Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(), lastJoinInfo.getResultColumns(),
-                    lastJoinInfo.isOutputJoinKeys(), currJoiner.getJoinedSchema(), lastChainJoin.getKeyColumnIds(),
-                    getResultSchema(rightTableSchema, rightTable.getColumnsToRead()), rightTable.getKeyColumnIds());
+            TypeDescription rightResultSchema = getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
+            Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(), lastJoinInfo.isOutputJoinKeys(),
+                    currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(), lastChainJoin.getKeyColumnIds(),
+                    rightResultSchema, lastJoinInfo.getLargeColumnAlias(), rightTable.getKeyColumnIds());
             chainJoin(executor, currJoiner, finalJoiner, lastLeftTable);
             return finalJoiner;
         } catch (Exception e)
@@ -274,9 +276,9 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
         getFileSchema(executor, s3, t1Schema, t2Schema,
                 t1.getInputSplits().get(0).getInputInfos().get(0).getPath(),
                 t2.getInputSplits().get(0).getInputInfos().get(0).getPath());
-        Joiner joiner = new Joiner(joinInfo.getJoinType(), joinInfo.getResultColumns(), joinInfo.isOutputJoinKeys(),
-                getResultSchema(t1Schema.get(), t1.getColumnsToRead()), t1.getKeyColumnIds(),
-                getResultSchema(t2Schema.get(), t2.getColumnsToRead()), t2.getKeyColumnIds());
+        Joiner joiner = new Joiner(joinInfo.getJoinType(), joinInfo.isOutputJoinKeys(),
+                getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(), t1.getKeyColumnIds(),
+                getResultSchema(t2Schema.get(), t2.getColumnsToRead()), joinInfo.getLargeColumnAlias(), t2.getKeyColumnIds());
         List<Future> leftFutures = new ArrayList<>();
         TableScanFilter t1Filter = JSON.parseObject(t1.getFilter(), TableScanFilter.class);
         for (InputSplit inputSplit : t1.getInputSplits())

@@ -82,8 +82,8 @@ public class TestPartitionedJoinInvoker
         joinInfo.setJoinType(JoinType.EQUI_INNER);
         joinInfo.setNumPartition(40);
         joinInfo.setHashValues(Arrays.asList(16));
-        joinInfo.setResultColumns(new String[]{"o_custkey", "o_orderstatus",
-                "o_orderdate", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setSmallColumnAlias(new String[]{"o_custkey", "o_orderstatus", "o_orderdate"});
+        joinInfo.setLargeColumnAlias(new String[]{"l_partkey", "l_extendedprice", "l_discount"});
         joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));

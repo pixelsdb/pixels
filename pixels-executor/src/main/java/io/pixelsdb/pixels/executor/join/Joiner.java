@@ -80,20 +80,23 @@ public class Joiner
      * the columns from the large (a.k.a., right) table.
      *
      * @param joinType the join type
-     * @param joinedCols the column names in the joined schema, in the same order of the columns
-     *                   in small schema and large schema
      * @param includeKeyCols whether joinedCols includes the key columns from both tables.
      * @param smallSchema the schema of the small table
+     * @param smallColumnAlias the alias of the columns from the small table. These alias
+     *                         are used as the column name in {@link #joinedSchema}.
      * @param smallKeyColumnIds the ids of the key columns of the small table
      * @param largeSchema the schema of the large table
+     * @param largeColumnAlias the alias of the columns from the large table. These alias
+     *                         are used as the column name in {@link #joinedSchema}.
      * @param largeKeyColumnIds the ids of the key columns of the large table
      */
-    public Joiner(JoinType joinType, String[] joinedCols, boolean includeKeyCols,
-                  TypeDescription smallSchema, int[] smallKeyColumnIds,
-                  TypeDescription largeSchema, int[] largeKeyColumnIds)
+    public Joiner(JoinType joinType, boolean includeKeyCols,
+                  TypeDescription smallSchema, String[] smallColumnAlias, int[] smallKeyColumnIds,
+                  TypeDescription largeSchema, String[] largeColumnAlias, int[] largeKeyColumnIds)
     {
         this.joinType = requireNonNull(joinType, "joinType is null");
-        requireNonNull(joinedCols, "joinedCols is null");
+        requireNonNull(smallColumnAlias, "smallColumnAlias is null");
+        requireNonNull(largeColumnAlias, "largeColumnAlias is null");
         checkArgument(joinType != JoinType.UNKNOWN, "joinType is UNKNOWN");
         this.smallSchema = requireNonNull(smallSchema, "smallSchema is null");
         this.largeSchema = requireNonNull(largeSchema, "largeSchema is null");
@@ -133,9 +136,9 @@ public class Joiner
         {
             outputColumNum -= (smallKeyColumnIds.length + largeKeyColumnIds.length);
         }
-        checkArgument(outputColumNum == joinedCols.length,
+        checkArgument(outputColumNum == smallColumnAlias.length + largeColumnAlias.length,
                 "joinedCols does not contain correct number of elements");
-        int joinedColId = 0;
+        int colAliasId = 0;
         for (int i = 0; i < smallColumnNames.size(); ++i)
         {
             if ((!this.includeKeyCols) && smallKeyColumnIdSet.contains(i))
@@ -143,8 +146,9 @@ public class Joiner
                 // ignore the join key columns.
                 continue;
             }
-            this.joinedSchema.addField(joinedCols[joinedColId++], smallColumnTypes.get(i));
+            this.joinedSchema.addField(smallColumnAlias[colAliasId++], smallColumnTypes.get(i));
         }
+        colAliasId = 0;
         for (int i = 0; i < largeColumnNames.size(); ++i)
         {
             if ((!this.includeKeyCols || joinType == JoinType.NATURAL) && largeKeyColumnIdSet.contains(i))
@@ -153,7 +157,7 @@ public class Joiner
                 // for natural join, the key columns of the right table is ignored.
                 continue;
             }
-            this.joinedSchema.addField(joinedCols[joinedColId++], largeColumnTypes.get(i));
+            this.joinedSchema.addField(largeColumnAlias[colAliasId++], largeColumnTypes.get(i));
         }
         // create the null tuples for outer join.
         int numSmallIncludedColumns = this.includeKeyCols ?

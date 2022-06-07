@@ -74,7 +74,8 @@ public class TestChainJoinInvoker
         chainJoinInfo0.setJoinType(JoinType.EQUI_INNER);
         chainJoinInfo0.setOutputJoinKeys(false);
         chainJoinInfo0.setPostPartition(false);
-        chainJoinInfo0.setResultColumns(new String[]{"r_name", "n_nationkey", "n_name"});
+        chainJoinInfo0.setSmallColumnAlias(new String[]{"r_name"});
+        chainJoinInfo0.setLargeColumnAlias(new String[]{"n_nationkey", "n_name"});
         chainJoinInfo0.setKeyColumnIds(new int[]{1});
         chainJoinInfos.add(chainJoinInfo0);
 
@@ -91,7 +92,8 @@ public class TestChainJoinInvoker
         chainJoinInfo1.setJoinType(JoinType.EQUI_INNER);
         chainJoinInfo1.setOutputJoinKeys(false);
         chainJoinInfo1.setPostPartition(false);
-        chainJoinInfo1.setResultColumns(new String[]{"r_name", "n_name", "s_suppkey", "s_name"});
+        chainJoinInfo1.setSmallColumnAlias(new String[]{"r_name", "n_name"});
+        chainJoinInfo1.setLargeColumnAlias(new String[]{"s_suppkey", "s_name"});
         chainJoinInfo1.setKeyColumnIds(new int[]{2});
         chainJoinInfos.add(chainJoinInfo1);
         
@@ -116,7 +118,8 @@ public class TestChainJoinInvoker
 
         JoinInfo joinInfo = new JoinInfo();
         joinInfo.setJoinType(JoinType.EQUI_INNER);
-        joinInfo.setResultColumns(new String[]{"r_name", "n_name", "s_name", "l_orderkey", "l_extendedprice", "l_discount"});
+        joinInfo.setSmallColumnAlias(new String[]{"r_name", "n_name", "s_name"});
+        joinInfo.setLargeColumnAlias(new String[]{"l_orderkey", "l_extendedprice", "l_discount"});
         joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 100));

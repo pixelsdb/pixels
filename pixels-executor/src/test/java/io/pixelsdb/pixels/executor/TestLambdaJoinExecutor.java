@@ -56,7 +56,7 @@ public class TestLambdaJoinExecutor
 
         JoinedTable joinedTable1 = new JoinedTable(
                 "join_1", "region_join_nation", "region_join_nation",
-                new String[] {"r_name", "n_nationkey", "n_name"}, false, join1);
+                new String[] {"r_name"}, new String[]{"n_nationkey", "n_name"}, false, join1);
 
         BaseTable supplier = new BaseTable(
                 "tpch", "supplier", "supplier",
@@ -70,7 +70,8 @@ public class TestLambdaJoinExecutor
                 "join_2",
                 "region_join_nation_join_supplier",
                 "region_join_nation_join_supplier",
-                new String[] {"r_name", "n_name", "s_suppkey", "s_name", "s_acctbal"},
+                new String[] {"r_name", "n_name"},
+                new String[] {"s_suppkey", "s_name", "s_acctbal"},
                 false, join2);
 
         BaseTable lineitem = new BaseTable(
@@ -84,7 +85,8 @@ public class TestLambdaJoinExecutor
         JoinedTable root = new JoinedTable("tpch",
                 "region_join_nation_join_supplier_join_lineitem",
                 "region_join_nation_join_supplier_join_lineitem",
-                new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_orderkey", "l_extendedprice", "l_shipdate"},
+                new String[] {"r_name", "n_name", "s_name", "s_acctbal"},
+                new String[] {"l_orderkey", "l_extendedprice", "l_shipdate"},
                 false, join3);
 
         LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(
@@ -111,7 +113,7 @@ public class TestLambdaJoinExecutor
 
         JoinedTable joinedTable1 = new JoinedTable(
                 "join_1", "region_join_nation", "region_join_nation",
-                new String[] {"r_name", "n_nationkey", "n_name"}, false, join1);
+                new String[] {"r_name"}, new String[] {"n_nationkey", "n_name"}, false, join1);
 
         BaseTable supplier = new BaseTable(
                 "tpch", "supplier", "supplier",
@@ -125,7 +127,8 @@ public class TestLambdaJoinExecutor
                 "join_2",
                 "region_join_nation_join_supplier",
                 "region_join_nation_join_supplier",
-                new String[] {"r_name", "n_name", "s_suppkey", "s_name", "s_acctbal"},
+                new String[] {"r_name", "n_name"},
+                new String[] {"s_suppkey", "s_name", "s_acctbal"},
                 false, join2);
 
         BaseTable lineitem = new BaseTable(
@@ -139,7 +142,8 @@ public class TestLambdaJoinExecutor
         JoinedTable joinedTable3 = new JoinedTable("tpch",
                 "region_join_nation_join_supplier_join_lineitem",
                 "region_join_nation_join_supplier_join_lineitem",
-                new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_orderkey", "l_extendedprice", "l_shipdate"},
+                new String[]{"r_name", "n_name", "s_name", "s_acctbal"},
+                new String[]{"l_orderkey", "l_extendedprice", "l_shipdate"},
                 false, join3);
 
         BaseTable orders = new BaseTable(
@@ -153,8 +157,8 @@ public class TestLambdaJoinExecutor
         JoinedTable joinedTable4 = new JoinedTable("tpch",
                 "region_join_nation_join_supplier_join_lineitem_join_orders",
                 "region_join_nation_join_supplier_join_lineitem_join_orders",
-                new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate",
-                        "o_custkey", "o_orderdate", "o_totalprice"},
+                new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate"},
+                new String[]{"o_custkey", "o_orderdate", "o_totalprice"},
                 false, join4);
 
         BaseTable customer = new BaseTable(
@@ -169,7 +173,7 @@ public class TestLambdaJoinExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate",
-                        "o_orderdate", "o_totalprice", "c_name"},
+                        "o_orderdate", "o_totalprice"}, new String[]{"c_name"},
                 false, join5);
 
         LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(

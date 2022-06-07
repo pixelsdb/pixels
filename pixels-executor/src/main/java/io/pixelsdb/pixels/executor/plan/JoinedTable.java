@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ObjectArrays;
 
 /**
  * The table (view) of the join result.
@@ -13,6 +14,8 @@ public class JoinedTable implements Table
     private final String tableName;
     private final String tableAlias;
     private final String[] columnNames;
+    private final String[] leftColumnNames;
+    private final String[] rightColumnNames;
     /**
      * Whether the {@link #columnNames} includes the key columns from each joined table.
      */
@@ -20,12 +23,15 @@ public class JoinedTable implements Table
     private final Join join;
 
     public JoinedTable(String schemaName, String tableName, String tableAlias,
-                       String[] columnNames, boolean includeKeyColumns, Join join)
+                       String[] leftColumnNames, String[] rightColumnNames,
+                       boolean includeKeyColumns, Join join)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
-        this.columnNames = columnNames;
+        this.leftColumnNames = leftColumnNames;
+        this.rightColumnNames = rightColumnNames;
+        this.columnNames = ObjectArrays.concat(leftColumnNames, rightColumnNames, String.class);
         this.includeKeyColumns = includeKeyColumns;
         this.join = join;
     }
@@ -58,6 +64,16 @@ public class JoinedTable implements Table
     public String[] getColumnNames()
     {
         return columnNames;
+    }
+
+    public String[] getLeftColumnNames()
+    {
+        return leftColumnNames;
+    }
+
+    public String[] getRightColumnNames()
+    {
+        return rightColumnNames;
     }
 
     public boolean isIncludeKeyColumns()

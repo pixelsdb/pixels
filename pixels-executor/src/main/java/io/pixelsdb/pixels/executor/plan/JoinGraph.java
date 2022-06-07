@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ObjectArrays;
 
 import java.util.*;
 
@@ -174,14 +173,14 @@ public class JoinGraph
                     newJoin = new Join(left, right, leftKeyColumnIds, rightKeyColumnIds,
                             baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
-                String[] joinedColumns = ObjectArrays.concat(newJoin.getLeftTable().getColumnNames(),
-                        newJoin.getRightTable().getColumnNames(), String.class);
+
                 String joinedSchemaName = "join_" + UUID.randomUUID().toString().replace("-", "");
                 String joinedTableName = newJoin.getLeftTable().getTableName() + "_join_" +
                         newJoin.getRightTable().getTableName();
                 // TODO: decide includeKeyColumns.
                 joinRoot = new JoinedTable(joinedSchemaName, joinedTableName, joinedTableName,
-                        joinedColumns, true, newJoin);
+                        newJoin.getLeftTable().getColumnNames(), newJoin.getRightTable().getColumnNames(),
+                        true, newJoin);
             }
             else
             {

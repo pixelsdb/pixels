@@ -92,7 +92,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             String[] rightCols = event.getLargeTable().getColumnsToRead();
             int[] rightKeyColumnIds = event.getLargeTable().getKeyColumnIds();
 
-            String[] joinedCols = event.getJoinInfo().getResultColumns();
+            String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
+            String[] rightColAlias = event.getJoinInfo().getLargeColumnAlias();
             boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
@@ -135,8 +136,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0), rightPartitioned.get(0));
-            Joiner joiner = new Joiner(joinType, joinedCols, includeKeyCols,
-                    leftSchema.get(), leftKeyColumnIds, rightSchema.get(), rightKeyColumnIds);
+            Joiner joiner = new Joiner(joinType, includeKeyCols,
+                    leftSchema.get(), leftColAlias, leftKeyColumnIds,
+                    rightSchema.get(), rightColAlias, rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
             int leftSplitSize = leftPartitioned.size() / leftParallelism;
