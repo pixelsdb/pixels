@@ -14,25 +14,14 @@ public class JoinedTable implements Table
     private final String tableName;
     private final String tableAlias;
     private final String[] columnNames;
-    private final String[] leftColumnNames;
-    private final String[] rightColumnNames;
-    /**
-     * Whether the {@link #columnNames} includes the key columns from each joined table.
-     */
-    private final boolean includeKeyColumns;
     private final Join join;
 
-    public JoinedTable(String schemaName, String tableName, String tableAlias,
-                       String[] leftColumnNames, String[] rightColumnNames,
-                       boolean includeKeyColumns, Join join)
+    public JoinedTable(String schemaName, String tableName, String tableAlias, Join join)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
-        this.leftColumnNames = leftColumnNames;
-        this.rightColumnNames = rightColumnNames;
-        this.columnNames = ObjectArrays.concat(leftColumnNames, rightColumnNames, String.class);
-        this.includeKeyColumns = includeKeyColumns;
+        this.columnNames = ObjectArrays.concat(join.getLeftColumnAlias(), join.getRightColumnAlias(), String.class);
         this.join = join;
     }
 
@@ -64,21 +53,6 @@ public class JoinedTable implements Table
     public String[] getColumnNames()
     {
         return columnNames;
-    }
-
-    public String[] getLeftColumnNames()
-    {
-        return leftColumnNames;
-    }
-
-    public String[] getRightColumnNames()
-    {
-        return rightColumnNames;
-    }
-
-    public boolean isIncludeKeyColumns()
-    {
-        return includeKeyColumns;
     }
 
     public Join getJoin()

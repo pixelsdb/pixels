@@ -38,5 +38,8 @@ public interface Table
 
     public String getTableAlias();
 
+    /**
+     * @return the names of the columns that are read from the table.
+     */
     public String[] getColumnNames();
 }

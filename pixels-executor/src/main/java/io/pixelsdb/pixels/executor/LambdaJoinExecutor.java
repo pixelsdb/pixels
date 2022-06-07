@@ -130,8 +130,8 @@ public class LambdaJoinExecutor
                 BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
-                        joinType, joinedTable.getLeftColumnNames(), joinedTable.getRightColumnNames(),
-                        parent.get().getJoin().getLeftKeyColumnIds(), joinedTable.isIncludeKeyColumns(),
+                        joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                        parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
                         false, null);
 
                 ChainJoinInput chainJoinInput = new ChainJoinInput();
@@ -164,8 +164,8 @@ public class LambdaJoinExecutor
                     BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
-                            joinType, joinedTable.getLeftColumnNames(), joinedTable.getRightColumnNames(),
-                            parent.get().getJoin().getLeftKeyColumnIds(), joinedTable.isIncludeKeyColumns(),
+                            joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                            parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
                             false, null);
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
@@ -187,9 +187,8 @@ public class LambdaJoinExecutor
                         postPartitionInfo = new PartitionInfo(
                                 parent.get().getJoin().getLeftKeyColumnIds(), 40);
                     }
-                    JoinInfo joinInfo = new JoinInfo(joinType, joinedTable.getLeftColumnNames(),
-                            joinedTable.getRightColumnNames(), joinedTable.isIncludeKeyColumns(),
-                            postPartition, postPartitionInfo);
+                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                            join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
@@ -284,9 +283,8 @@ public class LambdaJoinExecutor
                 postPartitionInfo = new PartitionInfo(
                         parent.get().getJoin().getLeftKeyColumnIds(), 40);
             }
-            JoinInfo joinInfo = new JoinInfo(joinType, joinedTable.getLeftColumnNames(),
-                    joinedTable.getRightColumnNames(), joinedTable.isIncludeKeyColumns(),
-                    postPartition, postPartitionInfo);
+            JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                    join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
             int outputId = 0;
@@ -457,8 +455,8 @@ public class LambdaJoinExecutor
         {
             // TODO: get numPartition from optimizer
             PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(
-                    joinedTable.getJoin().getJoinType(), joinedTable.getLeftColumnNames(),
-                    joinedTable.getRightColumnNames(), joinedTable.isIncludeKeyColumns(),
+                    joinedTable.getJoin().getJoinType(), joinedTable.getJoin().getLeftColumnAlias(),
+                    joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().isIncludeKeyColumns(),
                     postPartition, postPartitionInfo, 40, ImmutableList.of(i));
 
             ImmutableList.Builder<String> outputFileNames = ImmutableList.builder();
