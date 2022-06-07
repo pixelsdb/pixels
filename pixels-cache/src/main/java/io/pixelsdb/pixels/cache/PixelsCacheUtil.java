@@ -270,6 +270,7 @@ public class PixelsCacheUtil
                 break;
             }
         }
+//        Thread.sleep(CACHE_READ_LEASE_MS);
     }
 
     public static void endIndexWrite(MemoryMappedFile indexFile)
