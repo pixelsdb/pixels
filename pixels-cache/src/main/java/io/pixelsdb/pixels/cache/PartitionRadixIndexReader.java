@@ -3,8 +3,6 @@ package io.pixelsdb.pixels.cache;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.checkerframework.checker.units.qual.C;
-import org.openjsse.sun.security.util.Cache;
 
 import java.nio.ByteBuffer;
 import java.util.function.Supplier;

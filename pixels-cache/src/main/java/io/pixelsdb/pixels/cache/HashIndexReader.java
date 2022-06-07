@@ -11,11 +11,11 @@ import java.util.Arrays;
 
 public class HashIndexReader implements AutoCloseable, CacheIndexReader {
 
-    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
+    private static final Logger logger = LogManager.getLogger(HashIndexReader.class);
     private final byte[] key = new byte[PixelsCacheKey.SIZE];
     private final ByteBuffer keyBuf = ByteBuffer.wrap(key).order(ByteOrder.LITTLE_ENDIAN);
     private final int kvSize = PixelsCacheKey.SIZE + PixelsCacheIdx.SIZE;
-    private final int HEADER_OFFSET = 8;
+    private final int HEADER_OFFSET = PixelsCacheUtil.INDEX_RADIX_OFFSET + 8;
     private final byte[] kv = new byte[kvSize];
     private final ByteBuffer kvBuf = ByteBuffer.wrap(kv).order(ByteOrder.LITTLE_ENDIAN);
 
@@ -29,9 +29,8 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
     HashIndexReader(MemoryMappedFile indexFile)
     {
         this.indexFile = indexFile;
-        this.tableSize = (int) indexFile.getLong(0);
-        System.out.println("tableSize=" + tableSize);
-        System.out.println("cacheIdxAddr=" + cacheIdxBufAddr);
+        this.tableSize = (int) indexFile.getLong(PixelsCacheUtil.INDEX_RADIX_OFFSET);
+        logger.debug("tableSize=" + tableSize);
     }
 
     private int hashcode(byte[] bytes) {

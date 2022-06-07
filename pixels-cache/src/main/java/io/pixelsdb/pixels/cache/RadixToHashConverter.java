@@ -3,6 +3,7 @@ package io.pixelsdb.pixels.cache;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+// TODO: the RADIX_HEADER should also be written
 public class RadixToHashConverter {
     private final int HEADER_OFFSET = 8;
     private final MemoryMappedFile radixFile;
