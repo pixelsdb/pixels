@@ -130,6 +130,7 @@ public class TestPartitionCacheWriter {
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
                 .setOverwrite(true)
+                .setWriteContent(false)
                 .setHostName(hostName)
                 .setCacheConfig(cacheConfig)
                 .build();
@@ -182,6 +183,7 @@ public class TestPartitionCacheWriter {
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
                 .setOverwrite(true)
+                .setWriteContent(true)
                 .setHostName(hostName)
                 .setCacheConfig(cacheConfig)
                 .build();
@@ -245,6 +247,7 @@ public class TestPartitionCacheWriter {
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
                 .setOverwrite(false) // dont overwrite
+                .setWriteContent(false)
                 .setHostName(hostName)
                 .setCacheConfig(cacheConfig)
                 .build();
@@ -342,6 +345,7 @@ public class TestPartitionCacheWriter {
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
                 .setOverwrite(false) // dont overwrite
+                .setWriteContent(false)
                 .setHostName(hostName)
                 .setCacheConfig(cacheConfig)
                 .build();
@@ -422,6 +426,7 @@ public class TestPartitionCacheWriter {
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
                 .setOverwrite(false) // dont overwrite
+                .setWriteContent(true)
                 .setHostName(hostName)
                 .setCacheConfig(cacheConfig)
                 .build();

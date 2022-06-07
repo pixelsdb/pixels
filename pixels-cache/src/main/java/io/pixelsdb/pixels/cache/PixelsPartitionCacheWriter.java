@@ -36,6 +36,7 @@ public class PixelsPartitionCacheWriter {
     private final MemoryMappedFile indexDiskBackFile;
     private final Storage storage;
     private final EtcdUtil etcdUtil;
+    private final boolean writeContent;
 
 
     /**
@@ -70,7 +71,8 @@ public class PixelsPartitionCacheWriter {
                               PixelsRadix[] radixs,
                               int partitions,
                               EtcdUtil etcdUtil,
-                              String host)
+                              String host,
+                              boolean writeContent)
     {
         this.cacheBackFile = cacheFile;
         this.indexBackFile = indexFile;
@@ -94,6 +96,7 @@ public class PixelsPartitionCacheWriter {
 
         this.etcdUtil = etcdUtil;
         this.host = host;
+        this.writeContent = writeContent;
     }
 
     public static class Builder
@@ -110,9 +113,16 @@ public class PixelsPartitionCacheWriter {
         private int partitions = 16;
         // TODO: configure it with pixels.properties
         private Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory = RadixIndexWriter::new;
+        private boolean writeContent = false;
 
         private Builder()
         {
+        }
+
+        public PixelsPartitionCacheWriter.Builder setWriteContent(boolean writeContent)
+        {
+            this.writeContent = writeContent;
+            return this;
         }
 
         public PixelsPartitionCacheWriter.Builder setPartitions(int partitions)
@@ -252,7 +262,7 @@ public class PixelsPartitionCacheWriter {
 
             return new PixelsPartitionCacheWriter(cacheFile, indexFile, indexDiskFile,
                     cachePartitions, indexPartitions, indexDiskPartitions, indexWriterFactory, storage, radixs,
-                    partitions, etcdUtil, builderHostName);
+                    partitions, etcdUtil, builderHostName, writeContent);
         }
     }
 
@@ -481,7 +491,9 @@ public class PixelsPartitionCacheWriter {
                 indexWriter.put(new PixelsCacheKey(blockId, rowGroupId, columnId),
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
-//                cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+                if (writeContent) {
+                    cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+                }
                 logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
                 currCacheOffset += physicalLen;
