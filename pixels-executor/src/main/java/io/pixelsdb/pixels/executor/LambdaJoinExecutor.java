@@ -38,10 +38,7 @@ import io.pixelsdb.pixels.executor.lambda.PartitionedJoinOperator;
 import io.pixelsdb.pixels.executor.lambda.SingleStageJoinOperator;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.*;
-import io.pixelsdb.pixels.executor.plan.BaseTable;
-import io.pixelsdb.pixels.executor.plan.Join;
-import io.pixelsdb.pixels.executor.plan.JoinedTable;
-import io.pixelsdb.pixels.executor.plan.Table;
+import io.pixelsdb.pixels.executor.plan.*;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -136,10 +133,10 @@ public class LambdaJoinExecutor
 
                 ChainJoinInput chainJoinInput = new ChainJoinInput();
                 chainJoinInput.setQueryId(queryId);
-                List<BroadCastJoinTableInfo> leftTableInfos = new ArrayList<>();
-                leftTableInfos.add(leftTableInfo);
-                leftTableInfos.add(rightTableInfo);
-                chainJoinInput.setSmallTables(leftTableInfos);
+                List<BroadCastJoinTableInfo> smallTableInfos = new ArrayList<>();
+                smallTableInfos.add(leftTableInfo);
+                smallTableInfos.add(rightTableInfo);
+                chainJoinInput.setSmallTables(smallTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
                 chainJoinInput.setChainJoinInfos(chainJoinInfos);
@@ -453,12 +450,6 @@ public class LambdaJoinExecutor
         ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
         for (int i = 0; i < 40; ++i)
         {
-            // TODO: get numPartition from optimizer
-            PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(
-                    joinedTable.getJoin().getJoinType(), joinedTable.getJoin().getLeftColumnAlias(),
-                    joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().isIncludeKeyColumns(),
-                    postPartition, postPartitionInfo, 40, ImmutableList.of(i));
-
             ImmutableList.Builder<String> outputFileNames = ImmutableList.builder();
             for (int j = 0; j < 4; ++j) // TODO: get parallelism from config file.
             {
@@ -469,8 +460,27 @@ public class LambdaJoinExecutor
                     "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
                     null, null, null, true, outputFileNames.build());
 
-            PartitionedJoinInput joinInput = new PartitionedJoinInput(
-                    queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+            PartitionedJoinInput joinInput;
+            if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
+            {
+                // TODO: get numPartition from the optimizer.
+                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
+                        joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
+                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        40, ImmutableList.of(i));
+                 joinInput = new PartitionedJoinInput(
+                        queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+            }
+            else
+            {
+                // TODO: get numPartition from the optimizer.
+                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
+                        joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
+                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        40, ImmutableList.of(i));
+                joinInput = new PartitionedJoinInput(
+                        queryId, rightTableInfo, leftTableInfo, joinInfo, output);
+            }
 
             joinInputs.add(joinInput);
         }

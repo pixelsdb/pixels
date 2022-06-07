@@ -171,7 +171,7 @@ public class TestLambdaJoinExecutor
         Join join5 = new Join(joinedTable4, customer,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate",
                         "o_orderdate", "o_totalprice"}, new String[]{"c_name"},
-                new int[]{6}, new int[]{0}, false,
+                new int[]{0}, new int[]{0}, false,
                 JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable root = new JoinedTable("tpch",

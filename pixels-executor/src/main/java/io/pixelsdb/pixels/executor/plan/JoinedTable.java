@@ -16,12 +16,30 @@ public class JoinedTable implements Table
     private final String[] columnNames;
     private final Join join;
 
+    /**
+     * The {@link JoinedTable#columnNames} of this class is constructed by the colum alias
+     * of the left and right table. The column alias from the smaller table always come first.
+     *
+     * @param schemaName the schema name
+     * @param tableName the table name
+     * @param tableAlias the table alias
+     * @param join the join between the left and right table
+     */
     public JoinedTable(String schemaName, String tableName, String tableAlias, Join join)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
-        this.columnNames = ObjectArrays.concat(join.getLeftColumnAlias(), join.getRightColumnAlias(), String.class);
+        if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+        {
+            this.columnNames = ObjectArrays.concat(
+                    join.getLeftColumnAlias(), join.getRightColumnAlias(), String.class);
+        }
+        else
+        {
+            this.columnNames = ObjectArrays.concat(
+                    join.getRightColumnAlias(), join.getLeftColumnAlias(), String.class);
+        }
         this.join = join;
     }
 
