@@ -23,6 +23,7 @@ public class HashIndexWriter implements CacheIndexWriter {
         this.out = out;
         this.out.clear();
         this.tableSize = out.getSize() / kvSize;
+        logger.debug("tablesize=" + this.tableSize);
         out.setLong(currentIndexOffset, tableSize); // write table size, it can also be derived from the mmap file though
         currentIndexOffset += 8;
     }
@@ -55,6 +56,7 @@ public class HashIndexWriter implements CacheIndexWriter {
             out.getBytes(offset + currentIndexOffset, kv, 0, this.kvSize);
             valid = kvBuf.getLong(0) == 0 && kvBuf.getLong(8) == 0 && kvBuf.getLong(16) == 0;
         }
+        logger.trace(cacheKey + " put to bucket " + bucket + " offset " + offset);
         kvBuf.position(0);
         kvBuf.putLong(cacheKey.blockId).putShort(cacheKey.rowGroupId).putShort(cacheKey.columnId)
                 .putLong(cacheIdx.offset).putInt(cacheIdx.length);

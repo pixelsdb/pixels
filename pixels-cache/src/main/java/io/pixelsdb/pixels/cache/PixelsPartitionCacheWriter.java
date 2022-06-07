@@ -119,6 +119,18 @@ public class PixelsPartitionCacheWriter {
         {
         }
 
+        public PixelsPartitionCacheWriter.Builder setIndexType(String indexType)
+        {
+            checkArgument(Objects.equals(indexType, "hash") || Objects.equals(indexType, "radix"),
+                    "unknown index type " + indexType);
+            if (indexType.equals("hash")) {
+                indexWriterFactory = HashIndexWriter::new;
+            } else {
+                indexWriterFactory = RadixIndexWriter::new;
+            }
+            return this;
+        }
+
         public PixelsPartitionCacheWriter.Builder setWriteContent(boolean writeContent)
         {
             this.writeContent = writeContent;

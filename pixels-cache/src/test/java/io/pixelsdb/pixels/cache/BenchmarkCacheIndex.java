@@ -33,7 +33,9 @@ public class BenchmarkCacheIndex {
             Configurator.setRootLevel(Level.DEBUG);
             bigEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
             littleEndianIndexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
-            hashIndexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
+//            hashIndexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index", 102400000);
+            hashIndexFile = new MemoryMappedFile("/dev/shm/pixels.hash-index2", 102400000);
+
             hashIndexDiskFile = new RandomAccessFile("/dev/shm/pixels.hash-index", "r");
 
             BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
@@ -63,18 +65,20 @@ public class BenchmarkCacheIndex {
         double totalIO;
         double iops;
         double latency;
+        long dramAccess;
 
-        BenchmarkResult(double totalIO, double elapsedInMili) {
+        BenchmarkResult(double totalIO, double elapsedInMili, long dramAccess) {
             this.elapsed = elapsedInMili;
             this.totalIO = totalIO;
             this.iops = totalIO / (elapsed / 1e3);
             this.latency = 1.0 / this.iops * 1000;
+            this.dramAccess = dramAccess;
         }
 
         @Override
         public String toString() {
-            return String.format("elapsed=%fms(%fs), IOPS=%f, latency=%fms, totalIO=%f",
-                    elapsed, elapsed / 1e3, iops, latency, totalIO);
+            return String.format("elapsed=%fms(%fs), IOPS=%f, latency=%fms, totalIO=%f, ramAccessPerKey=%f",
+                    elapsed, elapsed / 1e3, iops, latency, totalIO, dramAccess / (double) totalIO);
         }
 
     }
@@ -92,6 +96,7 @@ public class BenchmarkCacheIndex {
                 }
                 CacheIndexReader reader = factory.get();
                 long searchStart = System.nanoTime();
+                long totalRamAccess = 0;
                 for (int access : accesses) {
                     PixelsCacheKey cacheKey = pixelsCacheKeys[access];
                     PixelsCacheIdx idx = reader.read(cacheKey.blockId,
@@ -101,10 +106,13 @@ public class BenchmarkCacheIndex {
                         System.out.println("[error] cannot find " + cacheKey.blockId
                                 + "-" + cacheKey.rowGroupId
                                 + "-" + cacheKey.columnId);
+                    } else {
+                        totalRamAccess += idx.dramAccessCount;
                     }
                 }
                 long searchEnd = System.nanoTime();
-                BenchmarkResult result = new BenchmarkResult(accesses.length, (searchEnd - searchStart) / ((double) 1e6));
+                BenchmarkResult result = new BenchmarkResult(accesses.length,
+                        (searchEnd - searchStart) / ((double) 1e6), totalRamAccess);
                 System.out.println(result);
                 return result;
 
@@ -133,6 +141,54 @@ public class BenchmarkCacheIndex {
             return new HashIndexReader(hashIndexFile);
         });
     }
+
+    @Test // TODO
+    public void benchmarkPartitionedHash() throws ExecutionException, InterruptedException {
+        int threadNum = 1;
+        benchmarkIndexReader(threadNum, () -> {
+            return new HashIndexReader(hashIndexFile);
+        });
+    }
+
+    @Test
+    public void benchmarkProtocolPartitionHash() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+        // disk cache
+        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
+        config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
+        config.addProperty("cache.partitions", "32");
+
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
+        config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
+
+        config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
+        config.addProperty("cache.schema", "pixels");
+        config.addProperty("cache.table", "test_mock");
+        config.addProperty("lease.ttl.seconds", "20");
+        config.addProperty("heartbeat.period.seconds", "10");
+        config.addProperty("enable.absolute.balancer", "false");
+        config.addProperty("cache.enabled", "true");
+        config.addProperty("enabled.storage.schemes", "mock");
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+
+        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+        int threadNum = 8;
+        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
+
+        benchmarkIndexReader(threadNum, () -> {
+            CacheReader reader = PartitionCacheReader.newBuilder().setIndexFile(indexFile).setCacheFile(cacheFile)
+                    .setIndexType("hash")
+                    .build();
+            return new CacheReaderAdaptor(reader);
+        });
+
+    }
+
 
     @Test
     public void benchmarkRadixTree() throws ExecutionException, InterruptedException {
@@ -214,44 +270,6 @@ public class BenchmarkCacheIndex {
 
     }
 
-    @Test // TODO
-    public void benchmarkProtocolPartitionHash() throws Exception {
-        ConfigFactory config = ConfigFactory.Instance();
-        // disk cache
-        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
-        config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
-        config.addProperty("cache.partitions", "32");
-
-
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
-        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
-        config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
-
-        config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
-        config.addProperty("cache.schema", "pixels");
-        config.addProperty("cache.table", "test_mock");
-        config.addProperty("lease.ttl.seconds", "20");
-        config.addProperty("heartbeat.period.seconds", "10");
-        config.addProperty("enable.absolute.balancer", "false");
-        config.addProperty("cache.enabled", "true");
-        config.addProperty("enabled.storage.schemes", "mock");
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-
-        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
-        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
-
-        int threadNum = 8;
-        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
-        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
-
-        benchmarkIndexReader(threadNum, () -> {
-            CacheReader reader = PartitionCacheReader.newBuilder().setIndexFile(indexFile).setCacheFile(cacheFile)
-                    .setCacheIndexReader(RadixIndexReader::new)
-                    .build();
-            return new CacheReaderAdaptor(reader);
-        });
-
-    }
 
     static class CacheReaderAdaptor implements CacheIndexReader {
         private final CacheReader reader;

@@ -30,7 +30,7 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
     {
         this.indexFile = indexFile;
         this.tableSize = (int) indexFile.getLong(PixelsCacheUtil.INDEX_RADIX_OFFSET);
-        logger.debug("tableSize=" + tableSize);
+        logger.trace("tableSize=" + tableSize);
     }
 
     private int hashcode(byte[] bytes) {
@@ -64,16 +64,18 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
 
         int hash = hashcode(keyBuf.array()) & 0x7fffffff;
 //        System.out.println("hash=" + hash);
-        int bucket = hash & (tableSize - 1); // initial bucket
+//        int bucket = hash & (tableSize - 1); // initial bucket
+        int bucket = hash % tableSize; // initial bucket
+
         int offset = bucket * kvSize;
         indexFile.getBytes(offset + HEADER_OFFSET, kv, 0, this.kvSize);
         kvBuf.position(0);
         boolean valid = keyBuf.position(0).equals(kvBuf.slice().position(0).limit(PixelsCacheKey.SIZE));
-
+        int dramAccess = 1;
         for(int i = 1; !valid; ++i) {
             bucket += i * i;
-//                bucket = bucket % tableSize;
-            bucket &= tableSize - 1;
+            bucket = bucket % tableSize;
+//            bucket &= tableSize - 1;
             offset = bucket * kvSize;
             indexFile.getBytes(offset + HEADER_OFFSET, kv, 0, this.kvSize);
             // check if key matches
@@ -84,10 +86,13 @@ public class HashIndexReader implements AutoCloseable, CacheIndexReader {
 
             valid = keyBuf.position(0).equals(kvBuf.slice().position(0).limit(PixelsCacheKey.SIZE));
 //            System.out.println(bucket + " " + offset + " " + i + " " + valid + " " + keyBuf.getLong(0) + " " + kvBuf.getLong(0));
+            dramAccess++;
         }
 
         kvBuf.position(PixelsCacheKey.SIZE);
-        return new PixelsCacheIdx(kvBuf.getLong(), kvBuf.getInt());
+        PixelsCacheIdx cacheIdx = new PixelsCacheIdx(kvBuf.getLong(), kvBuf.getInt());
+        cacheIdx.dramAccessCount = dramAccess;
+        return cacheIdx;
     }
 
     @Override
