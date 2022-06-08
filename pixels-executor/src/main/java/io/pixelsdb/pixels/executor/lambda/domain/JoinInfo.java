@@ -32,11 +32,17 @@ public class JoinInfo
      */
     private JoinType joinType;
     /**
-     * The column names in the join result, in the same order of
-     * left table columns+ right table columns. Join key columns may be ignored if
-     * the {@link #joinType} is NATURAL or {@link #outputJoinKeys} is false.
+     * The alias of the columns from the small table in the join. These alias are used
+     * as the column names in the join results. Join key columns are ignored if
+     * {@link #outputJoinKeys} is false.
      */
-    private String[] resultColumns;
+    private String[] smallColumnAlias;
+    /**
+     * The alias of the columns from the large table in the join. These alias are used
+     * as the column names in the join results. Join key columns are ignored if
+     * {@link #joinType} is NATURAL or {@link #outputJoinKeys} is false.
+     */
+    private String[] largeColumnAlias;
     /**
      * Whether the join result contains the join keys from the left and right tables.
      */
@@ -55,11 +61,12 @@ public class JoinInfo
      */
     public JoinInfo() { }
 
-    public JoinInfo(JoinType joinType, String[] resultColumns, boolean outputJoinKeys,
-                    boolean postPartition, PartitionInfo postPartitionInfo)
+    public JoinInfo(JoinType joinType, String[] smallColumnAlias, String[] largeColumnAlias,
+                    boolean outputJoinKeys, boolean postPartition, PartitionInfo postPartitionInfo)
     {
         this.joinType = joinType;
-        this.resultColumns = resultColumns;
+        this.smallColumnAlias = smallColumnAlias;
+        this.largeColumnAlias = largeColumnAlias;
         this.outputJoinKeys = outputJoinKeys;
         this.postPartition = postPartition;
         this.postPartitionInfo = postPartitionInfo;
@@ -75,25 +82,24 @@ public class JoinInfo
         this.joinType = joinType;
     }
 
-    /**
-     * Get the alias of the columns in the join result. The order of the alias <b>MUST</b>
-     * follow the order of the left table columns and the right table columns.
-     * <p/>
-     * For example, if the left table L scans 3 column A, B, and C, whereas the right table R
-     * scans 4 columns D, E, F, and G. The join condition is (L inner join R on L.A=R.B).
-     * Then, the joined columns would be A, B, C, D, E, F, and G. And the alias of the joined
-     * columns must follow this order, such as A_0, B_1, C_2, D_3, E_4, F_5, and G_6.
-     *
-     * @return the alias of the columns in the join result
-     */
-    public String[] getResultColumns()
+    public String[] getSmallColumnAlias()
     {
-        return resultColumns;
+        return smallColumnAlias;
     }
 
-    public void setResultColumns(String[] resultColumns)
+    public void setSmallColumnAlias(String[] smallColumnAlias)
     {
-        this.resultColumns = resultColumns;
+        this.smallColumnAlias = smallColumnAlias;
+    }
+
+    public String[] getLargeColumnAlias()
+    {
+        return largeColumnAlias;
+    }
+
+    public void setLargeColumnAlias(String[] largeColumnAlias)
+    {
+        this.largeColumnAlias = largeColumnAlias;
     }
 
     public boolean isOutputJoinKeys()

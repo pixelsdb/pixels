@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ObjectArrays;
 
 /**
  * The table (view) of the join result.
@@ -13,20 +14,32 @@ public class JoinedTable implements Table
     private final String tableName;
     private final String tableAlias;
     private final String[] columnNames;
-    /**
-     * Whether the {@link #columnNames} includes the key columns from each joined table.
-     */
-    private final boolean includeKeyColumns;
     private final Join join;
 
-    public JoinedTable(String schemaName, String tableName, String tableAlias,
-                       String[] columnNames, boolean includeKeyColumns, Join join)
+    /**
+     * The {@link JoinedTable#columnNames} of this class is constructed by the colum alias
+     * of the left and right table. The column alias from the smaller table always come first.
+     *
+     * @param schemaName the schema name
+     * @param tableName the table name
+     * @param tableAlias the table alias
+     * @param join the join between the left and right table
+     */
+    public JoinedTable(String schemaName, String tableName, String tableAlias, Join join)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
-        this.columnNames = columnNames;
-        this.includeKeyColumns = includeKeyColumns;
+        if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+        {
+            this.columnNames = ObjectArrays.concat(
+                    join.getLeftColumnAlias(), join.getRightColumnAlias(), String.class);
+        }
+        else
+        {
+            this.columnNames = ObjectArrays.concat(
+                    join.getRightColumnAlias(), join.getLeftColumnAlias(), String.class);
+        }
         this.join = join;
     }
 
@@ -58,11 +71,6 @@ public class JoinedTable implements Table
     public String[] getColumnNames()
     {
         return columnNames;
-    }
-
-    public boolean isIncludeKeyColumns()
-    {
-        return includeKeyColumns;
     }
 
     public Join getJoin()

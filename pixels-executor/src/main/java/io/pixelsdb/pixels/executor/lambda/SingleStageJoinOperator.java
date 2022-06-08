@@ -42,6 +42,7 @@ public class SingleStageJoinOperator implements JoinOperator
     protected final List<JoinInput> joinInputs;
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator child = null;
+    protected boolean smallChild = false;
 
     public SingleStageJoinOperator(JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -68,9 +69,10 @@ public class SingleStageJoinOperator implements JoinOperator
     }
 
     @Override
-    public void setChild(JoinOperator child)
+    public void setChild(JoinOperator child, boolean smallChild)
     {
         this.child = child;
+        this.smallChild = smallChild;
     }
 
     /**
@@ -84,7 +86,11 @@ public class SingleStageJoinOperator implements JoinOperator
         if (child != null)
         {
             CompletableFuture<JoinOutput>[] childOutputs = child.execute();
-            waitForCompletion(childOutputs);
+            if (smallChild)
+            {
+                // if the child is on the small side, we should wait for its completion.
+                waitForCompletion(childOutputs);
+            }
         }
         CompletableFuture<JoinOutput>[] joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)

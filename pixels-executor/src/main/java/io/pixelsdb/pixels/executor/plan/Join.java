@@ -33,20 +33,49 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 public class Join
 {
     private final Table leftTable;
+
     private final Table rightTable;
+    /**
+     * The alias of the columns that are in the join result and from the left table.
+     */
+    private final String[] leftColumnAlias;
+    /**
+     * The alias of the columns that are in the join result and from the right table.
+     */
+    private final String[] rightColumnAlias;
+    /**
+     * The indexes of the key columns in the columns that are read from the left table.
+     */
     private final int[] leftKeyColumnIds;
+    /**
+     * The indexes of the key columns in the columns that are read from the right table.
+     */
     private final int[] rightKeyColumnIds;
+    /**
+     * Whether the join result includes the key columns from the left and right tables.
+     */
+    private final boolean includeKeyColumns;
+
+    private final JoinEndian joinEndian;
+
     private final JoinType joinType;
+
     private final JoinAlgorithm joinAlgo;
 
     public Join(Table leftTable, Table rightTable,
+                String[] leftColumnAlias, String[] rightColumnAlias,
                 int[] leftKeyColumnIds, int[] rightKeyColumnIds,
+                boolean includeKeyColumns, JoinEndian joinEndian,
                 JoinType joinType, JoinAlgorithm joinAlgo)
     {
         this.leftTable = leftTable;
         this.rightTable = rightTable;
+        this.leftColumnAlias = leftColumnAlias;
+        this.rightColumnAlias = rightColumnAlias;
         this.leftKeyColumnIds = leftKeyColumnIds;
         this.rightKeyColumnIds = rightKeyColumnIds;
+        this.includeKeyColumns = includeKeyColumns;
+        this.joinEndian = joinEndian;
         this.joinType = joinType;
         this.joinAlgo = joinAlgo;
     }
@@ -61,6 +90,21 @@ public class Join
         return rightTable;
     }
 
+    public String[] getLeftColumnAlias()
+    {
+        return leftColumnAlias;
+    }
+
+    public String[] getRightColumnAlias()
+    {
+        return rightColumnAlias;
+    }
+
+    public boolean isIncludeKeyColumns()
+    {
+        return includeKeyColumns;
+    }
+
     public int[] getLeftKeyColumnIds()
     {
         return leftKeyColumnIds;
@@ -69,6 +113,11 @@ public class Join
     public int[] getRightKeyColumnIds()
     {
         return rightKeyColumnIds;
+    }
+
+    public JoinEndian getJoinEndian()
+    {
+        return joinEndian;
     }
 
     public JoinType getJoinType()

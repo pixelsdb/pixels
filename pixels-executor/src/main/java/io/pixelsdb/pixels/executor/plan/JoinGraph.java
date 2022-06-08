@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ObjectArrays;
 
 import java.util.*;
 
@@ -146,9 +145,10 @@ public class JoinGraph
                         leftKeyColumnIds = rightKeyColumnIds;
                         rightKeyColumnIds = tmpInts;
                     }
-                    // TODO: select join algorithm by the optimizer.
-                    newJoin = new Join(left, right, leftKeyColumnIds, rightKeyColumnIds,
-                            baseJoin.getJoinType(), baseJoin.getJoinAlgo());
+                    // TODO: select join algorithm by the optimizer, decide includeKeyColumns and join endian.
+                    newJoin = new Join(left, right, left.getColumnNames(), right.getColumnNames(),
+                            leftKeyColumnIds, rightKeyColumnIds, true,
+                            JoinEndian.SMALL_LEFT, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
                 else
                 {
@@ -170,18 +170,17 @@ public class JoinGraph
                         }
                     }
                     int[] rightKeyColumnIds = baseJoin.getRightKeyColumnIds();
-                    // TODO: select join algorithm by the optimizer.
-                    newJoin = new Join(left, right, leftKeyColumnIds, rightKeyColumnIds,
-                            baseJoin.getJoinType(), baseJoin.getJoinAlgo());
+                    // TODO: select join algorithm by the optimizer, decide includeKeyColumns and join endian.
+                    newJoin = new Join(left, right, left.getColumnNames(), right.getColumnNames(),
+                            leftKeyColumnIds, rightKeyColumnIds, true,
+                            JoinEndian.SMALL_LEFT, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
-                String[] joinedColumns = ObjectArrays.concat(newJoin.getLeftTable().getColumnNames(),
-                        newJoin.getRightTable().getColumnNames(), String.class);
+
                 String joinedSchemaName = "join_" + UUID.randomUUID().toString().replace("-", "");
                 String joinedTableName = newJoin.getLeftTable().getTableName() + "_join_" +
                         newJoin.getRightTable().getTableName();
-                // TODO: decide includeKeyColumns.
-                joinRoot = new JoinedTable(joinedSchemaName, joinedTableName, joinedTableName,
-                        joinedColumns, true, newJoin);
+
+                joinRoot = new JoinedTable(joinedSchemaName, joinedTableName, joinedTableName, newJoin);
             }
             else
             {

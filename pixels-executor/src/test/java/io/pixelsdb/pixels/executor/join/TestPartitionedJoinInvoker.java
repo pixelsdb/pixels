@@ -66,7 +66,7 @@ public class TestPartitionedJoinInvoker
                 "pixels-lambda-test/orders_part_6",
                 "pixels-lambda-test/orders_part_7"));
         leftTableInfo.setParallelism(8);
-        joinInput.setLeftTable(leftTableInfo);
+        joinInput.setSmallTable(leftTableInfo);
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
         rightTableInfo.setTableName("lineitem");
@@ -76,14 +76,14 @@ public class TestPartitionedJoinInvoker
                 "pixels-lambda-test/lineitem_part_0",
                 "pixels-lambda-test/lineitem_part_1"));
         rightTableInfo.setParallelism(2);
-        joinInput.setRightTable(rightTableInfo);
+        joinInput.setLargeTable(rightTableInfo);
 
         PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
         joinInfo.setJoinType(JoinType.EQUI_INNER);
         joinInfo.setNumPartition(40);
         joinInfo.setHashValues(Arrays.asList(16));
-        joinInfo.setResultColumns(new String[]{"o_custkey", "o_orderstatus",
-                "o_orderdate", "l_partkey", "l_extendedprice", "l_discount"});
+        joinInfo.setSmallColumnAlias(new String[]{"o_custkey", "o_orderstatus", "o_orderdate"});
+        joinInfo.setLargeColumnAlias(new String[]{"l_partkey", "l_extendedprice", "l_discount"});
         joinInfo.setOutputJoinKeys(false);
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));

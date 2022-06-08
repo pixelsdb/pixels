@@ -38,10 +38,7 @@ import io.pixelsdb.pixels.executor.lambda.PartitionedJoinOperator;
 import io.pixelsdb.pixels.executor.lambda.SingleStageJoinOperator;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.*;
-import io.pixelsdb.pixels.executor.plan.BaseTable;
-import io.pixelsdb.pixels.executor.plan.Join;
-import io.pixelsdb.pixels.executor.plan.JoinedTable;
-import io.pixelsdb.pixels.executor.plan.Table;
+import io.pixelsdb.pixels.executor.plan.*;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -119,7 +116,8 @@ public class LambdaJoinExecutor
             leftInputSplits = getInputSplits((BaseTable) leftTable);
             // check if there is a chain join.
             if (joinAlgo == JoinAlgorithm.BROADCAST && parent.isPresent() &&
-                    parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST)
+                    parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                    parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 /*
                  * Chain join is found, and this is the first broadcast join in the chain.
@@ -130,15 +128,16 @@ public class LambdaJoinExecutor
                 BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
-                        joinType, joinedTable.getColumnNames(), parent.get().getJoin().getLeftKeyColumnIds(),
-                        joinedTable.isIncludeKeyColumns(), false, null);
+                        joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                        parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
+                        false, null);
 
                 ChainJoinInput chainJoinInput = new ChainJoinInput();
                 chainJoinInput.setQueryId(queryId);
-                List<BroadCastJoinTableInfo> leftTableInfos = new ArrayList<>();
-                leftTableInfos.add(leftTableInfo);
-                leftTableInfos.add(rightTableInfo);
-                chainJoinInput.setLeftTables(leftTableInfos);
+                List<BroadCastJoinTableInfo> smallTableInfos = new ArrayList<>();
+                smallTableInfos.add(leftTableInfo);
+                smallTableInfos.add(rightTableInfo);
+                chainJoinInput.setSmallTables(smallTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
                 chainJoinInput.setChainJoinInfos(chainJoinInfos);
@@ -151,10 +150,12 @@ public class LambdaJoinExecutor
             childOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             requireNonNull(childOperator, "failed to get child operator");
             // check if there is an incomplete chain join.
-            if (childOperator.getJoinAlgo() == JoinAlgorithm.CHAIN && joinAlgo == JoinAlgorithm.BROADCAST)
+            if (childOperator.getJoinAlgo() == JoinAlgorithm.CHAIN && joinAlgo == JoinAlgorithm.BROADCAST &&
+                    join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 // the current join is still a broadcast join, thus the left child is an incomplete chain join.
-                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST)
+                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                        parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
                     /*
                      * The parent is still a broadcast join, continue chain join construction by
@@ -163,19 +164,20 @@ public class LambdaJoinExecutor
                     BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
-                            joinType, joinedTable.getColumnNames(), parent.get().getJoin().getLeftKeyColumnIds(),
-                            joinedTable.isIncludeKeyColumns(), false, null);
+                            joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                            parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
+                            false, null);
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
                     ChainJoinInput chainJoinInput = (ChainJoinInput) childOperator.getJoinInputs().get(0);
-                    chainJoinInput.getLeftTables().add(rightTableInfo);
+                    chainJoinInput.getSmallTables().add(rightTableInfo);
                     chainJoinInput.getChainJoinInfos().add(chainJoinInfo);
                     // no need to create a new operator.
                     return childOperator;
                 }
                 else
                 {
-                    // The parent is not present or is not a broadcast join, complete chain join construction.
+                    // The parent is not present or is not a small-left broadcast join, complete chain join construction.
                     boolean postPartition = false;
                     PartitionInfo postPartitionInfo = null;
                     if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
@@ -185,8 +187,8 @@ public class LambdaJoinExecutor
                         postPartitionInfo = new PartitionInfo(
                                 parent.get().getJoin().getLeftKeyColumnIds(), 40);
                     }
-                    JoinInfo joinInfo = new JoinInfo(joinType, joinedTable.getColumnNames(),
-                            joinedTable.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                            join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
@@ -206,7 +208,7 @@ public class LambdaJoinExecutor
                                 ImmutableList.of("join_" + outputId++));
 
                         ChainJoinInput complete = chainJoinInput.toBuilder()
-                                .setRightTable(rightTableInfo)
+                                .setLargeTable(rightTableInfo)
                                 .setJoinInfo(joinInfo)
                                 .setOutput(output).build();
 
@@ -269,8 +271,6 @@ public class LambdaJoinExecutor
         if (joinAlgo == JoinAlgorithm.BROADCAST)
         {
             requireNonNull(leftInputSplits, "leftInputSplits is null");
-            BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
-                    leftTable, leftInputSplits, join.getLeftKeyColumnIds());
 
             boolean postPartition = false;
             PartitionInfo postPartitionInfo = null;
@@ -281,30 +281,63 @@ public class LambdaJoinExecutor
                 postPartitionInfo = new PartitionInfo(
                         parent.get().getJoin().getLeftKeyColumnIds(), 40);
             }
-            JoinInfo joinInfo = new JoinInfo(joinType, joinedTable.getColumnNames(),
-                    joinedTable.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-            int outputId = 0;
-            for (InputSplit rightInputSplit : rightInputSplits)
+            if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+            {
+                BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                        leftTable, leftInputSplits, join.getLeftKeyColumnIds());
+
+                JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                        join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+
+                int outputId = 0;
+                for (InputSplit rightInputSplit : rightInputSplits)
+                {
+                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                            rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
+
+                    // TODO: get the path base from config file.
+                    MultiOutputInfo output = new MultiOutputInfo(
+                            "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            null, null, null, true,
+                            ImmutableList.of("join_" + outputId++));
+
+                    BroadcastJoinInput joinInput = new BroadcastJoinInput(
+                            queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+
+                    joinInputs.add(joinInput);
+                }
+            }
+            else
             {
                 BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
-                        rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
+                        rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
-                // TODO: get the path base from config file.
-                MultiOutputInfo output = new MultiOutputInfo(
-                        "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
-                        null, null, null,true,
-                        ImmutableList.of("join_" + outputId++));
+                JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
+                        join.getLeftColumnAlias(), join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
-                BroadcastJoinInput joinInput = new BroadcastJoinInput(
-                        queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+                int outputId = 0;
+                for (InputSplit leftInputSplit : leftInputSplits)
+                {
+                    BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                            leftTable, ImmutableList.of(leftInputSplit), join.getLeftKeyColumnIds());
 
-                joinInputs.add(joinInput);
+                    // TODO: get the path base from config file.
+                    MultiOutputInfo output = new MultiOutputInfo(
+                            "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            null, null, null, true,
+                            ImmutableList.of("join_" + outputId++));
+
+                    BroadcastJoinInput joinInput = new BroadcastJoinInput(
+                            queryId, rightTableInfo, leftTableInfo, joinInfo, output);
+
+                    joinInputs.add(joinInput);
+                }
             }
             SingleStageJoinOperator joinOperator =
                     new SingleStageJoinOperator(joinInputs.build(), joinAlgo);
-            joinOperator.setChild(childOperator);
+            joinOperator.setChild(childOperator, join.getJoinEndian() == JoinEndian.SMALL_LEFT);
             return joinOperator;
         }
         else if (joinAlgo == JoinAlgorithm.PARTITIONED)
@@ -331,8 +364,18 @@ public class LambdaJoinExecutor
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
                         joinedTable, parent, leftTableInfo, rightTableInfo);
 
-                joinOperator = new PartitionedJoinOperator(
-                        null, rightPartitionInputs, joinInputs, joinAlgo);
+                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                {
+                    joinOperator = new PartitionedJoinOperator(
+                            null, rightPartitionInputs, joinInputs, joinAlgo);
+                    joinOperator.setChild(childOperator,true);
+                }
+                else
+                {
+                    joinOperator = new PartitionedJoinOperator(
+                            rightPartitionInputs, null, joinInputs, joinAlgo);
+                    joinOperator.setChild(childOperator,false);
+                }
             }
             else
             {
@@ -356,10 +399,17 @@ public class LambdaJoinExecutor
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
                         joinedTable, parent, leftTableInfo, rightTableInfo);
 
-                joinOperator = new PartitionedJoinOperator(
-                        leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
+                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                {
+                    joinOperator = new PartitionedJoinOperator(
+                            leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
+                }
+                else
+                {
+                    joinOperator = new PartitionedJoinOperator(
+                            rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
+                }
             }
-            joinOperator.setChild(childOperator);
             return joinOperator;
         }
         else
@@ -451,12 +501,6 @@ public class LambdaJoinExecutor
         ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
         for (int i = 0; i < 40; ++i)
         {
-            // TODO: get numPartition from optimizer
-            PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(
-                    joinedTable.getJoin().getJoinType(), joinedTable.getColumnNames(),
-                    joinedTable.isIncludeKeyColumns(), postPartition, postPartitionInfo,
-                    40, ImmutableList.of(i));
-
             ImmutableList.Builder<String> outputFileNames = ImmutableList.builder();
             for (int j = 0; j < 4; ++j) // TODO: get parallelism from config file.
             {
@@ -467,8 +511,27 @@ public class LambdaJoinExecutor
                     "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
                     null, null, null, true, outputFileNames.build());
 
-            PartitionedJoinInput joinInput = new PartitionedJoinInput(
-                    queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+            PartitionedJoinInput joinInput;
+            if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
+            {
+                // TODO: get numPartition from the optimizer.
+                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
+                        joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
+                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        40, ImmutableList.of(i));
+                 joinInput = new PartitionedJoinInput(
+                        queryId, leftTableInfo, rightTableInfo, joinInfo, output);
+            }
+            else
+            {
+                // TODO: get numPartition from the optimizer.
+                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
+                        joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
+                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        40, ImmutableList.of(i));
+                joinInput = new PartitionedJoinInput(
+                        queryId, rightTableInfo, leftTableInfo, joinInfo, output);
+            }
 
             joinInputs.add(joinInput);
         }

@@ -32,5 +32,14 @@ public enum JoinType
     EQUI_INNER,
     EQUI_LEFT,
     EQUI_RIGHT,
-    EQUI_FULL
+    EQUI_FULL;
+
+    public JoinType flip()
+    {
+        if (this == EQUI_LEFT)
+        {
+            return EQUI_RIGHT;
+        }
+        return this;
+    }
 }

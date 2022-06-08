@@ -77,7 +77,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            BroadCastJoinTableInfo leftTable = event.getLeftTable();
+            BroadCastJoinTableInfo leftTable = event.getSmallTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
             requireNonNull(leftInputs, "leftInputs is null");
             checkArgument(leftInputs.size() > 0, "left table is empty");
@@ -85,7 +85,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            BroadCastJoinTableInfo rightTable = event.getRightTable();
+            BroadCastJoinTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             requireNonNull(rightInputs, "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "right table is empty");
@@ -93,7 +93,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int[] rightKeyColumnIds = rightTable.getKeyColumnIds();
             TableScanFilter rightFilter = JSON.parseObject(rightTable.getFilter(), TableScanFilter.class);
 
-            String[] joinedCols = event.getJoinInfo().getResultColumns();
+            String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
+            String[] rightColAlias = event.getJoinInfo().getLargeColumnAlias();
             boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
 
@@ -136,9 +137,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getInputInfos().get(0).getPath(),
                     rightInputs.get(0).getInputInfos().get(0).getPath());
-            Joiner joiner = new Joiner(joinType, joinedCols, includeKeyCols,
-                    getResultSchema(leftSchema.get(), leftCols), leftKeyColumnIds,
-                    getResultSchema(rightSchema.get(), rightCols), rightKeyColumnIds);
+            Joiner joiner = new Joiner(joinType, includeKeyCols,
+                    getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftKeyColumnIds,
+                    getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
             for (InputSplit inputSplit : leftInputs)
@@ -159,7 +160,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getLeftTableSize());
+            logger.info("hash table size: " + joiner.getSmallTableSize());
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
             int i = 0;
