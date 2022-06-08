@@ -32,7 +32,7 @@ import java.util.List;
  * @author hank
  * @date 03/06/2022
  */
-public class ChainJoinInput implements JoinInput
+public class BroadcastChainJoinInput implements JoinInput
 {
     private long queryId;
     /**
@@ -44,7 +44,7 @@ public class ChainJoinInput implements JoinInput
      */
     private BroadCastJoinTableInfo largeTable;
     /**
-     * The information of the chain joins. If there is N left tables and 1 right table,
+     * The information of the chain joins. If there are N small tables and 1 right table,
      * there should be N-1 chain join infos.
      */
     private List<ChainJoinInfo> chainJoinInfos;
@@ -52,6 +52,19 @@ public class ChainJoinInput implements JoinInput
      * The information of the last join with the right table.
      */
     private JoinInfo joinInfo;
+    /**
+     * Whether there are post chain joins.
+     */
+    protected boolean postChainJoinsExist;
+    /**
+     * The information of the post small tables that are broadcast in the chain join.
+     */
+    private List<BroadCastJoinTableInfo> postSmallTables;
+    /**
+     * The information of the post chain joins. If there is M post small tables,
+     * there should be M post chain join infos.
+     */
+    private List<ChainJoinInfo> postChainJoinInfos;
     /**
      * The information of the join output files.<br/>
      * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
@@ -63,17 +76,25 @@ public class ChainJoinInput implements JoinInput
     /**
      * Default constructor for Jackson.
      */
-    public ChainJoinInput() { }
+    public BroadcastChainJoinInput() { }
 
-    public ChainJoinInput(long queryId, List<BroadCastJoinTableInfo> smallTables,
-                          BroadCastJoinTableInfo largeTable, List<ChainJoinInfo> chainJoinInfos,
-                          JoinInfo joinInfo, MultiOutputInfo output)
+    public BroadcastChainJoinInput(long queryId,
+                                   List<BroadCastJoinTableInfo> smallTables,
+                                   List<ChainJoinInfo> chainJoinInfos,
+                                   BroadCastJoinTableInfo largeTable,
+                                   JoinInfo joinInfo, boolean postChainJoinsExist,
+                                   List<BroadCastJoinTableInfo> postSmallTables,
+                                   List<ChainJoinInfo> postChainJoinInfos,
+                                   MultiOutputInfo output)
     {
         this.queryId = queryId;
         this.smallTables = smallTables;
         this.largeTable = largeTable;
         this.chainJoinInfos = chainJoinInfos;
         this.joinInfo = joinInfo;
+        this.postChainJoinsExist = postChainJoinsExist;
+        this.postSmallTables = postSmallTables;
+        this.postChainJoinInfos = postChainJoinInfos;
         this.output = output;
     }
 
@@ -127,6 +148,36 @@ public class ChainJoinInput implements JoinInput
         this.joinInfo = joinInfo;
     }
 
+    public boolean isPostChainJoinsExist()
+    {
+        return postChainJoinsExist;
+    }
+
+    public void setPostChainJoinsExist(boolean postChainJoinsExist)
+    {
+        this.postChainJoinsExist = postChainJoinsExist;
+    }
+
+    public List<BroadCastJoinTableInfo> getPostSmallTables()
+    {
+        return postSmallTables;
+    }
+
+    public void setPostSmallTables(List<BroadCastJoinTableInfo> postSmallTables)
+    {
+        this.postSmallTables = postSmallTables;
+    }
+
+    public List<ChainJoinInfo> getPostChainJoinInfos()
+    {
+        return postChainJoinInfos;
+    }
+
+    public void setPostChainJoinInfos(List<ChainJoinInfo> postChainJoinInfos)
+    {
+        this.postChainJoinInfos = postChainJoinInfos;
+    }
+
     @Override
     public MultiOutputInfo getOutput()
     {
@@ -145,13 +196,14 @@ public class ChainJoinInput implements JoinInput
 
     public static class Builder
     {
-        private final ChainJoinInput builderInstance;
+        private final BroadcastChainJoinInput builderInstance;
 
-        private Builder(ChainJoinInput instance)
+        private Builder(BroadcastChainJoinInput instance)
         {
-            this.builderInstance = new ChainJoinInput(
-                    instance.queryId, instance.smallTables, instance.largeTable,
-                    instance.chainJoinInfos, instance.joinInfo, instance.output);
+            this.builderInstance = new BroadcastChainJoinInput(
+                    instance.queryId, instance.smallTables, instance.chainJoinInfos,
+                    instance.largeTable, instance.joinInfo, instance.postChainJoinsExist,
+                    instance.postSmallTables, instance.postChainJoinInfos, instance.output);
         }
 
         public Builder setLargeTable(BroadCastJoinTableInfo largeTable)
@@ -172,7 +224,7 @@ public class ChainJoinInput implements JoinInput
             return this;
         }
 
-        public ChainJoinInput build()
+        public BroadcastChainJoinInput build()
         {
             return this.builderInstance;
         }

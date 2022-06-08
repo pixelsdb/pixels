@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.executor.lambda.ChainJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.BroadcastChainJoinInvoker;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
-import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.junit.Test;
 
@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutionException;
  * @author hank
  * @date 15/05/2022
  */
-public class TestChainJoinInvoker
+public class TestBroadcastChainJoinInvoker
 {
     @Test
     public void testRegionNationSupplierLineitem() throws ExecutionException, InterruptedException
@@ -46,7 +46,7 @@ public class TestChainJoinInvoker
         String supplierFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"supplier\",\"columnFilters\":{}}";
         String lineitemFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
 
-        ChainJoinInput joinInput = new ChainJoinInput();
+        BroadcastChainJoinInput joinInput = new BroadcastChainJoinInput();
         joinInput.setQueryId(123456);
 
         List<BroadCastJoinTableInfo> leftTables = new ArrayList<>();
@@ -131,7 +131,7 @@ public class TestChainJoinInvoker
                         "chain-join-4","chain-join-5","chain-join-6","chain-join-7")));
 
         System.out.println(JSON.toJSONString(joinInput));
-        JoinOutput output = ChainJoinInvoker.invoke(joinInput).get();
+        JoinOutput output = BroadcastChainJoinInvoker.invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
         for (int i = 0; i < output.getOutputs().size(); ++i)
         {

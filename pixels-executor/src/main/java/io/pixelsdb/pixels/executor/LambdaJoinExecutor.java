@@ -103,6 +103,11 @@ public class LambdaJoinExecutor
                 "join.rightKeyColumnIds is null");
         JoinType joinType = requireNonNull(join.getJoinType(), "join.joinType is null");
         JoinAlgorithm joinAlgo = requireNonNull(join.getJoinAlgo(), "join.joinAlgo is null");
+        if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
+        {
+            checkArgument(joinAlgo != JoinAlgorithm.BROADCAST,
+                    "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join.");
+        }
 
         List<InputSplit> leftInputSplits = null;
         List<String> leftPartitionedFiles = null;
@@ -132,17 +137,17 @@ public class LambdaJoinExecutor
                         parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
                         false, null);
 
-                ChainJoinInput chainJoinInput = new ChainJoinInput();
-                chainJoinInput.setQueryId(queryId);
+                BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
+                broadcastChainJoinInput.setQueryId(queryId);
                 List<BroadCastJoinTableInfo> smallTableInfos = new ArrayList<>();
                 smallTableInfos.add(leftTableInfo);
                 smallTableInfos.add(rightTableInfo);
-                chainJoinInput.setSmallTables(smallTableInfos);
+                broadcastChainJoinInput.setSmallTables(smallTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);
-                chainJoinInput.setChainJoinInfos(chainJoinInfos);
+                broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
 
-                return new SingleStageJoinOperator(chainJoinInput, JoinAlgorithm.CHAIN);
+                return new SingleStageJoinOperator(broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
             }
         }
         else
@@ -150,7 +155,7 @@ public class LambdaJoinExecutor
             childOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             requireNonNull(childOperator, "failed to get child operator");
             // check if there is an incomplete chain join.
-            if (childOperator.getJoinAlgo() == JoinAlgorithm.CHAIN && joinAlgo == JoinAlgorithm.BROADCAST &&
+            if (childOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN && joinAlgo == JoinAlgorithm.BROADCAST &&
                     join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 // the current join is still a broadcast join, thus the left child is an incomplete chain join.
@@ -169,9 +174,9 @@ public class LambdaJoinExecutor
                             false, null);
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
-                    ChainJoinInput chainJoinInput = (ChainJoinInput) childOperator.getJoinInputs().get(0);
-                    chainJoinInput.getSmallTables().add(rightTableInfo);
-                    chainJoinInput.getChainJoinInfos().add(chainJoinInfo);
+                    BroadcastChainJoinInput broadcastChainJoinInput = (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
+                    broadcastChainJoinInput.getSmallTables().add(rightTableInfo);
+                    broadcastChainJoinInput.getChainJoinInfos().add(chainJoinInfo);
                     // no need to create a new operator.
                     return childOperator;
                 }
@@ -192,7 +197,7 @@ public class LambdaJoinExecutor
 
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
-                    ChainJoinInput chainJoinInput = (ChainJoinInput) childOperator.getJoinInputs().get(0);
+                    BroadcastChainJoinInput broadcastChainJoinInput = (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
                     int outputId = 0;
@@ -207,7 +212,7 @@ public class LambdaJoinExecutor
                                 null, null, null, true,
                                 ImmutableList.of("join_" + outputId++));
 
-                        ChainJoinInput complete = chainJoinInput.toBuilder()
+                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
                                 .setLargeTable(rightTableInfo)
                                 .setJoinInfo(joinInfo)
                                 .setOutput(output).build();
@@ -215,7 +220,7 @@ public class LambdaJoinExecutor
                         joinInputs.add(complete);
                     }
                     SingleStageJoinOperator joinOperator =
-                            new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.CHAIN);
+                            new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                     return joinOperator;
                 }
             }

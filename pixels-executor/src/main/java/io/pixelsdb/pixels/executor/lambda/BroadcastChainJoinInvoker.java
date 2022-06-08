@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
@@ -33,13 +33,13 @@ import java.util.concurrent.CompletableFuture;
  * @author hank
  * @date 03/06/2022
  */
-public class ChainJoinInvoker
+public class BroadcastChainJoinInvoker
 {
-    private static final String CHAIN_JOIN_WORKER_NAME = "ChainJoinWorker";
+    private static final String CHAIN_JOIN_WORKER_NAME = "BroadcastChainJoinWorker";
 
-    private ChainJoinInvoker() { }
+    private BroadcastChainJoinInvoker() { }
 
-    public static CompletableFuture<JoinOutput> invoke(ChainJoinInput input)
+    public static CompletableFuture<JoinOutput> invoke(BroadcastChainJoinInput input)
     {
         String inputJson = JSON.toJSONString(input);
         SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
