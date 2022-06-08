@@ -116,7 +116,8 @@ public class LambdaJoinExecutor
             leftInputSplits = getInputSplits((BaseTable) leftTable);
             // check if there is a chain join.
             if (joinAlgo == JoinAlgorithm.BROADCAST && parent.isPresent() &&
-                    parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST)
+                    parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                    parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 /*
                  * Chain join is found, and this is the first broadcast join in the chain.
@@ -149,12 +150,12 @@ public class LambdaJoinExecutor
             childOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             requireNonNull(childOperator, "failed to get child operator");
             // check if there is an incomplete chain join.
-            if (childOperator.getJoinAlgo() == JoinAlgorithm.CHAIN && joinAlgo == JoinAlgorithm.BROADCAST)
+            if (childOperator.getJoinAlgo() == JoinAlgorithm.CHAIN && joinAlgo == JoinAlgorithm.BROADCAST &&
+                    join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                checkArgument(join.getJoinEndian() == JoinEndian.SMALL_LEFT,
-                        "chain join only supports SMALL_LEFT join endian");
                 // the current join is still a broadcast join, thus the left child is an incomplete chain join.
-                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST)
+                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                        parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
                     /*
                      * The parent is still a broadcast join, continue chain join construction by
@@ -176,7 +177,7 @@ public class LambdaJoinExecutor
                 }
                 else
                 {
-                    // The parent is not present or is not a broadcast join, complete chain join construction.
+                    // The parent is not present or is not a small-left broadcast join, complete chain join construction.
                     boolean postPartition = false;
                     PartitionInfo postPartitionInfo = null;
                     if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
@@ -313,8 +314,8 @@ public class LambdaJoinExecutor
                 BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
-                JoinInfo joinInfo = new JoinInfo(joinType, join.getRightColumnAlias(), join.getLeftColumnAlias(),
-                        join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+                JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
+                        join.getLeftColumnAlias(), join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
 
                 int outputId = 0;
                 for (InputSplit leftInputSplit : leftInputSplits)
@@ -336,7 +337,7 @@ public class LambdaJoinExecutor
             }
             SingleStageJoinOperator joinOperator =
                     new SingleStageJoinOperator(joinInputs.build(), joinAlgo);
-            joinOperator.setChild(childOperator);
+            joinOperator.setChild(childOperator, join.getJoinEndian() == JoinEndian.SMALL_LEFT);
             return joinOperator;
         }
         else if (joinAlgo == JoinAlgorithm.PARTITIONED)
@@ -367,11 +368,13 @@ public class LambdaJoinExecutor
                 {
                     joinOperator = new PartitionedJoinOperator(
                             null, rightPartitionInputs, joinInputs, joinAlgo);
+                    joinOperator.setChild(childOperator,true);
                 }
                 else
                 {
                     joinOperator = new PartitionedJoinOperator(
                             rightPartitionInputs, null, joinInputs, joinAlgo);
+                    joinOperator.setChild(childOperator,false);
                 }
             }
             else
@@ -407,7 +410,6 @@ public class LambdaJoinExecutor
                             rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
                 }
             }
-            joinOperator.setChild(childOperator);
             return joinOperator;
         }
         else
@@ -523,7 +525,7 @@ public class LambdaJoinExecutor
             else
             {
                 // TODO: get numPartition from the optimizer.
-                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
+                PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
                         joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
                         40, ImmutableList.of(i));

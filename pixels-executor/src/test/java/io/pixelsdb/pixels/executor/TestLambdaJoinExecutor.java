@@ -183,4 +183,77 @@ public class TestLambdaJoinExecutor
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
     }
+
+    @Test
+    public void testChainBroadcastJoin() throws IOException, MetadataException
+    {
+        BaseTable region = new BaseTable(
+                "tpch", "region", "region",
+                new String[] {"r_regionkey", "r_name"},
+                TableScanFilter.empty("tpch", "region"));
+
+        BaseTable nation = new BaseTable(
+                "tpch", "nation", "nation",
+                new String[] {"n_nationkey", "n_name", "n_regionkey"},
+                TableScanFilter.empty("tpch", "nation"));
+
+        Join join1 = new Join(region, nation,
+                new String[] {"r_name"}, new String[] {"n_nationkey", "n_name"},
+                new int[]{0}, new int[]{2}, false,
+                JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+
+        JoinedTable joinedTable1 = new JoinedTable(
+                "join_1", "region_join_nation", "region_join_nation", join1);
+
+        BaseTable supplier = new BaseTable(
+                "tpch", "supplier", "supplier",
+                new String[] {"s_suppkey", "s_name", "s_acctbal", "s_nationkey"},
+                TableScanFilter.empty("tpch", "supplier"));
+
+        Join join2 = new Join(joinedTable1, supplier,
+                new String[] {"r_name", "n_name"},
+                new String[] {"s_suppkey", "s_name", "s_acctbal"},
+                new int[]{1}, new int[]{3}, false,
+                JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+
+        JoinedTable joinedTable2 = new JoinedTable(
+                "join_2",
+                "region_join_nation_join_supplier",
+                "region_join_nation_join_supplier", join2);
+
+        BaseTable lineitem = new BaseTable(
+                "tpch", "lineitem", "lineitem",
+                new String[] {"l_orderkey", "l_suppkey", "l_extendedprice", "l_shipdate"},
+                TableScanFilter.empty("tpch", "lineitem"));
+
+        Join join3 = new Join(joinedTable2, lineitem,
+                new String[]{"r_name", "n_name", "s_name", "s_acctbal"},
+                new String[]{"l_orderkey", "l_extendedprice", "l_shipdate"},
+                new int[]{2}, new int[]{1}, false,
+                JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+
+        JoinedTable joinedTable3 = new JoinedTable("tpch",
+                "region_join_nation_join_supplier_join_lineitem",
+                "region_join_nation_join_supplier_join_lineitem", join3);
+
+        BaseTable part = new BaseTable(
+                "tpch", "part", "part",
+                new String[] {"p_partkey", "p_name", "p_type"},
+                TableScanFilter.empty("tpch", "part"));
+
+        Join join4 = new Join(joinedTable3, part,
+                new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate"},
+                new String[]{"p_name", "p_type"},
+                new int[]{4}, new int[]{0}, false,
+                JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+
+        JoinedTable root = new JoinedTable("tpch",
+                "region_join_nation_join_supplier_join_lineitem_join_part",
+                "region_join_nation_join_supplier_join_lineitem_join_part", join4);
+
+        LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(
+                123456, root, false, true);
+
+        JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
+    }
 }

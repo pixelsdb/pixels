@@ -36,7 +36,7 @@ public interface JoinOperator
 
     JoinAlgorithm getJoinAlgo();
 
-    void setChild(JoinOperator child);
+    void setChild(JoinOperator child, boolean smallChild);
 
     /**
      * Execute this join operator.
