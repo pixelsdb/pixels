@@ -1,30 +1,28 @@
 package io.pixelsdb.pixels.cache;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
-public class DiskCacheContentReader implements CacheContentReader {
-    private final RandomAccessFile content;
+public class MmapFileCacheContentReader implements CacheContentReader {
+    private final MemoryMappedFile content;
 
-    DiskCacheContentReader(String loc) throws IOException {
-        this.content = new RandomAccessFile(loc, "r");
-        this.content.seek(0);
+    MmapFileCacheContentReader(MemoryMappedFile content) throws IOException {
+        this.content = content;
     }
 
     @Override
     public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
         read(idx, buf.array(), 0);
     }
+
     @Override
     public void read(PixelsCacheIdx idx, byte[] buf) throws IOException {
         read(idx, buf, 0);
     }
 
     private void read(PixelsCacheIdx idx, byte[] buf, int offset) throws IOException {
-        content.seek(idx.offset);
-        content.read(buf, offset, idx.length);
+        content.getBytes(idx.offset, buf, offset, idx.length);
     }
 
     @Override

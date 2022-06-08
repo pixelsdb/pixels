@@ -16,7 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
-public class BenchmarkCacheIndex {
+public class BenchmarkCacheIndexReader {
     static int KEYS = 512000;
     static int READ_COUNT = KEYS * 50;
     MemoryMappedFile bigEndianIndexFile;

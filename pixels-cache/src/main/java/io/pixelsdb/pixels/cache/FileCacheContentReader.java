@@ -39,11 +39,11 @@ public class FileCacheContentReader implements CacheContentReader {
     }
 
     @Override
-    public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
+    public void read(PixelsCacheIdx idx, byte[] buf) throws IOException {
 //        Path full = Paths.get(baseDir, idx.offset + "-" + idx.length);
 //        RandomAccessFile file = new RandomAccessFile(full.toString(), "r");
         RandomAccessFile file = map.get(idx);
-        file.read(buf.array(), 0, idx.length);
+        file.read(buf, 0, idx.length);
 //        file.close();
     }
 
