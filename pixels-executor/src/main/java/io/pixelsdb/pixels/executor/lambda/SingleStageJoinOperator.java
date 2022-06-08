@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor.lambda;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
-import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 
@@ -99,9 +99,9 @@ public class SingleStageJoinOperator implements JoinOperator
             {
                 joinOutputs[i] = BroadcastJoinInvoker.invoke((BroadcastJoinInput) joinInputs.get(i));
             }
-            else if (joinAlgo == JoinAlgorithm.CHAIN)
+            else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
             {
-                joinOutputs[i] = ChainJoinInvoker.invoke((ChainJoinInput) joinInputs.get(i));
+                joinOutputs[i] = BroadcastChainJoinInvoker.invoke((BroadcastChainJoinInput) joinInputs.get(i));
             }
             else
             {

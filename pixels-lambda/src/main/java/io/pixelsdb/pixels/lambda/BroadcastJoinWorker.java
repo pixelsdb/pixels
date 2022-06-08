@@ -97,18 +97,12 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             String[] rightColAlias = event.getJoinInfo().getLargeColumnAlias();
             boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
             JoinType joinType = event.getJoinInfo().getJoinType();
+            checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
+                    "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                checkArgument(rightInputs.size() + 1 == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
-            else
-            {
-                checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
+            checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
+                    "the number of output file names is incorrect");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -196,33 +190,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of join", e);
-            }
-
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                // output the left-outer tail.
-                String outputPath = outputFolder + outputInfo.getFileNames().get(
-                        outputInfo.getFileNames().size()-1);
-                PixelsWriter pixelsWriter;
-                if (partitionOutput)
-                {
-                    requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, true, Arrays.stream(
-                                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
-                    joiner.writeLeftOuterAndPartition(pixelsWriter, rowBatchSize, outputPartitionInfo);
-                }
-                else
-                {
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, false, null);
-                    joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
-                }
-                pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
             }
 
             return joinOutput;

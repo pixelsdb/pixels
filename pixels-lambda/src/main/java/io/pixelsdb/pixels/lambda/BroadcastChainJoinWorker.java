@@ -25,7 +25,6 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
@@ -34,17 +33,19 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
-import io.pixelsdb.pixels.executor.lambda.input.ChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
@@ -59,15 +60,15 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @date 03/06/2022
  */
-public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutput>
+public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJoinInput, JoinOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(ChainJoinWorker.class);
+    private static final Logger logger = LoggerFactory.getLogger(BroadcastChainJoinWorker.class);
     private long queryId;
     private boolean partitionOutput = false;
     private PartitionInfo outputPartitionInfo;
 
     @Override
-    public JoinOutput handleRequest(ChainJoinInput event, Context context)
+    public JoinOutput handleRequest(BroadcastChainJoinInput event, Context context)
     {
         try
         {
@@ -94,18 +95,12 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
 
             JoinInfo lastJoinInfo = event.getJoinInfo();
             JoinType joinType = lastJoinInfo.getJoinType();
+            checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
+                    "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                checkArgument(rightInputs.size() + 1 == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
-            else
-            {
-                checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
+            checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
+                    "the number of output file names is incorrect");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -165,33 +160,6 @@ public class ChainJoinWorker implements RequestHandler<ChainJoinInput, JoinOutpu
             } catch (InterruptedException e)
             {
                 logger.error("interrupted while waiting for the termination of join", e);
-            }
-
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                // output the left-outer tail.
-                String outputPath = outputFolder + outputInfo.getFileNames().get(
-                        outputInfo.getFileNames().size()-1);
-                PixelsWriter pixelsWriter;
-                if (partitionOutput)
-                {
-                    requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, true, Arrays.stream(
-                                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
-                    joiner.writeLeftOuterAndPartition(pixelsWriter, rowBatchSize, outputPartitionInfo);
-                }
-                else
-                {
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, false, null);
-                    joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
-                }
-                pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
             }
 
             return joinOutput;

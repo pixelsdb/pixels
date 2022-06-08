@@ -28,5 +28,6 @@ public enum JoinAlgorithm
     UNKNOWN, // The first enum value is the default value.
     BROADCAST,
     PARTITIONED,
-    CHAIN
+    BROADCAST_CHAIN,
+    PARTITIONED_CHAIN
 }
