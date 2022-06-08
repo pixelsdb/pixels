@@ -24,7 +24,7 @@ public class DiskCacheContentReader implements CacheContentReader {
 
     private void read(PixelsCacheIdx idx, byte[] buf, int offset) throws IOException {
         content.seek(idx.offset);
-        content.read(buf, offset, idx.length);
+        content.readFully(buf, offset, idx.length);
     }
 
     @Override

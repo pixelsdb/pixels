@@ -92,7 +92,12 @@ public class BenchmarkCacheContentReader {
                     }
                     byte[] interal = new byte[maxBytes];
                     ByteBuffer buf = ByteBuffer.wrap(interal);
+                    Random random = new Random();
                     long searchStart = System.nanoTime();
+//                    for (int j = 0; j < pixelsCacheIdxs.size(); ++j) {
+//                        int index = random.nextInt(pixelsCacheIdxs.size());
+//                        reader.read(pixelsCacheIdxs.get(index), buf);
+//                    }
                     for (PixelsCacheIdx idx : pixelsCacheIdxs) {
                         reader.read(idx, buf);
                     }
@@ -140,8 +145,26 @@ public class BenchmarkCacheContentReader {
         int threadNum = 1;
         benchmarkMultiThreadContentReader(() -> {
             try {
-                return new DiskCacheContentReader("/scratch/yeeef/pixels-cache/pixels.cache");
+//                return new DiskCacheContentReader("/scratch/yeeef/pixels-cache/pixels.cache");
+                return new DiskCacheContentReader("/mnt/nvme1n1/pixels.cache");
+
             } catch (IOException e) {
+                e.printStackTrace();
+                return null;
+            }
+        }, threadNum);
+    }
+
+    @Test
+    public void benchmarkMultiThreadMmapContentReader() throws IOException, InterruptedException, ExecutionException {
+        int threadNum = 1;
+        benchmarkMultiThreadContentReader(() -> {
+            try {
+//                return new DiskCacheContentReader("/scratch/yeeef/pixels-cache/pixels.cache");
+                MemoryMappedFile mmap = new MemoryMappedFile("/mnt/nvme1n1/pixels.cache", 70L * 1024 * 1024 * 1024);
+                return new MmapFileCacheContentReader(mmap);
+
+            } catch (Exception e) {
                 e.printStackTrace();
                 return null;
             }
