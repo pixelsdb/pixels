@@ -21,6 +21,8 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,7 @@ public class PixelsPartitionCacheWriter {
     private final Storage storage;
     private final EtcdUtil etcdUtil;
     private final boolean writeContent;
+    private final int bandwidthLimit = 1000;
 
 
     /**
@@ -53,7 +56,6 @@ public class PixelsPartitionCacheWriter {
     // TODO: how to partition the cache region? by columnId or blk+rg+column?
     /* something special for us */
     private final int partitions; // should be a power of 2 // TODO: init from the properties
-    private final PixelsRadix[] radixs; // length = partition
     private final MemoryMappedFile[] cachePartitions; // length=partitions + 1
     private final MemoryMappedFile[] indexPartitions; // length=partitions + 1
     // permanent disk copy of the index file
@@ -68,7 +70,6 @@ public class PixelsPartitionCacheWriter {
                               MemoryMappedFile[] indexDiskPartitions,
                               Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory,
                               Storage storage,
-                              PixelsRadix[] radixs,
                               int partitions,
                               EtcdUtil etcdUtil,
                               String host,
@@ -85,13 +86,11 @@ public class PixelsPartitionCacheWriter {
         this.indexWriterFactory = indexWriterFactory;
 
         this.storage = storage;
-        this.radixs = radixs;
         this.partitions = partitions;
 
         checkArgument(this.cachePartitions.length == this.partitions + 1);
         checkArgument(this.indexPartitions.length == this.partitions + 1);
         checkArgument(this.indexDiskPartitions.length == this.partitions);
-        checkArgument(this.radixs.length == this.partitions);
 
 
         this.etcdUtil = etcdUtil;
@@ -206,10 +205,70 @@ public class PixelsPartitionCacheWriter {
             return this;
         }
 
+        public PixelsPartitionCacheWriter build2() throws Exception {
+            long cachePartitionSize = builderCacheSize / partitions;
+            long indexPartitionSize = builderIndexSize / partitions;
+            checkArgument (cachePartitionSize * partitions == builderCacheSize);
+            checkArgument (indexPartitionSize * partitions == builderIndexSize);
+            MemoryMappedFile cacheHeader = new MemoryMappedFile(
+                    Paths.get(builderCacheLocation, "header").toString(), PixelsCacheUtil.CACHE_DATA_OFFSET);
+            MemoryMappedFile indexHeader = new MemoryMappedFile(
+                    Paths.get(builderIndexLocation, "header").toString(), PixelsCacheUtil.PARTITION_INDEX_META_SIZE);
+            MemoryMappedFile indexDiskHeader = new MemoryMappedFile(
+                    Paths.get(builderIndexDiskLocation, "header").toString(), PixelsCacheUtil.PARTITION_INDEX_META_SIZE);
+            MemoryMappedFile[] cachePartitions = new MemoryMappedFile[partitions + 1];
+            MemoryMappedFile[] indexPartitions = new MemoryMappedFile[partitions + 1];
+            MemoryMappedFile[] indexDiskPartitions = new MemoryMappedFile[partitions];
+
+            for (int partition = 0; partition < partitions; ++partition) {
+                indexPartitions[partition] = new MemoryMappedFile(
+                        Paths.get(builderIndexLocation, "physical-" + partition).toString(),
+                        indexPartitionSize);
+                indexDiskPartitions[partition] = new MemoryMappedFile(
+                        Paths.get(builderIndexDiskLocation, "physical-" + partition).toString(),
+                        indexPartitionSize);
+                cachePartitions[partition] = new MemoryMappedFile(
+                        Paths.get(builderCacheLocation, "physical-" + partition).toString(),
+                        cachePartitionSize);
+            }
+            indexPartitions[partitions] = new MemoryMappedFile(
+                    Paths.get(builderIndexLocation, "physical-" + partitions).toString(),
+                    indexPartitionSize);
+            cachePartitions[partitions] = new MemoryMappedFile(
+                    Paths.get(builderCacheLocation, "physical-" + partitions).toString(),
+                    cachePartitionSize);
+
+            if (!builderOverwrite)
+            {
+                checkArgument(PixelsCacheUtil.checkMagic(indexHeader) && PixelsCacheUtil.checkMagic(cacheHeader),
+                        "overwrite=false, but cacheFile and indexFile is polluted");
+            }
+            //   else, create a new radix tree, and initialize the index and cache file.
+            else
+            {
+                // set the header of the file and each partition
+                PixelsCacheUtil.initializePartitionMeta(indexDiskHeader, (short) partitions, indexPartitionSize);
+                PixelsCacheUtil.initializePartitionMeta(indexHeader, (short) partitions, indexPartitionSize);
+                PixelsCacheUtil.initializeCacheFile(cacheHeader);
+                for (int i = 0; i < partitions; ++i) {
+                    PixelsCacheUtil.initializeIndexFile(indexPartitions[i]);
+                    PixelsCacheUtil.initializeIndexFile(indexDiskPartitions[i]);
+                    PixelsCacheUtil.initializeCacheFile(cachePartitions[i]);
+                }
+
+            }
+            EtcdUtil etcdUtil = EtcdUtil.Instance();
+
+            Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
+
+            return new PixelsPartitionCacheWriter(cacheHeader, indexHeader, indexDiskHeader,
+                    cachePartitions, indexPartitions, indexDiskPartitions, indexWriterFactory, storage,
+                    partitions, etcdUtil, builderHostName, writeContent);
+        }
+
         public PixelsPartitionCacheWriter build()
                 throws Exception
         {
-            // TODO: add unit test on it
             // calculate a decent size of the builderCacheSize and BuilderIndexSize based on the partition
             long cachePartitionSize = builderCacheSize / partitions;
             long indexPartitionSize = builderIndexSize / partitions;
@@ -273,7 +332,7 @@ public class PixelsPartitionCacheWriter {
             Storage storage = StorageFactory.Instance().getStorage(cacheConfig.getStorageScheme());
 
             return new PixelsPartitionCacheWriter(cacheFile, indexFile, indexDiskFile,
-                    cachePartitions, indexPartitions, indexDiskPartitions, indexWriterFactory, storage, radixs,
+                    cachePartitions, indexPartitions, indexDiskPartitions, indexWriterFactory, storage,
                     partitions, etcdUtil, builderHostName, writeContent);
         }
     }
@@ -318,7 +377,7 @@ public class PixelsPartitionCacheWriter {
             List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
             return internalUpdateAll(version, cacheColumnletOrders, files);
         }
-        catch (IOException e)
+        catch (IOException | InterruptedException e)
         {
             e.printStackTrace();
             return -1;
@@ -344,7 +403,7 @@ public class PixelsPartitionCacheWriter {
             List<String> cacheColumnletOrders = compact.getColumnletOrder().subList(0, cacheBorder);
             return internalUpdateIncremental(version, cacheColumnletOrders, files);
         }
-        catch (IOException e)
+        catch (IOException | InterruptedException e)
         {
             e.printStackTrace();
             return -1;
@@ -357,7 +416,7 @@ public class PixelsPartitionCacheWriter {
         {
             return internalUpdateAll(version, cacheColumnletOrders, files);
         }
-        catch (IOException e)
+        catch (IOException | InterruptedException e)
         {
             e.printStackTrace();
             return -1;
@@ -369,14 +428,14 @@ public class PixelsPartitionCacheWriter {
         {
             return internalUpdateIncremental(version, cacheColumnletOrders, files);
         }
-        catch (IOException e)
+        catch (IOException | InterruptedException e)
         {
             e.printStackTrace();
             return -1;
         }
     }
 
-    public int internalUpdateIncremental(int version, List<String> cacheColumnletOrders, String[] files) throws IOException {
+    public int internalUpdateIncremental(int version, List<String> cacheColumnletOrders, String[] files) throws IOException, InterruptedException {
         // now we need to consider the protocol
         int status = 0;
         List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
@@ -422,6 +481,8 @@ public class PixelsPartitionCacheWriter {
             writeLogicalPartition = writeLogicalPartition + 1;
 
             // write the free and start in the meta header
+            // TODO: indexDiskBackFile free should always be partitions, start should always be 0;
+            //       but then it has inconsistency with cache disk file, so we should let it be exactly the same as the tmpfs version
             PixelsCacheUtil.setFirstAndFree(indexDiskBackFile, (short) free, (short) start);
             PixelsCacheUtil.setFirstAndFree(indexBackFile, (short) free, (short) start);
         }
@@ -447,7 +508,7 @@ public class PixelsPartitionCacheWriter {
     // the xxxPartition are guranteed by the caller that they are safe to write anything
     private int partitionUpdateAll(int version, int partition, Function<MemoryMappedFile, CacheIndexWriter> indexWriterFactory,
                                    MemoryMappedFile indexPartition, MemoryMappedFile indexDiskPartition, MemoryMappedFile cachePartition,
-                                   String[] files, List<Short> rgIds, List<Short> colIds) throws IOException {
+                                   String[] files, List<Short> rgIds, List<Short> colIds) throws IOException, InterruptedException {
         try {
             // TODO: for us, this should be done immediately, since there is no contention between reader and writer
             PixelsCacheUtil.beginIndexWrite(indexDiskPartition);
@@ -463,6 +524,10 @@ public class PixelsPartitionCacheWriter {
 
         logger.debug("number of files=" + files.length);
         logger.debug("rgId.size=" + rgIds.size() + " colId.size=" + colIds.size());
+
+//        int bandwidthLimit = 50; // 50 mib/s
+        long startTime = System.currentTimeMillis();
+        long windowWriteBytes = 0;
 
         for (String file : files)
         {
@@ -505,6 +570,16 @@ public class PixelsPartitionCacheWriter {
                 // TODO: uncomment it! we now test the index write first
                 if (writeContent) {
                     cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
+                    windowWriteBytes += columnlet.length;
+                    if (windowWriteBytes / 1024.0 / 1024 / ((System.currentTimeMillis() - startTime) / 1000.0) > bandwidthLimit) {
+                        double writeMib = windowWriteBytes / 1024.0 / 1024;
+                        double expectTimeMili = writeMib / bandwidthLimit * 1000;
+//                        checkArgument(expectTimeMili > System.currentTimeMillis() - startTime);
+//                        logger.debug("trigger sleep " + windowWriteBytes / 1024.0 / 1024 / ((System.currentTimeMillis() - startTime) / 1000.0));
+//                        Thread.sleep((long) (expectTimeMili - System.currentTimeMillis() + startTime) * 2);
+                        Thread.sleep(100);
+
+                    }
                 }
                 logger.trace(
                         "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
@@ -558,8 +633,7 @@ public class PixelsPartitionCacheWriter {
 
     // bulk load method, it will write all the partitions at once.
     private int internalUpdateAll(int version, List<String> cacheColumnletOrders, String[] files)
-            throws IOException
-    {
+            throws IOException, InterruptedException {
         int status = 0;
         List<List<Short>> partitionRgIds = new ArrayList<>(partitions);
         for (int i = 0; i < partitions; ++i) {
