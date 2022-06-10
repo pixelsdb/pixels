@@ -88,6 +88,11 @@ public class LambdaJoinExecutor
         this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
     }
 
+    public JoinOperator getJoinOperator() throws IOException, MetadataException
+    {
+        return this.getJoinOperator(this.rootTable, Optional.empty());
+    }
+
     protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
@@ -640,7 +645,7 @@ public class LambdaJoinExecutor
                     for (int i = 0; i < orderedPaths.size();)
                     {
                         ImmutableList.Builder<InputInfo> inputsBuilder = ImmutableList.builder();
-                        for (int j = 0; j < splitSize && j < orderedPaths.size(); ++j, ++i)
+                        for (int j = 0; j < splitSize && i < orderedPaths.size(); ++j, ++i)
                         {
                             InputInfo input = new InputInfo(orderedPaths.get(i), 0, 1);
                             inputsBuilder.add(input);
