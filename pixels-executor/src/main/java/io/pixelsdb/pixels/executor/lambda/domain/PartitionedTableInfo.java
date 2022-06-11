@@ -25,9 +25,8 @@ import java.util.List;
  * @author hank
  * @date 02/06/2022
  */
-public class PartitionedTableInfo
+public class PartitionedTableInfo extends TableInfo
 {
-    private String tableName;
     /**
      * The partitioned file paths of the table.
      */
@@ -36,10 +35,7 @@ public class PartitionedTableInfo
      * The number of threads used to process the table.
      */
     private int parallelism;
-    /**
-     * The name of the columns to read.
-     */
-    private String[] columnsToRead;
+
     /**
      * The ids of the join-key columns of the table.
      */
@@ -53,21 +49,10 @@ public class PartitionedTableInfo
     public PartitionedTableInfo(String tableName, List<String> inputFiles,
                                 int parallelism, String[] columnsToRead, int[] keyColumnIds)
     {
-        this.tableName = tableName;
+        super(tableName, columnsToRead);
         this.inputFiles = inputFiles;
         this.parallelism = parallelism;
-        this.columnsToRead = columnsToRead;
         this.keyColumnIds = keyColumnIds;
-    }
-
-    public String getTableName()
-    {
-        return tableName;
-    }
-
-    public void setTableName(String tableName)
-    {
-        this.tableName = tableName;
     }
 
     public List<String> getInputFiles()
@@ -88,16 +73,6 @@ public class PartitionedTableInfo
     public void setParallelism(int parallelism)
     {
         this.parallelism = parallelism;
-    }
-
-    public String[] getColumnsToRead()
-    {
-        return columnsToRead;
-    }
-
-    public void setColumnsToRead(String[] columnsToRead)
-    {
-        this.columnsToRead = columnsToRead;
     }
 
     public int[] getKeyColumnIds()

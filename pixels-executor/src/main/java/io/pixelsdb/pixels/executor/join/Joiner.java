@@ -56,14 +56,16 @@ public class Joiner
     private final TypeDescription smallSchema;
     private final TypeDescription largeSchema;
     private final TypeDescription joinedSchema;
-    /**
-     * Whether the join-key columns should be included in the {@link #joinedSchema}.
-     */
-    private final boolean includeKeyCols;
     private final int[] smallKeyColumnIds;
-    private final Set<Integer> smallKeyColumnIdSet;
     private final int[] largeKeyColumnIds;
-    private final Set<Integer> largeKeyColumnIdSet;
+    /**
+     * Whether the columns from {@link #smallSchema} should be included in the {@link #joinedSchema}.
+     */
+    private final boolean[] smallProjection;
+    /**
+     * Whether the columns from {@link #largeSchema} should be included in the {@link #joinedSchema}.
+     */
+    private final boolean[] largeProjection;
     /**
      * All the tuples from the small table that have been matched during the join.
      */
@@ -80,19 +82,24 @@ public class Joiner
      * the columns from the large (a.k.a., right) table.
      *
      * @param joinType the join type
-     * @param includeKeyCols whether joinedCols includes the key columns from both tables.
      * @param smallSchema the schema of the small table
      * @param smallColumnAlias the alias of the columns from the small table. These alias
-     *                         are used as the column name in {@link #joinedSchema}.
+     *                         are used as the column name in {@link #joinedSchema}
+     * @param smallProjection denotes whether the columns from {@link #smallSchema}
+     *                        are included in {@link #joinedSchema}
      * @param smallKeyColumnIds the ids of the key columns of the small table
      * @param largeSchema the schema of the large table
      * @param largeColumnAlias the alias of the columns from the large table. These alias
-     *                         are used as the column name in {@link #joinedSchema}.
+     *                         are used as the column name in {@link #joinedSchema}
+     * @param largeProjection denotes whether the columns from {@link #largeSchema}
+     *                        are included in {@link #joinedSchema}
      * @param largeKeyColumnIds the ids of the key columns of the large table
      */
-    public Joiner(JoinType joinType, boolean includeKeyCols,
-                  TypeDescription smallSchema, String[] smallColumnAlias, int[] smallKeyColumnIds,
-                  TypeDescription largeSchema, String[] largeColumnAlias, int[] largeKeyColumnIds)
+    public Joiner(JoinType joinType,
+                  TypeDescription smallSchema, String[] smallColumnAlias,
+                  boolean[] smallProjection, int[] smallKeyColumnIds,
+                  TypeDescription largeSchema, String[] largeColumnAlias,
+                  boolean[] largeProjection, int[] largeKeyColumnIds)
     {
         this.joinType = requireNonNull(joinType, "joinType is null");
         requireNonNull(smallColumnAlias, "smallColumnAlias is null");
@@ -104,21 +111,39 @@ public class Joiner
                 "smallKeyColumnIds is null or empty");
         checkArgument(largeKeyColumnIds != null && largeKeyColumnIds.length > 0,
                 "largeKeyColumnIds is null or empty");
+        checkArgument(smallProjection != null && smallProjection.length == smallSchema.getFieldNames().size(),
+                "smallProjection is null or of incorrect length");
+        checkArgument(largeProjection != null && largeProjection.length == largeSchema.getFieldNames().size(),
+                "largeProjection is null or of incorrect length");
+
         this.smallKeyColumnIds = smallKeyColumnIds;
-        this.smallKeyColumnIdSet = new HashSet<>(this.smallKeyColumnIds.length);
-        for (int id : this.smallKeyColumnIds)
+        this.smallProjection = smallProjection;
+        int numSmallIncludedColumns = 0;
+        for (boolean smallProj : this.smallProjection)
         {
-            this.smallKeyColumnIdSet.add(id);
+            if (smallProj)
+            {
+                ++numSmallIncludedColumns;
+            }
         }
+        checkArgument(smallColumnAlias.length == numSmallIncludedColumns,
+                "smallProjection is not consist with smallColumnAlias");
+
         this.largeKeyColumnIds = largeKeyColumnIds;
-        this.largeKeyColumnIdSet = new HashSet<>(this.largeKeyColumnIds.length);
-        for (int id : this.largeKeyColumnIds)
+        this.largeProjection = largeProjection;
+        int numLargeIncludedColumns = 0;
+        for (boolean largeProj : this.largeProjection)
         {
-            this.largeKeyColumnIdSet.add(id);
+            if (largeProj)
+            {
+                ++numLargeIncludedColumns;
+            }
         }
+        checkArgument(largeColumnAlias.length == numLargeIncludedColumns,
+                "largeProjection is not consist with largeColumnAlias");
+
         // build the schema for the join result.
         this.joinedSchema = new TypeDescription(TypeDescription.Category.STRUCT);
-        this.includeKeyCols = includeKeyCols;
         List<String> smallColumnNames = smallSchema.getFieldNames();
         List<TypeDescription> smallColumnTypes = smallSchema.getChildren();
         checkArgument(smallColumnTypes != null && smallColumnNames.size() == smallColumnTypes.size(),
@@ -127,43 +152,24 @@ public class Joiner
         List<TypeDescription> largeColumnTypes = largeSchema.getChildren();
         checkArgument(largeColumnTypes != null && largeColumnNames.size() == largeColumnTypes.size(),
                 "invalid children of largeSchema");
-        int outputColumNum = smallColumnNames.size() + largeColumnNames.size();
-        if (this.includeKeyCols)
-        {
-            outputColumNum -= (joinType == JoinType.NATURAL ? largeKeyColumnIds.length : 0);
-        }
-        else
-        {
-            outputColumNum -= (smallKeyColumnIds.length + largeKeyColumnIds.length);
-        }
-        checkArgument(outputColumNum == smallColumnAlias.length + largeColumnAlias.length,
-                "joinedCols does not contain correct number of elements");
+
         int colAliasId = 0;
         for (int i = 0; i < smallColumnNames.size(); ++i)
         {
-            if ((!this.includeKeyCols) && smallKeyColumnIdSet.contains(i))
+            if (this.smallProjection[i])
             {
-                // ignore the join key columns.
-                continue;
+                this.joinedSchema.addField(smallColumnAlias[colAliasId++], smallColumnTypes.get(i));
             }
-            this.joinedSchema.addField(smallColumnAlias[colAliasId++], smallColumnTypes.get(i));
         }
         colAliasId = 0;
         for (int i = 0; i < largeColumnNames.size(); ++i)
         {
-            if ((!this.includeKeyCols || joinType == JoinType.NATURAL) && largeKeyColumnIdSet.contains(i))
+            if (this.largeProjection[i])
             {
-                // ignore the join key columns.
-                // for natural join, the key columns of the right table is ignored.
-                continue;
+                this.joinedSchema.addField(largeColumnAlias[colAliasId++], largeColumnTypes.get(i));
             }
-            this.joinedSchema.addField(largeColumnAlias[colAliasId++], largeColumnTypes.get(i));
         }
         // create the null tuples for outer join.
-        int numSmallIncludedColumns = this.includeKeyCols ?
-                smallColumnNames.size() : smallColumnNames.size() - smallKeyColumnIds.length;
-        int numLargeIncludedColumns = this.includeKeyCols && this.joinType != JoinType.NATURAL ?
-                largeColumnNames.size() : largeColumnNames.size() - largeKeyColumnIds.length;
         this.smallNullTuple = buildNullTuple(numSmallIncludedColumns);
         this.largeNullTuple = buildNullTuple(numLargeIncludedColumns);
     }
@@ -180,8 +186,7 @@ public class Joiner
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");
-        Tuple.Builder builder = new Tuple.Builder(smallBatch,
-                this.smallKeyColumnIds, this.smallKeyColumnIdSet, this.includeKeyCols);
+        Tuple.Builder builder = new Tuple.Builder(smallBatch, this.smallKeyColumnIds, this.smallProjection);
         while (builder.hasNext())
         {
             Tuple tuple = builder.next();
@@ -203,8 +208,7 @@ public class Joiner
         checkArgument(largeBatch.size > 0, "largeBatch is empty");
         List<VectorizedRowBatch> result = new LinkedList<>();
         VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
-        Tuple.Builder builder = new Tuple.Builder(largeBatch, this.largeKeyColumnIds, this.largeKeyColumnIdSet,
-                this.includeKeyCols && this.joinType != JoinType.NATURAL);
+        Tuple.Builder builder = new Tuple.Builder(largeBatch, this.largeKeyColumnIds, this.largeProjection);
         while (builder.hasNext())
         {
             Tuple large = builder.next();
@@ -213,7 +217,6 @@ public class Joiner
             {
                 switch (joinType)
                 {
-                    case NATURAL:
                     case EQUI_INNER:
                     case EQUI_LEFT:
                         break;

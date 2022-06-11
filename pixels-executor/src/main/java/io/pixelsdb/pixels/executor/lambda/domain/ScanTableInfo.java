@@ -28,6 +28,10 @@ import java.util.List;
 public class ScanTableInfo extends TableInfo
 {
     /**
+     * The scan inputs of the table.
+     */
+    private List<InputSplit> inputSplits;
+    /**
      * The json string of the filter (i.e., predicates) to be used in scan.
      */
     private String filter;
@@ -37,10 +41,22 @@ public class ScanTableInfo extends TableInfo
      */
     public ScanTableInfo() { }
 
-    public ScanTableInfo(String tableName, List<InputSplit> inputs, String[] cols, String filter)
+    public ScanTableInfo(String tableName, List<InputSplit> inputSplits,
+                         String[] columnsToRead, String filter)
     {
-        super(tableName, inputs, cols);
+        super(tableName, columnsToRead);
+        this.inputSplits = inputSplits;
         this.filter = filter;
+    }
+
+    public List<InputSplit> getInputSplits()
+    {
+        return inputSplits;
+    }
+
+    public void setInputSplits(List<InputSplit> inputSplits)
+    {
+        this.inputSplits = inputSplits;
     }
 
     public String getFilter()

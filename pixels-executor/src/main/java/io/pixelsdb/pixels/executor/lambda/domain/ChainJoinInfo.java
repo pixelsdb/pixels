@@ -50,10 +50,11 @@ public class ChainJoinInfo extends JoinInfo
     public ChainJoinInfo() { }
 
     public ChainJoinInfo(JoinType joinType, String[] smallColumnAlias, String[] largeColumnAlias,
-                         int[] keyColumnIds, boolean outputJoinKeys, boolean postPartition,
-                         PartitionInfo postPartitionInfo)
+                         int[] keyColumnIds, boolean[] smallProjection, boolean[] largeProjection,
+                         boolean postPartition, PartitionInfo postPartitionInfo)
     {
-        super(joinType, smallColumnAlias, largeColumnAlias, outputJoinKeys, postPartition, postPartitionInfo);
+        super(joinType, smallColumnAlias, largeColumnAlias, smallProjection, largeProjection,
+                postPartition, postPartitionInfo);
         this.keyColumnIds = keyColumnIds;
         this.resultColumns = Arrays.copyOf(smallColumnAlias, smallColumnAlias.length + largeColumnAlias.length);
         System.arraycopy(largeColumnAlias, 0, this.resultColumns, smallColumnAlias.length, largeColumnAlias.length);

@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.executor.lambda.domain;
 
-import java.util.List;
-
 /**
  * @author hank
  * @date 02/06/2022
@@ -28,10 +26,7 @@ import java.util.List;
 public class TableInfo
 {
     private String tableName;
-    /**
-     * The scan inputs of the table.
-     */
-    private List<InputSplit> inputSplits;
+
     /**
      * The name of the columns to read.
      */
@@ -42,10 +37,9 @@ public class TableInfo
      */
     public TableInfo() { }
 
-    public TableInfo(String tableName, List<InputSplit> inputSplits, String[] columnsToRead)
+    public TableInfo(String tableName, String[] columnsToRead)
     {
         this.tableName = tableName;
-        this.inputSplits = inputSplits;
         this.columnsToRead = columnsToRead;
     }
 
@@ -57,16 +51,6 @@ public class TableInfo
     public void setTableName(String tableName)
     {
         this.tableName = tableName;
-    }
-
-    public List<InputSplit> getInputSplits()
-    {
-        return inputSplits;
-    }
-
-    public void setInputSplits(List<InputSplit> inputSplits)
-    {
-        this.inputSplits = inputSplits;
     }
 
     public String[] getColumnsToRead()

@@ -95,7 +95,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             String[] leftColAlias = event.getJoinInfo().getSmallColumnAlias();
             String[] rightColAlias = event.getJoinInfo().getLargeColumnAlias();
-            boolean includeKeyCols = event.getJoinInfo().isOutputJoinKeys();
+            boolean[] leftProjection = event.getJoinInfo().getSmallProjection();
+            boolean[] rightProjection = event.getJoinInfo().getLargeProjection();
             JoinType joinType = event.getJoinInfo().getJoinType();
             checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
                     "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
@@ -131,9 +132,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getInputInfos().get(0).getPath(),
                     rightInputs.get(0).getInputInfos().get(0).getPath());
-            Joiner joiner = new Joiner(joinType, includeKeyCols,
-                    getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftKeyColumnIds,
-                    getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightKeyColumnIds);
+            Joiner joiner = new Joiner(joinType,
+                    getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
+                    getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the hash table for the left table.
             List<Future> leftFutures = new ArrayList<>();
             for (InputSplit inputSplit : leftInputs)

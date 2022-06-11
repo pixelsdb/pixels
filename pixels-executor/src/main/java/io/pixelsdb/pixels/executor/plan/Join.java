@@ -52,9 +52,13 @@ public class Join
      */
     private final int[] rightKeyColumnIds;
     /**
-     * Whether the join result includes the key columns from the left and right tables.
+     * Whether the join result includes the columns from the left table.
      */
-    private final boolean includeKeyColumns;
+    private final boolean[] leftProjection;
+    /**
+     * Whether the join result includes the columns from the right table.
+     */
+    private final boolean[] rightProjection;
 
     private final JoinEndian joinEndian;
 
@@ -65,8 +69,8 @@ public class Join
     public Join(Table leftTable, Table rightTable,
                 String[] leftColumnAlias, String[] rightColumnAlias,
                 int[] leftKeyColumnIds, int[] rightKeyColumnIds,
-                boolean includeKeyColumns, JoinEndian joinEndian,
-                JoinType joinType, JoinAlgorithm joinAlgo)
+                boolean[] leftProjection, boolean[] rightProjection,
+                JoinEndian joinEndian, JoinType joinType, JoinAlgorithm joinAlgo)
     {
         this.leftTable = leftTable;
         this.rightTable = rightTable;
@@ -74,7 +78,8 @@ public class Join
         this.rightColumnAlias = rightColumnAlias;
         this.leftKeyColumnIds = leftKeyColumnIds;
         this.rightKeyColumnIds = rightKeyColumnIds;
-        this.includeKeyColumns = includeKeyColumns;
+        this.leftProjection = leftProjection;
+        this.rightProjection = rightProjection;
         this.joinEndian = joinEndian;
         this.joinType = joinType;
         this.joinAlgo = joinAlgo;
@@ -100,9 +105,14 @@ public class Join
         return rightColumnAlias;
     }
 
-    public boolean isIncludeKeyColumns()
+    public boolean[] getLeftProjection()
     {
-        return includeKeyColumns;
+        return leftProjection;
+    }
+
+    public boolean[] getRightProjection()
+    {
+        return rightProjection;
     }
 
     public int[] getLeftKeyColumnIds()

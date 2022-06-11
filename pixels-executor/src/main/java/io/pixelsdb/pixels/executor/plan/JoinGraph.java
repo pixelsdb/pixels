@@ -146,8 +146,9 @@ public class JoinGraph
                         rightKeyColumnIds = tmpInts;
                     }
                     // TODO: select join algorithm by the optimizer, decide includeKeyColumns and join endian.
-                    newJoin = new Join(left, right, left.getColumnNames(), right.getColumnNames(),
-                            leftKeyColumnIds, rightKeyColumnIds, true,
+                    newJoin = new Join(left, right,
+                            left.getColumnNames(), right.getColumnNames(), leftKeyColumnIds, rightKeyColumnIds,
+                            baseJoin.getLeftProjection(), baseJoin.getRightProjection(),
                             JoinEndian.SMALL_LEFT, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
                 else
@@ -155,6 +156,11 @@ public class JoinGraph
                     JoinedTable left = joinRoot;
                     Table right = nextTable;
                     String[] leftColumns = left.getColumnNames();
+                    boolean[] leftProjection = new boolean[leftColumns.length];
+                    for (int i = 0; i < leftProjection.length; ++i)
+                    {
+                        leftProjection[i] = true;
+                    }
                     int[] leftKeyColumnIds = new int[baseJoin.getLeftKeyColumnIds().length];
                     for (int i = 0; i < baseJoin.getLeftKeyColumnIds().length; ++i)
                     {
@@ -169,10 +175,14 @@ public class JoinGraph
                             }
                         }
                     }
+                    for (int leftKeyColumnId : leftKeyColumnIds)
+                    {
+                        leftProjection[leftKeyColumnId] = false;
+                    }
                     int[] rightKeyColumnIds = baseJoin.getRightKeyColumnIds();
                     // TODO: select join algorithm by the optimizer, decide includeKeyColumns and join endian.
                     newJoin = new Join(left, right, left.getColumnNames(), right.getColumnNames(),
-                            leftKeyColumnIds, rightKeyColumnIds, true,
+                            leftKeyColumnIds, rightKeyColumnIds, leftProjection, baseJoin.getRightProjection(),
                             JoinEndian.SMALL_LEFT, baseJoin.getJoinType(), baseJoin.getJoinAlgo());
                 }
 
