@@ -52,7 +52,7 @@ public class PartitionCacheReader implements CacheReader {
     // TODO: the verification of whether we can read shall be done where? I think this protocol verifier shall be
     //        decoupled
 
-    public PixelsCacheIdx naiveSearch(PixelsCacheKey key) {
+    public PixelsCacheIdx naivesearch(PixelsCacheKey key) {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
         int logicalPartition = PixelsCacheUtil.hashcode(partitionHashKeyBuf.array()) & 0x7fffffff % partitions;
@@ -154,9 +154,9 @@ public class PartitionCacheReader implements CacheReader {
             cnt++;
 
         } while (rwflag > 0 || !indexSubRegion.compareAndSwapInt(6, v, v + PixelsCacheUtil.READER_COUNT_INC));
-        if (cnt > 1) {
-            logger.debug(String.format("route %d times, physical partition=%d, logical partition=%d", physicalPartition, logicalPartition));
-        }
+//        if (cnt > 1) {
+//            logger.debug(String.format("route %d times, physical partition=%d, logical partition=%d",cnt , physicalPartition, logicalPartition));
+//        }
         return new ReadLease(start, physicalPartition, PixelsCacheUtil.getIndexVersion(indexSubRegion));
     }
 
@@ -286,6 +286,7 @@ public class PartitionCacheReader implements CacheReader {
         int rwflag = 0;
         int v;
         long lease;
+        int cnt = 0;
         do {
             // 0. use free and start to decide the physical partition
             physicalPartition = PixelsCacheUtil.retrievePhysicalPartition(indexWholeRegion,
@@ -296,8 +297,12 @@ public class PartitionCacheReader implements CacheReader {
             v = indexSubRegion.getIntVolatile(6);
             rwflag = v & PixelsCacheUtil.RW_MASK;
             lease = System.currentTimeMillis();
+            cnt++;
 
         } while (rwflag > 0);
+        if (cnt > 1) {
+            logger.debug(String.format("route %d times, physical partition=%d, logical partition=%d",cnt , physicalPartition, logicalPartition));
+        }
         // the loop will exit if rw_flag=0 and we have increased the rw_count atomically at the same time.
         int version = PixelsCacheUtil.getIndexVersion(indexSubRegion);
         // now we have the access to the region.

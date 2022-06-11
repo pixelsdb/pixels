@@ -60,6 +60,16 @@ public class MockPixelsPhysicalReader {
         blkId = Long.parseLong(path);
     }
 
+    public int read(short rgId, short colId, byte[] buf) {
+        String cacheIdx = keyToIdxs.get(blkId + "-" + rgId + "-" + colId);
+        String[] idxTokens = cacheIdx.split("-");
+        long offset = Long.parseLong(idxTokens[0]);
+        int length = Integer.parseInt(idxTokens[1]);
+        if (buf.length >= length) {
+            Arrays.fill(buf, 0, length, (byte) ('A' + (cacheIdx.hashCode() % 26)));
+        }
+        return length;
+    }
 
     public byte[] read(short rgId, short colId)
             throws IOException

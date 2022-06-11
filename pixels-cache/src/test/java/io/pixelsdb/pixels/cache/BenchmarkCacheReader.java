@@ -346,9 +346,9 @@ public class BenchmarkCacheReader {
         SettableFuture<Integer> finish = SettableFuture.create();
         List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
         for (int i = 0; i < nReaders; ++i) {
-            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
             ExecutorService readExecutor = Executors.newSingleThreadExecutor();
             Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
                 Random random = new Random();
                 byte[] buf = new byte[4096];
                 // metrics
@@ -361,6 +361,80 @@ public class BenchmarkCacheReader {
                     PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
                     if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
                     int readBytes = reader.naiveget(cacheKey, buf, cacheIdx.length);
+                    if (readBytes <= 0) {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(cacheKey.rowGroupId);
+                        keyBuf.putShort(cacheKey.columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println("readBytes=0 " + partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    } else {
+                        totalBytes += readBytes;
+                        io++;
+                    }
+                }
+                long end = System.nanoTime();
+                double elapsed = (double) (end - start) / (double) 1e6;
+
+                BenchmarkResult result = new BenchmarkResult(io, totalBytes, elapsed);
+                System.out.println(result);
+                return result;
+            });
+            futures.add(future);
+        }
+
+        Thread.sleep(durationMilis);
+        finish.set(1);
+        List<BenchmarkResult> results = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            results.add(futures.get(i).get());
+        }
+        double totalIOPS = 0.0;
+        double totalBandwidthMB = 0.0;
+        double totalBandwidthMiB = 0.0;
+
+        double averageLatency = 0.0;
+        for (BenchmarkResult res : results) {
+            totalIOPS += res.iops;
+            totalBandwidthMB += res.bandwidthMb;
+            totalBandwidthMiB += res.bandwidthMib;
+            averageLatency += res.latency;
+        }
+        averageLatency /= nReaders;
+        System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
+
+    }
+
+    @Test // read; w/ complex protocol; partitioned; radix; disk content reader
+    public void benchmarkPartitionedRead2() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+
+        int nReaders = 1;
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        // 1 reader continuously randomly read all keys
+        // 1 writer write the partitions once
+        SettableFuture<Integer> finish = SettableFuture.create();
+        List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
+            Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
+                        .setIndexLocation(cacheConfig.getIndexLocation()).build2();
+                Random random = new Random(System.nanoTime());
+                byte[] buf = new byte[1024 * 1024];
+                // metrics
+                long start = System.nanoTime();
+                long totalBytes = 0;
+                long io = 0;
+                while (!finish.isDone()) {
+                    int index = random.nextInt(pixelsCacheKeys.size());
+                    PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+                    PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+                    while (buf.length < cacheIdx.length) buf = new byte[buf.length * 2];
+                    int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
                     if (readBytes <= 0) {
                         ByteBuffer keyBuf = ByteBuffer.allocate(4);
                         keyBuf.putShort(cacheKey.rowGroupId);
@@ -556,11 +630,11 @@ public class BenchmarkCacheReader {
         SettableFuture<Integer> finish = SettableFuture.create();
         List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
         for (int i = 0; i < nReaders; ++i) {
-            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
             ExecutorService readExecutor = Executors.newSingleThreadExecutor();
             Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
                 Random random = new Random();
-                byte[] buf = new byte[4096];
+                byte[] buf = new byte[1024 * 1024];
                 // metrics
                 long start = System.nanoTime();
                 long totalBytes = 0;
@@ -570,7 +644,7 @@ public class BenchmarkCacheReader {
                     PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
                     PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
                     if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
-                    int readBytes = reader.naiveget(cacheKey, buf, cacheIdx.length);
+                    int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
                     if (readBytes <= 0) {
                         ByteBuffer keyBuf = ByteBuffer.allocate(4);
                         keyBuf.putShort(cacheKey.rowGroupId);
@@ -609,6 +683,7 @@ public class BenchmarkCacheReader {
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
         // build cacheColumnletOrders
         Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        long startWrite = System.currentTimeMillis();
         assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
 
         finish.set(1);
@@ -630,12 +705,116 @@ public class BenchmarkCacheReader {
         }
         averageLatency /= nReaders;
         System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
+        System.out.println(String.format("write bandwidth=%f", 64 * 1024.0 / ((System.currentTimeMillis() - startWrite) / 1000.0)));
 
 
     }
 
-    @Test // readers + 1 writer; w/ protocol; partitioned; radix
+    @Test // readers + 1 writer; w/ protocol; partitioned; radix; disk content reader
     public void benchmarkProtocolReadAndWrite2() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+
+        int nReaders = 6;
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        SettableFuture<Integer> finish = SettableFuture.create();
+        List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
+            Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
+                        .setIndexLocation(cacheConfig.getIndexLocation()).build2();
+//                Random random = new Random(System.nanoTime());
+                Random random = new Random();
+
+                byte[] buf = new byte[1024 * 1024];
+                // metrics
+                long start = System.nanoTime();
+                long totalBytes = 0;
+                long io = 0;
+                while (!finish.isDone()) {
+                    int index = random.nextInt(pixelsCacheKeys.size());
+                    PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+                    PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+                    while (buf.length < cacheIdx.length) buf = new byte[buf.length * 2];
+                    int readBytes = reader.simpleget(cacheKey, buf, cacheIdx.length);
+                    if (readBytes <= 0) {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(cacheKey.rowGroupId);
+                        keyBuf.putShort(cacheKey.columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println("readBytes=0 " + partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    } else {
+                        totalBytes += readBytes;
+                        io++;
+                    }
+                }
+                long end = System.nanoTime();
+                double elapsed = (double) (end - start) / (double) 1e6;
+
+                BenchmarkResult result = new BenchmarkResult(io, totalBytes, elapsed);
+                System.out.println(result);
+                return result;
+            });
+            futures.add(future);
+        }
+
+        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
+        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
+                .setPartitions(cacheConfig.getPartitions())
+                .setCacheSize(cacheConfig.getCacheSize())
+                .setIndexLocation(cacheConfig.getIndexLocation())
+                .setIndexSize(cacheConfig.getIndexSize())
+                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setOverwrite(false) // dont overwrite
+                .setWriteContent(true)
+                .setHostName("yeeef-fort")
+                .setCacheConfig(cacheConfig)
+                .build2();
+
+        // build files
+        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
+        // build cacheColumnletOrders
+        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        long startWrite = System.currentTimeMillis();
+
+        assert (writer.incrementalLoad(900, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+//        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+//        assert (writer.incrementalLoad(801, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+
+
+        finish.set(1);
+        List<BenchmarkResult> results = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            results.add(futures.get(i).get());
+        }
+        double totalIOPS = 0.0;
+        double totalBandwidthMB = 0.0;
+        double totalBandwidthMiB = 0.0;
+
+        double averageLatency = 0.0;
+        for (BenchmarkResult res : results) {
+            totalIOPS += res.iops;
+            totalBandwidthMB += res.bandwidthMb;
+            totalBandwidthMiB += res.bandwidthMib;
+            averageLatency += res.latency;
+        }
+        averageLatency /= nReaders;
+        System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
+        System.out.println(String.format("write bandwidth=%f", 64 * 1 * 1024.0 / ((System.currentTimeMillis() - startWrite) / 1000.0)));
+
+
+    }
+
+    @Test // readers + 1 writer; w/ protocol; partitioned; hash
+    public void benchmarkProtocolReadAndWriteIndex() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+//        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
         int nReaders = 8;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         // 1 reader continuously randomly read all keys
@@ -648,36 +827,32 @@ public class BenchmarkCacheReader {
         SettableFuture<Integer> finish = SettableFuture.create();
         List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
         for (int i = 0; i < nReaders; ++i) {
-            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
             ExecutorService readExecutor = Executors.newSingleThreadExecutor();
             Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setIndexType("hash").setCacheFile(cacheFile).setIndexFile(indexFile).build();
                 Random random = new Random();
-                byte[] buf = new byte[4096];
                 // metrics
                 long start = System.nanoTime();
-                long totalBytes = 0;
                 long io = 0;
                 while (!finish.isDone()) {
                     int index = random.nextInt(pixelsCacheKeys.size());
                     PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
-                    PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
-                    if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
-                    int readBytes = reader.naiveget(cacheKey, buf, cacheIdx.length);
-                    if (readBytes <= 0) {
+                    PixelsCacheIdx readed = reader.search(cacheKey);
+                    if (readed == null) {
                         ByteBuffer keyBuf = ByteBuffer.allocate(4);
                         keyBuf.putShort(cacheKey.rowGroupId);
                         keyBuf.putShort(cacheKey.columnId);
                         int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
                         System.out.println("readBytes=0 " + partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
                     } else {
-                        totalBytes += readBytes;
                         io++;
                     }
+//                    if (io % 10000 == 0) System.out.println(io);
                 }
                 long end = System.nanoTime();
                 double elapsed = (double) (end - start) / (double) 1e6;
 
-                BenchmarkResult result = new BenchmarkResult(io, totalBytes, elapsed);
+                BenchmarkResult result = new BenchmarkResult(io, 0, elapsed);
                 System.out.println(result);
                 return result;
             });
@@ -691,8 +866,9 @@ public class BenchmarkCacheReader {
                 .setIndexLocation(cacheConfig.getIndexLocation())
                 .setIndexSize(cacheConfig.getIndexSize())
                 .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setIndexType("hash")
                 .setOverwrite(false) // dont overwrite
-                .setWriteContent(true)
+                .setWriteContent(false)
                 .setHostName("yeeef-fort")
                 .setCacheConfig(cacheConfig)
                 .build();
@@ -701,9 +877,9 @@ public class BenchmarkCacheReader {
         Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
         // build cacheColumnletOrders
         Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+        long startWrite = System.currentTimeMillis();
+        assert (writer.incrementalLoad(800, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
 
-        finish.set(1);
         finish.set(1);
         List<BenchmarkResult> results = new ArrayList<>(nReaders);
         for (int i = 0; i < nReaders; ++i) {
@@ -722,6 +898,7 @@ public class BenchmarkCacheReader {
         }
         averageLatency /= nReaders;
         System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
+        System.out.println(String.format("write bandwidth=%f", 64 * 1024.0 / ((System.currentTimeMillis() - startWrite) / 1000.0)));
 
 
     }

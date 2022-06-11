@@ -54,13 +54,17 @@ public class TestPartitionCacheReader {
     public void buildConfig() {
         ConfigFactory config = ConfigFactory.Instance();
         // disk cache
-        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
+//        config.addProperty("cache.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.cache");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+
         config.addProperty("cache.size", String.valueOf(70 * 1024 * 1024 * 1024L)); // 70GiB
         config.addProperty("cache.partitions", "32");
 
 
         config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.index");
-        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
+//        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.index");
+
         config.addProperty("index.size", String.valueOf(100 * 1024 * 1024)); // 100 MiB
 
         config.addProperty("cache.storage.scheme", "mock"); // 100 MiB
@@ -261,7 +265,7 @@ public class TestPartitionCacheReader {
 //        }
 //
         byte[] readBuf = new byte[4096];
-        int readCnt = 10000;
+        int readCnt = 512000;
         System.out.println("readCnt=" + readCnt);
 //
 //        for (int index = 0; index < readCnt; ++index) {
@@ -324,7 +328,7 @@ public class TestPartitionCacheReader {
 
     @Test
     public void benchmarkMultipleReaders() throws Exception {
-        int nReaders = 8;
+        int nReaders = 1;
         String hostName = "diascld34";
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         // 1 reader continuously randomly read all keys
@@ -346,11 +350,11 @@ public class TestPartitionCacheReader {
                 int cnt = 0;
                 while(!finish.isDone()) {
                     int index = random.nextInt(pixelsCacheKeys.size());
-                    PixelsCacheIdx readed = reader.search(pixelsCacheKeys.get(index));
+                    ByteBuffer readed = reader.get(pixelsCacheKeys.get(index));
 
                     if (readed != null) {
-                        assert(readed.length == pixelsCacheIdxs.get(index).length);
-                        cnt++;
+//                        assert(readed.length == pixelsCacheIdxs.get(index).length);
+//                        cnt++;
 
                     } else {
                         ByteBuffer keyBuf = ByteBuffer.allocate(4);
@@ -359,6 +363,7 @@ public class TestPartitionCacheReader {
                         int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
                         System.out.println(partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
                     }
+                    cnt++;
 //                    index = (index + 1) % 512000;
                 }
                 System.out.println("=================================================");
@@ -369,7 +374,7 @@ public class TestPartitionCacheReader {
             });
             futures.add(future);
         }
-        Thread.sleep(1000 * 25); // 10s
+        Thread.sleep(1000 * 60); // 10s
         finish.set(1);
     }
 }

@@ -1,5 +1,6 @@
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.cache.utils.RadixIndexEndianRewriter;
 import org.junit.Test;
 
 public class TestRadixIndexEndianRewriter {

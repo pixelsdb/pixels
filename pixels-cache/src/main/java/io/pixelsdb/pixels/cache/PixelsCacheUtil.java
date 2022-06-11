@@ -85,7 +85,7 @@ public class PixelsCacheUtil
     /**
      * The length of cache read lease in millis.
      */
-    public static final int CACHE_READ_LEASE_MS = 1000;
+    public static final int CACHE_READ_LEASE_MS = 100;
 
     static
     {
@@ -248,29 +248,32 @@ public class PixelsCacheUtil
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
-        indexFile.setByteVolatile(6, (byte) 1);
-        final int sleepMs = 10;
-        int waitMs = 0;
-        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0) // polling to see if something is finished
-        {
-            /**
-             * Wait for the existing readers to finish.
-             * As rw flag has been set, there will be no new readers,
-             * the existing readers should finished cache reading in
-             * 10s (10000ms). If the reader can not finish cache reading
-             * in 10s, it is considered as failed.
-             */
-            Thread.sleep(sleepMs);
-            waitMs += sleepMs;
-            if (waitMs > CACHE_READ_LEASE_MS)
-            {
-                // clear reader count to continue writing.
-                logger.debug(String.format("waitms(%d) > CACHE_READ_LEASE_MS(%d)", waitMs, CACHE_READ_LEASE_MS));
-                indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
-                break;
-            }
-        }
-//        Thread.sleep(CACHE_READ_LEASE_MS);
+//        indexFile.setByteVolatile(6, (byte) 1);
+//        final int sleepMs = 10;
+//        int waitMs = 0;
+//        int readCount = indexFile.getIntVolatile(6) & READER_COUNT_MASK;
+//        while (readCount > 0) // polling to see if something is finished
+//        {
+//            /**
+//             * Wait for the existing readers to finish.
+//             * As rw flag has been set, there will be no new readers,
+//             * the existing readers should finished cache reading in
+//             * 10s (10000ms). If the reader can not finish cache reading
+//             * in 10s, it is considered as failed.
+//             */
+//            Thread.sleep(sleepMs);
+//            waitMs += sleepMs;
+//            if (waitMs > CACHE_READ_LEASE_MS)
+//            {
+//                // clear reader count to continue writing.
+//                logger.debug(String.format("waitms(%d) > CACHE_READ_LEASE_MS(%d), readCount=",
+//                        waitMs, CACHE_READ_LEASE_MS), readCount);
+//                indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
+//                break;
+//            }
+//            readCount = indexFile.getIntVolatile(6) & READER_COUNT_MASK;
+//        }
+        Thread.sleep(CACHE_READ_LEASE_MS * 2);
     }
 
     public static void endIndexWrite(MemoryMappedFile indexFile)

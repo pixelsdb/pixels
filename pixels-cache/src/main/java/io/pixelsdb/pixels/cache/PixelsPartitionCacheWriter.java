@@ -528,7 +528,7 @@ public class PixelsPartitionCacheWriter {
 //        int bandwidthLimit = 50; // 50 mib/s
         long startTime = System.currentTimeMillis();
         long windowWriteBytes = 0;
-
+        byte[] columnletBuf = new byte[1024 * 1024];
         for (String file : files)
         {
 //            PixelsPhysicalReader pixelsPhysicalReader = new PixelsPhysicalReader(storage, file);
@@ -558,8 +558,15 @@ public class PixelsPartitionCacheWriter {
 //                byte[] columnlet = pixelsPhysicalReader.read(physicalOffset, physicalLen);
 
                 long blockId = pixelsPhysicalReader.getCurrentBlockId();
-                byte[] columnlet = pixelsPhysicalReader.read(rowGroupId, columnId);
-                physicalLen = columnlet.length;
+                // byte[] columnlet = pixelsPhysicalReader.read(rowGroupId, columnId);
+                int columnletLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnletBuf);
+
+                while (columnletBuf.length < columnletLen) {
+                    columnletBuf = new byte[columnletBuf.length * 2];
+                    columnletLen = pixelsPhysicalReader.read(rowGroupId, columnId, columnletBuf);
+                    logger.debug("increate columnletBuf size");
+                }
+                physicalLen = columnletLen;
                 if (currCacheOffset + physicalLen >= cachePartition.getSize())
                 {
                     logger.warn("Cache writes have exceeded cache size. Break. Current size: " + currCacheOffset);
@@ -569,8 +576,8 @@ public class PixelsPartitionCacheWriter {
                         new PixelsCacheIdx(currCacheOffset, physicalLen));
                 // TODO: uncomment it! we now test the index write first
                 if (writeContent) {
-                    cachePartition.setBytes(currCacheOffset, columnlet); // sequential write pattern
-                    windowWriteBytes += columnlet.length;
+                    cachePartition.setBytes(currCacheOffset, columnletBuf, 0, columnletLen); // sequential write pattern
+                    windowWriteBytes += columnletLen;
                     if (windowWriteBytes / 1024.0 / 1024 / ((System.currentTimeMillis() - startTime) / 1000.0) > bandwidthLimit) {
                         double writeMib = windowWriteBytes / 1024.0 / 1024;
                         double expectTimeMili = writeMib / bandwidthLimit * 1000;
@@ -582,7 +589,7 @@ public class PixelsPartitionCacheWriter {
                     }
                 }
                 logger.trace(
-                        "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnlet.length);
+                        "Cache write: " + file + "-" + rowGroupId + "-" + columnId + ", offset: " + currCacheOffset + ", length: " + columnletLen);
                 currCacheOffset += physicalLen;
             }
         }
