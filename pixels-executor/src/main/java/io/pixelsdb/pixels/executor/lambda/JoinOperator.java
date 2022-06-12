@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.executor.lambda;
 
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
-import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -39,9 +38,15 @@ public interface JoinOperator
     void setChild(JoinOperator child, boolean smallChild);
 
     /**
-     * Execute this join operator.
+     * Execute this join operator recursively.
      *
      * @return the join outputs.
      */
-    CompletableFuture<JoinOutput>[] execute();
+    CompletableFuture<?>[] execute();
+
+    /**
+     * Only execute the previous stages (if any) before the last stage recursively.
+     * @return empty array if the previous stages do not exist
+     */
+    CompletableFuture<?>[] executePrev();
 }

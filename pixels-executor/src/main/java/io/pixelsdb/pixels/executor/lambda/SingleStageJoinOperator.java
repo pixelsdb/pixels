@@ -21,10 +21,9 @@ package io.pixelsdb.pixels.executor.lambda;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
-import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -81,18 +80,10 @@ public class SingleStageJoinOperator implements JoinOperator
      * @return the join outputs.
      */
     @Override
-    public CompletableFuture<JoinOutput>[] execute()
+    public CompletableFuture<?>[] execute()
     {
-        if (child != null)
-        {
-            CompletableFuture<JoinOutput>[] childOutputs = child.execute();
-            if (smallChild)
-            {
-                // if the child is on the small side, we should wait for its completion.
-                waitForCompletion(childOutputs);
-            }
-        }
-        CompletableFuture<JoinOutput>[] joinOutputs = new CompletableFuture[joinInputs.size()];
+        executePrev();
+        CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
             if (joinAlgo == JoinAlgorithm.BROADCAST)
@@ -109,6 +100,22 @@ public class SingleStageJoinOperator implements JoinOperator
             }
         }
         return joinOutputs;
+    }
+
+    @Override
+    public CompletableFuture<?>[] executePrev()
+    {
+        if (child != null)
+        {
+            CompletableFuture<?>[] childOutputs = child.execute();
+            if (smallChild)
+            {
+                // if the child is on the small side, we should wait for its completion.
+                waitForCompletion(childOutputs);
+            }
+            return childOutputs;
+        }
+        return new CompletableFuture[0];
     }
 
     protected static void waitForCompletion(CompletableFuture<?>[] childOutputs)
