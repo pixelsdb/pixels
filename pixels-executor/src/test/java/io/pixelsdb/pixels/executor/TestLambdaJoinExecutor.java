@@ -54,7 +54,7 @@ public class TestLambdaJoinExecutor
 
         Join join1 = new Join(region, nation,
                 new String[] {"r_name"}, new String[]{"n_nationkey", "n_name"},
-                new int[]{0}, new int[]{2},false,
+                new int[]{0}, new int[]{2}, new boolean[]{false, true}, new boolean[]{true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable1 = new JoinedTable(
@@ -68,7 +68,8 @@ public class TestLambdaJoinExecutor
         Join join2 = new Join(joinedTable1, supplier,
                 new String[] {"r_name", "n_name"},
                 new String[] {"s_suppkey", "s_name", "s_acctbal"},
-                new int[]{1}, new int[]{3}, false,
+                new int[]{1}, new int[]{3}, new boolean[]{true, false, true},
+                new boolean[]{true, true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable2 = new JoinedTable(
@@ -83,7 +84,8 @@ public class TestLambdaJoinExecutor
         Join join3 = new Join(joinedTable2, lineitem,
                 new String[] {"r_name", "n_name", "s_name", "s_acctbal"},
                 new String[] {"l_orderkey", "l_extendedprice", "l_shipdate"},
-                new int[]{2}, new int[]{1}, false,
+                new int[]{2}, new int[]{1}, new boolean[]{true, true, false, true, true},
+                new boolean[]{true, false, true, true},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable root = new JoinedTable("tpch",
@@ -111,7 +113,7 @@ public class TestLambdaJoinExecutor
 
         Join join1 = new Join(region, nation,
                 new String[] {"r_name"}, new String[] {"n_nationkey", "n_name"},
-                new int[]{0}, new int[]{2}, false,
+                new int[]{0}, new int[]{2}, new boolean[]{false, true}, new boolean[]{true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable1 = new JoinedTable(
@@ -125,7 +127,8 @@ public class TestLambdaJoinExecutor
         Join join2 = new Join(joinedTable1, supplier,
                 new String[] {"r_name", "n_name"},
                 new String[] {"s_suppkey", "s_name", "s_acctbal"},
-                new int[]{1}, new int[]{3}, false,
+                new int[]{1}, new int[]{3}, new boolean[]{true, false, true},
+                new boolean[]{true, true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable2 = new JoinedTable(
@@ -141,7 +144,8 @@ public class TestLambdaJoinExecutor
         Join join3 = new Join(joinedTable2, lineitem,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal"},
                 new String[]{"l_orderkey", "l_extendedprice", "l_shipdate"},
-                new int[]{2}, new int[]{1}, false,
+                new int[]{2}, new int[]{1}, new boolean[]{true, true, false, true, true},
+                new boolean[]{true, false, true, true},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable3 = new JoinedTable("tpch",
@@ -156,7 +160,8 @@ public class TestLambdaJoinExecutor
         Join join4 = new Join(joinedTable3, orders,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate"},
                 new String[]{"o_custkey", "o_orderdate", "o_totalprice"},
-                new int[]{4}, new int[]{0}, false,
+                new int[]{4}, new int[]{0}, new boolean[]{true, true, true, true, false, true, true},
+                new boolean[]{false, true, true, true},
                 JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.PARTITIONED);
 
         JoinedTable joinedTable4 = new JoinedTable("tpch",
@@ -171,8 +176,8 @@ public class TestLambdaJoinExecutor
         Join join5 = new Join(joinedTable4, customer,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate",
                         "o_orderdate", "o_totalprice"}, new String[]{"c_name"},
-                new int[]{0}, new int[]{0}, false,
-                JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+                new int[]{6}, new int[]{0}, new boolean[]{true, true, true, true, true, true, false, true, true},
+                new boolean[]{false, true}, JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable root = new JoinedTable("tpch",
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
@@ -199,7 +204,7 @@ public class TestLambdaJoinExecutor
 
         Join join1 = new Join(region, nation,
                 new String[] {"r_name"}, new String[] {"n_nationkey", "n_name"},
-                new int[]{0}, new int[]{2}, false,
+                new int[]{0}, new int[]{2}, new boolean[]{false, true}, new boolean[]{true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable1 = new JoinedTable(
@@ -213,7 +218,7 @@ public class TestLambdaJoinExecutor
         Join join2 = new Join(joinedTable1, supplier,
                 new String[] {"r_name", "n_name"},
                 new String[] {"s_suppkey", "s_name", "s_acctbal"},
-                new int[]{1}, new int[]{3}, false,
+                new int[]{1}, new int[]{3}, new boolean[]{true, false, true}, new boolean[]{true, true, true, false},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable2 = new JoinedTable(
@@ -223,13 +228,14 @@ public class TestLambdaJoinExecutor
 
         BaseTable lineitem = new BaseTable(
                 "tpch", "lineitem", "lineitem",
-                new String[] {"l_orderkey", "l_suppkey", "l_extendedprice", "l_shipdate"},
+                new String[] {"l_partkey", "l_suppkey", "l_extendedprice", "l_shipdate"},
                 TableScanFilter.empty("tpch", "lineitem"));
 
         Join join3 = new Join(joinedTable2, lineitem,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal"},
-                new String[]{"l_orderkey", "l_extendedprice", "l_shipdate"},
-                new int[]{2}, new int[]{1}, false,
+                new String[]{"l_partkey", "l_extendedprice", "l_shipdate"},
+                new int[]{2}, new int[]{1}, new boolean[]{true, true, false, true, true},
+                new boolean[]{true, false, true, true},
                 JoinEndian.SMALL_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable joinedTable3 = new JoinedTable("tpch",
@@ -244,8 +250,8 @@ public class TestLambdaJoinExecutor
         Join join4 = new Join(joinedTable3, part,
                 new String[]{"r_name", "n_name", "s_name", "s_acctbal", "l_extendedprice", "l_shipdate"},
                 new String[]{"p_name", "p_type"},
-                new int[]{4}, new int[]{0}, false,
-                JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
+                new int[]{4}, new int[]{0}, new boolean[]{true, true, true, true, false, true, true},
+                new boolean[]{false, true, true}, JoinEndian.LARGE_LEFT, JoinType.EQUI_INNER, JoinAlgorithm.BROADCAST);
 
         JoinedTable root = new JoinedTable("tpch",
                 "region_join_nation_join_supplier_join_lineitem_join_part",

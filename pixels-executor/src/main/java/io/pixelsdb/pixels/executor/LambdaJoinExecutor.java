@@ -88,6 +88,11 @@ public class LambdaJoinExecutor
         this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
     }
 
+    public JoinOperator getJoinOperator() throws IOException, MetadataException
+    {
+        return this.getJoinOperator(this.rootTable, Optional.empty());
+    }
+
     protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
@@ -134,8 +139,8 @@ public class LambdaJoinExecutor
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
                         joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                        parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
-                        false, null);
+                        parent.get().getJoin().getLeftKeyColumnIds(), join.getLeftProjection(),
+                        join.getRightProjection(), false, null);
 
                 BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
                 broadcastChainJoinInput.setQueryId(queryId);
@@ -170,8 +175,8 @@ public class LambdaJoinExecutor
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
                             joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                            parent.get().getJoin().getLeftKeyColumnIds(), join.isIncludeKeyColumns(),
-                            false, null);
+                            parent.get().getJoin().getLeftKeyColumnIds(), join.getLeftProjection(),
+                            join.getRightProjection(), false, null);
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
                     BroadcastChainJoinInput broadcastChainJoinInput = (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
@@ -193,7 +198,7 @@ public class LambdaJoinExecutor
                                 parent.get().getJoin().getLeftKeyColumnIds(), 40);
                     }
                     JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                            join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+                            join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
                     checkArgument(childOperator.getJoinInputs().size() == 1,
                             "there should be exact one incomplete chain join input in the child operator");
@@ -294,7 +299,7 @@ public class LambdaJoinExecutor
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                        join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+                        join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
                 int outputId = 0;
                 for (InputSplit rightInputSplit : rightInputSplits)
@@ -320,7 +325,8 @@ public class LambdaJoinExecutor
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
-                        join.getLeftColumnAlias(), join.isIncludeKeyColumns(), postPartition, postPartitionInfo);
+                        join.getLeftColumnAlias(), join.getRightProjection(), join.getLeftProjection(),
+                        postPartition, postPartitionInfo);
 
                 int outputId = 0;
                 for (InputSplit leftInputSplit : leftInputSplits)
@@ -522,7 +528,8 @@ public class LambdaJoinExecutor
                 // TODO: get numPartition from the optimizer.
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
-                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        joinedTable.getJoin().getLeftProjection(), joinedTable.getJoin().getRightProjection(),
+                        postPartition, postPartitionInfo,
                         40, ImmutableList.of(i));
                  joinInput = new PartitionedJoinInput(
                         queryId, leftTableInfo, rightTableInfo, joinInfo, output);
@@ -532,7 +539,8 @@ public class LambdaJoinExecutor
                 // TODO: get numPartition from the optimizer.
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
-                        joinedTable.getJoin().isIncludeKeyColumns(), postPartition, postPartitionInfo,
+                        joinedTable.getJoin().getRightProjection(), joinedTable.getJoin().getLeftProjection(),
+                        postPartition, postPartitionInfo,
                         40, ImmutableList.of(i));
                 joinInput = new PartitionedJoinInput(
                         queryId, rightTableInfo, leftTableInfo, joinInfo, output);
@@ -640,7 +648,7 @@ public class LambdaJoinExecutor
                     for (int i = 0; i < orderedPaths.size();)
                     {
                         ImmutableList.Builder<InputInfo> inputsBuilder = ImmutableList.builder();
-                        for (int j = 0; j < splitSize && j < orderedPaths.size(); ++j, ++i)
+                        for (int j = 0; j < splitSize && i < orderedPaths.size(); ++j, ++i)
                         {
                             InputInfo input = new InputInfo(orderedPaths.get(i), 0, 1);
                             inputsBuilder.add(input);

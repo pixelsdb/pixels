@@ -44,9 +44,15 @@ public class JoinInfo
      */
     private String[] largeColumnAlias;
     /**
-     * Whether the join result contains the join keys from the left and right tables.
+     * If a column from the small table's columnToRead appears in the join output,
+     * the corresponding element in this array would be true, and vice versa.
      */
-    private boolean outputJoinKeys;
+    private boolean[] smallProjection;
+    /**
+     * If a column from the large table's columnToRead appears in the join output,
+     * the corresponding element in this array would be true, and vice versa.
+     */
+    private boolean[] largeProjection;
     /**
      * Whether the join output has to be partitioned.
      */
@@ -62,12 +68,14 @@ public class JoinInfo
     public JoinInfo() { }
 
     public JoinInfo(JoinType joinType, String[] smallColumnAlias, String[] largeColumnAlias,
-                    boolean outputJoinKeys, boolean postPartition, PartitionInfo postPartitionInfo)
+                    boolean[] smallProjection, boolean[] largeProjection,
+                    boolean postPartition, PartitionInfo postPartitionInfo)
     {
         this.joinType = joinType;
         this.smallColumnAlias = smallColumnAlias;
         this.largeColumnAlias = largeColumnAlias;
-        this.outputJoinKeys = outputJoinKeys;
+        this.smallProjection = smallProjection;
+        this.largeProjection = largeProjection;
         this.postPartition = postPartition;
         this.postPartitionInfo = postPartitionInfo;
     }
@@ -102,14 +110,24 @@ public class JoinInfo
         this.largeColumnAlias = largeColumnAlias;
     }
 
-    public boolean isOutputJoinKeys()
+    public boolean[] getSmallProjection()
     {
-        return outputJoinKeys;
+        return smallProjection;
     }
 
-    public void setOutputJoinKeys(boolean outputJoinKeys)
+    public void setSmallProjection(boolean[] smallProjection)
     {
-        this.outputJoinKeys = outputJoinKeys;
+        this.smallProjection = smallProjection;
+    }
+
+    public boolean[] getLargeProjection()
+    {
+        return largeProjection;
+    }
+
+    public void setLargeProjection(boolean[] largeProjection)
+    {
+        this.largeProjection = largeProjection;
     }
 
     public boolean isPostPartition()
