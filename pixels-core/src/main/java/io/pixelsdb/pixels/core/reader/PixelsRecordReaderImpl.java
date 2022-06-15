@@ -56,7 +56,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final PixelsReaderOption option;
     private final long queryId;
     private final int RGStart;
-    private int RGLen;
+    private final int RGLen;
     private final boolean enableMetrics;
     private final String metricsDir;
     private final ReadPerfMetrics readPerfMetrics;
@@ -67,8 +67,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private final String fileName;
     private final List<PixelsProto.Type> includedColumnTypes;
 
-    private TypeDescription fileSchema = null;
-    private TypeDescription resultSchema = null;
+    private final TypeDescription fileSchema;
+    private final TypeDescription resultSchema;
     private boolean checkValid = false;
     private boolean everPrepared = false;
     private boolean everRead = false;
@@ -77,7 +77,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     /**
      * Columns included by reader option; if included, set true
      */
-    private boolean[] includedColumns;
+    private final boolean[] includedColumns;
     /**
      * Target row groups to read after matching reader option,
      * each element represents a row group id.
@@ -89,14 +89,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      * Different from resultColumns, the ith column id in targetColumns
      * corresponds to the ith true value in this.includedColumns.
      */
-    private int[] targetColumns;
+    private final int[] targetColumns;
     /**
      * The ith element in resultColumns is the column id (column's index in the schema)
      * of ith included column in the read option. The order of columns in the read option's
      * includedCols may be arbitrary, not related to the column order in schema.
      */
-    private int[] resultColumns;
-    private int includedColumnNum = 0; // the number of columns to read.
+    private final int[] resultColumns;
+    private final int includedColumnNum; // the number of columns to read.
     private int qualifiedRowNum = 0; // the number of qualified rows in this split.
     private boolean endOfFile = false;
 
@@ -107,7 +107,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private PixelsProto.RowGroupFooter[] rowGroupFooters;
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
-    private ColumnReader[] readers;      // column readers for each target columns
+    private final ColumnReader[] readers;      // column readers for each target columns
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
@@ -123,15 +123,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                                   boolean enableCache,
                                   List<String> cacheOrder,
                                   PixelsCacheReader cacheReader,
-                                  PixelsFooterCache pixelsFooterCache) throws IOException
-    {
+                                  PixelsFooterCache pixelsFooterCache) throws IOException {
         this.physicalReader = physicalReader;
         this.postScript = postScript;
         this.footer = footer;
         this.option = option;
         this.queryId = option.getQueryId();
         this.RGStart = option.getRGStart();
-        this.RGLen = option.getRGLen();
+        int RGLen = option.getRGLen();
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
@@ -144,117 +143,101 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
         //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");
-        checkBeforeRead();
-    }
 
-    private void checkBeforeRead() throws IOException
-    {
-        // get file schema
-        List<PixelsProto.Type> fileColTypes = footer.getTypesList();
-        if (fileColTypes == null || fileColTypes.isEmpty())
+        // checkBeforeRead
         {
-            checkValid = false;
-            throw new IOException("type list is empty.");
-        }
-        fileSchema = TypeDescription.createSchema(fileColTypes);
-        if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty())
-        {
-            checkValid = false;
-            throw new IOException("file schema is empty.");
-        }
+            // get file schema
+            List<PixelsProto.Type> fileColTypes = footer.getTypesList();
+            if (fileColTypes == null || fileColTypes.isEmpty()) {
+                throw new IOException("type list is empty.");
+            }
+            fileSchema = TypeDescription.createSchema(fileColTypes);
+            if (fileSchema.getChildren() == null || fileSchema.getChildren().isEmpty()) {
+                throw new IOException("file schema is empty.");
+            }
 
-        // check RGStart and RGLen are within the range of actual number of row groups
-        int rgNum = footer.getRowGroupInfosCount();
-        if (RGStart >= rgNum)
-        {
-            checkValid = false;
-            throw new IOException("row group start (" + RGStart + ") is out of bound (" + rgNum + ").");
-        }
-        if (RGLen == -1)
-        {
-            RGLen = footer.getRowGroupStatsList().size() - RGStart;
-        }
-        if (RGStart + RGLen > rgNum)
-        {
-            RGLen = rgNum - RGStart;
-        }
+            // check RGStart and RGLen are within the range of actual number of row groups
+            int rgNum = footer.getRowGroupInfosCount();
+            if (RGStart >= rgNum) {
+                throw new IOException("row group start (" + RGStart + ") is out of bound (" + rgNum + ").");
+            }
+            if (RGLen == -1) {
+                RGLen = footer.getRowGroupStatsList().size() - RGStart;
+            }
+            if (RGStart + RGLen > rgNum) {
+                RGLen = rgNum - RGStart;
+            }
+            this.RGLen = RGLen;
 
-        // filter included columns
-        includedColumnNum = 0;
-        String[] optionIncludedCols = option.getIncludedCols();
-        // if size of cols is 0, create an empty row batch
-        if (optionIncludedCols.length == 0)
-        {
-            checkValid = true;
-            // Issue #103: init the following members as null.
-            this.includedColumns = null;
-            this.resultColumns = null;
-            this.targetColumns = null;
-            this.readers = null;
-            //throw new IOException("ISSUE-103: included columns is empty.");
-            return;
-        }
-        List<Integer> optionColsIndices = new ArrayList<>();
-        this.includedColumns = new boolean[fileColTypes.size()];
-        for (String col : optionIncludedCols)
-        {
-            for (int j = 0; j < fileColTypes.size(); j++)
-            {
-                if (col.equalsIgnoreCase(fileColTypes.get(j).getName()))
-                {
-                    optionColsIndices.add(j);
-                    includedColumns[j] = true;
-                    includedColumnNum++;
-                    break;
+            // filter included columns
+            int includedColumnNum = 0;
+            String[] optionIncludedCols = option.getIncludedCols();
+            // if size of cols is 0, create an empty row batch
+            if (optionIncludedCols.length == 0) {
+                checkValid = true;
+                // Issue #103: init the following members as null.
+                this.includedColumns = null;
+                this.resultColumns = null;
+                this.targetColumns = null;
+                this.readers = null;
+                //throw new IOException("ISSUE-103: included columns is empty.");
+                this.resultSchema = null;
+                this.includedColumnNum = 0;
+                return;
+            }
+            List<Integer> optionColsIndices = new ArrayList<>();
+            this.includedColumns = new boolean[fileColTypes.size()];
+            for (String col : optionIncludedCols) {
+                for (int j = 0; j < fileColTypes.size(); j++) {
+                    if (col.equalsIgnoreCase(fileColTypes.get(j).getName())) {
+                        optionColsIndices.add(j);
+                        includedColumns[j] = true;
+                        includedColumnNum++;
+                        break;
+                    }
                 }
             }
-        }
+            this.includedColumnNum = includedColumnNum;
 
-        // check included columns
-        if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution())
-        {
-            checkValid = false;
-            throw new IOException("includedColumnsNum is " + includedColumnNum +
-                    " whereas optionIncludedCols.length is " + optionIncludedCols.length);
-        }
-
-        // create result columns storing result column ids in user specified order
-        this.resultColumns = new int[includedColumnNum];
-        for (int i = 0; i < optionColsIndices.size(); i++)
-        {
-            this.resultColumns[i] = optionColsIndices.get(i);
-        }
-
-        // assign target columns, ordered by original column order in schema
-        int targetColumnNum = new HashSet<>(optionColsIndices).size();
-        targetColumns = new int[targetColumnNum];
-        int targetColIdx = 0;
-        for (int i = 0; i < includedColumns.length; i++)
-        {
-            if (includedColumns[i])
-            {
-                targetColumns[targetColIdx] = i;
-                targetColIdx++;
+            // check included columns
+            if (includedColumnNum != optionIncludedCols.length && !option.isTolerantSchemaEvolution()) {
+                throw new IOException("includedColumnsNum is " + includedColumnNum +
+                        " whereas optionIncludedCols.length is " + optionIncludedCols.length);
             }
-        }
 
-        // create column readers
-        List<TypeDescription> columnSchemas = fileSchema.getChildren();
-        readers = new ColumnReader[resultColumns.length];
-        for (int i = 0; i < resultColumns.length; i++)
-        {
-            int index = resultColumns[i];
-            readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
-        }
+            // create result columns storing result column ids in user specified order
+            this.resultColumns = new int[includedColumnNum];
+            for (int i = 0; i < optionColsIndices.size(); i++) {
+                this.resultColumns[i] = optionColsIndices.get(i);
+            }
 
-        // create result vectorized row batch
-        for (int resultColumn : resultColumns)
-        {
-            includedColumnTypes.add(fileColTypes.get(resultColumn));
-        }
+            // assign target columns, ordered by original column order in schema
+            int targetColumnNum = new HashSet<>(optionColsIndices).size();
+            targetColumns = new int[targetColumnNum];
+            int targetColIdx = 0;
+            for (int i = 0; i < includedColumns.length; i++) {
+                if (includedColumns[i]) {
+                    targetColumns[targetColIdx] = i;
+                    targetColIdx++;
+                }
+            }
 
-        resultSchema = TypeDescription.createSchema(includedColumnTypes);
-        checkValid = true;
+            // create column readers
+            List<TypeDescription> columnSchemas = fileSchema.getChildren();
+            readers = new ColumnReader[resultColumns.length];
+            for (int i = 0; i < resultColumns.length; i++) {
+                int index = resultColumns[i];
+                readers[i] = ColumnReader.newColumnReader(columnSchemas.get(index));
+            }
+
+            // create result vectorized row batch
+            for (int resultColumn : resultColumns) {
+                includedColumnTypes.add(fileColTypes.get(resultColumn));
+            }
+
+            resultSchema = TypeDescription.createSchema(includedColumnTypes);
+            checkValid = true;
+        }
     }
 
     /**
