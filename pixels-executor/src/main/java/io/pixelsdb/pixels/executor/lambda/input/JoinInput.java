@@ -28,8 +28,14 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 public interface JoinInput
 {
     /**
-     * Get the information of the join output.
+     * Get the information about the join output.
      * @return the join output information
      */
     public MultiOutputInfo getOutput();
+
+    /**
+     * Set the information about the join output.
+     * @param output the join output
+     */
+    void setOutput(MultiOutputInfo output);
 }

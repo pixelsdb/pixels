@@ -116,6 +116,7 @@ public class BroadcastJoinInput implements JoinInput
         return output;
     }
 
+    @Override
     public void setOutput(MultiOutputInfo output)
     {
         this.output = output;

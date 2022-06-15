@@ -115,6 +115,7 @@ public class PartitionedJoinInput implements JoinInput
         return output;
     }
 
+    @Override
     public void setOutput(MultiOutputInfo output)
     {
         this.output = output;
