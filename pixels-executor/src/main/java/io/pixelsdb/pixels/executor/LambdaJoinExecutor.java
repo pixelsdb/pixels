@@ -213,7 +213,7 @@ public class LambdaJoinExecutor
 
                         // TODO: get the path base from config file.
                         MultiOutputInfo output = new MultiOutputInfo(
-                                "pixels-lambda/" + joinedTable.getTableName() + "/", Storage.Scheme.s3,
+                                "pixels-lambda-test/" + joinedTable.getTableName() + "/", Storage.Scheme.s3,
                                 null, null, null, true,
                                 ImmutableList.of("join_" + outputId++));
 
@@ -309,7 +309,7 @@ public class LambdaJoinExecutor
 
                     // TODO: get the path base from config file.
                     MultiOutputInfo output = new MultiOutputInfo(
-                            "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
                             null, null, null, true,
                             ImmutableList.of("join_" + outputId++));
 
@@ -336,7 +336,7 @@ public class LambdaJoinExecutor
 
                     // TODO: get the path base from config file.
                     MultiOutputInfo output = new MultiOutputInfo(
-                            "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
                             null, null, null, true,
                             ImmutableList.of("join_" + outputId++));
 
@@ -366,7 +366,7 @@ public class LambdaJoinExecutor
                 // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, 40,
-                        "pixels-lambda/" + joinedTable.getTableName() + "/" +
+                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
                                 rightTable.getTableName() + "/part-");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
@@ -394,7 +394,7 @@ public class LambdaJoinExecutor
                 // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, 40,
-                        "pixels-lambda/" + joinedTable.getTableName() + "/" +
+                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
                                 leftTable.getTableName() + "/part-");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs);
@@ -402,7 +402,7 @@ public class LambdaJoinExecutor
                 // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, 40,
-                        "pixels-lambda/" + joinedTable.getTableName() + "/" +
+                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
                                 rightTable.getTableName() + "/part-");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
@@ -519,7 +519,7 @@ public class LambdaJoinExecutor
             }
             // TODO: get the path base from config file.
             MultiOutputInfo output = new MultiOutputInfo(
-                    "pixels-lambda/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                    "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
                     null, null, null, true, outputFileNames.build());
 
             PartitionedJoinInput joinInput;
