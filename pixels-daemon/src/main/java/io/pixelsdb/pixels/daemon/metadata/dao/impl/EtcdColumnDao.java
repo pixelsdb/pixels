@@ -42,7 +42,7 @@ public class EtcdColumnDao extends ColumnDao
     public EtcdColumnDao () {}
 
     private static final EtcdUtil etcd = EtcdUtil.Instance();
-    private static Logger log = LogManager.getLogger(EtcdColumnDao.class);
+    private static final Logger log = LogManager.getLogger(EtcdColumnDao.class);
 
     @Override
     public MetadataProto.Column getById(long id)
@@ -64,7 +64,7 @@ public class EtcdColumnDao extends ColumnDao
     }
 
     @Override
-    public List<MetadataProto.Column> getByTable(MetadataProto.Table table)
+    public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics)
     {
         List<KeyValue> kvs = etcd.getKeyValuesByPrefix(EtcdDaoCommon.columnTableNameKeyPrefix + table.getId());
         List<MetadataProto.Column> columns = new ArrayList<>();
@@ -141,7 +141,7 @@ public class EtcdColumnDao extends ColumnDao
     @Override
     public boolean deleteByTable(MetadataProto.Table table)
     {
-        List<MetadataProto.Column> columns = getByTable(table);
+        List<MetadataProto.Column> columns = getByTable(table, false);
         for (MetadataProto.Column column : columns)
         {
             etcd.delete(EtcdDaoCommon.columnPrimaryKeyPrefix + column.getId());

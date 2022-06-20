@@ -41,7 +41,7 @@ public class EtcdViewDao extends ViewDao
     public EtcdViewDao() {}
 
     private static final EtcdUtil etcd = EtcdUtil.Instance();
-    private static Logger log = LogManager.getLogger(EtcdViewDao.class);
+    private static final Logger log = LogManager.getLogger(EtcdViewDao.class);
 
     @Override
     public MetadataProto.View getById(long id)

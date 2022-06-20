@@ -41,7 +41,7 @@ public class EtcdSchemaDao extends SchemaDao
     public EtcdSchemaDao() {}
 
     private static final EtcdUtil etcd = EtcdUtil.Instance();
-    private static Logger log = LogManager.getLogger(EtcdSchemaDao.class);
+    private static final Logger log = LogManager.getLogger(EtcdSchemaDao.class);
 
     @Override
     public MetadataProto.Schema getById(long id)

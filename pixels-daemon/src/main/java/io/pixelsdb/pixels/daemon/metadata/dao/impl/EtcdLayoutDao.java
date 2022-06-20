@@ -41,7 +41,7 @@ public class EtcdLayoutDao extends LayoutDao
     public EtcdLayoutDao () {}
 
     private static final EtcdUtil etcd = EtcdUtil.Instance();
-    private static Logger log = LogManager.getLogger(EtcdLayoutDao.class);
+    private static final Logger log = LogManager.getLogger(EtcdLayoutDao.class);
 
     @Override
     public MetadataProto.Layout getById(long id)

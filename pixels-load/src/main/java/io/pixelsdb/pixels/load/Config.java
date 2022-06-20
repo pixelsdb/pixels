@@ -90,7 +90,7 @@ public class Config
         int metaPort = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         MetadataService metadataService = new MetadataService(metaHost, metaPort);
         // get columns of the specified table
-        List<Column> columns = metadataService.getColumns(dbName, tableName);
+        List<Column> columns = metadataService.getColumns(dbName, tableName, false);
         int colSize = columns.size();
         // record original column names and types
         String[] originalColNames = new String[colSize];

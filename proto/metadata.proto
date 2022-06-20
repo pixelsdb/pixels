@@ -65,16 +65,22 @@ message Table {
     string name = 2;
     string type = 3;
     string storageScheme = 4;
-    uint64 schemaId = 5;
-    repeated uint64 columnIds = 6;
+    uint64 rowCount = 5;
+    uint64 schemaId = 6;
+    repeated uint64 columnIds = 7;
 }
 
 message Column {
     uint64 id = 1;
     string name = 2;
     string type = 3;
-    double size = 4;
-    uint64 tableId = 5;
+    double chunkSize = 4;
+    double size = 5;
+    double nullFraction = 6;
+    uint64 cardinality = 7;
+    bytes minValue = 8;
+    bytes maxValue = 9;
+    uint64 tableId = 10;
 }
 
 message Layout {
@@ -217,6 +223,7 @@ message GetColumnsRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
+    bool withStatistics = 4;
 }
 
 message GetColumnsResponse {

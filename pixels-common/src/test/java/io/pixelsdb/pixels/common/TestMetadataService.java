@@ -87,7 +87,7 @@ public class TestMetadataService
     @Test
     public void testGetColumnsBySchemaNameAndTblName() throws MetadataException
     {
-        List<Column> columns = instance.getColumns("pixels", "test_105");
+        List<Column> columns = instance.getColumns("pixels", "test_105", false);
         for (Column column : columns)
         {
             System.out.println(column.getName() + ", " + column.getType());

@@ -37,7 +37,7 @@ public class RdbSchemaDao extends SchemaDao
     public RdbSchemaDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static Logger log = LogManager.getLogger(RdbSchemaDao.class);
+    private static final Logger log = LogManager.getLogger(RdbSchemaDao.class);
 
     @Override
     public MetadataProto.Schema getById(long id)

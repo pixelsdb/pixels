@@ -19,8 +19,10 @@
  */
 package io.pixelsdb.pixels.load;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.Status;
@@ -29,6 +31,10 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsProto;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
 import net.sourceforge.argparse4j.ArgumentParsers;
@@ -39,10 +45,7 @@ import org.apache.hadoop.io.IOUtils;
 
 import java.io.*;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -594,10 +597,108 @@ public class Main
                 }
             }
 
+            if (command.equals("STAT"))
+            {
+                ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels Update Statistics")
+                        .defaultHelp(true);
+
+                argumentParser.addArgument("-d", "--data").required(true)
+                        .help("specify the data directory");
+                argumentParser.addArgument("-s", "--schema").required(true)
+                        .help("Specify the schema name");
+                argumentParser.addArgument("-t", "--table").required(true)
+                        .help("Specify the table name");
+
+                Namespace ns = null;
+                try
+                {
+                    ns = argumentParser.parseArgs(inputStr.substring(command.length()).trim().split("\\s+"));
+                } catch (ArgumentParserException e)
+                {
+                    argumentParser.handleError(e);
+                    System.out.println("Pixels STAT.");
+                    System.exit(0);
+                }
+
+                try
+                {
+                    String dataDir = ns.getString("data");
+                    String schemaName = ns.getString("schema");
+                    String tableName = ns.getString("table");
+
+                    if (!dataDir.endsWith("/"))
+                    {
+                        dataDir += "/";
+                    }
+
+                    ConfigFactory configFactory = ConfigFactory.Instance();
+                    String host = configFactory.getProperty("metadata.server.host");
+                    int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
+
+                    Storage storage = StorageFactory.Instance().getStorage(dataDir);
+
+                    List<String> files =  storage.listPaths(dataDir);
+
+                    // get the statistics.
+                    long startTime = System.currentTimeMillis();
+
+                    MetadataService metadataService = new MetadataService(host, port);
+                    List<Column> columns = metadataService.getColumns(schemaName, tableName, true);
+                    Map<String, Column> columnMap = new HashMap<>(columns.size());
+
+                    for (Column column : columns)
+                    {
+                        column.setChunkSize(0);
+                        column.setSize(0);
+                        columnMap.put(column.getName(), column);
+                    }
+
+                    int rowGroupCount = 0;
+                    for (String path : files)
+                    {
+                        PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                                .setPath(path).setStorage(storage).setEnableCache(false)
+                                .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
+                                .setPixelsFooterCache(new PixelsFooterCache()).build();
+                        PixelsProto.Footer fileFooter = pixelsReader.getFooter();
+                        int numRowGroup = pixelsReader.getRowGroupNum();
+                        rowGroupCount += numRowGroup;
+                        List<PixelsProto.Type> types = fileFooter.getTypesList();
+                        for (int i = 0; i < numRowGroup; ++i)
+                        {
+                            PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
+                            List<PixelsProto.ColumnChunkIndex> chunkIndices =
+                                    rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntriesList();
+                            for (int j = 0; j < types.size(); ++j)
+                            {
+                                Column column = columnMap.get(types.get(j).getName());
+                                long chunkLength = chunkIndices.get(j).getChunkLength();
+                                column.setSize(chunkLength + column.getSize());
+                            }
+                        }
+                        pixelsReader.close();
+                    }
+
+                    for (Column column : columns)
+                    {
+                        column.setChunkSize(column.getSize()/rowGroupCount);
+                        metadataService.updateColumn(column);
+                    }
+
+                    long endTime = System.currentTimeMillis();
+                    System.out.println("Elapsed time: " + (endTime - startTime) / 1000 + "s.");
+                }
+                catch (IOException | MetadataException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
             if (!command.equals("QUERY") &&
                     !command.equals("LOAD") &&
                     !command.equals("COPY") &&
-                    !command.equals("COMPACT"))
+                    !command.equals("COMPACT") &&
+                    !command.equals("STAT"))
             {
                 System.out.println("Command error");
             }

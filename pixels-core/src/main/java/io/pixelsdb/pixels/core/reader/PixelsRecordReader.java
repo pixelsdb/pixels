@@ -113,7 +113,7 @@ public interface PixelsRecordReader
     /**
      * Get current row number
      *
-     * @return number of the row currently being read
+     * @return the number of the rows have been read
      */
     long getRowNumber();
 

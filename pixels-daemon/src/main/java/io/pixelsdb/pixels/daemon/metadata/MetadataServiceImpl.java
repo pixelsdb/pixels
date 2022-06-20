@@ -352,7 +352,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             MetadataProto.Table table = tableDao.getByNameAndSchema(request.getTableName(), schema);
             if (table != null)
             {
-                columns = columnDao.getByTable(table);
+                columns = columnDao.getByTable(table, request.getWithStatistics());
             }
             else
             {

@@ -30,5 +30,14 @@ package io.pixelsdb.pixels.executor.plan;
 public enum JoinEndian
 {
     SMALL_LEFT,
-    LARGE_LEFT
+    LARGE_LEFT;
+
+    public JoinEndian flip()
+    {
+        if (this == SMALL_LEFT)
+        {
+            return LARGE_LEFT;
+        }
+        return SMALL_LEFT;
+    }
 }
