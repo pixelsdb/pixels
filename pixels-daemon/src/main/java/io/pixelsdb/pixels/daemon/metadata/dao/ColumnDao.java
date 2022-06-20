@@ -40,12 +40,20 @@ public abstract class ColumnDao implements Dao<MetadataProto.Column>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    abstract public List<MetadataProto.Column> getByTable(MetadataProto.Table table);
+    abstract public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics);
 
     abstract public Order getOrderByTable(MetadataProto.Table table);
 
     abstract public boolean update(MetadataProto.Column column);
 
+    /**
+     * Insert a batch of columns into the metadata. This method is used in table creation.
+     * Statistics are ignored and not inserted in to the metadata database.
+     *
+     * @param table the table that the columns belong to
+     * @param columns the columns to insert, statistics are ignored
+     * @return the number of columns that are inserted
+     */
     abstract public int insertBatch (MetadataProto.Table table, List<MetadataProto.Column> columns);
 
     abstract public boolean deleteByTable (MetadataProto.Table table);

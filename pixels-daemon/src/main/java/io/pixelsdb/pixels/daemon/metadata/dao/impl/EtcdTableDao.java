@@ -41,7 +41,7 @@ public class EtcdTableDao extends TableDao
     public EtcdTableDao() {}
 
     private static final EtcdUtil etcd = EtcdUtil.Instance();
-    private static Logger log = LogManager.getLogger(EtcdTableDao.class);
+    private static final Logger log = LogManager.getLogger(EtcdTableDao.class);
 
     @Override
     public MetadataProto.Table getById(long id)

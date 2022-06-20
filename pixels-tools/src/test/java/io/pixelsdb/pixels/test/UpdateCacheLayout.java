@@ -62,11 +62,11 @@ public class UpdateCacheLayout
 
             Order layoutOrder = layoutv1.getOrderObject();
             List<String> columnOrder = layoutOrder.getColumnOrder();
-            List<Column> columns = metadataService.getColumns(schemaName, tableName);
+            List<Column> columns = metadataService.getColumns(schemaName, tableName, true);
             Map<String, Double> columnSizeMap = new HashMap<>();
             for (Column column : columns)
             {
-                columnSizeMap.put(column.getName(), column.getSize());
+                columnSizeMap.put(column.getName(), column.getChunkSize());
             }
 
             BufferedReader reader = new BufferedReader(new FileReader(cacheFile));

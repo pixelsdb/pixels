@@ -37,7 +37,7 @@ public class RdbViewDao extends ViewDao
     public RdbViewDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static Logger log = LogManager.getLogger(RdbViewDao.class);
+    private static final Logger log = LogManager.getLogger(RdbViewDao.class);
 
     @Override
     public MetadataProto.View getById(long id)

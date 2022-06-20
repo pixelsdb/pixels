@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.common.metadata.domain;
 
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
+import java.nio.ByteBuffer;
+
 /**
  * @author hank
  */
@@ -28,7 +30,12 @@ public class Column extends Base
 {
     private String name;
     private String type;
+    private double chunkSize;
     private double size;
+    private double nullFraction;
+    private long cardinality;
+    private ByteBuffer minValue;
+    private ByteBuffer maxValue;
     private long tableId;
 
     public Column()
@@ -40,7 +47,12 @@ public class Column extends Base
         this.setId(column.getId());
         this.name = column.getName();
         this.type = column.getType();
+        this.chunkSize = column.getChunkSize();
         this.size = column.getSize();
+        this.nullFraction = column.getNullFraction();
+        this.cardinality = column.getCardinality();
+        this.minValue = column.getMinValue().asReadOnlyByteBuffer();
+        this.maxValue = column.getMaxValue().asReadOnlyByteBuffer();
         this.tableId = column.getTableId();
     }
 
@@ -68,6 +80,16 @@ public class Column extends Base
         this.type = type;
     }
 
+    public double getChunkSize()
+    {
+        return chunkSize;
+    }
+
+    public void setChunkSize(double chunkSize)
+    {
+        this.chunkSize = chunkSize;
+    }
+
     public double getSize()
     {
         return size;
@@ -76,6 +98,46 @@ public class Column extends Base
     public void setSize(double size)
     {
         this.size = size;
+    }
+
+    public double getNullFraction()
+    {
+        return nullFraction;
+    }
+
+    public void setNullFraction(double nullFraction)
+    {
+        this.nullFraction = nullFraction;
+    }
+
+    public long getCardinality()
+    {
+        return cardinality;
+    }
+
+    public void setCardinality(long cardinality)
+    {
+        this.cardinality = cardinality;
+    }
+
+    public ByteBuffer getMinValue()
+    {
+        return minValue;
+    }
+
+    public void setMinValue(ByteBuffer minValue)
+    {
+        this.minValue = minValue;
+    }
+
+    public ByteBuffer getMaxValue()
+    {
+        return maxValue;
+    }
+
+    public void setMaxValue(ByteBuffer maxValue)
+    {
+        this.maxValue = maxValue;
     }
 
     public long getTableId()
@@ -94,7 +156,12 @@ public class Column extends Base
         return "Column{" +
                 "name='" + name + '\'' +
                 ", type='" + type + '\'' +
-                ", size=" + size + '\'' +
+                ", chunkSize=" + chunkSize +
+                ", size=" + size +
+                ", nullFraction=" + nullFraction +
+                ", cardinality=" + cardinality +
+                ", minValue=" + minValue +
+                ", maxValue=" + maxValue +
                 ", tableId=" + tableId +
                 '}';
     }

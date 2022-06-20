@@ -36,7 +36,7 @@ public class RdbLayoutDao extends LayoutDao
 {
     public RdbLayoutDao() {}
 
-    private static Logger log = LogManager.getLogger(RdbLayoutDao.class);
+    private static final Logger log = LogManager.getLogger(RdbLayoutDao.class);
 
     private static final DBUtil db = DBUtil.Instance();
 

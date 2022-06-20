@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata;
 
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -167,13 +168,13 @@ public class MetadataService
         return views;
     }
 
-    public List<Column> getColumns(String schemaName, String tableName) throws MetadataException
+    public List<Column> getColumns(String schemaName, String tableName, boolean getStatistics) throws MetadataException
     {
         List<Column> columns = new ArrayList<>();
         String token = UUID.randomUUID().toString();
         MetadataProto.GetColumnsRequest request = MetadataProto.GetColumnsRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setTableName(tableName).build();
+                .setSchemaName(schemaName).setTableName(tableName).setWithStatistics(getStatistics).build();
         try
         {
             MetadataProto.GetColumnsResponse response = this.stub.getColumns(request);
@@ -200,7 +201,11 @@ public class MetadataService
         String token = UUID.randomUUID().toString();
         MetadataProto.Column columnPb = MetadataProto.Column.newBuilder()
                 .setId(column.getId()).setName(column.getName()).setType(column.getType())
-                .setSize(column.getSize()).setTableId(column.getTableId()).build();
+                .setChunkSize(column.getChunkSize()).setSize(column.getSize())
+                .setNullFraction(column.getNullFraction()).setCardinality(column.getCardinality())
+                .setMinValue(column.getMinValue() != null ? ByteString.copyFrom(column.getMinValue()) : null)
+                .setMaxValue(column.getMaxValue() != null ? ByteString.copyFrom(column.getMaxValue()) : null)
+                .setTableId(column.getTableId()).build();
         MetadataProto.UpdateColumnRequest request = MetadataProto.UpdateColumnRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
                 .setColumn(columnPb).build();
@@ -448,7 +453,7 @@ public class MetadataService
             columnList.add(MetadataProto.Column.newBuilder()
                     .setId(column.getId()).setName(column.getName())
                     .setType(column.getType().replaceAll("\\s", ""))
-                    .setSize(column.getSize()).build()); // no need to set table id.
+                    .build()); // no need to set table id.
         }
         MetadataProto.CreateTableRequest request = MetadataProto.CreateTableRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.utils.DBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
@@ -35,7 +36,7 @@ import java.util.List;
  */
 public class RdbColumnDao extends ColumnDao
 {
-    private static Logger log = LogManager.getLogger(RdbColumnDao.class);
+    private static final Logger log = LogManager.getLogger(RdbColumnDao.class);
 
     public RdbColumnDao() {}
 
@@ -47,15 +48,27 @@ public class RdbColumnDao extends ColumnDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT COL_NAME, COL_TYPE, COL_SIZE, TBLS_TBL_ID FROM COLS WHERE COL_ID=" + id);
+            ResultSet rs = st.executeQuery(
+                    "SELECT COL_NAME, COL_TYPE, COL_CHUNK_SIZE, COL_SIZE, COL_NULL_FRACTION, " +
+                            "COL_CARDINALITY, COL_MIN_VALUE, COL_MAX_VALUE, TBLS_TBL_ID " +
+                            "FROM COLS WHERE COL_ID=" + id);
             if (rs.next())
             {
+                byte[] minValueBytes = rs.getBytes("COL_MIN_VALUE");
+                byte[] maxValueBytes = rs.getBytes("COL_MAX_VALUE");
                 MetadataProto.Column column = MetadataProto.Column.newBuilder()
-                .setId(id)
-                .setName(rs.getString("COL_NAME"))
-                .setType(rs.getString("COL_TYPE"))
-                .setSize(rs.getDouble("COL_SIZE"))
-                .setTableId(rs.getLong("TBLS_TBL_ID")).build();
+                        .setId(id)
+                        .setName(rs.getString("COL_NAME"))
+                        .setType(rs.getString("COL_TYPE"))
+                        .setChunkSize(rs.getDouble("COL_CHUNK_SIZE"))
+                        .setSize(rs.getDouble("COL_SIZE"))
+                        .setNullFraction(rs.getDouble("COL_NULL_FRACTION"))
+                        .setCardinality(rs.getLong("COL_CARDINALITY"))
+                        .setMinValue(minValueBytes != null ?
+                                ByteString.copyFrom(minValueBytes) : ByteString.EMPTY)
+                        .setMaxValue(maxValueBytes != null ?
+                                ByteString.copyFrom(maxValueBytes) : ByteString.EMPTY)
+                        .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return column;
             }
 
@@ -67,29 +80,67 @@ public class RdbColumnDao extends ColumnDao
         return null;
     }
 
-    public List<MetadataProto.Column> getByTable(MetadataProto.Table table)
+    public List<MetadataProto.Column> getByTable(MetadataProto.Table table, boolean getStatistics)
     {
         Connection conn = db.getConnection();
-        try (Statement st = conn.createStatement())
+        if (getStatistics)
         {
-            ResultSet rs = st.executeQuery("SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
-                    " ORDER BY COL_ID");
-            List<MetadataProto.Column> columns = new ArrayList<>();
-            while (rs.next())
+            try (Statement st = conn.createStatement())
             {
-                MetadataProto.Column column = MetadataProto.Column.newBuilder()
-                .setId(rs.getLong("COL_ID"))
-                .setName(rs.getString("COL_NAME"))
-                .setType(rs.getString("COL_TYPE"))
-                .setSize(rs.getDouble("COL_SIZE"))
-                .setTableId(table.getId()).build();
-                columns.add(column);
-            }
-            return columns;
+                ResultSet rs = st.executeQuery(
+                        "SELECT COL_ID, COL_NAME, COL_TYPE, COL_CHUNK_SIZE, COL_SIZE, " +
+                                "COL_NULL_FRACTION, COL_CARDINALITY, COL_MIN_VALUE, COL_MAX_VALUE " +
+                                "FROM COLS WHERE TBLS_TBL_ID=" + table.getId() + " ORDER BY COL_ID");
+                List<MetadataProto.Column> columns = new ArrayList<>();
+                while (rs.next())
+                {
+                    byte[] minValueBytes = rs.getBytes("COL_MIN_VALUE");
+                    byte[] maxValueBytes = rs.getBytes("COL_MAX_VALUE");
+                    MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                            .setId(rs.getLong("COL_ID"))
+                            .setName(rs.getString("COL_NAME"))
+                            .setType(rs.getString("COL_TYPE"))
+                            .setChunkSize(rs.getDouble("COL_CHUNK_SIZE"))
+                            .setSize(rs.getDouble("COL_SIZE"))
+                            .setNullFraction(rs.getDouble("COL_NULL_FRACTION"))
+                            .setCardinality(rs.getLong("COL_CARDINALITY"))
+                            .setMinValue(minValueBytes != null ?
+                                    ByteString.copyFrom(minValueBytes) : ByteString.EMPTY)
+                            .setMaxValue(maxValueBytes != null ?
+                                    ByteString.copyFrom(maxValueBytes) : ByteString.EMPTY)
+                            .setTableId(table.getId()).build();
+                    columns.add(column);
+                }
+                return columns;
 
-        } catch (SQLException e)
+            } catch (SQLException e)
+            {
+                log.error("getByTable in RdbColumnDao", e);
+            }
+        }
+        else
         {
-            log.error("getByTable in RdbColumnDao", e);
+            try (Statement st = conn.createStatement())
+            {
+                ResultSet rs = st.executeQuery("SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
+                        " ORDER BY COL_ID");
+                List<MetadataProto.Column> columns = new ArrayList<>();
+                while (rs.next())
+                {
+                    MetadataProto.Column column = MetadataProto.Column.newBuilder()
+                            .setId(rs.getLong("COL_ID"))
+                            .setName(rs.getString("COL_NAME"))
+                            .setType(rs.getString("COL_TYPE"))
+                            .setSize(rs.getDouble("COL_SIZE"))
+                            .setTableId(table.getId()).build();
+                    columns.add(column);
+                }
+                return columns;
+
+            } catch (SQLException e)
+            {
+                log.error("getByTable in RdbColumnDao", e);
+            }
         }
 
         return null;
@@ -128,14 +179,24 @@ public class RdbColumnDao extends ColumnDao
                 "SET\n" +
                 "`COL_NAME` = ?," +
                 "`COL_TYPE` = ?," +
-                "`COL_SIZE` = ?\n" +
+                "`COL_CHUNK_SIZE` = ?," +
+                "`COL_SIZE` = ?," +
+                "`COL_NULL_FRACTION` = ?," +
+                "`COL_CARDINALITY` = ?," +
+                "`COL_MIN_VALUE` = ?," +
+                "`COL_MAX_VALUE` = ?\n" +
                 "WHERE `COL_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, column.getName());
             pst.setString(2, column.getType());
-            pst.setDouble(3, column.getSize());
-            pst.setLong(4, column.getId());
+            pst.setDouble(3, column.getChunkSize());
+            pst.setDouble(4, column.getSize());
+            pst.setDouble(5, column.getNullFraction());
+            pst.setLong(6, column.getCardinality());
+            pst.setBytes(7, column.getMinValue().toByteArray());
+            pst.setBytes(8, column.getMaxValue().toByteArray());
+            pst.setLong(9, column.getId());
 
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
@@ -148,12 +209,12 @@ public class RdbColumnDao extends ColumnDao
 
     public int insertBatch (MetadataProto.Table table, List<MetadataProto.Column> columns)
     {
-        StringBuilder sql = new StringBuilder("INSERT INTO COLS (COL_NAME,COL_TYPE,COL_SIZE,TBLS_TBL_ID)" +
+        StringBuilder sql = new StringBuilder("INSERT INTO COLS (COL_NAME,COL_TYPE,TBLS_TBL_ID)" +
                 "VALUES ");
         for (MetadataProto.Column column : columns)
         {
             sql.append("('").append(column.getName()).append("','").append(column.getType())
-                    .append("',").append(column.getSize()).append(",").append(table.getId()).append("),");
+                    .append("',").append(table.getId()).append("),");
         }
         sql.deleteCharAt(sql.length()-1);
         Connection conn = db.getConnection();

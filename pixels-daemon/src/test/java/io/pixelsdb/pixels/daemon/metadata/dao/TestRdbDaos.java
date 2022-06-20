@@ -63,7 +63,7 @@ public class TestRdbDaos
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
-        List<MetadataProto.Column> columns = columnDao.getByTable(table);
+        List<MetadataProto.Column> columns = columnDao.getByTable(table, false);
         List<MetadataProto.Layout> layouts = layoutDao.getAllByTable(table);
 
         for (MetadataProto.Column column : columns)
@@ -90,7 +90,7 @@ public class TestRdbDaos
 
         MetadataProto.Schema schema = schemaDao.getByName(schemaName);
         MetadataProto.Table table = tableDao.getByNameAndSchema(tableName, schema);
-        columnDao.getByTable(table);
+        columnDao.getByTable(table, false);
         List<MetadataProto.Layout> layouts = layoutDao.getAllByTable(table);
 
 

@@ -42,6 +42,7 @@
         <module>pixels-tools</module>
         <module>pixels-lambda</module>
         <module>pixels-executor</module>
+        <module>pixels-optimizer</module>
     </modules>
 
     <properties>
@@ -116,6 +117,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-executor</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-optimizer</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -176,11 +176,11 @@ public class WorkloadAnalyzer
             }
 
             // all columns
-            List<Column> columns = metadataService.getColumns("pixels", "test_1187");
+            List<Column> columns = metadataService.getColumns("pixels", "test_1187", true);
             Map<String, Double> columnSizes = new HashMap<>();
             for (Column column : columns)
             {
-                columnSizes.put(column.getName(), column.getSize());
+                columnSizes.put(column.getName(), column.getChunkSize());
             }
             BufferedWriter writer = new BufferedWriter(new FileWriter(workloadColsLog));
             writer.write("colName,colCount,colAppear,colSize");

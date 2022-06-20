@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.lambda;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -29,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -196,7 +196,7 @@ public class WorkerCommon
                 .setStorage(storage)
                 .setPath(filePath)
                 .setEnableCache(false)
-                .setCacheOrder(new ArrayList<>())
+                .setCacheOrder(ImmutableList.of())
                 .setPixelsCacheReader(null)
                 .setPixelsFooterCache(footerCache);
         PixelsReader pixelsReader = builder.build();

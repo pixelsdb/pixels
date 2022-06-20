@@ -37,7 +37,7 @@ public class RdbTableDao extends TableDao
     public RdbTableDao() {}
 
     private static final DBUtil db = DBUtil.Instance();
-    private static Logger log = LogManager.getLogger(RdbTableDao.class);
+    private static final Logger log = LogManager.getLogger(RdbTableDao.class);
 
     @Override
     public MetadataProto.Table getById(long id)
@@ -45,16 +45,17 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_NAME, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
-                    "FROM TBLS WHERE TBL_ID=" + id);
+            ResultSet rs = st.executeQuery("SELECT TBL_NAME, TBL_TYPE, TBL_STORAGE_SCHEME, " +
+                    "TBL_ROW_COUNT, DBS_DB_ID FROM TBLS WHERE TBL_ID=" + id);
             if (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
-                .setId(id)
-                .setName(rs.getString("TBL_NAME"))
-                .setType(rs.getString("TBL_TYPE"))
-                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
-                .setSchemaId(rs.getLong("DBS_DB_ID")).build();
+                        .setId(id)
+                        .setName(rs.getString("TBL_NAME"))
+                        .setType(rs.getString("TBL_TYPE"))
+                        .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
+                        .setRowCount(rs.getLong("TBL_ROW_COUNT"))
+                        .setSchemaId(rs.getLong("DBS_DB_ID")).build();
                 return table;
             }
         } catch (SQLException e)
@@ -80,16 +81,17 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME FROM TBLS WHERE TBL_NAME='" +
-                    name + "' AND DBS_DB_ID=" + schema.getId());
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME, TBL_ROW_COUNT " +
+                    "FROM TBLS WHERE TBL_NAME='" + name + "' AND DBS_DB_ID=" + schema.getId());
             if (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
-                .setId(rs.getLong("TBL_ID"))
-                .setName(name)
-                .setType(rs.getString("TBL_TYPE"))
-                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
-                .setSchemaId(schema.getId()).build();
+                        .setId(rs.getLong("TBL_ID"))
+                        .setName(name)
+                        .setType(rs.getString("TBL_TYPE"))
+                        .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
+                        .setRowCount(rs.getLong("TBL_ROW_COUNT"))
+                        .setSchemaId(schema.getId()).build();
                 return table;
             }
 
@@ -106,17 +108,18 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
-                    "FROM TBLS WHERE TBL_NAME='" + name + "'");
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_TYPE, TBL_STORAGE_SCHEME, " +
+                    "TBL_ROW_COUNT, DBS_DB_ID FROM TBLS WHERE TBL_NAME='" + name + "'");
             List<MetadataProto.Table> tables = new ArrayList<>();
             while (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
-                .setId(rs.getLong("TBL_ID"))
-                .setName(name)
-                .setType(rs.getString("TBL_TYPE"))
-                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
-                .setSchemaId(rs.getLong("DBS_DB_ID")).build();
+                        .setId(rs.getLong("TBL_ID"))
+                        .setName(name)
+                        .setType(rs.getString("TBL_TYPE"))
+                        .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
+                        .setRowCount(rs.getLong("TBL_ROW_COUNT"))
+                        .setSchemaId(rs.getLong("DBS_DB_ID")).build();
                 tables.add(table);
             }
             return tables;
@@ -138,17 +141,19 @@ public class RdbTableDao extends TableDao
         Connection conn = db.getConnection();
         try (Statement st = conn.createStatement())
         {
-            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_NAME, TBL_TYPE, TBL_STORAGE_SCHEME, DBS_DB_ID " +
+            ResultSet rs = st.executeQuery("SELECT TBL_ID, TBL_NAME, TBL_TYPE, " +
+                    "TBL_STORAGE_SCHEME, TBL_ROW_COUNT, DBS_DB_ID " +
                     "FROM TBLS WHERE DBS_DB_ID=" + schema.getId());
             List<MetadataProto.Table> tables = new ArrayList<>();
             while (rs.next())
             {
                 MetadataProto.Table table = MetadataProto.Table.newBuilder()
-                .setId(rs.getLong("TBL_ID"))
-                .setName(rs.getString("TBL_NAME"))
-                .setType(rs.getString("TBL_TYPE"))
-                .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
-                .setSchemaId(schema.getId()).build();
+                        .setId(rs.getLong("TBL_ID"))
+                        .setName(rs.getString("TBL_NAME"))
+                        .setType(rs.getString("TBL_TYPE"))
+                        .setStorageScheme(rs.getString("TBL_STORAGE_SCHEME"))
+                        .setRowCount(rs.getLong("TBL_ROW_COUNT"))
+                        .setSchemaId(schema.getId()).build();
                 tables.add(table);
             }
             return tables;
@@ -189,13 +194,15 @@ public class RdbTableDao extends TableDao
                 "`TBL_NAME`," +
                 "`TBL_TYPE`," +
                 "`TBL_STORAGE_SCHEME`," +
-                "`DBS_DB_ID`) VALUES (?,?,?,?)";
+                "`TBL_ROW_COUNT`," +
+                "`DBS_DB_ID`) VALUES (?,?,?,?,?)";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
             pst.setString(3, table.getStorageScheme());
-            pst.setLong(4, table.getSchemaId());
+            pst.setLong(4, table.getRowCount());
+            pst.setLong(5, table.getSchemaId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
@@ -211,14 +218,16 @@ public class RdbTableDao extends TableDao
                 "SET\n" +
                 "`TBL_NAME` = ?," +
                 "`TBL_TYPE` = ?," +
-                "`TBL_STORAGE_SCHEME` = ?\n" +
+                "`TBL_STORAGE_SCHEME` = ?," +
+                "`TBL_ROW_COUNT` = ?\n" +
                 "WHERE `TBL_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
             pst.setString(1, table.getName());
             pst.setString(2, table.getType());
             pst.setString(3, table.getStorageScheme());
-            pst.setLong(4, table.getId());
+            pst.setLong(4, table.getRowCount());
+            pst.setLong(5, table.getId());
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
         {
