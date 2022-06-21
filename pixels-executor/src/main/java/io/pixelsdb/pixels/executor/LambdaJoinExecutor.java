@@ -40,6 +40,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.*;
 import io.pixelsdb.pixels.executor.plan.*;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.executor.join.JoinAdvisor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -60,6 +61,9 @@ import static java.util.Objects.requireNonNull;
 public class LambdaJoinExecutor
 {
     private static final Logger logger = LogManager.getLogger(LambdaJoinExecutor.class);
+    private static final Storage.Scheme IntermediateStorage;
+    private static final String IntermediateFolder;
+    private static final int PartitionThreads;
     private final JoinedTable rootTable;
     private final ConfigFactory config;
     private final MetadataService metadataService;
@@ -69,6 +73,19 @@ public class LambdaJoinExecutor
     private final boolean compactPathEnabled;
     private final Storage storage;
     private final long queryId;
+
+    static
+    {
+        String storageScheme = ConfigFactory.Instance().getProperty("join.intermediate.storage");
+        IntermediateStorage = Storage.Scheme.from(storageScheme);
+        String storageFolder = ConfigFactory.Instance().getProperty("join.intermediate.folder");
+        if (!storageFolder.endsWith("/"))
+        {
+            storageFolder += "/";
+        }
+        IntermediateFolder = storageFolder;
+        PartitionThreads = Integer.parseInt(ConfigFactory.Instance().getProperty("join.partition.threads"));
+    }
 
     public LambdaJoinExecutor(long queryId,
                               JoinedTable rootTable,
@@ -193,9 +210,9 @@ public class LambdaJoinExecutor
                     if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
                     {
                         postPartition = true;
-                        // TODO: get numPartition from the optimizer.
+                        int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
                         postPartitionInfo = new PartitionInfo(
-                                parent.get().getJoin().getLeftKeyColumnIds(), 40);
+                                parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
                     }
                     JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                             join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
@@ -211,9 +228,8 @@ public class LambdaJoinExecutor
                         BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                        // TODO: get the path base from config file.
                         MultiOutputInfo output = new MultiOutputInfo(
-                                "pixels-lambda-test/" + joinedTable.getTableName() + "/", Storage.Scheme.s3,
+                                IntermediateFolder + joinedTable.getTableName() + "/", IntermediateStorage,
                                 null, null, null, true,
                                 ImmutableList.of("join_" + outputId++));
 
@@ -287,9 +303,9 @@ public class LambdaJoinExecutor
             if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
             {
                 postPartition = true;
-                // TODO: get numPartition from the optimizer.
+                int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
                 postPartitionInfo = new PartitionInfo(
-                        parent.get().getJoin().getLeftKeyColumnIds(), 40);
+                        parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
             }
 
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
@@ -307,9 +323,8 @@ public class LambdaJoinExecutor
                     BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
 
-                    // TODO: get the path base from config file.
                     MultiOutputInfo output = new MultiOutputInfo(
-                            "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            IntermediateFolder + joinedTable.getTableName(), IntermediateStorage,
                             null, null, null, true,
                             ImmutableList.of("join_" + outputId++));
 
@@ -334,9 +349,8 @@ public class LambdaJoinExecutor
                     BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                             leftTable, ImmutableList.of(leftInputSplit), join.getLeftKeyColumnIds());
 
-                    // TODO: get the path base from config file.
                     MultiOutputInfo output = new MultiOutputInfo(
-                            "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                            IntermediateFolder + joinedTable.getTableName(), IntermediateStorage,
                             null, null, null, true,
                             ImmutableList.of("join_" + outputId++));
 
@@ -355,25 +369,24 @@ public class LambdaJoinExecutor
         {
             // process partitioned join.
             PartitionedJoinOperator joinOperator;
+            int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
             if (childOperator != null)
             {
                 // left side is post partitioned, thus we only partition the right table.
-                // TODO: get parallelism from config file.
                 PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
-                        leftTable.getTableName(), leftPartitionedFiles, 8,
+                        leftTable.getTableName(), leftPartitionedFiles, PartitionThreads,
                         leftTable.getColumnNames(), leftKeyColumnIds);
 
-                // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
-                        rightTable, rightInputSplits, rightKeyColumnIds, 40,
-                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
+                        rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
+                        IntermediateFolder + joinedTable.getTableName() + "/" +
                                 rightTable.getTableName() + "/part-");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
 
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
-                        joinedTable, parent, leftTableInfo, rightTableInfo);
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -391,24 +404,22 @@ public class LambdaJoinExecutor
             else
             {
                 // partition both tables. in this case, the operator's child must be null.
-                // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
-                        leftTable, leftInputSplits, leftKeyColumnIds, 40,
-                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
+                        leftTable, leftInputSplits, leftKeyColumnIds, numPartition,
+                        IntermediateFolder + joinedTable.getTableName() + "/" +
                                 leftTable.getTableName() + "/part-");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs);
 
-                // TODO: get numPartition and outputBase from optimizer and config file respectively.
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
-                        rightTable, rightInputSplits, rightKeyColumnIds, 40,
-                        "pixels-lambda-test/" + joinedTable.getTableName() + "/" +
+                        rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
+                        IntermediateFolder + joinedTable.getTableName() + "/" +
                                 rightTable.getTableName() + "/part-");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
 
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
-                        joinedTable, parent, leftTableInfo, rightTableInfo);
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -459,9 +470,8 @@ public class LambdaJoinExecutor
             rightPartitionedFiles.add(partitionInput.getOutput().getPath());
         }
 
-        // TODO: get parallelism from config file.
         return new PartitionedTableInfo(table.getTableName(), rightPartitionedFiles.build(),
-                4, table.getColumnNames(), keyColumnIds);
+                PartitionThreads, table.getColumnNames(), keyColumnIds);
     }
 
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits,
@@ -497,7 +507,7 @@ public class LambdaJoinExecutor
     }
 
     private List<JoinInput> getPartitionedJoinInputs(
-            JoinedTable joinedTable, Optional<JoinedTable> parent,
+            JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
             PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo)
     {
         boolean postPartition = false;
@@ -505,43 +515,38 @@ public class LambdaJoinExecutor
         if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
         {
             postPartition = true;
-            // TODO: get numPartition from the optimizer.
-            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), 40);
+            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
         }
 
         ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-        for (int i = 0; i < 40; ++i)
+        for (int i = 0; i < numPartition; ++i)
         {
             ImmutableList.Builder<String> outputFileNames = ImmutableList.builder();
-            for (int j = 0; j < 4; ++j) // TODO: get parallelism from config file.
+            for (int j = 0; j < PartitionThreads; ++j)
             {
                 outputFileNames.add("join_" + i + "_out_" + j);
             }
-            // TODO: get the path base from config file.
+
             MultiOutputInfo output = new MultiOutputInfo(
-                    "pixels-lambda-test/" + joinedTable.getTableName(), Storage.Scheme.s3,
+                    IntermediateFolder + joinedTable.getTableName(), IntermediateStorage,
                     null, null, null, true, outputFileNames.build());
 
             PartitionedJoinInput joinInput;
             if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                // TODO: get numPartition from the optimizer.
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
                         joinedTable.getJoin().getLeftProjection(), joinedTable.getJoin().getRightProjection(),
-                        postPartition, postPartitionInfo,
-                        40, ImmutableList.of(i));
+                        postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
                  joinInput = new PartitionedJoinInput(
                         queryId, leftTableInfo, rightTableInfo, joinInfo, output);
             }
             else
             {
-                // TODO: get numPartition from the optimizer.
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
                         joinedTable.getJoin().getRightProjection(), joinedTable.getJoin().getLeftProjection(),
-                        postPartition, postPartitionInfo,
-                        40, ImmutableList.of(i));
+                        postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
                 joinInput = new PartitionedJoinInput(
                         queryId, rightTableInfo, leftTableInfo, joinInfo, output);
             }
