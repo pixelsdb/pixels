@@ -123,6 +123,11 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             this.partitionOutput = event.getJoinInfo().isPostPartition();
             this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
+            if (this.partitionOutput)
+            {
+                logger.info("post partitioning, number of partitions: " + this.outputPartitionInfo.getNumParition());
+            }
+
             // build the joiner.
             Joiner joiner = buildJoiner(threadPool, leftTables, chainJoinInfos, rightTable, lastJoinInfo);
             // scan the right table and do the join.

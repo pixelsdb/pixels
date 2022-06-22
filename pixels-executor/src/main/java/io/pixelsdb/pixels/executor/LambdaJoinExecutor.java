@@ -227,9 +227,13 @@ public class LambdaJoinExecutor
                     PartitionInfo postPartitionInfo = null;
                     if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
                     {
+                        // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
-                        int numPartition = JoinAdvisor.Instance()
-                                .getNumPartition(leftTable, rightTable, join.getJoinEndian());
+                        int numPartition = JoinAdvisor.Instance().getNumPartition(
+                                parent.get().getJoin().getLeftTable(),
+                                parent.get().getJoin().getRightTable(),
+                                parent.get().getJoin().getJoinEndian());
+
                         postPartitionInfo = new PartitionInfo(
                                 parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
                     }
@@ -333,7 +337,12 @@ public class LambdaJoinExecutor
             if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
             {
                 postPartition = true;
-                int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
+                // Note: we must use the parent to calculate the number of partitions for post partitioning.
+                int numPartition = JoinAdvisor.Instance().getNumPartition(
+                        parent.get().getJoin().getLeftTable(),
+                        parent.get().getJoin().getRightTable(),
+                        parent.get().getJoin().getJoinEndian());
+
                 postPartitionInfo = new PartitionInfo(
                         parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
             }
