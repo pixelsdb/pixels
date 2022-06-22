@@ -70,6 +70,8 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             long queryId = event.getQueryId();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             int numPartition = event.getPartitionInfo().getNumParition();
+            logger.info("table '" + event.getTableInfo().getTableName() +
+                    "', number of partitions (" + numPartition + ")");
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
             checkArgument(event.getOutput().getScheme() == Storage.Scheme.s3,
                     "the storage scheme for the partition result must be s3");

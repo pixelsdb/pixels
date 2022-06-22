@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -81,11 +82,12 @@ public class WorkerCommon
      * @param rightSchema the atomic reference to return the schema of the right table
      * @param leftPath the path of an input file of the left table
      * @param rightPath the path of an input file of the right table
+     * @param checkExistence whether check the existence of the input files
      */
     public static void getFileSchema(ExecutorService executor, Storage storage,
                                      AtomicReference<TypeDescription> leftSchema,
                                      AtomicReference<TypeDescription> rightSchema,
-                                     String leftPath, String rightPath)
+                                     String leftPath, String rightPath, boolean checkExistence)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(storage, "storage is null");
@@ -96,23 +98,37 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
+                if (checkExistence)
+                {
+                    while (!s3.exists(leftPath))
+                    {
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
                 PixelsReader reader = getReader(leftPath, storage);
                 leftSchema.set(reader.getFileSchema());
                 reader.close();
-            } catch (IOException e)
+            } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the left table");
+                logger.error("failed to read the schema of the left table file '" + leftPath + "'", e);
             }
         });
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
+                if (checkExistence)
+                {
+                    while (!s3.exists(rightPath))
+                    {
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
                 PixelsReader reader = getReader(rightPath, storage);
                 rightSchema.set(reader.getFileSchema());
                 reader.close();
-            } catch (IOException e)
+            } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the right table");
+                logger.error("failed to read the schema of the right table file '" + rightPath + "'", e);
             }
         });
         try
@@ -130,11 +146,20 @@ public class WorkerCommon
      *
      * @param storage the storage instance
      * @param path the path of an input file of the table
+     * @param checkExistence whether check the existence of the input files
      */
-    public static TypeDescription getFileSchema(Storage storage, String path) throws IOException
+    public static TypeDescription getFileSchema(Storage storage, String path, boolean checkExistence)
+            throws IOException, InterruptedException
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(path, "path is null");
+        if (checkExistence)
+        {
+            while (!s3.exists(path))
+            {
+                TimeUnit.MILLISECONDS.sleep(10);
+            }
+        }
         PixelsReader reader = getReader(path, storage);
         TypeDescription fileSchema = reader.getFileSchema();
         reader.close();

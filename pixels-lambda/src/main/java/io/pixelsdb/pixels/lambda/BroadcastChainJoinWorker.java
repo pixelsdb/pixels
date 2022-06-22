@@ -123,6 +123,11 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             this.partitionOutput = event.getJoinInfo().isPostPartition();
             this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
+            if (this.partitionOutput)
+            {
+                logger.info("post partitioning, number of partitions: " + this.outputPartitionInfo.getNumParition());
+            }
+
             // build the joiner.
             Joiner joiner = buildJoiner(threadPool, leftTables, chainJoinInfos, rightTable, lastJoinInfo);
             // scan the right table and do the join.
@@ -137,10 +142,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, true, rightCols, rightFilter,
+                                        queryId, joiner, inputs, false, rightCols, rightFilter,
                                         outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
                                         this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, false, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -197,7 +202,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 BroadCastJoinTableInfo currRightTable = leftTables.get(i);
                 BroadCastJoinTableInfo nextTable = leftTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
-                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
+                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
@@ -212,7 +217,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
             BroadCastJoinTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
-                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath());
+                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
             TypeDescription rightResultSchema = getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
             Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(),
                     currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(),
@@ -247,7 +252,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
         getFileSchema(executor, s3, t1Schema, t2Schema,
                 t1.getInputSplits().get(0).getInputInfos().get(0).getPath(),
-                t2.getInputSplits().get(0).getInputInfos().get(0).getPath());
+                t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
         Joiner joiner = new Joiner(joinInfo.getJoinType(),
                 getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(),
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
@@ -261,7 +266,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    buildHashTable(queryId, joiner, inputs, true, t1.getColumnsToRead(), t1Filter);
+                    buildHashTable(queryId, joiner, inputs, false, t1.getColumnsToRead(), t1Filter);
                 }
                 catch (Exception e)
                 {
@@ -299,7 +304,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(currJoiner, nextJoiner, inputs, true,
+                    chainJoinSplit(currJoiner, nextJoiner, inputs, false,
                             currRightTable.getColumnsToRead(), currRigthFilter);
                 }
                 catch (Exception e)

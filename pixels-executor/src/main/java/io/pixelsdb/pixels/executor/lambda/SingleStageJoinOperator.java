@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
@@ -38,10 +39,17 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class SingleStageJoinOperator implements JoinOperator
 {
+    protected static final double StageCompletionRatio;
     protected final List<JoinInput> joinInputs;
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator child = null;
     protected boolean smallChild = false;
+
+    static
+    {
+        StageCompletionRatio = Double.parseDouble(
+                ConfigFactory.Instance().getProperty("join.stage.completion.ratio"));
+    }
 
     public SingleStageJoinOperator(JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -134,8 +142,8 @@ public class SingleStageJoinOperator implements JoinOperator
                     completed++;
                 }
             }
-            // TODO: get the threshold from config file.
-            if (completed / childOutputs.length >= 0.6)
+
+            if (completed / childOutputs.length >= StageCompletionRatio)
             {
                 break;
             }

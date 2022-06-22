@@ -99,6 +99,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             JoinType joinType = event.getJoinInfo().getJoinType();
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
             int numPartition = event.getJoinInfo().getNumPartition();
+            logger.info("small table '" + event.getSmallTable().getTableName() +
+                    "', large table '" + event.getLargeTable().getTableName() +
+                    "', number of partitions (" + numPartition + ")");
 
             MultiOutputInfo outputInfo = event.getOutput();
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
@@ -136,7 +139,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
-                    leftPartitioned.get(0), rightPartitioned.get(0));
+                    leftPartitioned.get(0), rightPartitioned.get(0), true);
             Joiner joiner = new Joiner(joinType,
                     leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
                     rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
