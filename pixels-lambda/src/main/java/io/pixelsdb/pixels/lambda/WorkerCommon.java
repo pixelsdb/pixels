@@ -82,11 +82,12 @@ public class WorkerCommon
      * @param rightSchema the atomic reference to return the schema of the right table
      * @param leftPath the path of an input file of the left table
      * @param rightPath the path of an input file of the right table
+     * @param checkExistence whether check the existence of the input files
      */
     public static void getFileSchema(ExecutorService executor, Storage storage,
                                      AtomicReference<TypeDescription> leftSchema,
                                      AtomicReference<TypeDescription> rightSchema,
-                                     String leftPath, String rightPath)
+                                     String leftPath, String rightPath, boolean checkExistence)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(storage, "storage is null");
@@ -97,9 +98,12 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                while (!s3.exists(leftPath))
+                if (checkExistence)
                 {
-                    TimeUnit.MILLISECONDS.sleep(10);
+                    while (!s3.exists(leftPath))
+                    {
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
                 }
                 PixelsReader reader = getReader(leftPath, storage);
                 leftSchema.set(reader.getFileSchema());
@@ -112,9 +116,12 @@ public class WorkerCommon
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                while (!s3.exists(rightPath))
+                if (checkExistence)
                 {
-                    TimeUnit.MILLISECONDS.sleep(10);
+                    while (!s3.exists(rightPath))
+                    {
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
                 }
                 PixelsReader reader = getReader(rightPath, storage);
                 rightSchema.set(reader.getFileSchema());
@@ -139,11 +146,20 @@ public class WorkerCommon
      *
      * @param storage the storage instance
      * @param path the path of an input file of the table
+     * @param checkExistence whether check the existence of the input files
      */
-    public static TypeDescription getFileSchema(Storage storage, String path) throws IOException
+    public static TypeDescription getFileSchema(Storage storage, String path, boolean checkExistence)
+            throws IOException, InterruptedException
     {
         requireNonNull(storage, "storage is null");
         requireNonNull(path, "path is null");
+        if (checkExistence)
+        {
+            while (!s3.exists(path))
+            {
+                TimeUnit.MILLISECONDS.sleep(10);
+            }
+        }
         PixelsReader reader = getReader(path, storage);
         TypeDescription fileSchema = reader.getFileSchema();
         reader.close();

@@ -131,7 +131,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getInputInfos().get(0).getPath(),
-                    rightInputs.get(0).getInputInfos().get(0).getPath());
+                    rightInputs.get(0).getInputInfos().get(0).getPath(), true);
             Joiner joiner = new Joiner(joinType,
                     getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
