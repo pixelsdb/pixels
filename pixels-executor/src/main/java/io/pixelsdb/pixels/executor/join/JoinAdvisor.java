@@ -47,8 +47,8 @@ public class JoinAdvisor
     }
 
     private final MetadataService metadataService;
-    private final long broadcastThreshold;
-    private final long partitionSize;
+    private final double broadcastThreshold;
+    private final double partitionSize;
     /**
      * schemaName_tableName -> (columnName -> column)
      */
@@ -64,14 +64,13 @@ public class JoinAdvisor
         broadcastThreshold = parseDataSize(thresholdStr);
         String partitionSizeStr = configFactory.getProperty("join.partition.size");
         partitionSize = parseDataSize(partitionSizeStr);
-
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException
     {
         double smallTableSize;
-        if (joinEndian == JoinEndian.LARGE_LEFT)
+        if (joinEndian == JoinEndian.SMALL_LEFT)
         {
             smallTableSize = getTableSize(leftTable);
         }
@@ -107,16 +106,16 @@ public class JoinAdvisor
     public int getNumPartition(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException
     {
-        double tableSize;
+        double largeTableSize;
         if (joinEndian == JoinEndian.LARGE_LEFT)
         {
-            tableSize = getTableSize(leftTable);
+            largeTableSize = getTableSize(leftTable);
         }
         else
         {
-            tableSize = getTableSize(rightTable);
+            largeTableSize = getTableSize(rightTable);
         }
-        return (int) Math.ceil(tableSize / partitionSize);
+        return (int) Math.ceil(largeTableSize / partitionSize);
     }
 
     private double getTableSize(Table table) throws MetadataException
@@ -154,24 +153,24 @@ public class JoinAdvisor
         return getTableSize(leftTable) + getTableSize(rightTable);
     }
 
-    private long parseDataSize(String sizeStr)
+    private double parseDataSize(String sizeStr)
     {
-        if (sizeStr.endsWith("B"))
-        {
-            return Long.parseLong(sizeStr.substring(0, sizeStr.length()-1));
-        }
-        long l = Long.parseLong(sizeStr.substring(0, sizeStr.length() - 2));
+        double l = Double.parseDouble(sizeStr.substring(0, sizeStr.length() - 2));
         if (sizeStr.endsWith("KB"))
         {
-            return l * 1024L;
+            return l * 1024;
         }
         else if (sizeStr.endsWith("MB"))
         {
-            return l * 1024L * 1024L;
+            return l * 1024 * 1024;
         }
         else if (sizeStr.endsWith("GB"))
         {
-            return l * 1024L * 1024L * 1024L;
+            return l * 1024 * 1024 * 1024;
+        }
+        else if (sizeStr.endsWith("B"))
+        {
+            return Double.parseDouble(sizeStr.substring(0, sizeStr.length()-1));
         }
         throw new UnsupportedOperationException("size '" + sizeStr + "' can not be parsed");
     }

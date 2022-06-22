@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -96,23 +97,31 @@ public class WorkerCommon
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
+                while (!s3.exists(leftPath))
+                {
+                    TimeUnit.MILLISECONDS.sleep(10);
+                }
                 PixelsReader reader = getReader(leftPath, storage);
                 leftSchema.set(reader.getFileSchema());
                 reader.close();
-            } catch (IOException e)
+            } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the left table");
+                logger.error("failed to read the schema of the left table file '" + leftPath + "'", e);
             }
         });
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
+                while (!s3.exists(rightPath))
+                {
+                    TimeUnit.MILLISECONDS.sleep(10);
+                }
                 PixelsReader reader = getReader(rightPath, storage);
                 rightSchema.set(reader.getFileSchema());
                 reader.close();
-            } catch (IOException e)
+            } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the right table");
+                logger.error("failed to read the schema of the right table file '" + rightPath + "'", e);
             }
         });
         try

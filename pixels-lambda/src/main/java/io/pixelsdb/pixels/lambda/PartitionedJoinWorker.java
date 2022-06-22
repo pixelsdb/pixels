@@ -99,6 +99,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             JoinType joinType = event.getJoinInfo().getJoinType();
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
             int numPartition = event.getJoinInfo().getNumPartition();
+            logger.info("small table '" + event.getSmallTable().getTableName() +
+                    "', large table '" + event.getLargeTable().getTableName() +
+                    "', number of partitions (" + numPartition + ")");
 
             MultiOutputInfo outputInfo = event.getOutput();
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
