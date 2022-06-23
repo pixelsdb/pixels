@@ -207,7 +207,12 @@ public class LambdaJoinExecutor
 
                     joinInputs.add(complete);
                 }
-                return new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+
+                SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
+                        joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                // The right operator must be set as the large child.
+                joinOperator.setLargeChild(rightOperator);
+                return joinOperator;
             }
             else
             {
@@ -415,6 +420,7 @@ public class LambdaJoinExecutor
 
                         joinInputs.add(complete);
                     }
+
                     return new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
