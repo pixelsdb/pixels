@@ -39,6 +39,10 @@ public interface JoinOperator
 
     void setLargeChild(JoinOperator child);
 
+    JoinOperator getSmallChild();
+
+    JoinOperator getLargeChild();
+
     /**
      * Execute this join operator recursively.
      *

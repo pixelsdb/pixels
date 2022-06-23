@@ -322,8 +322,6 @@ public class LambdaJoinExecutor
 
                 BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
                 broadcastChainJoinInput.setQueryId(queryId);
-
-
                 broadcastChainJoinInput.setSmallTables(smallTableInfos);
                 List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
                 chainJoinInfos.add(chainJoinInfo);

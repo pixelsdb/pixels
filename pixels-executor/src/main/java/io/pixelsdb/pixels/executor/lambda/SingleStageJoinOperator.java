@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * The executor of a single-stage join.
@@ -87,6 +88,18 @@ public class SingleStageJoinOperator implements JoinOperator
         this.largeChild = child;
     }
 
+    @Override
+    public JoinOperator getSmallChild()
+    {
+        return this.smallChild;
+    }
+
+    @Override
+    public JoinOperator getLargeChild()
+    {
+        return this.largeChild;
+    }
+
     /**
      * Execute this join operator.
      *
@@ -136,6 +149,13 @@ public class SingleStageJoinOperator implements JoinOperator
 
     protected static void waitForCompletion(CompletableFuture<?>[] childOutputs)
     {
+        requireNonNull(childOutputs, "childOutputs is null");
+
+        if (childOutputs.length == 0)
+        {
+            return;
+        }
+
         while (true)
         {
             double completed = 0;

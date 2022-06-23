@@ -171,7 +171,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
                                         outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
                                         this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, false, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
