@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
@@ -87,11 +88,22 @@ public class LambdaJoinExecutor
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance().getProperty("join.intra.worker.parallelism"));
     }
 
+    /**
+     * Create an executor for the join plan that is represented as a joined table.
+     * In the join plan, all multi-pipeline joins are of small-left endian, all single-pipeline
+     * joins have joined table on the left. There is no requirement for the end-point joins of
+     * table base tables.
+     *
+     * @param queryId the query id
+     * @param rootTable the join plan
+     * @param orderedPathEnabled whether ordered path is enabled
+     * @param compactPathEnabled whether compact path is enabled
+     * @throws IOException
+     */
     public LambdaJoinExecutor(long queryId,
                               JoinedTable rootTable,
                               boolean orderedPathEnabled,
-                              boolean compactPathEnabled)
-            throws IOException
+                              boolean compactPathEnabled) throws IOException
     {
         this.queryId = queryId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
@@ -110,6 +122,131 @@ public class LambdaJoinExecutor
         return this.getJoinOperator(this.rootTable, Optional.empty());
     }
 
+    private JoinOperator getMultiPipelineJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent) throws IOException, MetadataException
+    {
+        requireNonNull(joinedTable, "joinedTable is null");
+        Join join = requireNonNull(joinedTable.getJoin(), "joinTable.join is null");
+        Table leftTable = requireNonNull(join.getLeftTable(), "join.leftTable is null");
+        Table rightTable = requireNonNull(join.getRightTable(), "join.rightTable is null");
+        checkArgument(!leftTable.isBase() && !rightTable.isBase(),
+                "both left and right tables should be joined tables");
+
+        int[] leftKeyColumnIds = requireNonNull(join.getLeftKeyColumnIds(),
+                "join.leftKeyColumnIds is null");
+        int[] rightKeyColumnIds = requireNonNull(join.getRightKeyColumnIds(),
+                "join.rightKeyColumnIds is null");
+        JoinType joinType = requireNonNull(join.getJoinType(), "join.joinType is null");
+        JoinEndian joinEndian = requireNonNull(join.getJoinEndian(), "join.joinEndian is null");
+        checkArgument(joinEndian == JoinEndian.SMALL_LEFT,
+                "multi-pipeline joins must be small-left");
+        JoinAlgorithm joinAlgo = requireNonNull(join.getJoinAlgo(), "join.joinAlgo is null");
+
+        JoinOperator leftOperator, rightOperator;
+        if (joinAlgo == JoinAlgorithm.BROADCAST)
+        {
+            /*
+            * If the current join is a broadcast join, we should not let the large side to chain
+            * above to the current join.
+            * And as the right table is a joined table, we will not continue build the chain join.
+            * We only complete the chain join if the operator of either side is an incomplete chain join.
+            * */
+            leftOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
+            rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
+            if (leftOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN)
+            {
+                boolean postPartition = false;
+                PartitionInfo postPartitionInfo = null;
+                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
+                {
+                    // Note: we must use the parent to calculate the number of partitions for post partitioning.
+                    postPartition = true;
+                    int numPartition = JoinAdvisor.Instance().getNumPartition(
+                            parent.get().getJoin().getLeftTable(),
+                            parent.get().getJoin().getRightTable(),
+                            parent.get().getJoin().getJoinEndian());
+
+                    postPartitionInfo = new PartitionInfo(
+                            parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                }
+                JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
+                        join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
+
+                checkArgument(leftOperator.getJoinInputs().size() == 1,
+                        "there should be exact one incomplete chain join input in the child operator");
+                BroadcastChainJoinInput broadcastChainJoinInput =
+                        (BroadcastChainJoinInput) leftOperator.getJoinInputs().get(0);
+
+                List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
+                List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+
+                ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+                int outputId = 0;
+                for (int i = 0; i < rightInputSplits.size();)
+                {
+                    ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
+                            .builderWithExpectedSize(IntraWorkerParallelism);
+                    ImmutableList.Builder<String> outputsBuilder = ImmutableList
+                            .builderWithExpectedSize(IntraWorkerParallelism);
+                    for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
+                    {
+                        inputsBuilder.add(rightInputSplits.get(i));
+                        outputsBuilder.add("join_" + outputId++);
+                    }
+                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                            rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
+
+                    MultiOutputInfo output = new MultiOutputInfo(
+                            IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                                    joinedTable.getTableName() + "/", IntermediateStorage,
+                            null, null, null, true, outputsBuilder.build());
+
+                    BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
+                            .setLargeTable(rightTableInfo)
+                            .setJoinInfo(joinInfo)
+                            .setOutput(output).build();
+
+                    joinInputs.add(complete);
+                }
+                return new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+            }
+            else
+            {
+                throw new InvalidArgumentException("the small-left child is not a broadcast chain join whereas the " +
+                        "current join is a broadcast join, such a join plan is invalid");
+            }
+        }
+        else if (joinAlgo == JoinAlgorithm.PARTITIONED)
+        {
+            leftOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
+            rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.of(joinedTable));
+            List<JoinInput> leftJoinInputs = leftOperator.getJoinInputs();
+            List<String> leftPartitionedFiles = getPartitionedFiles(leftJoinInputs);
+            List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
+            List<String> rightPartitionedFiles = getPartitionedFiles(rightJoinInputs);
+            PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
+                    leftTable.getTableName(), leftPartitionedFiles, IntraWorkerParallelism,
+                    leftTable.getColumnNames(), leftKeyColumnIds);
+            PartitionedTableInfo rightTableInfo = new PartitionedTableInfo(
+                    rightTable.getTableName(), rightPartitionedFiles, IntraWorkerParallelism,
+                    rightTable.getColumnNames(), rightKeyColumnIds);
+
+            int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
+            List<JoinInput> joinInputs = getPartitionedJoinInputs(
+                    joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
+            PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
+                    null, null, joinInputs, joinAlgo);
+
+            joinOperator.setSmallChild(leftOperator);
+            joinOperator.setLargeChild(rightOperator);
+            return joinOperator;
+        }
+        else
+        {
+            throw new UnsupportedOperationException("unsupported join algorithm '" + join.getJoinAlgo() +
+                    "' in the joined table constructed by users");
+        }
+    }
+
     protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
@@ -117,6 +254,13 @@ public class LambdaJoinExecutor
         Join join = requireNonNull(joinedTable.getJoin(), "joinTable.join is null");
         Table leftTable = requireNonNull(join.getLeftTable(), "join.leftTable is null");
         requireNonNull(join.getRightTable(), "join.rightTable is null");
+
+        if (!join.getLeftTable().isBase() && !join.getRightTable().isBase())
+        {
+            // Process multi-pipeline join.
+            return getMultiPipelineJoinOperator(joinedTable, parent);
+        }
+
         checkArgument(join.getRightTable().isBase(), "join.rightTable is not base table");
         BaseTable rightTable = (BaseTable) join.getRightTable();
         int[] leftKeyColumnIds = requireNonNull(join.getLeftKeyColumnIds(),
@@ -202,7 +346,7 @@ public class LambdaJoinExecutor
                         parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
                     /*
-                     * The parent is still a broadcast join, continue chain join construction by
+                     * The parent is still a small-left broadcast join, continue chain join construction by
                      * adding the right table of the current join into the left tables of the chain join
                      */
                     BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
@@ -273,57 +417,23 @@ public class LambdaJoinExecutor
 
                         joinInputs.add(complete);
                     }
-                    SingleStageJoinOperator joinOperator =
-                            new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
-                    return joinOperator;
+                    return new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
             // get the leftInputSplits or leftPartitionedFiles from childJoinInputs.
             List<JoinInput> childJoinInputs = childOperator.getJoinInputs();
             if (joinAlgo == JoinAlgorithm.BROADCAST)
             {
-                ImmutableList.Builder<InputSplit> inputSplits = ImmutableList.builder();
-                for (JoinInput childJoinInput : childJoinInputs)
-                {
-                    MultiOutputInfo childOutput = childJoinInput.getOutput();
-                    String base = childOutput.getPath();
-                    if (!base.endsWith("/"))
-                    {
-                        base += "/";
-                    }
-                    ImmutableList.Builder<InputInfo> inputs = ImmutableList
-                            .builderWithExpectedSize(childOutput.getFileNames().size());
-                    for (String fileName : childOutput.getFileNames())
-                    {
-                        InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
-                        inputs.add(inputInfo);
-                    }
-                    inputSplits.add(new InputSplit(inputs.build()));
-                }
-                leftInputSplits = inputSplits.build();
+                leftInputSplits = getBroadcastInputSplits(childJoinInputs);
             }
             else if (joinAlgo == JoinAlgorithm.PARTITIONED)
             {
-                ImmutableList.Builder<String> partitionedFiles = ImmutableList.builder();
-                for (JoinInput childJoinInput : childJoinInputs)
-                {
-                    MultiOutputInfo childOutput = childJoinInput.getOutput();
-                    String base = childOutput.getPath();
-                    if (!base.endsWith("/"))
-                    {
-                        base += "/";
-                    }
-                    for (String fileName : childOutput.getFileNames())
-                    {
-                        partitionedFiles.add(base + fileName);
-                    }
-                }
-                leftPartitionedFiles = partitionedFiles.build();
+                leftPartitionedFiles = getPartitionedFiles(childJoinInputs);
             }
             else
             {
-                throw new UnsupportedOperationException("join algorithm '" + joinAlgo +
-                        "' is not supported in the joined table constructed by users");
+                throw new UnsupportedOperationException("unsupported join algorithm '" + joinAlgo +
+                        "' in the joined table constructed by users");
             }
         }
 
@@ -419,7 +529,14 @@ public class LambdaJoinExecutor
             }
             SingleStageJoinOperator joinOperator =
                     new SingleStageJoinOperator(joinInputs.build(), joinAlgo);
-            joinOperator.setChild(childOperator, join.getJoinEndian() == JoinEndian.SMALL_LEFT);
+            if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+            {
+                joinOperator.setSmallChild(childOperator);
+            }
+            else
+            {
+                joinOperator.setLargeChild(childOperator);
+            }
             return joinOperator;
         }
         else if (joinAlgo == JoinAlgorithm.PARTITIONED)
@@ -449,13 +566,13 @@ public class LambdaJoinExecutor
                 {
                     joinOperator = new PartitionedJoinOperator(
                             null, rightPartitionInputs, joinInputs, joinAlgo);
-                    joinOperator.setChild(childOperator,true);
+                    joinOperator.setSmallChild(childOperator);
                 }
                 else
                 {
                     joinOperator = new PartitionedJoinOperator(
                             rightPartitionInputs, null, joinInputs, joinAlgo);
-                    joinOperator.setChild(childOperator,false);
+                    joinOperator.setLargeChild(childOperator);
                 }
             }
             else
@@ -493,9 +610,61 @@ public class LambdaJoinExecutor
         }
         else
         {
-            throw new UnsupportedOperationException("join algorithm '" + joinAlgo +
-                    "' is not supported in the joined table constructed by users");
+            throw new UnsupportedOperationException("unsupported join algorithm '" + joinAlgo +
+                    "' in the joined table constructed by users");
         }
+    }
+
+    /**
+     * Get the partitioned file paths from the join inputs of the child.
+     * @param joinInputs the join inputs of the child
+     * @return the paths of the partitioned files
+     */
+    private List<String> getPartitionedFiles(List<JoinInput> joinInputs)
+    {
+        ImmutableList.Builder<String> partitionedFiles = ImmutableList.builder();
+        for (JoinInput joinInput : joinInputs)
+        {
+            MultiOutputInfo output = joinInput.getOutput();
+            String base = output.getPath();
+            if (!base.endsWith("/"))
+            {
+                base += "/";
+            }
+            for (String fileName : output.getFileNames())
+            {
+                partitionedFiles.add(base + fileName);
+            }
+        }
+        return partitionedFiles.build();
+    }
+
+    /**
+     * Get the input splits for a broadcast join from the join inputs of the child.
+     * @param joinInputs the join inputs of the child
+     * @return the input splits for the broadcast join
+     */
+    private List<InputSplit> getBroadcastInputSplits(List<JoinInput> joinInputs)
+    {
+        ImmutableList.Builder<InputSplit> inputSplits = ImmutableList.builder();
+        for (JoinInput joinInput : joinInputs)
+        {
+            MultiOutputInfo output = joinInput.getOutput();
+            String base = output.getPath();
+            if (!base.endsWith("/"))
+            {
+                base += "/";
+            }
+            ImmutableList.Builder<InputInfo> inputs = ImmutableList
+                    .builderWithExpectedSize(output.getFileNames().size());
+            for (String fileName : output.getFileNames())
+            {
+                InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
+                inputs.add(inputInfo);
+            }
+            inputSplits.add(new InputSplit(inputs.build()));
+        }
+        return inputSplits.build();
     }
 
     private BroadCastJoinTableInfo getBroadcastJoinTableInfo(

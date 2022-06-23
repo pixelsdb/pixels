@@ -35,18 +35,22 @@ public interface JoinOperator
 
     JoinAlgorithm getJoinAlgo();
 
-    void setChild(JoinOperator child, boolean smallChild);
+    void setSmallChild(JoinOperator child);
+
+    void setLargeChild(JoinOperator child);
 
     /**
      * Execute this join operator recursively.
      *
-     * @return the join outputs.
+     * @return the completable futures of the join outputs.
      */
     CompletableFuture<?>[] execute();
 
     /**
-     * Only execute the previous stages (if any) before the last stage recursively.
-     * @return empty array if the previous stages do not exist
+     * Execute the previous stages (if any) before the last stage, recursively.
+     * And return the completable futures of the outputs of the previous states that
+     * we should wait for completion.
+     * @return empty array if the previous stages do not exist or do not need to be wait for
      */
     CompletableFuture<?>[] executePrev();
 }

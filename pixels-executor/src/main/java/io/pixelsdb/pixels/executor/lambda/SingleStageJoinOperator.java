@@ -42,8 +42,8 @@ public class SingleStageJoinOperator implements JoinOperator
     protected static final double StageCompletionRatio;
     protected final List<JoinInput> joinInputs;
     protected final JoinAlgorithm joinAlgo;
-    protected JoinOperator child = null;
-    protected boolean smallChild = false;
+    protected JoinOperator smallChild = null;
+    protected JoinOperator largeChild = null;
 
     static
     {
@@ -59,7 +59,7 @@ public class SingleStageJoinOperator implements JoinOperator
 
     public SingleStageJoinOperator(List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
-        this.joinInputs = joinInputs;
+        this.joinInputs = ImmutableList.copyOf(joinInputs);
         this.joinAlgo = joinAlgo;
     }
 
@@ -76,10 +76,15 @@ public class SingleStageJoinOperator implements JoinOperator
     }
 
     @Override
-    public void setChild(JoinOperator child, boolean smallChild)
+    public void setSmallChild(JoinOperator child)
     {
-        this.child = child;
-        this.smallChild = smallChild;
+        this.smallChild = child;
+    }
+
+    @Override
+    public void setLargeChild(JoinOperator child)
+    {
+        this.largeChild = child;
     }
 
     /**
@@ -90,7 +95,7 @@ public class SingleStageJoinOperator implements JoinOperator
     @Override
     public CompletableFuture<?>[] execute()
     {
-        executePrev();
+        waitForCompletion(executePrev());
         CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
@@ -113,15 +118,18 @@ public class SingleStageJoinOperator implements JoinOperator
     @Override
     public CompletableFuture<?>[] executePrev()
     {
-        if (child != null)
+        CompletableFuture<?>[] smallChildOutputs = null;
+        if (smallChild != null)
         {
-            CompletableFuture<?>[] childOutputs = child.execute();
-            if (smallChild)
-            {
-                // if the child is on the small side, we should wait for its completion.
-                waitForCompletion(childOutputs);
-            }
-            return childOutputs;
+            smallChildOutputs = smallChild.execute();
+        }
+        if (largeChild != null)
+        {
+            largeChild.execute();
+        }
+        if (smallChildOutputs != null)
+        {
+            return smallChildOutputs;
         }
         return new CompletableFuture[0];
     }
