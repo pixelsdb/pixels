@@ -334,6 +334,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
     private void chainJoinSplit(Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
                                 boolean checkExistence, String[] rightCols, TableScanFilter rightFilter)
     {
+        int numInputs = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -363,6 +364,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 {
                     it.remove();
                 }
+                numInputs++;
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -408,5 +410,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 }
             }
         }
+        logger.info("number of inputs for chain table: " + numInputs);
     }
 }
