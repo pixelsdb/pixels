@@ -79,7 +79,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             this.queryId = event.getQueryId();
 
-            List<BroadCastJoinTableInfo> leftTables = event.getSmallTables();
+            List<BroadCastJoinTableInfo> leftTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(leftTables, "leftTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");

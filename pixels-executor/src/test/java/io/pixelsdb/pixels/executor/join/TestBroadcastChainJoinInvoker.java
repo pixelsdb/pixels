@@ -99,7 +99,7 @@ public class TestBroadcastChainJoinInvoker
         chainJoinInfo1.setKeyColumnIds(new int[]{2});
         chainJoinInfos.add(chainJoinInfo1);
         
-        joinInput.setSmallTables(leftTables);
+        joinInput.setChainTables(leftTables);
         joinInput.setChainJoinInfos(chainJoinInfos);
 
         BroadCastJoinTableInfo lineitem = new BroadCastJoinTableInfo();

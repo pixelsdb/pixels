@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
@@ -29,23 +29,23 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The lambda invoker for broadcast chain join operator.
+ * The lambda invoker for partitioned chain join operator.
  * @author hank
- * @date 03/06/2022
+ * @date 25/06/2022
  */
-public class BroadcastChainJoinInvoker
+public class PartitionedChainJoinInvoker
 {
-    private static final String BROADCAST_CHAIN_JOIN_WORKER_NAME = "BroadcastChainJoinWorker";
+    private static final String PARTITIONED_CHAIN_JOIN_WORKER_NAME = "PartitionedChainJoinWorker";
 
-    private BroadcastChainJoinInvoker() { }
+    private PartitionedChainJoinInvoker() { }
 
-    public static CompletableFuture<JoinOutput> invoke(BroadcastChainJoinInput input)
+    public static CompletableFuture<JoinOutput> invoke(PartitionedChainJoinInput input)
     {
         String inputJson = JSON.toJSONString(input);
         SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
 
         InvokeRequest request = InvokeRequest.builder()
-                .functionName(BROADCAST_CHAIN_JOIN_WORKER_NAME)
+                .functionName(PARTITIONED_CHAIN_JOIN_WORKER_NAME)
                 .payload(payload)
                 // using RequestResponse for higher function concurrency.
                 .invocationType(InvocationType.REQUEST_RESPONSE)

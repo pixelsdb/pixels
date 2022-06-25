@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
 
 import java.util.List;
@@ -106,7 +107,18 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
-            joinOutputs[i] = PartitionedJoinInvoker.invoke((PartitionedJoinInput) joinInputs.get(i));
+            if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            {
+                joinOutputs[i] = PartitionedJoinInvoker.invoke((PartitionedJoinInput) joinInputs.get(i));
+            }
+            else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+            {
+                joinOutputs[i] = PartitionedChainJoinInvoker.invoke((PartitionedChainJoinInput) joinInputs.get(i));
+            }
+            else
+            {
+                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+            }
         }
         return joinOutputs;
     }

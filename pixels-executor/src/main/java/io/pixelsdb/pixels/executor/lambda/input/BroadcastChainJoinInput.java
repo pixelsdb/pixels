@@ -36,18 +36,18 @@ public class BroadcastChainJoinInput implements JoinInput
 {
     private long queryId;
     /**
-     * The information of the small tables that are broadcast in the chain join.
+     * The information of the chain tables that are broadcast in the chain join.
      */
-    private List<BroadCastJoinTableInfo> smallTables;
+    private List<BroadCastJoinTableInfo> chainTables;
+    /**
+     * The information of the chain joins. If there are N chain tables and 1 right table,
+     * there should be N-1 chain join infos.
+     */
+    private List<ChainJoinInfo> chainJoinInfos;
     /**
      * The information of the large table.
      */
     private BroadCastJoinTableInfo largeTable;
-    /**
-     * The information of the chain joins. If there are N small tables and 1 right table,
-     * there should be N-1 chain join infos.
-     */
-    private List<ChainJoinInfo> chainJoinInfos;
     /**
      * The information of the last join with the right table.
      */
@@ -79,18 +79,17 @@ public class BroadcastChainJoinInput implements JoinInput
     public BroadcastChainJoinInput() { }
 
     public BroadcastChainJoinInput(long queryId,
-                                   List<BroadCastJoinTableInfo> smallTables,
+                                   List<BroadCastJoinTableInfo> chainTables,
                                    List<ChainJoinInfo> chainJoinInfos,
                                    BroadCastJoinTableInfo largeTable,
                                    JoinInfo joinInfo, boolean postChainJoinsExist,
                                    List<BroadCastJoinTableInfo> postSmallTables,
-                                   List<ChainJoinInfo> postChainJoinInfos,
-                                   MultiOutputInfo output)
+                                   List<ChainJoinInfo> postChainJoinInfos, MultiOutputInfo output)
     {
         this.queryId = queryId;
-        this.smallTables = smallTables;
-        this.largeTable = largeTable;
+        this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
+        this.largeTable = largeTable;
         this.joinInfo = joinInfo;
         this.postChainJoinsExist = postChainJoinsExist;
         this.postSmallTables = postSmallTables;
@@ -108,24 +107,14 @@ public class BroadcastChainJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public List<BroadCastJoinTableInfo> getSmallTables()
+    public List<BroadCastJoinTableInfo> getChainTables()
     {
-        return smallTables;
+        return chainTables;
     }
 
-    public void setSmallTables(List<BroadCastJoinTableInfo> smallTables)
+    public void setChainTables(List<BroadCastJoinTableInfo> chainTables)
     {
-        this.smallTables = smallTables;
-    }
-
-    public BroadCastJoinTableInfo getLargeTable()
-    {
-        return largeTable;
-    }
-
-    public void setLargeTable(BroadCastJoinTableInfo largeTable)
-    {
-        this.largeTable = largeTable;
+        this.chainTables = chainTables;
     }
 
     public List<ChainJoinInfo> getChainJoinInfos()
@@ -136,6 +125,16 @@ public class BroadcastChainJoinInput implements JoinInput
     public void setChainJoinInfos(List<ChainJoinInfo> chainJoinInfos)
     {
         this.chainJoinInfos = chainJoinInfos;
+    }
+
+    public BroadCastJoinTableInfo getLargeTable()
+    {
+        return largeTable;
+    }
+
+    public void setLargeTable(BroadCastJoinTableInfo largeTable)
+    {
+        this.largeTable = largeTable;
     }
 
     public JoinInfo getJoinInfo()
@@ -202,7 +201,7 @@ public class BroadcastChainJoinInput implements JoinInput
         private Builder(BroadcastChainJoinInput instance)
         {
             this.builderInstance = new BroadcastChainJoinInput(
-                    instance.queryId, instance.smallTables, instance.chainJoinInfos,
+                    instance.queryId, instance.chainTables, instance.chainJoinInfos,
                     instance.largeTable, instance.joinInfo, instance.postChainJoinsExist,
                     instance.postSmallTables, instance.postChainJoinInfos, instance.output);
         }

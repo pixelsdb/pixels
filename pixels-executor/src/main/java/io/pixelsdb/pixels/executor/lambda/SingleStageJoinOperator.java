@@ -122,7 +122,7 @@ public class SingleStageJoinOperator implements JoinOperator
             }
             else
             {
-                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unknown");
+                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
             }
         }
         return joinOutputs;
