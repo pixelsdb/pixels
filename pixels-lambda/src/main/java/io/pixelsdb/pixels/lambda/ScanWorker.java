@@ -194,20 +194,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         // Finished scanning all the files in the split.
         try
         {
-            pixelsWriter.close();
-            while (true)
+            if (pixelsWriter != null)
             {
-                try
-                {
-                    if (minio.getStatus(outputPath) != null)
-                    {
-                        break;
-                    }
-                } catch (Exception e)
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
+                pixelsWriter.close();
+            }
+            while (!minio.exists(outputPath))
+            {
+                // Wait for 10ms and see if the output file is visible.
+                TimeUnit.MILLISECONDS.sleep(10);
             }
         } catch (Exception e)
         {

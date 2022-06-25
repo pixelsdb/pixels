@@ -215,7 +215,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
                                       boolean checkExistence, String[] leftCols, TableScanFilter leftFilter)
     {
-        int numInputs = 0;
         while (!leftInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
@@ -245,7 +244,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
-                numInputs++;
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -280,7 +278,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
-        logger.info("number of inputs for hash table: " + numInputs);
     }
 
     /**
@@ -305,7 +302,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
                 outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                 encoding, false, null);
-        int numInputs = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -335,7 +331,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
-                numInputs++;
+
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -381,25 +377,16 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
-        logger.info("number of inputs for large table: " + numInputs);
+
         try
         {
             pixelsWriter.close();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -439,7 +426,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             partitioned.add(new LinkedList<>());
         }
         int rowGroupNum = 0;
-        int numInputs = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -469,7 +455,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
-                numInputs++;
+
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -519,7 +505,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
-        logger.info("number of inputs for large table*: " + numInputs);
+
         try
         {
             VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
@@ -553,19 +539,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             rowGroupNum = pixelsWriter.getRowGroupNum();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)

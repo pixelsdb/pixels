@@ -122,7 +122,8 @@ public class LambdaJoinExecutor
         return this.getJoinOperator(this.rootTable, Optional.empty());
     }
 
-    private JoinOperator getMultiPipelineJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent) throws IOException, MetadataException
+    private JoinOperator getMultiPipelineJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
+            throws IOException, MetadataException
     {
         requireNonNull(joinedTable, "joinedTable is null");
         Join join = requireNonNull(joinedTable.getJoin(), "joinTable.join is null");
@@ -148,7 +149,7 @@ public class LambdaJoinExecutor
             * If the current join is a broadcast join, we should not let the large side to chain
             * above to the current join.
             * And as the right table is a joined table, we will not continue build the chain join.
-            * We only complete the chain join if the operator of either side is an incomplete chain join.
+            * We only complete the chain join if the operator of the left side is an incomplete chain join.
             * */
             leftOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
@@ -165,8 +166,17 @@ public class LambdaJoinExecutor
                             parent.get().getJoin().getRightTable(),
                             parent.get().getJoin().getJoinEndian());
 
-                    postPartitionInfo = new PartitionInfo(
-                            parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                    // Check if the current table if the left child or the right child of parent.
+                    if (joinedTable == parent.get().getJoin().getLeftTable())
+                    {
+                        postPartitionInfo = new PartitionInfo(
+                                parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                    }
+                    else
+                    {
+                        postPartitionInfo = new PartitionInfo(
+                                parent.get().getJoin().getRightKeyColumnIds(), numPartition);
+                    }
                 }
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                         join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
@@ -381,6 +391,11 @@ public class LambdaJoinExecutor
                                 parent.get().getJoin().getRightTable(),
                                 parent.get().getJoin().getJoinEndian());
 
+                        /*
+                        * If the program reaches here, as this is on a single-pipeline and the parent is present,
+                        * the current join must be the left child of the parent. Therefore, we can use the left key
+                        * column ids of the parent as the post partitioning key column ids.
+                        * */
                         postPartitionInfo = new PartitionInfo(
                                 parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
                     }
@@ -441,7 +456,7 @@ public class LambdaJoinExecutor
             }
         }
 
-        // generate join inputs and return.
+        // generate join inputs for normal broadcast join or partitioned join.
         if (joinAlgo == JoinAlgorithm.BROADCAST)
         {
             requireNonNull(leftInputSplits, "leftInputSplits is null");
@@ -457,8 +472,17 @@ public class LambdaJoinExecutor
                         parent.get().getJoin().getRightTable(),
                         parent.get().getJoin().getJoinEndian());
 
-                postPartitionInfo = new PartitionInfo(
-                        parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                // Check if the current table if the left child or the right child of parent.
+                if (joinedTable == parent.get().getJoin().getLeftTable())
+                {
+                    postPartitionInfo = new PartitionInfo(
+                            parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                }
+                else
+                {
+                    postPartitionInfo = new PartitionInfo(
+                            parent.get().getJoin().getRightKeyColumnIds(), numPartition);
+                }
             }
 
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
@@ -705,7 +729,7 @@ public class LambdaJoinExecutor
     }
 
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits,
-                                                    int[] keyColumnIds,int numPartition, String outputBase)
+                                                    int[] keyColumnIds, int numPartition, String outputBase)
     {
         List<PartitionInput> partitionInputs = new ArrayList<>();
         int outputId = 0;
@@ -745,14 +769,28 @@ public class LambdaJoinExecutor
 
     private List<JoinInput> getPartitionedJoinInputs(
             JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
-            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo)
+            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo) throws MetadataException
     {
         boolean postPartition = false;
         PartitionInfo postPartitionInfo = null;
         if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
         {
             postPartition = true;
-            postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+            // Note: DO NOT use numPartition as the number of partitions for post partitioning.
+            int numPostPartition = JoinAdvisor.Instance().getNumPartition(
+                    parent.get().getJoin().getLeftTable(),
+                    parent.get().getJoin().getRightTable(),
+                    parent.get().getJoin().getJoinEndian());
+
+            // Check if the current table if the left child or the right child of parent.
+            if (joinedTable == parent.get().getJoin().getLeftTable())
+            {
+                postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPostPartition);
+            }
+            else
+            {
+                postPartitionInfo = new PartitionInfo(parent.get().getJoin().getRightKeyColumnIds(), numPostPartition);
+            }
         }
 
         ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
