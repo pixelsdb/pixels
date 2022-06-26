@@ -124,6 +124,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             this.partitionOutput = event.getJoinInfo().isPostPartition();
             this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
+            if (this.partitionOutput)
+            {
+                logger.info("post partition num: " + this.outputPartitionInfo.getNumPartition());
+            }
+
             try
             {
                 if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)
@@ -289,6 +294,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             leftPartitioned + "' of the left table", e);
                 }
+
                 try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -366,6 +372,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
+
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -413,24 +420,16 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
             }
         }
+
         try
         {
             pixelsWriter.close();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -461,10 +460,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     {
         checkArgument(this.partitionOutput, "partitionOutput is false");
         requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(this.outputPartitionInfo.getNumParition(),
+        Partitioner partitioner = new Partitioner(this.outputPartitionInfo.getNumPartition(),
                 rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumParition());
-        for (int i = 0; i < outputPartitionInfo.getNumParition(); ++i)
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumPartition());
+        for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -488,6 +487,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     logger.error("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
+
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
@@ -539,6 +539,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
             }
         }
+
         try
         {
             VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
@@ -555,7 +556,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                             this.outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
-            for (int hash = 0; hash < outputPartitionInfo.getNumParition(); ++hash)
+            for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
             {
                 List<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())
@@ -572,19 +573,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             rowGroupNum = pixelsWriter.getRowGroupNum();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -622,7 +614,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
                 if (info.getPartitionInfo().getHashValue() == hashValue)
                 {
-                    option.rgRange(hashValue, 1);
+                    // Note: DO NOT use hashValue as the row group start index.
+                    option.rgRange(i, 1);
                     break;
                 }
             }

@@ -66,7 +66,7 @@ public class TestPartitionInvoker
         tableInfo.setFilter(filter);
         input.setTableInfo(tableInfo);
         PartitionInfo partitionInfo = new PartitionInfo();
-        partitionInfo.setNumParition(40);
+        partitionInfo.setNumPartition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/orders_part_6", false,
@@ -104,7 +104,7 @@ public class TestPartitionInvoker
         tableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         input.setTableInfo(tableInfo);
         PartitionInfo partitionInfo = new PartitionInfo();
-        partitionInfo.setNumParition(40);
+        partitionInfo.setNumPartition(40);
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/lineitem_part_1", false,

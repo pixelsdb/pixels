@@ -79,7 +79,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             this.queryId = event.getQueryId();
 
-            List<BroadCastJoinTableInfo> leftTables = event.getSmallTables();
+            List<BroadCastJoinTableInfo> leftTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(leftTables, "leftTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");
@@ -125,7 +125,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             if (this.partitionOutput)
             {
-                logger.info("post partitioning, number of partitions: " + this.outputPartitionInfo.getNumParition());
+                logger.info("post partition num: " + this.outputPartitionInfo.getNumPartition());
             }
 
             // build the joiner.
@@ -142,10 +142,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     {
                         int rowGroupNum = this.partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, false, rightCols, rightFilter,
+                                        queryId, joiner, inputs, true, rightCols, rightFilter,
                                         outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
                                         this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, false, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -202,7 +202,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 BroadCastJoinTableInfo currRightTable = leftTables.get(i);
                 BroadCastJoinTableInfo nextTable = leftTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
-                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
+                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
@@ -217,7 +217,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
             BroadCastJoinTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
-                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
+                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
             TypeDescription rightResultSchema = getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
             Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(),
                     currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(),
@@ -252,7 +252,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
         getFileSchema(executor, s3, t1Schema, t2Schema,
                 t1.getInputSplits().get(0).getInputInfos().get(0).getPath(),
-                t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), false);
+                t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
         Joiner joiner = new Joiner(joinInfo.getJoinType(),
                 getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(),
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
@@ -266,7 +266,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    buildHashTable(queryId, joiner, inputs, false, t1.getColumnsToRead(), t1Filter);
+                    buildHashTable(queryId, joiner, inputs, true, t1.getColumnsToRead(), t1Filter);
                 }
                 catch (Exception e)
                 {
@@ -304,7 +304,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(currJoiner, nextJoiner, inputs, false,
+                    chainJoinSplit(currJoiner, nextJoiner, inputs, true,
                             currRightTable.getColumnsToRead(), currRigthFilter);
                 }
                 catch (Exception e)
@@ -334,6 +334,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
     private void chainJoinSplit(Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
                                 boolean checkExistence, String[] rightCols, TableScanFilter rightFilter)
     {
+        int numInputs = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -363,6 +364,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 {
                     it.remove();
                 }
+                numInputs++;
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -408,5 +410,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 }
             }
         }
+        logger.info("number of inputs for chain table: " + numInputs);
     }
 }

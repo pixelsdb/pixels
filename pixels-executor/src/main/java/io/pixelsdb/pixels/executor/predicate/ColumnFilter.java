@@ -278,7 +278,7 @@ public class ColumnFilter<T extends Comparable<T>>
                 }
                 byte upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Byte) range.upperBound.value : Byte.MAX_VALUE;
-                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                if (range.upperBound.type == Bound.Type.EXCLUDED)
                 {
                     upperBound--;
                 }
@@ -371,7 +371,7 @@ public class ColumnFilter<T extends Comparable<T>>
                 }
                 long upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Long) range.upperBound.value : Long.MAX_VALUE;
-                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                if (range.upperBound.type == Bound.Type.EXCLUDED)
                 {
                     upperBound--;
                 }
@@ -481,9 +481,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 Decimal upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         new Decimal((Long) range.upperBound.value, precision, scale) :
                         new Decimal(Long.MAX_VALUE, 18, 0);
-                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                if (range.upperBound.type == Bound.Type.EXCLUDED)
                 {
-                    upperBound.value --;
+                    upperBound.value--;
                 }
                 if (this.filter.allowNull && !noNulls)
                 {
@@ -722,7 +722,7 @@ public class ColumnFilter<T extends Comparable<T>>
                 }
                 int upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         (Integer) range.upperBound.value : Integer.MAX_VALUE;
-                if (range.lowerBound.type == Bound.Type.EXCLUDED)
+                if (range.upperBound.type == Bound.Type.EXCLUDED)
                 {
                     upperBound--;
                 }

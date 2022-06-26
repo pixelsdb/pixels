@@ -171,7 +171,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
                                         outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
                                         this.outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, inputs, false, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -331,6 +331,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
+
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -376,24 +377,16 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
+
         try
         {
             pixelsWriter.close();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)
@@ -425,10 +418,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     {
         checkArgument(partitionOutput, "partitionOutput is false");
         requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumParition(),
+        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumPartition(),
                 rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumParition());
-        for (int i = 0; i < outputPartitionInfo.getNumParition(); ++i)
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumPartition());
+        for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -462,6 +455,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
+
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -511,6 +505,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
+
         try
         {
             VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
@@ -527,7 +522,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
-            for (int hash = 0; hash < outputPartitionInfo.getNumParition(); ++hash)
+            for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
             {
                 List<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())
@@ -544,19 +539,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             rowGroupNum = pixelsWriter.getRowGroupNum();
             if (outputScheme == Storage.Scheme.minio)
             {
-                while (true)
+                while (!minio.exists(outputPath))
                 {
-                    try
-                    {
-                        if (minio.getStatus(outputPath) != null)
-                        {
-                            break;
-                        }
-                    } catch (Exception e)
-                    {
-                        // Wait for 10ms and see if the output file is visible.
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
         } catch (Exception e)

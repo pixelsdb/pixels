@@ -510,20 +510,26 @@ public abstract class AbstractS3 implements Storage
                 HeadBucketRequest request = HeadBucketRequest.builder()
                         .bucket(path.bucket).build();
                 s3.headBucket(request);
+                return true;
             }
-            else
+            else if (path.isFolder)
             {
                 ListObjectsV2Request request = ListObjectsV2Request.builder()
                         .bucket(path.bucket).prefix(path.key).maxKeys(1).build();
                 return s3.listObjectsV2(request).keyCount() > 0;
             }
-            return true;
+            else
+            {
+                HeadObjectRequest request = HeadObjectRequest.builder()
+                        .bucket(path.bucket).key(path.key).build();
+                s3.headObject(request);
+                return true;
+            }
         } catch (Exception e)
         {
             if (e instanceof NoSuchKeyException ||
             e instanceof NoSuchBucketException)
             {
-
                 return false;
             }
             throw new IOException("Failed to check the existence of '" + path + "'", e);

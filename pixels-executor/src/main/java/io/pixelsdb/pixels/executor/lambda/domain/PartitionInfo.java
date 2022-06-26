@@ -33,17 +33,17 @@ public class PartitionInfo
     /**
      * The number of partitions in the output.
      */
-    private int numParition;
+    private int numPartition;
 
     /**
      * Default constructor for Jackson.
      */
     public PartitionInfo() { }
 
-    public PartitionInfo(int[] keyColumnIds, int numParition)
+    public PartitionInfo(int[] keyColumnIds, int numPartition)
     {
         this.keyColumnIds = keyColumnIds;
-        this.numParition = numParition;
+        this.numPartition = numPartition;
     }
 
     public int[] getKeyColumnIds()
@@ -56,13 +56,13 @@ public class PartitionInfo
         this.keyColumnIds = keyColumnIds;
     }
 
-    public int getNumParition()
+    public int getNumPartition()
     {
-        return numParition;
+        return numPartition;
     }
 
-    public void setNumParition(int numParition)
+    public void setNumPartition(int numPartition)
     {
-        this.numParition = numParition;
+        this.numPartition = numPartition;
     }
 }

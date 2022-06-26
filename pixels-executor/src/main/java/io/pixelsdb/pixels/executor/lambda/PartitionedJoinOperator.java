@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
 
 import java.util.List;
@@ -66,8 +67,22 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         {
             this.largePartitionInputs = ImmutableList.copyOf(largePartitionInputs);
         }
-        checkArgument(!this.smallPartitionInputs.isEmpty() || !this.largePartitionInputs.isEmpty(),
-                "both smallPartitionInputs and largePartitionInputs are empty");
+    }
+
+    @Override
+    public void setSmallChild(JoinOperator child)
+    {
+        checkArgument(this.smallPartitionInputs.isEmpty(),
+                "smallPartitionInputs must be empty if smallChild is set");
+        this.smallChild = child;
+    }
+
+    @Override
+    public void setLargeChild(JoinOperator child)
+    {
+        checkArgument(this.largePartitionInputs.isEmpty(),
+                "largePartitionInputs must be empty if largeChild is set");
+        this.largeChild = child;
     }
 
     public List<PartitionInput> getSmallPartitionInputs()
@@ -88,11 +103,22 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public CompletableFuture<?>[] execute()
     {
-        executePrev();
+        waitForCompletion(executePrev());
         CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
-            joinOutputs[i] = PartitionedJoinInvoker.invoke((PartitionedJoinInput) joinInputs.get(i));
+            if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            {
+                joinOutputs[i] = PartitionedJoinInvoker.invoke((PartitionedJoinInput) joinInputs.get(i));
+            }
+            else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+            {
+                joinOutputs[i] = PartitionedChainJoinInvoker.invoke((PartitionedChainJoinInput) joinInputs.get(i));
+            }
+            else
+            {
+                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+            }
         }
         return joinOutputs;
     }
@@ -100,40 +126,45 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public CompletableFuture<?>[] executePrev()
     {
-        if (child != null)
+        if (smallChild != null && largeChild != null)
         {
-            if (smallChild)
+            // both children exist, we should execute both children and wait for the small child.
+            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+            CompletableFuture<?>[] childOutputs = smallChild.execute();
+            largeChild.execute();
+            return childOutputs;
+        }
+        else if (smallChild != null)
+        {
+            // only small child exists, we should invoke the large table partitioning and wait for the small child.
+            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+            checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+            CompletableFuture<?>[] childOutputs = smallChild.execute();
+            for (PartitionInput partitionInput : largePartitionInputs)
             {
-                // child is on the small side, we should invoke the large table partitioning and wait for the child.
-                checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
-                checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-                CompletableFuture<?>[] childOutputs = child.execute();
-                for (PartitionInput partitionInput : largePartitionInputs)
-                {
-                    PartitionInvoker.invoke((partitionInput));
-                }
-                waitForCompletion(childOutputs);
-                return childOutputs;
+                PartitionInvoker.invoke((partitionInput));
             }
-            else
+            return childOutputs;
+        }
+        else if (largeChild != null)
+        {
+            // only large child exists, we should invoke and wait for the small table partitioning.
+            checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+            CompletableFuture<?>[] smallPartitionOutputs =
+                    new CompletableFuture[smallPartitionInputs.size()];
+            int i = 0;
+            for (PartitionInput partitionInput : smallPartitionInputs)
             {
-                // child is on the large side, we should invoke and wait for the small table partitioning.
-                checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
-                checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-                CompletableFuture<?>[] smallPartitionOutputs =
-                        new CompletableFuture[smallPartitionInputs.size()];
-                int i = 0;
-                for (PartitionInput partitionInput : smallPartitionInputs)
-                {
-                    smallPartitionOutputs[i++] = PartitionInvoker.invoke((partitionInput));
-                }
-                child.execute();
-                waitForCompletion(smallPartitionOutputs);
-                return smallPartitionOutputs;
+                smallPartitionOutputs[i++] = PartitionInvoker.invoke((partitionInput));
             }
+            largeChild.execute();
+            return smallPartitionOutputs;
         }
         else
         {
+            // no children exist, partition both tables and wait for the small table partitioning.
             CompletableFuture<?>[] smallPartitionOutputs =
                     new CompletableFuture[smallPartitionInputs.size()];
             int i = 0;
@@ -145,7 +176,6 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 PartitionInvoker.invoke((partitionInput));
             }
-            waitForCompletion(smallPartitionOutputs);
             return smallPartitionOutputs;
         }
     }

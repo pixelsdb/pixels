@@ -131,6 +131,10 @@ public class BinaryColumnVector extends ColumnVector
         this.start[elementNum] = start;
         this.lens[elementNum] = length;
         this.isNull[elementNum] = sourceBuf == null;
+        if (sourceBuf == null)
+        {
+            this.noNulls = false;
+        }
     }
 
     /**
@@ -514,8 +518,8 @@ public class BinaryColumnVector extends ColumnVector
         {
             isNull[index] = false;
             BinaryColumnVector in = (BinaryColumnVector) inputVector;
-            setVal(index, in.vector[inputIndex],
-                    in.start[inputIndex], in.lens[inputIndex]);
+            // We do not change the content of the elements in the vector, thus it is safe to setRef.
+            setRef(index, in.vector[inputIndex], in.start[inputIndex], in.lens[inputIndex]);
         }
         else
         {
@@ -541,6 +545,7 @@ public class BinaryColumnVector extends ColumnVector
             }
             else
             {
+                // We do not change the content of the elements in the vector, thus it is safe to setRef.
                 this.setRef(thisIndex, source.vector[srcIndex], source.start[srcIndex],
                         source.lens[srcIndex]);
             }
