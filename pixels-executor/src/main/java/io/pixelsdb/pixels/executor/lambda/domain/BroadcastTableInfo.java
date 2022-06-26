@@ -25,7 +25,7 @@ import java.util.List;
  * @author hank
  * @date 02/06/2022
  */
-public class BroadCastJoinTableInfo extends ScanTableInfo
+public class BroadcastTableInfo extends ScanTableInfo
 {
     /**
      * The ids of the join-key columns of the table.
@@ -35,10 +35,10 @@ public class BroadCastJoinTableInfo extends ScanTableInfo
     /**
      * Default constructor for Jackson.
      */
-    public BroadCastJoinTableInfo() { }
+    public BroadcastTableInfo() { }
 
-    public BroadCastJoinTableInfo(String tableName, List<InputSplit> inputs,
-                                  String[] cols, String filter, int[] keyColumnIds)
+    public BroadcastTableInfo(String tableName, List<InputSplit> inputs,
+                              String[] cols, String filter, int[] keyColumnIds)
     {
         super(tableName, inputs, cols, filter);
         this.keyColumnIds = keyColumnIds;

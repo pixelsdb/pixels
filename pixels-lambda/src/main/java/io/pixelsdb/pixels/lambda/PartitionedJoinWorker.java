@@ -61,8 +61,6 @@ import static java.util.Objects.requireNonNull;
 public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
-    private boolean partitionOutput = false;
-    private PartitionInfo outputPartitionInfo;
 
     @Override
     public JoinOutput handleRequest(PartitionedJoinInput event, Context context)
@@ -121,12 +119,12 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
             boolean encoding = outputInfo.isEncoding();
 
-            this.partitionOutput = event.getJoinInfo().isPostPartition();
-            this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            boolean partitionOutput = event.getJoinInfo().isPostPartition();
+            PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
-            if (this.partitionOutput)
+            if (partitionOutput)
             {
-                logger.info("post partition num: " + this.outputPartitionInfo.getNumPartition());
+                logger.info("post partition num: " + outputPartitionInfo.getNumPartition());
             }
 
             try
@@ -201,10 +199,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = this.partitionOutput ?
+                        int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, parts, rightCols, hashValues,
-                                        numPartition, outputPath, encoding, outputInfo.getScheme()) :
+                                        numPartition, outputPath, encoding, outputInfo.getScheme(),
+                                        outputPartitionInfo) :
                                 joinWithRightTable(queryId, joiner, parts, rightCols,
                                 hashValues, numPartition, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
@@ -235,11 +234,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 PixelsWriter pixelsWriter;
                 if (partitionOutput)
                 {
-                    requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
+                    requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
                     pixelsWriter = getWriter(joiner.getJoinedSchema(),
                             outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
                             encoding, true, Arrays.stream(
-                                    this.outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
                     joiner.writeLeftOuterAndPartition(pixelsWriter, rowBatchSize, outputPartitionInfo);
                 }
@@ -272,7 +271,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
      */
-    private void buildHashTable(long queryId, Joiner joiner, List<String> leftParts,
+    protected static void buildHashTable(long queryId, Joiner joiner, List<String> leftParts,
                                String[] leftCols, List<Integer> hashValues, int numPartition)
     {
         while (!leftParts.isEmpty())
@@ -346,7 +345,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
-    private int joinWithRightTable(long queryId, Joiner joiner, List<String> rightParts,
+    protected static int joinWithRightTable(long queryId, Joiner joiner, List<String> rightParts,
                                    String[] rightCols, List<Integer> hashValues, int numPartition,
                                    String outputPath, boolean encoding, Storage.Scheme outputScheme)
     {
@@ -451,19 +450,19 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
      * @param outputScheme the storage scheme of the output files
+     * @param postPartitionInfo the partition information of post partitioning
      * @return the number of row groups that have been written into the output.
      */
-    private int joinWithRightTableAndPartition(long queryId, Joiner joiner, List<String> rightParts,
+    protected static int joinWithRightTableAndPartition(long queryId, Joiner joiner, List<String> rightParts,
                                                String[] rightCols, List<Integer> hashValues,
                                                int numPartition, String outputPath, boolean encoding,
-                                               Storage.Scheme outputScheme)
+                                               Storage.Scheme outputScheme, PartitionInfo postPartitionInfo)
     {
-        checkArgument(this.partitionOutput, "partitionOutput is false");
-        requireNonNull(this.outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(this.outputPartitionInfo.getNumPartition(),
-                rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumPartition());
-        for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+        requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
+        Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
+                rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(postPartitionInfo.getNumPartition());
+        for (int i = 0; i < postPartitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -553,10 +552,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
                     outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
-                            this.outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    postPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
-            for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+            for (int hash = 0; hash < postPartitionInfo.getNumPartition(); ++hash)
             {
                 List<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())
@@ -584,42 +583,5 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return rowGroupNum;
-    }
-
-    /**
-     * Create the reader option for a record reader of the given hash partition in a partitioned file.
-     * It must be checked outside that the given hash partition info exists in the file.
-     * @param queryId the query id
-     * @param cols the column names in the partitioned file
-     * @param pixelsReader the reader of the partitioned file
-     * @param hashValue the hash value of the given hash partition
-     * @param numPartition the total number of partitions
-     * @return the reader option
-     */
-    private PixelsReaderOption getReaderOption(long queryId, String[] cols, PixelsReader pixelsReader,
-                                               int hashValue, int numPartition)
-    {
-        PixelsReaderOption option = new PixelsReaderOption();
-        option.skipCorruptRecords(true);
-        option.tolerantSchemaEvolution(true);
-        option.queryId(queryId);
-        option.includeCols(cols);
-        if (pixelsReader.getRowGroupNum() == numPartition)
-        {
-            option.rgRange(hashValue, 1);
-        } else
-        {
-            for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
-            {
-                PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
-                if (info.getPartitionInfo().getHashValue() == hashValue)
-                {
-                    // Note: DO NOT use hashValue as the row group start index.
-                    option.rgRange(i, 1);
-                    break;
-                }
-            }
-        }
-        return option;
     }
 }

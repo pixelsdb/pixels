@@ -205,7 +205,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -251,7 +251,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -364,12 +364,12 @@ public class LambdaJoinExecutor
                  * Chain join is found, and this is the first broadcast join in the chain.
                  * In this case, we build an incomplete chain join with only two left tables and one ChainJoinInfo.
                  */
-                BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
-                BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo;
-                List<BroadCastJoinTableInfo> chainTableInfos = new ArrayList<>();
+                List<BroadcastTableInfo> chainTableInfos = new ArrayList<>();
                 // deal with join endian, ensure that small table is on the left.
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -417,7 +417,7 @@ public class LambdaJoinExecutor
                      * The parent is still a small-left broadcast join, continue chain join construction by
                      * adding the right table of the current join into the left tables of the chain join
                      */
-                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
                             joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -475,7 +475,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -543,7 +543,7 @@ public class LambdaJoinExecutor
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -561,7 +561,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(rightInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -577,7 +577,7 @@ public class LambdaJoinExecutor
             }
             else
             {
-                BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
@@ -596,7 +596,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(leftInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -750,10 +750,10 @@ public class LambdaJoinExecutor
         return inputSplits.build();
     }
 
-    private BroadCastJoinTableInfo getBroadcastJoinTableInfo(
+    private BroadcastTableInfo getBroadcastJoinTableInfo(
             Table table, List<InputSplit> inputSplits, int[] keyColumnIds)
     {
-        BroadCastJoinTableInfo tableInfo = new BroadCastJoinTableInfo();
+        BroadcastTableInfo tableInfo = new BroadcastTableInfo();
         tableInfo.setTableName(table.getTableName());
         tableInfo.setInputSplits(inputSplits);
         tableInfo.setColumnsToRead(table.getColumnNames());

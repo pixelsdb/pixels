@@ -33,14 +33,12 @@ public class JoinInfo
     private JoinType joinType;
     /**
      * The alias of the columns from the small table in the join. These alias are used
-     * as the column names in the join results. Join key columns are ignored if
-     * {@link #outputJoinKeys} is false.
+     * as the column names in the join results.
      */
     private String[] smallColumnAlias;
     /**
      * The alias of the columns from the large table in the join. These alias are used
-     * as the column names in the join results. Join key columns are ignored if
-     * {@link #joinType} is NATURAL or {@link #outputJoinKeys} is false.
+     * as the column names in the join results.
      */
     private String[] largeColumnAlias;
     /**

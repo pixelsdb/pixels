@@ -49,10 +49,10 @@ public class TestBroadcastChainJoinInvoker
         BroadcastChainJoinInput joinInput = new BroadcastChainJoinInput();
         joinInput.setQueryId(123456);
 
-        List<BroadCastJoinTableInfo> leftTables = new ArrayList<>();
+        List<BroadcastTableInfo> leftTables = new ArrayList<>();
         List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
 
-        BroadCastJoinTableInfo region = new BroadCastJoinTableInfo();
+        BroadcastTableInfo region = new BroadcastTableInfo();
         region.setColumnsToRead(new String[]{"r_regionkey", "r_name"});
         region.setKeyColumnIds(new int[]{0});
         region.setTableName("region");
@@ -61,7 +61,7 @@ public class TestBroadcastChainJoinInvoker
         region.setFilter(regionFilter);
         leftTables.add(region);
 
-        BroadCastJoinTableInfo nation = new BroadCastJoinTableInfo();
+        BroadcastTableInfo nation = new BroadcastTableInfo();
         nation.setColumnsToRead(new String[]{"n_nationkey", "n_name", "n_regionkey"});
         nation.setKeyColumnIds(new int[]{2});
         nation.setTableName("nation");
@@ -80,7 +80,7 @@ public class TestBroadcastChainJoinInvoker
         chainJoinInfo0.setKeyColumnIds(new int[]{1});
         chainJoinInfos.add(chainJoinInfo0);
 
-        BroadCastJoinTableInfo supplier = new BroadCastJoinTableInfo();
+        BroadcastTableInfo supplier = new BroadcastTableInfo();
         supplier.setColumnsToRead(new String[]{"s_suppkey", "s_name", "s_nationkey"});
         supplier.setKeyColumnIds(new int[]{2});
         supplier.setTableName("supplier");
@@ -102,7 +102,7 @@ public class TestBroadcastChainJoinInvoker
         joinInput.setChainTables(leftTables);
         joinInput.setChainJoinInfos(chainJoinInfos);
 
-        BroadCastJoinTableInfo lineitem = new BroadCastJoinTableInfo();
+        BroadcastTableInfo lineitem = new BroadcastTableInfo();
         lineitem.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
         lineitem.setKeyColumnIds(new int[]{1});
         lineitem.setTableName("lineitem");
