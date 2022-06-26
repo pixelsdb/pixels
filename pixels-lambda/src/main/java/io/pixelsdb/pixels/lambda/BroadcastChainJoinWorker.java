@@ -125,7 +125,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             if (this.partitionOutput)
             {
-                logger.info("post partition num: " + this.outputPartitionInfo.getNumParition());
+                logger.info("post partition num: " + this.outputPartitionInfo.getNumPartition());
             }
 
             // build the joiner.

@@ -90,6 +90,7 @@ public class PixelsWriterImpl implements PixelsWriter
     private final List<RowGroupStatistic> rowGroupStatisticList; // row group statistic in footer
 
     private final PhysicalWriter physicalWriter;
+    private final List<TypeDescription> children;
 
     private PixelsWriterImpl(
             TypeDescription schema,
@@ -116,7 +117,7 @@ public class PixelsWriterImpl implements PixelsWriter
         this.partitioned = partitioned;
         this.partKeyColumnIds = requireNonNull(partKeyColumnIds, "partKeyColumnIds is null");
 
-        List<TypeDescription> children = schema.getChildren();
+        children = schema.getChildren();
         checkArgument(!requireNonNull(children, "schema is null").isEmpty(), "schema is empty");
         this.columnWriters = new ColumnWriter[children.size()];
         fileColStatRecorders = new StatsRecorder[children.size()];
@@ -481,12 +482,13 @@ public class PixelsWriterImpl implements PixelsWriter
             else
             {
                 LOGGER.warn("Write row group prepare failed");
+                throw new IOException("Write row group prepare failed");
             }
         }
         catch (IOException e)
         {
             LOGGER.error(e.getMessage());
-            return;
+            throw e;
         }
 
         // update index and stats
@@ -506,8 +508,14 @@ public class PixelsWriterImpl implements PixelsWriter
             curRowGroupEncoding.addColumnChunkEncodings(writer.getColumnChunkEncoding().build());
             // update file column statistic
             fileColStatRecorders[i].merge(writer.getColumnChunkStatRecorder());
-            // call children writer reset()
-            writer.reset();
+            /* TODO: writer.reset() does not work for partitioned file writing, fix it later.
+             * The possible reason is that: when the file is partitioned, the last stride of a row group
+             * (a.k.a., partition) is likely not full (length < pixelsStride), thus if the writer is not
+             * reset correctly, the strides of the next row group will not be written correctly.
+             * We temporarily fix this problem by creating a new column writer for each row group.
+             */
+            // writer.reset();
+            columnWriters[i] = newColumnWriter(children.get(i), pixelStride, encoding);
         }
 
         // put curRowGroupIndex into rowGroupFooter
@@ -528,7 +536,7 @@ public class PixelsWriterImpl implements PixelsWriter
         catch (IOException e)
         {
             LOGGER.error(e.getMessage());
-            return;
+            throw e;
         }
 
         // update RowGroupInformation, and put it into rowGroupInfoList
@@ -538,7 +546,6 @@ public class PixelsWriterImpl implements PixelsWriter
         curRowGroupInfo.setNumberOfRows(curRowGroupNumOfRows);
         if (partitioned)
         {
-
             PixelsProto.PartitionInformation.Builder partitionInfo =
                     PixelsProto.PartitionInformation.newBuilder();
             // partitionColumnIds has been checked to be present in the builder.

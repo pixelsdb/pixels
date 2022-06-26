@@ -315,10 +315,10 @@ public class Joiner
         requireNonNull(pixelsWriter, "pixelsWriter is null");
         requireNonNull(partitionInfo, "partitionInfo is null");
 
-        Partitioner partitioner = new Partitioner(partitionInfo.getNumParition(),
+        Partitioner partitioner = new Partitioner(partitionInfo.getNumPartition(),
                 batchSize, this.joinedSchema, partitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(partitionInfo.getNumParition());
-        for (int i = 0; i < partitionInfo.getNumParition(); ++i)
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(partitionInfo.getNumPartition());
+        for (int i = 0; i < partitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -340,7 +340,10 @@ public class Joiner
                 {
                     partitioned.get(entry.getKey()).add(entry.getValue());
                 }
-                //pixelsWriter.addRowBatch(leftOuterBatch);
+                /* Reset should be fine because the row batches in the partition result should not be
+                 * affected by resetting leftOuterBatch. But be careful of this line and double check
+                 * it if the left outer result is incorrect.
+                 */
                 leftOuterBatch.reset();
             }
             this.largeNullTuple.concatLeft(small).writeTo(leftOuterBatch);
@@ -352,7 +355,6 @@ public class Joiner
             {
                 partitioned.get(entry.getKey()).add(entry.getValue());
             }
-            //pixelsWriter.addRowBatch(leftOuterBatch);
         }
         VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
         for (int hash = 0; hash < tailBatches.length; ++hash)
@@ -362,7 +364,7 @@ public class Joiner
                 partitioned.get(hash).add(tailBatches[hash]);
             }
         }
-        for (int hash = 0; hash < partitionInfo.getNumParition(); ++hash)
+        for (int hash = 0; hash < partitionInfo.getNumPartition(); ++hash)
         {
             List<VectorizedRowBatch> batches = partitioned.get(hash);
             if (!batches.isEmpty())

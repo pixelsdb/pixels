@@ -69,7 +69,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
 
             long queryId = event.getQueryId();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
-            int numPartition = event.getPartitionInfo().getNumParition();
+            int numPartition = event.getPartitionInfo().getNumPartition();
             logger.info("table '" + event.getTableInfo().getTableName() +
                     "', number of partitions (" + numPartition + ")");
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();

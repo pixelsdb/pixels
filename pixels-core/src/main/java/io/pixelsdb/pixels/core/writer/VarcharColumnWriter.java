@@ -66,6 +66,13 @@ public class VarcharColumnWriter extends StringColumnWriter
         return super.write(vector, length);
     }
 
+    @Override
+    public void reset()
+    {
+        super.reset();
+        this.numTruncated = 0;
+    }
+
     /**
      * Get the number of truncated values.
      * TODO: report it as a warning in Pixels and other query engines.

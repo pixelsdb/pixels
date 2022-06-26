@@ -235,7 +235,43 @@ public class LambdaJoinExecutor
                      * replace the join inputs with the partitioned chain join inputs in the new operator,
                      * drop the right operator and return the new operator.
                      */
-                    return null;
+                    List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
+                    List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+
+                    ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+                    int outputId = 0;
+                    for (int i = 0; i < rightInputSplits.size(); )
+                    {
+                        ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
+                                .builderWithExpectedSize(IntraWorkerParallelism);
+                        ImmutableList.Builder<String> outputsBuilder = ImmutableList
+                                .builderWithExpectedSize(IntraWorkerParallelism);
+                        for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
+                        {
+                            inputsBuilder.add(rightInputSplits.get(i));
+                            outputsBuilder.add("join_" + outputId++);
+                        }
+                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                                rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
+
+                        MultiOutputInfo output = new MultiOutputInfo(
+                                IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                                        joinedTable.getTableName() + "/", IntermediateStorage,
+                                null, null, null, true, outputsBuilder.build());
+
+                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
+                                .setLargeTable(rightTableInfo)
+                                .setJoinInfo(joinInfo)
+                                .setOutput(output).build();
+
+                        joinInputs.add(complete);
+                    }
+
+                    SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
+                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                    // The right operator must be set as the large child.
+                    joinOperator.setLargeChild(rightOperator);
+                    return joinOperator;
                 }
                 else
                 {

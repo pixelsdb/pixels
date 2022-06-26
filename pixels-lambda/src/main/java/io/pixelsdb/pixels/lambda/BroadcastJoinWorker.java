@@ -418,10 +418,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     {
         checkArgument(partitionOutput, "partitionOutput is false");
         requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumParition(),
+        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumPartition(),
                 rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumParition());
-        for (int i = 0; i < outputPartitionInfo.getNumParition(); ++i)
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumPartition());
+        for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -522,7 +522,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             outputPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
-            for (int hash = 0; hash < outputPartitionInfo.getNumParition(); ++hash)
+            for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
             {
                 List<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())
