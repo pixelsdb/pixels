@@ -281,7 +281,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * Scan the input files of the right table and do the join.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
      * @param checkExistence whether check the existence of the input files
@@ -397,7 +397,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * Scan the input files of the right table, do the join, and partition the result.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
      * @param checkExistence whether check the existence of the input files

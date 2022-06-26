@@ -335,7 +335,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * Scan the partitioned file of the right table and do the join.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the partitioned join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
@@ -442,7 +442,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * Scan the partitioned file of the right table, do the join, and partition the output.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the partitioned join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
@@ -552,7 +552,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
                     outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
-                                    postPartitionInfo.getKeyColumnIds()).boxed().
+                            postPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
             for (int hash = 0; hash < postPartitionInfo.getNumPartition(); ++hash)

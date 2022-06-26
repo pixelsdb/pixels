@@ -738,14 +738,16 @@ public class LambdaJoinExecutor
             {
                 base += "/";
             }
-            ImmutableList.Builder<InputInfo> inputs = ImmutableList
-                    .builderWithExpectedSize(output.getFileNames().size());
+            /*
+            * We make each input file as an input split, thus the number of broadcast join workers
+            * will be the same as the number of workers of the child join. This provides better
+            * parallelism and is required by partitioned chain join.
+            * */
             for (String fileName : output.getFileNames())
             {
                 InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
-                inputs.add(inputInfo);
+                inputSplits.add(new InputSplit(ImmutableList.of(inputInfo)));
             }
-            inputSplits.add(new InputSplit(inputs.build()));
         }
         return inputSplits.build();
     }

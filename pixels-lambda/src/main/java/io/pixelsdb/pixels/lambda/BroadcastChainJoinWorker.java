@@ -76,13 +76,13 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             long queryId = event.getQueryId();
 
-            List<BroadcastTableInfo> leftTables = event.getChainTables();
+            List<BroadcastTableInfo> chainTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
-            requireNonNull(leftTables, "leftTables is null");
+            requireNonNull(chainTables, "chainTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");
-            checkArgument(leftTables.size() == chainJoinInfos.size()+1,
+            checkArgument(chainTables.size() == chainJoinInfos.size()+1,
                     "left table num is not consistent with (chain-join info num + 1).");
-            checkArgument(leftTables.size() > 1, "there should be at least two left tables");
+            checkArgument(chainTables.size() > 1, "there should be at least two chain tables");
 
             BroadcastTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
@@ -126,7 +126,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             }
 
             // build the joiner.
-            Joiner joiner = buildJoiner(queryId, threadPool, leftTables, chainJoinInfos, rightTable, lastJoinInfo);
+            Joiner joiner = buildJoiner(queryId, threadPool, chainTables, chainJoinInfos, rightTable, lastJoinInfo);
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
 
