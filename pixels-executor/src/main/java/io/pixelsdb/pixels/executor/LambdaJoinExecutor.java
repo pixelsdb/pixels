@@ -69,6 +69,7 @@ public class LambdaJoinExecutor
     private final ConfigFactory config;
     private final MetadataService metadataService;
     private final int fixedSplitSize;
+    private final boolean capSplitSizeByStatistics;
     private final boolean projectionReadEnabled;
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
@@ -111,6 +112,7 @@ public class LambdaJoinExecutor
         this.metadataService = new MetadataService(config.getProperty("metadata.server.host"),
                 Integer.parseInt(config.getProperty("metadata.server.port")));
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
+        this.capSplitSizeByStatistics = Boolean.parseBoolean(config.getProperty("join.cap.split-size.by.statistics"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.orderedPathEnabled = orderedPathEnabled;
         this.compactPathEnabled = compactPathEnabled;
@@ -206,7 +208,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -361,9 +363,9 @@ public class LambdaJoinExecutor
                  * Chain join is found, and this is the first broadcast join in the chain.
                  * In this case, we build an incomplete chain join with only two left tables and one ChainJoinInfo.
                  */
-                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
-                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo;
                 List<BroadcastTableInfo> chainTableInfos = new ArrayList<>();
@@ -414,7 +416,7 @@ public class LambdaJoinExecutor
                      * The parent is still a small-left broadcast join, continue chain join construction by
                      * adding the right table of the current join into the left tables of the chain join
                      */
-                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
                             joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -472,7 +474,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -540,7 +542,7 @@ public class LambdaJoinExecutor
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -558,7 +560,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(rightInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -574,7 +576,7 @@ public class LambdaJoinExecutor
             }
             else
             {
-                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
@@ -593,7 +595,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(leftInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -749,7 +751,7 @@ public class LambdaJoinExecutor
         return inputSplits.build();
     }
 
-    private BroadcastTableInfo getBroadcastJoinTableInfo(
+    private BroadcastTableInfo getBroadcastTableInfo(
             Table table, List<InputSplit> inputSplits, int[] keyColumnIds)
     {
         BroadcastTableInfo tableInfo = new BroadcastTableInfo();
@@ -910,8 +912,7 @@ public class LambdaJoinExecutor
             if (this.fixedSplitSize > 0)
             {
                 splitSize = this.fixedSplitSize;
-            }
-            else
+            } else
             {
                 // log.info("columns to be accessed: " + columnSet.toString());
                 SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
@@ -919,8 +920,7 @@ public class LambdaJoinExecutor
                 {
                     logger.debug("splits index not exist in factory, building index...");
                     splitsIndex = buildSplitsIndex(order, splits, indexName);
-                }
-                else
+                } else
                 {
                     int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version)
@@ -981,6 +981,16 @@ public class LambdaJoinExecutor
                 {
                     List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
 
+                    if (capSplitSizeByStatistics)
+                    {
+                        int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(table, orderedPaths.size());
+                        if (splitSizeCap < splitSize)
+                        {
+                            logger.debug("split size capped to: " + splitSizeCap);
+                            splitSize = splitSizeCap;
+                        }
+                    }
+
                     for (int i = 0; i < orderedPaths.size();)
                     {
                         ImmutableList.Builder<InputInfo> inputsBuilder =
@@ -997,6 +1007,17 @@ public class LambdaJoinExecutor
                 if (compactPathEnabled)
                 {
                     List<String> compactPaths = storage.listPaths(compactPath);
+
+                    if (capSplitSizeByStatistics)
+                    {
+                        int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(
+                                table, compactPaths.size() * rowGroupNum);
+                        if (splitSizeCap < splitSize)
+                        {
+                            logger.debug("split size capped to: " + splitSizeCap);
+                            splitSize = splitSizeCap;
+                        }
+                    }
 
                     int curFileRGIdx;
                     for (String path : compactPaths)
