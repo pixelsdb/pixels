@@ -178,8 +178,6 @@ public class LambdaJoinExecutor
                                 parent.get().getJoin().getRightKeyColumnIds(), numPartition);
                     }
                 }
-                JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                        join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
                 checkArgument(leftOperator.getJoinInputs().size() == 1,
                         "there should be exact one incomplete chain join input in the child operator");
@@ -191,6 +189,9 @@ public class LambdaJoinExecutor
                 {
                     List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
                     List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(),
+                            join.getRightColumnAlias(), join.getLeftProjection(),
+                            join.getRightProjection(), postPartition, postPartitionInfo);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
                     int outputId = 0;
@@ -229,48 +230,44 @@ public class LambdaJoinExecutor
                 }
                 else if (rightOperator.getJoinAlgo() == JoinAlgorithm.PARTITIONED)
                 {
-                    // TODO: produce the partitioned chain join.
                     /*
-                     * Create a new operator from the right operator,
-                     * replace the join inputs with the partitioned chain join inputs in the new operator,
+                     * Create a new partitioned chain join operator from the right operator,
+                     * replace the join inputs with the partitioned chain join inputs,
                      * drop the right operator and return the new operator.
                      */
-                    List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
-                    List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+                    PartitionedJoinOperator rightJoinOperator = (PartitionedJoinOperator) rightOperator;
+                    List<JoinInput> rightJoinInputs = rightJoinOperator.getJoinInputs();
+
+                    List<BroadcastTableInfo> chainTables = broadcastChainJoinInput.getChainTables();
+                    List<ChainJoinInfo> chainJoinInfos = broadcastChainJoinInput.getChainJoinInfos();
+                    ChainJoinInfo lastChainJoinInfo = new ChainJoinInfo(joinType,
+                            join.getLeftColumnAlias(), join.getRightColumnAlias(), join.getRightKeyColumnIds(),
+                            join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
+                    // chainJoinInfos in broadcastChainJoin is mutable, thus we can add element directly.
+                    chainJoinInfos.add(lastChainJoinInfo);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    int outputId = 0;
-                    for (int i = 0; i < rightInputSplits.size(); )
+                    for (int i = 0; i < rightJoinInputs.size(); ++i)
                     {
-                        ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
-                        for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
-                        {
-                            inputsBuilder.add(rightInputSplits.get(i));
-                            outputsBuilder.add("join_" + outputId++);
-                        }
-                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
-                                rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
-
-                        MultiOutputInfo output = new MultiOutputInfo(
-                                IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                        joinedTable.getTableName() + "/", IntermediateStorage,
-                                null, null, null, true, outputsBuilder.build());
-
-                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
-                                .setLargeTable(rightTableInfo)
-                                .setJoinInfo(joinInfo)
-                                .setOutput(output).build();
-
-                        joinInputs.add(complete);
+                        PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) rightJoinInputs.get(i);
+                        PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
+                        chainJoinInput.setQueryId(queryId);
+                        chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
+                        chainJoinInput.setOutput(rightJoinInput.getOutput());
+                        chainJoinInput.setSmallTable(rightJoinInput.getSmallTable());
+                        chainJoinInput.setLargeTable(rightJoinInput.getLargeTable());
+                        chainJoinInput.setChainTables(chainTables);
+                        chainJoinInput.setChainJoinInfos(chainJoinInfos);
+                        joinInputs.add(chainJoinInput);
                     }
 
-                    SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
-                    // The right operator must be set as the large child.
-                    joinOperator.setLargeChild(rightOperator);
+                    PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
+                            rightJoinOperator.getSmallPartitionInputs(),
+                            rightJoinOperator.getLargePartitionInputs(),
+                            joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
+                    // Set the children of the right operator as the children of the current join operator.
+                    joinOperator.setSmallChild(rightJoinOperator.getSmallChild());
+                    joinOperator.setLargeChild(rightJoinOperator.getLargeChild());
                     return joinOperator;
                 }
                 else
