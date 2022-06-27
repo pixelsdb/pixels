@@ -37,10 +37,18 @@ public class PartitionedChainJoinInput implements JoinInput
     /**
      * The information of the chain tables that are broadcast in the chain join.
      */
-    private List<BroadCastJoinTableInfo> chainTables;
+    private List<BroadcastTableInfo> chainTables;
     /**
-     * The information of the chain joins. If there are N chain tables and 1 right table,
-     * there should be N-1 chain join infos.
+     * The information of the chain joins. If there are N chain tables, there should be N
+     * chain join infos.
+     *
+     * The last chain join info is for the final join of the chain tables and the join
+     * result of the small and large partitioned tables. Its keyColumnIds is not the key
+     * column ids of its join result, it is the key column ids of the join result of the
+     * small and large partitioned tables.
+     *
+     * However, the post partitioning info of the last chain join is the post partitioning
+     * info of the entire partitioned chain join.
      */
     private List<ChainJoinInfo> chainJoinInfos;
     /**
@@ -52,7 +60,10 @@ public class PartitionedChainJoinInput implements JoinInput
      */
     private PartitionedTableInfo largeTable;
     /**
-     * The information of the partitioned join.
+     * The information of the partitioned join. Currently, the join type of the partitioned
+     * join in a partitioned chain join <b>CAN NOT</b> be LEFT_OUTER or FULL_OUTER.
+     *
+     * TODO: support left/full outer join for partitioned chain join.
      */
     private PartitionedJoinInfo joinInfo;
     /**
@@ -69,7 +80,7 @@ public class PartitionedChainJoinInput implements JoinInput
     public PartitionedChainJoinInput() { }
 
     public PartitionedChainJoinInput(long queryId,
-                                     List<BroadCastJoinTableInfo> chainTables,
+                                     List<BroadcastTableInfo> chainTables,
                                      List<ChainJoinInfo> chainJoinInfos,
                                      PartitionedTableInfo smallTable,
                                      PartitionedTableInfo largeTable,
@@ -95,12 +106,12 @@ public class PartitionedChainJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public List<BroadCastJoinTableInfo> getChainTables()
+    public List<BroadcastTableInfo> getChainTables()
     {
         return chainTables;
     }
 
-    public void setChainTables(List<BroadCastJoinTableInfo> chainTables)
+    public void setChainTables(List<BroadcastTableInfo> chainTables)
     {
         this.chainTables = chainTables;
     }

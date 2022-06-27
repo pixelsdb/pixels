@@ -178,8 +178,6 @@ public class LambdaJoinExecutor
                                 parent.get().getJoin().getRightKeyColumnIds(), numPartition);
                     }
                 }
-                JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                        join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
                 checkArgument(leftOperator.getJoinInputs().size() == 1,
                         "there should be exact one incomplete chain join input in the child operator");
@@ -191,6 +189,9 @@ public class LambdaJoinExecutor
                 {
                     List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
                     List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(),
+                            join.getRightColumnAlias(), join.getLeftProjection(),
+                            join.getRightProjection(), postPartition, postPartitionInfo);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
                     int outputId = 0;
@@ -205,7 +206,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -229,48 +230,44 @@ public class LambdaJoinExecutor
                 }
                 else if (rightOperator.getJoinAlgo() == JoinAlgorithm.PARTITIONED)
                 {
-                    // TODO: produce the partitioned chain join.
                     /*
-                     * Create a new operator from the right operator,
-                     * replace the join inputs with the partitioned chain join inputs in the new operator,
+                     * Create a new partitioned chain join operator from the right operator,
+                     * replace the join inputs with the partitioned chain join inputs,
                      * drop the right operator and return the new operator.
                      */
-                    List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
-                    List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+                    PartitionedJoinOperator rightJoinOperator = (PartitionedJoinOperator) rightOperator;
+                    List<JoinInput> rightJoinInputs = rightJoinOperator.getJoinInputs();
+
+                    List<BroadcastTableInfo> chainTables = broadcastChainJoinInput.getChainTables();
+                    List<ChainJoinInfo> chainJoinInfos = broadcastChainJoinInput.getChainJoinInfos();
+                    ChainJoinInfo lastChainJoinInfo = new ChainJoinInfo(joinType,
+                            join.getLeftColumnAlias(), join.getRightColumnAlias(), join.getRightKeyColumnIds(),
+                            join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
+                    // chainJoinInfos in broadcastChainJoin is mutable, thus we can add element directly.
+                    chainJoinInfos.add(lastChainJoinInfo);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    int outputId = 0;
-                    for (int i = 0; i < rightInputSplits.size(); )
+                    for (int i = 0; i < rightJoinInputs.size(); ++i)
                     {
-                        ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
-                        for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
-                        {
-                            inputsBuilder.add(rightInputSplits.get(i));
-                            outputsBuilder.add("join_" + outputId++);
-                        }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
-                                rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
-
-                        MultiOutputInfo output = new MultiOutputInfo(
-                                IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                        joinedTable.getTableName() + "/", IntermediateStorage,
-                                null, null, null, true, outputsBuilder.build());
-
-                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
-                                .setLargeTable(rightTableInfo)
-                                .setJoinInfo(joinInfo)
-                                .setOutput(output).build();
-
-                        joinInputs.add(complete);
+                        PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) rightJoinInputs.get(i);
+                        PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
+                        chainJoinInput.setQueryId(queryId);
+                        chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
+                        chainJoinInput.setOutput(rightJoinInput.getOutput());
+                        chainJoinInput.setSmallTable(rightJoinInput.getSmallTable());
+                        chainJoinInput.setLargeTable(rightJoinInput.getLargeTable());
+                        chainJoinInput.setChainTables(chainTables);
+                        chainJoinInput.setChainJoinInfos(chainJoinInfos);
+                        joinInputs.add(chainJoinInput);
                     }
 
-                    SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
-                    // The right operator must be set as the large child.
-                    joinOperator.setLargeChild(rightOperator);
+                    PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
+                            rightJoinOperator.getSmallPartitionInputs(),
+                            rightJoinOperator.getLargePartitionInputs(),
+                            joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
+                    // Set the children of the right operator as the children of the current join operator.
+                    joinOperator.setSmallChild(rightJoinOperator.getSmallChild());
+                    joinOperator.setLargeChild(rightJoinOperator.getLargeChild());
                     return joinOperator;
                 }
                 else
@@ -364,12 +361,12 @@ public class LambdaJoinExecutor
                  * Chain join is found, and this is the first broadcast join in the chain.
                  * In this case, we build an incomplete chain join with only two left tables and one ChainJoinInfo.
                  */
-                BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
-                BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
                 ChainJoinInfo chainJoinInfo;
-                List<BroadCastJoinTableInfo> chainTableInfos = new ArrayList<>();
+                List<BroadcastTableInfo> chainTableInfos = new ArrayList<>();
                 // deal with join endian, ensure that small table is on the left.
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -417,7 +414,7 @@ public class LambdaJoinExecutor
                      * The parent is still a small-left broadcast join, continue chain join construction by
                      * adding the right table of the current join into the left tables of the chain join
                      */
-                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, rightInputSplits, join.getRightKeyColumnIds());
                     ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
                             joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -475,7 +472,7 @@ public class LambdaJoinExecutor
                             inputsBuilder.add(rightInputSplits.get(i));
                             outputsBuilder.add("join_" + outputId++);
                         }
-                        BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                        BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                         MultiOutputInfo output = new MultiOutputInfo(
@@ -543,7 +540,7 @@ public class LambdaJoinExecutor
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
-                BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                         leftTable, leftInputSplits, join.getLeftKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
@@ -561,7 +558,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(rightInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -577,7 +574,7 @@ public class LambdaJoinExecutor
             }
             else
             {
-                BroadCastJoinTableInfo rightTableInfo = getBroadcastJoinTableInfo(
+                BroadcastTableInfo rightTableInfo = getBroadcastJoinTableInfo(
                         rightTable, rightInputSplits, join.getRightKeyColumnIds());
 
                 JoinInfo joinInfo = new JoinInfo(joinType.flip(), join.getRightColumnAlias(),
@@ -596,7 +593,7 @@ public class LambdaJoinExecutor
                         inputsBuilder.add(leftInputSplits.get(i));
                         outputsBuilder.add("join_" + outputId++);
                     }
-                    BroadCastJoinTableInfo leftTableInfo = getBroadcastJoinTableInfo(
+                    BroadcastTableInfo leftTableInfo = getBroadcastJoinTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
                     MultiOutputInfo output = new MultiOutputInfo(
@@ -738,22 +735,24 @@ public class LambdaJoinExecutor
             {
                 base += "/";
             }
-            ImmutableList.Builder<InputInfo> inputs = ImmutableList
-                    .builderWithExpectedSize(output.getFileNames().size());
+            /*
+            * We make each input file as an input split, thus the number of broadcast join workers
+            * will be the same as the number of workers of the child join. This provides better
+            * parallelism and is required by partitioned chain join.
+            * */
             for (String fileName : output.getFileNames())
             {
                 InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
-                inputs.add(inputInfo);
+                inputSplits.add(new InputSplit(ImmutableList.of(inputInfo)));
             }
-            inputSplits.add(new InputSplit(inputs.build()));
         }
         return inputSplits.build();
     }
 
-    private BroadCastJoinTableInfo getBroadcastJoinTableInfo(
+    private BroadcastTableInfo getBroadcastJoinTableInfo(
             Table table, List<InputSplit> inputSplits, int[] keyColumnIds)
     {
-        BroadCastJoinTableInfo tableInfo = new BroadCastJoinTableInfo();
+        BroadcastTableInfo tableInfo = new BroadcastTableInfo();
         tableInfo.setTableName(table.getTableName());
         tableInfo.setInputSplits(inputSplits);
         tableInfo.setColumnsToRead(table.getColumnNames());

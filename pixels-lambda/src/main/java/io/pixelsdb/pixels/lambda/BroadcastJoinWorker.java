@@ -62,8 +62,6 @@ import static java.util.Objects.requireNonNull;
 public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(BroadcastJoinWorker.class);
-    private boolean partitionOutput = false;
-    private PartitionInfo outputPartitionInfo;
 
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
@@ -77,7 +75,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             long queryId = event.getQueryId();
 
-            BroadCastJoinTableInfo leftTable = event.getSmallTable();
+            BroadcastTableInfo leftTable = event.getSmallTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
             requireNonNull(leftInputs, "leftInputs is null");
             checkArgument(leftInputs.size() > 0, "left table is empty");
@@ -85,7 +83,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             int[] leftKeyColumnIds = leftTable.getKeyColumnIds();
             TableScanFilter leftFilter = JSON.parseObject(leftTable.getFilter(), TableScanFilter.class);
 
-            BroadCastJoinTableInfo rightTable = event.getLargeTable();
+            BroadcastTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             requireNonNull(rightInputs, "rightInputs is null");
             checkArgument(rightInputs.size() > 0, "right table is empty");
@@ -123,8 +121,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 logger.error("failed to initialize MinIO storage", e);
             }
 
-            this.partitionOutput = event.getJoinInfo().isPostPartition();
-            this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            boolean partitionOutput = event.getJoinInfo().isPostPartition();
+            PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
@@ -166,11 +164,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = this.partitionOutput ?
+                        int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
-                                        outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
-                                        this.outputPartitionInfo) :
+                                        outputPath, encoding, outputInfo.getScheme(), outputPartitionInfo) :
                                 joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
@@ -284,7 +281,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * Scan the input files of the right table and do the join.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
      * @param checkExistence whether check the existence of the input files
@@ -400,7 +397,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * Scan the input files of the right table, do the join, and partition the result.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
+     * @param joiner the joiner for the broadcast join
      * @param rightInputs the information of input files of the right table,
      *                    the list <b>must be mutable</b>
      * @param checkExistence whether check the existence of the input files
@@ -409,19 +406,19 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param outputPath fileName on s3 to store the scan results
      * @param encoding whether encode the scan results or not
      * @param outputScheme the storage scheme of the output files
+     * @param postPartitionInfo the partition information of post partitioning
      * @return the number of row groups that have been written into the output.
      */
     public static int joinWithRightTableAndPartition(
-            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence, String[] rightCols,
-            TableScanFilter rightFilter, String outputPath, boolean encoding, Storage.Scheme outputScheme,
-            boolean partitionOutput, PartitionInfo outputPartitionInfo)
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence,
+            String[] rightCols, TableScanFilter rightFilter, String outputPath, boolean encoding,
+            Storage.Scheme outputScheme, PartitionInfo postPartitionInfo)
     {
-        checkArgument(partitionOutput, "partitionOutput is false");
-        requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
-        Partitioner partitioner = new Partitioner(outputPartitionInfo.getNumPartition(),
-                rowBatchSize, joiner.getJoinedSchema(), outputPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(outputPartitionInfo.getNumPartition());
-        for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+        requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
+        Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
+                rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(postPartitionInfo.getNumPartition());
+        for (int i = 0; i < postPartitionInfo.getNumPartition(); ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -519,10 +516,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
                     outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
-                            outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    postPartitionInfo.getKeyColumnIds()).boxed().
                             collect(Collectors.toList()));
             int rowNum = 0;
-            for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+            for (int hash = 0; hash < postPartitionInfo.getNumPartition(); ++hash)
             {
                 List<VectorizedRowBatch> batches = partitioned.get(hash);
                 if (!batches.isEmpty())

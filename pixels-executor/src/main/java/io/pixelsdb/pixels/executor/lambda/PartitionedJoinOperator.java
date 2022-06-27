@@ -47,11 +47,11 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                    List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
         super(joinInputs, joinAlgo);
-        if (joinAlgo != JoinAlgorithm.PARTITIONED)
+        if (joinAlgo != JoinAlgorithm.PARTITIONED && joinAlgo != JoinAlgorithm.PARTITIONED_CHAIN)
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is not supported");
         }
-        if (smallPartitionInputs == null)
+        if (smallPartitionInputs == null || smallPartitionInputs.isEmpty())
         {
             this.smallPartitionInputs = ImmutableList.of();
         }
@@ -59,7 +59,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         {
             this.smallPartitionInputs = ImmutableList.copyOf(smallPartitionInputs);
         }
-        if (largePartitionInputs == null)
+        if (largePartitionInputs == null || largePartitionInputs.isEmpty())
         {
             this.largePartitionInputs = ImmutableList.of();
         }
@@ -72,17 +72,35 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public void setSmallChild(JoinOperator child)
     {
-        checkArgument(this.smallPartitionInputs.isEmpty(),
-                "smallPartitionInputs must be empty if smallChild is set");
-        this.smallChild = child;
+        if (child == null)
+        {
+            checkArgument(!this.smallPartitionInputs.isEmpty(),
+                    "smallPartitionInputs must be non-empty if smallChild is set to null");
+            this.smallChild = null;
+        }
+        else
+        {
+            checkArgument(this.smallPartitionInputs.isEmpty(),
+                    "smallPartitionInputs must be empty if smallChild is set to non-null");
+            this.smallChild = child;
+        }
     }
 
     @Override
     public void setLargeChild(JoinOperator child)
     {
-        checkArgument(this.largePartitionInputs.isEmpty(),
-                "largePartitionInputs must be empty if largeChild is set");
-        this.largeChild = child;
+        if (child == null)
+        {
+            checkArgument(!this.largePartitionInputs.isEmpty(),
+                    "largePartitionInputs must be non-empty if largeChild is set to null");
+            this.largeChild = null;
+        }
+        else
+        {
+            checkArgument(this.largePartitionInputs.isEmpty(),
+                    "largePartitionInputs must be empty if largeChild is set to non-null");
+            this.largeChild = child;
+        }
     }
 
     public List<PartitionInput> getSmallPartitionInputs()

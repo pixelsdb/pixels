@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
-import io.pixelsdb.pixels.executor.lambda.domain.BroadCastJoinTableInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.JoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 
@@ -37,11 +37,11 @@ public class BroadcastJoinInput implements JoinInput
     /**
      * The small (i.e., broadcast) table.
      */
-    private BroadCastJoinTableInfo smallTable;
+    private BroadcastTableInfo smallTable;
     /**
      * The large table.
      */
-    private BroadCastJoinTableInfo largeTable;
+    private BroadcastTableInfo largeTable;
     /**
      * The information of the broadcast join.
      */
@@ -59,8 +59,8 @@ public class BroadcastJoinInput implements JoinInput
      */
     public BroadcastJoinInput() { }
 
-    public BroadcastJoinInput(long queryId, BroadCastJoinTableInfo smallTable,
-                              BroadCastJoinTableInfo largeTable, JoinInfo joinInfo,
+    public BroadcastJoinInput(long queryId, BroadcastTableInfo smallTable,
+                              BroadcastTableInfo largeTable, JoinInfo joinInfo,
                               MultiOutputInfo output)
     {
         this.queryId = queryId;
@@ -80,22 +80,22 @@ public class BroadcastJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public BroadCastJoinTableInfo getSmallTable()
+    public BroadcastTableInfo getSmallTable()
     {
         return smallTable;
     }
 
-    public void setSmallTable(BroadCastJoinTableInfo smallTable)
+    public void setSmallTable(BroadcastTableInfo smallTable)
     {
         this.smallTable = smallTable;
     }
 
-    public BroadCastJoinTableInfo getLargeTable()
+    public BroadcastTableInfo getLargeTable()
     {
         return largeTable;
     }
 
-    public void setLargeTable(BroadCastJoinTableInfo largeTable)
+    public void setLargeTable(BroadcastTableInfo largeTable)
     {
         this.largeTable = largeTable;
     }

@@ -70,7 +70,7 @@ public class TestPartitionedJoinInvoker
 
         PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
         rightTableInfo.setTableName("lineitem");
-        rightTableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
+        rightTableInfo.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
         rightTableInfo.setKeyColumnIds(new int[]{0});
         rightTableInfo.setInputFiles(Arrays.asList(
                 "pixels-lambda-test/lineitem_part_0",
@@ -90,9 +90,9 @@ public class TestPartitionedJoinInvoker
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));
         joinInput.setJoinInfo(joinInfo);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
-                "http://172.31.32.193:9000", "lambda", "password",
-                true, Arrays.asList("partitioned-join-0", "partitioned-join-1")));
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/", Storage.Scheme.s3,
+                null, null, null, true,
+                Arrays.asList("partitioned-join-0", "partitioned-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = PartitionedJoinInvoker.invoke(joinInput).get();

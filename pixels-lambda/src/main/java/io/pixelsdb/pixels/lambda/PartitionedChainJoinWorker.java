@@ -33,9 +33,11 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
+import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.ChainJoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
-import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,19 +53,27 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.buildFirstJoiner;
+import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.chainJoin;
+import static io.pixelsdb.pixels.lambda.PartitionedJoinWorker.buildHashTable;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * Partitioned chain join is the combination of a set of broadcast joins and a partitioned join.
+ * It contains a set of chain left tables that are broadcast, a left partitioned table, and a
+ * right partitioned table. The join result of the chain tables are then joined with the join
+ * result of the left and right partitioned tables.
+ *
  * @author hank
- * @date 07/05/2022
+ * @date 26/06/2022
  */
-public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInput, JoinOutput>
+public class PartitionedChainJoinWorker implements RequestHandler<PartitionedChainJoinInput, JoinOutput>
 {
-    private static final Logger logger = LoggerFactory.getLogger(PartitionedJoinWorker.class);
+    private static final Logger logger = LoggerFactory.getLogger(PartitionedChainJoinWorker.class);
 
     @Override
-    public JoinOutput handleRequest(PartitionedJoinInput event, Context context)
+    public JoinOutput handleRequest(PartitionedChainJoinInput event, Context context)
     {
         try
         {
@@ -73,6 +83,14 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
+
+            List<BroadcastTableInfo> chainTables = event.getChainTables();
+            List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
+            requireNonNull(chainTables, "leftTables is null");
+            requireNonNull(chainJoinInfos, "chainJoinInfos is null");
+            checkArgument(chainTables.size() == chainJoinInfos.size(),
+                    "left table num is not consistent with chain-join info num.");
+            checkArgument(chainTables.size() > 1, "there should be at least two chain tables");
 
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
             requireNonNull(leftPartitioned, "leftPartitioned is null");
@@ -95,6 +113,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             boolean[] leftProjection = event.getJoinInfo().getSmallProjection();
             boolean[] rightProjection = event.getJoinInfo().getLargeProjection();
             JoinType joinType = event.getJoinInfo().getJoinType();
+            checkArgument(joinType != JoinType.EQUI_LEFT && joinType != JoinType.EQUI_FULL,
+                    "currently, left or full outer join is not supported in partitioned chain join");
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
             int numPartition = event.getJoinInfo().getNumPartition();
             logger.info("small table '" + event.getSmallTable().getTableName() +
@@ -119,8 +139,9 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
             boolean encoding = outputInfo.isEncoding();
 
-            boolean partitionOutput = event.getJoinInfo().isPostPartition();
-            PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            ChainJoinInfo lastJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
+            boolean partitionOutput = lastJoin.isPostPartition();
+            PartitionInfo outputPartitionInfo = lastJoin.getPostPartitionInfo();
 
             if (partitionOutput)
             {
@@ -138,15 +159,27 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             {
                 logger.error("failed to initialize MinIO storage", e);
             }
+
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftPartitioned.get(0), rightPartitioned.get(0), true);
-            Joiner joiner = new Joiner(joinType,
+            Joiner partitionJoiner = new Joiner(joinType,
                     leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
                     rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
-            // build the hash table for the left table.
+            // build the chain joiner.
+            Joiner chainJoiner = buildChainJoiner(queryId, threadPool, chainTables, chainJoinInfos,
+                    partitionJoiner.getJoinedSchema());
+
+            JoinOutput joinOutput = new JoinOutput();
+            if (chainJoiner.getSmallTableSize() == 0)
+            {
+                // the result of the chain joins is empty, no need to continue the join.
+                return joinOutput;
+            }
+
+            // build the hash table for the left partitioned table.
             List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
             int leftSplitSize = leftPartitioned.size() / leftParallelism;
             if (leftPartitioned.size() % leftParallelism > 0)
@@ -163,7 +196,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, parts, leftCols, hashValues, numPartition);
+                        buildHashTable(queryId, partitionJoiner, parts, leftCols, hashValues, numPartition);
                     }
                     catch (Exception e)
                     {
@@ -175,9 +208,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getSmallTableSize());
-            JoinOutput joinOutput = new JoinOutput();
-            if (joiner.getSmallTableSize() == 0)
+            logger.info("hash table size of small partitioned table '" +
+                    event.getSmallTable().getTableName() + "': " + partitionJoiner.getSmallTableSize());
+
+            if (partitionJoiner.getSmallTableSize() == 0)
             {
                 // the left table is empty, no need to continue the join.
                 return joinOutput;
@@ -201,10 +235,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     {
                         int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, parts, rightCols, hashValues,
+                                        queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
                                         numPartition, outputPath, encoding, outputInfo.getScheme(),
                                         outputPartitionInfo) :
-                                joinWithRightTable(queryId, joiner, parts, rightCols,
+                                joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
                                 hashValues, numPartition, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
@@ -226,33 +260,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 logger.error("interrupted while waiting for the termination of join", e);
             }
 
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                // output the left-outer tail.
-                String outputPath = outputFolder + outputInfo.getFileNames().get(
-                        outputInfo.getFileNames().size()-1);
-                PixelsWriter pixelsWriter;
-                if (partitionOutput)
-                {
-                    requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, true, Arrays.stream(
-                                    outputPartitionInfo.getKeyColumnIds()).boxed().
-                                    collect(Collectors.toList()));
-                    joiner.writeLeftOuterAndPartition(pixelsWriter, rowBatchSize, outputPartitionInfo);
-                }
-                else
-                {
-                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                            outputInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
-                            encoding, false, null);
-                    joiner.writeLeftOuter(pixelsWriter, rowBatchSize);
-                }
-                pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
-            }
-
             return joinOutput;
         } catch (Exception e)
         {
@@ -261,73 +268,55 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         }
     }
 
-    /**
-     * Scan the partitioned file of the left table and populate the hash table for the join.
-     *
-     * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for which the hash table is built
-     * @param leftParts the information of partitioned files of the left table
-     * @param leftCols the column names of the left table
-     * @param hashValues the hash values that are processed by this join worker
-     * @param numPartition the total number of partitions
-     */
-    protected static void buildHashTable(long queryId, Joiner joiner, List<String> leftParts,
-                               String[] leftCols, List<Integer> hashValues, int numPartition)
+    private static Joiner buildChainJoiner(long queryId, ExecutorService executor,
+                                      List<BroadcastTableInfo> chainTables,
+                                      List<ChainJoinInfo> chainJoinInfos,
+                                      TypeDescription lastResultSchema)
     {
-        while (!leftParts.isEmpty())
+        requireNonNull(executor, "executor is null");
+        requireNonNull(chainTables, "chainTables is null");
+        requireNonNull(chainJoinInfos, "chainJoinInfos is null");
+        checkArgument(chainTables.size() == chainJoinInfos.size() && chainTables.size() > 1,
+                "the size of chainTables and chainJoinInfos must be the same, and larger than 1");
+        try
         {
-            for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
+            BroadcastTableInfo t1 = chainTables.get(0);
+            BroadcastTableInfo t2 = chainTables.get(1);
+            ChainJoinInfo currChainJoin = chainJoinInfos.get(0);
+            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, currChainJoin);
+            for (int i = 1; i < chainTables.size() - 1; ++i)
             {
-                String leftPartitioned = it.next();
-                try
-                {
-                    if (s3.exists(leftPartitioned))
-                    {
-                        it.remove();
-                    } else
-                    {
-                        continue;
-                    }
-                } catch (IOException e)
-                {
-                    logger.error("failed to check the existence of the partitioned file '" +
-                            leftPartitioned + "' of the left table", e);
-                }
+                BroadcastTableInfo currRightTable = chainTables.get(i);
+                BroadcastTableInfo nextChainTable = chainTables.get(i+1);
+                TypeDescription nextTableSchema = getFileSchema(s3,
+                        nextChainTable.getInputSplits().get(0).getInputInfos().get(0).getPath(),
+                        true);
+                TypeDescription nextResultSchema = getResultSchema(
+                        nextTableSchema, nextChainTable.getColumnsToRead());
 
-                try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
-                {
-                    checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
-                    Set<Integer> leftHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
-                    for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
-                    {
-                        leftHashValues.add(rgInfo.getPartitionInfo().getHashValue());
-                    }
-                    for (int hashValue : hashValues)
-                    {
-                        if (!leftHashValues.contains(hashValue))
-                        {
-                            continue;
-                        }
-                        PixelsReaderOption option = getReaderOption(queryId, leftCols, pixelsReader,
-                                hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
-                        PixelsRecordReader recordReader = pixelsReader.read(option);
-                        checkArgument(recordReader.isValid(), "failed to get record reader");
-                        do
-                        {
-                            rowBatch = recordReader.readBatch(rowBatchSize);
-                            if (rowBatch.size > 0)
-                            {
-                                joiner.populateLeftTable(rowBatch);
-                            }
-                        } while (!rowBatch.endOfFile);
-                    }
-                } catch (Exception e)
-                {
-                    logger.error("failed to scan the partitioned file '" +
-                            leftPartitioned + "' and build the hash table", e);
-                }
+                ChainJoinInfo nextChainJoin = chainJoinInfos.get(i);
+                Joiner nextJoiner = new Joiner(nextChainJoin.getJoinType(),
+                        currJoiner.getJoinedSchema(), nextChainJoin.getSmallColumnAlias(),
+                        nextChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
+                        nextResultSchema, nextChainJoin.getLargeColumnAlias(),
+                        nextChainJoin.getLargeProjection(), nextChainTable.getKeyColumnIds());
+
+                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable);
+                currJoiner = nextJoiner;
+                currChainJoin = nextChainJoin;
             }
+            BroadcastTableInfo lastChainTable = chainTables.get(chainTables.size()-1);
+            ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
+            Joiner finalJoiner = new Joiner(lastChainJoin.getJoinType(),
+                    currJoiner.getJoinedSchema(), lastChainJoin.getSmallColumnAlias(),
+                    lastChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
+                    lastResultSchema, lastChainJoin.getLargeColumnAlias(),
+                    lastChainJoin.getLargeProjection(), lastChainJoin.getKeyColumnIds());
+            chainJoin(queryId, executor, currJoiner, finalJoiner, lastChainTable);
+            return finalJoiner;
+        } catch (Exception e)
+        {
+            throw new RuntimeException("failed to join left tables", e);
         }
     }
 
@@ -335,7 +324,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * Scan the partitioned file of the right table and do the join.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for the partitioned join
+     * @param partitionedJoiner the joiner for the partitioned join
+     * @param chainJoiner the joiner of the final chain join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
@@ -345,11 +335,14 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param outputScheme the storage scheme of the output files
      * @return the number of row groups that have been written into the output.
      */
-    protected static int joinWithRightTable(long queryId, Joiner joiner, List<String> rightParts,
-                                   String[] rightCols, List<Integer> hashValues, int numPartition,
-                                   String outputPath, boolean encoding, Storage.Scheme outputScheme)
+    protected static int joinWithRightTable(long queryId,
+                                            Joiner partitionedJoiner, Joiner chainJoiner,
+                                            List<String> rightParts, String[] rightCols,
+                                            List<Integer> hashValues, int numPartition,
+                                            String outputPath, boolean encoding,
+                                            Storage.Scheme outputScheme)
     {
-        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+        PixelsWriter pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
                 outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                 encoding, false, null);
         while (!rightParts.isEmpty())
@@ -388,29 +381,38 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         }
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
+                        VectorizedRowBatch rightRowBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
                         checkArgument(recordReader.isValid(), "failed to get record reader");
                         int scannedRows = 0, joinedRows = 0;
                         do
                         {
-                            rowBatch = recordReader.readBatch(rowBatchSize);
-                            scannedRows += rowBatch.size;
-                            if (rowBatch.size > 0)
+                            rightRowBatch = recordReader.readBatch(rowBatchSize);
+                            scannedRows += rightRowBatch.size;
+                            if (rightRowBatch.size > 0)
                             {
-                                List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                                for (VectorizedRowBatch joined : joinedBatches)
+                                List<VectorizedRowBatch> partitionedJoinResults =
+                                        partitionedJoiner.join(rightRowBatch);
+                                for (VectorizedRowBatch partitionedJoinResult : partitionedJoinResults)
                                 {
-                                    if (!joined.isEmpty())
+                                    if (!partitionedJoinResult.isEmpty())
                                     {
-                                        pixelsWriter.addRowBatch(joined);
-                                        joinedRows += joined.size;
+                                        List<VectorizedRowBatch> chainJoinResults =
+                                                chainJoiner.join(partitionedJoinResult);
+                                        for (VectorizedRowBatch chainJoinResult : chainJoinResults)
+                                        {
+                                            if (!chainJoinResult.isEmpty())
+                                            {
+                                                pixelsWriter.addRowBatch(chainJoinResult);
+                                                joinedRows += chainJoinResult.size;
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        } while (!rowBatch.endOfFile);
-                        logger.info("number of scanned rows: " + scannedRows +
-                                ", number of joined rows: " + joinedRows);
+                        } while (!rightRowBatch.endOfFile);
+                        logger.info("number of rows scanned from right partitioned file: " +
+                                scannedRows + ", number of final joined rows: " + joinedRows);
                     }
                 } catch (Exception e)
                 {
@@ -442,7 +444,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * Scan the partitioned file of the right table, do the join, and partition the output.
      *
      * @param queryId the query id used by I/O scheduler
-     * @param joiner the joiner for the partitioned join
+     * @param partitionedJoiner the joiner for the partitioned join
+     * @param chainJoiner the joiner for the final chain join
      * @param rightParts the information of partitioned files of the right table
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
@@ -453,14 +456,17 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param postPartitionInfo the partition information of post partitioning
      * @return the number of row groups that have been written into the output.
      */
-    protected static int joinWithRightTableAndPartition(long queryId, Joiner joiner, List<String> rightParts,
-                                               String[] rightCols, List<Integer> hashValues,
-                                               int numPartition, String outputPath, boolean encoding,
-                                               Storage.Scheme outputScheme, PartitionInfo postPartitionInfo)
+    protected static int joinWithRightTableAndPartition(long queryId,
+                                                        Joiner partitionedJoiner, Joiner chainJoiner,
+                                                        List<String> rightParts, String[] rightCols,
+                                                        List<Integer> hashValues, int numPartition,
+                                                        String outputPath, boolean encoding,
+                                                        Storage.Scheme outputScheme,
+                                                        PartitionInfo postPartitionInfo)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
-                rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
+                rowBatchSize, chainJoiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
         List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(postPartitionInfo.getNumPartition());
         for (int i = 0; i < postPartitionInfo.getNumPartition(); ++i)
         {
@@ -503,33 +509,44 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         }
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
-                        VectorizedRowBatch rowBatch;
+                        VectorizedRowBatch rightBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
                         checkArgument(recordReader.isValid(), "failed to get record reader");
                         int scannedRows = 0, joinedRows = 0;
                         do
                         {
-                            rowBatch = recordReader.readBatch(rowBatchSize);
-                            scannedRows += rowBatch.size;
-                            if (rowBatch.size > 0)
+                            rightBatch = recordReader.readBatch(rowBatchSize);
+                            scannedRows += rightBatch.size;
+                            if (rightBatch.size > 0)
                             {
-                                List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
-                                for (VectorizedRowBatch joined : joinedBatches)
+                                List<VectorizedRowBatch> partitionedJoinResults =
+                                        partitionedJoiner.join(rightBatch);
+                                for (VectorizedRowBatch partitionedJoinResult : partitionedJoinResults)
                                 {
-                                    if (!joined.isEmpty())
+                                    if (!partitionedJoinResult.isEmpty())
                                     {
-                                        Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
-                                        for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                                        List<VectorizedRowBatch> chainJoinResults =
+                                                chainJoiner.join(partitionedJoinResult);
+                                        for (VectorizedRowBatch chainJoinResult : chainJoinResults)
                                         {
-                                            partitioned.get(entry.getKey()).add(entry.getValue());
+                                            if (!chainJoinResult.isEmpty())
+                                            {
+                                                Map<Integer, VectorizedRowBatch> parts =
+                                                        partitioner.partition(chainJoinResult);
+                                                for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                                                {
+                                                    partitioned.get(entry.getKey()).add(entry.getValue());
+                                                }
+                                                joinedRows += chainJoinResult.size;
+                                            }
                                         }
-                                        joinedRows += joined.size;
+
                                     }
                                 }
                             }
-                        } while (!rowBatch.endOfFile);
-                        logger.info("number of scanned rows: " + scannedRows +
-                                ", number of joined rows: " + joinedRows);
+                        } while (!rightBatch.endOfFile);
+                        logger.info("number of rows scanned from right partitioned file: " +
+                                scannedRows + ", number of final joined rows: " + joinedRows);
                     }
                 } catch (Exception e)
                 {
@@ -549,7 +566,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     partitioned.get(hash).add(tailBatches[hash]);
                 }
             }
-            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
+            PixelsWriter pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
                     outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
                     encoding, true, Arrays.stream(
                             postPartitionInfo.getKeyColumnIds()).boxed().

@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
-import io.pixelsdb.pixels.executor.lambda.domain.BroadCastJoinTableInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.ChainJoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.JoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
@@ -38,7 +38,7 @@ public class BroadcastChainJoinInput implements JoinInput
     /**
      * The information of the chain tables that are broadcast in the chain join.
      */
-    private List<BroadCastJoinTableInfo> chainTables;
+    private List<BroadcastTableInfo> chainTables;
     /**
      * The information of the chain joins. If there are N chain tables and 1 right table,
      * there should be N-1 chain join infos.
@@ -47,7 +47,7 @@ public class BroadcastChainJoinInput implements JoinInput
     /**
      * The information of the large table.
      */
-    private BroadCastJoinTableInfo largeTable;
+    private BroadcastTableInfo largeTable;
     /**
      * The information of the last join with the right table.
      */
@@ -59,7 +59,7 @@ public class BroadcastChainJoinInput implements JoinInput
     /**
      * The information of the post small tables that are broadcast in the chain join.
      */
-    private List<BroadCastJoinTableInfo> postSmallTables;
+    private List<BroadcastTableInfo> postSmallTables;
     /**
      * The information of the post chain joins. If there is M post small tables,
      * there should be M post chain join infos.
@@ -79,11 +79,11 @@ public class BroadcastChainJoinInput implements JoinInput
     public BroadcastChainJoinInput() { }
 
     public BroadcastChainJoinInput(long queryId,
-                                   List<BroadCastJoinTableInfo> chainTables,
+                                   List<BroadcastTableInfo> chainTables,
                                    List<ChainJoinInfo> chainJoinInfos,
-                                   BroadCastJoinTableInfo largeTable,
+                                   BroadcastTableInfo largeTable,
                                    JoinInfo joinInfo, boolean postChainJoinsExist,
-                                   List<BroadCastJoinTableInfo> postSmallTables,
+                                   List<BroadcastTableInfo> postSmallTables,
                                    List<ChainJoinInfo> postChainJoinInfos, MultiOutputInfo output)
     {
         this.queryId = queryId;
@@ -107,12 +107,12 @@ public class BroadcastChainJoinInput implements JoinInput
         this.queryId = queryId;
     }
 
-    public List<BroadCastJoinTableInfo> getChainTables()
+    public List<BroadcastTableInfo> getChainTables()
     {
         return chainTables;
     }
 
-    public void setChainTables(List<BroadCastJoinTableInfo> chainTables)
+    public void setChainTables(List<BroadcastTableInfo> chainTables)
     {
         this.chainTables = chainTables;
     }
@@ -127,12 +127,12 @@ public class BroadcastChainJoinInput implements JoinInput
         this.chainJoinInfos = chainJoinInfos;
     }
 
-    public BroadCastJoinTableInfo getLargeTable()
+    public BroadcastTableInfo getLargeTable()
     {
         return largeTable;
     }
 
-    public void setLargeTable(BroadCastJoinTableInfo largeTable)
+    public void setLargeTable(BroadcastTableInfo largeTable)
     {
         this.largeTable = largeTable;
     }
@@ -157,12 +157,12 @@ public class BroadcastChainJoinInput implements JoinInput
         this.postChainJoinsExist = postChainJoinsExist;
     }
 
-    public List<BroadCastJoinTableInfo> getPostSmallTables()
+    public List<BroadcastTableInfo> getPostSmallTables()
     {
         return postSmallTables;
     }
 
-    public void setPostSmallTables(List<BroadCastJoinTableInfo> postSmallTables)
+    public void setPostSmallTables(List<BroadcastTableInfo> postSmallTables)
     {
         this.postSmallTables = postSmallTables;
     }
@@ -206,7 +206,7 @@ public class BroadcastChainJoinInput implements JoinInput
                     instance.postSmallTables, instance.postChainJoinInfos, instance.output);
         }
 
-        public Builder setLargeTable(BroadCastJoinTableInfo largeTable)
+        public Builder setLargeTable(BroadcastTableInfo largeTable)
         {
             this.builderInstance.setLargeTable(largeTable);
             return this;

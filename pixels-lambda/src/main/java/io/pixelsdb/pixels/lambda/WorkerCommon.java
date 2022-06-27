@@ -283,4 +283,41 @@ public class WorkerCommon
         option.rgRange(input.getRgStart(), input.getRgLength());
         return option;
     }
+
+    /**
+     * Create the reader option for a record reader of the given hash partition in a partitioned file.
+     * It must be checked outside that the given hash partition info exists in the file.
+     * @param queryId the query id
+     * @param cols the column names in the partitioned file
+     * @param pixelsReader the reader of the partitioned file
+     * @param hashValue the hash value of the given hash partition
+     * @param numPartition the total number of partitions
+     * @return the reader option
+     */
+    public static PixelsReaderOption getReaderOption(long queryId, String[] cols, PixelsReader pixelsReader,
+                                               int hashValue, int numPartition)
+    {
+        PixelsReaderOption option = new PixelsReaderOption();
+        option.skipCorruptRecords(true);
+        option.tolerantSchemaEvolution(true);
+        option.queryId(queryId);
+        option.includeCols(cols);
+        if (pixelsReader.getRowGroupNum() == numPartition)
+        {
+            option.rgRange(hashValue, 1);
+        } else
+        {
+            for (int i = 0; i < pixelsReader.getRowGroupNum(); ++i)
+            {
+                PixelsProto.RowGroupInformation info = pixelsReader.getRowGroupInfo(i);
+                if (info.getPartitionInfo().getHashValue() == hashValue)
+                {
+                    // Note: DO NOT use hashValue as the row group start index.
+                    option.rgRange(i, 1);
+                    break;
+                }
+            }
+        }
+        return option;
+    }
 }

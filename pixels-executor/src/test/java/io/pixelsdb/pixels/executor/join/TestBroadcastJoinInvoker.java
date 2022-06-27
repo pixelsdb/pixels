@@ -69,7 +69,7 @@ public class TestBroadcastJoinInvoker
         BroadcastJoinInput joinInput = new BroadcastJoinInput();
         joinInput.setQueryId(123456);
 
-        BroadCastJoinTableInfo leftTable = new BroadCastJoinTableInfo();
+        BroadcastTableInfo leftTable = new BroadcastTableInfo();
         leftTable.setColumnsToRead(new String[]{"p_partkey", "p_name", "p_size"});
         leftTable.setKeyColumnIds(new int[]{0});
         leftTable.setTableName("part");
@@ -85,7 +85,7 @@ public class TestBroadcastJoinInvoker
         leftTable.setFilter(leftFilter);
         joinInput.setSmallTable(leftTable);
 
-        BroadCastJoinTableInfo rightTable = new BroadCastJoinTableInfo();
+        BroadcastTableInfo rightTable = new BroadcastTableInfo();
         rightTable.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         rightTable.setKeyColumnIds(new int[]{1});
         rightTable.setTableName("lineitem");

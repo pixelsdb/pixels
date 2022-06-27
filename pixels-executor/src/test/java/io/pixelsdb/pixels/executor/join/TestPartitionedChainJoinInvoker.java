@@ -21,35 +21,32 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.executor.lambda.BroadcastChainJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.PartitionedChainJoinInvoker;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
- * @date 15/05/2022
+ * @date 14/05/2022
  */
-public class TestBroadcastChainJoinInvoker
+public class TestPartitionedChainJoinInvoker
 {
     @Test
-    public void testRegionNationSupplierLineitem() throws ExecutionException, InterruptedException
+    public void testRegionNationSupplierOrdersLineitem() throws ExecutionException, InterruptedException
     {
         String regionFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"region\",\"columnFilters\":{}}";
         String nationFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"nation\",\"columnFilters\":{}}";
         String supplierFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"supplier\",\"columnFilters\":{}}";
-        String lineitemFilter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\",\"columnFilters\":{}}";
 
-        BroadcastChainJoinInput joinInput = new BroadcastChainJoinInput();
+        PartitionedChainJoinInput joinInput = new PartitionedChainJoinInput();
         joinInput.setQueryId(123456);
 
-        List<BroadcastTableInfo> leftTables = new ArrayList<>();
+        List<BroadcastTableInfo> chainTables = new ArrayList<>();
         List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
 
         BroadcastTableInfo region = new BroadcastTableInfo();
@@ -59,7 +56,7 @@ public class TestBroadcastChainJoinInvoker
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20220313093112_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
-        leftTables.add(region);
+        chainTables.add(region);
 
         BroadcastTableInfo nation = new BroadcastTableInfo();
         nation.setColumnsToRead(new String[]{"n_nationkey", "n_name", "n_regionkey"});
@@ -68,7 +65,7 @@ public class TestBroadcastChainJoinInvoker
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20220313080937_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
-        leftTables.add(nation);
+        chainTables.add(nation);
 
         ChainJoinInfo chainJoinInfo0 = new ChainJoinInfo();
         chainJoinInfo0.setJoinType(JoinType.EQUI_INNER);
@@ -85,9 +82,11 @@ public class TestBroadcastChainJoinInvoker
         supplier.setKeyColumnIds(new int[]{2});
         supplier.setTableName("supplier");
         supplier.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20220313101902_0.compact.pxl", 0, 4)))));
+                new InputSplit(Arrays.asList(new InputInfo(
+                        "pixels-tpch/supplier/v-0-compact/20220313101902_0.compact.pxl",
+                        0, 4)))));
         supplier.setFilter(supplierFilter);
-        leftTables.add(supplier);
+        chainTables.add(supplier);
 
         ChainJoinInfo chainJoinInfo1 = new ChainJoinInfo();
         chainJoinInfo1.setJoinType(JoinType.EQUI_INNER);
@@ -98,43 +97,73 @@ public class TestBroadcastChainJoinInvoker
         chainJoinInfo1.setLargeColumnAlias(new String[]{"s_suppkey", "s_name"});
         chainJoinInfo1.setKeyColumnIds(new int[]{2});
         chainJoinInfos.add(chainJoinInfo1);
-        
-        joinInput.setChainTables(leftTables);
-        joinInput.setChainJoinInfos(chainJoinInfos);
 
-        BroadcastTableInfo lineitem = new BroadcastTableInfo();
-        lineitem.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
-        lineitem.setKeyColumnIds(new int[]{1});
-        lineitem.setTableName("lineitem");
-        lineitem.setInputSplits(Arrays.asList(
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 8, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 12, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 16, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 20, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 24, 4))),
-                new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 28, 4)))));
-        lineitem.setFilter(lineitemFilter);
-        joinInput.setLargeTable(lineitem);
+        Set<Integer> hashValues = new HashSet<>(40);
+        for (int i = 0 ; i < 40; ++i)
+        {
+            hashValues.add(i);
+        }
 
-        JoinInfo joinInfo = new JoinInfo();
+        PartitionedTableInfo leftTableInfo = new PartitionedTableInfo();
+        leftTableInfo.setTableName("orders");
+        leftTableInfo.setColumnsToRead(new String[]
+                {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
+        leftTableInfo.setKeyColumnIds(new int[]{0});
+        leftTableInfo.setInputFiles(Arrays.asList(
+                "pixels-lambda-test/orders_part_0",
+                "pixels-lambda-test/orders_part_1",
+                "pixels-lambda-test/orders_part_2",
+                "pixels-lambda-test/orders_part_3",
+                "pixels-lambda-test/orders_part_4",
+                "pixels-lambda-test/orders_part_5",
+                "pixels-lambda-test/orders_part_6",
+                "pixels-lambda-test/orders_part_7"));
+        leftTableInfo.setParallelism(8);
+        joinInput.setSmallTable(leftTableInfo);
+
+        PartitionedTableInfo rightTableInfo = new PartitionedTableInfo();
+        rightTableInfo.setTableName("lineitem");
+        rightTableInfo.setColumnsToRead(new String[]
+                {"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
+        rightTableInfo.setKeyColumnIds(new int[]{0});
+        rightTableInfo.setInputFiles(Arrays.asList(
+                "pixels-lambda-test/lineitem_part_0",
+                "pixels-lambda-test/lineitem_part_1"));
+        rightTableInfo.setParallelism(2);
+        joinInput.setLargeTable(rightTableInfo);
+
+        PartitionedJoinInfo joinInfo = new PartitionedJoinInfo();
         joinInfo.setJoinType(JoinType.EQUI_INNER);
-        joinInfo.setSmallColumnAlias(new String[]{"r_name", "n_name", "s_name"});
-        joinInfo.setLargeColumnAlias(new String[]{"l_orderkey", "l_extendedprice", "l_discount"});
-        joinInfo.setSmallProjection(new boolean[]{true, true, false, true});
-        joinInfo.setLargeProjection(new boolean[]{true, false, true, true});
-        joinInfo.setPostPartition(true);
-        joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 100));
+        joinInfo.setNumPartition(40);
+        joinInfo.setHashValues(Arrays.asList(16));
+        joinInfo.setSmallColumnAlias(new String[]{"o_custkey", "o_orderstatus", "o_orderdate"});
+        joinInfo.setLargeColumnAlias(new String[]{"l_suppkey", "l_extendedprice", "l_discount"});
+        joinInfo.setSmallProjection(new boolean[]{false, true, true, true});
+        joinInfo.setLargeProjection(new boolean[]{false, true, true, true});
+        joinInfo.setPostPartition(false);
         joinInput.setJoinInfo(joinInfo);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
-                "http://172.31.32.193:9000", "lambda", "password", true,
-                Arrays.asList("chain-join-0","chain-join-1","chain-join-2","chain-join-3",
-                        "chain-join-4","chain-join-5","chain-join-6","chain-join-7")));
+        ChainJoinInfo chainJoinInfo2 = new ChainJoinInfo();
+        chainJoinInfo2.setJoinType(JoinType.EQUI_INNER);
+        chainJoinInfo2.setSmallProjection(new boolean[]{true, true, false, true});
+        chainJoinInfo2.setLargeProjection(new boolean[]{true, true, true, false, true, true});
+        chainJoinInfo2.setPostPartition(true);
+        chainJoinInfo2.setPostPartitionInfo(new PartitionInfo(new int[] {3}, 20));
+        chainJoinInfo2.setSmallColumnAlias(new String[]{"r_name", "n_name", "s_name"});
+        chainJoinInfo2.setLargeColumnAlias(new String[]{
+                "o_custkey", "o_orderstatus", "o_orderdate", "l_extendedprice", "l_discount"});
+        chainJoinInfo2.setKeyColumnIds(new int[]{3});
+        chainJoinInfos.add(chainJoinInfo2);
+
+        joinInput.setChainTables(chainTables);
+        joinInput.setChainJoinInfos(chainJoinInfos);
+
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/", Storage.Scheme.s3,
+                null, null, null, true,
+                Arrays.asList("partitioned-chain-join-0", "partitioned-chain-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
-        JoinOutput output = BroadcastChainJoinInvoker.invoke(joinInput).get();
+        JoinOutput output = PartitionedChainJoinInvoker.invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
         for (int i = 0; i < output.getOutputs().size(); ++i)
         {

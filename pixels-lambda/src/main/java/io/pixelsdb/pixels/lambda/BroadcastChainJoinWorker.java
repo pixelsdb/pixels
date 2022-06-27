@@ -54,7 +54,7 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Chain join is the combination of a set of broadcast joins.
+ * Broadcast chain join is the combination of a set of broadcast joins.
  * All the left tables in a chain join are broadcast.
  *
  * @author hank
@@ -63,9 +63,6 @@ import static java.util.Objects.requireNonNull;
 public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(BroadcastChainJoinWorker.class);
-    private long queryId;
-    private boolean partitionOutput = false;
-    private PartitionInfo outputPartitionInfo;
 
     @Override
     public JoinOutput handleRequest(BroadcastChainJoinInput event, Context context)
@@ -77,17 +74,17 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
             // String requestId = context.getAwsRequestId();
 
-            this.queryId = event.getQueryId();
+            long queryId = event.getQueryId();
 
-            List<BroadCastJoinTableInfo> leftTables = event.getChainTables();
+            List<BroadcastTableInfo> chainTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
-            requireNonNull(leftTables, "leftTables is null");
+            requireNonNull(chainTables, "chainTables is null");
             requireNonNull(chainJoinInfos, "chainJoinInfos is null");
-            checkArgument(leftTables.size() == chainJoinInfos.size()+1,
+            checkArgument(chainTables.size() == chainJoinInfos.size()+1,
                     "left table num is not consistent with (chain-join info num + 1).");
-            checkArgument(leftTables.size() > 1, "there should be at least two left tables");
+            checkArgument(chainTables.size() > 1, "there should be at least two chain tables");
 
-            BroadCastJoinTableInfo rightTable = event.getLargeTable();
+            BroadcastTableInfo rightTable = event.getLargeTable();
             List<InputSplit> rightInputs = rightTable.getInputSplits();
             checkArgument(rightInputs.size() > 0, "rightPartitioned is empty");
             String[] rightCols = rightTable.getColumnsToRead();
@@ -120,18 +117,25 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 logger.error("failed to initialize MinIO storage", e);
             }
 
-            this.partitionOutput = event.getJoinInfo().isPostPartition();
-            this.outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            boolean partitionOutput = event.getJoinInfo().isPostPartition();
+            PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
 
-            if (this.partitionOutput)
+            if (partitionOutput)
             {
-                logger.info("post partition num: " + this.outputPartitionInfo.getNumPartition());
+                logger.info("post partition num: " + outputPartitionInfo.getNumPartition());
             }
 
             // build the joiner.
-            Joiner joiner = buildJoiner(threadPool, leftTables, chainJoinInfos, rightTable, lastJoinInfo);
+            Joiner joiner = buildJoiner(queryId, threadPool, chainTables, chainJoinInfos, rightTable, lastJoinInfo);
             // scan the right table and do the join.
             JoinOutput joinOutput = new JoinOutput();
+
+            if (joiner.getSmallTableSize() == 0)
+            {
+                // the result of the left chain joins is empty, no need to continue the join.
+                return joinOutput;
+            }
+
             int i = 0;
             for (InputSplit inputSplit : rightInputs)
             {
@@ -140,11 +144,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = this.partitionOutput ?
+                        int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
-                                        outputPath, encoding, outputInfo.getScheme(), this.partitionOutput,
-                                        this.outputPartitionInfo) :
+                                        outputPath, encoding, outputInfo.getScheme(), outputPartitionInfo) :
                                 joinWithRightTable(queryId, joiner, inputs, true, rightCols,
                                         rightFilter, outputPath, encoding, outputInfo.getScheme());
                         if (rowGroupNum > 0)
@@ -186,21 +189,21 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param lastJoinInfo the information of the last join
      * @return the joiner of the last join
      */
-    private Joiner buildJoiner(ExecutorService executor,
-                                  List<BroadCastJoinTableInfo> leftTables,
-                                  List<ChainJoinInfo> chainJoinInfos,
-                                  BroadCastJoinTableInfo rightTable,
-                                  JoinInfo lastJoinInfo)
+    private static Joiner buildJoiner(long queryId, ExecutorService executor,
+                               List<BroadcastTableInfo> leftTables,
+                               List<ChainJoinInfo> chainJoinInfos,
+                               BroadcastTableInfo rightTable,
+                               JoinInfo lastJoinInfo)
     {
         try
         {
-            BroadCastJoinTableInfo t1 = leftTables.get(0);
-            BroadCastJoinTableInfo t2 = leftTables.get(1);
-            Joiner currJoiner = buildFirstJoiner(executor, t1, t2, chainJoinInfos.get(0));
+            BroadcastTableInfo t1 = leftTables.get(0);
+            BroadcastTableInfo t2 = leftTables.get(1);
+            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, chainJoinInfos.get(0));
             for (int i = 1; i < leftTables.size() - 1; ++i)
             {
-                BroadCastJoinTableInfo currRightTable = leftTables.get(i);
-                BroadCastJoinTableInfo nextTable = leftTables.get(i+1);
+                BroadcastTableInfo currRightTable = leftTables.get(i);
+                BroadcastTableInfo nextTable = leftTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
                         nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
@@ -211,11 +214,11 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                         nextJoinInfo.getSmallProjection(), currJoinInfo.getKeyColumnIds(),
                         nextResultSchema, nextJoinInfo.getLargeColumnAlias(),
                         nextJoinInfo.getLargeProjection(), nextTable.getKeyColumnIds());
-                chainJoin(executor, currJoiner, nextJoiner, currRightTable);
+                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable);
                 currJoiner = nextJoiner;
             }
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
-            BroadCastJoinTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
+            BroadcastTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
                     rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
             TypeDescription rightResultSchema = getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
@@ -224,7 +227,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     lastJoinInfo.getSmallProjection(), lastChainJoin.getKeyColumnIds(),
                     rightResultSchema, lastJoinInfo.getLargeColumnAlias(),
                     lastJoinInfo.getLargeProjection(), rightTable.getKeyColumnIds());
-            chainJoin(executor, currJoiner, finalJoiner, lastLeftTable);
+            chainJoin(queryId, executor, currJoiner, finalJoiner, lastLeftTable);
             return finalJoiner;
         } catch (Exception e)
         {
@@ -243,9 +246,9 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    private Joiner buildFirstJoiner(ExecutorService executor,
-                                    BroadCastJoinTableInfo t1,
-                                    BroadCastJoinTableInfo t2,
+    protected static Joiner buildFirstJoiner(long queryId, ExecutorService executor,
+                                    BroadcastTableInfo t1,
+                                    BroadcastTableInfo t2,
                                     ChainJoinInfo joinInfo) throws ExecutionException, InterruptedException
     {
         AtomicReference<TypeDescription> t1Schema = new AtomicReference<>();
@@ -293,8 +296,8 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    private void chainJoin(ExecutorService executor, Joiner currJoiner, Joiner nextJoiner,
-                           BroadCastJoinTableInfo currRightTable) throws ExecutionException, InterruptedException
+    protected static void chainJoin(long queryId, ExecutorService executor, Joiner currJoiner, Joiner nextJoiner,
+                           BroadcastTableInfo currRightTable) throws ExecutionException, InterruptedException
     {
         TableScanFilter currRigthFilter = JSON.parseObject(currRightTable.getFilter(), TableScanFilter.class);
         List<Future> rightFutures = new ArrayList<>();
@@ -304,7 +307,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(currJoiner, nextJoiner, inputs, true,
+                    chainJoinSplit(queryId, currJoiner, nextJoiner, inputs, true,
                             currRightTable.getColumnsToRead(), currRigthFilter);
                 }
                 catch (Exception e)
@@ -331,7 +334,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param rightCols the column names of the right one of the two left tables
      * @param rightFilter the filter of the right one of the two left tables
      */
-    private void chainJoinSplit(Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
+    private static void chainJoinSplit(long queryId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
                                 boolean checkExistence, String[] rightCols, TableScanFilter rightFilter)
     {
         int numInputs = 0;
