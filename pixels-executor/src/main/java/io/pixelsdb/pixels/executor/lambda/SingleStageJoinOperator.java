@@ -22,8 +22,6 @@ package io.pixelsdb.pixels.executor.lambda;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastJoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 
 import java.util.List;
@@ -114,11 +112,13 @@ public class SingleStageJoinOperator implements JoinOperator
         {
             if (joinAlgo == JoinAlgorithm.BROADCAST)
             {
-                joinOutputs[i] = BroadcastJoinInvoker.invoke((BroadcastJoinInput) joinInputs.get(i));
+                joinOutputs[i] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInputs.get(i));
             }
             else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
             {
-                joinOutputs[i] = BroadcastChainJoinInvoker.invoke((BroadcastChainJoinInput) joinInputs.get(i));
+                joinOutputs[i] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInputs.get(i));
             }
             else
             {

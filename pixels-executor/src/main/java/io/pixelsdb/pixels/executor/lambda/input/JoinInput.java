@@ -25,13 +25,13 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
  * @author hank
  * @date 22/05/2022
  */
-public interface JoinInput
+public interface JoinInput extends Input
 {
     /**
      * Get the information about the join output.
      * @return the join output information
      */
-    public MultiOutputInfo getOutput();
+    MultiOutputInfo getOutput();
 
     /**
      * Set the information about the join output.

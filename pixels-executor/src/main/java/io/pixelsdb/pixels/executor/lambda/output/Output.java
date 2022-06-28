@@ -17,28 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
-
-import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.output.Output;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
+package io.pixelsdb.pixels.executor.lambda.output;
 
 /**
- * The lambda invoker for scan operator.
- *
  * @author hank
- * @date 4/18/22
+ * @date 6/28/22
  */
-public class ScanInvoker extends Invoker
+public interface Output
 {
-    protected ScanInvoker(String functionName)
-    {
-        super(functionName);
-    }
-
-    @Override
-    protected Output parseOutput(String outputJson)
-    {
-        return JSON.parseObject(outputJson, ScanOutput.class);
-    }
 }
