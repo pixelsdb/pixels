@@ -20,59 +20,24 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
-import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.services.lambda.model.InvocationType;
-import software.amazon.awssdk.services.lambda.model.InvokeRequest;
-
-import java.util.concurrent.CompletableFuture;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 /**
  * The lambda invoker for broadcast chain join operator.
  * @author hank
  * @date 03/06/2022
  */
-public class BroadcastChainJoinInvoker
+public class BroadcastChainJoinInvoker extends Invoker
 {
-    private static final String BROADCAST_CHAIN_JOIN_WORKER_NAME = "BroadcastChainJoinWorker";
-
-    private BroadcastChainJoinInvoker() { }
-
-    public static CompletableFuture<JoinOutput> invoke(BroadcastChainJoinInput input)
+    protected BroadcastChainJoinInvoker(String functionName)
     {
-        String inputJson = JSON.toJSONString(input);
-        SdkBytes payload = SdkBytes.fromUtf8String(inputJson);
+        super(functionName);
+    }
 
-        InvokeRequest request = InvokeRequest.builder()
-                .functionName(BROADCAST_CHAIN_JOIN_WORKER_NAME)
-                .payload(payload)
-                // using RequestResponse for higher function concurrency.
-                .invocationType(InvocationType.REQUEST_RESPONSE)
-                .build();
-
-        return Lambda.Instance().getAsyncClient().invoke(request).handle((response, err) -> {
-            if (err == null && response != null)
-            {
-                // 200 is the success status for RequestResponse invocation type.
-                if(response.statusCode() == 200 && response.functionError() == null)
-                {
-                    String outputJson = response.payload().asUtf8String();
-                    JoinOutput joinOutput = JSON.parseObject(outputJson, JoinOutput.class);
-                    if (joinOutput == null)
-                    {
-                        throw new RuntimeException("failed to parse response payload, length=" +
-                                response.payload().asByteArray().length);
-                    }
-                    return joinOutput;
-                }
-                else
-                {
-                    throw new RuntimeException("failed to execute the request, function error (" +
-                            response.statusCode() + "): " + response.functionError());
-                }
-            }
-            throw new RuntimeException("failed to get response", err);
-        });
+    @Override
+    protected Output parseOutput(String outputJson)
+    {
+        return JSON.parseObject(outputJson, JoinOutput.class);
     }
 }

@@ -21,7 +21,8 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.executor.lambda.PartitionInvoker;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.PartitionOutput;
@@ -74,7 +75,8 @@ public class TestPartitionInvoker
 
         System.out.println(JSON.toJSONString(input));
 
-        PartitionOutput output = PartitionInvoker.invoke(input).get();
+        PartitionOutput output = (PartitionOutput) InvokerFactory.Instance()
+                .getInvoker(WorkerType.PARTITION).invoke(input).get();
         System.out.println(output.getPath());
         for (int hashValue : output.getHashValues())
         {
@@ -112,7 +114,8 @@ public class TestPartitionInvoker
 
         System.out.println(JSON.toJSONString(input));
 
-        PartitionOutput output = PartitionInvoker.invoke(input).get();
+        PartitionOutput output = (PartitionOutput) InvokerFactory.Instance()
+                .getInvoker(WorkerType.PARTITION).invoke(input).get();
         System.out.println(output.getPath());
         for (int hashValue : output.getHashValues())
         {

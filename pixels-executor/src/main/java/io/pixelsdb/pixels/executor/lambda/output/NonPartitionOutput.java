@@ -26,7 +26,7 @@ import java.util.ArrayList;
  * @author hank
  * Created at: 11/04/2022
  */
-public class NonPartitionOutput
+public class NonPartitionOutput implements Output
 {
     /**
      * The path of the result files. No need to contain endpoint information.

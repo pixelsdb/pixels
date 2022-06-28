@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.ScanTableInfo;
  * @author hank
  * Created at: 11/04/2022
  */
-public class ScanInput
+public class ScanInput implements Input
 {
     /**
      * The unique id of the query.

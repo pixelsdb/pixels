@@ -21,7 +21,8 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.executor.lambda.PartitionedChainJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
@@ -163,7 +164,8 @@ public class TestPartitionedChainJoinInvoker
                 Arrays.asList("partitioned-chain-join-0", "partitioned-chain-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
-        JoinOutput output = PartitionedChainJoinInvoker.invoke(joinInput).get();
+        JoinOutput output = (JoinOutput) InvokerFactory.Instance()
+                .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
         for (int i = 0; i < output.getOutputs().size(); ++i)
         {

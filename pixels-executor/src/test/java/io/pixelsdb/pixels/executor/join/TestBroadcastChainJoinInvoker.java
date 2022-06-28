@@ -21,7 +21,8 @@ package io.pixelsdb.pixels.executor.join;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.executor.lambda.BroadcastChainJoinInvoker;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.BroadcastChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
@@ -134,7 +135,8 @@ public class TestBroadcastChainJoinInvoker
                         "chain-join-4","chain-join-5","chain-join-6","chain-join-7")));
 
         System.out.println(JSON.toJSONString(joinInput));
-        JoinOutput output = BroadcastChainJoinInvoker.invoke(joinInput).get();
+        JoinOutput output = (JoinOutput) InvokerFactory.Instance()
+                .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInput).get();
         System.out.println(output.getOutputs().size());
         for (int i = 0; i < output.getOutputs().size(); ++i)
         {

@@ -26,7 +26,7 @@ import java.util.Set;
  * @author hank
  * @date 07/05/2022
  */
-public class PartitionOutput
+public class PartitionOutput implements Output
 {
     /**
      * The path of the partitioned file.
