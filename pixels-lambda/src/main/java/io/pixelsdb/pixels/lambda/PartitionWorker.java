@@ -61,6 +61,13 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
     {
+        PartitionOutput partitionOutput = new PartitionOutput();
+        long startTime = System.currentTimeMillis();
+        partitionOutput.setStartTimeMs(startTime);
+        partitionOutput.setRequestId(context.getAwsRequestId());
+        partitionOutput.setSuccessful(true);
+        partitionOutput.setErrorMessage("");
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
@@ -80,7 +87,6 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
 
             String[] cols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-            PartitionOutput partitionOutput = new PartitionOutput();
             AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
             // The partitioned data would be kept in memory.
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
@@ -100,7 +106,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during partitioning", e);
+                        throw new PixelsWorkerException("error during partitioning", e);
                     }
                 });
             }
@@ -110,7 +116,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of partitioning", e);
+                throw new PixelsWorkerException("interrupted while waiting for the termination of partitioning", e);
             }
 
             PixelsWriter pixelsWriter = getWriter(writerSchema.get(), s3, outputPath, encoding,
@@ -133,12 +139,16 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
 
             pixelsWriter.close();
 
+            partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return partitionOutput;
         }
         catch (Exception e)
         {
             logger.error("error during partition", e);
-            return null;
+            partitionOutput.setSuccessful(false);
+            partitionOutput.setErrorMessage(e.getMessage());
+            partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            return partitionOutput;
         }
     }
 
@@ -212,7 +222,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 }
             } catch (Exception e)
             {
-                logger.error("failed to scan the file '" +
+                throw new PixelsWorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the partitioning result", e);
             }
         }

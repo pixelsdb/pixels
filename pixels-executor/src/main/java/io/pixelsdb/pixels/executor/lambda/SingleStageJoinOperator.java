@@ -23,9 +23,11 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -43,6 +45,7 @@ public class SingleStageJoinOperator implements JoinOperator
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
+    protected CompletableFuture<?>[] joinOutputs = null;
 
     static
     {
@@ -107,7 +110,7 @@ public class SingleStageJoinOperator implements JoinOperator
     public CompletableFuture<?>[] execute()
     {
         waitForCompletion(executePrev());
-        CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
+        joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
             if (joinAlgo == JoinAlgorithm.BROADCAST)
@@ -147,6 +150,31 @@ public class SingleStageJoinOperator implements JoinOperator
         return new CompletableFuture[0];
     }
 
+    @Override
+    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    {
+        SingleStageJoinOutputCollection outputCollection = new SingleStageJoinOutputCollection();
+        outputCollection.setJoinAlgo(joinAlgo);
+        if (joinOutputs != null)
+        {
+            Output[] outputs = new Output[joinOutputs.length];
+            for (int i = 0; i < joinOutputs.length; ++i)
+            {
+                outputs[i] = (Output) joinOutputs[i].get();
+            }
+            outputCollection.setJoinOutputs(outputs);
+        }
+        if (smallChild != null)
+        {
+            outputCollection.setSmallChild(smallChild.collectOutputs());
+        }
+        if (largeChild != null)
+        {
+            outputCollection.setLargeChild(largeChild.collectOutputs());
+        }
+        return outputCollection;
+    }
+
     protected static void waitForCompletion(CompletableFuture<?>[] childOutputs)
     {
         requireNonNull(childOutputs, "childOutputs is null");
@@ -175,6 +203,32 @@ public class SingleStageJoinOperator implements JoinOperator
             {
                 break;
             }
+        }
+    }
+
+    public static class SingleStageJoinOutputCollection extends OutputCollection
+    {
+        protected Output[] joinOutputs = null;
+
+        public SingleStageJoinOutputCollection() { }
+
+        public SingleStageJoinOutputCollection(JoinAlgorithm joinAlgo,
+                                               OutputCollection smallChild,
+                                               OutputCollection largeChild,
+                                               Output[] joinOutputs)
+        {
+            super(joinAlgo, smallChild, largeChild);
+            this.joinOutputs = joinOutputs;
+        }
+
+        public Output[] getJoinOutputs()
+        {
+            return joinOutputs;
+        }
+
+        public void setJoinOutputs(Output[] joinOutputs)
+        {
+            this.joinOutputs = joinOutputs;
         }
     }
 }

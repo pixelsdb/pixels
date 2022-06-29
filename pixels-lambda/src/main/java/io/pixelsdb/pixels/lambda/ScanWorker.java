@@ -62,6 +62,13 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
     @Override
     public ScanOutput handleRequest(ScanInput event, Context context)
     {
+        ScanOutput scanOutput = new ScanOutput();
+        long startTime = System.currentTimeMillis();
+        scanOutput.setStartTimeMs(startTime);
+        scanOutput.setRequestId(context.getAwsRequestId());
+        scanOutput.setSuccessful(true);
+        scanOutput.setErrorMessage("");
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
@@ -91,11 +98,10 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 }
             } catch (Exception e)
             {
-                logger.error("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
             }
             String[] cols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-            ScanOutput scanOutput = new ScanOutput();
             int i = 0;
             for (InputSplit inputSplit : inputSplits)
             {
@@ -113,7 +119,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during scan", e);
+                        throw new PixelsWorkerException("error during scan", e);
                     }
                 });
             }
@@ -123,14 +129,18 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of scan", e);
+                throw new PixelsWorkerException("interrupted while waiting for the termination of scan", e);
             }
 
+            scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return scanOutput;
         } catch (Exception e)
         {
             logger.error("error during scan", e);
-            return null;
+            scanOutput.setSuccessful(false);
+            scanOutput.setErrorMessage(e.getMessage());
+            scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            return scanOutput;
         }
     }
 
@@ -187,7 +197,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 } while (!rowBatch.endOfFile);
             } catch (Exception e)
             {
-                logger.error("failed to scan the file '" +
+                throw new PixelsWorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the result", e);
             }
         }
@@ -205,7 +215,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             }
         } catch (Exception e)
         {
-            logger.error("failed finish writing and close the output file '" + outputPath + "'", e);
+            throw new PixelsWorkerException(
+                    "failed finish writing and close the output file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
     }

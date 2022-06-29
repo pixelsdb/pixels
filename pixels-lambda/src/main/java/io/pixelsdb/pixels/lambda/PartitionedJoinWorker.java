@@ -65,6 +65,13 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     @Override
     public JoinOutput handleRequest(PartitionedJoinInput event, Context context)
     {
+        JoinOutput joinOutput = new JoinOutput();
+        long startTime = System.currentTimeMillis();
+        joinOutput.setStartTimeMs(startTime);
+        joinOutput.setRequestId(context.getAwsRequestId());
+        joinOutput.setSuccessful(true);
+        joinOutput.setErrorMessage("");
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
@@ -136,7 +143,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
             } catch (Exception e)
             {
-                logger.error("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
             }
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
@@ -167,7 +174,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during hash table construction", e);
+                        throw new PixelsWorkerException("error during hash table construction", e);
                     }
                 }));
             }
@@ -176,10 +183,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 future.get();
             }
             logger.info("hash table size: " + joiner.getSmallTableSize());
-            JoinOutput joinOutput = new JoinOutput();
+
             if (joiner.getSmallTableSize() == 0)
             {
                 // the left table is empty, no need to continue the join.
+                joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
                 return joinOutput;
             }
             // scan the right table and do the join.
@@ -213,7 +221,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during hash join", e);
+                        throw new PixelsWorkerException("error during hash join", e);
                     }
                 });
             }
@@ -223,7 +231,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of join", e);
+                throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
             }
 
             if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
@@ -253,11 +261,15 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
             }
 
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         } catch (Exception e)
         {
             logger.error("error during join", e);
-            return null;
+            joinOutput.setSuccessful(false);
+            joinOutput.setErrorMessage(e.getMessage());
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            return joinOutput;
         }
     }
 
@@ -290,7 +302,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (IOException e)
                 {
-                    logger.error("failed to check the existence of the partitioned file '" +
+                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             leftPartitioned + "' of the left table", e);
                 }
 
@@ -324,7 +336,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the partitioned file '" +
+                    throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             leftPartitioned + "' and build the hash table", e);
                 }
             }
@@ -368,7 +380,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (IOException e)
                 {
-                    logger.error("failed to check the existence of the partitioned file '" +
+                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
 
@@ -414,7 +426,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the partitioned file '" +
+                    throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
             }
@@ -433,7 +445,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
         } catch (Exception e)
         {
-            logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
+            throw new PixelsWorkerException(
+                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
     }
@@ -483,7 +496,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (IOException e)
                 {
-                    logger.error("failed to check the existence of the partitioned file '" +
+                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
                 }
 
@@ -533,7 +546,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     }
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the partitioned file '" +
+                    throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
             }
@@ -580,7 +593,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             }
         } catch (Exception e)
         {
-            logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
+            throw new PixelsWorkerException(
+                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return rowGroupNum;
     }

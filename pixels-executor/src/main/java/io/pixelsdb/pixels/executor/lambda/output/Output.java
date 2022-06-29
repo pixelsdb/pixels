@@ -23,6 +23,61 @@ package io.pixelsdb.pixels.executor.lambda.output;
  * @author hank
  * @date 6/28/22
  */
-public interface Output
+public class Output
 {
+    private String requestId;
+    private boolean successful;
+    private String errorMessage;
+    private long startTimeMs;
+    private int durationMs;
+
+    public String getRequestId()
+    {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId)
+    {
+        this.requestId = requestId;
+    }
+
+    public boolean isSuccessful()
+    {
+        return successful;
+    }
+
+    public void setSuccessful(boolean yes)
+    {
+        this.successful = successful;
+    }
+
+    public String getErrorMessage()
+    {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage)
+    {
+        this.errorMessage = errorMessage;
+    }
+
+    public long getStartTimeMs()
+    {
+        return startTimeMs;
+    }
+
+    public void setStartTimeMs(long startTimeMs)
+    {
+        this.startTimeMs = startTimeMs;
+    }
+
+    public int getDurationMs()
+    {
+        return durationMs;
+    }
+
+    public void setDurationMs(int durationMs)
+    {
+        this.durationMs = durationMs;
+    }
 }

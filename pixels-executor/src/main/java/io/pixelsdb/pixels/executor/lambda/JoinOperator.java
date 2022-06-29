@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
@@ -57,4 +58,65 @@ public interface JoinOperator
      * @return empty array if the previous stages do not exist or do not need to be wait for
      */
     CompletableFuture<?>[] executePrev();
+
+    /**
+     * This method collects the outputs of the join operator. It may block until the join
+     * completes, therefore it should not be called in the query execution thread. Otherwise,
+     * it will block the query execution.
+     * @return the out
+     */
+    OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
+
+    /**
+     * This class is used to collect the outputs of a join operator.
+     * It can be serialized to a json string or deserialized to an object from json string
+     * by fastjson or other feasible json libraries.
+     */
+    class OutputCollection
+    {
+        protected JoinAlgorithm joinAlgo;
+        protected OutputCollection smallChild;
+        protected OutputCollection largeChild;
+
+        public OutputCollection() { }
+
+        public OutputCollection(JoinAlgorithm joinAlgo,
+                                OutputCollection smallChild,
+                                OutputCollection largeChild)
+        {
+            this.joinAlgo = joinAlgo;
+            this.smallChild = smallChild;
+            this.largeChild = largeChild;
+        }
+
+        public JoinAlgorithm getJoinAlgo()
+        {
+            return joinAlgo;
+        }
+
+        public void setJoinAlgo(JoinAlgorithm joinAlgo)
+        {
+            this.joinAlgo = joinAlgo;
+        }
+
+        public OutputCollection getSmallChild()
+        {
+            return smallChild;
+        }
+
+        public void setSmallChild(OutputCollection smallChild)
+        {
+            this.smallChild = smallChild;
+        }
+
+        public OutputCollection getLargeChild()
+        {
+            return largeChild;
+        }
+
+        public void setLargeChild(OutputCollection largeChild)
+        {
+            this.largeChild = largeChild;
+        }
+    }
 }

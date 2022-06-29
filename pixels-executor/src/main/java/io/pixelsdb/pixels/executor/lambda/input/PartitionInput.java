@@ -31,7 +31,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.ScanTableInfo;
  * @author hank
  * @date 07/05/2022
  */
-public class PartitionInput implements Input
+public class PartitionInput extends Input
 {
     /**
      * The unique id of the query.

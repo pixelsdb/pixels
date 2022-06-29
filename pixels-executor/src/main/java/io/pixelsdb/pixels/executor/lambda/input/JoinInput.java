@@ -25,17 +25,38 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
  * @author hank
  * @date 22/05/2022
  */
-public interface JoinInput extends Input
+public class JoinInput extends Input
 {
+    /**
+     * The information of the join output files.<br/>
+     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
+     * should be consistent with the number of input splits in right table. For left-outer
+     * and full-outer joins, there is an additional output file for the left-outer records.
+     */
+    private MultiOutputInfo output;
+
+    public JoinInput() {}
+
+    public JoinInput(MultiOutputInfo output)
+    {
+        this.output = output;
+    }
+
     /**
      * Get the information about the join output.
      * @return the join output information
      */
-    MultiOutputInfo getOutput();
+    public MultiOutputInfo getOutput()
+    {
+        return output;
+    }
 
     /**
      * Set the information about the join output.
      * @param output the join output
      */
-    void setOutput(MultiOutputInfo output);
+    public void setOutput(MultiOutputInfo output)
+    {
+        this.output = output;
+    }
 }
