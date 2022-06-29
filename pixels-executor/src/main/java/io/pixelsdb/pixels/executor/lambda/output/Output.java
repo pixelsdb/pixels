@@ -46,7 +46,7 @@ public class Output
         return successful;
     }
 
-    public void setSuccessful(boolean yes)
+    public void setSuccessful(boolean successful)
     {
         this.successful = successful;
     }
