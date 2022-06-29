@@ -23,9 +23,11 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -37,8 +39,10 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PartitionedJoinOperator extends SingleStageJoinOperator
 {
-    private final List<PartitionInput> smallPartitionInputs;
-    private final List<PartitionInput> largePartitionInputs;
+    protected final List<PartitionInput> smallPartitionInputs;
+    protected final List<PartitionInput> largePartitionInputs;
+    protected CompletableFuture<?>[] smallPartitionOutputs = null;
+    protected CompletableFuture<?>[] largePartitionOutputs = null;
 
     public PartitionedJoinOperator(List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
@@ -120,7 +124,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     public CompletableFuture<?>[] execute()
     {
         waitForCompletion(executePrev());
-        CompletableFuture<?>[] joinOutputs = new CompletableFuture[joinInputs.size()];
+        joinOutputs = new CompletableFuture[joinInputs.size()];
         for (int i = 0; i < joinInputs.size(); ++i)
         {
             if (joinAlgo == JoinAlgorithm.PARTITIONED)
@@ -144,34 +148,37 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public CompletableFuture<?>[] executePrev()
     {
+        CompletableFuture<?>[] smallChildOutputs;
         if (smallChild != null && largeChild != null)
         {
             // both children exist, we should execute both children and wait for the small child.
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            CompletableFuture<?>[] childOutputs = smallChild.execute();
+            smallChildOutputs = smallChild.execute();
             largeChild.execute();
-            return childOutputs;
+            return smallChildOutputs;
         }
         else if (smallChild != null)
         {
             // only small child exists, we should invoke the large table partitioning and wait for the small child.
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            CompletableFuture<?>[] childOutputs = smallChild.execute();
+            smallChildOutputs = smallChild.execute();
+            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+            int i = 0;
             for (PartitionInput partitionInput : largePartitionInputs)
             {
-                InvokerFactory.Instance().getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                largePartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
-            return childOutputs;
+            return smallChildOutputs;
         }
         else if (largeChild != null)
         {
             // only large child exists, we should invoke and wait for the small table partitioning.
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            CompletableFuture<?>[] smallPartitionOutputs =
-                    new CompletableFuture[smallPartitionInputs.size()];
+            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
             int i = 0;
             for (PartitionInput partitionInput : smallPartitionInputs)
             {
@@ -184,19 +191,102 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         else
         {
             // no children exist, partition both tables and wait for the small table partitioning.
-            CompletableFuture<?>[] smallPartitionOutputs =
-                    new CompletableFuture[smallPartitionInputs.size()];
+            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
             int i = 0;
             for (PartitionInput partitionInput : smallPartitionInputs)
             {
                 smallPartitionOutputs[i++] = InvokerFactory.Instance()
                         .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
+            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+            i = 0;
             for (PartitionInput partitionInput : largePartitionInputs)
             {
-                InvokerFactory.Instance().getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                largePartitionOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
             return smallPartitionOutputs;
+        }
+    }
+
+    @Override
+    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    {
+        PartitionedJoinOutputCollection outputCollection = new PartitionedJoinOutputCollection();
+        if (joinOutputs != null)
+        {
+            Output[] outputs = new Output[joinOutputs.length];
+            for (int i = 0; i < joinOutputs.length; ++i)
+            {
+                outputs[i] = (Output) joinOutputs[i].get();
+            }
+            outputCollection.setJoinOutputs(outputs);
+        }
+        if (smallPartitionOutputs != null)
+        {
+            Output[] outputs = new Output[smallPartitionOutputs.length];
+            for (int i = 0; i < smallPartitionOutputs.length; ++i)
+            {
+                outputs[i] = (Output) smallPartitionOutputs[i].get();
+            }
+            outputCollection.setSmallPartitionOutputs(outputs);
+        }
+        if (largePartitionOutputs != null)
+        {
+            Output[] outputs = new Output[largePartitionOutputs.length];
+            for (int i = 0; i < largePartitionOutputs.length; ++i)
+            {
+                outputs[i] = (Output) largePartitionOutputs[i].get();
+            }
+            outputCollection.setLargePartitionOutputs(outputs);
+        }
+        if (smallChild != null)
+        {
+            outputCollection.setSmallChild(smallChild.collectOutputs());
+        }
+        if (largeChild != null)
+        {
+            outputCollection.setLargeChild(largeChild.collectOutputs());
+        }
+        return outputCollection;
+    }
+
+    public static class PartitionedJoinOutputCollection extends SingleStageJoinOutputCollection
+    {
+        protected Output[] smallPartitionOutputs = null;
+        protected Output[] largePartitionOutputs = null;
+
+        public PartitionedJoinOutputCollection() { }
+
+        public PartitionedJoinOutputCollection(OutputCollection smallChild,
+                                               OutputCollection largeChild,
+                                               Output[] joinOutputs,
+                                               Output[] smallPartitionOutputs,
+                                               Output[] largePartitionOutputs)
+        {
+            super(smallChild, largeChild, joinOutputs);
+            this.smallPartitionOutputs = smallPartitionOutputs;
+            this.largePartitionOutputs = largePartitionOutputs;
+        }
+
+        public Output[] getSmallPartitionOutputs()
+        {
+            return smallPartitionOutputs;
+        }
+
+        public void setSmallPartitionOutputs(Output[] smallPartitionOutputs)
+        {
+            this.smallPartitionOutputs = smallPartitionOutputs;
+        }
+
+        public Output[] getLargePartitionOutputs()
+        {
+            return largePartitionOutputs;
+        }
+
+        public void setLargePartitionOutputs(Output[] largePartitionOutputs)
+        {
+            this.largePartitionOutputs = largePartitionOutputs;
         }
     }
 }

@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.PartitionedTableInfo;
  * @author hank
  * @date 07/05/2022
  */
-public class PartitionedJoinInput implements JoinInput
+public class PartitionedJoinInput extends JoinInput
 {
     /**
      * The unique id of the query.
@@ -45,13 +45,6 @@ public class PartitionedJoinInput implements JoinInput
      * The information of the partitioned join.
      */
     private PartitionedJoinInfo joinInfo;
-    /**
-     * The information of the join output files.<br/>
-     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
-     * should be consistent with the parallelism of the right table. For left-outer and
-     * full-outer joins, there is an additional output file for the left-outer records.
-     */
-    private MultiOutputInfo output;
 
     /**
      * Default constructor for Jackson.
@@ -62,11 +55,11 @@ public class PartitionedJoinInput implements JoinInput
                                 PartitionedTableInfo largeTable, PartitionedJoinInfo joinInfo,
                                 MultiOutputInfo output)
     {
+        super(output);
         this.queryId = queryId;
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-        this.output = output;
     }
 
     public long getQueryId()
@@ -107,17 +100,5 @@ public class PartitionedJoinInput implements JoinInput
     public void setJoinInfo(PartitionedJoinInfo joinInfo)
     {
         this.joinInfo = joinInfo;
-    }
-
-    @Override
-    public MultiOutputInfo getOutput()
-    {
-        return output;
-    }
-
-    @Override
-    public void setOutput(MultiOutputInfo output)
-    {
-        this.output = output;
     }
 }

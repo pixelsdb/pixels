@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
  * @author hank
  * @date 07/05/2022
  */
-public class BroadcastJoinInput implements JoinInput
+public class BroadcastJoinInput extends JoinInput
 {
     /**
      * The unique id of the query.
@@ -46,13 +46,6 @@ public class BroadcastJoinInput implements JoinInput
      * The information of the broadcast join.
      */
     private JoinInfo joinInfo;
-    /**
-     * The information of the join output files.<br/>
-     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
-     * should be consistent with the number of input splits in right table. For left-outer
-     * and full-outer joins, there is an additional output file for the left-outer records.
-     */
-    private MultiOutputInfo output;
 
     /**
      * Default constructor for Jackson.
@@ -63,11 +56,11 @@ public class BroadcastJoinInput implements JoinInput
                               BroadcastTableInfo largeTable, JoinInfo joinInfo,
                               MultiOutputInfo output)
     {
+        super(output);
         this.queryId = queryId;
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-        this.output = output;
     }
 
     public long getQueryId()
@@ -108,17 +101,5 @@ public class BroadcastJoinInput implements JoinInput
     public void setJoinInfo(JoinInfo joinInfo)
     {
         this.joinInfo = joinInfo;
-    }
-
-    @Override
-    public MultiOutputInfo getOutput()
-    {
-        return output;
-    }
-
-    @Override
-    public void setOutput(MultiOutputInfo output)
-    {
-        this.output = output;
     }
 }

@@ -66,6 +66,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
     {
+        JoinOutput joinOutput = new JoinOutput();
+        long startTime = System.currentTimeMillis();
+        joinOutput.setStartTimeMs(startTime);
+        joinOutput.setRequestId(context.getAwsRequestId());
+        joinOutput.setSuccessful(true);
+        joinOutput.setErrorMessage("");
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
@@ -118,7 +125,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             } catch (Exception e)
             {
-                logger.error("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
             }
 
             boolean partitionOutput = event.getJoinInfo().isPostPartition();
@@ -145,7 +152,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during hash table construction", e);
+                        throw new PixelsWorkerException("error during hash table construction", e);
                     }
                 }));
             }
@@ -154,8 +161,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 future.get();
             }
             logger.info("hash table size: " + joiner.getSmallTableSize());
+
             // scan the right table and do the join.
-            JoinOutput joinOutput = new JoinOutput();
             int i = 0;
             for (InputSplit inputSplit : rightInputs)
             {
@@ -177,7 +184,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     }
                     catch (Exception e)
                     {
-                        logger.error("error during broadcast join", e);
+                        throw new PixelsWorkerException("error during broadcast join", e);
                     }
                 });
             }
@@ -187,14 +194,18 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
             } catch (InterruptedException e)
             {
-                logger.error("interrupted while waiting for the termination of join", e);
+                throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
             }
 
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         } catch (Exception e)
         {
             logger.error("error during join", e);
-            return null;
+            joinOutput.setSuccessful(false);
+            joinOutput.setErrorMessage(e.getMessage());
+            joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            return joinOutput;
         }
     }
 
@@ -231,7 +242,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } catch (IOException e)
                     {
-                        logger.error("failed to check the existence of the left table input file '" +
+                        throw new PixelsWorkerException(
+                                "failed to check the existence of the left table input file '" +
                                 input.getPath() + "'", e);
                     }
                     long end = System.currentTimeMillis();
@@ -270,7 +282,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     } while (!rowBatch.endOfFile);
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the left table input file '" +
+                    throw new PixelsWorkerException("failed to scan the left table input file '" +
                             input.getPath() + "' and build the hash table", e);
                 }
             }
@@ -318,8 +330,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } catch (IOException e)
                     {
-                        logger.error("failed to check the existence of the right table input file '" +
-                                input.getPath() + "'", e);
+                        throw new PixelsWorkerException(
+                                "failed to check the existence of the right table input file '" +
+                                        input.getPath() + "'", e);
                     }
                     long end = System.currentTimeMillis();
                     logger.info("duration of existence check: " + (end - start));
@@ -369,7 +382,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             ", number of joined rows: " + joinedRows);
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the right table input file '" +
+                    throw new PixelsWorkerException("failed to scan the right table input file '" +
                             input.getPath() + "' and do the join", e);
                 }
             }
@@ -388,7 +401,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
         } catch (Exception e)
         {
-            logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
+            throw new PixelsWorkerException(
+                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return pixelsWriter.getRowGroupNum();
     }
@@ -442,7 +456,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } catch (IOException e)
                     {
-                        logger.error("failed to check the existence of the right table input file '" +
+                        throw new PixelsWorkerException(
+                                "failed to check the existence of the right table input file '" +
                                 input.getPath() + "'", e);
                     }
                     long end = System.currentTimeMillis();
@@ -497,7 +512,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             ", number of joined rows: " + joinedRows);
                 } catch (Exception e)
                 {
-                    logger.error("failed to scan the right table input file '" +
+                    throw new PixelsWorkerException("failed to scan the right table input file '" +
                             input.getPath() + "' and do the join", e);
                 }
             }
@@ -544,7 +559,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
         } catch (Exception e)
         {
-            logger.error("failed to finish writing and close the join result file '" + outputPath + "'", e);
+            throw new PixelsWorkerException(
+                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
         return rowGroupNum;
     }

@@ -17,12 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda.input;
+package io.pixelsdb.pixels.lambda;
 
 /**
  * @author hank
- * @date 6/28/22
+ * @date 28/06/2022
  */
-public class Input
+public class PixelsWorkerException extends RuntimeException
 {
+    public PixelsWorkerException(String message)
+    {
+        super(message);
+    }
+
+    public PixelsWorkerException(String message, Throwable cause)
+    {
+        super(message, cause);
+    }
 }

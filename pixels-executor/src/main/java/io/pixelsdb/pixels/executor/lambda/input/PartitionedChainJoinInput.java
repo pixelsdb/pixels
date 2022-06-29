@@ -28,7 +28,7 @@ import java.util.List;
  * @author hank
  * @date 25/06/2022
  */
-public class PartitionedChainJoinInput implements JoinInput
+public class PartitionedChainJoinInput extends JoinInput
 {
     /**
      * The unique id of the query.
@@ -66,13 +66,6 @@ public class PartitionedChainJoinInput implements JoinInput
      * TODO: support left/full outer join for partitioned chain join.
      */
     private PartitionedJoinInfo joinInfo;
-    /**
-     * The information of the join output files.<br/>
-     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
-     * should be consistent with the parallelism of the right table. For left-outer and
-     * full-outer joins, there is an additional output file for the left-outer records.
-     */
-    private MultiOutputInfo output;
 
     /**
      * Default constructor for Jackson.
@@ -87,13 +80,13 @@ public class PartitionedChainJoinInput implements JoinInput
                                      PartitionedJoinInfo joinInfo,
                                      MultiOutputInfo output)
     {
+        super(output);
         this.queryId = queryId;
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
         this.smallTable = smallTable;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-        this.output = output;
     }
 
     public long getQueryId()
@@ -156,18 +149,6 @@ public class PartitionedChainJoinInput implements JoinInput
         this.joinInfo = joinInfo;
     }
 
-    @Override
-    public MultiOutputInfo getOutput()
-    {
-        return output;
-    }
-
-    @Override
-    public void setOutput(MultiOutputInfo output)
-    {
-        this.output = output;
-    }
-
     public Builder toBuilder()
     {
         return new Builder(this);
@@ -181,7 +162,7 @@ public class PartitionedChainJoinInput implements JoinInput
         {
             this.builderInstance = new PartitionedChainJoinInput(
                     instance.queryId, instance.chainTables, instance.chainJoinInfos,
-                    instance.smallTable, instance.largeTable, instance.joinInfo, instance.output);
+                    instance.smallTable, instance.largeTable, instance.joinInfo, instance.getOutput());
         }
 
         public Builder setLargeTable(PartitionedTableInfo largeTable)

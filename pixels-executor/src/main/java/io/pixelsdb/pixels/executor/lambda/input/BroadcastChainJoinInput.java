@@ -32,7 +32,7 @@ import java.util.List;
  * @author hank
  * @date 03/06/2022
  */
-public class BroadcastChainJoinInput implements JoinInput
+public class BroadcastChainJoinInput extends JoinInput
 {
     private long queryId;
     /**
@@ -65,13 +65,6 @@ public class BroadcastChainJoinInput implements JoinInput
      * there should be M post chain join infos.
      */
     private List<ChainJoinInfo> postChainJoinInfos;
-    /**
-     * The information of the join output files.<br/>
-     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
-     * should be consistent with the number of input splits in right table. For left-outer
-     * and full-outer joins, there is an additional output file for the left-outer records.
-     */
-    private MultiOutputInfo output;
 
     /**
      * Default constructor for Jackson.
@@ -86,6 +79,7 @@ public class BroadcastChainJoinInput implements JoinInput
                                    List<BroadcastTableInfo> postSmallTables,
                                    List<ChainJoinInfo> postChainJoinInfos, MultiOutputInfo output)
     {
+        super(output);
         this.queryId = queryId;
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
@@ -94,7 +88,6 @@ public class BroadcastChainJoinInput implements JoinInput
         this.postChainJoinsExist = postChainJoinsExist;
         this.postSmallTables = postSmallTables;
         this.postChainJoinInfos = postChainJoinInfos;
-        this.output = output;
     }
 
     public long getQueryId()
@@ -177,18 +170,6 @@ public class BroadcastChainJoinInput implements JoinInput
         this.postChainJoinInfos = postChainJoinInfos;
     }
 
-    @Override
-    public MultiOutputInfo getOutput()
-    {
-        return output;
-    }
-
-    @Override
-    public void setOutput(MultiOutputInfo output)
-    {
-        this.output = output;
-    }
-
     public Builder toBuilder()
     {
         return new Builder(this);
@@ -203,7 +184,7 @@ public class BroadcastChainJoinInput implements JoinInput
             this.builderInstance = new BroadcastChainJoinInput(
                     instance.queryId, instance.chainTables, instance.chainJoinInfos,
                     instance.largeTable, instance.joinInfo, instance.postChainJoinsExist,
-                    instance.postSmallTables, instance.postChainJoinInfos, instance.output);
+                    instance.postSmallTables, instance.postChainJoinInfos, instance.getOutput());
         }
 
         public Builder setLargeTable(BroadcastTableInfo largeTable)
