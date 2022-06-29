@@ -69,19 +69,34 @@ public interface JoinOperator
 
     /**
      * This class is used to collect the outputs of a join operator.
-     * It can be parsed into a json string by fastjson or jackson.
+     * It can be serialized to a json string or deserialized to an object from json string
+     * by fastjson or other feasible json libraries.
      */
     class OutputCollection
     {
+        protected JoinAlgorithm joinAlgo;
         protected OutputCollection smallChild;
         protected OutputCollection largeChild;
 
         public OutputCollection() { }
 
-        public OutputCollection(OutputCollection smallChild, OutputCollection largeChild)
+        public OutputCollection(JoinAlgorithm joinAlgo,
+                                OutputCollection smallChild,
+                                OutputCollection largeChild)
         {
+            this.joinAlgo = joinAlgo;
             this.smallChild = smallChild;
             this.largeChild = largeChild;
+        }
+
+        public JoinAlgorithm getJoinAlgo()
+        {
+            return joinAlgo;
+        }
+
+        public void setJoinAlgo(JoinAlgorithm joinAlgo)
+        {
+            this.joinAlgo = joinAlgo;
         }
 
         public OutputCollection getSmallChild()

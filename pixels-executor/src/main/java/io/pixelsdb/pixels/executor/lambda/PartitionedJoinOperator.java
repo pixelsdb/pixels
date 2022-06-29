@@ -213,6 +213,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         PartitionedJoinOutputCollection outputCollection = new PartitionedJoinOutputCollection();
+        outputCollection.setJoinAlgo(joinAlgo);
         if (joinOutputs != null)
         {
             Output[] outputs = new Output[joinOutputs.length];
@@ -258,13 +259,14 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
 
         public PartitionedJoinOutputCollection() { }
 
-        public PartitionedJoinOutputCollection(OutputCollection smallChild,
+        public PartitionedJoinOutputCollection(JoinAlgorithm joinAlgo,
+                                               OutputCollection smallChild,
                                                OutputCollection largeChild,
                                                Output[] joinOutputs,
                                                Output[] smallPartitionOutputs,
                                                Output[] largePartitionOutputs)
         {
-            super(smallChild, largeChild, joinOutputs);
+            super(joinAlgo, smallChild, largeChild, joinOutputs);
             this.smallPartitionOutputs = smallPartitionOutputs;
             this.largePartitionOutputs = largePartitionOutputs;
         }

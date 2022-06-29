@@ -154,6 +154,7 @@ public class SingleStageJoinOperator implements JoinOperator
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         SingleStageJoinOutputCollection outputCollection = new SingleStageJoinOutputCollection();
+        outputCollection.setJoinAlgo(joinAlgo);
         if (joinOutputs != null)
         {
             Output[] outputs = new Output[joinOutputs.length];
@@ -211,11 +212,12 @@ public class SingleStageJoinOperator implements JoinOperator
 
         public SingleStageJoinOutputCollection() { }
 
-        public SingleStageJoinOutputCollection(OutputCollection smallChild,
-                                           OutputCollection largeChild,
-                                           Output[] joinOutputs)
+        public SingleStageJoinOutputCollection(JoinAlgorithm joinAlgo,
+                                               OutputCollection smallChild,
+                                               OutputCollection largeChild,
+                                               Output[] joinOutputs)
         {
-            super(smallChild, largeChild);
+            super(joinAlgo, smallChild, largeChild);
             this.joinOutputs = joinOutputs;
         }
 
