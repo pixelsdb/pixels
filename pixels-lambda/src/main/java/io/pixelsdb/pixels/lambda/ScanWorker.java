@@ -207,17 +207,18 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             if (pixelsWriter != null)
             {
                 pixelsWriter.close();
+                while (!minio.exists(outputPath))
+                {
+                    // Wait for 10ms and see if the output file is visible.
+                    TimeUnit.MILLISECONDS.sleep(10);
+                }
+                return pixelsWriter.getRowGroupNum();
             }
-            while (!minio.exists(outputPath))
-            {
-                // Wait for 10ms and see if the output file is visible.
-                TimeUnit.MILLISECONDS.sleep(10);
-            }
+            return 0;
         } catch (Exception e)
         {
             throw new PixelsWorkerException(
                     "failed finish writing and close the output file '" + outputPath + "'", e);
         }
-        return pixelsWriter.getRowGroupNum();
     }
 }
