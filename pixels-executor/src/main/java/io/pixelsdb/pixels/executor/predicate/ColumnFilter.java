@@ -221,6 +221,11 @@ public class ColumnFilter<T extends Comparable<T>>
                 doFilter(lcv.vector, lcv.noNulls ? null : lcv.isNull, start, length, result);
                 return;
             case DECIMAL:
+                if (columnVector instanceof LongDecimalColumnVector)
+                {
+                    // TODO: support column filter for long decimal.
+                    throw new UnsupportedOperationException("long decimal is currently not supported in column filter");
+                }
                 DecimalColumnVector decv = (DecimalColumnVector) columnVector;
                 // doFilter(decv.vector, decv.noNulls ? null : decv.isNull,
                 //         decv.precision, decv.scale, start, length, result);
@@ -259,7 +264,7 @@ public class ColumnFilter<T extends Comparable<T>>
                 return;
             default:
                 throw new UnsupportedOperationException("column type (" +
-                        columnType.getPrimaryName() + "is not supported in column filter");
+                        columnType.getPrimaryName() + ") is not supported in column filter");
         }
     }
 

@@ -226,6 +226,14 @@ public class EncodingUtils
         }
     }
 
+    /**
+     * Write a long value into the output in little endian.
+     * TODO: the value is not encoded.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
     public void writeLongLE(OutputStream output, long value)
             throws IOException
     {
@@ -252,6 +260,14 @@ public class EncodingUtils
                 + ((long) (inputBytes[7 + offset] & 0xff) << 56));
     }
 
+    /**
+     * Write a int value into the output in little endian.
+     * TODO: the value is not encoded.
+     *
+     * @param output the output
+     * @param value the long value
+     * @throws IOException
+     */
     public void writeIntLE(OutputStream output, int value)
             throws IOException
     {

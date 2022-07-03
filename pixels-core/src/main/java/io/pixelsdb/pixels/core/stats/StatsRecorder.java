@@ -21,10 +21,13 @@ package io.pixelsdb.pixels.core.stats;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Integer128;
 
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
 
 /**
  * This is a base class for recording (updating) all kinds of column statistics during file writing.
@@ -81,6 +84,16 @@ public class StatsRecorder
     public void updateInteger(long value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update integer");
+    }
+
+    public void updateInteger128(long high, long low, int repetitions)
+    {
+        throw new UnsupportedOperationException("Can't update integer128");
+    }
+
+    public void updateInteger128(Integer128 int128, int repetitions)
+    {
+        throw new UnsupportedOperationException("Can't update integer128");
     }
 
     public void updateFloat(float value)
@@ -181,9 +194,9 @@ public class StatsRecorder
         return builder;
     }
 
-    public static StatsRecorder create(TypeDescription schema)
+    public static StatsRecorder create(TypeDescription type)
     {
-        switch (schema.getCategory())
+        switch (type.getCategory())
         {
             case BOOLEAN:
                 return new BooleanStatsRecorder();
@@ -196,10 +209,13 @@ public class StatsRecorder
                  * To be compatible with Presto, use IntegerColumnStats for decimal.
                  * Decimal and its statistics in Presto are represented as long. If
                  * needed in other places, integer statistics can be converted to double
-                 * using the precision and scale from the schema in the file footer.
+                 * using the precision and scale from the type in the file footer.
                  */
             case DECIMAL:
-                return new IntegerStatsRecorder();
+                if (type.getPrecision() <= SHORT_MAX_PRECISION)
+                    return new IntegerStatsRecorder();
+                else
+                    return new Integer128StatsRecorder();
             case FLOAT:
             case DOUBLE:
                 return new DoubleStatsRecorder();
@@ -221,9 +237,9 @@ public class StatsRecorder
         }
     }
 
-    public static StatsRecorder create(TypeDescription schema, PixelsProto.ColumnStatistic statistic)
+    public static StatsRecorder create(TypeDescription type, PixelsProto.ColumnStatistic statistic)
     {
-        switch (schema.getCategory())
+        switch (type.getCategory())
         {
             case BOOLEAN:
                 return new BooleanStatsRecorder(statistic);

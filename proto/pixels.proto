@@ -156,6 +156,14 @@ message IntegerStatistic  {
     optional sint64 sum = 3;
 }
 
+message Integer128Statistic  {
+    // high stores the highest 64 bits whereas low stores the lowest 64 bits
+    optional uint64 minimum_high = 1;
+    optional uint64 minimum_low = 2;
+    optional sint64 maximum_high = 3;
+    optional sint64 maximum_low = 4;
+}
+
 message DoubleStatistic {
     optional double minimum = 1;
     optional double maximum = 2;
@@ -208,6 +216,8 @@ message ColumnStatistic {
     // use field number 9 and 10 for compatibility.
     optional DateStatistic dateStatistics = 9;
     optional TimeStatistic timeStatistics = 10;
+    // Integer128 is added for long decimal in Issue #203.
+    optional Integer128Statistic int128Statistics = 11;
     optional bool hasNull = 8;
 }
 

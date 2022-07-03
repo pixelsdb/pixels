@@ -49,7 +49,6 @@ service MetadataService {
     rpc ExistView (ExistViewRequest) returns (ExistViewResponse);
     rpc GetViews (GetViewsRequest) returns (GetViewsResponse);
     rpc DropView (DropViewRequest) returns (DropViewResponse);
-
 }
 
 // begin domain objects definition

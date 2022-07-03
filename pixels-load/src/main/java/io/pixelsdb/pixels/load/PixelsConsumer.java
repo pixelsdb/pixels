@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.load;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.DateUtil;
-import io.pixelsdb.pixels.common.utils.StringUtil;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -135,10 +134,10 @@ public class PixelsConsumer extends Consumer
                         }
                         initPixelsFile = false;
 
-                        line = StringUtil.replaceAll(line, "false", "0");
-                        line = StringUtil.replaceAll(line, "False", "0");
-                        line = StringUtil.replaceAll(line, "true", "1");
-                        line = StringUtil.replaceAll(line, "True", "1");
+                        //line = StringUtil.replaceAll(line, "false", "0");
+                        //line = StringUtil.replaceAll(line, "False", "0");
+                        //line = StringUtil.replaceAll(line, "true", "1");
+                        //line = StringUtil.replaceAll(line, "True", "1");
                         int rowId = rowBatch.size++;
                         rowCounter++;
                         if (regex.equals("\\s"))
