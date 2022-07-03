@@ -74,10 +74,10 @@ public class TestPixelsWriter
             DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
             LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
 
-            vi.precision = 15;
-            vi.scale = 2;
-            vj.precision = 30;
-            vj.scale = 4;
+            System.out.println(vi.precision);
+            System.out.println(vi.scale);
+            System.out.println(vj.precision);
+            System.out.println(vj.scale);
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -238,7 +238,7 @@ public class TestPixelsWriter
     public void testRead()
     {
         PixelsReaderOption option = new PixelsReaderOption();
-        String[] cols = {"a", "b", "c", "d", "e", "f", "g", "h"};
+        String[] cols = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"};
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.includeCols(cols);
@@ -269,15 +269,19 @@ public class TestPixelsWriter
             DateColumnVector fcv = (DateColumnVector) rowBatch.cols[5];
             TimeColumnVector gcv = (TimeColumnVector) rowBatch.cols[6];
             BinaryColumnVector hcv = (BinaryColumnVector) rowBatch.cols[7];
+            DecimalColumnVector icv = (DecimalColumnVector) rowBatch.cols[8];
+            LongDecimalColumnVector jcv = (LongDecimalColumnVector) rowBatch.cols[9];
             for (int i = 0, j = 0; i < rowBatch.size; ++i)
             {
-                if (fcv.isNull[i])
+                if (jcv.isNull[i])
                 {
                     System.out.println("null");
                 }
                 else
                 {
-                    System.out.println(fcv.asScratchDate(j++));
+                    System.out.println(jcv.vector[j*2] + ", " + jcv.vector[j*2+1]);
+                    System.out.println(jcv.getScratchDecimal(j++).toString());
+
                 }
             }
         }

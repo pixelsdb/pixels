@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.utils.Decimal;
-import io.pixelsdb.pixels.core.utils.LongDecimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
@@ -102,7 +101,6 @@ public final class TypeDescription
                         result = maxLength - other.maxLength;
                         break;
                     case DECIMAL:
-                    case LONG_DECIMAL:
                         result = precision - other.precision;
                         if (result == 0)
                         {
@@ -147,8 +145,7 @@ public final class TypeDescription
         LONG(true, long.class, long.class, "bigint", "long"),
         FLOAT(true, float.class, long.class, "float", "real"),
         DOUBLE(true, double.class, long.class, "double"),
-        DECIMAL(true, double.class, Decimal.class, "decimal", "short_decimal"),
-        LONG_DECIMAL(true, double.class, LongDecimal.class, "long_decimal"),
+        DECIMAL(true, double.class, Decimal.class, "decimal"),
         STRING(true, String.class, byte[].class, "string"),
         DATE(true, Date.class, int.class, "date"),
         TIME(true, Time.class, int.class, "time"),
@@ -252,15 +249,7 @@ public final class TypeDescription
         checkArgument(precision >= scale && scale >= 0 &&
                         precision > 0 && precision <= LONG_MAX_PRECISION,
                 "invalid precision and scale (" + precision + "," + scale + ")");
-        TypeDescription type;
-        if (precision <= SHORT_MAX_PRECISION)
-        {
-            type = new TypeDescription(Category.DECIMAL);
-        }
-        else
-        {
-            type = new TypeDescription(Category.LONG_DECIMAL);
-        }
+        TypeDescription type = new TypeDescription(Category.DECIMAL);
         type.precision = precision;
         type.scale = scale;
         return type;
@@ -609,7 +598,6 @@ public final class TypeDescription
                 }
                 break;
             case DECIMAL:
-            case LONG_DECIMAL:
                 if (consumeChar(source, '('))
                 {
                     int precision = parseInt(source);
@@ -724,7 +712,6 @@ public final class TypeDescription
                     tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
                     break;
                 case DECIMAL:
-                case LONG_DECIMAL:
                     tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
                     tmpType.setPrecision(child.precision);
                     tmpType.setScale(child.scale);
@@ -777,12 +764,7 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (category == Category.DECIMAL && precision > SHORT_MAX_PRECISION)
-        {
-            throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + SHORT_MAX_PRECISION);
-        }
-        else if (category == Category.LONG_DECIMAL && precision > LONG_MAX_PRECISION)
+        else if (category == Category.DECIMAL && precision > LONG_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
                     " is out of the max precision " + LONG_MAX_PRECISION);
@@ -808,12 +790,7 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (category == Category.DECIMAL && scale > SHORT_MAX_SCALE)
-        {
-            throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + SHORT_MAX_SCALE);
-        }
-        else if (category == Category.LONG_DECIMAL && scale > LONG_MAX_SCALE)
+        else if (category == Category.DECIMAL && scale > LONG_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
                     " is out of the max scale " + LONG_MAX_SCALE);
@@ -1012,9 +989,10 @@ public final class TypeDescription
             case DOUBLE:
                 return new DoubleColumnVector(maxSize);
             case DECIMAL:
-                return new DecimalColumnVector(maxSize, precision, scale);
-            case LONG_DECIMAL:
-                return new LongDecimalColumnVector(maxSize, precision, scale);
+                if (precision <= SHORT_MAX_PRECISION)
+                    return new DecimalColumnVector(maxSize, precision, scale);
+                else
+                    return new LongDecimalColumnVector(maxSize, precision, scale);
             case STRING:
             case BINARY:
             case VARBINARY:
@@ -1213,7 +1191,6 @@ public final class TypeDescription
                 buffer.append(')');
                 break;
             case DECIMAL:
-            case LONG_DECIMAL:
                 buffer.append('(');
                 buffer.append(precision);
                 buffer.append(',');
@@ -1270,7 +1247,6 @@ public final class TypeDescription
                 buffer.append(maxLength);
                 break;
             case DECIMAL:
-            case LONG_DECIMAL:
                 buffer.append(", \"precision\": ");
                 buffer.append(precision);
                 buffer.append(", \"scale\": ");

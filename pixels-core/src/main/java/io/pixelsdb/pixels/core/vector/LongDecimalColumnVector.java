@@ -201,6 +201,12 @@ public class LongDecimalColumnVector extends ColumnVector
         isNull[index] = false;
     }
 
+    public BigDecimal getScratchDecimal(int index)
+    {
+        BigInteger unscaled = new BigInteger(Integer128.toBigEndianBytes(vector[index*2], vector[index*2+1]));
+        return new BigDecimal(unscaled, scale);
+    }
+
     @Override
     public void addElement(int inputIndex, ColumnVector inputVector)
     {
