@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * We store the value field of a Time class in primitive arrays.
  * <p>
  * We do this to avoid an array of Java Time objects which would have poor storage
- * and memory access characteristics.
+ * and memory access performance.
  * <p>
  * Generally, the caller will fill in a scratch time object with values from a row, work
  * using the scratch time, and then perhaps update the column vector row with a result.

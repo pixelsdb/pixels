@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
  * We store the value field of a Date class in primitive arrays.
  * <p>
  * We do this to avoid an array of Java Date objects which would have poor storage
- * and memory access characteristics.
+ * and memory access performance.
  * <p>
  * Generally, the caller will fill in a scratch date object with values from a row, work
  * using the scratch date, and then perhaps update the column vector row with a result.

@@ -134,7 +134,7 @@ public class TimestampColumnReader
                 }
                 else
                 {
-                    columnVector.set(i + vectorIndex, new Timestamp(decoder.next()));
+                    columnVector.set(i + vectorIndex, decoder.next());
                 }
                 if (hasNull)
                 {

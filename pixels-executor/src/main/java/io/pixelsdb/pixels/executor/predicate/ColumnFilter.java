@@ -240,7 +240,6 @@ public class ColumnFilter<T extends Comparable<T>>
                 DoubleColumnVector dcv = (DoubleColumnVector) columnVector;
                 doFilter(dcv.vector, dcv.noNulls ? null : dcv.isNull, start, length, result);
                 return;
-
             case STRING:
             case VARCHAR:
             case CHAR:

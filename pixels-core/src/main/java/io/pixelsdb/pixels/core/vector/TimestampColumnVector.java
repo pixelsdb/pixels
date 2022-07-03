@@ -33,25 +33,41 @@ import static java.util.Objects.requireNonNull;
  * This class represents a nullable timestamp column vector capable of handing a wide range of
  * timestamp values.
  * <p>
- * We store the 2 (value) fields of a Timestamp class in primitive arrays.
+ * We store the microseconds since the epoch of a Timestamp class in primitive arrays.
  * <p>
  * We do this to avoid an array of Java Timestamp objects which would have poor storage
- * and memory access characteristics.
+ * and memory access performance.
  * <p>
  * Generally, the caller will fill in a scratch timestamp object with values from a row, work
  * using the scratch timestamp, and then perhaps update the column vector row with a result.
  */
 public class TimestampColumnVector extends ColumnVector
 {
+    private static final long MICROS_PER_MILLIS = 1000L;
+    private static final long NANOS_PER_MILLIS = 1000_000L;
+    private static final long MICROS_PER_SEC = 1000_000L;
+    private static final long NANOS_PER_MICROS = 1000L;
+
+    private static long microsToMillis(long micros)
+    {
+        return micros / MICROS_PER_MILLIS;
+    }
+
+    private static int microsToFracNanos(long micros)
+    {
+        return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
+    }
+
+    private static long timestampToMicros(Timestamp timestamp)
+    {
+        return timestamp.getTime() * MICROS_PER_MILLIS +
+                timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;
+    }
+
     /*
-     * Milliseconds from the epoch (1970-0-1).
+     * Microseconds from the epoch (1970-0-1).
      */
     public long[] times;
-    // The values from Timestamp.getTime().
-
-    // TODO: fully support or remove nanos. And it can be int[].
-    public long[] nanos;
-    // The values from Timestamp.getNanos().
 
     /*
      * Scratch objects.
@@ -76,8 +92,7 @@ public class TimestampColumnVector extends ColumnVector
     {
         super(len);
         times = new long[len];
-        nanos = new long[len];
-        memoryUsage += (long) Long.BYTES * len * 2;
+        memoryUsage += (long) Long.BYTES * len;
 
         scratchTimestamp = new Timestamp(0);
     }
@@ -104,7 +119,6 @@ public class TimestampColumnVector extends ColumnVector
             {
                 continue;
             }
-            // this.nanos is currently not used.
             hashCode[i] = 31 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 32));
         }
         return hashCode;
@@ -116,34 +130,21 @@ public class TimestampColumnVector extends ColumnVector
         TimestampColumnVector otherVector = (TimestampColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
-            // this.nanos is currently not used.
             return this.times[index] == otherVector.times[otherIndex];
         }
         return false;
     }
 
     /**
-     * Return a row's Timestamp.getTime() value.
+     * Return the microseconds since the epoch.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
      * @param elementNum
      * @return
      */
-    public long getTime(int elementNum)
+    public long getMicros(int elementNum)
     {
         return times[elementNum];
-    }
-
-    /**
-     * Return a row's Timestamp.getNanos() value.
-     * We assume the entry has already been NULL checked and isRepeated adjusted.
-     *
-     * @param elementNum
-     * @return
-     */
-    public int getNanos(int elementNum)
-    {
-        return (int) nanos[elementNum];
     }
 
     /**
@@ -155,8 +156,8 @@ public class TimestampColumnVector extends ColumnVector
      */
     public void timestampUpdate(Timestamp timestamp, int elementNum)
     {
-        timestamp.setTime(times[elementNum]);
-        timestamp.setNanos((int) nanos[elementNum]);
+        timestamp.setTime(microsToMillis(times[elementNum]));
+        timestamp.setNanos(microsToFracNanos(times[elementNum]));
     }
 
     /**
@@ -168,8 +169,8 @@ public class TimestampColumnVector extends ColumnVector
      */
     public Timestamp asScratchTimestamp(int elementNum)
     {
-        scratchTimestamp.setTime(times[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
+        scratchTimestamp.setTime(microsToMillis(times[elementNum]));
+        scratchTimestamp.setNanos(microsToFracNanos(times[elementNum]));
         return scratchTimestamp;
     }
 
@@ -181,76 +182,6 @@ public class TimestampColumnVector extends ColumnVector
     public Timestamp getScratchTimestamp()
     {
         return scratchTimestamp;
-    }
-
-    /**
-     * Return a long representation of a Timestamp.
-     *
-     * @param elementNum
-     * @return
-     */
-    public long getTimestampAsLong(int elementNum)
-    {
-        scratchTimestamp.setTime(times[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
-        return getTimestampAsLong(scratchTimestamp);
-    }
-
-    /**
-     * Return a long representation of a Timestamp.
-     *
-     * @param timestamp
-     * @return
-     */
-    public static long getTimestampAsLong(Timestamp timestamp)
-    {
-        return millisToSeconds(timestamp.getTime());
-    }
-
-    // Copy of TimestampWritable.millisToSeconds
-
-    /**
-     * Rounds the number of milliseconds relative to the epoch down to the nearest whole number of
-     * seconds. 500 would round to 0, -500 would round to -1.
-     */
-    private static long millisToSeconds(long millis)
-    {
-        if (millis >= 0)
-        {
-            return millis / 1000;
-        }
-        else
-        {
-            return (millis - 999) / 1000;
-        }
-    }
-
-    /**
-     * Return a double representation of a Timestamp.
-     *
-     * @param elementNum
-     * @return
-     */
-    public double getDouble(int elementNum)
-    {
-        scratchTimestamp.setTime(times[elementNum]);
-        scratchTimestamp.setNanos((int) nanos[elementNum]);
-        return getDouble(scratchTimestamp);
-    }
-
-    /**
-     * Return a double representation of a Timestamp.
-     *
-     * @param timestamp
-     * @return
-     */
-    public static double getDouble(Timestamp timestamp)
-    {
-        // Same algorithm as TimestampWritable (not currently import-able here).
-        double seconds, nanos;
-        seconds = millisToSeconds(timestamp.getTime());
-        nanos = timestamp.getNanos();
-        return seconds + nanos / 1000000000;
     }
 
     /**
@@ -318,7 +249,6 @@ public class TimestampColumnVector extends ColumnVector
             isNull[index] = false;
             TimestampColumnVector in = (TimestampColumnVector) inputVector;
             times[index] = in.times[inputIndex];
-            // this.nanos is currently not used.
         }
         else
         {
@@ -358,7 +288,6 @@ public class TimestampColumnVector extends ColumnVector
         {
             TimestampColumnVector srcVector = (TimestampColumnVector) inputVector;
             this.times = srcVector.times;
-            this.nanos = srcVector.nanos;
             this.isNull = srcVector.isNull;
             this.noNulls = srcVector.noNulls;
             this.isRepeating = srcVector.isRepeating;
@@ -406,20 +335,17 @@ public class TimestampColumnVector extends ColumnVector
         {
             isRepeating = false;
             long repeatFastTime = times[0];
-            int repeatNanos = (int) nanos[0];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
                     times[i] = repeatFastTime;
-                    nanos[i] = repeatNanos;
                 }
             }
             else
             {
                 Arrays.fill(times, 0, size, repeatFastTime);
-                Arrays.fill(nanos, 0, size, repeatNanos);
             }
             writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
@@ -468,25 +394,25 @@ public class TimestampColumnVector extends ColumnVector
         else
         {
             this.isNull[elementNum] = false;
-            this.times[elementNum] = timestamp.getTime();
-            this.nanos[elementNum] = timestamp.getNanos();
+            this.times[elementNum] = timestampToMicros(timestamp);
         }
     }
 
     /**
-     * Set a row from the current value in the scratch timestamp.
+     * Set a row from a time in long.
+     * We assume the entry has already been isRepeated adjusted.
      *
-     * @param elementNum
+     * @param elementNum the index of the element
+     * @param time microseconds since the epoch
      */
-    public void setFromScratchTimestamp(int elementNum)
+    public void set(int elementNum, long time)
     {
         if (elementNum >= writeIndex)
         {
             writeIndex = elementNum + 1;
         }
         this.isNull[elementNum] = false;
-        this.times[elementNum] = scratchTimestamp.getTime();
-        this.nanos[elementNum] = scratchTimestamp.getNanos();
+        this.times[elementNum] = time;
     }
 
     /**
@@ -503,7 +429,6 @@ public class TimestampColumnVector extends ColumnVector
         }
         isNull[elementNum] = true;
         times[elementNum] = 0;
-        nanos[elementNum] = 0;
         noNulls = false;
     }
 
@@ -516,8 +441,7 @@ public class TimestampColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        times[0] = timestamp.getTime();
-        nanos[0] = timestamp.getNanos();
+        times[0] = timestampToMicros(timestamp);
     }
 
     @Override
@@ -529,8 +453,8 @@ public class TimestampColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchTimestamp.setTime(times[row]);
-            scratchTimestamp.setNanos((int) nanos[row]);
+            scratchTimestamp.setTime(microsToMillis(times[row]));
+            scratchTimestamp.setNanos(microsToFracNanos(times[row]));
             buffer.append(scratchTimestamp.toString());
         }
         else
@@ -548,22 +472,18 @@ public class TimestampColumnVector extends ColumnVector
             return;
         }
         long[] oldTime = times;
-        long[] oldNanos = nanos;
         times = new long[size];
-        nanos = new long[size];
-        memoryUsage += Long.BYTES * size * 2;
+        memoryUsage += (long) Long.BYTES * size;
         length = size;
         if (preserveData)
         {
             if (isRepeating)
             {
                 times[0] = oldTime[0];
-                nanos[0] = oldNanos[0];
             }
             else
             {
                 System.arraycopy(oldTime, 0, times, 0, oldTime.length);
-                System.arraycopy(oldNanos, 0, nanos, 0, oldNanos.length);
             }
         }
     }
@@ -572,7 +492,6 @@ public class TimestampColumnVector extends ColumnVector
     public void close()
     {
         super.close();
-        this.nanos = null;
         this.times = null;
     }
 }
