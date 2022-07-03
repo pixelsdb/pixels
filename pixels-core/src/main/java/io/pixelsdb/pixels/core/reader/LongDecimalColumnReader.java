@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -23,26 +23,29 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.LongDecimalColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * @author guodong
+ * The column reader of long decimals with max precision and scale 38.
+ *
+ * @date 03/07/2022
+ * @author hank
  */
-public class FloatColumnReader
+public class LongDecimalColumnReader
         extends ColumnReader
 {
     // private final EncodingUtils encodingUtils;
     private ByteBuffer inputBuffer;
     private byte[] isNull = new byte[8];
-    private int inputIndex = 0;
     private int isNullOffset = 0;
     private int isNullBitIndex = 0;
+    private int inputIndex = 0;
 
-    FloatColumnReader(TypeDescription type)
+    LongDecimalColumnReader(TypeDescription type)
     {
         super(type);
     }
@@ -84,14 +87,22 @@ public class FloatColumnReader
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
-        DoubleColumnVector columnVector = (DoubleColumnVector) vector;
+        LongDecimalColumnVector columnVector = (LongDecimalColumnVector) vector;
+        if (type.getPrecision() != columnVector.precision || type.getScale() != columnVector.scale)
+        {
+            throw new IllegalArgumentException("reader of long_decimal(" + type.getPrecision() + "," + type.getScale() +
+                    ") does not match the column vector of long_decimal(" + columnVector.precision + "," +
+                    columnVector.scale + ")");
+        }
         if (offset == 0)
         {
             this.inputBuffer = input;
-            // using little endian, for that float is encoded into int by little endian
+            // using little endian, for that the long values were written in little endian
             this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
             inputIndex = 0;
+            // isNull
             isNullOffset = (int) chunkIndex.getIsNullOffset();
+            // re-init
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;
@@ -104,13 +115,13 @@ public class FloatColumnReader
                 hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                 if (hasNull && isNullBitIndex > 0)
                 {
-                    BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
+                    BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                     isNullBitIndex = 0;
                 }
             }
             if (hasNull && isNullBitIndex >= 8)
             {
-                BitUtils.bitWiseDeCompact(this.isNull, inputBuffer, isNullOffset++, 1);
+                BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
                 isNullBitIndex = 0;
             }
             if (hasNull && isNull[isNullBitIndex] == 1)
@@ -120,8 +131,11 @@ public class FloatColumnReader
             }
             else
             {
-                columnVector.vector[i + vectorIndex] = this.inputBuffer.getInt(inputIndex);
-                inputIndex += 4;
+                int index = (i+vectorIndex)*2;
+                columnVector.vector[index] = this.inputBuffer.getLong(inputIndex);
+                inputIndex += Long.BYTES;
+                columnVector.vector[index+1] = this.inputBuffer.getLong(inputIndex);
+                inputIndex += Long.BYTES;
             }
             if (hasNull)
             {

@@ -58,6 +58,8 @@ public abstract class ColumnReader implements Closeable
                 return new DoubleColumnReader(type);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
                 return new DecimalColumnReader(type);
+            case LONG_DECIMAL:
+                return new LongDecimalColumnReader(type);
             case FLOAT:
                 return new FloatColumnReader(type);
             case CHAR:

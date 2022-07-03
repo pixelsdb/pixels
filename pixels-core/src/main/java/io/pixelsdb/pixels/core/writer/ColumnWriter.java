@@ -58,6 +58,8 @@ public interface ColumnWriter
                 return new DoubleColumnWriter(type, pixelStride, isEncoding);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
                 return new DecimalColumnWriter(type, pixelStride, isEncoding);
+            case LONG_DECIMAL:
+                return new LongDecimalColumnWriter(type, pixelStride, isEncoding);
             case STRING:
                 return new StringColumnWriter(type, pixelStride, isEncoding);
             // Issue #196: max length of char, varchar, binary, and varbinary, are passed through type.

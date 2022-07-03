@@ -63,14 +63,21 @@ public class TestPixelsWriter
             Storage storage = StorageFactory.Instance().getStorage("file");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
-            DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
-            DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
-            TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];              // boolean
-            DateColumnVector f = (DateColumnVector) rowBatch.cols[5];              // date
-            TimeColumnVector g = (TimeColumnVector) rowBatch.cols[6];              // time
-            BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7];          // string
+            LongColumnVector va = (LongColumnVector) rowBatch.cols[0];              // int
+            DoubleColumnVector vb = (DoubleColumnVector) rowBatch.cols[1];          // float
+            DoubleColumnVector vc = (DoubleColumnVector) rowBatch.cols[2];          // double
+            TimestampColumnVector vd = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
+            ByteColumnVector ve = (ByteColumnVector) rowBatch.cols[4];              // boolean
+            DateColumnVector vf = (DateColumnVector) rowBatch.cols[5];              // date
+            TimeColumnVector vg = (TimeColumnVector) rowBatch.cols[6];              // time
+            BinaryColumnVector vh = (BinaryColumnVector) rowBatch.cols[7];          // string
+            DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
+            LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
+
+            vi.precision = 15;
+            vi.scale = 2;
+            vj.precision = 30;
+            vj.scale = 4;
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -93,42 +100,52 @@ public class TestPixelsWriter
                 int row = rowBatch.size++;
                 if (i % 100 == 0)
                 {
-                    a.isNull[row] = true;
-                    a.vector[row] = 0;
-                    b.isNull[row] = true;
-                    b.vector[row] = 0;
-                    c.isNull[row] = true;
-                    c.vector[row] = 0;
-                    d.isNull[row] = true;
-                    d.times[row] = 0;
-                    d.nanos[row] = 0;
-                    e.isNull[row] = true;
-                    e.vector[row] = 0;
-                    f.isNull[row] = true;
-                    f.dates[row] = 0;
-                    g.isNull[row] = true;
-                    g.times[row] = 0;
-                    h.isNull[row] = true;
-                    h.vector[row] = new byte[0];
+                    va.isNull[row] = true;
+                    va.vector[row] = 0;
+                    vb.isNull[row] = true;
+                    vb.vector[row] = 0;
+                    vc.isNull[row] = true;
+                    vc.vector[row] = 0;
+                    vd.isNull[row] = true;
+                    vd.times[row] = 0;
+                    vd.nanos[row] = 0;
+                    ve.isNull[row] = true;
+                    ve.vector[row] = 0;
+                    vf.isNull[row] = true;
+                    vf.dates[row] = 0;
+                    vg.isNull[row] = true;
+                    vg.times[row] = 0;
+                    vh.isNull[row] = true;
+                    vh.vector[row] = new byte[0];
+                    vi.isNull[row] = true;
+                    vi.vector[row] = 0;
+                    vj.isNull[row] = true;
+                    vj.vector[row*2] = 0;
+                    vj.vector[row*2+1] = 0;
                 }
                 else
                 {
-                    a.vector[row] = i;
-                    a.isNull[row] = false;
-                    b.vector[row] = Float.floatToIntBits(i * 3.1415f);
-                    b.isNull[row] = false;
-                    c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
-                    c.isNull[row] = false;
-                    d.set(row, timestamp);
-                    d.isNull[row] = false;
-                    e.vector[row] = (byte) (i % 100 > 25 ? 1 : 0);
-                    e.isNull[row] = false;
-                    f.set(row, new Date(System.currentTimeMillis()));
-                    f.isNull[row] = false;
-                    g.set(row, new Time(System.currentTimeMillis()));
-                    g.isNull[row] = false;
-                    h.setVal(row, String.valueOf(i).getBytes());
-                    h.isNull[row] = false;
+                    va.vector[row] = i;
+                    va.isNull[row] = false;
+                    vb.vector[row] = Float.floatToIntBits(i * 3.1415f);
+                    vb.isNull[row] = false;
+                    vc.vector[row] = Double.doubleToLongBits(i * 3.14159d);
+                    vc.isNull[row] = false;
+                    vd.set(row, timestamp);
+                    vd.isNull[row] = false;
+                    ve.vector[row] = (byte) (i % 100 > 25 ? 1 : 0);
+                    ve.isNull[row] = false;
+                    vf.set(row, new Date(System.currentTimeMillis()));
+                    vf.isNull[row] = false;
+                    vg.set(row, new Time(System.currentTimeMillis()));
+                    vg.isNull[row] = false;
+                    vh.setVal(row, String.valueOf(i).getBytes());
+                    vh.isNull[row] = false;
+                    vi.vector[row] = i;
+                    vi.isNull[row] = false;
+                    vj.vector[row*2] = i;
+                    vj.vector[row*2+1] = i;
+                    vj.isNull[row] = false;
                 }
                 if (rowBatch.size == rowBatch.getMaxSize())
                 {

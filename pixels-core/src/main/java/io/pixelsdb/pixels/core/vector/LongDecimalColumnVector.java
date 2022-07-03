@@ -20,57 +20,55 @@
 package io.pixelsdb.pixels.core.vector;
 
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.Integer128;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_SCALE;
+import static io.pixelsdb.pixels.core.TypeDescription.LONG_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.LONG_MAX_SCALE;
 import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.util.Objects.requireNonNull;
 
 /**
- * The decimal column vector with precision and scale.
- * The values of this column vector are the unscaled integer value
- * of the decimal. For example, the unscaled value of 3.14, which is
- * of the type decimal(3,2), is 314. While the precision and scale
- * of this decimal are 3 and 2, respectively.
+ * This class is similar to {@link DecimalColumnVector}, but supports long decimals
+ * with max precision and scale 38.
  *
- * <p><b>Note: it only supports short decimals with max precision
- * and scale 18.</b></p>
- *
- * Created at: 05/03/2022
+ * Created at: 01/07/2022
  * Author: hank
  */
-public class DecimalColumnVector extends ColumnVector
+public class LongDecimalColumnVector extends ColumnVector
 {
+    public static final ByteOrder ENDIAN = ByteOrder.BIG_ENDIAN;
     public static final long DEFAULT_UNSCALED_VALUE = 0;
     public long[] vector;
     public int precision;
     public int scale;
 
-    public DecimalColumnVector(int precision, int scale)
+    public LongDecimalColumnVector(int precision, int scale)
     {
         this(VectorizedRowBatch.DEFAULT_SIZE, precision, scale);
     }
 
-    public DecimalColumnVector(int len, int precision, int scale)
+    public LongDecimalColumnVector(int len, int precision, int scale)
     {
         super(len);
-        vector = new long[len];
+        vector = new long[2*len];
         Arrays.fill(vector, DEFAULT_UNSCALED_VALUE);
-        memoryUsage += Long.BYTES * len + Integer.BYTES * 2;
+        memoryUsage += (long) Long.BYTES * len * 2 + Integer.BYTES * 2;
 
         if (precision < 1)
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (precision > SHORT_MAX_PRECISION)
+        else if (precision > LONG_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + SHORT_MAX_PRECISION);
+                    " is out of the max precision " + LONG_MAX_PRECISION);
         }
         this.precision = precision;
 
@@ -78,10 +76,10 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (scale > SHORT_MAX_SCALE)
+        else if (scale > LONG_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + SHORT_MAX_SCALE);
+                    " is out of the max scale " + LONG_MAX_SCALE);
         }
         else if (scale > precision)
         {
@@ -100,7 +98,9 @@ public class DecimalColumnVector extends ColumnVector
         noNulls = true;
         isRepeating = true;
         BigDecimal decimal = BigDecimal.valueOf(value);
-        vector[0] = decimal.unscaledValue().longValueExact();
+        BigInteger unscaled = decimal.unscaledValue();
+        vector[1] = unscaled.longValue();
+        vector[0] = unscaled.shiftRight(64).longValueExact();
         this.scale = decimal.scale();
         this.precision = decimal.precision();
     }
@@ -120,18 +120,24 @@ public class DecimalColumnVector extends ColumnVector
         if (isRepeating)
         {
             isRepeating = false;
-            long repeatVal = vector[0];
+            long repeatHigh = vector[0];
+            long repeatLow = vector[1];
             if (selectedInUse)
             {
                 for (int j = 0; j < size; j++)
                 {
                     int i = sel[j];
-                    vector[i] = repeatVal;
+                    vector[i*2] = repeatHigh;
+                    vector[i*2+1] = repeatLow;
                 }
             }
             else
             {
-                Arrays.fill(vector, 0, size, repeatVal);
+                for (int i = 1; i < size; i++)
+                {
+                    vector[i*2] = repeatHigh;
+                    vector[i*2+1] = repeatLow;
+                }
             }
             writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
@@ -157,8 +163,10 @@ public class DecimalColumnVector extends ColumnVector
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
         int index = writeIndex++;
-        // As we only support max precision 18, it is safe to convert unscaled value to long.
-        vector[index] = decimal.unscaledValue().longValue();
+        // We use big endian.
+        BigInteger unscaledValue = decimal.unscaledValue();
+        vector[index*2+1] = unscaledValue.longValue();
+        vector[index*2] = unscaledValue.shiftRight(64).longValueExact();
         isNull[index] = false;
     }
 
@@ -186,8 +194,10 @@ public class DecimalColumnVector extends ColumnVector
             throw new IllegalArgumentException("value exceeds the allowed precision " + precision);
         }
         int index = writeIndex++;
-        // As we only support max precision 18, it is safe to convert unscaled value to long.
-        vector[index] = decimal.unscaledValue().longValue();
+        // We use big endian.
+        BigInteger unscaledValue = decimal.unscaledValue();
+        vector[index*2+1] = unscaledValue.longValue();
+        vector[index*2] = unscaledValue.shiftRight(64).longValueExact();
         isNull[index] = false;
     }
 
@@ -198,7 +208,9 @@ public class DecimalColumnVector extends ColumnVector
         if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
             isNull[index] = false;
-            vector[index] = ((DecimalColumnVector) inputVector).vector[inputIndex];
+            LongDecimalColumnVector src = ((LongDecimalColumnVector) inputVector);
+            vector[index*2] = src.vector[inputIndex*2];
+            vector[index*2+1] = src.vector[inputIndex*2+1];
         }
         else
         {
@@ -212,7 +224,7 @@ public class DecimalColumnVector extends ColumnVector
     {
         // isRepeating should be false and src should be an instance of DecimalColumnVector.
         // However, we do not check these for performance considerations.
-        DecimalColumnVector source = (DecimalColumnVector) src;
+        LongDecimalColumnVector source = (LongDecimalColumnVector) src;
 
         for (int i = offset; i < offset + length; i++)
         {
@@ -224,7 +236,8 @@ public class DecimalColumnVector extends ColumnVector
             }
             else
             {
-                this.vector[thisIndex] = source.vector[srcIndex];
+                this.vector[thisIndex*2] = source.vector[srcIndex*2];
+                this.vector[thisIndex*2+1] = source.vector[srcIndex*2+1];
                 this.isNull[thisIndex] = false;
             }
         }
@@ -236,13 +249,18 @@ public class DecimalColumnVector extends ColumnVector
         requireNonNull(hashCode, "hashCode is null");
         checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
                 "the length of hashCode is not in the range [1, length]");
+        long hash;
         for (int i = 0; i < hashCode.length; ++i)
         {
             if (this.isNull[i])
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+            // FNV-1a style hash
+            hash = 0x9E3779B185EBCA87L;
+            hash = (hash ^ this.vector[i*2]) * 0xC2B2AE3D27D4EB4FL;
+            hash = (hash ^ this.vector[i*2+1]) * 0xC2B2AE3D27D4EB4FL;
+            hashCode[i] = 31 * hashCode[i] + Long.hashCode(hash);
         }
         return hashCode;
     }
@@ -250,10 +268,11 @@ public class DecimalColumnVector extends ColumnVector
     @Override
     public boolean elementEquals(int index, int otherIndex, ColumnVector other)
     {
-        DecimalColumnVector otherVector = (DecimalColumnVector) other;
+        LongDecimalColumnVector otherVector = (LongDecimalColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
-            return this.vector[index] == otherVector.vector[otherIndex] &&
+            return this.vector[index*2] == otherVector.vector[otherIndex*2] &&
+                    this.vector[index*2+1] == otherVector.vector[otherIndex*2+1] &&
                     this.scale == otherVector.scale;
             // We assume the values never overflow and do not check the precisions.
         }
@@ -264,9 +283,9 @@ public class DecimalColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof DecimalColumnVector)
+        if (inputVector instanceof LongDecimalColumnVector)
         {
-            DecimalColumnVector srcVector = (DecimalColumnVector) inputVector;
+            LongDecimalColumnVector srcVector = (LongDecimalColumnVector) inputVector;
             this.vector = srcVector.vector;
             this.isNull = srcVector.isNull;
             this.writeIndex = srcVector.writeIndex;
@@ -291,7 +310,8 @@ public class DecimalColumnVector extends ColumnVector
         {
             if (i > j)
             {
-                this.vector[j] = this.vector[i];
+                this.vector[j*2] = this.vector[i*2];
+                this.vector[j*2+1] = this.vector[i*2+1];
                 this.isNull[j] = this.isNull[i];
             }
             if (this.isNull[j])
@@ -315,7 +335,17 @@ public class DecimalColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            BigDecimal value = BigDecimal.valueOf(vector[row], scale);
+            BigDecimal value;
+            if (precision <= 18)
+            {
+                value = BigDecimal.valueOf(vector[row*2+1], scale);
+            }
+            else
+            {
+                BigInteger unscaledValue = new BigInteger(
+                        Integer128.toBigEndianBytes(vector[row*2], vector[row*2+1]));
+                value = new BigDecimal(unscaledValue, scale);
+            }
             buffer.append(value);
         }
         else
@@ -345,15 +375,16 @@ public class DecimalColumnVector extends ColumnVector
         if (size > vector.length)
         {
             long[] oldArray = vector;
-            vector = new long[size];
+            vector = new long[size*2];
             Arrays.fill(vector, DEFAULT_UNSCALED_VALUE);
-            memoryUsage += Long.BYTES * size;
+            memoryUsage += (long) Long.BYTES * size * 2;
             length = size;
             if (preserveData)
             {
                 if (isRepeating)
                 {
                     vector[0] = oldArray[0];
+                    vector[1] = oldArray[1];
                 }
                 else
                 {

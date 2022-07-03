@@ -77,7 +77,7 @@ public class TimestampColumnVector extends ColumnVector
         super(len);
         times = new long[len];
         nanos = new long[len];
-        memoryUsage += Long.BYTES * len * 2;
+        memoryUsage += (long) Long.BYTES * len * 2;
 
         scratchTimestamp = new Timestamp(0);
     }
@@ -435,6 +435,16 @@ public class TimestampColumnVector extends ColumnVector
             ensureSize(writeIndex * 2, true);
         }
         set(writeIndex++, value);
+    }
+
+    @Override
+    public void add(String value)
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        set(writeIndex++, Timestamp.valueOf(value));
     }
 
     /**

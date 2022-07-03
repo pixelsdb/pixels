@@ -89,7 +89,7 @@ public class DoubleColumnReader
         if (offset == 0)
         {
             this.inputBuffer = input;
-            // using little endian, for that double is encoded into long by little endian
+            // using little endian, for that the long values were written in little endian
             this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
             inputIndex = 0;
             // isNull
@@ -125,7 +125,7 @@ public class DoubleColumnReader
             {
                 // columnVector.vector[i + vectorIndex] = encodingUtils.readLongLE(this.input, inputIndex);
                 columnVector.vector[i + vectorIndex] = this.inputBuffer.getLong(inputIndex);
-                inputIndex += 8;
+                inputIndex += Long.BYTES;
             }
             if (hasNull)
             {

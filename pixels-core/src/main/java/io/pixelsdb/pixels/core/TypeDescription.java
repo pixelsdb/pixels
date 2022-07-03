@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
 import io.pixelsdb.pixels.core.utils.Decimal;
+import io.pixelsdb.pixels.core.utils.LongDecimal;
 import io.pixelsdb.pixels.core.vector.*;
 
 import java.io.Serializable;
@@ -41,27 +42,31 @@ public final class TypeDescription
 {
     private static final long serialVersionUID = 4270695889340023552L;
     /**
-     * Issue #196:
      * In SQL standard, the max precision of decimal is 38.
-     * However, we only support short decimal of which the max precision is 18.
+     * Issue #196: support short decimal of which the max precision is 18.
+     * Issue #203: support long decimal of which the max precision is 38.
      */
-    public static final int MAX_PRECISION = 18;
+    public static final int SHORT_MAX_PRECISION = 18;
+    public static final int LONG_MAX_PRECISION = 38;
     /**
-     * Issue #196:
      * In SQL standard, the max scale of decimal is 38.
-     * However, we only support short decimal of which the max scale is 18.
+     * Issue #196: support short decimal of which the max scale is 18.
+     * Issue #203: support long decimal of which the max scale is 38.
      */
-    public static final int MAX_SCALE = 18;
+    public static final int SHORT_MAX_SCALE = 18;
+    public static final int LONG_MAX_SCALE = 38;
     /**
-     * Issue #196:
      * In SQL standard, the default precision of decimal is 38.
-     * However, we only support short decimal of which the default precision is 18.
+     * Issue #196: support short decimal of which the default precision is 18.
+     * Issue #203: support long decimal of which the default precision is 38.
      */
-    public static final int DEFAULT_PRECISION = 18;
+    public static final int SHORT_DEFAULT_PRECISION = 18;
+    public static final int LONG_DEFAULT_PRECISION = 38;
     /**
      * It is a standard that the default scale of decimal is 0.
      */
-    public static final int DEFAULT_SCALE = 0;
+    public static final int SHORT_DEFAULT_SCALE = 0;
+    public static final int LONG_DEFAULT_SCALE = 0;
     /**
      * The default length of varchar, binary, and varbinary.
      */
@@ -97,10 +102,11 @@ public final class TypeDescription
                         result = maxLength - other.maxLength;
                         break;
                     case DECIMAL:
+                    case LONG_DECIMAL:
                         result = precision - other.precision;
                         if (result == 0)
                         {
-                            result = scale = other.scale;
+                            result = scale - other.scale;
                         }
                         break;
                     case STRUCT:
@@ -141,7 +147,8 @@ public final class TypeDescription
         LONG(true, long.class, long.class, "bigint", "long"),
         FLOAT(true, float.class, long.class, "float", "real"),
         DOUBLE(true, double.class, long.class, "double"),
-        DECIMAL(true, double.class, Decimal.class, "decimal"),
+        DECIMAL(true, double.class, Decimal.class, "decimal", "short_decimal"),
+        LONG_DECIMAL(true, double.class, LongDecimal.class, "long_decimal"),
         STRING(true, String.class, byte[].class, "string"),
         DATE(true, Date.class, int.class, "date"),
         TIME(true, Time.class, int.class, "time"),
@@ -240,9 +247,23 @@ public final class TypeDescription
         return new TypeDescription(Category.DOUBLE);
     }
 
-    public static TypeDescription createDecimal()
+    public static TypeDescription createDecimal(int precision, int scale)
     {
-        return new TypeDescription(Category.DECIMAL);
+        checkArgument(precision >= scale && scale >= 0 &&
+                        precision > 0 && precision <= LONG_MAX_PRECISION,
+                "invalid precision and scale (" + precision + "," + scale + ")");
+        TypeDescription type;
+        if (precision <= SHORT_MAX_PRECISION)
+        {
+            type = new TypeDescription(Category.DECIMAL);
+        }
+        else
+        {
+            type = new TypeDescription(Category.LONG_DECIMAL);
+        }
+        type.precision = precision;
+        type.scale = scale;
+        return type;
     }
 
     public static TypeDescription createString()
@@ -321,9 +342,8 @@ public final class TypeDescription
                     fieldType = TypeDescription.createDouble();
                     break;
                 case DECIMAL:
-                    fieldType = TypeDescription.createDecimal();
-                    fieldType.precision = type.getPrecision();
-                    fieldType.scale = type.getScale();
+                    fieldType = TypeDescription.createDecimal(
+                            type.getPrecision(), type.getScale());
                     break;
                 case VARCHAR:
                     fieldType = TypeDescription.createVarchar();
@@ -380,7 +400,7 @@ public final class TypeDescription
         {
             StringBuilder buffer = new StringBuilder();
             buffer.append('\'');
-            buffer.append(value.substring(0, position));
+            buffer.append(value, 0, position);
             buffer.append('^');
             buffer.append(value.substring(position));
             buffer.append('\'');
@@ -589,6 +609,7 @@ public final class TypeDescription
                 }
                 break;
             case DECIMAL:
+            case LONG_DECIMAL:
                 if (consumeChar(source, '('))
                 {
                     int precision = parseInt(source);
@@ -703,6 +724,7 @@ public final class TypeDescription
                     tmpType.setKind(PixelsProto.Type.Kind.DOUBLE);
                     break;
                 case DECIMAL:
+                case LONG_DECIMAL:
                     tmpType.setKind(PixelsProto.Type.Kind.DECIMAL);
                     tmpType.setPrecision(child.precision);
                     tmpType.setScale(child.scale);
@@ -755,10 +777,15 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (precision > MAX_PRECISION)
+        else if (category == Category.DECIMAL && precision > SHORT_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + MAX_PRECISION);
+                    " is out of the max precision " + SHORT_MAX_PRECISION);
+        }
+        else if (category == Category.LONG_DECIMAL && precision > LONG_MAX_PRECISION)
+        {
+            throw new IllegalArgumentException("precision " + precision +
+                    " is out of the max precision " + LONG_MAX_PRECISION);
         }
         else if (scale > precision)
         {
@@ -781,10 +808,15 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (scale > MAX_SCALE)
+        else if (category == Category.DECIMAL && scale > SHORT_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + MAX_SCALE);
+                    " is out of the max scale " + SHORT_MAX_SCALE);
+        }
+        else if (category == Category.LONG_DECIMAL && scale > LONG_MAX_SCALE)
+        {
+            throw new IllegalArgumentException("scale " + scale +
+                    " is out of the max scale " + LONG_MAX_SCALE);
         }
         else if (scale > precision)
         {
@@ -981,6 +1013,8 @@ public final class TypeDescription
                 return new DoubleColumnVector(maxSize);
             case DECIMAL:
                 return new DecimalColumnVector(maxSize, precision, scale);
+            case LONG_DECIMAL:
+                return new LongDecimalColumnVector(maxSize, precision, scale);
             case STRING:
             case BINARY:
             case VARBINARY:
@@ -1148,8 +1182,8 @@ public final class TypeDescription
     private final List<TypeDescription> children;
     private final List<String> fieldNames;
     private int maxLength = DEFAULT_LENGTH;
-    private int precision = DEFAULT_PRECISION;
-    private int scale = DEFAULT_SCALE;
+    private int precision = SHORT_DEFAULT_PRECISION;
+    private int scale = SHORT_DEFAULT_SCALE;
 
     static void printFieldName(StringBuilder buffer, String name)
     {
@@ -1179,6 +1213,7 @@ public final class TypeDescription
                 buffer.append(')');
                 break;
             case DECIMAL:
+            case LONG_DECIMAL:
                 buffer.append('(');
                 buffer.append(precision);
                 buffer.append(',');
@@ -1235,6 +1270,7 @@ public final class TypeDescription
                 buffer.append(maxLength);
                 break;
             case DECIMAL:
+            case LONG_DECIMAL:
                 buffer.append(", \"precision\": ");
                 buffer.append(precision);
                 buffer.append(", \"scale\": ");

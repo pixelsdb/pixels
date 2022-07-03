@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.stats;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.Integer128;
 
 import java.sql.Date;
 import java.sql.Time;
@@ -81,6 +82,16 @@ public class StatsRecorder
     public void updateInteger(long value, int repetitions)
     {
         throw new UnsupportedOperationException("Can't update integer");
+    }
+
+    public void updateInteger128(long high, long low, int repetitions)
+    {
+        throw new UnsupportedOperationException("Can't update integer128");
+    }
+
+    public void updateInteger128(Integer128 int128, int repetitions)
+    {
+        throw new UnsupportedOperationException("Can't update integer128");
     }
 
     public void updateFloat(float value)
