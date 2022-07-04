@@ -27,7 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -58,7 +58,7 @@ public abstract class ColumnReader implements Closeable
             case DOUBLE:
                 return new DoubleColumnReader(type);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
-                if (type.getPrecision() <= SHORT_MAX_PRECISION)
+                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
                     return new DecimalColumnReader(type);
                 else
                     return new LongDecimalColumnReader(type);

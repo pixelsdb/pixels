@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.core.utils;
 import java.math.BigInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.LONG_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.LONG_DECIMAL_MAX_PRECISION;
 
 /**
  * @date 03/07/2022
@@ -78,7 +78,7 @@ public class LongDecimal implements Comparable<LongDecimal>
 
     public LongDecimal(Integer128 value, int precision, int scale)
     {
-        checkArgument(precision > 0 && scale >= 0 && precision >= scale && precision <= LONG_MAX_PRECISION,
+        checkArgument(precision > 0 && scale >= 0 && precision >= scale && precision <= LONG_DECIMAL_MAX_PRECISION,
                 "invalid precision and scale (" + precision + "," + scale + ")");
         this.value = value;
         this.precision = precision;

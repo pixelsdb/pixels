@@ -31,9 +31,8 @@ import java.nio.ByteBuffer;
 /**
  * Timestamp column writer.
  * All timestamp values are converted to standard UTC time before they are stored as long values.
- * TODO: Currently not support nanos
  *
- * @author guodong
+ * @author hank
  */
 public class TimestampColumnWriter extends BaseColumnWriter
 {

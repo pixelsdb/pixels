@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * We store the value field of a Time class in primitive arrays.
  * <p>
  * We do this to avoid an array of Java Time objects which would have poor storage
- * and memory access characteristics.
+ * and memory access performance.
  * <p>
  * Generally, the caller will fill in a scratch time object with values from a row, work
  * using the scratch time, and then perhaps update the column vector row with a result.
@@ -155,16 +155,6 @@ public class TimeColumnVector extends ColumnVector
     }
 
     /**
-     * Return the scratch time (contents undefined).
-     *
-     * @return
-     */
-    public Time getScratchTime()
-    {
-        return scratchTime;
-    }
-
-    /**
      * Return a long representation of a time.
      *
      * @param elementNum
@@ -242,8 +232,7 @@ public class TimeColumnVector extends ColumnVector
     public int compareTo(int elementNum1, TimeColumnVector timeColVector2,
                          int elementNum2)
     {
-        return asScratchTime(elementNum1).compareTo(
-                timeColVector2.asScratchTime(elementNum2));
+        return Integer.compare(this.times[elementNum1], timeColVector2.times[elementNum2]);
     }
 
     /**
@@ -257,8 +246,7 @@ public class TimeColumnVector extends ColumnVector
     public int compareTo(TimeColumnVector timeColVector1, int elementNum1,
                          int elementNum2)
     {
-        return timeColVector1.asScratchTime(elementNum1).compareTo(
-                asScratchTime(elementNum2));
+        return Integer.compare(timeColVector1.times[elementNum1], this.times[elementNum2]);
     }
 
     @Override

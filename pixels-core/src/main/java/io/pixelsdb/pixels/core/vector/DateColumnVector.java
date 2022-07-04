@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
  * We store the value field of a Date class in primitive arrays.
  * <p>
  * We do this to avoid an array of Java Date objects which would have poor storage
- * and memory access characteristics.
+ * and memory access performance.
  * <p>
  * Generally, the caller will fill in a scratch date object with values from a row, work
  * using the scratch date, and then perhaps update the column vector row with a result.
@@ -162,16 +162,6 @@ public class DateColumnVector extends ColumnVector
     }
 
     /**
-     * Return the scratch date (contents undefined).
-     *
-     * @return
-     */
-    public Date getScratchDate()
-    {
-        return scratchDate;
-    }
-
-    /**
      * Return a long representation of a date.
      *
      * @param elementNum
@@ -249,8 +239,7 @@ public class DateColumnVector extends ColumnVector
     public int compareTo(int elementNum1, DateColumnVector dateColVector2,
                          int elementNum2)
     {
-        return asScratchDate(elementNum1).compareTo(
-                dateColVector2.asScratchDate(elementNum2));
+        return Integer.compare(this.dates[elementNum1], dateColVector2.dates[elementNum2]);
     }
 
     /**
@@ -264,8 +253,7 @@ public class DateColumnVector extends ColumnVector
     public int compareTo(DateColumnVector dateColVector1, int elementNum1,
                          int elementNum2)
     {
-        return dateColVector1.asScratchDate(elementNum1).compareTo(
-                asScratchDate(elementNum2));
+        return Integer.compare(dateColVector1.dates[elementNum1], this.dates[elementNum2]);
     }
 
     @Override

@@ -88,11 +88,11 @@ public class LongDecimalColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
     {
         LongDecimalColumnVector columnVector = (LongDecimalColumnVector) vector;
-        if (type.getPrecision() != columnVector.precision || type.getScale() != columnVector.scale)
+        if (type.getPrecision() != columnVector.getPrecision() || type.getScale() != columnVector.getScale())
         {
             throw new IllegalArgumentException("reader of long_decimal(" + type.getPrecision() + "," + type.getScale() +
-                    ") does not match the column vector of long_decimal(" + columnVector.precision + "," +
-                    columnVector.scale + ")");
+                    ") does not match the column vector of long_decimal(" + columnVector.getPrecision() + "," +
+                    columnVector.getScale() + ")");
         }
         if (offset == 0)
         {

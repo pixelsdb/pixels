@@ -27,7 +27,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
 
 /**
  * This is a base class for recording (updating) all kinds of column statistics during file writing.
@@ -212,7 +212,7 @@ public class StatsRecorder
                  * using the precision and scale from the type in the file footer.
                  */
             case DECIMAL:
-                if (type.getPrecision() <= SHORT_MAX_PRECISION)
+                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
                     return new IntegerStatsRecorder();
                 else
                     return new Integer128StatsRecorder();

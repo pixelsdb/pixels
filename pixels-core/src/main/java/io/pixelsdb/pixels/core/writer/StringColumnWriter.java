@@ -113,7 +113,8 @@ public class StringColumnWriter extends BaseColumnWriter
         return outputStream.size();
     }
 
-    private void writeCurPartWithoutDict(BinaryColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    private void writeCurPartWithoutDict(BinaryColumnVector columnVector, byte[][] values,
+                                         int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -127,16 +128,16 @@ public class StringColumnWriter extends BaseColumnWriter
             {
                 outputStream.write(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
                 lensArray.add(vLens[curPartOffset + i]);
-                pixelStatRecorder
-                        .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
-                                1);
+                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i],
+                        vLens[curPartOffset + i], 1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);
         curPixelIsNullIndex += curPartLength;
     }
 
-    private void writeCurPartWithDict(BinaryColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets, int curPartLength, int curPartOffset)
+    private void writeCurPartWithDict(BinaryColumnVector columnVector, byte[][] values, int[] vLens, int[] vOffsets,
+                                      int curPartLength, int curPartOffset)
     {
         for (int i = 0; i < curPartLength; i++)
         {
@@ -150,9 +151,8 @@ public class StringColumnWriter extends BaseColumnWriter
             {
                 curPixelVector[curPixelVectorIndex++] = dictionary
                         .add(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i]);
-                pixelStatRecorder
-                        .updateString(values[curPartOffset + i], vOffsets[curPartOffset + i], vLens[curPartOffset + i],
-                                1);
+                pixelStatRecorder.updateString(values[curPartOffset + i], vOffsets[curPartOffset + i],
+                        vLens[curPartOffset + i], 1);
             }
         }
         System.arraycopy(columnVector.isNull, curPartOffset, isNull, curPixelIsNullIndex, curPartLength);

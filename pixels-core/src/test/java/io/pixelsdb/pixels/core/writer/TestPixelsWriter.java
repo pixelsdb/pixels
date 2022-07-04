@@ -74,10 +74,10 @@ public class TestPixelsWriter
             DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
             LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
 
-            System.out.println(vi.precision);
-            System.out.println(vi.scale);
-            System.out.println(vj.precision);
-            System.out.println(vj.scale);
+            System.out.println(vi.getPrecision());
+            System.out.println(vi.getScale());
+            System.out.println(vj.getPrecision());
+            System.out.println(vj.getScale());
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()
@@ -108,7 +108,6 @@ public class TestPixelsWriter
                     vc.vector[row] = 0;
                     vd.isNull[row] = true;
                     vd.times[row] = 0;
-                    vd.nanos[row] = 0;
                     ve.isNull[row] = true;
                     ve.vector[row] = 0;
                     vf.isNull[row] = true;
@@ -271,16 +270,15 @@ public class TestPixelsWriter
             BinaryColumnVector hcv = (BinaryColumnVector) rowBatch.cols[7];
             DecimalColumnVector icv = (DecimalColumnVector) rowBatch.cols[8];
             LongDecimalColumnVector jcv = (LongDecimalColumnVector) rowBatch.cols[9];
-            for (int i = 0, j = 0; i < rowBatch.size; ++i)
+            for (int i = 0; i < rowBatch.size; ++i)
             {
-                if (jcv.isNull[i])
+                if (dcv.isNull[i])
                 {
                     System.out.println("null");
                 }
                 else
                 {
-                    System.out.println(jcv.vector[j*2] + ", " + jcv.vector[j*2+1]);
-                    System.out.println(jcv.getScratchDecimal(j++).toString());
+                    System.out.println(dcv.asScratchTimestamp(i));
 
                 }
             }

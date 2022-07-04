@@ -77,8 +77,8 @@ public class ORCConsumer
 
             Properties prop = getProp();
             int pixelStride = Integer.parseInt(prop.getProperty("pixel.stride"));
-            int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size")) * 1024 * 1024;
-            long blockSize = Long.parseLong(prop.getProperty("block.size")) * 1024l * 1024l;
+            int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size"));
+            long blockSize = Long.parseLong(prop.getProperty("block.size"));
             short replication = Short.parseShort(prop.getProperty("block.replication"));
 
             Configuration conf = new Configuration();

@@ -151,8 +151,11 @@ public class DateStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.DateStatistic.Builder dateBuilder =
                 PixelsProto.DateStatistic.newBuilder();
-        dateBuilder.setMinimum((int)minimum);
-        dateBuilder.setMaximum((int)maximum);
+        if (hasMinMax)
+        {
+            dateBuilder.setMinimum((int) minimum);
+            dateBuilder.setMaximum((int) maximum);
+        }
         builder.setDateStatistics(dateBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;

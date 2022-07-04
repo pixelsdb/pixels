@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
 
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
 
 /**
  * pixels
@@ -59,7 +59,7 @@ public interface ColumnWriter
             case DOUBLE:
                 return new DoubleColumnWriter(type, pixelStride, isEncoding);
             case DECIMAL: // Issue #196: precision and scale are passed through type.
-                if (type.getPrecision() <= SHORT_MAX_PRECISION)
+                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
                     return new DecimalColumnWriter(type, pixelStride, isEncoding);
                 else
                     return new LongDecimalColumnWriter(type, pixelStride, isEncoding);
