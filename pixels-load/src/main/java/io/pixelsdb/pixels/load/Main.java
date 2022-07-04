@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * pixels loader command line tool
  * <p>
- * LOAD -f pixels -o hdfs://dbiir27:9000/pixels/pixels/test_105/source -d pixels -t test_105 -n 220000 -r \t -c 16
+ * LOAD -f pixels -o s3://text-105/source -d pixels -t test_105 -n 220000 -r \t -c 16 -l s3://pixels-105/v-0-order
  * -p false [optional, default false]
  * </p>
  * <p>
@@ -75,7 +75,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * QUERY -t pixels -w /home/tao/software/station/bitbucket/105_dedup_query.txt -l /home/tao/software/station/bitbucket/pixels_duration_local.csv
  * </p>
  * <p>
- * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3
+ * COPY -p .pxl -s hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -d hdfs://dbiir27:9000/pixels/pixels/test_105/v_1_order -n 3 -c 3
  * </p>
  * <p>
  * COMPACT -s pixels -t test_105 -l 3 -n yes -c 8
@@ -376,7 +376,7 @@ public class Main
                     Storage destStorage = StorageFactory.Instance().getStorage(destination);
 
                     List<Status> files =  sourceStorage.listStatus(source);
-                    long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
+                    long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
 
                     // copy
@@ -507,7 +507,7 @@ public class Main
                     ConfigFactory configFactory = ConfigFactory.Instance();
                     Storage orderStorage = StorageFactory.Instance().getStorage(layout.getOrderPath());
                     Storage compactStorage = StorageFactory.Instance().getStorage(layout.getCompactPath());
-                    long blockSize = Long.parseLong(configFactory.getProperty("block.size")) * 1024l * 1024l;
+                    long blockSize = Long.parseLong(configFactory.getProperty("block.size"));
                     short replication = Short.parseShort(configFactory.getProperty("block.replication"));
                     List<Status> statuses = orderStorage.listStatus(layout.getOrderPath());
 
