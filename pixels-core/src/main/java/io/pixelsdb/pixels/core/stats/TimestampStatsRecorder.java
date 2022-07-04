@@ -148,8 +148,11 @@ public class TimestampStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.TimestampStatistic.Builder tsBuilder =
                 PixelsProto.TimestampStatistic.newBuilder();
-        tsBuilder.setMinimum(minimum);
-        tsBuilder.setMaximum(maximum);
+        if (hasMinMax)
+        {
+            tsBuilder.setMinimum(minimum);
+            tsBuilder.setMaximum(maximum);
+        }
         builder.setTimestampStatistics(tsBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;

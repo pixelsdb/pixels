@@ -74,10 +74,10 @@ public class TestPixelsWriter
             DecimalColumnVector vi = (DecimalColumnVector) rowBatch.cols[8];        // decimal
             LongDecimalColumnVector vj = (LongDecimalColumnVector) rowBatch.cols[9];// long decimal
 
-            System.out.println(vi.precision);
-            System.out.println(vi.scale);
-            System.out.println(vj.precision);
-            System.out.println(vj.scale);
+            System.out.println(vi.getPrecision());
+            System.out.println(vi.getScale());
+            System.out.println(vj.getPrecision());
+            System.out.println(vj.getScale());
 
             PixelsWriter pixelsWriter =
                     PixelsWriterImpl.newBuilder()

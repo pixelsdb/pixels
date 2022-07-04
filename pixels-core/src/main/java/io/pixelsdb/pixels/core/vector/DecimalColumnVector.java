@@ -26,8 +26,8 @@ import java.math.MathContext;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_PRECISION;
-import static io.pixelsdb.pixels.core.TypeDescription.SHORT_MAX_SCALE;
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.SHORT_DECIMAL_MAX_SCALE;
 import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.util.Objects.requireNonNull;
 
@@ -48,8 +48,8 @@ public class DecimalColumnVector extends ColumnVector
 {
     public static final long DEFAULT_UNSCALED_VALUE = 0;
     public long[] vector;
-    public int precision;
-    public int scale;
+    private int precision;
+    private int scale;
 
     public DecimalColumnVector(int precision, int scale)
     {
@@ -67,10 +67,10 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (precision > SHORT_MAX_PRECISION)
+        else if (precision > SHORT_DECIMAL_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + SHORT_MAX_PRECISION);
+                    " is out of the max precision " + SHORT_DECIMAL_MAX_PRECISION);
         }
         this.precision = precision;
 
@@ -78,10 +78,10 @@ public class DecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (scale > SHORT_MAX_SCALE)
+        else if (scale > SHORT_DECIMAL_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + SHORT_MAX_SCALE);
+                    " is out of the max scale " + SHORT_DECIMAL_MAX_SCALE);
         }
         else if (scale > precision)
         {
@@ -89,6 +89,16 @@ public class DecimalColumnVector extends ColumnVector
                     " is smaller that scale " + scale);
         }
         this.scale = scale;
+    }
+
+    public int getPrecision()
+    {
+        return precision;
+    }
+
+    public int getScale()
+    {
+        return scale;
     }
 
     /**

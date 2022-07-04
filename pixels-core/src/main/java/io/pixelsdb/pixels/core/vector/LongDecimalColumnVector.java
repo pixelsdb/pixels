@@ -29,8 +29,8 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.TypeDescription.LONG_MAX_PRECISION;
-import static io.pixelsdb.pixels.core.TypeDescription.LONG_MAX_SCALE;
+import static io.pixelsdb.pixels.core.TypeDescription.LONG_DECIMAL_MAX_PRECISION;
+import static io.pixelsdb.pixels.core.TypeDescription.LONG_DECIMAL_MAX_SCALE;
 import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.util.Objects.requireNonNull;
 
@@ -46,8 +46,8 @@ public class LongDecimalColumnVector extends ColumnVector
     public static final ByteOrder ENDIAN = ByteOrder.BIG_ENDIAN;
     public static final long DEFAULT_UNSCALED_VALUE = 0;
     public long[] vector;
-    public int precision;
-    public int scale;
+    private int precision;
+    private int scale;
 
     public LongDecimalColumnVector(int precision, int scale)
     {
@@ -65,10 +65,10 @@ public class LongDecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (precision > LONG_MAX_PRECISION)
+        else if (precision > LONG_DECIMAL_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + LONG_MAX_PRECISION);
+                    " is out of the max precision " + LONG_DECIMAL_MAX_PRECISION);
         }
         this.precision = precision;
 
@@ -76,10 +76,10 @@ public class LongDecimalColumnVector extends ColumnVector
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (scale > LONG_MAX_SCALE)
+        else if (scale > LONG_DECIMAL_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + LONG_MAX_SCALE);
+                    " is out of the max scale " + LONG_DECIMAL_MAX_SCALE);
         }
         else if (scale > precision)
         {
@@ -87,6 +87,16 @@ public class LongDecimalColumnVector extends ColumnVector
                     " is smaller that scale " + scale);
         }
         this.scale = scale;
+    }
+
+    public int getPrecision()
+    {
+        return precision;
+    }
+
+    public int getScale()
+    {
+        return scale;
     }
 
     /**

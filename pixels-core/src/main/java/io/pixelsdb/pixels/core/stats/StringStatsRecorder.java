@@ -27,10 +27,13 @@ import io.airlift.slice.Slices;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
  */
 public class StringStatsRecorder
         extends StatsRecorder implements StringColumnStats
@@ -47,7 +50,7 @@ public class StringStatsRecorder
     {
         super(statistic);
         PixelsProto.StringStatistic strStat = statistic.getStringStatistics();
-        if (strStat.hasMaximum())
+        if (strStat.hasMinimum())
         {
             minimum = strStat.getMinimum();
         }
@@ -73,6 +76,8 @@ public class StringStatsRecorder
     @Override
     public void updateString(String value, int repetitions)
     {
+        requireNonNull(value, "value is null");
+        checkArgument(repetitions > 0, "repetitions is non-positive");
         if (minimum == null)
         {
             minimum = maximum = value;
@@ -88,7 +93,7 @@ public class StringStatsRecorder
                 maximum = value;
             }
         }
-        sum += value.length() * repetitions;
+        sum += (long) value.length() * repetitions;
         numberOfValues += repetitions;
     }
 
@@ -153,7 +158,7 @@ public class StringStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.StringStatistic.Builder strBuilder =
                 PixelsProto.StringStatistic.newBuilder();
-        if (getNumberOfValues() != 0)
+        if (minimum != null)
         {
             strBuilder.setMinimum(minimum);
             strBuilder.setMaximum(maximum);

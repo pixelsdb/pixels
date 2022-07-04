@@ -94,16 +94,16 @@ public class TimeStatsRecorder
         {
             if (value.getTime() < minimum)
             {
-                minimum = (int)value.getTime();
+                minimum = (int) value.getTime();
             }
             if (value.getTime() > maximum)
             {
-                maximum = (int)value.getTime();
+                maximum = (int) value.getTime();
             }
         }
         else
         {
-            minimum = maximum = (int)value.getTime();
+            minimum = maximum = (int) value.getTime();
             hasMinMax = true;
         }
         numberOfValues++;
@@ -148,8 +148,11 @@ public class TimeStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.TimeStatistic.Builder tBuilder =
                 PixelsProto.TimeStatistic.newBuilder();
-        tBuilder.setMinimum(minimum);
-        tBuilder.setMaximum(maximum);
+        if (hasMinMax)
+        {
+            tBuilder.setMinimum(minimum);
+            tBuilder.setMaximum(maximum);
+        }
         builder.setTimeStatistics(tBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;

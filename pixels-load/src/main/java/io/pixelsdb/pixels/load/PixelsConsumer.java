@@ -29,7 +29,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Date;
@@ -75,11 +74,15 @@ public class PixelsConsumer extends Consumer
             int[] orderMapping = config.getOrderMapping();
             int maxRowNum = config.getMaxRowNum();
             String regex = config.getRegex();
+            if (regex.equals("\\s"))
+            {
+                regex = " ";
+            }
 
             Properties prop = getProp();
             int pixelStride = Integer.parseInt(prop.getProperty("pixel.stride"));
-            int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size")) * 1024 * 1024;
-            long blockSize = Long.parseLong(prop.getProperty("block.size")) * 1024l * 1024l;
+            int rowGroupSize = Integer.parseInt(prop.getProperty("row.group.size"));
+            long blockSize = Long.parseLong(prop.getProperty("block.size"));
             short replication = Short.parseShort(prop.getProperty("block.replication"));
 
             TypeDescription schema = TypeDescription.fromString(schemaStr);
@@ -134,16 +137,9 @@ public class PixelsConsumer extends Consumer
                         }
                         initPixelsFile = false;
 
-                        //line = StringUtil.replaceAll(line, "false", "0");
-                        //line = StringUtil.replaceAll(line, "False", "0");
-                        //line = StringUtil.replaceAll(line, "true", "1");
-                        //line = StringUtil.replaceAll(line, "True", "1");
-                        int rowId = rowBatch.size++;
+                        rowBatch.size++;
                         rowCounter++;
-                        if (regex.equals("\\s"))
-                        {
-                            regex = " ";
-                        }
+
                         String[] colsInLine = line.split(regex);
                         for (int i = 0; i < columnVectors.length; i++)
                         {
@@ -151,8 +147,7 @@ public class PixelsConsumer extends Consumer
                             if (colsInLine[valueIdx].isEmpty() ||
                                     colsInLine[valueIdx].equalsIgnoreCase("\\N"))
                             {
-                                columnVectors[i].isNull[rowId] = true;
-                                columnVectors[i].noNulls = false;
+                                columnVectors[i].addNull();
                             } else
                             {
                                 columnVectors[i].add(colsInLine[valueIdx]);
@@ -195,9 +190,6 @@ public class PixelsConsumer extends Consumer
         {
             System.out.println("PixelsConsumer: " + e.getMessage());
             currentThread().interrupt();
-        } catch (FileNotFoundException e)
-        {
-            e.printStackTrace();
         } catch (IOException e)
         {
             e.printStackTrace();

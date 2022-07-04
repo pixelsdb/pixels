@@ -45,27 +45,27 @@ public final class TypeDescription
      * Issue #196: support short decimal of which the max precision is 18.
      * Issue #203: support long decimal of which the max precision is 38.
      */
-    public static final int SHORT_MAX_PRECISION = 18;
-    public static final int LONG_MAX_PRECISION = 38;
+    public static final int SHORT_DECIMAL_MAX_PRECISION = 18;
+    public static final int LONG_DECIMAL_MAX_PRECISION = 38;
     /**
      * In SQL standard, the max scale of decimal is 38.
      * Issue #196: support short decimal of which the max scale is 18.
      * Issue #203: support long decimal of which the max scale is 38.
      */
-    public static final int SHORT_MAX_SCALE = 18;
-    public static final int LONG_MAX_SCALE = 38;
+    public static final int SHORT_DECIMAL_MAX_SCALE = 18;
+    public static final int LONG_DECIMAL_MAX_SCALE = 38;
     /**
      * In SQL standard, the default precision of decimal is 38.
      * Issue #196: support short decimal of which the default precision is 18.
      * Issue #203: support long decimal of which the default precision is 38.
      */
-    public static final int SHORT_DEFAULT_PRECISION = 18;
-    public static final int LONG_DEFAULT_PRECISION = 38;
+    public static final int SHORT_DECIMAL_DEFAULT_PRECISION = 18;
+    public static final int LONG_DECIMAL_DEFAULT_PRECISION = 38;
     /**
      * It is a standard that the default scale of decimal is 0.
      */
-    public static final int SHORT_DEFAULT_SCALE = 0;
-    public static final int LONG_DEFAULT_SCALE = 0;
+    public static final int SHORT_DECIMAL_DEFAULT_SCALE = 0;
+    public static final int LONG_DECIMAL_DEFAULT_SCALE = 0;
     /**
      * The default length of varchar, binary, and varbinary.
      */
@@ -74,6 +74,19 @@ public final class TypeDescription
      * It is a standard that the default length of char is 1.
      */
     public static final int DEFAULT_CHAR_LENGTH = 1;
+    /**
+     * In SQL standard, the default precision of timestamp is 6 (i.e., microseconds),
+     * however, in Pixels, we use default precision 3 to be compatible with Trino.
+     */
+    public static final int DEFAULT_TIMESTAMP_PRECISION = 3;
+    /**
+     * 9 = nanosecond, 6 = microsecond, 3 = millisecond, 0 = second.
+     * <p>Although 64-bit long is enough to encode the nanoseconds for now, it is
+     * risky to encode a nanosecond time in the near future, thus some query engines
+     * such as Trino only use long to encode a timestamp up to 6 precision.
+     * Therefore, we also set the max precision of long encoded timestamp to 6 in Pixels.</p>
+     */
+    public static final int MAX_TIMESTAMP_PRECISION = 6;
     private static final Pattern UNQUOTED_NAMES = Pattern.compile("^\\w+$");
 
     @Override
@@ -99,6 +112,9 @@ public final class TypeDescription
                     case CHAR:
                     case VARCHAR:
                         result = maxLength - other.maxLength;
+                        break;
+                    case TIMESTAMP:
+                        result = precision - other.precision;
                         break;
                     case DECIMAL:
                         result = precision - other.precision;
@@ -247,7 +263,7 @@ public final class TypeDescription
     public static TypeDescription createDecimal(int precision, int scale)
     {
         checkArgument(precision >= scale && scale >= 0 &&
-                        precision > 0 && precision <= LONG_MAX_PRECISION,
+                        precision > 0 && precision <= LONG_DECIMAL_MAX_PRECISION,
                 "invalid precision and scale (" + precision + "," + scale + ")");
         TypeDescription type = new TypeDescription(Category.DECIMAL);
         type.precision = precision;
@@ -353,6 +369,7 @@ public final class TypeDescription
                     break;
                 case TIMESTAMP:
                     fieldType = TypeDescription.createTimestamp();
+                    fieldType.precision = type.getPrecision();
                     break;
                 case VARBINARY:
                     fieldType = TypeDescription.createVarbinary();
@@ -579,7 +596,18 @@ public final class TypeDescription
             case LONG:
             case SHORT:
             case STRING:
+                break;
             case TIMESTAMP:
+                if (consumeChar(source, '('))
+                {
+                    // with precision specified.
+                    result.withPrecision(parseInt(source));
+                    requireChar(source, ')');
+                }
+                else
+                {
+                    result.withPrecision(DEFAULT_TIMESTAMP_PRECISION);
+                }
                 break;
             case BINARY:
             case VARBINARY:
@@ -595,6 +623,10 @@ public final class TypeDescription
                 {
                     // It is a standard that the default length of char is 1.
                     result.withMaxLength(DEFAULT_CHAR_LENGTH);
+                }
+                else
+                {
+                    result.withMaxLength(DEFAULT_LENGTH);
                 }
                 break;
             case DECIMAL:
@@ -737,6 +769,7 @@ public final class TypeDescription
                     break;
                 case TIMESTAMP:
                     tmpType.setKind(PixelsProto.Type.Kind.TIMESTAMP);
+                    tmpType.setPrecision(child.getPrecision());
                     break;
                 case DATE:
                     tmpType.setKind(PixelsProto.Type.Kind.DATE);
@@ -764,10 +797,10 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("precision " + precision + " is negative");
         }
-        else if (category == Category.DECIMAL && precision > LONG_MAX_PRECISION)
+        else if (category == Category.DECIMAL && precision > LONG_DECIMAL_MAX_PRECISION)
         {
             throw new IllegalArgumentException("precision " + precision +
-                    " is out of the max precision " + LONG_MAX_PRECISION);
+                    " is out of the max precision " + LONG_DECIMAL_MAX_PRECISION);
         }
         else if (scale > precision)
         {
@@ -790,10 +823,10 @@ public final class TypeDescription
         {
             throw new IllegalArgumentException("scale " + scale + " is negative");
         }
-        else if (category == Category.DECIMAL && scale > LONG_MAX_SCALE)
+        else if (category == Category.DECIMAL && scale > LONG_DECIMAL_MAX_SCALE)
         {
             throw new IllegalArgumentException("scale " + scale +
-                    " is out of the max scale " + LONG_MAX_SCALE);
+                    " is out of the max scale " + LONG_DECIMAL_MAX_SCALE);
         }
         else if (scale > precision)
         {
@@ -984,12 +1017,12 @@ public final class TypeDescription
             case TIME:
                 return new TimeColumnVector(maxSize);
             case TIMESTAMP:
-                return new TimestampColumnVector(maxSize);
+                return new TimestampColumnVector(maxSize, precision);
             case FLOAT:
             case DOUBLE:
                 return new DoubleColumnVector(maxSize);
             case DECIMAL:
-                if (precision <= SHORT_MAX_PRECISION)
+                if (precision <= SHORT_DECIMAL_MAX_PRECISION)
                     return new DecimalColumnVector(maxSize, precision, scale);
                 else
                     return new LongDecimalColumnVector(maxSize, precision, scale);
@@ -1160,8 +1193,8 @@ public final class TypeDescription
     private final List<TypeDescription> children;
     private final List<String> fieldNames;
     private int maxLength = DEFAULT_LENGTH;
-    private int precision = SHORT_DEFAULT_PRECISION;
-    private int scale = SHORT_DEFAULT_SCALE;
+    private int precision = SHORT_DECIMAL_DEFAULT_PRECISION;
+    private int scale = SHORT_DECIMAL_DEFAULT_SCALE;
 
     static void printFieldName(StringBuilder buffer, String name)
     {
@@ -1195,6 +1228,11 @@ public final class TypeDescription
                 buffer.append(precision);
                 buffer.append(',');
                 buffer.append(scale);
+                buffer.append(')');
+                break;
+            case TIMESTAMP:
+                buffer.append('(');
+                buffer.append(precision);
                 buffer.append(')');
                 break;
             case STRUCT:
@@ -1251,6 +1289,10 @@ public final class TypeDescription
                 buffer.append(precision);
                 buffer.append(", \"scale\": ");
                 buffer.append(scale);
+                break;
+            case TIMESTAMP:
+                buffer.append(", \"precision\": ");
+                buffer.append(precision);
                 break;
             case STRUCT:
                 buffer.append(", \"fields\": [");
