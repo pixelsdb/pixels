@@ -72,6 +72,7 @@ public class PixelsExecutor
     private final boolean projectionReadEnabled;
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
+    private final boolean computeFinalAggrInServer;
     private final Storage storage;
     private final long queryId;
 
@@ -115,6 +116,7 @@ public class PixelsExecutor
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
         this.capSplitSizeByStatistics = Boolean.parseBoolean(config.getProperty("join.cap.split-size.by.statistics"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
+        this.computeFinalAggrInServer = Boolean.parseBoolean(config.getProperty("aggregation.compute.final.in.server"));
         this.orderedPathEnabled = orderedPathEnabled;
         this.compactPathEnabled = compactPathEnabled;
         this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
