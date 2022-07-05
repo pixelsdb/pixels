@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
+import io.pixelsdb.pixels.executor.lambda.domain.AggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.JoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
@@ -54,9 +55,10 @@ public class BroadcastJoinInput extends JoinInput
 
     public BroadcastJoinInput(long queryId, BroadcastTableInfo smallTable,
                               BroadcastTableInfo largeTable, JoinInfo joinInfo,
+                              boolean aggregationPresent, AggregationInfo aggregationInfo,
                               MultiOutputInfo output)
     {
-        super(output);
+        super(aggregationPresent, aggregationInfo, output);
         this.queryId = queryId;
         this.smallTable = smallTable;
         this.largeTable = largeTable;

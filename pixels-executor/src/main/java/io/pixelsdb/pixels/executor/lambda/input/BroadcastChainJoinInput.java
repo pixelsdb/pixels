@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
-import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.ChainJoinInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.JoinInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
 
 import java.util.List;
 
@@ -55,7 +52,7 @@ public class BroadcastChainJoinInput extends JoinInput
     /**
      * Whether there are post chain joins.
      */
-    protected boolean postChainJoinsExist;
+    protected boolean postChainJoinsPresent = false;
     /**
      * The information of the post small tables that are broadcast in the chain join.
      */
@@ -75,17 +72,20 @@ public class BroadcastChainJoinInput extends JoinInput
                                    List<BroadcastTableInfo> chainTables,
                                    List<ChainJoinInfo> chainJoinInfos,
                                    BroadcastTableInfo largeTable,
-                                   JoinInfo joinInfo, boolean postChainJoinsExist,
+                                   JoinInfo joinInfo, boolean postChainJoinsPresent,
                                    List<BroadcastTableInfo> postSmallTables,
-                                   List<ChainJoinInfo> postChainJoinInfos, MultiOutputInfo output)
+                                   List<ChainJoinInfo> postChainJoinInfos,
+                                   boolean aggregationPresent,
+                                   AggregationInfo aggregationInfo,
+                                   MultiOutputInfo output)
     {
-        super(output);
+        super(aggregationPresent, aggregationInfo, output);
         this.queryId = queryId;
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
         this.largeTable = largeTable;
         this.joinInfo = joinInfo;
-        this.postChainJoinsExist = postChainJoinsExist;
+        this.postChainJoinsPresent = postChainJoinsPresent;
         this.postSmallTables = postSmallTables;
         this.postChainJoinInfos = postChainJoinInfos;
     }
@@ -140,14 +140,14 @@ public class BroadcastChainJoinInput extends JoinInput
         this.joinInfo = joinInfo;
     }
 
-    public boolean isPostChainJoinsExist()
+    public boolean isPostChainJoinsPresent()
     {
-        return postChainJoinsExist;
+        return postChainJoinsPresent;
     }
 
-    public void setPostChainJoinsExist(boolean postChainJoinsExist)
+    public void setPostChainJoinsPresent(boolean postChainJoinsPresent)
     {
-        this.postChainJoinsExist = postChainJoinsExist;
+        this.postChainJoinsPresent = postChainJoinsPresent;
     }
 
     public List<BroadcastTableInfo> getPostSmallTables()
@@ -183,8 +183,10 @@ public class BroadcastChainJoinInput extends JoinInput
         {
             this.builderInstance = new BroadcastChainJoinInput(
                     instance.queryId, instance.chainTables, instance.chainJoinInfos,
-                    instance.largeTable, instance.joinInfo, instance.postChainJoinsExist,
-                    instance.postSmallTables, instance.postChainJoinInfos, instance.getOutput());
+                    instance.largeTable, instance.joinInfo, instance.postChainJoinsPresent,
+                    instance.postSmallTables, instance.postChainJoinInfos,
+                    instance.isAggregationPresent(), instance.getAggregationInfo(),
+                    instance.getOutput());
         }
 
         public Builder setLargeTable(BroadcastTableInfo largeTable)

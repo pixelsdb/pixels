@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 /**
  * The tuple of which all the columns are null.
- * This is mainly used in outer join.
+ * This is mainly used in outer joins.
  *
  * @author hank
  * @date 5/10/22

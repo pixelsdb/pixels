@@ -17,30 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.plan;
+package io.pixelsdb.pixels.executor.aggregation;
 
 /**
- * The table that is used in joins.
+ * The aggregate function type
  * @author hank
- * @date 26/05/2022
+ * @date 04/07/2022
  */
-public interface Table
+public enum FunctionType
 {
-    public static enum TableType
+    UNKNOWN, // The first enum value is the default value.
+    SUM,
+    MIN,
+    MAX,
+    COUNT;
+
+    public static FunctionType fromName(String name)
     {
-        BASE, JOINED, AGGREGATED
+        return valueOf(name.toUpperCase());
     }
-
-    public TableType getTableType();
-
-    public String getSchemaName();
-
-    public String getTableName();
-
-    public String getTableAlias();
-
-    /**
-     * @return the names of the columns that are read from the table.
-     */
-    public String[] getColumnNames();
 }

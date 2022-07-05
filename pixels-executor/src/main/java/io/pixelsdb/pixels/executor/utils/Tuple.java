@@ -28,7 +28,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * The tuple to be used in join.
+ * The tuple to be used in join and aggregation.
  *
  * @author hank
  * @date 09/05/2022
@@ -42,7 +42,7 @@ public class Tuple
          */
         private final int[] hashCode;
         /**
-         * The ids of the join-key columns.
+         * The ids of the key columns.
          */
         protected final int[] keyColumnIds;
         /**
@@ -103,25 +103,29 @@ public class Tuple
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof Tuple)
+        if (this == obj)
         {
-            Tuple other = (Tuple) obj;
-            if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass())
+        {
+            return false;
+        }
+        Tuple other = (Tuple) obj;
+        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+        {
+            return false;
+        }
+        for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
+        {
+            // We only support equi-joins, thus null value is considered not equal to anything.
+            if (!this.commonFields.columns[this.commonFields.keyColumnIds[i]].elementEquals(
+                    this.rowId, other.rowId, other.commonFields.columns[other.commonFields.keyColumnIds[i]]))
             {
                 return false;
             }
-            for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
-            {
-                // We only support equi-joins, thus null value is not checked.
-                if (!this.commonFields.columns[this.commonFields.keyColumnIds[i]].elementEquals(
-                        this.rowId, other.rowId, other.commonFields.columns[other.commonFields.keyColumnIds[i]]))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
-        return false;
+        return true;
     }
 
     /**

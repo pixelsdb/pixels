@@ -20,35 +20,42 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.base.Objects;
-import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 
 /**
- * The table that is used in joins.
  * @author hank
- * @date 26/05/2022
+ * @date 05/07/2022
  */
-public class BaseTable implements Table
+public class AggregatedTable implements Table
 {
     private final String schemaName;
     private final String tableName;
     private final String tableAlias;
     private final String[] columnNames;
-    private final TableScanFilter filter;
+    private final Aggregation aggregation;
 
-    public BaseTable(String schemaName, String tableName, String tableAlias,
-                     String[] columnNames, TableScanFilter filter)
+    /**
+     * The {@link AggregatedTable#columnNames} of this class is constructed by the colum alias
+     * of the origin table on which the aggregation is computed.
+     *
+     * @param schemaName the schema name
+     * @param tableName the table name
+     * @param tableAlias the table alias
+     * @param aggregation the information of the aggregation
+     */
+    public AggregatedTable(String schemaName, String tableName, String tableAlias,
+                           String[] columnNames, Aggregation aggregation)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
         this.columnNames = columnNames;
-        this.filter = filter;
+        this.aggregation = aggregation;
     }
 
     @Override
     public TableType getTableType()
     {
-        return TableType.BASE;
+        return TableType.AGGREGATED;
     }
 
     @Override
@@ -75,9 +82,9 @@ public class BaseTable implements Table
         return columnNames;
     }
 
-    public TableScanFilter getFilter()
+    public Aggregation getAggregation()
     {
-        return filter;
+        return aggregation;
     }
 
     @Override
@@ -85,17 +92,17 @@ public class BaseTable implements Table
     {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        BaseTable table = (BaseTable) o;
-        return Objects.equal(schemaName, table.schemaName) &&
-                Objects.equal(tableName, table.tableName) &&
-                Objects.equal(tableAlias, table.tableAlias) &&
-                Objects.equal(columnNames, table.columnNames) &&
-                Objects.equal(filter, table.filter);
+        AggregatedTable that = (AggregatedTable) o;
+        return Objects.equal(schemaName, that.schemaName) &&
+                Objects.equal(tableName, that.tableName) &&
+                Objects.equal(tableAlias, that.tableAlias) &&
+                Objects.equal(columnNames, that.columnNames) &&
+                Objects.equal(aggregation, that.aggregation);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, filter);
+        return Objects.hashCode(schemaName, tableName, tableAlias, columnNames, aggregation);
     }
 }

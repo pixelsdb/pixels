@@ -151,7 +151,7 @@ public class SingleStageJoinOperator implements JoinOperator
     }
 
     @Override
-    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    public JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         SingleStageJoinOutputCollection outputCollection = new SingleStageJoinOutputCollection();
         outputCollection.setJoinAlgo(joinAlgo);
@@ -206,7 +206,7 @@ public class SingleStageJoinOperator implements JoinOperator
         }
     }
 
-    public static class SingleStageJoinOutputCollection extends OutputCollection
+    public static class SingleStageJoinOutputCollection extends JoinOutputCollection
     {
         protected Output[] joinOutputs = null;
 

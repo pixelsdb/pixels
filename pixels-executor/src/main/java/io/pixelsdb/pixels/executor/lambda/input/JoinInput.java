@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
+import io.pixelsdb.pixels.executor.lambda.domain.AggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 
 /**
@@ -28,6 +29,15 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 public class JoinInput extends Input
 {
     /**
+     * Whether the aggregation exists.
+     */
+    private boolean aggregationPresent = false;
+    /**
+     * The information of the aggregation.
+     */
+    private AggregationInfo aggregationInfo;
+
+    /**
      * The information of the join output files.<br/>
      * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
      * should be consistent with the number of input splits in right table. For left-outer
@@ -35,11 +45,36 @@ public class JoinInput extends Input
      */
     private MultiOutputInfo output;
 
+    /**
+     * Default constructor for Jackson.
+     */
     public JoinInput() {}
 
-    public JoinInput(MultiOutputInfo output)
+    public JoinInput(boolean aggregationPresent, AggregationInfo aggregationInfo, MultiOutputInfo output)
     {
+        this.aggregationPresent = aggregationPresent;
+        this.aggregationInfo = aggregationInfo;
         this.output = output;
+    }
+
+    public boolean isAggregationPresent()
+    {
+        return aggregationPresent;
+    }
+
+    public void setAggregationPresent(boolean aggregationPresent)
+    {
+        this.aggregationPresent = aggregationPresent;
+    }
+
+    public AggregationInfo getAggregationInfo()
+    {
+        return aggregationInfo;
+    }
+
+    public void setAggregationInfo(AggregationInfo aggregationInfo)
+    {
+        this.aggregationInfo = aggregationInfo;
     }
 
     /**
