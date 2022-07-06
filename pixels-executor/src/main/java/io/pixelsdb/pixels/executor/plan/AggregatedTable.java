@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.executor.plan;
 
 import com.google.common.base.Objects;
+import com.google.common.collect.ObjectArrays;
 
 /**
  * @author hank
@@ -35,21 +36,22 @@ public class AggregatedTable implements Table
 
     /**
      * The {@link AggregatedTable#columnNames} of this class is constructed by the colum alias
-     * of the origin table on which the aggregation is computed.
+     * of the origin table on which the aggregation is computed and the column alias of the
+     * aggregation result columns that are computed by the aggregation functions.
      *
      * @param schemaName the schema name
      * @param tableName the table name
      * @param tableAlias the table alias
      * @param aggregation the information of the aggregation
      */
-    public AggregatedTable(String schemaName, String tableName, String tableAlias,
-                           String[] columnNames, Aggregation aggregation)
+    public AggregatedTable(String schemaName, String tableName, String tableAlias, Aggregation aggregation)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.tableAlias = tableAlias;
-        this.columnNames = columnNames;
         this.aggregation = aggregation;
+        this.columnNames =  ObjectArrays.concat(
+                aggregation.getGroupKeyColumnAlias(), aggregation.getResultColumnAlias(), String.class);
     }
 
     @Override

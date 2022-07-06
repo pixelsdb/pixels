@@ -28,20 +28,42 @@ import io.pixelsdb.pixels.executor.aggregation.FunctionType;
  */
 public class Aggregation
 {
-    private final String[] groupColumnAlias;
+    /**
+     * The alias of the grouping key columns in the aggregation result.
+     */
+    private final String[] groupKeyColumnAlias;
+    /**
+     * The alias of the synthetic aggregation columns in the aggregation result.
+     */
     private final String[] resultColumnAlias;
+    /**
+     * The index of the grouping key columns in the origin table.
+     */
     private final int[] groupKeyColumnIds;
+    /**
+     * The index of group aggregated columns in the origin table.
+     */
     private final int[] aggregateColumnIds;
+    /**
+     * The aggregate functions that are applied on the aggregated columns.
+     * TODO: currently, we only support one function per aggregated column.
+     */
     private final FunctionType[] functionTypes;
+    /**
+     * The information of the output endpoint of the aggregation result.
+     */
     private final OutputEndPoint outputEndPoint;
+    /**
+     * The origin table that the aggregation is performed.
+     */
     private final Table originTable;
 
-    public Aggregation(String[] groupColumnAlias, String[] resultColumnAlias,
+    public Aggregation(String[] groupKeyColumnAlias, String[] resultColumnAlias,
                        int[] groupKeyColumnIds, int[] aggregateColumnIds,
                        FunctionType[] functionTypes, OutputEndPoint outputEndPoint,
                        Table originTable)
     {
-        this.groupColumnAlias = groupColumnAlias;
+        this.groupKeyColumnAlias = groupKeyColumnAlias;
         this.resultColumnAlias = resultColumnAlias;
         this.groupKeyColumnIds = groupKeyColumnIds;
         this.aggregateColumnIds = aggregateColumnIds;
@@ -50,9 +72,9 @@ public class Aggregation
         this.originTable = originTable;
     }
 
-    public String[] getGroupColumnAlias()
+    public String[] getGroupKeyColumnAlias()
     {
-        return groupColumnAlias;
+        return groupKeyColumnAlias;
     }
 
     public String[] getResultColumnAlias()

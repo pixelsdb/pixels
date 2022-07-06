@@ -159,7 +159,7 @@ public class PixelsExecutor
                 "aggregation.outputEndPoint is null");
 
         AggregationInfo aggregationInfo = new AggregationInfo();
-        aggregationInfo.setGroupColumnAlias(aggregation.getGroupColumnAlias());
+        aggregationInfo.setGroupColumnAlias(aggregation.getGroupKeyColumnAlias());
         aggregationInfo.setResultColumnAlias(aggregation.getResultColumnAlias());
         aggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
         aggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
@@ -277,7 +277,7 @@ public class PixelsExecutor
                 }
                 AggregationInput preAggrInput = new AggregationInput();
                 preAggrInput.setInputFiles(inputFilesBuilder.build());
-                preAggrInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
+                preAggrInput.setGroupColumnNames(aggregation.getGroupKeyColumnAlias());
                 preAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
                 preAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
                 preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
@@ -307,7 +307,7 @@ public class PixelsExecutor
         // build the final aggregation input.
         AggregationInput finalAggrInput = new AggregationInput();
         finalAggrInput.setInputFiles(finalAggrInputFilesBuilder.build());
-        finalAggrInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
+        finalAggrInput.setGroupColumnNames(aggregation.getGroupKeyColumnAlias());
         finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
         finalAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
         StorageInfo storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
