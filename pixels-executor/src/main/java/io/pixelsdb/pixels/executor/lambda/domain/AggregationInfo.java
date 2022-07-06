@@ -51,9 +51,7 @@ public class AggregationInfo
     /**
      * Default constructor for Jackson.
      */
-    public AggregationInfo()
-    {
-    }
+    public AggregationInfo() { }
 
     public AggregationInfo(String[] groupColumnAlias, String[] resultColumnAlias, int[] groupKeyColumnIds, int[] aggregateColumnIds, FunctionType[] functionTypes)
     {

@@ -61,9 +61,12 @@ import static java.util.Objects.requireNonNull;
 public class PixelsExecutor
 {
     private static final Logger logger = LogManager.getLogger(PixelsExecutor.class);
+    private static final Storage.Scheme InputStorage;
     private static final Storage.Scheme IntermediateStorage;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
+    private static final int PreAggrThreshold;
+
     private final Table rootTable;
     private final ConfigFactory config;
     private final MetadataService metadataService;
@@ -78,15 +81,20 @@ public class PixelsExecutor
 
     static
     {
-        String storageScheme = ConfigFactory.Instance().getProperty("join.intermediate.storage");
+        String storageScheme = ConfigFactory.Instance().getProperty("executor.input.storage");
+        InputStorage = Storage.Scheme.from(storageScheme);
+        storageScheme = ConfigFactory.Instance().getProperty("executor.intermediate.storage");
         IntermediateStorage = Storage.Scheme.from(storageScheme);
-        String storageFolder = ConfigFactory.Instance().getProperty("join.intermediate.folder");
+        String storageFolder = ConfigFactory.Instance().getProperty("executor.intermediate.folder");
         if (!storageFolder.endsWith("/"))
         {
             storageFolder += "/";
         }
         IntermediateFolder = storageFolder;
-        IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance().getProperty("join.intra.worker.parallelism"));
+        IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
+                .getProperty("executor.intra.worker.parallelism"));
+        PreAggrThreshold = Integer.parseInt(ConfigFactory.Instance()
+                .getProperty("aggregation.pre-aggr.threshold"));
     }
 
     /**
@@ -119,7 +127,7 @@ public class PixelsExecutor
         this.computeFinalAggrInServer = Boolean.parseBoolean(config.getProperty("aggregation.compute.final.in.server"));
         this.orderedPathEnabled = orderedPathEnabled;
         this.compactPathEnabled = compactPathEnabled;
-        this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
+        this.storage = StorageFactory.Instance().getStorage(InputStorage);
     }
 
     public Operator getRootOperator() throws IOException, MetadataException
@@ -163,12 +171,21 @@ public class PixelsExecutor
             outputBase += "/";
         }
 
+        ImmutableList.Builder<String> partialAggrFilesBuilder = ImmutableList.builder();
+        ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
+        JoinOperator joinOperator = null;
+        boolean preAggregate;
         if (originTable.getTableType() == BASE)
         {
             List<InputSplit> inputSplits = this.getInputSplits((BaseTable) originTable);
             int outputId = 0;
-            ImmutableList.Builder<String> aggrInputFilesBuilder = ImmutableList.builder();
-            ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
+            int numScanInputs = inputSplits.size() / IntraWorkerParallelism;
+            if (inputSplits.size() % IntraWorkerParallelism > 0)
+            {
+                numScanInputs++;
+            }
+            preAggregate = numScanInputs > PreAggrThreshold;
+
             for (int i = 0; i < inputSplits.size(); )
             {
                 ScanInput scanInput = new ScanInput();
@@ -188,59 +205,130 @@ public class PixelsExecutor
                 scanInput.setTableInfo(tableInfo);
                 scanInput.setAggregationPresent(true);
                 scanInput.setAggregationInfo(aggregationInfo);
-                String fileName = outputBase + "aggr_" + outputId++;
-                scanInput.setOutput(new OutputInfo(fileName, false,
-                        endPoint.getScheme(), endPoint.getEndPoint(), endPoint.getAccessKey(),
-                        endPoint.getSecretKey(), true));
+                String fileName = outputBase + "partial_aggr_" + outputId++;
+                StorageInfo storageInfo;
+                if (computeFinalAggrInServer && !preAggregate)
+                {
+                    storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
+                            endPoint.getAccessKey(), endPoint.getSecretKey());
+                }
+                else
+                {
+                    storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
+                }
+                scanInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
                 scanInputsBuilder.add(scanInput);
-                aggrInputFilesBuilder.add(fileName);
+                partialAggrFilesBuilder.add(fileName);
             }
-            AggregationInput aggregationInput = new AggregationInput();
-            aggregationInput.setInputFiles(aggrInputFilesBuilder.build());
-            aggregationInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
-            aggregationInput.setResultColumnNames(aggregation.getResultColumnAlias());
-            aggregationInput.setFunctionTypes(aggregation.getFunctionTypes());
-            aggregationInput.setOutput(new OutputInfo(outputBase + "final_aggr",
-                    false, endPoint.getScheme(), endPoint.getEndPoint(), endPoint.getAccessKey(),
-                    endPoint.getSecretKey(), true));
-            return new AggregationOperator(aggregationInput, scanInputsBuilder.build());
         }
         else if (originTable.getTableType() == JOINED)
         {
-            JoinOperator joinOperator = this.getJoinOperator((JoinedTable) originTable, Optional.empty());
+            joinOperator = this.getJoinOperator((JoinedTable) originTable, Optional.empty());
             List<JoinInput> joinInputs = joinOperator.getJoinInputs();
             int outputId = 0;
-            ImmutableList.Builder<String> aggrInputFilesBuilder = ImmutableList.builder();
+            int numScanInputs = joinInputs.size() / IntraWorkerParallelism;
+            if (joinInputs.size() % IntraWorkerParallelism > 0)
+            {
+                numScanInputs++;
+            }
+            preAggregate = numScanInputs > PreAggrThreshold;
+
             for (JoinInput joinInput : joinInputs)
             {
                 joinInput.setAggregationPresent(true);
                 joinInput.setAggregationInfo(aggregationInfo);
                 String fileName = "aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
-                outputInfo.setScheme(endPoint.getScheme());
+                StorageInfo storageInfo;
+                if (computeFinalAggrInServer && !preAggregate)
+                {
+                    storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
+                            endPoint.getAccessKey(), endPoint.getSecretKey());
+                }
+                else
+                {
+                    storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
+                }
+                outputInfo.setStorageInfo(storageInfo);
                 outputInfo.setPath(endPoint.getFolder());
                 outputInfo.setFileNames(ImmutableList.of(fileName));
-                outputInfo.setAccessKey(endPoint.getAccessKey());
-                outputInfo.setSecretKey(endPoint.getSecretKey());
-                outputInfo.setEndpoint(endPoint.getEndPoint());
-                aggrInputFilesBuilder.add(outputBase + fileName);
+                partialAggrFilesBuilder.add(outputBase + fileName);
             }
-            AggregationInput aggregationInput = new AggregationInput();
-            aggregationInput.setInputFiles(aggrInputFilesBuilder.build());
-            aggregationInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
-            aggregationInput.setResultColumnNames(aggregation.getResultColumnAlias());
-            aggregationInput.setFunctionTypes(aggregation.getFunctionTypes());
-            aggregationInput.setOutput(new OutputInfo(outputBase + "final_aggr",
-                    false, endPoint.getScheme(), endPoint.getEndPoint(), endPoint.getAccessKey(),
-                    endPoint.getSecretKey(), true));
-            AggregationOperator aggregationOperator = new AggregationOperator(aggregationInput, null);
-            aggregationOperator.setChild(joinOperator);
-            return aggregationOperator;
         }
         else
         {
             throw new InvalidArgumentException("origin table for aggregation must be base or joined table");
         }
+        // build the pre-aggregation inputs.
+        ImmutableList.Builder<AggregationInput> preAggrInputsBuilder = ImmutableList.builder();
+        ImmutableList.Builder<String> finalAggrInputFilesBuilder;
+        if (preAggregate)
+        {
+            finalAggrInputFilesBuilder = ImmutableList.builder();
+            List<String> partialAggrFiles = partialAggrFilesBuilder.build();
+            int outputId = 0;
+            for (int i = 0; i < partialAggrFiles.size();)
+            {
+                ImmutableList.Builder<String> inputFilesBuilder = ImmutableList
+                        .builderWithExpectedSize(PreAggrThreshold);
+                for (int j = 0; j < PreAggrThreshold && i < partialAggrFiles.size(); ++j, ++i)
+                {
+                    inputFilesBuilder.add(partialAggrFiles.get(i));
+                }
+                AggregationInput preAggrInput = new AggregationInput();
+                preAggrInput.setInputFiles(inputFilesBuilder.build());
+                preAggrInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
+                preAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
+                preAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
+                preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
+                        null, null, null));
+                StorageInfo outputStorageInfo;
+                if (computeFinalAggrInServer)
+                {
+                    outputStorageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
+                            endPoint.getAccessKey(), endPoint.getSecretKey());
+                }
+                else
+                {
+                    outputStorageInfo = new StorageInfo(IntermediateStorage,
+                            null, null, null);
+                }
+                String fileName = outputBase + "pre_aggr_" + outputId++;
+                preAggrInput.setOutput(new OutputInfo(fileName, false,
+                        outputStorageInfo, true));
+                finalAggrInputFilesBuilder.add(fileName);
+                preAggrInputsBuilder.add(preAggrInput);
+            }
+        }
+        else
+        {
+            finalAggrInputFilesBuilder = partialAggrFilesBuilder;
+        }
+        // build the final aggregation input.
+        AggregationInput finalAggrInput = new AggregationInput();
+        finalAggrInput.setInputFiles(finalAggrInputFilesBuilder.build());
+        finalAggrInput.setGroupColumnNames(aggregation.getGroupColumnAlias());
+        finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
+        finalAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
+        StorageInfo storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
+                endPoint.getAccessKey(), endPoint.getSecretKey());
+        if (computeFinalAggrInServer)
+        {
+            finalAggrInput.setInputStorage(storageInfo);
+        }
+        else
+        {
+            finalAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
+                    null, null, null));
+        }
+        finalAggrInput.setOutput(new OutputInfo(outputBase + "final_aggr",
+                false, storageInfo, true));
+
+        AggregationOperator aggregationOperator = new AggregationOperator(
+                finalAggrInput, preAggrInputsBuilder.build(), scanInputsBuilder.build());
+        aggregationOperator.setChild(joinOperator);
+
+        return aggregationOperator;
     }
 
     private JoinOperator getMultiPipelineJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
@@ -330,10 +418,11 @@ public class PixelsExecutor
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                        MultiOutputInfo output = new MultiOutputInfo(
-                                IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                        joinedTable.getTableName() + "/", IntermediateStorage,
-                                null, null, null, true, outputsBuilder.build());
+                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                                joinedTable.getTableName() + "/";
+                        MultiOutputInfo output = new MultiOutputInfo(path,
+                                new StorageInfo(IntermediateStorage, null, null, null),
+                                true, outputsBuilder.build());
 
                         BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
                                 .setLargeTable(rightTableInfo)
@@ -601,10 +690,11 @@ public class PixelsExecutor
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                        MultiOutputInfo output = new MultiOutputInfo(
-                                IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                        joinedTable.getTableName() + "/", IntermediateStorage,
-                                null, null, null, true, outputsBuilder.build());
+                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                                joinedTable.getTableName() + "/";
+                        MultiOutputInfo output = new MultiOutputInfo(path,
+                                new StorageInfo(IntermediateStorage, null, null, null),
+                                true, outputsBuilder.build());
 
                         BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
                                 .setLargeTable(rightTableInfo)
@@ -687,10 +777,11 @@ public class PixelsExecutor
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
 
-                    MultiOutputInfo output = new MultiOutputInfo(
-                            IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                    joinedTable.getTableName(), IntermediateStorage,
-                            null, null, null, true, outputsBuilder.build());
+                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                            joinedTable.getTableName() + "/";
+                    MultiOutputInfo output = new MultiOutputInfo(path,
+                            new StorageInfo(IntermediateStorage, null, null, null),
+                            true, outputsBuilder.build());
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, leftTableInfo, rightTableInfo, joinInfo,
@@ -723,10 +814,11 @@ public class PixelsExecutor
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
 
-                    MultiOutputInfo output = new MultiOutputInfo(
-                            IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                    joinedTable.getTableName() + "/", IntermediateStorage,
-                            null, null, null, true, outputsBuilder.build());
+                    String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                            joinedTable.getTableName() + "/";
+                    MultiOutputInfo output = new MultiOutputInfo(path,
+                            new StorageInfo(IntermediateStorage, null, null, null),
+                            true, outputsBuilder.build());
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, rightTableInfo, leftTableInfo, joinInfo,
@@ -941,7 +1033,7 @@ public class PixelsExecutor
             }
             partitionInput.setTableInfo(tableInfo);
             partitionInput.setOutput(new OutputInfo(outputBase + outputId++, false,
-                    Storage.Scheme.s3, null, null, null, true));
+                    new StorageInfo(InputStorage, null, null, null), true));
             partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
         }
@@ -985,10 +1077,11 @@ public class PixelsExecutor
                 outputFileNames.add("join_" + i + "_out_" + j);
             }
 
-            MultiOutputInfo output = new MultiOutputInfo(
-                    IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                            joinedTable.getTableName(), IntermediateStorage,
-                    null, null, null, true, outputFileNames.build());
+            String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                    joinedTable.getTableName() + "/";
+            MultiOutputInfo output = new MultiOutputInfo(path,
+                    new StorageInfo(IntermediateStorage, null, null, null),
+                    true, outputFileNames.build());
 
             PartitionedJoinInput joinInput;
             if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)

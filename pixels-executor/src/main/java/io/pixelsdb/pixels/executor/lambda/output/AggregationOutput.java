@@ -17,20 +17,13 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.output;
 
 /**
+ * The output format for aggregation.
  * @author hank
- * @date 6/28/22
+ * Created at: 06/07/2022
  */
-public enum WorkerType
+public class AggregationOutput extends NonPartitionOutput
 {
-    UNKNOW, // The first enum value is the default value.
-    SCAN,
-    PARTITION,
-    BROADCAST_JOIN,
-    BROADCAST_CHAIN_JOIN,
-    PARTITIONED_JOIN,
-    PARTITIONED_CHAIN_JOIN,
-    AGGREGATION
 }

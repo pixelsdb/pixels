@@ -19,18 +19,27 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.executor.lambda.output.AggregationOutput;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
+
 /**
+ * The lambda invoker for pre or final aggregation operator that aggregates
+ * the partial aggregation results produced in the previous stage.
+ *
  * @author hank
- * @date 6/28/22
+ * @date 06/07/2022
  */
-public enum WorkerType
+public class AggregationInvoker extends Invoker
 {
-    UNKNOW, // The first enum value is the default value.
-    SCAN,
-    PARTITION,
-    BROADCAST_JOIN,
-    BROADCAST_CHAIN_JOIN,
-    PARTITIONED_JOIN,
-    PARTITIONED_CHAIN_JOIN,
-    AGGREGATION
+    protected AggregationInvoker(String functionName)
+    {
+        super(functionName);
+    }
+
+    @Override
+    protected Output parseOutput(String outputJson)
+    {
+        return JSON.parseObject(outputJson, AggregationOutput.class);
+    }
 }

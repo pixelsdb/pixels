@@ -60,6 +60,9 @@ public class InvokerFactory
 
         String partitionedChainJoinWorker = config.getProperty("partitioned.chain.join.worker.name");
         invokerMap.put(WorkerType.PARTITIONED_CHAIN_JOIN, new PartitionedChainJoinInvoker(partitionedChainJoinWorker));
+
+        String aggregationWorker = config.getProperty("aggregation.worker.name");
+        invokerMap.put(WorkerType.AGGREGATION, new AggregationInvoker(aggregationWorker));
     }
 
     public Invoker getInvoker(WorkerType workerType)

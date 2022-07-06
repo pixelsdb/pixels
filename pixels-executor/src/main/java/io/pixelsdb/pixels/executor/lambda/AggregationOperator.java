@@ -36,15 +36,52 @@ import static java.util.Objects.requireNonNull;
  */
 public class AggregationOperator implements Operator
 {
-    private final AggregationInput aggregationInput;
+    /**
+     * The input of the final aggregation worker that produce the
+     * final aggregation result.
+     */
+    private final AggregationInput finalAggrInput;
+    /**
+     * The inputs of the aggregation workers that pre-aggregate the
+     * partial aggregation results produced by the child or the scan workers.
+     */
+    private final List<AggregationInput> preAggrInputs;
+    /**
+     * The scan inputs of the scan workers that produce the partial aggregation
+     * results. It should be empty if child is not null.
+     */
     private final List<ScanInput> scanInputs;
+    /**
+     * The child operator that produce the partial aggregation results. It
+     * should be null if scanInputs is not empty.
+     */
     private Operator child = null;
+    /**
+     * The outputs of the scan workers.
+     */
     private CompletableFuture<?>[] scanOutputs = null;
-    private CompletableFuture<?> aggregateOutput = null;
+    /**
+     * The outputs of the pre-aggregation workers.
+     */
+    private CompletableFuture<?>[] preAggrOutputs = null;
+    /**
+     * The output of the final aggregation worker.
+     */
+    private CompletableFuture<?> finalAggrOutput = null;
 
-    public AggregationOperator(AggregationInput aggregationInput, List<ScanInput> scanInputs)
+    public AggregationOperator(AggregationInput finalAggrInput,
+                               List<AggregationInput> preAggrInputs,
+                               List<ScanInput> scanInputs)
     {
-        this.aggregationInput = requireNonNull(aggregationInput, "aggregateInput is null");
+        this.finalAggrInput = requireNonNull(finalAggrInput, "aggregateInput is null");
+        if (preAggrInputs == null || preAggrInputs.isEmpty())
+        {
+            this.preAggrInputs = ImmutableList.of();
+        }
+        else
+        {
+            this.preAggrInputs = ImmutableList.copyOf(preAggrInputs);
+        }
         if (scanInputs == null || scanInputs.isEmpty())
         {
             this.scanInputs = ImmutableList.of();
@@ -55,9 +92,14 @@ public class AggregationOperator implements Operator
         }
     }
 
-    public AggregationInput getAggregationInput()
+    public AggregationInput getFinalAggrInput()
     {
-        return aggregationInput;
+        return finalAggrInput;
+    }
+
+    public List<AggregationInput> getPreAggrInputs()
+    {
+        return preAggrInputs;
     }
 
     public List<ScanInput> getScanInputs()

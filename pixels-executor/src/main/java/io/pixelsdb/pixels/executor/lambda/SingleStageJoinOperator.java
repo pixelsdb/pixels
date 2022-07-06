@@ -50,7 +50,7 @@ public class SingleStageJoinOperator implements JoinOperator
     static
     {
         StageCompletionRatio = Double.parseDouble(
-                ConfigFactory.Instance().getProperty("join.stage.completion.ratio"));
+                ConfigFactory.Instance().getProperty("executor.stage.completion.ratio"));
     }
 
     public SingleStageJoinOperator(JoinInput joinInput, JoinAlgorithm joinAlgo)

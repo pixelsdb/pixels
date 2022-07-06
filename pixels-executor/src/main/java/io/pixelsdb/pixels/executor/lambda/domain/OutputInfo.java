@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.executor.lambda.domain;
 
-import io.pixelsdb.pixels.common.physical.Storage;
-
 /**
  * @author hank
  * @date 02/06/2022
@@ -37,21 +35,9 @@ public class OutputInfo
      */
     private boolean randomFileName;
     /**
-     * The storage scheme of the output storage, e.g., s3, minio.
+     * The information of the storage endpoint.
      */
-    private Storage.Scheme scheme;
-    /**
-     * The endpoint of the output storage, e.g., http://hostname:port.
-     */
-    private String endpoint;
-    /**
-     * The access key of the output storage.
-     */
-    private String accessKey;
-    /**
-     * The secret key of the output storage.
-     */
-    private String secretKey;
+    private StorageInfo storageInfo;
     /**
      * Whether the output file should be encoded.
      */
@@ -62,15 +48,11 @@ public class OutputInfo
      */
     public OutputInfo() { }
 
-    public OutputInfo(String path, boolean randomFileName, Storage.Scheme scheme,
-                      String endpoint, String accessKey, String secretKey, boolean encoding)
+    public OutputInfo(String path, boolean randomFileName, StorageInfo storageInfo, boolean encoding)
     {
         this.path = path;
         this.randomFileName = randomFileName;
-        this.scheme = scheme;
-        this.endpoint = endpoint;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
+        this.storageInfo = storageInfo;
         this.encoding = encoding;
     }
 
@@ -94,44 +76,14 @@ public class OutputInfo
         this.randomFileName = randomFileName;
     }
 
-    public Storage.Scheme getScheme()
+    public StorageInfo getStorageInfo()
     {
-        return scheme;
+        return storageInfo;
     }
 
-    public void setScheme(Storage.Scheme scheme)
+    public void setStorageInfo(StorageInfo storageInfo)
     {
-        this.scheme = scheme;
-    }
-
-    public String getEndpoint()
-    {
-        return endpoint;
-    }
-
-    public void setEndpoint(String endpoint)
-    {
-        this.endpoint = endpoint;
-    }
-
-    public String getAccessKey()
-    {
-        return accessKey;
-    }
-
-    public void setAccessKey(String accessKey)
-    {
-        this.accessKey = accessKey;
-    }
-
-    public String getSecretKey()
-    {
-        return secretKey;
-    }
-
-    public void setSecretKey(String secretKey)
-    {
-        this.secretKey = secretKey;
+        this.storageInfo = storageInfo;
     }
 
     public boolean isEncoding()

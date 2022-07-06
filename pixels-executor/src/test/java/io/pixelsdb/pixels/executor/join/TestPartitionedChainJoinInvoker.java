@@ -159,9 +159,9 @@ public class TestPartitionedChainJoinInvoker
         joinInput.setChainTables(chainTables);
         joinInput.setChainJoinInfos(chainJoinInfos);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/", Storage.Scheme.s3,
-                null, null, null, true,
-                Arrays.asList("partitioned-chain-join-0", "partitioned-chain-join-1")));
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/",
+                new StorageInfo(Storage.Scheme.s3, null, null, null),
+                true, Arrays.asList("partitioned-chain-join-0", "partitioned-chain-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

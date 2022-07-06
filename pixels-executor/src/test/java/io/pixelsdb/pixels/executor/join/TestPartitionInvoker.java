@@ -71,7 +71,7 @@ public class TestPartitionInvoker
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/orders_part_6", false,
-                Storage.Scheme.s3, null, null, null, true));
+                new StorageInfo(Storage.Scheme.s3, null, null, null), true));
 
         System.out.println(JSON.toJSONString(input));
 
@@ -110,7 +110,7 @@ public class TestPartitionInvoker
         partitionInfo.setKeyColumnIds(new int[]{0});
         input.setPartitionInfo(partitionInfo);
         input.setOutput(new OutputInfo("pixels-lambda-test/lineitem_part_0", false,
-                Storage.Scheme.s3, null, null, null,true));
+                new StorageInfo(Storage.Scheme.s3, null, null, null),true));
 
         System.out.println(JSON.toJSONString(input));
 

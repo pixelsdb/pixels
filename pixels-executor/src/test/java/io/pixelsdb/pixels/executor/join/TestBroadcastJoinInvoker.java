@@ -111,8 +111,9 @@ public class TestBroadcastJoinInvoker
         joinInfo.setPostPartition(true);
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {2}, 100));
         joinInput.setJoinInfo(joinInfo);
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/", Storage.Scheme.minio,
-                "http://172.31.32.193:9000", "lambda", "password", true,
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda/",
+                new StorageInfo(Storage.Scheme.minio, "http://172.31.32.193:9000",
+                        "lambda", "password"), true,
                 Arrays.asList("broadcast-join-0","broadcast-join-1","broadcast-join-2","broadcast-join-3",
                         "broadcast-join-4","broadcast-join-5","broadcast-join-6","broadcast-join-7")));
 

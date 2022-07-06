@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.executor.lambda.domain;
 
-import io.pixelsdb.pixels.common.physical.Storage;
-
 import java.util.List;
 
 /**
@@ -36,12 +34,9 @@ public class MultiOutputInfo extends OutputInfo
      */
     public MultiOutputInfo() { }
 
-    public MultiOutputInfo(String path, Storage.Scheme scheme,
-                           String endpoint, String accessKey,
-                           String secretKey, boolean encoding,
-                           List<String> fileNames)
+    public MultiOutputInfo(String path, StorageInfo storageInfo, boolean encoding, List<String> fileNames)
     {
-        super(path, false, scheme, endpoint, accessKey, secretKey, encoding);
+        super(path, false, storageInfo, encoding);
         this.fileNames = fileNames;
     }
 

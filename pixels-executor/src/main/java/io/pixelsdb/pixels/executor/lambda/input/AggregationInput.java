@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor.lambda.input;
 
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
 import io.pixelsdb.pixels.executor.lambda.domain.OutputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.StorageInfo;
 
 import java.util.List;
 
@@ -30,7 +31,7 @@ import java.util.List;
  * @author hank
  * @date 05/07/2022
  */
-public class AggregationInput
+public class AggregationInput extends Input
 {
     /**
      * The column names of the group key columns in the aggregation result.
@@ -48,6 +49,10 @@ public class AggregationInput
      * The paths of the partial aggregated files.
      */
     private List<String> inputFiles;
+    /**
+     * The information of the input storage.
+     */
+    private StorageInfo inputStorage;
 
     /**
      * The output of the aggregation.
@@ -57,18 +62,17 @@ public class AggregationInput
     /**
      * Default constructor for Jackson.
      */
-    public AggregationInput()
-    {
-    }
+    public AggregationInput() { }
 
     public AggregationInput(String[] groupColumnNames, String[] resultColumnNames,
                             FunctionType[] functionTypes, List<String> inputFiles,
-                            OutputInfo output)
+                            StorageInfo inputStorage, OutputInfo output)
     {
         this.groupColumnNames = groupColumnNames;
         this.resultColumnNames = resultColumnNames;
         this.functionTypes = functionTypes;
         this.inputFiles = inputFiles;
+        this.inputStorage = inputStorage;
         this.output = output;
     }
 
@@ -110,6 +114,16 @@ public class AggregationInput
     public void setInputFiles(List<String> inputFiles)
     {
         this.inputFiles = inputFiles;
+    }
+
+    public StorageInfo getInputStorage()
+    {
+        return inputStorage;
+    }
+
+    public void setInputStorage(StorageInfo inputStorage)
+    {
+        this.inputStorage = inputStorage;
     }
 
     public OutputInfo getOutput()

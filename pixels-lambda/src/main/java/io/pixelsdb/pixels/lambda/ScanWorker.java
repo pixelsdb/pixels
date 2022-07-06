@@ -78,7 +78,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 
             long queryId = event.getQueryId();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
-            checkArgument(event.getOutput().getScheme() == Storage.Scheme.minio,
+            checkArgument(event.getOutput().getStorageInfo().getScheme() == Storage.Scheme.minio,
                     "the storage scheme is not minio");
             checkArgument(event.getOutput().isRandomFileName(),
                     "random output file name is not enabled by the caller");
@@ -92,8 +92,9 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 if (minio == null)
                 {
-                    ConfigMinIO(event.getOutput().getEndpoint(),
-                            event.getOutput().getAccessKey(), event.getOutput().getSecretKey());
+                    ConfigMinIO(event.getOutput().getStorageInfo().getEndpoint(),
+                            event.getOutput().getStorageInfo().getAccessKey(),
+                            event.getOutput().getStorageInfo().getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
