@@ -372,6 +372,17 @@ public class DateColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(int value)
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        this.dates[writeIndex] = millisToDay(value);
+        this.isNull[writeIndex++] = false;
+    }
+
+    @Override
     public void add(Date value)
     {
         if (writeIndex >= getLength())

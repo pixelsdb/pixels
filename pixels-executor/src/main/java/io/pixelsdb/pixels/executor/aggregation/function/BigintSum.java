@@ -35,9 +35,9 @@ public class BigintSum extends SingleColumnFunction
     @Override
     public void input(int rowId, ColumnVector inputVector)
     {
-        LongColumnVector longColumnVector = (LongColumnVector) inputVector;
-        if (longColumnVector.noNulls || !longColumnVector.isNull[rowId])
+        if (inputVector.noNulls || !inputVector.isNull[rowId])
         {
+            LongColumnVector longColumnVector = (LongColumnVector) inputVector;
             this.value += longColumnVector.vector[rowId];
         }
     }

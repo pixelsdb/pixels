@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.executor.aggregation.function;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.utils.Integer128;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
 
 /**
  * @author hank
@@ -29,7 +30,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
  */
 public class DecimalSum extends SingleColumnFunction
 {
-    // TODO: implement.
     private final TypeDescription outputType;
     private Integer128 longValue;
     private long shortValue = 0;
@@ -48,13 +48,31 @@ public class DecimalSum extends SingleColumnFunction
     @Override
     public void input(int rowId, ColumnVector inputVector)
     {
-
+        if (inputVector.noNulls || !inputVector.isNull[rowId])
+        {
+            DecimalColumnVector decimalColumnVector = (DecimalColumnVector) inputVector;
+            if (isLong)
+            {
+                longValue.add(decimalColumnVector.vector[rowId*2], decimalColumnVector.vector[rowId*2+1]);
+            }
+            else
+            {
+                shortValue += decimalColumnVector.vector[rowId];
+            }
+        }
     }
 
     @Override
     public void output(ColumnVector outputVector)
     {
-
+        if (isLong)
+        {
+            outputVector.add(longValue);
+        }
+        else
+        {
+            outputVector.add(shortValue);
+        }
     }
 
     @Override
