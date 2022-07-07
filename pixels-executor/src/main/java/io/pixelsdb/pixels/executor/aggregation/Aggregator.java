@@ -19,40 +19,39 @@
  */
 package io.pixelsdb.pixels.executor.aggregation;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
 
 /**
- * The aggregate function type
  * @author hank
- * @date 04/07/2022
+ * @date 07/07/2022
  */
-public enum FunctionType
+public class Aggregator
 {
-    UNKNOWN, // The first enum value is the default value.
-    SUM,
-    MIN,
-    MAX,
-    COUNT;
+    private final HashMap<AggrTuple, AggrTuple> hashTable = new HashMap<>();
+    private int size;
 
-    private static final Set<String> supported;
-
-    static
+    /**
+     * The user of this method must ensure the tuple is not null and the same tuple
+     * is only put once. Different tuples with the same value of join key are put
+     * into the same bucket.
+     *
+     * @param tuple the tuple to be put
+     */
+    public void put(AggrTuple tuple)
     {
-        supported = new HashSet<>();
-        supported.add(SUM.name());
-        supported.add(MIN.name());
-        supported.add(MAX.name());
-        supported.add(COUNT.name());
+        AggrTuple baseTuple = this.hashTable.get(tuple);
+        if (baseTuple != null)
+        {
+            baseTuple.aggregate(tuple);
+            return;
+        }
+        size++;
+        // Create the functions.
+        this.hashTable.put(tuple, tuple);
     }
 
-    public static FunctionType fromName(String name)
+    public int size()
     {
-        return valueOf(name.toUpperCase());
-    }
-
-    public static boolean isSupported(String name)
-    {
-        return supported.contains(name.toUpperCase());
+        return size;
     }
 }

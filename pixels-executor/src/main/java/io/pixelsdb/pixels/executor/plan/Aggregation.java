@@ -37,6 +37,16 @@ public class Aggregation
      */
     private final String[] resultColumnAlias;
     /**
+     * The display name of the synthetic aggregation columns in the aggregation result.
+     * They should be parsed by the TypeDescription in Pixels.
+     */
+    private final String[] resultColumnTypes;
+    /**
+     * If a group key column appears in the aggregation output,
+     * the corresponding element in this array would be true, and vice versa.
+     */
+    private final boolean[] groupKeyColumnProjection;
+    /**
      * The index of the grouping key columns in the origin table.
      */
     private final int[] groupKeyColumnIds;
@@ -59,12 +69,15 @@ public class Aggregation
     private final Table originTable;
 
     public Aggregation(String[] groupKeyColumnAlias, String[] resultColumnAlias,
+                       String[] resultColumnTypes, boolean[] groupKeyColumnProjection,
                        int[] groupKeyColumnIds, int[] aggregateColumnIds,
                        FunctionType[] functionTypes, OutputEndPoint outputEndPoint,
                        Table originTable)
     {
         this.groupKeyColumnAlias = groupKeyColumnAlias;
         this.resultColumnAlias = resultColumnAlias;
+        this.resultColumnTypes = resultColumnTypes;
+        this.groupKeyColumnProjection = groupKeyColumnProjection;
         this.groupKeyColumnIds = groupKeyColumnIds;
         this.aggregateColumnIds = aggregateColumnIds;
         this.functionTypes = functionTypes;
@@ -80,6 +93,16 @@ public class Aggregation
     public String[] getResultColumnAlias()
     {
         return resultColumnAlias;
+    }
+
+    public String[] getResultColumnTypes()
+    {
+        return resultColumnTypes;
+    }
+
+    public boolean[] getGroupKeyColumnProjection()
+    {
+        return groupKeyColumnProjection;
     }
 
     public int[] getGroupKeyColumnIds()

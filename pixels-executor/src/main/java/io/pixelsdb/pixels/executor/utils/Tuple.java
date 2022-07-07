@@ -28,7 +28,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * The tuple to be used in join and aggregation.
+ * The tuple to be used in join and extended by the AggrTuple used by aggregation.
  *
  * @author hank
  * @date 09/05/2022
@@ -40,21 +40,21 @@ public class Tuple
         /**
          * The hashCode of the join key of the tuples.
          */
-        private final int[] hashCode;
+        public final int[] hashCode;
         /**
          * The ids of the key columns.
          */
-        protected final int[] keyColumnIds;
+        public final int[] keyColumnIds;
         /**
          * The column vectors in the row batch.
          */
-        private final ColumnVector[] columns;
+        public final ColumnVector[] columns;
         /**
          * Whether the vectors of the columns are written into the output.
          */
-        private final boolean[] projection;
+        public final boolean[] projection;
 
-        protected CommonFields(int[] hashCode, int[] keyColumnIds,
+        public CommonFields(int[] hashCode, int[] keyColumnIds,
                             ColumnVector[] columns, boolean[] projection)
         {
             this.hashCode = hashCode;
@@ -67,11 +67,11 @@ public class Tuple
     /**
      * The index of this tuple in the corresponding row batch.
      */
-    private final int rowId;
+    protected final int rowId;
     /**
      * The common fields that are shared by all the tuples from the same row batch.
      */
-    private final CommonFields commonFields;
+    protected final CommonFields commonFields;
     /**
      * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
@@ -180,8 +180,7 @@ public class Tuple
         private int rowId = 0;
 
         /**
-         * Create a tuple builder for the row batch. The first numKeyColumns columns
-         * are considered as the columns in the join key.
+         * Create a tuple builder for the row batch.
          *
          * @param rowBatch the row batch
          * @param keyColumnIds the ids of the join-key columns
@@ -195,6 +194,8 @@ public class Tuple
             checkArgument(rowBatch.numCols >= keyColumnIds.length,
                     "rowBatch does not have enough columns");
             checkArgument(rowBatch.size > 0, "rowBatch is empty");
+            checkArgument(projection != null && rowBatch.numCols == projection.length,
+                    "projection is null or has incorrect size");
 
             ColumnVector[] columns = rowBatch.cols;
             int[] hashCode = new int[rowBatch.size];

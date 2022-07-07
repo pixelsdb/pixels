@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
-import io.pixelsdb.pixels.executor.lambda.domain.AggregationInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.PartitionedJoinInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.PartitionedTableInfo;
@@ -54,10 +54,11 @@ public class PartitionedJoinInput extends JoinInput
 
     public PartitionedJoinInput(long queryId, PartitionedTableInfo smallTable,
                                 PartitionedTableInfo largeTable, PartitionedJoinInfo joinInfo,
-                                boolean aggregationPresent, AggregationInfo aggregationInfo,
+                                boolean partialAggregationPresent,
+                                PartialAggregationInfo partialAggregationInfo,
                                 MultiOutputInfo output)
     {
-        super(aggregationPresent, aggregationInfo, output);
+        super(partialAggregationPresent, partialAggregationInfo, output);
         this.queryId = queryId;
         this.smallTable = smallTable;
         this.largeTable = largeTable;

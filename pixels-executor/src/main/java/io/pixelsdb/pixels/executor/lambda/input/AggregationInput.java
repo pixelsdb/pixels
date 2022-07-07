@@ -34,13 +34,23 @@ import java.util.List;
 public class AggregationInput extends Input
 {
     /**
-     * The column names of the group key columns in the aggregation result.
+     * The column names of the group-key columns in the aggregation result.
      */
-    private String[] groupColumnNames;
+    private String[] groupKeyColumnNames;
+    /**
+     * If a group-key column appears in the aggregation output,
+     * the corresponding element in this array would be true, and vice versa.
+     */
+    private boolean[] groupKeyColumnProjection;
     /**
      * The column names of the aggregated columns in the aggregation result.
      */
     private String[] resultColumnNames;
+    /**
+     * The display name of the data types of the result columns.
+     * They should be parsed by the TypeDescription in Pixels.
+     */
+    private String[] resultColumnTypes;
     /**
      * The aggregation functions, in the same order of resultColumnNames.
      */
@@ -64,26 +74,39 @@ public class AggregationInput extends Input
      */
     public AggregationInput() { }
 
-    public AggregationInput(String[] groupColumnNames, String[] resultColumnNames,
+    public AggregationInput(String[] groupKeyColumnNames, boolean[] groupKeyColumnProjection,
+                            String[] resultColumnNames, String[] resultColumnTypes,
                             FunctionType[] functionTypes, List<String> inputFiles,
                             StorageInfo inputStorage, OutputInfo output)
     {
-        this.groupColumnNames = groupColumnNames;
+        this.groupKeyColumnNames = groupKeyColumnNames;
+        this.groupKeyColumnProjection = groupKeyColumnProjection;
         this.resultColumnNames = resultColumnNames;
+        this.resultColumnTypes = resultColumnTypes;
         this.functionTypes = functionTypes;
         this.inputFiles = inputFiles;
         this.inputStorage = inputStorage;
         this.output = output;
     }
 
-    public String[] getGroupColumnNames()
+    public String[] getGroupKeyColumnNames()
     {
-        return groupColumnNames;
+        return groupKeyColumnNames;
     }
 
-    public void setGroupColumnNames(String[] groupColumnNames)
+    public void setGroupKeyColumnNames(String[] groupKeyColumnNames)
     {
-        this.groupColumnNames = groupColumnNames;
+        this.groupKeyColumnNames = groupKeyColumnNames;
+    }
+
+    public boolean[] getGroupKeyColumnProjection()
+    {
+        return groupKeyColumnProjection;
+    }
+
+    public void setGroupKeyColumnProjection(boolean[] groupKeyColumnProjection)
+    {
+        this.groupKeyColumnProjection = groupKeyColumnProjection;
     }
 
     public String[] getResultColumnNames()
@@ -94,6 +117,16 @@ public class AggregationInput extends Input
     public void setResultColumnNames(String[] resultColumnNames)
     {
         this.resultColumnNames = resultColumnNames;
+    }
+
+    public String[] getResultColumnTypes()
+    {
+        return resultColumnTypes;
+    }
+
+    public void setResultColumnTypes(String[] resultColumnTypes)
+    {
+        this.resultColumnTypes = resultColumnTypes;
     }
 
     public FunctionType[] getFunctionTypes()

@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
-import io.pixelsdb.pixels.executor.lambda.domain.AggregationInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.OutputInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.ScanTableInfo;
 
@@ -40,13 +40,13 @@ public class ScanInput extends Input
     private ScanTableInfo tableInfo;
 
     /**
-     * Whether the aggregation exists.
+     * Whether the partial aggregation exists.
      */
-    private boolean aggregationPresent = false;
+    private boolean partialAggregationPresent = false;
     /**
-     * The information of the aggregation.
+     * The information of the partial aggregation.
      */
-    private AggregationInfo aggregationInfo;
+    private PartialAggregationInfo partialAggregationInfo;
 
     /**
      * The output of the scan.
@@ -58,13 +58,13 @@ public class ScanInput extends Input
      */
     public ScanInput() { }
 
-    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean aggregationPresent,
-                     AggregationInfo aggregationInfo, OutputInfo output)
+    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean partialAggregationPresent,
+                     PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
         this.queryId = queryId;
         this.tableInfo = tableInfo;
-        this.aggregationPresent = aggregationPresent;
-        this.aggregationInfo = aggregationInfo;
+        this.partialAggregationPresent = partialAggregationPresent;
+        this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
     }
 
@@ -88,24 +88,24 @@ public class ScanInput extends Input
         this.tableInfo = tableInfo;
     }
 
-    public boolean isAggregationPresent()
+    public boolean isPartialAggregationPresent()
     {
-        return aggregationPresent;
+        return partialAggregationPresent;
     }
 
-    public void setAggregationPresent(boolean aggregationPresent)
+    public void setPartialAggregationPresent(boolean partialAggregationPresent)
     {
-        this.aggregationPresent = aggregationPresent;
+        this.partialAggregationPresent = partialAggregationPresent;
     }
 
-    public AggregationInfo getAggregationInfo()
+    public PartialAggregationInfo getPartialAggregationInfo()
     {
-        return aggregationInfo;
+        return partialAggregationInfo;
     }
 
-    public void setAggregationInfo(AggregationInfo aggregationInfo)
+    public void setPartialAggregationInfo(PartialAggregationInfo partialAggregationInfo)
     {
-        this.aggregationInfo = aggregationInfo;
+        this.partialAggregationInfo = partialAggregationInfo;
     }
 
     public OutputInfo getOutput()

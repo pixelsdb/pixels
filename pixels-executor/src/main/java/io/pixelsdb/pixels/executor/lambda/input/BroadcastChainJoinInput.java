@@ -75,11 +75,11 @@ public class BroadcastChainJoinInput extends JoinInput
                                    JoinInfo joinInfo, boolean postChainJoinsPresent,
                                    List<BroadcastTableInfo> postSmallTables,
                                    List<ChainJoinInfo> postChainJoinInfos,
-                                   boolean aggregationPresent,
-                                   AggregationInfo aggregationInfo,
+                                   boolean partialAggregationPresent,
+                                   PartialAggregationInfo partialAggregationInfo,
                                    MultiOutputInfo output)
     {
-        super(aggregationPresent, aggregationInfo, output);
+        super(partialAggregationPresent, partialAggregationInfo, output);
         this.queryId = queryId;
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
@@ -185,7 +185,7 @@ public class BroadcastChainJoinInput extends JoinInput
                     instance.queryId, instance.chainTables, instance.chainJoinInfos,
                     instance.largeTable, instance.joinInfo, instance.postChainJoinsPresent,
                     instance.postSmallTables, instance.postChainJoinInfos,
-                    instance.isAggregationPresent(), instance.getAggregationInfo(),
+                    instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(),
                     instance.getOutput());
         }
 

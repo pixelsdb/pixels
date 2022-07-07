@@ -25,18 +25,23 @@ import io.pixelsdb.pixels.executor.aggregation.FunctionType;
  * @author hank
  * @date 05/07/2022
  */
-public class AggregationInfo
+public class PartialAggregationInfo
 {
     /**
-     * The column alias of the group key columns in the aggregation result.
+     * The column alias of the group-key columns in the aggregation result.
      */
-    private String[] groupColumnAlias;
+    private String[] groupKeyColumnAlias;
     /**
      * The column alias of the aggregated columns in the aggregation result.
      */
     private String[] resultColumnAlias;
     /**
-     * The column ids of the group key columns in the origin table.
+     * The display name of the data types of the result columns.
+     * They should be parsed by the TypeDescription in Pixels.
+     */
+    private String[] resultColumnTypes;
+    /**
+     * The column ids of the group-key columns in the origin table.
      */
     private int[] groupKeyColumnIds;
     /**
@@ -51,25 +56,28 @@ public class AggregationInfo
     /**
      * Default constructor for Jackson.
      */
-    public AggregationInfo() { }
+    public PartialAggregationInfo() { }
 
-    public AggregationInfo(String[] groupColumnAlias, String[] resultColumnAlias, int[] groupKeyColumnIds, int[] aggregateColumnIds, FunctionType[] functionTypes)
+    public PartialAggregationInfo(String[] groupKeyColumnAlias, String[] resultColumnAlias,
+                                  String[] resultColumnTypes, int[] groupKeyColumnIds,
+                                  int[] aggregateColumnIds, FunctionType[] functionTypes)
     {
-        this.groupColumnAlias = groupColumnAlias;
+        this.groupKeyColumnAlias = groupKeyColumnAlias;
         this.resultColumnAlias = resultColumnAlias;
+        this.resultColumnTypes = resultColumnTypes;
         this.groupKeyColumnIds = groupKeyColumnIds;
         this.aggregateColumnIds = aggregateColumnIds;
         this.functionTypes = functionTypes;
     }
 
-    public String[] getGroupColumnAlias()
+    public String[] getGroupKeyColumnAlias()
     {
-        return groupColumnAlias;
+        return groupKeyColumnAlias;
     }
 
-    public void setGroupColumnAlias(String[] groupColumnAlias)
+    public void setGroupKeyColumnAlias(String[] groupKeyColumnAlias)
     {
-        this.groupColumnAlias = groupColumnAlias;
+        this.groupKeyColumnAlias = groupKeyColumnAlias;
     }
 
     public String[] getResultColumnAlias()
@@ -80,6 +88,16 @@ public class AggregationInfo
     public void setResultColumnAlias(String[] resultColumnAlias)
     {
         this.resultColumnAlias = resultColumnAlias;
+    }
+
+    public String[] getResultColumnTypes()
+    {
+        return resultColumnTypes;
+    }
+
+    public void setResultColumnTypes(String[] resultColumnTypes)
+    {
+        this.resultColumnTypes = resultColumnTypes;
     }
 
     public int[] getGroupKeyColumnIds()

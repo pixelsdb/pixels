@@ -45,6 +45,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -158,12 +159,13 @@ public class PixelsExecutor
         OutputEndPoint endPoint = requireNonNull(aggregation.getOutputEndPoint(),
                 "aggregation.outputEndPoint is null");
 
-        AggregationInfo aggregationInfo = new AggregationInfo();
-        aggregationInfo.setGroupColumnAlias(aggregation.getGroupKeyColumnAlias());
-        aggregationInfo.setResultColumnAlias(aggregation.getResultColumnAlias());
-        aggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
-        aggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
-        aggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
+        PartialAggregationInfo partialAggregationInfo = new PartialAggregationInfo();
+        partialAggregationInfo.setGroupKeyColumnAlias(aggregation.getGroupKeyColumnAlias());
+        partialAggregationInfo.setResultColumnAlias(aggregation.getResultColumnAlias());
+        partialAggregationInfo.setResultColumnTypes(aggregation.getResultColumnTypes());
+        partialAggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
+        partialAggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
+        partialAggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
 
         String outputBase = endPoint.getFolder();
         if (!outputBase.endsWith("/"))
@@ -203,8 +205,8 @@ public class PixelsExecutor
                 tableInfo.setTableName(originTable.getTableName());
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) originTable).getFilter()));
                 scanInput.setTableInfo(tableInfo);
-                scanInput.setAggregationPresent(true);
-                scanInput.setAggregationInfo(aggregationInfo);
+                scanInput.setPartialAggregationPresent(true);
+                scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = outputBase + "partial_aggr_" + outputId++;
                 StorageInfo storageInfo;
                 if (computeFinalAggrInServer && !preAggregate)
@@ -235,8 +237,8 @@ public class PixelsExecutor
 
             for (JoinInput joinInput : joinInputs)
             {
-                joinInput.setAggregationPresent(true);
-                joinInput.setAggregationInfo(aggregationInfo);
+                joinInput.setPartialAggregationPresent(true);
+                joinInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = "aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
                 StorageInfo storageInfo;
@@ -266,6 +268,8 @@ public class PixelsExecutor
         {
             finalAggrInputFilesBuilder = ImmutableList.builder();
             List<String> partialAggrFiles = partialAggrFilesBuilder.build();
+            boolean[] groupKeyColumnProjection = new boolean[aggregation.getGroupKeyColumnAlias().length];
+            Arrays.fill(groupKeyColumnProjection, true);
             int outputId = 0;
             for (int i = 0; i < partialAggrFiles.size();)
             {
@@ -277,8 +281,11 @@ public class PixelsExecutor
                 }
                 AggregationInput preAggrInput = new AggregationInput();
                 preAggrInput.setInputFiles(inputFilesBuilder.build());
-                preAggrInput.setGroupColumnNames(aggregation.getGroupKeyColumnAlias());
+                preAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
+                // Pre-aggregation should output all the group-key columns.
+                preAggrInput.setGroupKeyColumnProjection(groupKeyColumnProjection);
                 preAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
+                preAggrInput.setResultColumnTypes(aggregation.getResultColumnTypes());
                 preAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
                 preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
                         null, null, null));
@@ -307,8 +314,10 @@ public class PixelsExecutor
         // build the final aggregation input.
         AggregationInput finalAggrInput = new AggregationInput();
         finalAggrInput.setInputFiles(finalAggrInputFilesBuilder.build());
-        finalAggrInput.setGroupColumnNames(aggregation.getGroupKeyColumnAlias());
+        finalAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
+        finalAggrInput.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
         finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
+        finalAggrInput.setResultColumnTypes(aggregation.getResultColumnTypes());
         finalAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
         StorageInfo storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
                 endPoint.getAccessKey(), endPoint.getSecretKey());
