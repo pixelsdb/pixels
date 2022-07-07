@@ -40,7 +40,32 @@ public class FunctionFactory
     public Function createFunction(FunctionType functionType,
                                    TypeDescription inputType,TypeDescription outputType)
     {
-        // TODO: implement.
-        return null;
+        switch (functionType)
+        {
+            case SUM:
+                return createSum(inputType, outputType);
+            default:
+                // TODO: support more function types.
+                throw new UnsupportedOperationException(
+                        "function type '" + functionType +"' is not supported");
+        }
+
+    }
+
+    private Function createSum(TypeDescription inputType, TypeDescription outputType)
+    {
+        switch (inputType.getCategory())
+        {
+            case SHORT:
+            case INT:
+            case LONG:
+                return new BigintSum(outputType);
+            case DECIMAL:
+                return new DecimalSum(outputType);
+            default:
+                // TODO: support more types.
+                throw new UnsupportedOperationException(
+                        "input type '" + inputType.getCategory() +"' is not supported in SUM");
+        }
     }
 }

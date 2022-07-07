@@ -46,6 +46,19 @@ public class Aggregator
     private final boolean[] groupKeyColumnProjection;
     private final Function[] aggrFunctions;
 
+    /**
+     * Create the aggregator to compute the aggregation result.
+     *
+     * @param batchSize the row batch size of the output
+     * @param inputSchema the schema of the input row batches
+     * @param groupKeyColumnAlias the column names for the group-key columns in the output
+     * @param groupKeyColumnIds the ids of the group-key columns in the input row batch
+     * @param groupKeyColumnProjection the projection of the group-key columns in the input row batch
+     * @param aggrColumnIds the ids of the aggregate columns in the input row batch
+     * @param resultColumnAlias the alias of the result columns in the output row batch
+     * @param resultColumnTypes the types of the result columns in the output row batch
+     * @param functionTypes the types of the aggregate functions for each aggregation
+     */
     public Aggregator(int batchSize, TypeDescription inputSchema,
                       String[] groupKeyColumnAlias, int[] groupKeyColumnIds,
                       boolean[] groupKeyColumnProjection, int[] aggrColumnIds,
@@ -123,15 +136,15 @@ public class Aggregator
         }
     }
 
-    public boolean writeAggrOutput(PixelsWriter pixelsWriter, int batchSize) throws IOException
+    public boolean writeAggrOutput(PixelsWriter pixelsWriter) throws IOException
     {
-        VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(batchSize);
+        VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
         for (AggrTuple output : this.hashTable.values())
         {
             if (outputRowBatch.isFull())
             {
                 pixelsWriter.addRowBatch(outputRowBatch);
-                outputRowBatch = this.outputSchema.createRowBatch(batchSize);
+                outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
             }
             output.writeTo(outputRowBatch, 0);
         }
