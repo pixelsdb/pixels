@@ -19,47 +19,23 @@
  */
 package io.pixelsdb.pixels.executor.aggregation.function;
 
-import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.utils.Integer128;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 /**
  * @author hank
  * @date 07/07/2022
  */
-public class DecimalSum extends SingleColumnFunction
+public abstract class SingleColumnFunction implements Function
 {
-    // TODO: implement.
-    private final TypeDescription outputType;
-    private Integer128 longValue;
-    private long shortValue = 0;
-    private boolean isLong = false;
-
-    protected DecimalSum(TypeDescription outputType)
+    @Override
+    public void input(int rowId, ColumnVector... inputVectors)
     {
-        this.outputType = outputType;
-        if (outputType.getPrecision() > 18)
-        {
-            this.isLong = true;
-            this.longValue = new Integer128(0L, 0L);
-        }
+        throw new UnsupportedOperationException("multi-column aggregation is not supported");
     }
 
     @Override
-    public void input(int rowId, ColumnVector inputVector)
+    public void output(ColumnVector... outputVectors)
     {
-
-    }
-
-    @Override
-    public void output(ColumnVector outputVector)
-    {
-
-    }
-
-    @Override
-    public Function clone()
-    {
-        return new DecimalSum(this.outputType);
+        throw new UnsupportedOperationException("multi-output aggregation is not supported");
     }
 }

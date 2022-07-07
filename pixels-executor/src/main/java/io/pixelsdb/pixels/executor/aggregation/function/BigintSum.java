@@ -19,47 +19,38 @@
  */
 package io.pixelsdb.pixels.executor.aggregation.function;
 
-import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 /**
  * @author hank
  * @date 07/07/2022
  */
-public class BigintSum implements Function
+public class BigintSum extends SingleColumnFunction
 {
-    protected BigintSum(TypeDescription outputType)
-    {
+    private long value = 0;
 
-    }
+    protected BigintSum() { }
 
     @Override
     public void input(int rowId, ColumnVector inputVector)
     {
-
-    }
-
-    @Override
-    public void input(int rowId, ColumnVector... inputVectors)
-    {
-
+        LongColumnVector longColumnVector = (LongColumnVector) inputVector;
+        if (longColumnVector.noNulls || !longColumnVector.isNull[rowId])
+        {
+            this.value += longColumnVector.vector[rowId];
+        }
     }
 
     @Override
     public void output(ColumnVector outputVector)
     {
-
-    }
-
-    @Override
-    public void output(ColumnVector... outputVectors)
-    {
-
+        outputVector.add(value);
     }
 
     @Override
     public Function clone()
     {
-        return null;
+        return new BigintSum();
     }
 }

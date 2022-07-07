@@ -59,7 +59,7 @@ public class FunctionFactory
             case SHORT:
             case INT:
             case LONG:
-                return new BigintSum(outputType);
+                return new BigintSum();
             case DECIMAL:
                 return new DecimalSum(outputType);
             default:
