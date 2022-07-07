@@ -19,7 +19,18 @@
  */
 package io.pixelsdb.pixels.executor.aggregation;
 
+import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.executor.aggregation.function.Function;
+import io.pixelsdb.pixels.executor.aggregation.function.FunctionFactory;
+
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
@@ -28,30 +39,116 @@ import java.util.HashMap;
 public class Aggregator
 {
     private final HashMap<AggrTuple, AggrTuple> hashTable = new HashMap<>();
-    private int size;
+    private final int batchSize;
+    private final TypeDescription outputSchema;
+    private final int[] groupKeyColumnIds;
+    private final int[] aggrColumnIds;
+    private final boolean[] groupKeyColumnProjection;
+    private final Function[] aggrFunctions;
+
+    public Aggregator(int batchSize, TypeDescription inputSchema,
+                      String[] groupKeyColumnAlias, int[] groupKeyColumnIds,
+                      boolean[] groupKeyColumnProjection, int[] aggrColumnIds,
+                      String[] resultColumnAlias, String[] resultColumnTypes,
+                      FunctionType[] functionTypes)
+    {
+        requireNonNull(inputSchema, "inputSchema is null");
+        requireNonNull(groupKeyColumnAlias, "groupKeyColumnAlias is null");
+        requireNonNull(resultColumnAlias, "resultColumnAlias is null");
+        requireNonNull(resultColumnTypes, "resultColumnTypes is null");
+        requireNonNull(functionTypes, "functionTypes is null");
+        this.batchSize = batchSize;
+        this.groupKeyColumnIds = requireNonNull(groupKeyColumnIds, "groupKeyColumnIds is null");
+        this.aggrColumnIds = requireNonNull(aggrColumnIds, "aggrColumnIds is null");
+        this.groupKeyColumnProjection = requireNonNull(groupKeyColumnProjection, "groupKeyColumnProjection is null");
+        checkArgument(batchSize > 1, "batchSize must be non-negative");
+        checkArgument(groupKeyColumnAlias.length == groupKeyColumnIds.length &&
+                groupKeyColumnAlias.length == groupKeyColumnProjection.length,
+                "the lengths of column alias, column ids, and projection of group key column are inconsistent");
+        checkArgument(resultColumnAlias.length == resultColumnTypes.length,
+                "the lengths of column alias and column types of result columns are inconsistent");
+
+        this.outputSchema = new TypeDescription(TypeDescription.Category.STRUCT);
+        List<TypeDescription> inputTypes = inputSchema.getChildren();
+        requireNonNull(inputTypes, "children types of the inputSchema is null");
+        checkArgument(inputTypes.size() >= groupKeyColumnIds.length + aggrColumnIds.length,
+                "inputSchema does not contain enough columns");
+        for (int i = 0; i < groupKeyColumnAlias.length; ++i)
+        {
+            if (groupKeyColumnProjection[i])
+            {
+                this.outputSchema.addField(groupKeyColumnAlias[i], inputTypes.get(groupKeyColumnIds[i]));
+            }
+        }
+        this.aggrFunctions = new Function[resultColumnAlias.length];
+        for (int i = 0; i < resultColumnAlias.length; ++i)
+        {
+            TypeDescription outputType = TypeDescription.fromString(resultColumnTypes[i]);
+            this.outputSchema.addField(resultColumnAlias[i], outputType);
+            this.aggrFunctions[i] = FunctionFactory.Instance().createFunction(
+                    functionTypes[i], inputTypes.get(aggrColumnIds[i]), outputType);
+        }
+    }
 
     /**
      * The user of this method must ensure the tuple is not null and the same tuple
      * is only put once. Different tuples with the same value of join key are put
      * into the same bucket.
      *
-     * @param tuple the tuple to be put
+     * @param inputRowBatch the row batch of the aggregation input
      */
-    public void put(AggrTuple tuple)
+    public void aggregate(VectorizedRowBatch inputRowBatch)
     {
-        AggrTuple baseTuple = this.hashTable.get(tuple);
-        if (baseTuple != null)
+        AggrTuple.Builder builder = new AggrTuple.Builder(
+                inputRowBatch, this.groupKeyColumnIds, this.groupKeyColumnProjection, this.aggrColumnIds);
+        while (builder.hasNext())
         {
-            baseTuple.aggregate(tuple);
-            return;
+            AggrTuple input = builder.next();
+            AggrTuple baseTuple = this.hashTable.get(input);
+            if (baseTuple != null)
+            {
+                baseTuple.aggregate(input);
+            }
+            else
+            {
+                // Create the functions.
+                Function[] functions = new Function[this.aggrFunctions.length];
+                for (int i = 0; i < this.aggrFunctions.length; ++i)
+                {
+                    functions[i] = this.aggrFunctions[i].clone();
+                }
+                input.setFunctions(functions);
+                this.hashTable.put(input, input);
+            }
         }
-        size++;
-        // Create the functions.
-        this.hashTable.put(tuple, tuple);
     }
 
-    public int size()
+    public boolean writeAggrOutput(PixelsWriter pixelsWriter, int batchSize) throws IOException
     {
-        return size;
+        VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(batchSize);
+        for (AggrTuple output : this.hashTable.values())
+        {
+            if (outputRowBatch.isFull())
+            {
+                pixelsWriter.addRowBatch(outputRowBatch);
+                outputRowBatch = this.outputSchema.createRowBatch(batchSize);
+            }
+            output.writeTo(outputRowBatch, 0);
+        }
+        if (!outputRowBatch.isEmpty())
+        {
+            pixelsWriter.addRowBatch(outputRowBatch);
+        }
+        return true;
+    }
+
+    public TypeDescription getOutputSchema()
+    {
+        return outputSchema;
+    }
+
+    public void clear()
+    {
+        this.hashTable.clear();
     }
 }

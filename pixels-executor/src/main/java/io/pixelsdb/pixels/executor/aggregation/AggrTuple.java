@@ -100,34 +100,35 @@ public class AggrTuple extends Tuple
          * Create a tuple builder for the row batch.
          *
          * @param rowBatch the row batch
-         * @param keyColumnIds the ids of the group-key columns
-         * @param projection whether the group-key columns are written into the output
+         * @param groupKeyColumnIds the ids of the group-key columns
+         * @param groupKeyColumnProjection whether the group-key columns are written into the output
          * @param aggrColumnIds the ids of the columns used for aggregation
          */
-        public Builder(VectorizedRowBatch rowBatch, int[] keyColumnIds, boolean[] projection,
+        public Builder(VectorizedRowBatch rowBatch, int[] groupKeyColumnIds, boolean[] groupKeyColumnProjection,
                        int[] aggrColumnIds)
         {
-            checkArgument(keyColumnIds != null && keyColumnIds.length > 0,
-                    "keyColumnIds is null or empty");
+            checkArgument(groupKeyColumnIds != null && groupKeyColumnIds.length > 0,
+                    "groupKeyColumnIds is null or empty");
             checkArgument(aggrColumnIds != null && aggrColumnIds.length > 0,
                     "aggrColumnIds is null or empty");
             requireNonNull(rowBatch, "rowBatch is null");
-            checkArgument(rowBatch.numCols >= keyColumnIds.length,
+            checkArgument(rowBatch.numCols >= groupKeyColumnIds.length,
                     "rowBatch does not have enough columns");
             checkArgument(rowBatch.size > 0, "rowBatch is empty");
-            checkArgument(projection != null && keyColumnIds.length == projection.length,
-                    "projection is null or has incorrect size");
+            checkArgument(groupKeyColumnProjection != null &&
+                            groupKeyColumnIds.length == groupKeyColumnProjection.length,
+                    "groupKeyColumnProjection is null or has incorrect size");
 
             ColumnVector[] columns = rowBatch.cols;
             int[] hashCode = new int[rowBatch.size];
             Arrays.fill(hashCode, 0);
-            for (int id : keyColumnIds)
+            for (int id : groupKeyColumnIds)
             {
                 columns[id].accumulateHashCode(hashCode);
             }
             this.numRows = rowBatch.size;
             this.aggrColumnIds = aggrColumnIds;
-            this.commonFields = new CommonFields(hashCode, keyColumnIds, columns, projection);
+            this.commonFields = new CommonFields(hashCode, groupKeyColumnIds, columns, groupKeyColumnProjection);
         }
 
         /**
@@ -141,7 +142,7 @@ public class AggrTuple extends Tuple
         /**
          * @return the next tuple in the row batch
          */
-        public Tuple next()
+        public AggrTuple next()
         {
             int id = this.rowId++;
             return new AggrTuple(id, commonFields, aggrColumnIds);
