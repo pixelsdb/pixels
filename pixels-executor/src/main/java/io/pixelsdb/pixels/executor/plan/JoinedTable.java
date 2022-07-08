@@ -44,9 +44,9 @@ public class JoinedTable implements Table
     }
 
     @Override
-    public boolean isBase()
+    public TableType getTableType()
     {
-        return false;
+        return TableType.JOINED;
     }
 
     @Override

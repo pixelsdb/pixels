@@ -210,7 +210,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     }
 
     @Override
-    public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    public JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         PartitionedJoinOutputCollection outputCollection = new PartitionedJoinOutputCollection();
         outputCollection.setJoinAlgo(joinAlgo);

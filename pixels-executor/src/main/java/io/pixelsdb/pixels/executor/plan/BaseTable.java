@@ -46,9 +46,9 @@ public class BaseTable implements Table
     }
 
     @Override
-    public boolean isBase()
+    public TableType getTableType()
     {
-        return true;
+        return TableType.BASE;
     }
 
     @Override

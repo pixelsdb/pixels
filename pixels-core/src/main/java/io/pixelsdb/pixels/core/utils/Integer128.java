@@ -159,6 +159,19 @@ public class Integer128 implements Comparable<Integer128>
         return new Integer128(value >> 63, value);
     }
 
+    public void add(long high, long low)
+    {
+        // TODO: optimize.
+        BigInteger res = this.toBigInteger().add(new BigInteger(toBigEndianBytes(high, low)));
+        this.low = res.longValue();
+        try {
+            this.high = res.shiftRight(64).longValueExact();
+        }
+        catch (ArithmeticException e) {
+            throw new ArithmeticException("BigInteger out of Integer128 range");
+        }
+    }
+
     @Override
     public boolean equals(Object o)
     {

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
+import io.pixelsdb.pixels.executor.lambda.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 
 /**
@@ -28,6 +29,15 @@ import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
 public class JoinInput extends Input
 {
     /**
+     * Whether the partial aggregation exists.
+     */
+    private boolean partialAggregationPresent = false;
+    /**
+     * The information of the partial aggregation.
+     */
+    private PartialAggregationInfo partialAggregationInfo;
+
+    /**
      * The information of the join output files.<br/>
      * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
      * should be consistent with the number of input splits in right table. For left-outer
@@ -35,11 +45,36 @@ public class JoinInput extends Input
      */
     private MultiOutputInfo output;
 
+    /**
+     * Default constructor for Jackson.
+     */
     public JoinInput() {}
 
-    public JoinInput(MultiOutputInfo output)
+    public JoinInput(boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, MultiOutputInfo output)
     {
+        this.partialAggregationPresent = partialAggregationPresent;
+        this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
+    }
+
+    public boolean isPartialAggregationPresent()
+    {
+        return partialAggregationPresent;
+    }
+
+    public void setPartialAggregationPresent(boolean partialAggregationPresent)
+    {
+        this.partialAggregationPresent = partialAggregationPresent;
+    }
+
+    public PartialAggregationInfo getPartialAggregationInfo()
+    {
+        return partialAggregationInfo;
+    }
+
+    public void setPartialAggregationInfo(PartialAggregationInfo partialAggregationInfo)
+    {
+        this.partialAggregationInfo = partialAggregationInfo;
     }
 
     /**

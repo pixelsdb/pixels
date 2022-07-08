@@ -23,10 +23,7 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
 import io.pixelsdb.pixels.executor.lambda.WorkerType;
-import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.PartitionedJoinInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.PartitionedTableInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.junit.Test;
@@ -91,9 +88,9 @@ public class TestPartitionedJoinInvoker
         joinInfo.setPostPartitionInfo(new PartitionInfo(new int[] {0}, 100));
         joinInput.setJoinInfo(joinInfo);
 
-        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/", Storage.Scheme.s3,
-                null, null, null, true,
-                Arrays.asList("partitioned-join-0", "partitioned-join-1")));
+        joinInput.setOutput(new MultiOutputInfo("pixels-lambda-test/",
+                new StorageInfo(Storage.Scheme.s3, null, null, null),
+                true, Arrays.asList("partitioned-join-0", "partitioned-join-1")));
 
         System.out.println(JSON.toJSONString(joinInput));
         JoinOutput output = (JoinOutput) InvokerFactory.Instance()

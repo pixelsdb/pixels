@@ -78,9 +78,11 @@ public class PartitionedChainJoinInput extends JoinInput
                                      PartitionedTableInfo smallTable,
                                      PartitionedTableInfo largeTable,
                                      PartitionedJoinInfo joinInfo,
+                                     boolean partialAggregationPresent,
+                                     PartialAggregationInfo partialAggregationInfo,
                                      MultiOutputInfo output)
     {
-        super(output);
+        super(partialAggregationPresent, partialAggregationInfo, output);
         this.queryId = queryId;
         this.chainTables = chainTables;
         this.chainJoinInfos = chainJoinInfos;
@@ -162,7 +164,9 @@ public class PartitionedChainJoinInput extends JoinInput
         {
             this.builderInstance = new PartitionedChainJoinInput(
                     instance.queryId, instance.chainTables, instance.chainJoinInfos,
-                    instance.smallTable, instance.largeTable, instance.joinInfo, instance.getOutput());
+                    instance.smallTable, instance.largeTable, instance.joinInfo,
+                    instance.isPartialAggregationPresent(), instance.getPartialAggregationInfo(),
+                    instance.getOutput());
         }
 
         public Builder setLargeTable(PartitionedTableInfo largeTable)

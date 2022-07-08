@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.executor.plan.Table.TableType.BASE;
+import static io.pixelsdb.pixels.executor.plan.Table.TableType.JOINED;
 
 /**
  * The advisor for serverless joins.
@@ -140,7 +142,7 @@ public class JoinAdvisor
 
     private double getTableSize(Table table) throws MetadataException
     {
-        if (table.isBase())
+        if (table.getTableType() == BASE)
         {
             String schemaTableName = table.getSchemaName() + "_" + table.getTableName();
             Map<String, Column> columnMap;
@@ -166,6 +168,7 @@ public class JoinAdvisor
             }
             return size;
         }
+        checkArgument(table.getTableType() == JOINED, "the table is not a base or joined table");
         JoinedTable joinedTable = (JoinedTable) table;
         Table leftTable = joinedTable.getJoin().getLeftTable();
         Table rightTable = joinedTable.getJoin().getRightTable();

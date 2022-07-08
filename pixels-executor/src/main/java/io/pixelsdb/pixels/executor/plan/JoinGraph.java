@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.executor.plan.Table.TableType.BASE;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -45,8 +46,10 @@ public class JoinGraph
         {
             Table left = join.getLeftTable();
             Table right = join.getRightTable();
-            checkArgument(left.isBase(), "left table in the link is not base table");
-            checkArgument(right.isBase(), "right table in the link is not base table");
+            checkArgument(left.getTableType() == BASE,
+                    "left table in the link is not base table");
+            checkArgument(right.getTableType() == BASE,
+                    "right table in the link is not base table");
             this.baseTables.add(left);
             this.baseTables.add(right);
             if (this.joinIndex.containsKey(left))

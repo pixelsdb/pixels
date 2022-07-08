@@ -37,7 +37,7 @@ import java.util.Optional;
  * @author hank
  * @date 06/06/2022
  */
-public class TestLambdaJoinExecutor
+public class TestPixelsExecutor
 {
     @Test
     public void testChainJoin() throws IOException, MetadataException
@@ -92,7 +92,7 @@ public class TestLambdaJoinExecutor
                 "region_join_nation_join_supplier_join_lineitem",
                 "region_join_nation_join_supplier_join_lineitem", join3);
 
-        LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(
+        PixelsExecutor joinExecutor = new PixelsExecutor(
                 123456, root, false, true);
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
@@ -183,7 +183,7 @@ public class TestLambdaJoinExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer", join5);
 
-        LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(
+        PixelsExecutor joinExecutor = new PixelsExecutor(
                 123456, root, false, true);
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
@@ -257,7 +257,7 @@ public class TestLambdaJoinExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_part",
                 "region_join_nation_join_supplier_join_lineitem_join_part", join4);
 
-        LambdaJoinExecutor joinExecutor = new LambdaJoinExecutor(
+        PixelsExecutor joinExecutor = new PixelsExecutor(
                 123456, root, false, true);
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());

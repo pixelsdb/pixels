@@ -365,6 +365,17 @@ public class TimeColumnVector extends ColumnVector
     }
 
     @Override
+    public void add(int value)
+    {
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        this.times[writeIndex] = roundSqlTime(value);
+        this.isNull[writeIndex++] = false;
+    }
+
+    @Override
     public void add(Time value)
     {
         if (writeIndex >= getLength())

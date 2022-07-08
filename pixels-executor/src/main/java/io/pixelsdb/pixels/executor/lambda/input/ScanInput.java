@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda.input;
 
+import io.pixelsdb.pixels.executor.lambda.domain.PartialAggregationInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.OutputInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.ScanTableInfo;
 
@@ -37,6 +38,16 @@ public class ScanInput extends Input
      * The information of the table to scan.
      */
     private ScanTableInfo tableInfo;
+
+    /**
+     * Whether the partial aggregation exists.
+     */
+    private boolean partialAggregationPresent = false;
+    /**
+     * The information of the partial aggregation.
+     */
+    private PartialAggregationInfo partialAggregationInfo;
+
     /**
      * The output of the scan.
      */
@@ -47,10 +58,13 @@ public class ScanInput extends Input
      */
     public ScanInput() { }
 
-    public ScanInput(long queryId, ScanTableInfo tableInfo, OutputInfo output)
+    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean partialAggregationPresent,
+                     PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
         this.queryId = queryId;
         this.tableInfo = tableInfo;
+        this.partialAggregationPresent = partialAggregationPresent;
+        this.partialAggregationInfo = partialAggregationInfo;
         this.output = output;
     }
 
@@ -72,6 +86,26 @@ public class ScanInput extends Input
     public void setTableInfo(ScanTableInfo tableInfo)
     {
         this.tableInfo = tableInfo;
+    }
+
+    public boolean isPartialAggregationPresent()
+    {
+        return partialAggregationPresent;
+    }
+
+    public void setPartialAggregationPresent(boolean partialAggregationPresent)
+    {
+        this.partialAggregationPresent = partialAggregationPresent;
+    }
+
+    public PartialAggregationInfo getPartialAggregationInfo()
+    {
+        return partialAggregationInfo;
+    }
+
+    public void setPartialAggregationInfo(PartialAggregationInfo partialAggregationInfo)
+    {
+        this.partialAggregationInfo = partialAggregationInfo;
     }
 
     public OutputInfo getOutput()

@@ -28,7 +28,7 @@ import java.util.*;
 public class HashTable implements Iterable<Tuple>
 {
     private final HashMap<Tuple, Tuple> hashTable = new HashMap<>();
-    private int size;
+    private int size = 0;
 
     /**
      * The user of this method must ensure the tuple is not null and the same tuple

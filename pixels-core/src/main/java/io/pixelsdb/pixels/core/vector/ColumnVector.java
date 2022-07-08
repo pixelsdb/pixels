@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.Integer128;
 
 import java.sql.Date;
 import java.sql.Time;
@@ -124,10 +125,21 @@ public abstract class ColumnVector implements AutoCloseable
         throw new UnsupportedOperationException("Adding float is not supported");
     }
 
+    public void add(int value)
+    {
+        throw new UnsupportedOperationException("Adding int is not supported");
+    }
+
     public void add(long value)
     {
         throw new UnsupportedOperationException("Adding long is not supported");
     }
+
+    public void add(Integer128 value)
+    {
+        throw new UnsupportedOperationException("Adding Integer128 is not supported");
+    }
+
 
     public void add(String value)
     {

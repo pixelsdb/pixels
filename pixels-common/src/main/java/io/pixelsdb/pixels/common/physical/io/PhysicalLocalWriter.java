@@ -39,7 +39,7 @@ public class PhysicalLocalWriter implements PhysicalWriter
     private long position;
     private DataOutputStream rawWriter;
 
-    public PhysicalLocalWriter(Storage storage, String path) throws IOException
+    public PhysicalLocalWriter(Storage storage, String path, boolean overwrite) throws IOException
     {
         if (storage instanceof LocalFS)
         {
@@ -56,7 +56,7 @@ public class PhysicalLocalWriter implements PhysicalWriter
         }
         this.path = path;
         this.position = 0;
-        this.rawWriter = this.local.create(path, false, Constants.LOCAL_BUFFER_SIZE, (short) 1);
+        this.rawWriter = this.local.create(path, overwrite, Constants.LOCAL_BUFFER_SIZE, (short) 1);
     }
 
     /**

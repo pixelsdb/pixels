@@ -26,11 +26,12 @@ package io.pixelsdb.pixels.executor.plan;
  */
 public interface Table
 {
+    public static enum TableType
+    {
+        BASE, JOINED, AGGREGATED
+    }
 
-    /**
-     * Whether this is a base table or a joined table.
-     */
-    public boolean isBase();
+    public TableType getTableType();
 
     public String getSchemaName();
 

@@ -33,10 +33,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.executor.lambda.domain.BroadcastTableInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.ChainJoinInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.MultiOutputInfo;
-import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.slf4j.Logger;
@@ -129,16 +126,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                     "', number of partitions (" + numPartition + ")");
 
             MultiOutputInfo outputInfo = event.getOutput();
-            if (joinType == JoinType.EQUI_LEFT || joinType == JoinType.EQUI_FULL)
-            {
-                checkArgument(rightParallelism + 1 == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
-            else
-            {
-                checkArgument(rightParallelism == outputInfo.getFileNames().size(),
-                        "the number of output file names is incorrect");
-            }
+            StorageInfo storageInfo = outputInfo.getStorageInfo();
+            checkArgument(rightParallelism == outputInfo.getFileNames().size(),
+                    "the number of output file names is incorrect");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -157,9 +147,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
 
             try
             {
-                if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)
+                if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinIO(outputInfo.getEndpoint(), outputInfo.getAccessKey(), outputInfo.getSecretKey());
+                    ConfigMinIO(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
@@ -244,10 +234,10 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
-                                        numPartition, outputPath, encoding, outputInfo.getScheme(),
+                                        numPartition, outputPath, encoding, storageInfo.getScheme(),
                                         outputPartitionInfo) :
                                 joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
-                                hashValues, numPartition, outputPath, encoding, outputInfo.getScheme());
+                                hashValues, numPartition, outputPath, encoding, storageInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
                             joinOutput.addOutput(outputPath, rowGroupNum);

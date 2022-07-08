@@ -23,9 +23,8 @@ import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 
 /**
- * The join link is the edge between two tables in the join graph.
- * It represents the join type and condition between the two tables,
- * and is used in join order optimization.
+ * {@link Join} is the edge between two tables in the join tree.
+ * It represents the join type and condition between the two tables.
  *
  * @author hank
  * @date 29/05/2022

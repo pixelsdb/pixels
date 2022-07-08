@@ -107,6 +107,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     "broadcast join can not be used for LEFT_OUTER or FULL_OUTER join");
 
             MultiOutputInfo outputInfo = event.getOutput();
+            StorageInfo storageInfo = outputInfo.getStorageInfo();
             checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
                     "the number of output file names is incorrect");
             String outputFolder = outputInfo.getPath();
@@ -118,9 +119,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             try
             {
-                if (minio == null && outputInfo.getScheme() == Storage.Scheme.minio)
+                if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinIO(outputInfo.getEndpoint(), outputInfo.getAccessKey(), outputInfo.getSecretKey());
+                    ConfigMinIO(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
@@ -174,9 +175,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         int rowGroupNum = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
-                                        outputPath, encoding, outputInfo.getScheme(), outputPartitionInfo) :
+                                        outputPath, encoding, storageInfo.getScheme(), outputPartitionInfo) :
                                 joinWithRightTable(queryId, joiner, inputs, true, rightCols,
-                                        rightFilter, outputPath, encoding, outputInfo.getScheme());
+                                        rightFilter, outputPath, encoding, storageInfo.getScheme());
                         if (rowGroupNum > 0)
                         {
                             joinOutput.addOutput(outputPath, rowGroupNum);

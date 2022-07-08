@@ -23,14 +23,13 @@ import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
  * @author hank
  * @date 05/06/2022
  */
-public interface JoinOperator
+public interface JoinOperator extends Operator
 {
     List<JoinInput> getJoinInputs();
 
@@ -45,42 +44,27 @@ public interface JoinOperator
     JoinOperator getLargeChild();
 
     /**
-     * Execute this join operator recursively.
-     *
-     * @return the completable futures of the join outputs.
-     */
-    CompletableFuture<?>[] execute();
-
-    /**
-     * Execute the previous stages (if any) before the last stage, recursively.
-     * And return the completable futures of the outputs of the previous states that
-     * we should wait for completion.
-     * @return empty array if the previous stages do not exist or do not need to be wait for
-     */
-    CompletableFuture<?>[] executePrev();
-
-    /**
      * This method collects the outputs of the join operator. It may block until the join
      * completes, therefore it should not be called in the query execution thread. Otherwise,
      * it will block the query execution.
      * @return the out
      */
-    OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
+    JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
     /**
      * This class is used to collect the outputs of a join operator.
      * It can be serialized to a json string or deserialized to an object from json string
      * by fastjson or other feasible json libraries.
      */
-    class OutputCollection
+    class JoinOutputCollection implements OutputCollection
     {
         protected JoinAlgorithm joinAlgo;
         protected OutputCollection smallChild;
         protected OutputCollection largeChild;
 
-        public OutputCollection() { }
+        public JoinOutputCollection() { }
 
-        public OutputCollection(JoinAlgorithm joinAlgo,
+        public JoinOutputCollection(JoinAlgorithm joinAlgo,
                                 OutputCollection smallChild,
                                 OutputCollection largeChild)
         {
