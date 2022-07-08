@@ -68,7 +68,7 @@ public class TestPartialAggregation
         aggregationInfo.setResultColumnTypes(new String[] {"bigint"});
         aggregationInfo.setFunctionTypes(new FunctionType[] {FunctionType.SUM});
         scanInput.setPartialAggregationInfo(aggregationInfo);
-        scanInput.setOutput(new OutputInfo("pixels-lambda-test/orders_final_aggr_6", false,
+        scanInput.setOutput(new OutputInfo("pixels-lambda-test/orders_partial_aggr_6", false,
                 new StorageInfo(Storage.Scheme.s3, null, null, null), true));
 
         System.out.println(JSON.toJSONString(scanInput));

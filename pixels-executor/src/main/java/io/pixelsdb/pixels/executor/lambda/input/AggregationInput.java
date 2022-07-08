@@ -33,6 +33,7 @@ import java.util.List;
  */
 public class AggregationInput extends Input
 {
+    private long queryId;
     /**
      * The column names of the group-key columns in the aggregation result.
      */
@@ -63,6 +64,10 @@ public class AggregationInput extends Input
      * The information of the input storage.
      */
     private StorageInfo inputStorage;
+    /**
+     * The number of threads to scan and aggregate the input files.
+     */
+    private int parallelism;
 
     /**
      * The output of the aggregation.
@@ -74,11 +79,13 @@ public class AggregationInput extends Input
      */
     public AggregationInput() { }
 
-    public AggregationInput(String[] groupKeyColumnNames, boolean[] groupKeyColumnProjection,
+    public AggregationInput(long queryId, String[] groupKeyColumnNames,
+                            boolean[] groupKeyColumnProjection,
                             String[] resultColumnNames, String[] resultColumnTypes,
                             FunctionType[] functionTypes, List<String> inputFiles,
-                            StorageInfo inputStorage, OutputInfo output)
+                            StorageInfo inputStorage, int parallelism, OutputInfo output)
     {
+        this.queryId = queryId;
         this.groupKeyColumnNames = groupKeyColumnNames;
         this.groupKeyColumnProjection = groupKeyColumnProjection;
         this.resultColumnNames = resultColumnNames;
@@ -86,7 +93,18 @@ public class AggregationInput extends Input
         this.functionTypes = functionTypes;
         this.inputFiles = inputFiles;
         this.inputStorage = inputStorage;
+        this.parallelism = parallelism;
         this.output = output;
+    }
+
+    public long getQueryId()
+    {
+        return queryId;
+    }
+
+    public void setQueryId(long queryId)
+    {
+        this.queryId = queryId;
     }
 
     public String[] getGroupKeyColumnNames()
@@ -157,6 +175,16 @@ public class AggregationInput extends Input
     public void setInputStorage(StorageInfo inputStorage)
     {
         this.inputStorage = inputStorage;
+    }
+
+    public int getParallelism()
+    {
+        return parallelism;
+    }
+
+    public void setParallelism(int parallelism)
+    {
+        this.parallelism = parallelism;
     }
 
     public OutputInfo getOutput()

@@ -280,6 +280,7 @@ public class PixelsExecutor
                     inputFilesBuilder.add(partialAggrFiles.get(i));
                 }
                 AggregationInput preAggrInput = new AggregationInput();
+                preAggrInput.setQueryId(queryId);
                 preAggrInput.setInputFiles(inputFilesBuilder.build());
                 preAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
                 // Pre-aggregation should output all the group-key columns.
@@ -300,6 +301,7 @@ public class PixelsExecutor
                     outputStorageInfo = new StorageInfo(IntermediateStorage,
                             null, null, null);
                 }
+                preAggrInput.setParallelism(IntraWorkerParallelism);
                 String fileName = outputBase + "pre_aggr_" + outputId++;
                 preAggrInput.setOutput(new OutputInfo(fileName, false,
                         outputStorageInfo, true));
@@ -313,6 +315,7 @@ public class PixelsExecutor
         }
         // build the final aggregation input.
         AggregationInput finalAggrInput = new AggregationInput();
+        finalAggrInput.setQueryId(queryId);
         finalAggrInput.setInputFiles(finalAggrInputFilesBuilder.build());
         finalAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
         finalAggrInput.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
@@ -330,6 +333,7 @@ public class PixelsExecutor
             finalAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
                     null, null, null));
         }
+        finalAggrInput.setParallelism(IntraWorkerParallelism);
         finalAggrInput.setOutput(new OutputInfo(outputBase + "final_aggr",
                 false, storageInfo, true));
 

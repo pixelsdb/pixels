@@ -130,12 +130,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 aggregator = null;
             }
-            int i = 0;
+            int outputId = 0;
             logger.info("start scan and aggregate");
             for (InputSplit inputSplit : inputSplits)
             {
                 List<InputInfo> scanInputs = inputSplit.getInputInfos();
-                String outputPath = outputFolder + requestId + "_scan_" + i++;
+                String outputPath = outputFolder + requestId + "_scan_" + outputId++;
 
                 threadPool.execute(() -> {
                     try
@@ -168,7 +168,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 String outputPath = event.getOutput().getPath();
                 PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
                         storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3,
-                        outputPath, true, false, null);
+                        outputPath, encoding, false, null);
                 aggregator.writeAggrOutput(pixelsWriter);
                 pixelsWriter.close();
                 if (storageInfo.getScheme() == Storage.Scheme.minio)
@@ -199,16 +199,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * results to the given path.
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
-     * @param cols the included columns
+     * @param columnsToRead the included columns
      * @param filter the filter for the scan
-     * @param outputPath fileName on s3 to store the scan results
+     * @param outputPath fileName for the scan results
      * @param encoding whether encode the scan results or not
      * @param outputScheme the storage scheme for the scan result
      * @param partialAggregate whether perform partial aggregation on the scan result
      * @param aggregator the aggregator for the partial aggregation
      * @return the number of row groups that have been written into the output.
      */
-    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] cols,
+    private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead,
                          TableScanFilter filter, String outputPath, boolean encoding,
                          Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator)
     {
@@ -231,7 +231,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
 
-                PixelsReaderOption option = getReaderOption(queryId, cols, inputInfo);
+                PixelsReaderOption option = getReaderOption(queryId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
