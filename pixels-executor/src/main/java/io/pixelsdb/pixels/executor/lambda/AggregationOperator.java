@@ -182,6 +182,10 @@ public class AggregationOperator implements Operator
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         AggregationOutputCollection outputCollection = new AggregationOutputCollection();
+        if (this.finalAggrOutput != null)
+        {
+            outputCollection.setFinalAggrOutput((Output) this.finalAggrOutput[0].get());
+        }
         if (this.scanOutputs.length > 0)
         {
             Output[] outputs = new Output[this.scanOutputs.length];
@@ -200,7 +204,6 @@ public class AggregationOperator implements Operator
             }
             outputCollection.setPreAggrOutputs(outputs);
         }
-        outputCollection.setFinalAggrOutput((Output) this.finalAggrOutput[0].get());
         return outputCollection;
     }
 
