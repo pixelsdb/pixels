@@ -32,9 +32,6 @@ import org.junit.After;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.sql.Date;
-
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
 
 /**
  * @author hank
@@ -54,14 +51,15 @@ public class TestAggregator
                 .setPixelsFooterCache(new PixelsFooterCache())
                 .setEnableCache(false).build();
         PixelsReaderOption option = new PixelsReaderOption();
-        option.includeCols(new String[] {"o_custkey", "o_orderstatus", "o_orderdate", "o_shippriority"});
+        option.includeCols(new String[] {"o_orderkey", "o_custkey", "o_orderstatus", "o_orderdate"});
         PixelsRecordReader recordReader = pixelsReader.read(option);
         System.out.println("millis to read: " + (System.currentTimeMillis() - start));
         start = System.currentTimeMillis();
+        int num = 0;
         Aggregator aggregator = new Aggregator(1024, recordReader.getResultSchema(),
-                new String[] {"o_orderstatus_1", "o_orderdate_2"},
-                new int[] {1, 2}, new boolean[] {true, true}, new int[] {0},
-                new String[] {"sum_o_custkey_3"}, new String[] {"bigint"},
+                new String[] {"o_custkey_1", "o_orderstatus_2", "o_orderdate_3"},
+                new int[] {1, 2, 3}, new boolean[] {true, true, true}, new int[] {0},
+                new String[] {"sum_o_orderkey_0"}, new String[] {"bigint"},
                 new FunctionType[] {FunctionType.SUM});
         VectorizedRowBatch rowBatch;
         do
@@ -69,10 +67,12 @@ public class TestAggregator
             rowBatch = recordReader.readBatch(1024);
             if (rowBatch.size > 0)
             {
-                //aggregator.aggregate(rowBatch);
+                num += rowBatch.size;
+                aggregator.aggregate(rowBatch);
             }
         } while (!rowBatch.endOfFile);
         pixelsReader.close();
+        System.out.println(num);
         System.out.println("millis to aggregate: " + (System.currentTimeMillis() - start));
         start = System.currentTimeMillis();
 
@@ -102,20 +102,25 @@ public class TestAggregator
                 .setPixelsFooterCache(new PixelsFooterCache())
                 .setEnableCache(false).build();
         PixelsReaderOption option = new PixelsReaderOption();
-        option.includeCols(new String[] {"o_orderstatus_1", "o_orderdate_2", "sum_o_custkey_3"});
+        option.includeCols(new String[] {"o_custkey_1", "o_orderstatus_2", "o_orderdate_3", "sum_o_orderkey_0"});
         PixelsRecordReader recordReader = pixelsReader.read(option);
         VectorizedRowBatch rowBatch;
+        int num = 0;
         do
         {
             rowBatch = recordReader.readBatch(1024);
             for (int i = 0; i < rowBatch.size; ++i)
             {
-                BinaryColumnVector c0 = (BinaryColumnVector) rowBatch.cols[0];
-                DateColumnVector c1 = (DateColumnVector) rowBatch.cols[1];
-                LongColumnVector c2 = (LongColumnVector) rowBatch.cols[2];
-                System.out.println(new String(c0.vector[i], c0.start[i], c0.lens[i]) + ", "
-                + (new Date(dayToMillis(c1.dates[i]))) + ", " + c2.vector[i]);
+                LongColumnVector c0 = (LongColumnVector) rowBatch.cols[0];
+                BinaryColumnVector c1 = (BinaryColumnVector) rowBatch.cols[1];
+                DateColumnVector c2 = (DateColumnVector) rowBatch.cols[2];
+                LongColumnVector c3 = (LongColumnVector) rowBatch.cols[3];
+                //System.out.println(c0.vector[i] + ", " + new String(c1.vector[i], c1.start[i], c1.lens[i]) + ", "
+                //+ (new Date(dayToMillis(c2.dates[i]))) + ", " + c3.vector[i]);
+                num++;
             }
         } while (!rowBatch.endOfFile);
+        System.out.println(num);
+        pixelsReader.close();
     }
 }

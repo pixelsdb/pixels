@@ -110,7 +110,7 @@ public class Aggregator
      *
      * @param inputRowBatch the row batch of the aggregation input
      */
-    public void aggregate(VectorizedRowBatch inputRowBatch)
+    public synchronized void aggregate(VectorizedRowBatch inputRowBatch)
     {
         AggrTuple.Builder builder = new AggrTuple.Builder(
                 inputRowBatch, this.groupKeyColumnIds, this.groupKeyColumnProjection, this.aggrColumnIds);

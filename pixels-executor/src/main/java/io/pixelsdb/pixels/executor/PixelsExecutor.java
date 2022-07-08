@@ -239,7 +239,7 @@ public class PixelsExecutor
             {
                 joinInput.setPartialAggregationPresent(true);
                 joinInput.setPartialAggregationInfo(partialAggregationInfo);
-                String fileName = "aggr_" + outputId++;
+                String fileName = "partial_aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
                 StorageInfo storageInfo;
                 if (computeFinalAggrInServer && !preAggregate)
