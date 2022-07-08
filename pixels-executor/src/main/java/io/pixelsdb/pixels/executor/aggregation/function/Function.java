@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
  * @author hank
  * @date 07/07/2022
  */
-public interface Function extends Cloneable
+public interface Function
 {
     /**
      * Input an element into this function. This is used by the single-column aggregations.
@@ -63,5 +63,5 @@ public interface Function extends Cloneable
      */
     void output(ColumnVector... outputVectors);
 
-    Function clone();
+    Function buildCopy();
 }

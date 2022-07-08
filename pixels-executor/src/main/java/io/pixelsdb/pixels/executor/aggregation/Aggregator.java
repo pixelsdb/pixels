@@ -128,9 +128,9 @@ public class Aggregator
                 Function[] functions = new Function[this.aggrFunctions.length];
                 for (int i = 0; i < this.aggrFunctions.length; ++i)
                 {
-                    functions[i] = this.aggrFunctions[i].clone();
+                    functions[i] = this.aggrFunctions[i].buildCopy();
                 }
-                input.setFunctions(functions);
+                input.initFunctions(functions);
                 this.hashTable.put(input, input);
             }
         }
@@ -144,9 +144,9 @@ public class Aggregator
             if (outputRowBatch.isFull())
             {
                 pixelsWriter.addRowBatch(outputRowBatch);
-                outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
+                outputRowBatch.reset();
             }
-            output.writeTo(outputRowBatch, 0);
+            output.writeTo(outputRowBatch);
         }
         if (!outputRowBatch.isEmpty())
         {

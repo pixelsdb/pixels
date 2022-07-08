@@ -58,9 +58,18 @@ public class AggrTuple extends Tuple
         this.aggrColumnIds = aggrColumnIds;
     }
 
-    public void setFunctions(Function[] functions)
+    /**
+     * Set the functions of this AggrType, and input the fields of this tuple into the functions.
+     *
+     * @param functions to be set as the functions of this AggrTuple
+     */
+    public void initFunctions(Function[] functions)
     {
         this.functions = functions;
+        for (int i = 0; i < this.aggrColumnIds.length; ++i)
+        {
+            this.functions[i].input(this.rowId, this.commonFields.columns[this.aggrColumnIds[i]]);
+        }
     }
 
     public void aggregate(AggrTuple other)

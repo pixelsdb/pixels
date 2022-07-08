@@ -49,7 +49,7 @@ public class BigintSum extends SingleColumnFunction
     }
 
     @Override
-    public Function clone()
+    public Function buildCopy()
     {
         return new BigintSum();
     }

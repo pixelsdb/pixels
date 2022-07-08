@@ -65,7 +65,7 @@ public class PhysicalWriterUtil
                         addBlockPadding, blockSize, overwrite);
                 break;
             case file:
-                writer = new PhysicalLocalWriter(storage, path);
+                writer = new PhysicalLocalWriter(storage, path, overwrite);
                 break;
             case s3:
             case minio:
