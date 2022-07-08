@@ -22,12 +22,14 @@ package io.pixelsdb.pixels.executor.lambda;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.lambda.input.AggregationInput;
 import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.executor.lambda.SingleStageJoinOperator.waitForCompletion;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -66,8 +68,9 @@ public class AggregationOperator implements Operator
     private CompletableFuture<?>[] preAggrOutputs = null;
     /**
      * The output of the final aggregation worker.
+     * There should be only one element in this array.
      */
-    private CompletableFuture<?> finalAggrOutput = null;
+    private CompletableFuture<?>[] finalAggrOutput = null;
 
     public AggregationOperator(AggregationInput finalAggrInput,
                                List<AggregationInput> preAggrInputs,
@@ -126,21 +129,124 @@ public class AggregationOperator implements Operator
     @Override
     public CompletableFuture<?>[] execute()
     {
-        // TODO: implement.
-        return new CompletableFuture[0];
+        waitForCompletion(executePrev());
+        requireNonNull(this.finalAggrInput, "finalAggrInput is null");
+        this.finalAggrOutput = new CompletableFuture[1];
+        this.finalAggrOutput[0] = InvokerFactory.Instance()
+                .getInvoker(WorkerType.AGGREGATION).invoke(this.finalAggrInput);
+        return this.finalAggrOutput;
     }
 
     @Override
     public CompletableFuture<?>[] executePrev()
     {
-        // TODO: implement.
-        return new CompletableFuture[0];
+        if (this.child != null)
+        {
+            checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
+            this.scanOutputs = new CompletableFuture[0];
+            this.child.execute();
+        }
+        else
+        {
+            checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
+            this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
+            int i = 0;
+            for (ScanInput scanInput : this.scanInputs)
+            {
+                this.scanOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.SCAN).invoke(scanInput);
+            }
+        }
+        if (this.preAggrInputs.isEmpty())
+        {
+            this.preAggrOutputs = new CompletableFuture[0];
+        }
+        else
+        {
+            this.preAggrOutputs = new CompletableFuture[this.preAggrInputs.size()];
+            int i = 0;
+            for (AggregationInput preAggrInput : this.preAggrInputs)
+            {
+                this.preAggrOutputs[i++] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
+            }
+        }
+        if (this.preAggrOutputs.length > 0)
+        {
+            return this.preAggrOutputs;
+        }
+        return this.scanOutputs;
     }
 
     @Override
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
-        // TODO: implement.
-        return null;
+        AggregationOutputCollection outputCollection = new AggregationOutputCollection();
+        if (this.scanOutputs.length > 0)
+        {
+            Output[] outputs = new Output[this.scanOutputs.length];
+            for (int i = 0; i < this.scanOutputs.length; ++i)
+            {
+                outputs[i] = (Output) this.scanOutputs[i].get();
+            }
+            outputCollection.setScanOutputs(outputs);
+        }
+        if (this.preAggrOutputs.length > 0)
+        {
+            Output[] outputs = new Output[this.preAggrOutputs.length];
+            for (int i = 0; i < this.preAggrOutputs.length; ++i)
+            {
+                outputs[i] = (Output) this.preAggrOutputs[i].get();
+            }
+            outputCollection.setPreAggrOutputs(outputs);
+        }
+        outputCollection.setFinalAggrOutput((Output) this.finalAggrOutput[0].get());
+        return outputCollection;
+    }
+
+    public static class AggregationOutputCollection implements OutputCollection
+    {
+        private Output[] scanOutputs = null;
+        private Output[] preAggrOutputs = null;
+        private Output finalAggrOutput = null;
+
+        public AggregationOutputCollection() { }
+
+        public AggregationOutputCollection(Output[] scanOutputs, Output[] preAggrOutputs, Output finalAggrOutput)
+        {
+            this.scanOutputs = scanOutputs;
+            this.preAggrOutputs = preAggrOutputs;
+            this.finalAggrOutput = finalAggrOutput;
+        }
+
+        public Output[] getScanOutputs()
+        {
+            return scanOutputs;
+        }
+
+        public void setScanOutputs(Output[] scanOutputs)
+        {
+            this.scanOutputs = scanOutputs;
+        }
+
+        public Output[] getPreAggrOutputs()
+        {
+            return preAggrOutputs;
+        }
+
+        public void setPreAggrOutputs(Output[] preAggrOutputs)
+        {
+            this.preAggrOutputs = preAggrOutputs;
+        }
+
+        public Output getFinalAggrOutput()
+        {
+            return finalAggrOutput;
+        }
+
+        public void setFinalAggrOutput(Output finalAggrOutput)
+        {
+            this.finalAggrOutput = finalAggrOutput;
+        }
     }
 }
