@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.domain.OutputInfo;
 import io.pixelsdb.pixels.executor.lambda.domain.StorageInfo;
 import io.pixelsdb.pixels.executor.lambda.input.AggregationInput;
-import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
+import io.pixelsdb.pixels.executor.lambda.output.AggregationOutput;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -47,14 +47,14 @@ public class TestAggregationWorker
         aggregationInput.setParallelism(8);
         aggregationInput.setInputStorage(new StorageInfo(Storage.Scheme.s3, null, null, null));
         aggregationInput.setInputFiles(Arrays.asList(
-                "pixels-lambda-test/orders_final_aggr_0",
-                "pixels-lambda-test/orders_final_aggr_1",
-                "pixels-lambda-test/orders_final_aggr_2",
-                "pixels-lambda-test/orders_final_aggr_3",
-                "pixels-lambda-test/orders_final_aggr_4",
-                "pixels-lambda-test/orders_final_aggr_5",
-                "pixels-lambda-test/orders_final_aggr_6",
-                "pixels-lambda-test/orders_final_aggr_7"));
+                "pixels-lambda-test/orders_partial_aggr_0",
+                "pixels-lambda-test/orders_partial_aggr_1",
+                "pixels-lambda-test/orders_partial_aggr_2",
+                "pixels-lambda-test/orders_partial_aggr_3",
+                "pixels-lambda-test/orders_partial_aggr_4",
+                "pixels-lambda-test/orders_partial_aggr_5",
+                "pixels-lambda-test/orders_partial_aggr_6",
+                "pixels-lambda-test/orders_partial_aggr_7"));
         aggregationInput.setGroupKeyColumnNames(new String[] {"o_orderstatus_2", "o_orderdate_3"});
         aggregationInput.setGroupKeyColumnProjection(new boolean[] {true, true});
         aggregationInput.setResultColumnNames(new String[] {"sum_o_orderkey_0"});
@@ -65,7 +65,7 @@ public class TestAggregationWorker
 
         System.out.println(JSON.toJSONString(aggregationInput));
 
-        ScanOutput output = (ScanOutput) InvokerFactory.Instance()
+        AggregationOutput output = (AggregationOutput) InvokerFactory.Instance()
                 .getInvoker(WorkerType.AGGREGATION).invoke(aggregationInput).get();
         System.out.println(Joiner.on(",").join(output.getOutputs()));
         System.out.println(Joiner.on(",").join(output.getRowGroupNums()));

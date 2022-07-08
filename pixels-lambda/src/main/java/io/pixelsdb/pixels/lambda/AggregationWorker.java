@@ -123,14 +123,15 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             checkArgument(inputSchema.getChildren().size() == includeCols.length,
                     "input file does not contain the correct number of columns");
             int[] groupKeyColumnIds = new int[groupKeyColumnNames.length];
+            int columnId = 0;
             for (int i = 0; i < groupKeyColumnIds.length; ++i)
             {
-                groupKeyColumnIds[i] = i;
+                groupKeyColumnIds[i] = columnId++;
             }
             int[] aggrColumnIds = new int[resultColumnNames.length];
             for (int i = 0; i < aggrColumnIds.length; ++i)
             {
-                aggrColumnIds[i] = i;
+                aggrColumnIds[i] = columnId++;
             }
             Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema,
                     groupKeyColumnNames, groupKeyColumnIds, groupKeyColumnProj,
