@@ -84,7 +84,6 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             long queryId = event.getQueryId();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
             boolean partialAggregationPresent = event.isPartialAggregationPresent();
-            PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
             checkArgument(partialAggregationPresent != event.getOutput().isRandomFileName(),
                     "partial aggregation and random output file name should not equal");
             String outputFolder = event.getOutput().getPath();
@@ -113,11 +112,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             TypeDescription inputSchema = getFileSchema(s3,
                     inputSplits.get(0).getInputInfos().get(0).getPath(), false);
             inputSchema = getResultSchema(inputSchema, includeCols);
-            boolean[] groupKeyProjection = new boolean[partialAggregationInfo.getGroupKeyColumnAlias().length];
-            Arrays.fill(groupKeyProjection, true);
+
             Aggregator aggregator;
             if (partialAggregationPresent)
             {
+                PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
+                requireNonNull(partialAggregationInfo, "partialAggregationInfo");
+                boolean[] groupKeyProjection = new boolean[partialAggregationInfo.getGroupKeyColumnAlias().length];
+                Arrays.fill(groupKeyProjection, true);
                 aggregator = new Aggregator(rowBatchSize, inputSchema,
                         partialAggregationInfo.getGroupKeyColumnAlias(),
                         partialAggregationInfo.getGroupKeyColumnIds(), groupKeyProjection,
