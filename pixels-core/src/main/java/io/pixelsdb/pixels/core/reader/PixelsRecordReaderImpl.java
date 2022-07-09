@@ -85,13 +85,15 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private int[] targetRGs;
     /**
      * The target columns to read after matching reader option.
-     * Each element represents a column id (column's index in the schema).
+     * Each element represents a column id (column's index in the file schema).
      * Different from resultColumns, the ith column id in targetColumns
-     * corresponds to the ith true value in this.includedColumns.
+     * corresponds to the ith true value in this.includedColumns, i.e.,
+     * The elements in targetColumns and resultColumns are in different order,
+     * but they are all the index of the columns in the file schema.
      */
     private int[] targetColumns;
     /**
-     * The ith element in resultColumns is the column id (column's index in the schema)
+     * The ith element in resultColumns is the column id (column's index in the file schema)
      * of ith included column in the read option. The order of columns in the read option's
      * includedCols may be arbitrary, not related to the column order in schema.
      */
