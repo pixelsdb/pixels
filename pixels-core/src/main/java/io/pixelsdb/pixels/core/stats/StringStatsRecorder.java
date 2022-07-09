@@ -26,6 +26,7 @@ import io.airlift.slice.Slices;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -42,9 +43,7 @@ public class StringStatsRecorder
     private String maximum = null;
     private long sum = 0L;
 
-    StringStatsRecorder()
-    {
-    }
+    StringStatsRecorder() { }
 
     StringStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -80,18 +79,19 @@ public class StringStatsRecorder
         checkArgument(repetitions > 0, "repetitions is non-positive");
         if (minimum == null)
         {
-            minimum = maximum = value;
+            minimum = value;
         }
-        else
+        else if (value.compareTo(minimum) < 0)
         {
-            if (value.compareTo(minimum) < 0)
-            {
-                minimum = value;
-            }
-            if (value.compareTo(maximum) > 0)
-            {
-                maximum = value;
-            }
+            minimum = value;
+        }
+        if (maximum == null)
+        {
+            maximum = value;
+        }
+        else if (value.compareTo(maximum) > 0)
+        {
+            maximum = value;
         }
         sum += (long) value.length() * repetitions;
         numberOfValues += repetitions;
@@ -118,36 +118,33 @@ public class StringStatsRecorder
         if (other instanceof StringStatsRecorder)
         {
             StringStatsRecorder strStat = (StringStatsRecorder) other;
-            if (minimum == null)
+            if (strStat.minimum != null)
             {
-                if (strStat.minimum != null)
+                if (minimum == null)
                 {
                     minimum = strStat.minimum;
-                    maximum = strStat.maximum;
+                }
+                else if (strStat.minimum.compareTo(minimum) < 0)
+                {
+                    minimum = strStat.minimum;
                 }
             }
-            else
+            if (strStat.maximum != null)
             {
-                if (strStat.minimum != null)
+                if (maximum == null)
                 {
-                    if (strStat.minimum.compareTo(minimum) < 0)
-                    {
-                        minimum = strStat.minimum;
-                    }
-                    if (strStat.maximum.compareTo(maximum) > 0)
-                    {
-                        maximum = strStat.maximum;
-                    }
+                    maximum = strStat.maximum;
+                }
+                else if (strStat.maximum.compareTo(maximum) < 0)
+                {
+                    maximum = strStat.maximum;
                 }
             }
             sum += strStat.sum;
         }
         else
         {
-            if (isStatsExists() && minimum != null)
-            {
-                throw new IllegalArgumentException("Incompatible merging of string column statistics");
-            }
+            throw new IllegalArgumentException("Incompatible merging of string column statistics");
         }
         super.merge(other);
     }
@@ -161,9 +158,13 @@ public class StringStatsRecorder
         if (minimum != null)
         {
             strBuilder.setMinimum(minimum);
-            strBuilder.setMaximum(maximum);
-            strBuilder.setSum(sum);
+
         }
+        if (maximum != null)
+        {
+            strBuilder.setMaximum(maximum);
+        }
+        strBuilder.setSum(sum);
         builder.setStringStatistics(strBuilder);
         builder.setNumberOfValues(numberOfValues);
         return builder;
@@ -181,6 +182,18 @@ public class StringStatsRecorder
         return Slices.utf8Slice(maximum);
     }
 
+    @Override
+    public boolean hasMinimum()
+    {
+        return minimum != null;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return maximum != null;
+    }
+
     /**
      * Get the total length of all strings
      *
@@ -196,15 +209,18 @@ public class StringStatsRecorder
     public String toString()
     {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (getNumberOfValues() != 0)
+        if (minimum != null)
         {
             buf.append(" min: ");
             buf.append(getMinimum());
+        }
+        if (maximum != null)
+        {
             buf.append(" max: ");
             buf.append(getMaximum());
-            buf.append(" sum: ");
-            buf.append(sum);
         }
+        buf.append(" sum: ");
+        buf.append(sum);
         buf.append(" numberOfValues: ");
         buf.append(numberOfValues);
         return buf.toString();
@@ -232,11 +248,11 @@ public class StringStatsRecorder
         {
             return false;
         }
-        if (minimum != null ? !minimum.equals(that.minimum) : that.minimum != null)
+        if (!Objects.equals(minimum, that.minimum))
         {
             return false;
         }
-        if (maximum != null ? !maximum.equals(that.maximum) : that.maximum != null)
+        if (!Objects.equals(maximum, that.maximum))
         {
             return false;
         }

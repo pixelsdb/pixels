@@ -22,11 +22,21 @@ package io.pixelsdb.pixels.core.stats;
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
  */
 public interface RangeStats<T>
 {
     T getMinimum();
 
     T getMaximum();
+
+    /**
+     * @return true if the minimum value is present.
+     */
+    boolean hasMinimum();
+
+    /**
+     * @return true if the maximum value is present.
+     */
+    boolean hasMaximum();
 }

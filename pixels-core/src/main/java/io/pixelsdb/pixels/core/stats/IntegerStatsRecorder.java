@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
  */
 public class IntegerStatsRecorder
         extends StatsRecorder implements IntegerColumnStats
@@ -33,11 +33,10 @@ public class IntegerStatsRecorder
     private long maximum = Long.MAX_VALUE;
     private long sum = 0L;
     private boolean hasMinimum = false;
+    private boolean hasMaximum = false;
     private boolean overflow = false;
 
-    IntegerStatsRecorder()
-    {
-    }
+    IntegerStatsRecorder() { }
 
     IntegerStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -50,6 +49,7 @@ public class IntegerStatsRecorder
         }
         if (intStat.hasMaximum())
         {
+            hasMaximum = true;
             maximum = intStat.getMaximum();
         }
         if (intStat.hasSum())
@@ -67,6 +67,7 @@ public class IntegerStatsRecorder
     {
         super.reset();
         hasMinimum = false;
+        hasMaximum = false;
         minimum = Long.MIN_VALUE;
         maximum = Long.MAX_VALUE;
         sum = 0L;
@@ -81,11 +82,15 @@ public class IntegerStatsRecorder
         {
             hasMinimum = true;
             minimum = value;
-            maximum = value;
         }
         else if (value < minimum)
         {
             minimum = value;
+        }
+        if (!hasMaximum)
+        {
+            hasMaximum = true;
+            maximum = value;
         }
         else if (value > maximum)
         {
@@ -108,19 +113,26 @@ public class IntegerStatsRecorder
         if (other instanceof IntegerStatsRecorder)
         {
             IntegerStatsRecorder intStat = (IntegerStatsRecorder) other;
-            if (!hasMinimum)
+            if (intStat.hasMinimum)
             {
-                hasMinimum = intStat.hasMinimum;
-                minimum = intStat.minimum;
-                maximum = intStat.maximum;
-            }
-            else if (intStat.hasMinimum)
-            {
-                if (intStat.minimum < minimum)
+                if (!hasMinimum)
+                {
+                    hasMinimum = true;
+                    minimum = intStat.minimum;
+                }
+                else if (intStat.minimum < minimum)
                 {
                     minimum = intStat.minimum;
                 }
-                if (intStat.maximum > maximum)
+            }
+            if (intStat.hasMaximum)
+            {
+                if (!hasMaximum)
+                {
+                    hasMaximum = true;
+                    maximum = intStat.maximum;
+                }
+                else if (intStat.maximum > maximum)
                 {
                     maximum = intStat.maximum;
                 }
@@ -156,6 +168,9 @@ public class IntegerStatsRecorder
         if (hasMinimum)
         {
             intBuilder.setMinimum(minimum);
+        }
+        if (hasMaximum)
+        {
             intBuilder.setMaximum(maximum);
         }
         if (!overflow)
@@ -180,6 +195,18 @@ public class IntegerStatsRecorder
     }
 
     @Override
+    public boolean hasMinimum()
+    {
+        return hasMinimum;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return hasMaximum;
+    }
+
+    @Override
     public boolean isSumDefined()
     {
         return !overflow;
@@ -199,6 +226,10 @@ public class IntegerStatsRecorder
         {
             buf.append(" min: ");
             buf.append(minimum);
+        }
+        if (hasMaximum)
+        {
+
             buf.append(" max: ");
             buf.append(maximum);
         }
@@ -230,6 +261,11 @@ public class IntegerStatsRecorder
 
         IntegerStatsRecorder that = (IntegerStatsRecorder) o;
 
+        if (hasMinimum != that.hasMinimum || hasMaximum != that.hasMaximum)
+        {
+            return false;
+        }
+
         if (minimum != that.minimum)
         {
             return false;
@@ -242,10 +278,7 @@ public class IntegerStatsRecorder
         {
             return false;
         }
-        if (hasMinimum != that.hasMinimum)
-        {
-            return false;
-        }
+
         if (overflow != that.overflow)
         {
             return false;
@@ -267,6 +300,7 @@ public class IntegerStatsRecorder
         result = 31 * result + (int) (sum ^ (sum >>> 32));
         result = 31 * result + (int) (numberOfValues ^ (numberOfValues >>> 32));
         result = 31 * result + (hasMinimum ? 1 : 0);
+        result = 31 * result + (hasMaximum ? 1 : 0);
         result = 31 * result + (overflow ? 1 : 0);
         return result;
     }

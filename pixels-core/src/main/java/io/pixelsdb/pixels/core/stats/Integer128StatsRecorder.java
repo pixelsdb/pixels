@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -35,10 +35,9 @@ public class Integer128StatsRecorder
     private Integer128 minimum = MIN_VALUE;
     private Integer128 maximum = MAX_VALUE;
     private boolean hasMinimum = false;
+    private boolean hasMaximum = false;
 
-    Integer128StatsRecorder()
-    {
-    }
+    Integer128StatsRecorder() { }
 
     Integer128StatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -62,6 +61,7 @@ public class Integer128StatsRecorder
         long maxHigh = MAX_HIGH, maxLow = MAX_LOW;
         if (int128Stat.hasMaximumLow())
         {
+            hasMaximum = true;
             maxLow = int128Stat.getMaximumLow();
             maxHigh = maxLow >> 63;
         }
@@ -79,6 +79,7 @@ public class Integer128StatsRecorder
     {
         super.reset();
         hasMinimum = false;
+        hasMaximum = false;
         minimum = MIN_VALUE;
         maximum = MAX_VALUE;
     }
@@ -97,13 +98,16 @@ public class Integer128StatsRecorder
         {
             hasMinimum = true;
             minimum.update(high, low);
-            maximum.update(high, low);
-            return;
         }
-
-        if (minimum.compareTo(high, low) > 0)
+        else if (minimum.compareTo(high, low) > 0)
         {
             minimum.update(high, low);
+        }
+
+        if (!hasMaximum)
+        {
+            hasMaximum = true;
+            maximum.update(high, low);
         }
         else if (maximum.compareTo(high, low) < 0)
         {
@@ -117,20 +121,26 @@ public class Integer128StatsRecorder
         if (other instanceof Integer128StatsRecorder)
         {
             Integer128StatsRecorder int128Stat = (Integer128StatsRecorder) other;
-            if (!hasMinimum)
+            if (int128Stat.hasMinimum)
             {
-                hasMinimum = int128Stat.hasMinimum;
-                minimum = int128Stat.minimum;
-                maximum = int128Stat.maximum;
-            }
-            else if (int128Stat.hasMinimum)
-            {
-                if (int128Stat.minimum.compareTo(this.minimum) < 0)
+                if (!hasMinimum)
+                {
+                    hasMinimum = true;
+                    minimum = int128Stat.minimum;
+                }
+                else if (int128Stat.minimum.compareTo(this.minimum) < 0)
                 {
                     minimum = int128Stat.minimum;
                 }
-
-                if (int128Stat.maximum.compareTo(this.maximum) > 0)
+            }
+            if (int128Stat.hasMaximum)
+            {
+                if (!hasMaximum)
+                {
+                    hasMaximum = true;
+                    maximum = int128Stat.maximum;
+                }
+                else if (int128Stat.maximum.compareTo(this.maximum) > 0)
                 {
                     maximum = int128Stat.maximum;
                 }
@@ -138,10 +148,7 @@ public class Integer128StatsRecorder
         }
         else
         {
-            if (isStatsExists() && hasMinimum)
-            {
-                throw new IllegalArgumentException("Incompatible merging of integer128 column statistics");
-            }
+            throw new IllegalArgumentException("Incompatible merging of integer128 column statistics");
         }
         super.merge(other);
     }
@@ -156,6 +163,9 @@ public class Integer128StatsRecorder
         {
             int128Builder.setMinimumHigh(minimum.getHigh());
             int128Builder.setMinimumLow(minimum.getLow());
+        }
+        if (hasMaximum)
+        {
             int128Builder.setMaximumHigh(maximum.getHigh());
             int128Builder.setMaximumLow(maximum.getLow());
         }
@@ -167,13 +177,25 @@ public class Integer128StatsRecorder
     @Override
     public Integer128 getMinimum()
     {
-        return this.minimum;
+        return minimum;
     }
 
     @Override
     public Integer128 getMaximum()
     {
         return maximum;
+    }
+
+    @Override
+    public boolean hasMinimum()
+    {
+        return hasMinimum;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return hasMaximum;
     }
 
     @Override
@@ -190,6 +212,9 @@ public class Integer128StatsRecorder
         {
             buf.append(" min: ");
             buf.append(minimum);
+        }
+        if (hasMaximum)
+        {
             buf.append(" max: ");
             buf.append(maximum);
         }
@@ -216,7 +241,7 @@ public class Integer128StatsRecorder
 
         Integer128StatsRecorder that = (Integer128StatsRecorder) o;
 
-        if (hasMinimum != that.hasMinimum)
+        if (hasMinimum != that.hasMinimum || hasMaximum != that.hasMaximum)
         {
             return false;
         }
@@ -239,6 +264,7 @@ public class Integer128StatsRecorder
         result = 31 * result + maximum.hashCode();
         result = 31 * result + (int) (numberOfValues ^ (numberOfValues >>> 32));
         result = 31 * result + (hasMinimum ? 1 : 0);
+        result = 31 * result + (hasMaximum ? 1 : 0);
         return result;
     }
 

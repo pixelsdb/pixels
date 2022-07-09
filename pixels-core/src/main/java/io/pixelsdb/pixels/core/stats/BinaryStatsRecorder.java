@@ -31,9 +31,7 @@ public class BinaryStatsRecorder
 {
     private long sum = 0L;
 
-    BinaryStatsRecorder()
-    {
-    }
+    BinaryStatsRecorder() { }
 
     BinaryStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
