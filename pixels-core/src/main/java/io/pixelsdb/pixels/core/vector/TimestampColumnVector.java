@@ -58,7 +58,7 @@ public class TimestampColumnVector extends ColumnVector
         return (int) (micros % MICROS_PER_SEC * NANOS_PER_MICROS);
     }
 
-    private static long timestampToMicros(Timestamp timestamp)
+    public static long timestampToMicros(Timestamp timestamp)
     {
         return timestamp.getTime() * MICROS_PER_MILLIS +
                 timestamp.getNanos() % NANOS_PER_MILLIS / NANOS_PER_MICROS;

@@ -32,13 +32,12 @@ import java.sql.Time;
 public class TimeStatsRecorder
         extends StatsRecorder implements TimeColumnStats
 {
-    private boolean hasMinMax = false;
-    private int minimum = Integer.MAX_VALUE;
-    private int maximum = Integer.MIN_VALUE;
+    private boolean hasMinimum = false;
+    private boolean hasMaximum = false;
+    private int minimum = Integer.MIN_VALUE;
+    private int maximum = Integer.MAX_VALUE;
 
-    TimeStatsRecorder()
-    {
-    }
+    TimeStatsRecorder() { }
 
     TimeStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -47,12 +46,12 @@ public class TimeStatsRecorder
         if (tState.hasMinimum())
         {
             minimum = tState.getMinimum();
-            hasMinMax = true;
+            hasMinimum = true;
         }
         if (tState.hasMaximum())
         {
             maximum = tState.getMaximum();
-            hasMinMax = true;
+            hasMaximum = true;
         }
     }
 
@@ -60,7 +59,8 @@ public class TimeStatsRecorder
     public void reset()
     {
         super.reset();
-        hasMinMax = false;
+        hasMinimum = false;
+        hasMaximum = false;
         minimum = Integer.MIN_VALUE;
         maximum = Integer.MAX_VALUE;
     }
@@ -68,12 +68,21 @@ public class TimeStatsRecorder
     @Override
     public void updateTime(int value)
     {
-        if (hasMinMax)
+        if (hasMinimum)
         {
             if (value < minimum)
             {
                 minimum = value;
             }
+        }
+        else
+        {
+            minimum = value;
+            hasMinimum = true;
+        }
+
+        if (hasMaximum)
+        {
             if (value > maximum)
             {
                 maximum = value;
@@ -81,8 +90,8 @@ public class TimeStatsRecorder
         }
         else
         {
-            minimum = maximum = value;
-            hasMinMax = true;
+            maximum = value;
+            hasMaximum = true;
         }
         numberOfValues++;
     }
@@ -90,23 +99,7 @@ public class TimeStatsRecorder
     @Override
     public void updateTime(Time value)
     {
-        if (hasMinMax)
-        {
-            if (value.getTime() < minimum)
-            {
-                minimum = (int) value.getTime();
-            }
-            if (value.getTime() > maximum)
-            {
-                maximum = (int) value.getTime();
-            }
-        }
-        else
-        {
-            minimum = maximum = (int) value.getTime();
-            hasMinMax = true;
-        }
-        numberOfValues++;
+        this.updateTime((int) value.getTime());
     }
 
     @Override
@@ -115,29 +108,41 @@ public class TimeStatsRecorder
         if (other instanceof TimestampColumnStats)
         {
             TimeStatsRecorder tStat = (TimeStatsRecorder) other;
-            if (hasMinMax)
+            if (tStat.hasMinimum)
             {
-                if (tStat.getMinimum() < minimum)
+                if (hasMinimum)
                 {
-                    minimum = tStat.getMinimum();
+                    if (tStat.minimum < minimum)
+                    {
+                        minimum = tStat.minimum;
+                    }
                 }
-                if (tStat.getMaximum() > maximum)
+                else
                 {
-                    maximum = tStat.getMaximum();
+                    minimum = tStat.minimum;
+                    hasMinimum = true;
                 }
             }
-            else
+
+            if (tStat.hasMaximum)
             {
-                minimum = tStat.getMinimum();
-                maximum = tStat.getMaximum();
+                if (hasMaximum)
+                {
+                    if (tStat.maximum > maximum)
+                    {
+                        maximum = tStat.maximum;
+                    }
+                }
+                else
+                {
+                    maximum = tStat.maximum;
+                    hasMaximum = true;
+                }
             }
         }
         else
         {
-            if (isStatsExists() && hasMinMax)
-            {
-                throw new IllegalArgumentException("Incompatible merging of time column statistics");
-            }
+            throw new IllegalArgumentException("Incompatible merging of time column statistics");
         }
         super.merge(other);
     }
@@ -148,9 +153,12 @@ public class TimeStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.TimeStatistic.Builder tBuilder =
                 PixelsProto.TimeStatistic.newBuilder();
-        if (hasMinMax)
+        if (hasMinimum)
         {
             tBuilder.setMinimum(minimum);
+        }
+        if (hasMaximum)
+        {
             tBuilder.setMaximum(maximum);
         }
         builder.setTimeStatistics(tBuilder);
@@ -171,13 +179,28 @@ public class TimeStatsRecorder
     }
 
     @Override
+    public boolean hasMinimum()
+    {
+        return hasMinimum;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return hasMaximum;
+    }
+
+    @Override
     public String toString()
     {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (hasMinMax)
+        if (hasMinimum)
         {
             buf.append(" min: ");
             buf.append(getMinimum());
+        }
+        if (hasMaximum)
+        {
             buf.append(" max: ");
             buf.append(getMaximum());
         }
@@ -204,11 +227,11 @@ public class TimeStatsRecorder
 
         TimeStatsRecorder that = (TimeStatsRecorder) o;
 
-        if (hasMinMax ? !(minimum == that.minimum) : that.hasMinMax)
+        if (hasMinimum ? !(minimum == that.minimum) : that.hasMinimum)
         {
             return false;
         }
-        if (hasMinMax ? !(maximum == that.maximum) : that.hasMinMax)
+        if (hasMaximum ? !(maximum == that.maximum) : that.hasMaximum)
         {
             return false;
         }
@@ -225,6 +248,8 @@ public class TimeStatsRecorder
     public int hashCode()
     {
         int result = super.hashCode();
+        result = 15 * result + (hasMinimum ? 1 : 0);
+        result = 15 * result + (hasMaximum ? 1 : 0);
         result = 15 * result + (minimum ^ (minimum >>> 16));
         result = 15 * result + (maximum ^ (maximum >>> 16));
         return result;

@@ -41,9 +41,7 @@ public class StatsRecorder
     long numberOfValues = 0L;
     private boolean hasNull = false;
 
-    StatsRecorder()
-    {
-    }
+    StatsRecorder() { }
 
     StatsRecorder(PixelsProto.ColumnStatistic statistic)
     {

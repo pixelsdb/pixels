@@ -34,13 +34,12 @@ import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 public class DateStatsRecorder
         extends StatsRecorder implements DateColumnStats
 {
-    private boolean hasMinMax = false;
-    private long minimum = Integer.MAX_VALUE;
-    private long maximum = Integer.MIN_VALUE;
+    private boolean hasMinimum = false;
+    private boolean hasMaximum = false;
+    private long minimum = Integer.MIN_VALUE;
+    private long maximum = Integer.MAX_VALUE;
 
-    DateStatsRecorder()
-    {
-    }
+    DateStatsRecorder() { }
 
     DateStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -49,12 +48,12 @@ public class DateStatsRecorder
         if (dateState.hasMinimum())
         {
             minimum = dateState.getMinimum();
-            hasMinMax = true;
+            hasMinimum = true;
         }
         if (dateState.hasMaximum())
         {
             maximum = dateState.getMaximum();
-            hasMinMax = true;
+            hasMaximum = true;
         }
     }
 
@@ -62,7 +61,8 @@ public class DateStatsRecorder
     public void reset()
     {
         super.reset();
-        hasMinMax = false;
+        hasMinimum = false;
+        hasMaximum = false;
         minimum = Integer.MIN_VALUE;
         maximum = Integer.MAX_VALUE;
     }
@@ -70,12 +70,20 @@ public class DateStatsRecorder
     @Override
     public void updateDate(int value)
     {
-        if (hasMinMax)
+        if (hasMinimum)
         {
             if (value < minimum)
             {
                 minimum = value;
             }
+        }
+        else
+        {
+            minimum = value;
+            hasMinimum = true;
+        }
+        if (hasMaximum)
+        {
             if (value > maximum)
             {
                 maximum = value;
@@ -83,8 +91,8 @@ public class DateStatsRecorder
         }
         else
         {
-            minimum = maximum = value;
-            hasMinMax = true;
+            maximum = value;
+            hasMaximum = true;
         }
         numberOfValues++;
     }
@@ -92,24 +100,7 @@ public class DateStatsRecorder
     @Override
     public void updateDate(Date value)
     {
-        if (hasMinMax)
-        {
-            int v = millisToDay(value.getTime());
-            if (value.getTime() < minimum)
-            {
-                minimum = v;
-            }
-            if (value.getTime() > maximum)
-            {
-                maximum = v;
-            }
-        }
-        else
-        {
-            minimum = maximum = millisToDay(value.getTime());
-            hasMinMax = true;
-        }
-        numberOfValues++;
+        this.updateDate(millisToDay(value.getTime()));
     }
 
     @Override
@@ -118,29 +109,38 @@ public class DateStatsRecorder
         if (other instanceof DateColumnStats)
         {
             DateStatsRecorder dateStat = (DateStatsRecorder) other;
-            if (hasMinMax)
+            if (dateStat.hasMinimum)
             {
-                if (dateStat.getMinimum() < minimum)
+                if (hasMinimum)
+                {
+                    if (dateStat.getMinimum() < minimum)
+                    {
+                        minimum = dateStat.getMinimum();
+                    }
+                } else
                 {
                     minimum = dateStat.getMinimum();
-                }
-                if (dateStat.getMaximum() > maximum)
-                {
-                    maximum = dateStat.getMaximum();
+                    hasMinimum = true;
                 }
             }
-            else
+            if (dateStat.hasMaximum)
             {
-                minimum = dateStat.getMinimum();
-                maximum = dateStat.getMaximum();
+                if (hasMinimum)
+                {
+                    if (dateStat.getMaximum() > maximum)
+                    {
+                        maximum = dateStat.getMaximum();
+                    }
+                } else
+                {
+                    maximum = dateStat.getMaximum();
+                    hasMaximum = true;
+                }
             }
         }
         else
         {
-            if (isStatsExists() && hasMinMax)
-            {
-                throw new IllegalArgumentException("Incompatible merging of date column statistics");
-            }
+            throw new IllegalArgumentException("Incompatible merging of date column statistics");
         }
         super.merge(other);
     }
@@ -151,9 +151,12 @@ public class DateStatsRecorder
         PixelsProto.ColumnStatistic.Builder builder = super.serialize();
         PixelsProto.DateStatistic.Builder dateBuilder =
                 PixelsProto.DateStatistic.newBuilder();
-        if (hasMinMax)
+        if (hasMinimum)
         {
             dateBuilder.setMinimum((int) minimum);
+        }
+        if (hasMaximum)
+        {
             dateBuilder.setMaximum((int) maximum);
         }
         builder.setDateStatistics(dateBuilder);
@@ -174,13 +177,28 @@ public class DateStatsRecorder
     }
 
     @Override
+    public boolean hasMinimum()
+    {
+        return hasMinimum;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return hasMaximum;
+    }
+
+    @Override
     public String toString()
     {
         StringBuilder buf = new StringBuilder(super.toString());
-        if (hasMinMax)
+        if (hasMinimum)
         {
             buf.append(" min: ");
             buf.append(getMinimum());
+        }
+        if (hasMaximum)
+        {
             buf.append(" max: ");
             buf.append(getMaximum());
         }
@@ -207,11 +225,11 @@ public class DateStatsRecorder
 
         DateStatsRecorder that = (DateStatsRecorder) o;
 
-        if (hasMinMax ? !(minimum == that.minimum) : that.hasMinMax)
+        if (hasMinimum ? !(minimum == that.minimum) : that.hasMinimum)
         {
             return false;
         }
-        if (hasMinMax ? !(maximum == that.maximum) : that.hasMinMax)
+        if (hasMaximum ? !(maximum == that.maximum) : that.hasMaximum)
         {
             return false;
         }
@@ -228,6 +246,8 @@ public class DateStatsRecorder
     public int hashCode()
     {
         int result = super.hashCode();
+        result = 15 * result + (hasMinimum ? 1 : 0);
+        result = 15 * result + (hasMaximum ? 1 : 0);
         result = 15 * result + (int)(minimum ^ (minimum >>> 16));
         result = 15 * result + (int)(maximum ^ (maximum >>> 16));
         return result;

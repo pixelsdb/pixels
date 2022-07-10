@@ -31,9 +31,7 @@ public class BooleanStatsRecorder
 {
     private long trueCount = 0L;
 
-    BooleanStatsRecorder()
-    {
-    }
+    BooleanStatsRecorder() { }
 
     BooleanStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {

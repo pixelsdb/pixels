@@ -24,19 +24,18 @@ import io.pixelsdb.pixels.core.PixelsProto;
 /**
  * pixels
  *
- * @author guodong
+ * @author guodong, hank
  */
 public class DoubleStatsRecorder
         extends StatsRecorder implements DoubleColumnStats
 {
     private boolean hasMinimum = false;
+    private boolean hasMaximum = false;
     private double minimum = Double.MIN_VALUE;
     private double maximum = Double.MAX_VALUE;
     private double sum = 0;
 
-    DoubleStatsRecorder()
-    {
-    }
+    DoubleStatsRecorder() { }
 
     DoubleStatsRecorder(PixelsProto.ColumnStatistic statistic)
     {
@@ -49,6 +48,7 @@ public class DoubleStatsRecorder
         }
         if (dbStat.hasMaximum())
         {
+            hasMaximum = true;
             maximum = dbStat.getMaximum();
         }
         if (dbStat.hasSum())
@@ -62,6 +62,7 @@ public class DoubleStatsRecorder
     {
         super.reset();
         this.hasMinimum = false;
+        this.hasMaximum = false;
         this.minimum = Double.MIN_VALUE;
         this.maximum = Double.MAX_VALUE;
         this.sum = 0;
@@ -74,11 +75,15 @@ public class DoubleStatsRecorder
         {
             hasMinimum = true;
             minimum = value;
-            maximum = value;
         }
         else if (value < minimum)
         {
             minimum = value;
+        }
+        if (!hasMaximum)
+        {
+            hasMaximum = true;
+            maximum = value;
         }
         else if (value > maximum)
         {
@@ -91,22 +96,7 @@ public class DoubleStatsRecorder
     @Override
     public void updateFloat(float value)
     {
-        if (!hasMinimum)
-        {
-            hasMinimum = true;
-            minimum = value;
-            maximum = value;
-        }
-        else if (value < minimum)
-        {
-            minimum = value;
-        }
-        else if (value > maximum)
-        {
-            maximum = value;
-        }
-        sum += value;
-        numberOfValues++;
+        this.updateDouble(value);
     }
 
     @Override
@@ -115,28 +105,35 @@ public class DoubleStatsRecorder
         if (other instanceof DoubleColumnStats)
         {
             DoubleStatsRecorder dbStat = (DoubleStatsRecorder) other;
-            if (!hasMinimum)
+            if (dbStat.hasMinimum)
             {
-                hasMinimum = dbStat.hasMinimum;
-                minimum = dbStat.minimum;
-                maximum = dbStat.maximum;
+                if (!hasMinimum)
+                {
+                    hasMinimum = true;
+                    minimum = dbStat.minimum;
+                }
+                else if (dbStat.minimum < minimum)
+                {
+                    minimum = dbStat.minimum;
+                }
             }
-            else if (dbStat.minimum < minimum)
+            if (dbStat.hasMaximum)
             {
-                minimum = dbStat.minimum;
-            }
-            else if (dbStat.maximum > maximum)
-            {
-                maximum = dbStat.maximum;
+                if (!hasMaximum)
+                {
+                    hasMinimum = true;
+                    maximum = dbStat.maximum;
+                }
+                else if (dbStat.maximum > maximum)
+                {
+                    maximum = dbStat.maximum;
+                }
             }
             sum += dbStat.sum;
         }
         else
         {
-            if (isStatsExists() && hasMinimum)
-            {
-                throw new IllegalArgumentException("Incompatible merging of double column statistics");
-            }
+            throw new IllegalArgumentException("Incompatible merging of double column statistics");
         }
         super.merge(other);
     }
@@ -150,6 +147,9 @@ public class DoubleStatsRecorder
         if (hasMinimum)
         {
             dbBuilder.setMinimum(minimum);
+        }
+        if (hasMaximum)
+        {
             dbBuilder.setMaximum(maximum);
         }
         dbBuilder.setSum(sum);
@@ -171,6 +171,18 @@ public class DoubleStatsRecorder
     }
 
     @Override
+    public boolean hasMinimum()
+    {
+        return hasMinimum;
+    }
+
+    @Override
+    public boolean hasMaximum()
+    {
+        return hasMaximum;
+    }
+
+    @Override
     public double getSum()
     {
         return sum;
@@ -184,6 +196,9 @@ public class DoubleStatsRecorder
         {
             buf.append(" min: ");
             buf.append(minimum);
+        }
+        if (hasMaximum)
+        {
             buf.append(" max: ");
             buf.append(maximum);
         }
@@ -212,7 +227,7 @@ public class DoubleStatsRecorder
 
         DoubleStatsRecorder that = (DoubleStatsRecorder) o;
 
-        if (hasMinimum != that.hasMinimum)
+        if (hasMinimum != that.hasMinimum || hasMaximum != that.hasMaximum)
         {
             return false;
         }
@@ -243,6 +258,7 @@ public class DoubleStatsRecorder
         int result = super.hashCode();
         long temp;
         result = 31 * result + (hasMinimum ? 1 : 0);
+        result = 31 * result + (hasMaximum ? 1 : 0);
         temp = Double.doubleToLongBits(minimum);
         result = 31 * result + (int) (temp ^ (temp >>> 32));
         temp = Double.doubleToLongBits(maximum);
