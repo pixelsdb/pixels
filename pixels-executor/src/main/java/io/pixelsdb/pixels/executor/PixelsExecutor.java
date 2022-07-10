@@ -1220,7 +1220,7 @@ public class PixelsExecutor
                 {
                     List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
 
-                    if (capSplitSizeByStatistics)
+                    if (capSplitSizeByStatistics && !orderedPaths.isEmpty())
                     {
                         int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(table, orderedPaths.size());
                         if (splitSizeCap < splitSize)
@@ -1247,7 +1247,7 @@ public class PixelsExecutor
                 {
                     List<String> compactPaths = storage.listPaths(compactPath);
 
-                    if (capSplitSizeByStatistics)
+                    if (capSplitSizeByStatistics && !compactPaths.isEmpty())
                     {
                         int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(
                                 table, compactPaths.size() * rowGroupNum);
