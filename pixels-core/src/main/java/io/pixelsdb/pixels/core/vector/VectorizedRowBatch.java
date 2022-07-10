@@ -217,6 +217,38 @@ public class VectorizedRowBatch implements AutoCloseable
     }
 
     /**
+     * Project the column vectors from this row batch.
+     * <b>Note: </b> the returned row batch should not be reused by the PixelsRecordReader.
+     * @param projection indicates whether the column vector should be reserved,
+     *                   its length is the same as this.numCols and this.projectionSize
+     * @param projectionSize the number of true values, i.e., columns to reserve
+     * @return this row batch after projection.
+     */
+    public VectorizedRowBatch applyProjection(boolean[] projection, int projectionSize)
+    {
+        requireNonNull(projection, "projection is null");
+        checkArgument(this.cols.length == projection.length,
+                "this.cols.length does not equal projection.length");
+        checkArgument(projection.length >= projectionSize && projectionSize >=0,
+                "projection.length must be greater or equal to projectionSize, and projectionSize must be non-negative");
+
+        ColumnVector[] newCols = new ColumnVector[projectionSize];
+        for (int i = 0, j = 0; i < this.cols.length; ++i)
+        {
+            if (projection[i])
+            {
+                newCols[j++] = this.cols[i];
+            }
+            // does not reset the purged column vector for performance considerations.
+        }
+        this.cols = newCols;
+        this.projectionSize = projectionSize;
+        this.numCols = projectionSize;
+
+        return this;
+    }
+
+    /**
      * Resets the row batch to default state for the next read.
      * - sets selectedInUse to false
      * - sets size to 0
