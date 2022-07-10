@@ -60,10 +60,11 @@ public abstract class AbstractS3 implements Storage
 
     protected static int ConnTimeoutSec = 3600;
     protected static int ConnAcquisitionTimeoutSec = 3600;
-    protected static int clientServiceThreads = 20;
+    protected static int ClientServiceThreads = 20;
     protected static int MaxRequestConcurrency = 200;
-    protected static int maxPendingRequests = 50_000;
+    protected static int MaxPendingRequests = 50_000;
     protected final static boolean EnableCache;
+    protected static final int FilesPerDeleteRequest = 1000;
 
     protected S3Client s3 = null;
 
@@ -75,11 +76,11 @@ public abstract class AbstractS3 implements Storage
                 ConfigFactory.Instance().getProperty("s3.connection.timeout.sec"));
         ConnAcquisitionTimeoutSec = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.connection.acquisition.timeout.sec"));
-        clientServiceThreads = Integer.parseInt(
+        ClientServiceThreads = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.client.service.threads"));
         MaxRequestConcurrency = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.request.concurrency"));
-        maxPendingRequests = Integer.parseInt(
+        MaxPendingRequests = Integer.parseInt(
                 ConfigFactory.Instance().getProperty("s3.max.pending.requests"));
     }
 
@@ -212,7 +213,7 @@ public abstract class AbstractS3 implements Storage
             response = s3.listObjectsV2(request);
         }
         objects.addAll(response.contents());
-        List<Status> statuses = new ArrayList<>();
+        List<Status> statuses = new ArrayList<>(objects.size());
         Path op = new Path(path);
         for (S3Object object : objects)
         {
@@ -404,20 +405,26 @@ public abstract class AbstractS3 implements Storage
             }
             // The ListObjects S3 API, which is used by listStatus, is already recursive.
             List<Status> statuses = this.listStatus(path);
-            List<ObjectIdentifier> objectsToDelete = new ArrayList<>(statuses.size());
-            for (Status status : statuses)
+            int numStatuses = statuses.size();
+            for (int i = 0; i < numStatuses; )
             {
-                Path sub = new Path(status.getPath());
-                objectsToDelete.add(ObjectIdentifier.builder().key(sub.key).build());
-            }
-            try
-            {
-                DeleteObjectsRequest request = DeleteObjectsRequest.builder().bucket(p.bucket)
-                        .delete(Delete.builder().objects(objectsToDelete).build()).build();
-                s3.deleteObjects(request);
-            } catch (Exception e)
-            {
-                throw new IOException("Failed to delete objects under '" + path + "'.", e);
+                // Currently, AWS SDK only supports deleting 1000 objects per request.
+                List<ObjectIdentifier> objectsToDelete = new ArrayList<>(
+                        Math.min(numStatuses, FilesPerDeleteRequest));
+                for (int j = 0; j < FilesPerDeleteRequest && i < numStatuses; ++j, ++i)
+                {
+                    Path sub = new Path(statuses.get(i).getPath());
+                    objectsToDelete.add(ObjectIdentifier.builder().key(sub.key).build());
+                }
+                try
+                {
+                    DeleteObjectsRequest request = DeleteObjectsRequest.builder().bucket(p.bucket)
+                            .delete(Delete.builder().objects(objectsToDelete).build()).build();
+                    s3.deleteObjects(request);
+                } catch (Exception e)
+                {
+                    throw new IOException("Failed to delete objects under '" + path + "'.", e);
+                }
             }
         }
         else
