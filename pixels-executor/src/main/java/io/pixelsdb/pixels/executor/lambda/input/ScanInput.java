@@ -38,7 +38,10 @@ public class ScanInput extends Input
      * The information of the table to scan.
      */
     private ScanTableInfo tableInfo;
-
+    /**
+     * Whether the columns in tableInfo.columnsToRead should be included in the scan output.
+     */
+    private boolean[] scanProjection;
     /**
      * Whether the partial aggregation exists.
      */
@@ -58,8 +61,8 @@ public class ScanInput extends Input
      */
     public ScanInput() { }
 
-    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean partialAggregationPresent,
-                     PartialAggregationInfo partialAggregationInfo, OutputInfo output)
+    public ScanInput(long queryId, ScanTableInfo tableInfo, boolean[] scanProjection,
+                     boolean partialAggregationPresent, PartialAggregationInfo partialAggregationInfo, OutputInfo output)
     {
         this.queryId = queryId;
         this.tableInfo = tableInfo;
@@ -86,6 +89,16 @@ public class ScanInput extends Input
     public void setTableInfo(ScanTableInfo tableInfo)
     {
         this.tableInfo = tableInfo;
+    }
+
+    public boolean[] getScanProjection()
+    {
+        return scanProjection;
+    }
+
+    public void setScanProjection(boolean[] scanProjection)
+    {
+        this.scanProjection = scanProjection;
     }
 
     public boolean isPartialAggregationPresent()

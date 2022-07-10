@@ -29,7 +29,6 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.aggregation.Aggregator;
 import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
@@ -39,6 +38,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.StorageInfo;
 import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
 import io.pixelsdb.pixels.executor.lambda.output.ScanOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.executor.scan.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +82,10 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
+            requireNonNull(event.getTableInfo(), "even.tableInfo is null");
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
+            boolean[] scanProjection = requireNonNull(event.getScanProjection(),
+                    "event.scanProjection is null");
             boolean partialAggregationPresent = event.isPartialAggregationPresent();
             checkArgument(partialAggregationPresent != event.getOutput().isRandomFileName(),
                     "partial aggregation and random output file name should not equal");
@@ -108,16 +111,17 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             }
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-            logger.info("start get output schema");
-            TypeDescription inputSchema = getFileSchema(s3,
-                    inputSplits.get(0).getInputInfos().get(0).getPath(), false);
-            inputSchema = getResultSchema(inputSchema, includeCols);
+
 
             Aggregator aggregator;
             if (partialAggregationPresent)
             {
+                logger.info("start get output schema");
+                TypeDescription inputSchema = getFileSchema(s3,
+                        inputSplits.get(0).getInputInfos().get(0).getPath(), false);
+                inputSchema = getResultSchema(inputSchema, includeCols);
                 PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
-                requireNonNull(partialAggregationInfo, "partialAggregationInfo");
+                requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");
                 boolean[] groupKeyProjection = new boolean[partialAggregationInfo.getGroupKeyColumnAlias().length];
                 Arrays.fill(groupKeyProjection, true);
                 aggregator = new Aggregator(rowBatchSize, inputSchema,
@@ -132,6 +136,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 aggregator = null;
             }
+
             int outputId = 0;
             logger.info("start scan and aggregate");
             for (InputSplit inputSplit : inputSplits)
@@ -142,8 +147,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = scanFile(queryId, scanInputs, includeCols, filter, outputPath,
-                                encoding, storageInfo.getScheme(), partialAggregationPresent, aggregator);
+                        int rowGroupNum = scanFile(queryId, scanInputs, includeCols, scanProjection, filter,
+                                outputPath, encoding, storageInfo.getScheme(), partialAggregationPresent, aggregator);
                         if (rowGroupNum > 0)
                         {
                             scanOutput.addOutput(outputPath, rowGroupNum);
@@ -202,6 +207,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
      * @param columnsToRead the included columns
+     * @param scanProjection whether the column in columnsToRead is included in the scan output
      * @param filter the filter for the scan
      * @param outputPath fileName for the scan results
      * @param encoding whether encode the scan results or not
@@ -211,10 +217,11 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
      * @return the number of row groups that have been written into the output.
      */
     private int scanFile(long queryId, List<InputInfo> scanInputs, String[] columnsToRead,
-                         TableScanFilter filter, String outputPath, boolean encoding,
+                         boolean[] scanProjection, TableScanFilter filter, String outputPath, boolean encoding,
                          Storage.Scheme outputScheme, boolean partialAggregate, Aggregator aggregator)
     {
         PixelsWriter pixelsWriter = null;
+        Scanner scanner = null;
         if (partialAggregate)
         {
             requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
@@ -238,18 +245,20 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
 
+                if(scanner == null)
+                {
+                    scanner = new Scanner(rowBatchSize, rowBatchSchema, columnsToRead, scanProjection, filter);
+                }
                 if (pixelsWriter == null && !partialAggregate)
                 {
-                    pixelsWriter = getWriter(rowBatchSchema, outputScheme == Storage.Scheme.minio ? minio : s3,
+                    pixelsWriter = getWriter(scanner.getOutputSchema(),
+                            outputScheme == Storage.Scheme.minio ? minio : s3,
                             outputPath, encoding, false, null);
                 }
-                Bitmap filtered = new Bitmap(rowBatchSize, true);
-                Bitmap tmp = new Bitmap(rowBatchSize, false);
+
                 do
                 {
-                    rowBatch = recordReader.readBatch(rowBatchSize);
-                    filter.doFilter(rowBatch, filtered, tmp);
-                    rowBatch.applyFilter(filtered);
+                    rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
                     if (rowBatch.size > 0)
                     {
                         if (partialAggregate)

@@ -191,6 +191,9 @@ public class PixelsExecutor
             }
             preAggregate = numScanInputs > PreAggrThreshold;
 
+            boolean[] scanProjection = new boolean[originTable.getColumnNames().length];
+            Arrays.fill(scanProjection, true);
+
             for (int i = 0; i < inputSplits.size(); )
             {
                 ScanInput scanInput = new ScanInput();
@@ -208,6 +211,7 @@ public class PixelsExecutor
                 tableInfo.setTableName(originTable.getTableName());
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) originTable).getFilter()));
                 scanInput.setTableInfo(tableInfo);
+                scanInput.setScanProjection(scanProjection);
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = computeFinalAggrInServer && !preAggregate ? finalOutputBase : intermediateBase;
