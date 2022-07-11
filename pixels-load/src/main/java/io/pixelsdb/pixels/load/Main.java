@@ -31,12 +31,10 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.DateUtil;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
+import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -49,6 +47,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author tao
  * @author hank
@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * pixels loader command line tool
  * <p>
- * LOAD -f pixels -o s3://text-105/source -d pixels -t test_105 -n 220000 -r \t -c 16 -l s3://pixels-105/v-0-order
+ * LOAD -f pixels -o s3://text-105/source -d pixels -t test_105 -n 275000 -r \t -c 16 -l s3://pixels-105/v-0-order
  * -p false [optional, default false]
  * </p>
  * <p>
@@ -79,6 +79,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * </p>
  * <p>
  * COMPACT -s pixels -t test_105 -l 3 -n yes -c 8
+ * </p>
+ * <p>
+ * STAT -d s3://pixels-tpch/region/v-0-order/ -s tpch -t region
  * </p>
  */
 public class Main
@@ -117,7 +120,8 @@ public class Main
                         "LOAD\n" +
                         "QUERY\n" +
                         "COPY\n" +
-                        "COMPACT");
+                        "COMPACT\n" +
+                        "STAT");
                 System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                 continue;
             }
@@ -645,6 +649,7 @@ public class Main
                     MetadataService metadataService = new MetadataService(host, port);
                     List<Column> columns = metadataService.getColumns(schemaName, tableName, true);
                     Map<String, Column> columnMap = new HashMap<>(columns.size());
+                    Map<String, StatsRecorder> columnStatsMap = new HashMap<>(columns.size());
 
                     for (Column column : columns)
                     {
@@ -676,12 +681,32 @@ public class Main
                                 column.setSize(chunkLength + column.getSize());
                             }
                         }
+                        List<TypeDescription> fields = pixelsReader.getFileSchema().getChildren();
+                        checkArgument(fields.size() == types.size(),
+                                "types.size and fields.size are not consistent");
+                        for (int i = 0; i < fields.size(); ++i)
+                        {
+                            TypeDescription field = fields.get(i);
+                            PixelsProto.Type type = types.get(i);
+                            StatsRecorder statsRecorder = columnStatsMap.get(type.getName());
+                            if (statsRecorder == null)
+                            {
+                                columnStatsMap.put(type.getName(),
+                                        StatsRecorder.create(field, fileFooter.getColumnStats(i)));
+                            }
+                            else
+                            {
+                                statsRecorder.merge(StatsRecorder.create(field, fileFooter.getColumnStats(i)));
+                            }
+                        }
                         pixelsReader.close();
                     }
 
                     for (Column column : columns)
                     {
                         column.setChunkSize(column.getSize()/rowGroupCount);
+                        column.setRecordStats(columnStatsMap.get(column.getName())
+                                .serialize().build().toByteString().asReadOnlyByteBuffer());
                         metadataService.updateColumn(column);
                     }
 

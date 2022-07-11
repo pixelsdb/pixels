@@ -71,7 +71,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -99,7 +99,7 @@ public class MetadataService
                 throw new MetadataException("error code" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -127,7 +127,7 @@ public class MetadataService
                 throw new MetadataException("error code" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -155,7 +155,7 @@ public class MetadataService
                 throw new MetadataException("error code" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -183,7 +183,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -203,8 +203,8 @@ public class MetadataService
                 .setId(column.getId()).setName(column.getName()).setType(column.getType())
                 .setChunkSize(column.getChunkSize()).setSize(column.getSize())
                 .setNullFraction(column.getNullFraction()).setCardinality(column.getCardinality())
-                .setMinValue(column.getMinValue() != null ? ByteString.copyFrom(column.getMinValue()) : null)
-                .setMaxValue(column.getMaxValue() != null ? ByteString.copyFrom(column.getMaxValue()) : null)
+                // column.getRecordStats() returns empty bytes if the record stats does not exist.
+                .setRecordStats(ByteString.copyFrom(column.getRecordStats()))
                 .setTableId(column.getTableId()).build();
         MetadataProto.UpdateColumnRequest request = MetadataProto.UpdateColumnRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
@@ -217,7 +217,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -251,7 +251,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -310,7 +310,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(request.getHeader().getToken()) == false)
+            if (!response.getHeader().getToken().equals(request.getHeader().getToken()))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -358,7 +358,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -391,7 +391,7 @@ public class MetadataService
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
-            if (response.getHeader().getToken().equals(token) == false)
+            if (!response.getHeader().getToken().equals(token))
             {
                 throw new MetadataException("response token does not match.");
             }
@@ -416,7 +416,7 @@ public class MetadataService
             throw new MetadataException("failed to create schema. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -465,7 +465,7 @@ public class MetadataService
             throw new MetadataException("failed to create table. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -488,7 +488,7 @@ public class MetadataService
             throw new MetadataException("failed to create view. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -510,7 +510,7 @@ public class MetadataService
             throw new MetadataException("failed to drop table. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -532,7 +532,7 @@ public class MetadataService
             throw new MetadataException("failed to drop view. error code=" + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -555,7 +555,7 @@ public class MetadataService
                     + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -578,7 +578,7 @@ public class MetadataService
                     + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }
@@ -600,7 +600,7 @@ public class MetadataService
                     + response.getHeader().getErrorCode()
                     + ", error message=" + response.getHeader().getErrorMsg());
         }
-        if (response.getHeader().getToken().equals(token) == false)
+        if (!response.getHeader().getToken().equals(token))
         {
             throw new MetadataException("response token does not match.");
         }

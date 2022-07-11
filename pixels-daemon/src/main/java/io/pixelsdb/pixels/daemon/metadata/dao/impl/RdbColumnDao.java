@@ -50,12 +50,10 @@ public class RdbColumnDao extends ColumnDao
         {
             ResultSet rs = st.executeQuery(
                     "SELECT COL_NAME, COL_TYPE, COL_CHUNK_SIZE, COL_SIZE, COL_NULL_FRACTION, " +
-                            "COL_CARDINALITY, COL_MIN_VALUE, COL_MAX_VALUE, TBLS_TBL_ID " +
-                            "FROM COLS WHERE COL_ID=" + id);
+                            "COL_CARDINALITY, COL_RECORD_STATS, TBLS_TBL_ID " + "FROM COLS WHERE COL_ID=" + id);
             if (rs.next())
             {
-                byte[] minValueBytes = rs.getBytes("COL_MIN_VALUE");
-                byte[] maxValueBytes = rs.getBytes("COL_MAX_VALUE");
+                byte[] recordStats = rs.getBytes("COL_RECORD_STATS");
                 MetadataProto.Column column = MetadataProto.Column.newBuilder()
                         .setId(id)
                         .setName(rs.getString("COL_NAME"))
@@ -64,10 +62,8 @@ public class RdbColumnDao extends ColumnDao
                         .setSize(rs.getDouble("COL_SIZE"))
                         .setNullFraction(rs.getDouble("COL_NULL_FRACTION"))
                         .setCardinality(rs.getLong("COL_CARDINALITY"))
-                        .setMinValue(minValueBytes != null ?
-                                ByteString.copyFrom(minValueBytes) : ByteString.EMPTY)
-                        .setMaxValue(maxValueBytes != null ?
-                                ByteString.copyFrom(maxValueBytes) : ByteString.EMPTY)
+                        .setRecordStats(recordStats != null ?
+                                ByteString.copyFrom(recordStats) : ByteString.EMPTY)
                         .setTableId(rs.getLong("TBLS_TBL_ID")).build();
                 return column;
             }
@@ -89,13 +85,12 @@ public class RdbColumnDao extends ColumnDao
             {
                 ResultSet rs = st.executeQuery(
                         "SELECT COL_ID, COL_NAME, COL_TYPE, COL_CHUNK_SIZE, COL_SIZE, " +
-                                "COL_NULL_FRACTION, COL_CARDINALITY, COL_MIN_VALUE, COL_MAX_VALUE " +
+                                "COL_NULL_FRACTION, COL_CARDINALITY, COL_RECORD_STATS " +
                                 "FROM COLS WHERE TBLS_TBL_ID=" + table.getId() + " ORDER BY COL_ID");
                 List<MetadataProto.Column> columns = new ArrayList<>();
                 while (rs.next())
                 {
-                    byte[] minValueBytes = rs.getBytes("COL_MIN_VALUE");
-                    byte[] maxValueBytes = rs.getBytes("COL_MAX_VALUE");
+                    byte[] recordStats = rs.getBytes("COL_RECORD_STATS");
                     MetadataProto.Column column = MetadataProto.Column.newBuilder()
                             .setId(rs.getLong("COL_ID"))
                             .setName(rs.getString("COL_NAME"))
@@ -104,10 +99,8 @@ public class RdbColumnDao extends ColumnDao
                             .setSize(rs.getDouble("COL_SIZE"))
                             .setNullFraction(rs.getDouble("COL_NULL_FRACTION"))
                             .setCardinality(rs.getLong("COL_CARDINALITY"))
-                            .setMinValue(minValueBytes != null ?
-                                    ByteString.copyFrom(minValueBytes) : ByteString.EMPTY)
-                            .setMaxValue(maxValueBytes != null ?
-                                    ByteString.copyFrom(maxValueBytes) : ByteString.EMPTY)
+                            .setRecordStats(recordStats != null ?
+                                    ByteString.copyFrom(recordStats) : ByteString.EMPTY)
                             .setTableId(table.getId()).build();
                     columns.add(column);
                 }
@@ -122,8 +115,9 @@ public class RdbColumnDao extends ColumnDao
         {
             try (Statement st = conn.createStatement())
             {
-                ResultSet rs = st.executeQuery("SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" + table.getId() +
-                        " ORDER BY COL_ID");
+                ResultSet rs = st.executeQuery(
+                        "SELECT COL_ID, COL_NAME, COL_TYPE, COL_SIZE FROM COLS WHERE TBLS_TBL_ID=" +
+                                table.getId() + " ORDER BY COL_ID");
                 List<MetadataProto.Column> columns = new ArrayList<>();
                 while (rs.next())
                 {
@@ -183,8 +177,7 @@ public class RdbColumnDao extends ColumnDao
                 "`COL_SIZE` = ?," +
                 "`COL_NULL_FRACTION` = ?," +
                 "`COL_CARDINALITY` = ?," +
-                "`COL_MIN_VALUE` = ?," +
-                "`COL_MAX_VALUE` = ?\n" +
+                "`COL_RECORD_STATS` = ?\n" +
                 "WHERE `COL_ID` = ?";
         try (PreparedStatement pst = conn.prepareStatement(sql))
         {
@@ -194,9 +187,8 @@ public class RdbColumnDao extends ColumnDao
             pst.setDouble(4, column.getSize());
             pst.setDouble(5, column.getNullFraction());
             pst.setLong(6, column.getCardinality());
-            pst.setBytes(7, column.getMinValue().toByteArray());
-            pst.setBytes(8, column.getMaxValue().toByteArray());
-            pst.setLong(9, column.getId());
+            pst.setBytes(7, column.getRecordStats().toByteArray());
+            pst.setLong(8, column.getId());
 
             return pst.executeUpdate() == 1;
         } catch (SQLException e)
