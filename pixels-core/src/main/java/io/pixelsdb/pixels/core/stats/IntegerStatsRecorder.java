@@ -304,5 +304,4 @@ public class IntegerStatsRecorder
         result = 31 * result + (overflow ? 1 : 0);
         return result;
     }
-
 }

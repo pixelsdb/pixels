@@ -34,8 +34,7 @@ public class Column extends Base
     private double size;
     private double nullFraction;
     private long cardinality;
-    private ByteBuffer minValue;
-    private ByteBuffer maxValue;
+    private ByteBuffer recordStats;
     private long tableId;
 
     public Column()
@@ -51,8 +50,8 @@ public class Column extends Base
         this.size = column.getSize();
         this.nullFraction = column.getNullFraction();
         this.cardinality = column.getCardinality();
-        this.minValue = column.getMinValue().asReadOnlyByteBuffer();
-        this.maxValue = column.getMaxValue().asReadOnlyByteBuffer();
+        // The default value pf bytes in protobuf is empty bytes, thus no need to check for null.
+        this.recordStats = column.getRecordStats().asReadOnlyByteBuffer();
         this.tableId = column.getTableId();
     }
 
@@ -120,24 +119,14 @@ public class Column extends Base
         this.cardinality = cardinality;
     }
 
-    public ByteBuffer getMinValue()
+    public ByteBuffer getRecordStats()
     {
-        return minValue;
+        return recordStats;
     }
 
-    public void setMinValue(ByteBuffer minValue)
+    public void setRecordStats(ByteBuffer recordStats)
     {
-        this.minValue = minValue;
-    }
-
-    public ByteBuffer getMaxValue()
-    {
-        return maxValue;
-    }
-
-    public void setMaxValue(ByteBuffer maxValue)
-    {
-        this.maxValue = maxValue;
+        this.recordStats = recordStats;
     }
 
     public long getTableId()
@@ -160,9 +149,8 @@ public class Column extends Base
                 ", size=" + size +
                 ", nullFraction=" + nullFraction +
                 ", cardinality=" + cardinality +
-                ", minValue=" + minValue +
-                ", maxValue=" + maxValue +
-                ", tableId=" + tableId +
+                ", recordStats=bytes(" + recordStats.remaining() +
+                "), tableId=" + tableId +
                 '}';
     }
 }

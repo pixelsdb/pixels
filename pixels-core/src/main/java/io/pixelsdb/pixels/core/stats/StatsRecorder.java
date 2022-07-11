@@ -202,6 +202,8 @@ public class StatsRecorder
             case SHORT:
             case INT:
             case LONG:
+                return new IntegerStatsRecorder();
+            case DECIMAL:
                 /**
                  * Issue #208:
                  * To be compatible with Presto, use IntegerColumnStats for decimal.
@@ -209,7 +211,6 @@ public class StatsRecorder
                  * needed in other places, integer statistics can be converted to double
                  * using the precision and scale from the type in the file footer.
                  */
-            case DECIMAL:
                 if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
                     return new IntegerStatsRecorder();
                 else
@@ -245,8 +246,19 @@ public class StatsRecorder
             case SHORT:
             case INT:
             case LONG:
-            case DECIMAL: // Issue #208: use IntegerColumnStats for decimal.
                 return new IntegerStatsRecorder(statistic);
+            case DECIMAL:
+                /**
+                 * Issue #208:
+                 * To be compatible with Presto, use IntegerColumnStats for decimal.
+                 * Decimal and its statistics in Presto are represented as long. If
+                 * needed in other places, integer statistics can be converted to double
+                 * using the precision and scale from the type in the file footer.
+                 */
+                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
+                    return new IntegerStatsRecorder(statistic);
+                else
+                    return new Integer128StatsRecorder(statistic);
             case FLOAT:
             case DOUBLE:
                 return new DoubleStatsRecorder(statistic);
@@ -265,6 +277,42 @@ public class StatsRecorder
                 return new BinaryStatsRecorder(statistic);
             default:
                 return new StatsRecorder(statistic);
+        }
+    }
+
+    /**
+     * Cast the range stats to general range stats according to the type of the columns.
+     *
+     * @param type the type of the column
+     * @param rangeStats the range stats to be cast
+     * @return the general range stats if cast is successful, null otherwise
+     */
+    public static GeneralRangeStats toGeneral(TypeDescription type, RangeStats<?> rangeStats)
+    {
+        switch (type.getCategory())
+        {
+            case BYTE:
+            case SHORT:
+            case INT:
+            case LONG:
+                return GeneralRangeStats.fromStatsRecorder(type, (IntegerStatsRecorder) rangeStats);
+            case DECIMAL:
+                if (type.getPrecision() <= SHORT_DECIMAL_MAX_PRECISION)
+                    return GeneralRangeStats.fromStatsRecorder(type, (IntegerStatsRecorder) rangeStats);
+                else
+                    return GeneralRangeStats.fromStatsRecorder(type, (Integer128StatsRecorder) rangeStats);
+            case FLOAT:
+            case DOUBLE:
+                return GeneralRangeStats.fromStatsRecorder(type, (DoubleStatsRecorder) rangeStats);
+            case DATE:
+                return GeneralRangeStats.fromStatsRecorder(type, (DateStatsRecorder) rangeStats);
+            case TIME:
+                return GeneralRangeStats.fromStatsRecorder(type, (TimeStatsRecorder) rangeStats);
+            case TIMESTAMP:
+                return GeneralRangeStats.fromStatsRecorder(type, (TimestampStatsRecorder) rangeStats);
+            default:
+                // Other type are unknown or incompatible with general range stats.
+                return null;
         }
     }
 }

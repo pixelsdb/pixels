@@ -77,9 +77,8 @@ message Column {
     double size = 5;
     double nullFraction = 6;
     uint64 cardinality = 7;
-    bytes minValue = 8;
-    bytes maxValue = 9;
-    uint64 tableId = 10;
+    bytes recordStats = 8;
+    uint64 tableId = 9;
 }
 
 message Layout {
