@@ -137,7 +137,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     groupKeyColumnNames, groupKeyColumnIds, groupKeyColumnProj,
                     aggrColumnIds, resultColumnNames, resultColumnTypes, functionTypes);
             logger.info("start scan and aggregate");
-            for (int i = 0; i <  inputFiles.size(); ++i)
+            for (int i = 0; i <  inputFiles.size(); )
             {
                 List<String> files = new LinkedList<>();
                 for (int j = 0; j < parallelism && i < inputFiles.size(); ++j, ++i)
