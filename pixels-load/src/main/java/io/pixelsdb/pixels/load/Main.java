@@ -389,22 +389,20 @@ public class Main
                     for (int i = 0; i < n; ++i)
                     {
                         String destination_ = destination;
-                        int i_ = i;
                         // Issue #192: make copy multi-threaded.
-                        copyExecutor.execute(() -> {
-                            try
+                        for (Status s : files)
+                        {
+                            String sourceName = s.getName();
+                            if (!sourceName.contains(postfix))
                             {
-                                System.out.println("Copying thread (" + i_ + ") is started.");
-                                for (Status s : files)
+                                continue;
+                            }
+                            String destPath = destination_ +
+                                    sourceName.substring(0, sourceName.indexOf(postfix)) +
+                                    "_copy_" + DateUtil.getCurTime() + postfix;
+                            copyExecutor.execute(() -> {
+                                try
                                 {
-                                    String sourceName = s.getName();
-                                    if (!sourceName.contains(postfix))
-                                    {
-                                        continue;
-                                    }
-                                    String destPath = destination_ +
-                                            sourceName.substring(0, sourceName.indexOf(postfix)) +
-                                            "_copy_" + DateUtil.getCurTime() + postfix;
                                     if (sourceStorage.getScheme() == destStorage.getScheme() &&
                                             destStorage.supportDirectCopy())
                                     {
@@ -418,12 +416,12 @@ public class Main
                                                 Constants.HDFS_BUFFER_SIZE, true);
                                     }
                                     copiedNum.incrementAndGet();
+                                } catch (IOException e)
+                                {
+                                    e.printStackTrace();
                                 }
-                            } catch (IOException e)
-                            {
-                                e.printStackTrace();
-                            }
-                        });
+                            });
+                        }
                     }
 
                     copyExecutor.shutdown();
