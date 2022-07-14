@@ -17,18 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.layout;
+package io.pixelsdb.pixels.common.metadata;
+
+import com.google.common.base.Objects;
 
 /**
- * @author: tao
+ * @author: tao, hank
  * @date: Create in 2018-06-19 14:46
  **/
-public class IndexName
+public class SchemaTableName
 {
-    private String schemaName;
-    private String tableName;
+    private final String schemaName;
+    private final String tableName;
 
-    public IndexName(String schemaName, String tableName)
+    public SchemaTableName(String schemaName, String tableName)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
@@ -39,19 +41,9 @@ public class IndexName
         return schemaName;
     }
 
-    public void setSchemaName(String schemaName)
-    {
-        this.schemaName = schemaName;
-    }
-
     public String getTableName()
     {
         return tableName;
-    }
-
-    public void setTableName(String tableName)
-    {
-        this.tableName = tableName;
     }
 
     @Override
@@ -59,18 +51,23 @@ public class IndexName
     {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-
-        IndexName that = (IndexName) o;
-
-        if (schemaName != null ? !schemaName.equals(that.schemaName) : that.schemaName != null) return false;
-        return tableName != null ? tableName.equals(that.tableName) : that.tableName == null;
+        SchemaTableName that = (SchemaTableName) o;
+        return Objects.equal(schemaName, that.schemaName) &&
+                Objects.equal(tableName, that.tableName);
     }
 
     @Override
     public int hashCode()
     {
-        int result = schemaName != null ? schemaName.hashCode() : 0;
-        result = 31 * result + (tableName != null ? tableName.hashCode() : 0);
-        return result;
+        return Objects.hashCode(schemaName, tableName);
+    }
+
+    @Override
+    public String toString()
+    {
+        return "SchemaTableName{" +
+                "schemaName='" + schemaName + '\'' +
+                ", tableName='" + tableName + '\'' +
+                '}';
     }
 }

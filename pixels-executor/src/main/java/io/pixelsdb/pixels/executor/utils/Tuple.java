@@ -103,19 +103,19 @@ public class Tuple
     @Override
     public boolean equals(Object obj)
     {
-        if (this == obj)
-        {
-            return true;
-        }
-        if (obj == null || getClass() != obj.getClass())
-        {
-            return false;
-        }
+//        if (this == obj)
+//        {
+//            return true;
+//        }
+//        if (obj == null || getClass() != obj.getClass())
+//        {
+//            return false;
+//        }
         Tuple other = (Tuple) obj;
-        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
-        {
-            return false;
-        }
+//        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+//        {
+//            return false;
+//        }
         for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
         {
             // We only support equi-joins, thus null value is considered not equal to anything.

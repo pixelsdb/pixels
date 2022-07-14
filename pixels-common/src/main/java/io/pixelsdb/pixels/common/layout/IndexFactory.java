@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.layout;
 
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,8 +37,8 @@ public class IndexFactory
         return instance;
     }
 
-    private Map<IndexName, SplitsIndex> splitsIndexes;
-    private Map<IndexName, ProjectionsIndex> projectionsIndexes;
+    private Map<SchemaTableName, SplitsIndex> splitsIndexes;
+    private Map<SchemaTableName, ProjectionsIndex> projectionsIndexes;
 
     private IndexFactory()
     {
@@ -44,22 +46,22 @@ public class IndexFactory
         this.projectionsIndexes = new HashMap<>();
     }
 
-    public void cacheSplitsIndex(IndexName entry, SplitsIndex splitsIndex)
+    public void cacheSplitsIndex(SchemaTableName entry, SplitsIndex splitsIndex)
     {
         this.splitsIndexes.put(entry, splitsIndex);
     }
 
-    public SplitsIndex getSplitsIndex(IndexName entry)
+    public SplitsIndex getSplitsIndex(SchemaTableName entry)
     {
         return this.splitsIndexes.get(entry);
     }
 
-    public void cacheProjectionsIndex(IndexName entry, ProjectionsIndex projectionsIndex)
+    public void cacheProjectionsIndex(SchemaTableName entry, ProjectionsIndex projectionsIndex)
     {
         this.projectionsIndexes.put(entry, projectionsIndex);
     }
 
-    public ProjectionsIndex getProjectionsIndex(IndexName entry)
+    public ProjectionsIndex getProjectionsIndex(SchemaTableName entry)
     {
         return this.projectionsIndexes.get(entry);
     }
