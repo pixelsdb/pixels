@@ -20,10 +20,11 @@
 package io.pixelsdb.pixels.executor.join;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.executor.plan.BaseTable;
 import io.pixelsdb.pixels.executor.plan.JoinEndian;
 import io.pixelsdb.pixels.executor.plan.JoinedTable;
 import io.pixelsdb.pixels.executor.plan.Table;
@@ -54,11 +55,10 @@ public class JoinAdvisor
     private final MetadataService metadataService;
     private final double broadcastThreshold;
     private final double partitionSize;
-    private final double baseTableScanUnit;
     /**
-     * schemaName_tableName -> (columnName -> column)
+     * schemaTableName -> (columnName -> column)
      */
-    private final Map<String, Map<String, Column>> columnStatisticCache = new HashMap<>();
+    private final Map<SchemaTableName, Map<String, Column>> columnStatisticCache = new HashMap<>();
 
     private JoinAdvisor()
     {
@@ -70,8 +70,6 @@ public class JoinAdvisor
         broadcastThreshold = parseDataSize(thresholdStr);
         String partitionSizeStr = configFactory.getProperty("join.partition.size");
         partitionSize = parseDataSize(partitionSizeStr);
-        String baseTableScanUnitStr = configFactory.getProperty("join.base.table.scan.unit");
-        baseTableScanUnit = parseDataSize(baseTableScanUnitStr);
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
@@ -126,25 +124,11 @@ public class JoinAdvisor
         return (int) Math.ceil(largeTableSize / partitionSize);
     }
 
-    /**
-     * Get the table scan input split size for the base table.
-     * @param table the base table
-     * @param numRowGroups the total number of row groups in the base table
-     * @return the number of row groups to be scanned by each task
-     */
-    public int getSplitSizeCap(BaseTable table, int numRowGroups) throws MetadataException
-    {
-        double tableSize = getTableSize(table);
-        double numSplits = tableSize / baseTableScanUnit;
-        double splitSize = Math.ceil(numRowGroups / numSplits);
-        return roundSplitSize(splitSize);
-    }
-
     private double getTableSize(Table table) throws MetadataException
     {
         if (table.getTableType() == BASE)
         {
-            String schemaTableName = table.getSchemaName() + "_" + table.getTableName();
+            SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
             Map<String, Column> columnMap;
             if (columnStatisticCache.containsKey(schemaTableName))
             {
@@ -152,8 +136,12 @@ public class JoinAdvisor
             }
             else
             {
-                List<Column> columns = metadataService.getColumns(
-                        table.getSchemaName(), table.getTableName(), true);
+                List<Column> columns = MetadataCache.Instance().getTableColumns(schemaTableName);
+                if (columns == null)
+                {
+                    columns = metadataService.getColumns(
+                            table.getSchemaName(), table.getTableName(), true);
+                }
                 columnMap = new HashMap<>(columns.size());
                 for (Column column : columns)
                 {
@@ -196,15 +184,5 @@ public class JoinAdvisor
             return Double.parseDouble(sizeStr.substring(0, sizeStr.length()-1));
         }
         throw new UnsupportedOperationException("size '" + sizeStr + "' can not be parsed");
-    }
-
-    private static final double log2 = Math.log(2);
-
-    private int roundSplitSize(double splitSize)
-    {
-        checkArgument(splitSize >= 1.0, "split size must >= 1.0");
-        long power2 = Math.round(Math.log(splitSize) / log2);
-        checkArgument(power2 >= 0.0, "split size must be a non-negative power of 2.");
-        return (int) Math.pow(2, power2);
     }
 }

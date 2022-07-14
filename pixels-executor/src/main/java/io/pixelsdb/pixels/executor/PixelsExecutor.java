@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
@@ -72,7 +73,6 @@ public class PixelsExecutor
     private final ConfigFactory config;
     private final MetadataService metadataService;
     private final int fixedSplitSize;
-    private final boolean capSplitSizeByStatistics;
     private final boolean projectionReadEnabled;
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
@@ -123,7 +123,6 @@ public class PixelsExecutor
         this.metadataService = new MetadataService(config.getProperty("metadata.server.host"),
                 Integer.parseInt(config.getProperty("metadata.server.port")));
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
-        this.capSplitSizeByStatistics = Boolean.parseBoolean(config.getProperty("join.cap.split-size.by.statistics"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.computeFinalAggrInServer = Boolean.parseBoolean(config.getProperty("aggregation.compute.final.in.server"));
         this.orderedPathEnabled = orderedPathEnabled;
@@ -1142,7 +1141,7 @@ public class PixelsExecutor
         for (Layout layout : layouts)
         {
             int version = layout.getVersion();
-            IndexName indexName = new IndexName(table.getSchemaName(), table.getTableName());
+            SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
             Order order = JSON.parseObject(layout.getOrder(), Order.class);
             ColumnSet columnSet = new ColumnSet();
             for (String column : table.getColumnNames())
@@ -1158,18 +1157,18 @@ public class PixelsExecutor
             } else
             {
                 // log.info("columns to be accessed: " + columnSet.toString());
-                SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(indexName);
+                SplitsIndex splitsIndex = IndexFactory.Instance().getSplitsIndex(schemaTableName);
                 if (splitsIndex == null)
                 {
                     logger.debug("splits index not exist in factory, building index...");
-                    splitsIndex = buildSplitsIndex(order, splits, indexName);
+                    splitsIndex = buildSplitsIndex(order, splits, schemaTableName);
                 } else
                 {
                     int indexVersion = splitsIndex.getVersion();
                     if (indexVersion < version)
                     {
                         logger.debug("splits index version is not up-to-date, updating index...");
-                        splitsIndex = buildSplitsIndex(order, splits, indexName);
+                        splitsIndex = buildSplitsIndex(order, splits, schemaTableName);
                     }
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
@@ -1183,12 +1182,12 @@ public class PixelsExecutor
             String compactPath;
             if (projectionReadEnabled)
             {
-                ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(indexName);
+                ProjectionsIndex projectionsIndex = IndexFactory.Instance().getProjectionsIndex(schemaTableName);
                 Projections projections = JSON.parseObject(layout.getProjections(), Projections.class);
                 if (projectionsIndex == null)
                 {
                     logger.debug("projections index not exist in factory, building index...");
-                    projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                    projectionsIndex = buildProjectionsIndex(order, projections, schemaTableName);
                 }
                 else
                 {
@@ -1196,7 +1195,7 @@ public class PixelsExecutor
                     if (indexVersion < version)
                     {
                         logger.debug("projections index is not up-to-date, updating index...");
-                        projectionsIndex = buildProjectionsIndex(order, projections, indexName);
+                        projectionsIndex = buildProjectionsIndex(order, projections, schemaTableName);
                     }
                 }
                 ProjectionPattern projectionPattern = projectionsIndex.search(columnSet);
@@ -1224,16 +1223,6 @@ public class PixelsExecutor
                 {
                     List<String> orderedPaths = storage.listPaths(layout.getOrderPath());
 
-                    if (capSplitSizeByStatistics && !orderedPaths.isEmpty())
-                    {
-                        int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(table, orderedPaths.size());
-                        if (splitSizeCap < splitSize)
-                        {
-                            logger.debug("split size capped to: " + splitSizeCap);
-                            splitSize = splitSizeCap;
-                        }
-                    }
-
                     for (int i = 0; i < orderedPaths.size();)
                     {
                         ImmutableList.Builder<InputInfo> inputsBuilder =
@@ -1250,17 +1239,6 @@ public class PixelsExecutor
                 if (compactPathEnabled)
                 {
                     List<String> compactPaths = storage.listPaths(compactPath);
-
-                    if (capSplitSizeByStatistics && !compactPaths.isEmpty())
-                    {
-                        int splitSizeCap = JoinAdvisor.Instance().getSplitSizeCap(
-                                table, compactPaths.size() * rowGroupNum);
-                        if (splitSizeCap < splitSize)
-                        {
-                            logger.debug("split size capped to: " + splitSizeCap);
-                            splitSize = splitSizeCap;
-                        }
-                    }
 
                     int curFileRGIdx;
                     for (String path : compactPaths)
@@ -1284,20 +1262,36 @@ public class PixelsExecutor
         return splitsBuilder.build();
     }
 
-    private SplitsIndex buildSplitsIndex(Order order, Splits splits, IndexName indexName) {
+    private SplitsIndex buildSplitsIndex(Order order, Splits splits, SchemaTableName schemaTableName)
+            throws MetadataException
+    {
         List<String> columnOrder = order.getColumnOrder();
         SplitsIndex index;
-        index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
-                splits.getNumRowGroupInBlock());
-        IndexFactory.Instance().cacheSplitsIndex(indexName, index);
+        String indexTypeName = ConfigFactory.Instance().getProperty("splits.index.type");
+        SplitsIndex.IndexType indexType = SplitsIndex.IndexType.valueOf(indexTypeName);
+        switch (indexType)
+        {
+            case INVERTED:
+                index = new InvertedSplitsIndex(columnOrder, SplitPattern.buildPatterns(columnOrder, splits),
+                        splits.getNumRowGroupInBlock());
+                break;
+            case COST_BASED:
+                index = new CostBasedSplitsIndex(this.metadataService, schemaTableName,
+                        splits.getNumRowGroupInBlock(), splits.getNumRowGroupInBlock());
+                break;
+            default:
+                throw new UnsupportedOperationException("splits index type '" + indexType + "' is not supported");
+        }
+
+        IndexFactory.Instance().cacheSplitsIndex(schemaTableName, index);
         return index;
     }
 
-    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, IndexName indexName) {
+    private ProjectionsIndex buildProjectionsIndex(Order order, Projections projections, SchemaTableName schemaTableName) {
         List<String> columnOrder = order.getColumnOrder();
         ProjectionsIndex index;
         index = new InvertedProjectionsIndex(columnOrder, ProjectionPattern.buildPatterns(columnOrder, projections));
-        IndexFactory.Instance().cacheProjectionsIndex(indexName, index);
+        IndexFactory.Instance().cacheProjectionsIndex(schemaTableName, index);
         return index;
     }
 }

@@ -26,14 +26,14 @@ import java.util.*;
  */
 public class InvertedSplitsIndex implements SplitsIndex
 {
-    /**
-     * key: column name;
-     * value: bit map
-     */
     private int version;
 
     private final int defaultSplitSize;
 
+    /**
+     * key: column name;
+     * value: bit map
+     */
     private Map<String, BitSet> bitMapIndex;
 
     private List<SplitPattern> querySplitPatterns;
@@ -120,6 +120,7 @@ public class InvertedSplitsIndex implements SplitsIndex
         return bestPattern;
     }
 
+    @Override
     public int getVersion()
     {
         return version;
