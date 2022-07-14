@@ -1268,7 +1268,7 @@ public class PixelsExecutor
         List<String> columnOrder = order.getColumnOrder();
         SplitsIndex index;
         String indexTypeName = ConfigFactory.Instance().getProperty("splits.index.type");
-        SplitsIndex.IndexType indexType = SplitsIndex.IndexType.valueOf(indexTypeName);
+        SplitsIndex.IndexType indexType = SplitsIndex.IndexType.valueOf(indexTypeName.toUpperCase());
         switch (indexType)
         {
             case INVERTED:
