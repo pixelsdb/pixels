@@ -53,7 +53,8 @@ public class JoinAdvisor
     }
 
     private final MetadataService metadataService;
-    private final double broadcastThreshold;
+    private final double broadcastThresholdMB;
+    private final double broadcastThresholdRows;
     private final double partitionSize;
     /**
      * schemaTableName -> (columnName -> column)
@@ -66,25 +67,30 @@ public class JoinAdvisor
         String host = configFactory.getProperty("metadata.server.host");
         int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         metadataService = new MetadataService(host, port);
-        String thresholdStr = configFactory.getProperty("join.broadcast.threshold");
-        broadcastThreshold = parseDataSize(thresholdStr);
-        String partitionSizeStr = configFactory.getProperty("join.partition.size");
-        partitionSize = parseDataSize(partitionSizeStr);
+        String thresholdMB = configFactory.getProperty("join.broadcast.threshold.mb");
+        broadcastThresholdMB = Integer.parseInt(thresholdMB) * 1024 * 1024;
+        String thresholdRows = configFactory.getProperty("join.broadcast.threshold.rows");
+        broadcastThresholdRows = Integer.parseInt(thresholdRows);
+        String partitionSizeMB = configFactory.getProperty("join.partition.size.mb");
+        partitionSize = Integer.parseInt(partitionSizeMB) * 1024 * 1024;
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException
     {
         double smallTableSize;
+        long smallTableRows;
         if (joinEndian == JoinEndian.SMALL_LEFT)
         {
-            smallTableSize = getTableSize(leftTable);
+            smallTableSize = getTableInputSize(leftTable);
+            smallTableRows = getTableRowCount(leftTable);
         }
         else
         {
-            smallTableSize = getTableSize(rightTable);
+            smallTableSize = getTableInputSize(rightTable);
+            smallTableRows = getTableRowCount(rightTable);
         }
-        if (smallTableSize >= broadcastThreshold)
+        if (smallTableSize >= broadcastThresholdMB || smallTableRows > broadcastThresholdRows)
         {
             return JoinAlgorithm.PARTITIONED;
         }
@@ -97,8 +103,8 @@ public class JoinAdvisor
 
     public JoinEndian getJoinEndian(Table leftTable, Table rightTable) throws MetadataException
     {
-        double leftTableSize = getTableSize(leftTable);
-        double rightTableSize = getTableSize(rightTable);
+        double leftTableSize = getTableInputSize(leftTable);
+        double rightTableSize = getTableInputSize(rightTable);
         if (leftTableSize < rightTableSize)
         {
             return JoinEndian.SMALL_LEFT;
@@ -115,16 +121,16 @@ public class JoinAdvisor
         double largeTableSize;
         if (joinEndian == JoinEndian.LARGE_LEFT)
         {
-            largeTableSize = getTableSize(leftTable);
+            largeTableSize = getTableInputSize(leftTable);
         }
         else
         {
-            largeTableSize = getTableSize(rightTable);
+            largeTableSize = getTableInputSize(rightTable);
         }
         return (int) Math.ceil(largeTableSize / partitionSize);
     }
 
-    private double getTableSize(Table table) throws MetadataException
+    private double getTableInputSize(Table table) throws MetadataException
     {
         if (table.getTableType() == BASE)
         {
@@ -141,6 +147,7 @@ public class JoinAdvisor
                 {
                     columns = metadataService.getColumns(
                             table.getSchemaName(), table.getTableName(), true);
+                    MetadataCache.Instance().cacheTableColumns(schemaTableName, columns);
                 }
                 columnMap = new HashMap<>(columns.size());
                 for (Column column : columns)
@@ -161,28 +168,29 @@ public class JoinAdvisor
         Table leftTable = joinedTable.getJoin().getLeftTable();
         Table rightTable = joinedTable.getJoin().getRightTable();
         // We estimate the size of the joined table by the sum of the two tables' size.
-        return getTableSize(leftTable) + getTableSize(rightTable);
+        return getTableInputSize(leftTable) + getTableInputSize(rightTable);
     }
 
-    private double parseDataSize(String sizeStr)
+    protected long getTableRowCount(Table table) throws MetadataException
     {
-        double l = Double.parseDouble(sizeStr.substring(0, sizeStr.length() - 2));
-        if (sizeStr.endsWith("KB"))
+        if (table.getTableType() == BASE)
         {
-            return l * 1024;
+            SchemaTableName schemaTableName = new SchemaTableName(table.getSchemaName(), table.getTableName());
+            io.pixelsdb.pixels.common.metadata.domain.Table metadataTable =
+                    MetadataCache.Instance().getTable(schemaTableName);
+            if (metadataTable == null)
+            {
+                metadataTable = metadataService.getTable(
+                        table.getSchemaName(), table.getTableName());
+                MetadataCache.Instance().cacheTable(schemaTableName, metadataTable);
+            }
+            return metadataTable.getRowCount();
         }
-        else if (sizeStr.endsWith("MB"))
-        {
-            return l * 1024 * 1024;
-        }
-        else if (sizeStr.endsWith("GB"))
-        {
-            return l * 1024 * 1024 * 1024;
-        }
-        else if (sizeStr.endsWith("B"))
-        {
-            return Double.parseDouble(sizeStr.substring(0, sizeStr.length()-1));
-        }
-        throw new UnsupportedOperationException("size '" + sizeStr + "' can not be parsed");
+        checkArgument(table.getTableType() == JOINED, "the table is not a base or joined table");
+        JoinedTable joinedTable = (JoinedTable) table;
+        Table leftTable = joinedTable.getJoin().getLeftTable();
+        Table rightTable = joinedTable.getJoin().getRightTable();
+        // We estimate the number of rows in the joined table by the max of the two tables' row count.
+        return Math.max(getTableRowCount(leftTable), getTableRowCount(rightTable));
     }
 }

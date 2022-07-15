@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.metadata;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.Table;
 
 import java.util.HashMap;
 import java.util.List;
@@ -43,7 +44,22 @@ public class MetadataCache
 
     private final Map<SchemaTableName, List<Column>> tableColumnsMap = new HashMap<>();
 
+    private final Map<SchemaTableName, Table> tableMap = new HashMap<>();
+
     private MetadataCache() { }
+
+    public void cacheTable(SchemaTableName schemaTableName, Table table)
+    {
+        requireNonNull(schemaTableName, "schemaTableName is null");
+        requireNonNull(table, "table is null");
+        this.tableMap.put(schemaTableName, table);
+    }
+
+    public Table getTable(SchemaTableName schemaTableName)
+    {
+        requireNonNull(schemaTableName, "schemaTableName is null");
+        return this.tableMap.get(schemaTableName);
+    }
 
     public void cacheTableColumns(SchemaTableName schemaTableName, List<Column> columns)
     {
