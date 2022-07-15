@@ -82,6 +82,11 @@ public class TableScanFilter
         return columnFilters.get(columnId);
     }
 
+    public boolean isEmpty()
+    {
+        return this.columnFilters.isEmpty();
+    }
+
     /**
      * Filter all the rows in the row batch using this table scan filter.
      * In the returned BitSet, the ith bit is set if the ith row in the row batch matches the filter.

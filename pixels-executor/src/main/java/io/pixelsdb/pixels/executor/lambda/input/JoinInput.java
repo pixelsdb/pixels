@@ -39,9 +39,8 @@ public class JoinInput extends Input
 
     /**
      * The information of the join output files.<br/>
-     * <b>Note: </b>for inner, right-outer, and natural joins, the number of output files
-     * should be consistent with the number of input splits in right table. For left-outer
-     * and full-outer joins, there is an additional output file for the left-outer records.
+     * <b>Note: </b>for inner, right-outer, and natural joins, there is only one output file.
+     * For left-outer and full-outer joins, there might be an additional output file for the left-outer records.
      */
     private MultiOutputInfo output;
 

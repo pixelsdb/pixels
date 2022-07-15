@@ -378,10 +378,10 @@ public class PixelsExecutor
         if (joinAlgo == JoinAlgorithm.BROADCAST)
         {
             /*
-            * If the current join is a broadcast join, we should not let the large side to chain
-            * above to the current join.
-            * And as the right table is a joined table, we will not continue build the chain join.
-            * We only complete the chain join if the operator of the left side is an incomplete chain join.
+            * The current join is a broadcast join.
+            * The left side must be an incomplete broadcast chain join, in this case, we should either complete
+            * the broadcast join if the right side is a broadcast or broadcast chain join, or build a partitioned
+            * chain join if the right side is a partitioned join.
             * */
             leftOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
@@ -431,12 +431,10 @@ public class PixelsExecutor
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
+                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
-                            outputsBuilder.add("join_" + outputId++);
                         }
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
@@ -445,7 +443,7 @@ public class PixelsExecutor
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path,
                                 new StorageInfo(IntermediateStorage, null, null, null),
-                                true, outputsBuilder.build());
+                                true, outputs);
 
                         BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
                                 .setLargeTable(rightTableInfo)
@@ -480,9 +478,9 @@ public class PixelsExecutor
                     chainJoinInfos.add(lastChainJoinInfo);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    for (int i = 0; i < rightJoinInputs.size(); ++i)
+                    for (JoinInput joinInput : rightJoinInputs)
                     {
-                        PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) rightJoinInputs.get(i);
+                        PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) joinInput;
                         PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
                         chainJoinInput.setQueryId(queryId);
                         chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
@@ -703,12 +701,10 @@ public class PixelsExecutor
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
+                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
-                            outputsBuilder.add("join_" + outputId++);
                         }
                         BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                                 rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
@@ -717,7 +713,7 @@ public class PixelsExecutor
                                 joinedTable.getTableName() + "/";
                         MultiOutputInfo output = new MultiOutputInfo(path,
                                 new StorageInfo(IntermediateStorage, null, null, null),
-                                true, outputsBuilder.build());
+                                true, outputs);
 
                         BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
                                 .setLargeTable(rightTableInfo)
@@ -776,6 +772,18 @@ public class PixelsExecutor
                 }
             }
 
+            int internalParallelism = IntraWorkerParallelism;
+            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty() &&
+                    rightTable.getFilter().isEmpty() && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
+            {
+                /*
+                 * This is used to reduce the latency of join result writing, by increasing the
+                 * number of function instances (external parallelism).
+                 * TODO: estimate the cost and tune the parallelism of join by histogram.
+                 */
+                internalParallelism = 2;
+            }
+
             ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
@@ -789,13 +797,11 @@ public class PixelsExecutor
                 for (int i = 0; i < rightInputSplits.size();)
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                            .builderWithExpectedSize(IntraWorkerParallelism);
-                    ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                            .builderWithExpectedSize(IntraWorkerParallelism);
-                    for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
+                            .builderWithExpectedSize(internalParallelism);
+                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    for (int j = 0; j < internalParallelism && i < rightInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(rightInputSplits.get(i));
-                        outputsBuilder.add("join_" + outputId++);
                     }
                     BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
                             rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
@@ -804,7 +810,7 @@ public class PixelsExecutor
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path,
                             new StorageInfo(IntermediateStorage, null, null, null),
-                            true, outputsBuilder.build());
+                            true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, leftTableInfo, rightTableInfo, joinInfo,
@@ -826,13 +832,11 @@ public class PixelsExecutor
                 for (int i = 0; i < leftInputSplits.size();)
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                            .builderWithExpectedSize(IntraWorkerParallelism);
-                    ImmutableList.Builder<String> outputsBuilder = ImmutableList
-                            .builderWithExpectedSize(IntraWorkerParallelism);
-                    for (int j = 0; j < IntraWorkerParallelism && i < leftInputSplits.size(); ++j, ++i)
+                            .builderWithExpectedSize(internalParallelism);
+                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    for (int j = 0; j < internalParallelism && i < leftInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(leftInputSplits.get(i));
-                        outputsBuilder.add("join_" + outputId++);
                     }
                     BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
                             leftTable, inputsBuilder.build(), join.getLeftKeyColumnIds());
@@ -841,7 +845,7 @@ public class PixelsExecutor
                             joinedTable.getTableName() + "/";
                     MultiOutputInfo output = new MultiOutputInfo(path,
                             new StorageInfo(IntermediateStorage, null, null, null),
-                            true, outputsBuilder.build());
+                            true, outputs);
 
                     BroadcastJoinInput joinInput = new BroadcastJoinInput(
                             queryId, rightTableInfo, leftTableInfo, joinInfo,
@@ -1064,6 +1068,16 @@ public class PixelsExecutor
         return partitionInputsBuilder.build();
     }
 
+    /**
+     * Get the join inputs of a partitioned join, given the left and right children.
+     * @param joinedTable this joined table
+     * @param parent the parent of this joined table
+     * @param numPartition the number of partitions
+     * @param leftTableInfo the left table
+     * @param rightTableInfo the right table
+     * @return the join input of this join
+     * @throws MetadataException
+     */
     private List<JoinInput> getPartitionedJoinInputs(
             JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
             PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo) throws MetadataException
@@ -1095,9 +1109,11 @@ public class PixelsExecutor
         {
             ImmutableList.Builder<String> outputFileNames = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
-            for (int j = 0; j < IntraWorkerParallelism; ++j)
+            outputFileNames.add("join_" + i);
+            if (joinedTable.getJoin().getJoinType() == JoinType.EQUI_LEFT ||
+                    joinedTable.getJoin().getJoinType() == JoinType.EQUI_FULL)
             {
-                outputFileNames.add("join_" + i + "_out_" + j);
+                outputFileNames.add("join_" + i + "_left");
             }
 
             String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
