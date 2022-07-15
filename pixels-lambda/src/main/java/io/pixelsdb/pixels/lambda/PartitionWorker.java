@@ -85,7 +85,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             String outputPath = event.getOutput().getPath();
             boolean encoding = event.getOutput().isEncoding();
 
-            String[] cols = event.getTableInfo().getColumnsToRead();
+            String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
             AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
             // The partitioned data would be kept in memory.
@@ -101,7 +101,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 threadPool.execute(() -> {
                     try
                     {
-                        partitionFile(queryId, scanInputs, cols, filter,
+                        partitionFile(queryId, scanInputs, columnsToRead, filter,
                                 keyColumnIds, partitioned, writerSchema);
                     }
                     catch (Exception e)
@@ -119,6 +119,13 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 throw new PixelsWorkerException("interrupted while waiting for the termination of partitioning", e);
             }
 
+            if (writerSchema.get() == null)
+            {
+                InputInfo inputInfo = inputSplits.get(0).getInputInfos().get(0);
+                TypeDescription fileSchema = getFileSchema(s3, inputInfo.getPath(), true);
+                TypeDescription resultSchema = getResultSchema(fileSchema, columnsToRead);
+                writerSchema.set(resultSchema);
+            }
             PixelsWriter pixelsWriter = getWriter(writerSchema.get(), s3, outputPath, encoding,
                     true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
             Set<Integer> hashValues = new HashSet<>(numPartition);

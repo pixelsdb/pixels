@@ -41,10 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -127,8 +124,8 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
 
             MultiOutputInfo outputInfo = event.getOutput();
             StorageInfo storageInfo = outputInfo.getStorageInfo();
-            checkArgument(rightParallelism == outputInfo.getFileNames().size(),
-                    "the number of output file names is incorrect");
+            checkArgument(outputInfo.getFileNames().size() == 1,
+                    "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -220,28 +217,36 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             {
                 rightSplitSize++;
             }
-            for (int i = 0, outputId = 0; i < rightPartitioned.size(); i += rightSplitSize, ++outputId)
+
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
+            if (partitionOutput)
+            {
+                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                {
+                    result.add(new ConcurrentLinkedQueue<>());
+                }
+            }
+            else
+            {
+                result.add(new ConcurrentLinkedQueue<>());
+            }
+
+            for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
             {
                 List<String> parts = new LinkedList<>();
                 for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
                 {
                     parts.add(rightPartitioned.get(j));
                 }
-                String outputPath = outputFolder + outputInfo.getFileNames().get(outputId);
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = partitionOutput ?
+                        int numJoinedRows = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
-                                        numPartition, outputPath, encoding, storageInfo.getScheme(),
-                                        outputPartitionInfo) :
+                                        numPartition, outputPartitionInfo, result) :
                                 joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
-                                hashValues, numPartition, outputPath, encoding, storageInfo.getScheme());
-                        if (rowGroupNum > 0)
-                        {
-                            joinOutput.addOutput(outputPath, rowGroupNum);
-                        }
+                                        hashValues, numPartition, result.get(0));
                     }
                     catch (Exception e)
                     {
@@ -256,6 +261,55 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             } catch (InterruptedException e)
             {
                 throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+            }
+
+            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            try
+            {
+                PixelsWriter pixelsWriter;
+                if (partitionOutput)
+                {
+                    pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, true, Arrays.stream(
+                                    outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
+                            }
+                        }
+                    }
+                } else
+                {
+                    pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, false, null);
+                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                }
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                {
+                    while (!minio.exists(outputPath))
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
+            } catch (Exception e)
+            {
+                throw new PixelsWorkerException("failed to scan the partitioned file '" +
+                        rightPartitioned + "' and do the join", e);
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
@@ -332,21 +386,16 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
-     * @param outputPath fileName on s3 to store the scan results
-     * @param encoding whether encode the scan results or not
-     * @param outputScheme the storage scheme of the output files
-     * @return the number of row groups that have been written into the output.
+     * @param joinResult the container of the join result
+     * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTable(long queryId,
                                             Joiner partitionedJoiner, Joiner chainJoiner,
                                             List<String> rightParts, String[] rightCols,
                                             List<Integer> hashValues, int numPartition,
-                                            String outputPath, boolean encoding,
-                                            Storage.Scheme outputScheme)
+                                            ConcurrentLinkedQueue<VectorizedRowBatch> joinResult)
     {
-        PixelsWriter pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
-                outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
-                encoding, false, null);
+        int joinedRows = 0;
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -386,11 +435,10 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         VectorizedRowBatch rightRowBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        int scannedRows = 0, joinedRows = 0;
+
                         do
                         {
                             rightRowBatch = recordReader.readBatch(rowBatchSize);
-                            scannedRows += rightRowBatch.size;
                             if (rightRowBatch.size > 0)
                             {
                                 List<VectorizedRowBatch> partitionedJoinResults =
@@ -405,7 +453,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                         {
                                             if (!chainJoinResult.isEmpty())
                                             {
-                                                pixelsWriter.addRowBatch(chainJoinResult);
+                                                joinResult.add(chainJoinResult);
                                                 joinedRows += chainJoinResult.size;
                                             }
                                         }
@@ -413,8 +461,6 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                 }
                             }
                         } while (!rightRowBatch.endOfFile);
-                        logger.info("number of rows scanned from right partitioned file: " +
-                                scannedRows + ", number of final joined rows: " + joinedRows);
                     }
                 } catch (Exception e)
                 {
@@ -424,23 +470,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             }
         }
 
-        try
-        {
-            pixelsWriter.close();
-            if (outputScheme == Storage.Scheme.minio)
-            {
-                while (!minio.exists(outputPath))
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new PixelsWorkerException(
-                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
-        }
-        return pixelsWriter.getRowGroupNum();
+        return joinedRows;
     }
 
     /**
@@ -453,29 +483,21 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
      * @param rightCols the column names of the right table
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
-     * @param outputPath fileName on s3 to store the scan results
-     * @param encoding whether encode the scan results or not
-     * @param outputScheme the storage scheme of the output files
      * @param postPartitionInfo the partition information of post partitioning
-     * @return the number of row groups that have been written into the output.
+     * @param partitionResult the container of the join and post partitioning result
+     * @return the number of joined rows produced in this split
      */
     protected static int joinWithRightTableAndPartition(long queryId,
                                                         Joiner partitionedJoiner, Joiner chainJoiner,
                                                         List<String> rightParts, String[] rightCols,
                                                         List<Integer> hashValues, int numPartition,
-                                                        String outputPath, boolean encoding,
-                                                        Storage.Scheme outputScheme,
-                                                        PartitionInfo postPartitionInfo)
+                                                        PartitionInfo postPartitionInfo,
+                                                        List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
                 rowBatchSize, chainJoiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(postPartitionInfo.getNumPartition());
-        for (int i = 0; i < postPartitionInfo.getNumPartition(); ++i)
-        {
-            partitioned.add(new LinkedList<>());
-        }
-        int rowGroupNum = 0;
+        int joinedRows = 0;
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -515,15 +537,13 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         VectorizedRowBatch rightBatch;
                         PixelsRecordReader recordReader = pixelsReader.read(option);
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        int scannedRows = 0, joinedRows = 0;
+
                         do
                         {
                             rightBatch = recordReader.readBatch(rowBatchSize);
-                            scannedRows += rightBatch.size;
                             if (rightBatch.size > 0)
                             {
-                                List<VectorizedRowBatch> partitionedJoinResults =
-                                        partitionedJoiner.join(rightBatch);
+                                List<VectorizedRowBatch> partitionedJoinResults = partitionedJoiner.join(rightBatch);
                                 for (VectorizedRowBatch partitionedJoinResult : partitionedJoinResults)
                                 {
                                     if (!partitionedJoinResult.isEmpty())
@@ -538,7 +558,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                                         partitioner.partition(chainJoinResult);
                                                 for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
                                                 {
-                                                    partitioned.get(entry.getKey()).add(entry.getValue());
+                                                    partitionResult.get(entry.getKey()).add(entry.getValue());
                                                 }
                                                 joinedRows += chainJoinResult.size;
                                             }
@@ -548,8 +568,6 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                 }
                             }
                         } while (!rightBatch.endOfFile);
-                        logger.info("number of rows scanned from right partitioned file: " +
-                                scannedRows + ", number of final joined rows: " + joinedRows);
                     }
                 } catch (Exception e)
                 {
@@ -559,50 +577,15 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             }
         }
 
-        try
+        VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+        for (int hash = 0; hash < tailBatches.length; ++hash)
         {
-            VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
-            for (int hash = 0; hash < tailBatches.length; ++hash)
+            if (!tailBatches[hash].isEmpty())
             {
-                if (!tailBatches[hash].isEmpty())
-                {
-                    partitioned.get(hash).add(tailBatches[hash]);
-                }
+                partitionResult.get(hash).add(tailBatches[hash]);
             }
-            PixelsWriter pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
-                    outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
-                    encoding, true, Arrays.stream(
-                            postPartitionInfo.getKeyColumnIds()).boxed().
-                            collect(Collectors.toList()));
-            int rowNum = 0;
-            for (int hash = 0; hash < postPartitionInfo.getNumPartition(); ++hash)
-            {
-                List<VectorizedRowBatch> batches = partitioned.get(hash);
-                if (!batches.isEmpty())
-                {
-                    for (VectorizedRowBatch batch : batches)
-                    {
-                        pixelsWriter.addRowBatch(batch, hash);
-                        rowNum += batch.size;
-                    }
-                }
-            }
-            logger.info("number of partitioned rows: " + rowNum);
-            pixelsWriter.close();
-            rowGroupNum = pixelsWriter.getRowGroupNum();
-            if (outputScheme == Storage.Scheme.minio)
-            {
-                while (!minio.exists(outputPath))
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new PixelsWorkerException(
-                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
-        return rowGroupNum;
+
+        return joinedRows;
     }
 }

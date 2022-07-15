@@ -43,10 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -108,8 +105,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             MultiOutputInfo outputInfo = event.getOutput();
             StorageInfo storageInfo = outputInfo.getStorageInfo();
-            checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
-                    "the number of output file names is incorrect");
+            checkArgument(outputInfo.getFileNames().size() == 1,
+                    "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -163,25 +160,32 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
             logger.info("hash table size: " + joiner.getSmallTableSize());
 
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
+            if (partitionOutput)
+            {
+                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                {
+                    result.add(new ConcurrentLinkedQueue<>());
+                }
+            }
+            else
+            {
+                result.add(new ConcurrentLinkedQueue<>());
+            }
+
             // scan the right table and do the join.
-            int i = 0;
             for (InputSplit inputSplit : rightInputs)
             {
                 List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                String outputPath = outputFolder + outputInfo.getFileNames().get(i++);
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = partitionOutput ?
+                        int numJoinedRows = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
-                                        outputPath, encoding, storageInfo.getScheme(), outputPartitionInfo) :
+                                        outputPartitionInfo, result) :
                                 joinWithRightTable(queryId, joiner, inputs, true, rightCols,
-                                        rightFilter, outputPath, encoding, storageInfo.getScheme());
-                        if (rowGroupNum > 0)
-                        {
-                            joinOutput.addOutput(outputPath, rowGroupNum);
-                        }
+                                        rightFilter, result.get(0));
                     }
                     catch (Exception e)
                     {
@@ -196,6 +200,56 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             } catch (InterruptedException e)
             {
                 throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+            }
+
+            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            try
+            {
+                PixelsWriter pixelsWriter;
+                if (partitionOutput)
+                {
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, true, Arrays.stream(
+                                    outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, false, null);
+                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                }
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                {
+                    while (!minio.exists(outputPath))
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
+            } catch (Exception e)
+            {
+                throw new PixelsWorkerException(
+                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
@@ -300,18 +354,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
-     * @param outputPath fileName on s3 to store the scan results
-     * @param encoding whether encode the scan results or not
-     * @param outputScheme the storage scheme of the output files
-     * @return the number of row groups that have been written into the output.
+     * @param joinResult the container of the join result
+     * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
-                                   boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
-                                   String outputPath, boolean encoding, Storage.Scheme outputScheme)
+                                         boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
+                                         ConcurrentLinkedQueue<VectorizedRowBatch> joinResult)
     {
-        PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
-                encoding, false, null);
+        int joinedRows = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -357,7 +407,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    int scannedRows = 0, joinedRows = 0;
+
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
                     do
@@ -365,7 +415,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         rowBatch = recordReader.readBatch(rowBatchSize);
                         rightFilter.doFilter(rowBatch, filtered, tmp);
                         rowBatch.applyFilter(filtered);
-                        scannedRows += rowBatch.size;
                         if (rowBatch.size > 0)
                         {
                             List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
@@ -373,14 +422,12 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             {
                                 if (!joined.isEmpty())
                                 {
-                                    pixelsWriter.addRowBatch(joined);
+                                    joinResult.add(joined);
                                     joinedRows += joined.size;
                                 }
                             }
                         }
                     } while (!rowBatch.endOfFile);
-                    logger.info("number of scanned rows: " + scannedRows +
-                            ", number of joined rows: " + joinedRows);
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -389,23 +436,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
         }
 
-        try
-        {
-            pixelsWriter.close();
-            if (outputScheme == Storage.Scheme.minio)
-            {
-                while (!minio.exists(outputPath))
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new PixelsWorkerException(
-                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
-        }
-        return pixelsWriter.getRowGroupNum();
+        return joinedRows;
     }
 
     /**
@@ -418,26 +449,19 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
-     * @param outputPath fileName on s3 to store the scan results
-     * @param encoding whether encode the scan results or not
-     * @param outputScheme the storage scheme of the output files
      * @param postPartitionInfo the partition information of post partitioning
-     * @return the number of row groups that have been written into the output.
+     * @param partitionResult the container of the join and post partitioning result
+     * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTableAndPartition(
             long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence,
-            String[] rightCols, TableScanFilter rightFilter, String outputPath, boolean encoding,
-            Storage.Scheme outputScheme, PartitionInfo postPartitionInfo)
+            String[] rightCols, TableScanFilter rightFilter, PartitionInfo postPartitionInfo,
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
                 rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(postPartitionInfo.getNumPartition());
-        for (int i = 0; i < postPartitionInfo.getNumPartition(); ++i)
-        {
-            partitioned.add(new LinkedList<>());
-        }
-        int rowGroupNum = 0;
+        int joinedRows = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -445,7 +469,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 InputInfo input = it.next();
                 if (checkExistence)
                 {
-                    long start = System.currentTimeMillis();
                     try
                     {
                         if (s3.exists(input.getPath()))
@@ -461,8 +484,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                 "failed to check the existence of the right table input file '" +
                                 input.getPath() + "'", e);
                     }
-                    long end = System.currentTimeMillis();
-                    logger.info("duration of existence check: " + (end - start));
                 }
                 else
                 {
@@ -483,7 +504,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    int scannedRows = 0, joinedRows = 0;
+
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
                     do
@@ -491,7 +512,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         rowBatch = recordReader.readBatch(rowBatchSize);
                         rightFilter.doFilter(rowBatch, filtered, tmp);
                         rowBatch.applyFilter(filtered);
-                        scannedRows += rowBatch.size;
                         if (rowBatch.size > 0)
                         {
                             List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
@@ -502,15 +522,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                     Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
                                     for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
                                     {
-                                        partitioned.get(entry.getKey()).add(entry.getValue());
+                                        partitionResult.get(entry.getKey()).add(entry.getValue());
                                     }
                                     joinedRows += joined.size;
                                 }
                             }
                         }
                     } while (!rowBatch.endOfFile);
-                    logger.info("number of scanned rows: " + scannedRows +
-                            ", number of joined rows: " + joinedRows);
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -519,50 +537,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
         }
 
-        try
+        VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+        for (int hash = 0; hash < tailBatches.length; ++hash)
         {
-            VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
-            for (int hash = 0; hash < tailBatches.length; ++hash)
+            if (!tailBatches[hash].isEmpty())
             {
-                if (!tailBatches[hash].isEmpty())
-                {
-                    partitioned.get(hash).add(tailBatches[hash]);
-                }
+                partitionResult.get(hash).add(tailBatches[hash]);
             }
-            PixelsWriter pixelsWriter = getWriter(joiner.getJoinedSchema(),
-                    outputScheme == Storage.Scheme.minio ? minio : s3, outputPath,
-                    encoding, true, Arrays.stream(
-                                    postPartitionInfo.getKeyColumnIds()).boxed().
-                            collect(Collectors.toList()));
-            int rowNum = 0;
-            for (int hash = 0; hash < postPartitionInfo.getNumPartition(); ++hash)
-            {
-                List<VectorizedRowBatch> batches = partitioned.get(hash);
-                if (!batches.isEmpty())
-                {
-                    for (VectorizedRowBatch batch : batches)
-                    {
-                        pixelsWriter.addRowBatch(batch, hash);
-                        rowNum += batch.size;
-                    }
-                }
-            }
-            logger.info("number of partitioned rows: " + rowNum);
-            pixelsWriter.close();
-            rowGroupNum = pixelsWriter.getRowGroupNum();
-            if (outputScheme == Storage.Scheme.minio)
-            {
-                while (!minio.exists(outputPath))
-                {
-                    // Wait for 10ms and see if the output file is visible.
-                    TimeUnit.MILLISECONDS.sleep(10);
-                }
-            }
-        } catch (Exception e)
-        {
-            throw new PixelsWorkerException(
-                    "failed to finish writing and close the join result file '" + outputPath + "'", e);
         }
-        return rowGroupNum;
+        return joinedRows;
     }
 }

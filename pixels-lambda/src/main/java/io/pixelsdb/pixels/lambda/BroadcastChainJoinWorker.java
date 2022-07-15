@@ -25,6 +25,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
@@ -40,12 +41,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
@@ -105,8 +104,8 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             MultiOutputInfo outputInfo = event.getOutput();
             StorageInfo storageInfo = outputInfo.getStorageInfo();
-            checkArgument(rightInputs.size() == outputInfo.getFileNames().size(),
-                    "the number of output file names is incorrect");
+            checkArgument(outputInfo.getFileNames().size() == 1,
+                    "it is incorrect to have more than one output files");
             String outputFolder = outputInfo.getPath();
             if (!outputFolder.endsWith("/"))
             {
@@ -145,24 +144,31 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 return joinOutput;
             }
 
-            int i = 0;
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
+            if (partitionOutput)
+            {
+                for (int i = 0; i < outputPartitionInfo.getNumPartition(); ++i)
+                {
+                    result.add(new ConcurrentLinkedQueue<>());
+                }
+            }
+            else
+            {
+                result.add(new ConcurrentLinkedQueue<>());
+            }
+
             for (InputSplit inputSplit : rightInputs)
             {
                 List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                String outputPath = outputFolder + outputInfo.getFileNames().get(i++);
                 threadPool.execute(() -> {
                     try
                     {
-                        int rowGroupNum = partitionOutput ?
+                        int numJoinedRows = partitionOutput ?
                                 joinWithRightTableAndPartition(
                                         queryId, joiner, inputs, true, rightCols, rightFilter,
-                                        outputPath, encoding, storageInfo.getScheme(), outputPartitionInfo) :
+                                        outputPartitionInfo, result) :
                                 joinWithRightTable(queryId, joiner, inputs, true, rightCols,
-                                        rightFilter, outputPath, encoding, storageInfo.getScheme());
-                        if (rowGroupNum > 0)
-                        {
-                            joinOutput.addOutput(outputPath, rowGroupNum);
-                        }
+                                        rightFilter, result.get(0));
                     }
                     catch (Exception e)
                     {
@@ -177,6 +183,56 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             } catch (InterruptedException e)
             {
                 throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+            }
+
+            String outputPath = outputFolder + outputInfo.getFileNames().get(0);
+            try
+            {
+                PixelsWriter pixelsWriter;
+                if (partitionOutput)
+                {
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, true, Arrays.stream(
+                                    outputPartitionInfo.getKeyColumnIds()).boxed().
+                                    collect(Collectors.toList()));
+                    for (int hash = 0; hash < outputPartitionInfo.getNumPartition(); ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = result.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    pixelsWriter = getWriter(joiner.getJoinedSchema(),
+                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            encoding, false, null);
+                    ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
+                    for (VectorizedRowBatch rowBatch : rowBatches)
+                    {
+                        pixelsWriter.addRowBatch(rowBatch);
+                    }
+                }
+                pixelsWriter.close();
+                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                if (storageInfo.getScheme() == Storage.Scheme.minio)
+                {
+                    while (!minio.exists(outputPath))
+                    {
+                        // Wait for 10ms and see if the output file is visible.
+                        TimeUnit.MILLISECONDS.sleep(10);
+                    }
+                }
+            } catch (Exception e)
+            {
+                throw new PixelsWorkerException(
+                        "failed to finish writing and close the join result file '" + outputPath + "'", e);
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
