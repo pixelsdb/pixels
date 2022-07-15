@@ -143,14 +143,22 @@ public class PixelsConsumer extends Consumer
                         String[] colsInLine = line.split(regex);
                         for (int i = 0; i < columnVectors.length; i++)
                         {
-                            int valueIdx = orderMapping[i];
-                            if (colsInLine[valueIdx].isEmpty() ||
-                                    colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                            try
                             {
-                                columnVectors[i].addNull();
-                            } else
+                                int valueIdx = orderMapping[i];
+                                if (colsInLine[valueIdx].isEmpty() ||
+                                        colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                                {
+                                    columnVectors[i].addNull();
+                                } else
+                                {
+                                    columnVectors[i].add(colsInLine[valueIdx]);
+                                }
+                            }
+                            catch (Exception e)
                             {
-                                columnVectors[i].add(colsInLine[valueIdx]);
+                                System.out.println("line: " + line);
+                                e.printStackTrace();
                             }
                         }
 

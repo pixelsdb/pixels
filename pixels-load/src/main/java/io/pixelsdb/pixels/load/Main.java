@@ -176,6 +176,11 @@ public class Main
                     int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
                     boolean producer = ns.getBoolean("producer");
 
+                    if (!origin.endsWith("/"))
+                    {
+                        origin += "/";
+                    }
+
                     Storage storage = StorageFactory.Instance().getStorage(origin);
 
                     if (format != null)
