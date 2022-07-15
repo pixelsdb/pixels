@@ -95,7 +95,7 @@ public class PixelsExecutor
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
         PreAggrThreshold = Integer.parseInt(ConfigFactory.Instance()
-                .getProperty("aggregation.pre-aggr.threshold"));
+                .getProperty("aggregation.pre-aggregate.threshold"));
     }
 
     /**
