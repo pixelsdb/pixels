@@ -96,7 +96,7 @@ public class ByteColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + this.vector[i];
+            hashCode[i] = 524287 * hashCode[i] + this.vector[i];
         }
         return hashCode;
     }
@@ -110,6 +110,17 @@ public class ByteColumnVector extends ColumnVector
             return this.vector[index] == otherVector.vector[otherIndex];
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        ByteColumnVector otherVector = (ByteColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return Byte.compare(this.vector[index], otherVector.vector[otherIndex]);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     @Override

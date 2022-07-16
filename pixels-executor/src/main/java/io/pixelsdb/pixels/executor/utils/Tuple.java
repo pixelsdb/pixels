@@ -33,7 +33,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @date 09/05/2022
  */
-public class Tuple
+public class Tuple implements Comparable<Tuple>
 {
     protected static class CommonFields
     {
@@ -103,19 +103,19 @@ public class Tuple
     @Override
     public boolean equals(Object obj)
     {
-//        if (this == obj)
-//        {
-//            return true;
-//        }
-//        if (obj == null || getClass() != obj.getClass())
-//        {
-//            return false;
-//        }
+        if (this == obj)
+        {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass())
+        {
+            return false;
+        }
         Tuple other = (Tuple) obj;
-//        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
-//        {
-//            return false;
-//        }
+        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+        {
+            return false;
+        }
         for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
         {
             // We only support equi-joins, thus null value is considered not equal to anything.
@@ -126,6 +126,29 @@ public class Tuple
             }
         }
         return true;
+    }
+
+    @Override
+    public int compareTo(Tuple other)
+    {
+        if (this == other)
+        {
+            return 0;
+        }
+        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+        {
+            return Integer.compare(this.commonFields.keyColumnIds.length, other.commonFields.keyColumnIds.length);
+        }
+        for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
+        {
+            int c = this.commonFields.columns[this.commonFields.keyColumnIds[i]].compareElement(
+                    this.rowId, other.rowId, other.commonFields.columns[other.commonFields.keyColumnIds[i]]);
+            if (c != 0)
+            {
+                return c;
+            }
+        }
+        return 0;
     }
 
     /**

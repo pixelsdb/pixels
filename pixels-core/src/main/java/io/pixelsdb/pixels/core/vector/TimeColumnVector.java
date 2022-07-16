@@ -101,7 +101,7 @@ public class TimeColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + this.times[i];
+            hashCode[i] = 524287 * hashCode[i] + this.times[i];
         }
         return hashCode;
     }
@@ -115,6 +115,17 @@ public class TimeColumnVector extends ColumnVector
             return this.times[index] == otherVector.times[otherIndex];
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        TimeColumnVector otherVector = (TimeColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return Integer.compare(this.times[index], otherVector.times[otherIndex]);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     /**

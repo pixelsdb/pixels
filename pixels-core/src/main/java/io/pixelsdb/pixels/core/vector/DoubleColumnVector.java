@@ -185,7 +185,7 @@ public class DoubleColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+            hashCode[i] = 524287 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
         }
         return hashCode;
     }
@@ -199,6 +199,17 @@ public class DoubleColumnVector extends ColumnVector
             return this.vector[index] == otherVector.vector[otherIndex];
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        DoubleColumnVector otherVector = (DoubleColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return Long.compare(this.vector[index], otherVector.vector[otherIndex]);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     @Override

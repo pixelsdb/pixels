@@ -111,7 +111,7 @@ public class LongColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+            hashCode[i] = 524287 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
         }
         return hashCode;
     }
@@ -125,6 +125,18 @@ public class LongColumnVector extends ColumnVector
             return this.vector[index] == otherVector.vector[otherIndex];
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        LongColumnVector otherVector = (LongColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return this.vector[index] < otherVector.vector[otherIndex] ? -1 :
+                    (this.vector[index] == otherVector.vector[otherIndex] ? 0 : 1);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     // Fill the column vector with the provided value

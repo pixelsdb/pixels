@@ -136,7 +136,7 @@ public class TimestampColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 32));
+            hashCode[i] = 524287 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 32));
         }
         return hashCode;
     }
@@ -151,6 +151,18 @@ public class TimestampColumnVector extends ColumnVector
             return this.times[index] == otherVector.times[otherIndex];
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        TimestampColumnVector otherVector = (TimestampColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            // if times are equal, precision does not matter.
+            return Long.compare(this.times[index], otherVector.times[otherIndex]);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     /**
