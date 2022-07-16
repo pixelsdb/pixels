@@ -53,9 +53,10 @@ public class JoinAdvisor
     }
 
     private final MetadataService metadataService;
-    private final double broadcastThresholdMB;
+    private final double broadcastThresholdBytes;
     private final double broadcastThresholdRows;
-    private final double partitionSize;
+    private final double partitionSizeBytes;
+    private final double partitionSizeRows;
     /**
      * schemaTableName -> (columnName -> column)
      */
@@ -68,11 +69,13 @@ public class JoinAdvisor
         int port = Integer.parseInt(configFactory.getProperty("metadata.server.port"));
         metadataService = new MetadataService(host, port);
         String thresholdMB = configFactory.getProperty("join.broadcast.threshold.mb");
-        broadcastThresholdMB = Integer.parseInt(thresholdMB) * 1024 * 1024;
+        broadcastThresholdBytes = Long.parseLong(thresholdMB) * 1024L * 1024L;
         String thresholdRows = configFactory.getProperty("join.broadcast.threshold.rows");
-        broadcastThresholdRows = Integer.parseInt(thresholdRows);
+        broadcastThresholdRows = Long.parseLong(thresholdRows);
         String partitionSizeMB = configFactory.getProperty("join.partition.size.mb");
-        partitionSize = Integer.parseInt(partitionSizeMB) * 1024 * 1024;
+        this.partitionSizeBytes = Long.parseLong(partitionSizeMB) * 1024L * 1024L;
+        String partitionSizeRows = configFactory.getProperty("join.partition.size.rows");
+        this.partitionSizeRows = Long.parseLong(partitionSizeRows);
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
@@ -90,7 +93,7 @@ public class JoinAdvisor
             smallTableSize = getTableInputSize(rightTable);
             smallTableRows = getTableRowCount(rightTable);
         }
-        if (smallTableSize >= broadcastThresholdMB || smallTableRows > broadcastThresholdRows)
+        if (smallTableSize >= broadcastThresholdBytes || smallTableRows > broadcastThresholdRows)
         {
             return JoinAlgorithm.PARTITIONED;
         }
@@ -103,9 +106,10 @@ public class JoinAdvisor
 
     public JoinEndian getJoinEndian(Table leftTable, Table rightTable) throws MetadataException
     {
-        double leftTableSize = getTableInputSize(leftTable);
-        double rightTableSize = getTableInputSize(rightTable);
-        if (leftTableSize < rightTableSize)
+        // Use row count instead of input size, because building hash table is the main cost.
+        long leftTableRowCount = getTableRowCount(leftTable);
+        long rightTableRowCount = getTableRowCount(rightTable);
+        if (leftTableRowCount < rightTableRowCount)
         {
             return JoinEndian.SMALL_LEFT;
         }
@@ -119,15 +123,21 @@ public class JoinAdvisor
             throws MetadataException
     {
         double largeTableSize;
+        double largeTableRowCount;
         if (joinEndian == JoinEndian.LARGE_LEFT)
         {
             largeTableSize = getTableInputSize(leftTable);
+            largeTableRowCount = getTableRowCount(leftTable);
         }
         else
         {
             largeTableSize = getTableInputSize(rightTable);
+            largeTableRowCount = getTableRowCount(rightTable);
         }
-        return (int) Math.ceil(largeTableSize / partitionSize);
+        int numFromSize = (int) Math.ceil(largeTableSize / partitionSizeBytes);
+        int numFromRows = (int) Math.ceil(largeTableRowCount / partitionSizeRows);
+        // Limit the partition size by choosing the maximum number of partitions.
+        return Math.max(numFromSize, numFromRows);
     }
 
     private double getTableInputSize(Table table) throws MetadataException

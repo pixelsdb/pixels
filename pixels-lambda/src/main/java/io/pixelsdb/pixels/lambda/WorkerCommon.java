@@ -30,9 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +50,7 @@ public class WorkerCommon
     private static final Logger logger = LoggerFactory.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
+    public static final Set<String> existFiles = ConcurrentHashMap.newKeySet();
     public static Storage s3;
     public static Storage minio;
     public static final int rowBatchSize;
@@ -100,9 +100,9 @@ public class WorkerCommon
             {
                 if (checkExistence)
                 {
-                    while (!s3.exists(leftPath))
+                    while (!exists(s3, leftPath))
                     {
-                        TimeUnit.MILLISECONDS.sleep(10);
+                        TimeUnit.MILLISECONDS.sleep(100);
                     }
                 }
                 PixelsReader reader = getReader(leftPath, storage);
@@ -118,9 +118,9 @@ public class WorkerCommon
             {
                 if (checkExistence)
                 {
-                    while (!s3.exists(rightPath))
+                    while (!exists(s3, rightPath))
                     {
-                        TimeUnit.MILLISECONDS.sleep(10);
+                        TimeUnit.MILLISECONDS.sleep(100);
                     }
                 }
                 PixelsReader reader = getReader(rightPath, storage);
@@ -142,6 +142,28 @@ public class WorkerCommon
     }
 
     /**
+     * Check whether the given path exists in the storage.
+     * @param storage the storage
+     * @param path the given path
+     * @return true if the path exists
+     * @throws IOException
+     */
+    public static boolean exists(Storage storage, String path) throws IOException
+    {
+        if (existFiles.contains(path))
+        {
+            return true;
+        }
+
+        if (storage.exists(path))
+        {
+            existFiles.add(path);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Read the schemas of the table.
      *
      * @param storage the storage instance
@@ -155,9 +177,9 @@ public class WorkerCommon
         requireNonNull(path, "path is null");
         if (checkExistence)
         {
-            while (!s3.exists(path))
+            while (!exists(storage, path))
             {
-                TimeUnit.MILLISECONDS.sleep(10);
+                TimeUnit.MILLISECONDS.sleep(100);
             }
         }
         PixelsReader reader = getReader(path, storage);

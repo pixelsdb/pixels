@@ -74,6 +74,7 @@ public class TestBroadcastJoinInvoker
         leftTable.setColumnsToRead(new String[]{"p_partkey", "p_name", "p_size"});
         leftTable.setKeyColumnIds(new int[]{0});
         leftTable.setTableName("part");
+        leftTable.setBase(true);
         leftTable.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 0, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/part/v-0-compact/20220313172545_0.compact.pxl", 4, 4))),
@@ -90,6 +91,7 @@ public class TestBroadcastJoinInvoker
         rightTable.setColumnsToRead(new String[]{"l_orderkey", "l_partkey", "l_extendedprice", "l_discount"});
         rightTable.setKeyColumnIds(new int[]{1});
         rightTable.setTableName("lineitem");
+        rightTable.setBase(true);
         rightTable.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4))),

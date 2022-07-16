@@ -57,6 +57,7 @@ public class TestBroadcastChainJoinInvoker
         region.setColumnsToRead(new String[]{"r_regionkey", "r_name"});
         region.setKeyColumnIds(new int[]{0});
         region.setTableName("region");
+        region.setBase(true);
         region.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/region/v-0-order/20220313093112_0.pxl", 0, 4)))));
         region.setFilter(regionFilter);
@@ -66,6 +67,7 @@ public class TestBroadcastChainJoinInvoker
         nation.setColumnsToRead(new String[]{"n_nationkey", "n_name", "n_regionkey"});
         nation.setKeyColumnIds(new int[]{2});
         nation.setTableName("nation");
+        nation.setBase(true);
         nation.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/nation/v-0-order/20220313080937_0.pxl", 0, 4)))));
         nation.setFilter(nationFilter);
@@ -85,6 +87,7 @@ public class TestBroadcastChainJoinInvoker
         supplier.setColumnsToRead(new String[]{"s_suppkey", "s_name", "s_nationkey"});
         supplier.setKeyColumnIds(new int[]{2});
         supplier.setTableName("supplier");
+        supplier.setBase(true);
         supplier.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/supplier/v-0-compact/20220313101902_0.compact.pxl", 0, 4)))));
         supplier.setFilter(supplierFilter);
@@ -107,6 +110,7 @@ public class TestBroadcastChainJoinInvoker
         lineitem.setColumnsToRead(new String[]{"l_orderkey", "l_suppkey", "l_extendedprice", "l_discount"});
         lineitem.setKeyColumnIds(new int[]{1});
         lineitem.setTableName("lineitem");
+        lineitem.setBase(true);
         lineitem.setInputSplits(Arrays.asList(
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 0, 4))),
                 new InputSplit(Arrays.asList(new InputInfo("pixels-tpch/lineitem/v-0-compact/20220313102020_0.compact.pxl", 4, 4))),

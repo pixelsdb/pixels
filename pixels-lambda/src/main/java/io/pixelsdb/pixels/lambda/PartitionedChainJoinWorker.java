@@ -69,6 +69,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
     @Override
     public JoinOutput handleRequest(PartitionedChainJoinInput event, Context context)
     {
+        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -346,7 +347,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 BroadcastTableInfo nextChainTable = chainTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
                         nextChainTable.getInputSplits().get(0).getInputInfos().get(0).getPath(),
-                        true);
+                        !nextChainTable.isBase());
                 TypeDescription nextResultSchema = getResultSchema(
                         nextTableSchema, nextChainTable.getColumnsToRead());
 
@@ -403,7 +404,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 String rightPartitioned = it.next();
                 try
                 {
-                    if (s3.exists(rightPartitioned))
+                    if (exists(s3, rightPartitioned))
                     {
                         it.remove();
                     } else
@@ -505,7 +506,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 String rightPartitioned = it.next();
                 try
                 {
-                    if (s3.exists(rightPartitioned))
+                    if (exists(s3, rightPartitioned))
                     {
                         it.remove();
                     } else

@@ -63,6 +63,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     @Override
     public JoinOutput handleRequest(PartitionedJoinInput event, Context context)
     {
+        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -347,7 +348,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
      * @param numPartition the total number of partitions
      */
     protected static void buildHashTable(long queryId, Joiner joiner, List<String> leftParts,
-                               String[] leftCols, List<Integer> hashValues, int numPartition)
+                                         String[] leftCols, List<Integer> hashValues, int numPartition)
     {
         while (!leftParts.isEmpty())
         {
@@ -356,7 +357,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 String leftPartitioned = it.next();
                 try
                 {
-                    if (s3.exists(leftPartitioned))
+                    if (exists(s3, leftPartitioned))
                     {
                         it.remove();
                     } else
@@ -430,7 +431,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 String rightPartitioned = it.next();
                 try
                 {
-                    if (s3.exists(rightPartitioned))
+                    if (exists(s3, rightPartitioned))
                     {
                         it.remove();
                     } else
@@ -517,10 +518,11 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
+                long start = System.currentTimeMillis();
                 String rightPartitioned = it.next();
                 try
                 {
-                    if (s3.exists(rightPartitioned))
+                    if (exists(s3, rightPartitioned))
                     {
                         it.remove();
                     } else
@@ -579,6 +581,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
+                logger.info("finish processing: " + rightPartitioned + " in " +
+                        (System.currentTimeMillis() - start) + "ms");
             }
         }
 

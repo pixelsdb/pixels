@@ -28,6 +28,12 @@ public class TableInfo
     private String tableName;
 
     /**
+     * Whether this is a base table.
+     * We don't check the existence of the base table files.
+     */
+    private boolean base;
+
+    /**
      * The name of the columns to read.
      */
     private String[] columnsToRead;
@@ -37,9 +43,10 @@ public class TableInfo
      */
     public TableInfo() { }
 
-    public TableInfo(String tableName, String[] columnsToRead)
+    public TableInfo(String tableName, boolean base, String[] columnsToRead)
     {
         this.tableName = tableName;
+        this.base = base;
         this.columnsToRead = columnsToRead;
     }
 
@@ -51,6 +58,16 @@ public class TableInfo
     public void setTableName(String tableName)
     {
         this.tableName = tableName;
+    }
+
+    public boolean isBase()
+    {
+        return base;
+    }
+
+    public void setBase(boolean base)
+    {
+        base = base;
     }
 
     public String[] getColumnsToRead()

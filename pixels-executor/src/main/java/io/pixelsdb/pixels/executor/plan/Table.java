@@ -26,7 +26,7 @@ package io.pixelsdb.pixels.executor.plan;
  */
 public interface Table
 {
-    public static enum TableType
+    enum TableType
     {
         BASE, JOINED, AGGREGATED
     }

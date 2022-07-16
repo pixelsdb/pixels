@@ -63,6 +63,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
     {
+        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -134,7 +135,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
             getFileSchema(threadPool, s3, leftSchema, rightSchema,
                     leftInputs.get(0).getInputInfos().get(0).getPath(),
-                    rightInputs.get(0).getInputInfos().get(0).getPath(), true);
+                    rightInputs.get(0).getInputInfos().get(0).getPath(), !(leftTable.isBase() && rightTable.isBase()));
             Joiner joiner = new Joiner(joinType,
                     getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);
@@ -146,7 +147,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, inputs, true, leftCols, leftFilter);
+                        buildHashTable(queryId, joiner, inputs, !leftTable.isBase(), leftCols, leftFilter);
                     }
                     catch (Exception e)
                     {
@@ -182,9 +183,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     {
                         int numJoinedRows = partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, true, rightCols, rightFilter,
+                                        queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
                                         outputPartitionInfo, result) :
-                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
                                         rightFilter, result.get(0));
                     }
                     catch (Exception e)
@@ -288,7 +289,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     long start = System.currentTimeMillis();
                     try
                     {
-                        if (s3.exists(input.getPath()))
+                        if (exists(s3, input.getPath()))
                         {
                             it.remove();
                         } else
@@ -372,7 +373,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     long start = System.currentTimeMillis();
                     try
                     {
-                        if (s3.exists(input.getPath()))
+                        if (exists(s3, input.getPath()))
                         {
                             it.remove();
                         } else
@@ -471,7 +472,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     try
                     {
-                        if (s3.exists(input.getPath()))
+                        if (exists(s3, input.getPath()))
                         {
                             it.remove();
                         } else
