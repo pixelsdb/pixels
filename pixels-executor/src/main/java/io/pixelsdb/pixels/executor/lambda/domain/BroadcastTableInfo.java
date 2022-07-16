@@ -37,10 +37,10 @@ public class BroadcastTableInfo extends ScanTableInfo
      */
     public BroadcastTableInfo() { }
 
-    public BroadcastTableInfo(String tableName, List<InputSplit> inputs,
+    public BroadcastTableInfo(String tableName, boolean base, List<InputSplit> inputs,
                               String[] cols, String filter, int[] keyColumnIds)
     {
-        super(tableName, inputs, cols, filter);
+        super(tableName, base, inputs, cols, filter);
         this.keyColumnIds = keyColumnIds;
     }
 

@@ -66,6 +66,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
     @Override
     public JoinOutput handleRequest(BroadcastChainJoinInput event, Context context)
     {
+        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -165,9 +166,9 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     {
                         int numJoinedRows = partitionOutput ?
                                 joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, true, rightCols, rightFilter,
+                                        queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
                                         outputPartitionInfo, result) :
-                                joinWithRightTable(queryId, joiner, inputs, true, rightCols,
+                                joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
                                         rightFilter, result.get(0));
                     }
                     catch (Exception e)
@@ -274,7 +275,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 BroadcastTableInfo currRightTable = leftTables.get(i);
                 BroadcastTableInfo nextTable = leftTables.get(i+1);
                 TypeDescription nextTableSchema = getFileSchema(s3,
-                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
+                        nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), !nextTable.isBase());
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
@@ -289,7 +290,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
             BroadcastTableInfo lastLeftTable = leftTables.get(leftTables.size()-1);
             TypeDescription rightTableSchema = getFileSchema(s3,
-                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
+                    rightTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), !rightTable.isBase());
             TypeDescription rightResultSchema = getResultSchema(rightTableSchema, rightTable.getColumnsToRead());
             Joiner finalJoiner = new Joiner(lastJoinInfo.getJoinType(),
                     currJoiner.getJoinedSchema(), lastJoinInfo.getSmallColumnAlias(),
@@ -324,7 +325,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
         getFileSchema(executor, s3, t1Schema, t2Schema,
                 t1.getInputSplits().get(0).getInputInfos().get(0).getPath(),
-                t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), true);
+                t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), !(t1.isBase() && t2.isBase()));
         Joiner joiner = new Joiner(joinInfo.getJoinType(),
                 getResultSchema(t1Schema.get(), t1.getColumnsToRead()), joinInfo.getSmallColumnAlias(),
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
@@ -338,7 +339,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    buildHashTable(queryId, joiner, inputs, true, t1.getColumnsToRead(), t1Filter);
+                    buildHashTable(queryId, joiner, inputs, !t1.isBase(), t1.getColumnsToRead(), t1Filter);
                 }
                 catch (Exception e)
                 {
@@ -376,7 +377,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             rightFutures.add(executor.submit(() -> {
                 try
                 {
-                    chainJoinSplit(queryId, currJoiner, nextJoiner, inputs, true,
+                    chainJoinSplit(queryId, currJoiner, nextJoiner, inputs, !currRightTable.isBase(),
                             currRightTable.getColumnsToRead(), currRigthFilter);
                 }
                 catch (Exception e)
@@ -417,7 +418,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     long start = System.currentTimeMillis();
                     try
                     {
-                        if (s3.exists(input.getPath()))
+                        if (exists(s3, input.getPath()))
                         {
                             it.remove();
                         } else

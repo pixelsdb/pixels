@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.HashMap;
@@ -40,12 +41,15 @@ import static java.util.Objects.requireNonNull;
  */
 public class CostBasedSplitsIndex implements SplitsIndex
 {
-    private static final int SPLIT_SIZE_BYTES;
+    private static final long SPLIT_SIZE_BYTES;
+    private static final long SPLIT_SIZE_ROWS;
 
     static
     {
-        String unit = ConfigFactory.Instance().getProperty("split.size.in.bytes");
-        SPLIT_SIZE_BYTES = Integer.parseInt(unit);
+        String splitSizeMB = ConfigFactory.Instance().getProperty("split.size.mb");
+        SPLIT_SIZE_BYTES = Long.parseLong(splitSizeMB) * 1024L * 1024L;
+        String splitSizeRows = ConfigFactory.Instance().getProperty("split.size.rows");
+        SPLIT_SIZE_ROWS = Long.parseLong(splitSizeRows);
     }
 
     private int version;
@@ -62,7 +66,6 @@ public class CostBasedSplitsIndex implements SplitsIndex
         this.defaultSplitSize = defaultSplitSize;
         checkArgument(maxSplitSize >= defaultSplitSize,
                 "maxSplitSize must be greater or equal to defaultSplitSize");
-        this.maxSplitSize = maxSplitSize;
         this.metadataService = requireNonNull(metadataService, "metadataService is null");
         requireNonNull(schemaTableName, "schemaTableName is null");
 
@@ -74,9 +77,35 @@ public class CostBasedSplitsIndex implements SplitsIndex
             MetadataCache.Instance().cacheTableColumns(schemaTableName, columns);
         }
         this.columnMap = new HashMap<>(columns.size());
+        double rowGroupSize = 0, tableSize = 0;
         for (Column column : columns)
         {
+            rowGroupSize += column.getChunkSize();
+            tableSize += column.getSize();
             this.columnMap.put(column.getName(), column);
+        }
+
+        if (SPLIT_SIZE_ROWS > 0)
+        {
+            Table table = MetadataCache.Instance().getTable(schemaTableName);
+            if (table == null)
+            {
+                table = this.metadataService.getTable(
+                        schemaTableName.getSchemaName(), schemaTableName.getTableName());
+                MetadataCache.Instance().cacheTable(schemaTableName, table);
+            }
+            double numRowGroups = Math.ceil(tableSize / rowGroupSize);
+            double rowsPerRowGroup = table.getRowCount() / numRowGroups;
+            checkArgument(rowsPerRowGroup > 0,
+                    "Number of rows per row-group must > 0.");
+            int splitSizeCap = (int) Math.ceil(SPLIT_SIZE_ROWS / rowsPerRowGroup);
+            // round the split size to be the power of 2.
+            splitSizeCap = Integer.highestOneBit(splitSizeCap - 1) << 1;
+            this.maxSplitSize = Math.min(maxSplitSize, splitSizeCap);
+        }
+        else
+        {
+            this.maxSplitSize = maxSplitSize;
         }
     }
 

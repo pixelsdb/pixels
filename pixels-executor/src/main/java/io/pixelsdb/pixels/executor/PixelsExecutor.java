@@ -522,10 +522,12 @@ public class PixelsExecutor
             List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
             List<String> rightPartitionedFiles = getPartitionedFiles(rightJoinInputs);
             PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
-                    leftTable.getTableName(), leftPartitionedFiles, IntraWorkerParallelism,
+                    leftTable.getTableName(), leftTable.getTableType() == BASE,
+                    leftPartitionedFiles, IntraWorkerParallelism,
                     leftTable.getColumnNames(), leftKeyColumnIds);
             PartitionedTableInfo rightTableInfo = new PartitionedTableInfo(
-                    rightTable.getTableName(), rightPartitionedFiles, IntraWorkerParallelism,
+                    rightTable.getTableName(), rightTable.getTableType() == BASE,
+                    rightPartitionedFiles, IntraWorkerParallelism,
                     rightTable.getColumnNames(), rightKeyColumnIds);
 
             int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
@@ -773,8 +775,8 @@ public class PixelsExecutor
             }
 
             int internalParallelism = IntraWorkerParallelism;
-            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty() &&
-                    rightTable.getFilter().isEmpty() && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
+            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty())// &&
+                    //rightTable.getFilter().isEmpty() && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
             {
                 /*
                  * This is used to reduce the latency of join result writing, by increasing the
@@ -875,7 +877,8 @@ public class PixelsExecutor
             {
                 // left side is post partitioned, thus we only partition the right table.
                 PartitionedTableInfo leftTableInfo = new PartitionedTableInfo(
-                        leftTable.getTableName(), leftPartitionedFiles, IntraWorkerParallelism,
+                        leftTable.getTableName(), leftTable.getTableType() == BASE,
+                        leftPartitionedFiles, IntraWorkerParallelism,
                         leftTable.getColumnNames(), leftKeyColumnIds);
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
@@ -1001,6 +1004,7 @@ public class PixelsExecutor
     {
         BroadcastTableInfo tableInfo = new BroadcastTableInfo();
         tableInfo.setTableName(table.getTableName());
+        tableInfo.setBase(table.getTableType() == BASE);
         tableInfo.setInputSplits(inputSplits);
         tableInfo.setColumnsToRead(table.getColumnNames());
         if (table.getTableType() == BASE)
@@ -1025,8 +1029,8 @@ public class PixelsExecutor
             rightPartitionedFiles.add(partitionInput.getOutput().getPath());
         }
 
-        return new PartitionedTableInfo(table.getTableName(), rightPartitionedFiles.build(),
-                IntraWorkerParallelism, table.getColumnNames(), keyColumnIds);
+        return new PartitionedTableInfo(table.getTableName(), table.getTableType() == BASE,
+                rightPartitionedFiles.build(), IntraWorkerParallelism, table.getColumnNames(), keyColumnIds);
     }
 
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits,

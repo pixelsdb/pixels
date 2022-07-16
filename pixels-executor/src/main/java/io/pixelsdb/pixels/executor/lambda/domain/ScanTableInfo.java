@@ -41,10 +41,10 @@ public class ScanTableInfo extends TableInfo
      */
     public ScanTableInfo() { }
 
-    public ScanTableInfo(String tableName, List<InputSplit> inputSplits,
+    public ScanTableInfo(String tableName, boolean base, List<InputSplit> inputSplits,
                          String[] columnsToRead, String filter)
     {
-        super(tableName, columnsToRead);
+        super(tableName, base, columnsToRead);
         this.inputSplits = inputSplits;
         this.filter = filter;
     }

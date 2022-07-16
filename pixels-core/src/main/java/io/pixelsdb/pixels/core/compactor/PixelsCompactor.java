@@ -223,7 +223,7 @@ public class PixelsCompactor
         {
             // check arguments
             if (sourcePaths == null || compactLayout == null || builderStorage == null ||
-                    builderFilePath == null || pixelStride <= 0)
+                    builderFilePath == null)
             {
                 throw new IllegalArgumentException("Missing argument to build PixelsCompactor");
             }

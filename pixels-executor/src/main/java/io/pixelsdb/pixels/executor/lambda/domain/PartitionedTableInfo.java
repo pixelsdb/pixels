@@ -46,10 +46,10 @@ public class PartitionedTableInfo extends TableInfo
      */
     public PartitionedTableInfo() { }
 
-    public PartitionedTableInfo(String tableName, List<String> inputFiles,
+    public PartitionedTableInfo(String tableName, boolean base, List<String> inputFiles,
                                 int parallelism, String[] columnsToRead, int[] keyColumnIds)
     {
-        super(tableName, columnsToRead);
+        super(tableName, base, columnsToRead);
         this.inputFiles = inputFiles;
         this.parallelism = parallelism;
         this.keyColumnIds = keyColumnIds;

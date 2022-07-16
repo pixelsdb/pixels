@@ -63,6 +63,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
     @Override
     public AggregationOutput handleRequest(AggregationInput event, Context context)
     {
+        existFiles.clear();
         AggregationOutput aggregationOutput = new AggregationOutput();
         long startTime = System.currentTimeMillis();
         aggregationOutput.setStartTimeMs(startTime);
@@ -214,7 +215,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 String inputFile = it.next();
                 try
                 {
-                    if (s3.exists(inputFile))
+                    if (exists(s3, inputFile))
                     {
                         it.remove();
                     } else
