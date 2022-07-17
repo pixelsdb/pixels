@@ -520,7 +520,7 @@ public class Main
 
                     // compact
                     long startTime = System.currentTimeMillis();
-                    for (int i = 0, thdId = 0; i < statuses.size(); i+=numRowGroupInBlock, thdId++)
+                    for (int i = 0, thdId = 0; i < statuses.size(); i += numRowGroupInBlock, ++thdId)
                     {
                         if (i + numRowGroupInBlock > statuses.size())
                         {
@@ -542,12 +542,19 @@ public class Main
                         List<String> sourcePaths = new ArrayList<>();
                         for (int j = 0; j < numRowGroupInBlock; ++j)
                         {
-                            sourcePaths.add(statuses.get(i+j).getPath());
+                            if (!statuses.get(i+j).getPath().endsWith("/"))
+                            {
+                                sourcePaths.add(statuses.get(i + j).getPath());
+                            }
                         }
 
-                        String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/") +
-                                DateUtil.getCurTime() +
-                                ".compact.pxl";
+                        String filePath = layout.getCompactPath() + (layout.getCompactPath().endsWith("/") ? "" : "/");
+                        if (compactStorage.getScheme() == Storage.Scheme.s3 || compactStorage.getScheme() == Storage.Scheme.minio)
+                        {
+                            // Give each compact file a unique prefix to avoid throttling.
+                            filePath += thdId + "/";
+                        }
+                        filePath += DateUtil.getCurTime() + "_compact.pxl";
 
                         System.out.println("(" + thdId + ") " + sourcePaths.size() +
                                 " ordered files to be compacted into '" + filePath + "'.");
@@ -572,6 +579,7 @@ public class Main
                                         .setBlockPadding(false);
 
                         long threadStart = System.currentTimeMillis();
+                        String finalFilePath = filePath;
                         compactExecutor.execute(() -> {
                             // Issue #192: run compaction in threads.
                             try
@@ -584,7 +592,7 @@ public class Main
                             {
                                 e.printStackTrace();
                             }
-                            System.out.println("Compact file '" + filePath + "' is built in " +
+                            System.out.println("Compact file '" + finalFilePath + "' is built in " +
                                     ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
                         });
                     }

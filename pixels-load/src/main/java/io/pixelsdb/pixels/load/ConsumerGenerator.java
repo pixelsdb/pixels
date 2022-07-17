@@ -81,7 +81,7 @@ public class ConsumerGenerator
                 {
                     if (config.getFormat().equalsIgnoreCase("pixels"))
                     {
-                        PixelsConsumer pixelsConsumer = new PixelsConsumer(queue, prop, config);
+                        PixelsConsumer pixelsConsumer = new PixelsConsumer(queue, prop, config, i);
                         consumers[i] = pixelsConsumer;
                         pixelsConsumer.start();
                     } else if (config.getFormat().equalsIgnoreCase("orc"))

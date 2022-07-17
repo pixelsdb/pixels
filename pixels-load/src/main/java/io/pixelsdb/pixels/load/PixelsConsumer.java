@@ -44,20 +44,22 @@ import java.util.concurrent.TimeUnit;
 public class PixelsConsumer extends Consumer
 {
 
-    private BlockingQueue<String> queue;
-    private Properties prop;
-    private Config config;
+    private final BlockingQueue<String> queue;
+    private final Properties prop;
+    private final Config config;
+    private final int consumerId;
 
     public Properties getProp()
     {
         return prop;
     }
 
-    public PixelsConsumer(BlockingQueue<String> queue, Properties prop, Config config)
+    public PixelsConsumer(BlockingQueue<String> queue, Properties prop, Config config, int consumerId)
     {
         this.queue = queue;
         this.prop = prop;
         this.config = config;
+        this.consumerId = consumerId;
     }
 
     @Override
@@ -121,7 +123,14 @@ public class PixelsConsumer extends Consumer
                             }
                             // we create a new pixels file if we can read a next line from the source file.
 
-                            targetFilePath = targetDirPath + DateUtil.getCurTime() + ".pxl";
+                            targetFilePath = targetDirPath;
+                            if (targetStorage.getScheme() == Storage.Scheme.s3 || targetStorage.getScheme() == Storage.Scheme.minio)
+                            {
+                                // Partition the objects into different prefixes to avoid throttling.
+                                targetFilePath += consumerId + "/";
+                            }
+                            targetFilePath += DateUtil.getCurTime() + ".pxl";
+
                             pixelsWriter = PixelsWriterImpl.newBuilder()
                                     .setSchema(schema)
                                     .setPixelStride(pixelStride)
