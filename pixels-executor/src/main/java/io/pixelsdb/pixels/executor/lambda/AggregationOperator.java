@@ -29,14 +29,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.executor.lambda.SingleStageJoinOperator.waitForCompletion;
 import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
  * @date 05/07/2022
  */
-public class AggregationOperator implements Operator
+public class AggregationOperator extends Operator
 {
     /**
      * The input of the final aggregation worker that produce the

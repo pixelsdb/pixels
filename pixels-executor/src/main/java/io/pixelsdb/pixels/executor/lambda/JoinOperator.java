@@ -29,19 +29,19 @@ import java.util.concurrent.ExecutionException;
  * @author hank
  * @date 05/06/2022
  */
-public interface JoinOperator extends Operator
+public abstract class JoinOperator extends Operator
 {
-    List<JoinInput> getJoinInputs();
+    public abstract List<JoinInput> getJoinInputs();
 
-    JoinAlgorithm getJoinAlgo();
+    public abstract JoinAlgorithm getJoinAlgo();
 
-    void setSmallChild(JoinOperator child);
+    public abstract void setSmallChild(JoinOperator child);
 
-    void setLargeChild(JoinOperator child);
+    public abstract void setLargeChild(JoinOperator child);
 
-    JoinOperator getSmallChild();
+    public abstract JoinOperator getSmallChild();
 
-    JoinOperator getLargeChild();
+    public abstract JoinOperator getLargeChild();
 
     /**
      * This method collects the outputs of the join operator. It may block until the join
@@ -49,14 +49,14 @@ public interface JoinOperator extends Operator
      * it will block the query execution.
      * @return the out
      */
-    JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException;
+    public abstract JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
     /**
      * This class is used to collect the outputs of a join operator.
      * It can be serialized to a json string or deserialized to an object from json string
      * by fastjson or other feasible json libraries.
      */
-    class JoinOutputCollection implements OutputCollection
+    public static class JoinOutputCollection implements OutputCollection
     {
         protected JoinAlgorithm joinAlgo;
         protected OutputCollection smallChild;

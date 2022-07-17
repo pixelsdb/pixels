@@ -19,21 +19,34 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * @author hank
  * @date 05/07/2022
  */
-public interface Operator
+public abstract class Operator
 {
+    protected static final double StageCompletionRatio;
+
+    static
+    {
+        StageCompletionRatio = Double.parseDouble(
+                ConfigFactory.Instance().getProperty("executor.stage.completion.ratio"));
+    }
+
     /**
      * Execute this operator recursively.
      *
      * @return the completable futures of the execution outputs.
      */
-    CompletableFuture<?>[] execute();
+    public abstract CompletableFuture<?>[] execute();
 
     /**
      * Execute the previous stages (if any) before the last stage, recursively.
@@ -41,15 +54,46 @@ public interface Operator
      * we should wait for completion.
      * @return empty array if the previous stages do not exist or do not need to be wait for
      */
-    CompletableFuture<?>[] executePrev();
+    public abstract CompletableFuture<?>[] executePrev();
 
     /**
-     * This method collects the outputs of the the operator. It may block until the join
+     * This method collects the outputs of the operator. It may block until the join
      * completes, therefore it should not be called in the query execution thread. Otherwise,
      * it will block the query execution.
      * @return the out
      */
-    OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
+    public abstract OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
-    interface OutputCollection { }
+    public interface OutputCollection { }
+
+    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs)
+    {
+        requireNonNull(stageOutputs, "stageOutputs is null");
+
+        if (stageOutputs.length == 0)
+        {
+            return;
+        }
+
+        while (true)
+        {
+            double completed = 0;
+            for (CompletableFuture<?> childOutput : stageOutputs)
+            {
+                if (childOutput.isDone())
+                {
+                    checkArgument(!childOutput.isCompletedExceptionally(),
+                            "worker in the stage is completed exceptionally");
+                    checkArgument(!childOutput.isCancelled(),
+                            "worker in the stage is cancelled");
+                    completed++;
+                }
+            }
+
+            if (completed / stageOutputs.length >= StageCompletionRatio)
+            {
+                break;
+            }
+        }
+    }
 }

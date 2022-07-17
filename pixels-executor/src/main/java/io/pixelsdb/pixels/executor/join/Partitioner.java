@@ -19,11 +19,12 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
-import com.google.common.primitives.Ints;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -40,8 +41,13 @@ public class Partitioner
     private final int numPartition;
     private final int batchSize;
     private final TypeDescription schema;
+    private final int numFields;
     private final int[] keyColumnIds;
     private final VectorizedRowBatch[] rowBatches;
+    private final int[][] selectedArrays;
+    private final int[] selectedArrayIndexes;
+    private final int[] hashCode;
+    private int hashCodeLength;
 
     /**
      * Create a partitioner to partition the input row batches into a number of
@@ -50,7 +56,7 @@ public class Partitioner
      * For combined partition key, the key column must be the first numKeyColumns columns
      * int the input row batches. And the hash code of the key is computed as:
      * <blockquote>
-     * col[0].hashCode()*31^(n-1) + col[1].hashCode()*31^(n-2) + ... + col[n-1].hashCode()
+     * col[0].hashCode()*524287^(n-1) + col[1].hashCode()*524287^(n-2) + ... + col[n-1].hashCode()
      * </blockquote>
      * Where col[i] is the value of the ith column in the partition key.
      *
@@ -70,12 +76,19 @@ public class Partitioner
         this.numPartition = numPartition;
         this.batchSize = batchSize;
         this.schema = schema;
+        this.numFields = schema.getChildren().size();
         this.keyColumnIds = keyColumnIds;
         this.rowBatches = new VectorizedRowBatch[numPartition];
+        this.selectedArrays = new int[numPartition][];
+        this.selectedArrayIndexes = new int[numPartition];
         for (int i = 0; i < numPartition; ++i)
         {
             this.rowBatches[i] = schema.createRowBatch(batchSize);
+            this.selectedArrays[i] = new int[batchSize];
+            this.selectedArrayIndexes[i] = 0;
         }
+        this.hashCode = new int[batchSize];
+        this.hashCodeLength = 0;
     }
 
     /**
@@ -89,51 +102,47 @@ public class Partitioner
         requireNonNull(input, "input is null");
         checkArgument(input.size <= batchSize, "input is oversize");
         // this.schema.getChildren() has been checked not null.
-        checkArgument(input.numCols == this.schema.getChildren().size(),
+        checkArgument(input.numCols == this.numFields,
                 "input.numCols does not match the number of fields in the schema");
-        int[] hashCode = getHashCode(input);
-        List<List<Integer>> selectedArrays = new ArrayList<>(numPartition);
-        for (int i = 0; i < numPartition; ++i)
+        computeHashCode(input);
+        for (int i = 0; i < this.hashCodeLength; ++i)
         {
-            selectedArrays.add(new LinkedList<>());
-        }
-        for (int i = 0; i < hashCode.length; ++i)
-        {
-            int hashKey = Math.abs(hashCode[i]) % this.numPartition;
+            int hashKey = Math.abs(this.hashCode[i]) % this.numPartition;
             // add the row id to the selected array of the partition.
-            selectedArrays.get(hashKey).add(i);
+            this.selectedArrays[hashKey][this.selectedArrayIndexes[hashKey]++] = i;
         }
 
         Map<Integer, VectorizedRowBatch> output = new HashMap<>();
         for (int hash = 0; hash < numPartition; ++hash)
         {
-            int[] selected = Ints.toArray(selectedArrays.get(hash));
-            if (selected.length == 0)
+            if (this.selectedArrayIndexes[hash] == 0)
             {
                 // this partition is empty
                 continue;
             }
             int freeSlots = rowBatches[hash].freeSlots();
+            int[] selected = this.selectedArrays[hash];
+            int selectedLength = this.selectedArrayIndexes[hash];
+            this.selectedArrayIndexes[hash] = 0;
             if (freeSlots == 0)
             {
                 output.put(hash, rowBatches[hash]);
                 rowBatches[hash] = schema.createRowBatch(batchSize);
-                rowBatches[hash].addSelected(selected, 0, selected.length, input);
+                rowBatches[hash].addSelected(selected, 0, selectedLength, input);
             }
-            else if (freeSlots <= selected.length)
+            else if (freeSlots <= selectedLength)
             {
                 rowBatches[hash].addSelected(selected, 0, freeSlots, input);
                 output.put(hash, rowBatches[hash]);
                 rowBatches[hash] = schema.createRowBatch(batchSize);
-                if (freeSlots < selected.length)
+                if (freeSlots < selectedLength)
                 {
-                    rowBatches[hash].addSelected(selected, freeSlots,
-                            selected.length - freeSlots, input);
+                    rowBatches[hash].addSelected(selected, freeSlots, selectedLength - freeSlots, input);
                 }
             }
             else
             {
-                rowBatches[hash].addSelected(selected, 0, selected.length, input);
+                rowBatches[hash].addSelected(selected, 0, selectedLength, input);
             }
         }
         return output;
@@ -142,17 +151,15 @@ public class Partitioner
     /**
      * Get the hash code of the partition key of the rows in the input row batch.
      * @param input the input row batch
-     * @return the hash code
      */
-    private int[] getHashCode(VectorizedRowBatch input)
+    private void computeHashCode(VectorizedRowBatch input)
     {
-        int[] hashCode = new int[input.size];
-        Arrays.fill(hashCode, 0);
+        this.hashCodeLength = input.size;
+        Arrays.fill(hashCode, 0, this.hashCodeLength, 0);
         for (int columnId : keyColumnIds)
         {
             input.cols[columnId].accumulateHashCode(hashCode);
         }
-        return hashCode;
     }
 
     public int getNumPartition()

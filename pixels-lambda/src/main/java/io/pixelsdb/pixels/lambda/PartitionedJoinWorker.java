@@ -41,7 +41,6 @@ import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -362,9 +361,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         it.remove();
                     } else
                     {
+                        TimeUnit.MILLISECONDS.sleep(10);
                         continue;
                     }
-                } catch (IOException e)
+                } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             leftPartitioned + "' of the left table", e);
@@ -436,9 +436,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         it.remove();
                     } else
                     {
+                        TimeUnit.MILLISECONDS.sleep(10);
                         continue;
                     }
-                } catch (IOException e)
+                } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);
@@ -527,9 +528,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         it.remove();
                     } else
                     {
+                        TimeUnit.MILLISECONDS.sleep(10);
                         continue;
                     }
-                } catch (IOException e)
+                } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
                             rightPartitioned + "' of the right table", e);

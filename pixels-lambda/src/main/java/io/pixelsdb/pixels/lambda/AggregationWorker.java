@@ -39,7 +39,6 @@ import io.pixelsdb.pixels.executor.lambda.output.AggregationOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -220,9 +219,10 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                         it.remove();
                     } else
                     {
+                        TimeUnit.MILLISECONDS.sleep(10);
                         continue;
                     }
-                } catch (IOException e)
+                } catch (Exception e)
                 {
                     throw new PixelsWorkerException(
                             "failed to check the existence of the input partial aggregation file '" +

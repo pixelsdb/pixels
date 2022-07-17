@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.executor.lambda;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
@@ -29,29 +28,19 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static java.util.Objects.requireNonNull;
-
 /**
  * The executor of a single-stage join.
  *
  * @author hank
  * @date 04/06/2022
  */
-public class SingleStageJoinOperator implements JoinOperator
+public class SingleStageJoinOperator extends JoinOperator
 {
-    protected static final double StageCompletionRatio;
     protected final List<JoinInput> joinInputs;
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
     protected CompletableFuture<?>[] joinOutputs = null;
-
-    static
-    {
-        StageCompletionRatio = Double.parseDouble(
-                ConfigFactory.Instance().getProperty("executor.stage.completion.ratio"));
-    }
 
     public SingleStageJoinOperator(JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
@@ -173,37 +162,6 @@ public class SingleStageJoinOperator implements JoinOperator
             outputCollection.setLargeChild(largeChild.collectOutputs());
         }
         return outputCollection;
-    }
-
-    protected static void waitForCompletion(CompletableFuture<?>[] childOutputs)
-    {
-        requireNonNull(childOutputs, "childOutputs is null");
-
-        if (childOutputs.length == 0)
-        {
-            return;
-        }
-
-        while (true)
-        {
-            double completed = 0;
-            for (CompletableFuture<?> childOutput : childOutputs)
-            {
-                if (childOutput.isDone())
-                {
-                    checkArgument(!childOutput.isCompletedExceptionally(),
-                            "child join worker is completed exceptionally");
-                    checkArgument(!childOutput.isCancelled(),
-                            "child join worker is cancelled");
-                    completed++;
-                }
-            }
-
-            if (completed / childOutputs.length >= StageCompletionRatio)
-            {
-                break;
-            }
-        }
     }
 
     public static class SingleStageJoinOutputCollection extends JoinOutputCollection
