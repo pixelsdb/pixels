@@ -214,7 +214,7 @@ public class PixelsExecutor
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = computeFinalAggrInServer && !preAggregate ? finalOutputBase : intermediateBase;
-                fileName += "partial_aggr_" + outputId++;
+                fileName += (outputId++) + "/partial_aggr";
                 StorageInfo storageInfo;
                 if (computeFinalAggrInServer && !preAggregate)
                 {
@@ -312,7 +312,7 @@ public class PixelsExecutor
                 preAggrInput.setParallelism(IntraWorkerParallelism);
 
                 String fileName = computeFinalAggrInServer ? finalOutputBase : intermediateBase;
-                fileName += "pre_aggr_" + outputId++;
+                fileName += (outputId++) + "/pre_aggr";
                 preAggrInput.setOutput(new OutputInfo(fileName, false,
                         outputStorageInfo, true));
                 finalAggrInputFilesBuilder.add(fileName);
@@ -431,7 +431,7 @@ public class PixelsExecutor
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
@@ -703,7 +703,7 @@ public class PixelsExecutor
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
@@ -800,7 +800,7 @@ public class PixelsExecutor
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                             .builderWithExpectedSize(internalParallelism);
-                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                     for (int j = 0; j < internalParallelism && i < rightInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(rightInputSplits.get(i));
@@ -835,7 +835,7 @@ public class PixelsExecutor
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                             .builderWithExpectedSize(internalParallelism);
-                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                     for (int j = 0; j < internalParallelism && i < leftInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(leftInputSplits.get(i));
@@ -884,7 +884,7 @@ public class PixelsExecutor
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
@@ -911,14 +911,14 @@ public class PixelsExecutor
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + leftTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs);
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
 
@@ -1063,7 +1063,7 @@ public class PixelsExecutor
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
             }
             partitionInput.setTableInfo(tableInfo);
-            partitionInput.setOutput(new OutputInfo(outputBase + outputId++, false,
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", false,
                     new StorageInfo(InputStorage, null, null, null), true));
             partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1113,11 +1113,11 @@ public class PixelsExecutor
         {
             ImmutableList.Builder<String> outputFileNames = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
-            outputFileNames.add("join_" + i);
+            outputFileNames.add(i + "/join");
             if (joinedTable.getJoin().getJoinType() == JoinType.EQUI_LEFT ||
                     joinedTable.getJoin().getJoinType() == JoinType.EQUI_FULL)
             {
-                outputFileNames.add("join_" + i + "_left");
+                outputFileNames.add(i + "/join_left");
             }
 
             String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
