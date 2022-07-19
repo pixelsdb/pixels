@@ -775,8 +775,8 @@ public class PixelsExecutor
             }
 
             int internalParallelism = IntraWorkerParallelism;
-            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty())// &&
-                    //rightTable.getFilter().isEmpty() && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
+            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty() &&
+                    rightTable.getFilter().isEmpty())// && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
             {
                 /*
                  * This is used to reduce the latency of join result writing, by increasing the

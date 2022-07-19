@@ -27,8 +27,18 @@ import java.util.*;
  */
 public class HashTable implements Iterable<Tuple>
 {
-    private final HashMap<Tuple, Tuple> hashTable = new HashMap<>();
+    private final int NUM_HASH_TABLES = 31;
+    private final List<HashMap<Tuple, Tuple>> hashTables;
     private int size = 0;
+
+    public HashTable()
+    {
+        this.hashTables = new ArrayList<>(NUM_HASH_TABLES);
+        for (int i = 0; i < NUM_HASH_TABLES; ++i)
+        {
+            this.hashTables.add(new HashMap<>());
+        }
+    }
 
     /**
      * The user of this method must ensure the tuple is not null and the same tuple
@@ -40,19 +50,22 @@ public class HashTable implements Iterable<Tuple>
     public void put(Tuple tuple)
     {
         size++;
-        Tuple head = this.hashTable.get(tuple);
+        int index = tuple.hashCode() % NUM_HASH_TABLES;
+        Map<Tuple, Tuple> hashTable = this.hashTables.get(index < 0 ? -index : index);
+        Tuple head = hashTable.get(tuple);
         if (head != null)
         {
             tuple.next = head.next;
             head.next = tuple;
             return;
         }
-        this.hashTable.put(tuple, tuple);
+        hashTable.put(tuple, tuple);
     }
 
     public Tuple getHead(Tuple tuple)
     {
-        return this.hashTable.get(tuple);
+        int index = tuple.hashCode() % NUM_HASH_TABLES;
+        return this.hashTables.get(index < 0 ? -index : index).get(tuple);
     }
 
     public int size()
@@ -68,22 +81,24 @@ public class HashTable implements Iterable<Tuple>
 
     private class TupleIterator implements Iterator<Tuple>
     {
-        private final Iterator<Tuple> mainIterator;
+        private int mapIndex;
+        private Iterator<Tuple> mapIterator;
         private Tuple currHead = null;
 
         private TupleIterator()
         {
-            mainIterator = hashTable.values().iterator();
-            if (mainIterator.hasNext())
+            mapIndex = 0;
+            mapIterator = hashTables.get(mapIndex++).values().iterator();
+            if (mapIterator.hasNext())
             {
-                currHead = mainIterator.next();
+                currHead = mapIterator.next();
             }
         }
 
         @Override
         public boolean hasNext()
         {
-            return currHead != null || mainIterator.hasNext();
+            return currHead != null || mapIterator.hasNext() || mapIndex < NUM_HASH_TABLES;
         }
 
         @Override
@@ -96,13 +111,20 @@ public class HashTable implements Iterable<Tuple>
                 currHead = currHead.next;
                 return next;
             }
-            if (mainIterator.hasNext())
+            if (mapIterator.hasNext())
             {
-                currHead = mainIterator.next();
-                if (currHead != null)
+                next = mapIterator.next();
+                currHead = next.next;
+                return next;
+                // We ensure there is no null value in the hash maps.
+            }
+            if (mapIndex < NUM_HASH_TABLES)
+            {
+                mapIterator = hashTables.get(mapIndex++).values().iterator();
+                if (mapIterator.hasNext())
                 {
-                    next = currHead;
-                    currHead = currHead.next;
+                    next = mapIterator.next();
+                    currHead = next.next;
                     return next;
                 }
             }
