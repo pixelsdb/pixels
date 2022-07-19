@@ -199,6 +199,36 @@ public class Integer128StatsRecorder
     }
 
     @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        if (!this.hasMinimum || !this.hasMaximum)
+        {
+            return -1;
+        }
+        Integer128 lower = minimum;
+        Integer128 upper = maximum;
+        if (lowerBound != null)
+        {
+            lower = (Integer128) lowerBound;
+        }
+        if (upperBound != null)
+        {
+            upper = (Integer128) upperBound;
+        }
+        checkArgument(lower.compareTo(upper) < 0, "lower bound must be larger than the upper bound");
+        if (lower.compareTo(minimum) < 0)
+        {
+            lower = minimum;
+        }
+        if (upper.compareTo(maximum) > 0)
+        {
+            upper = maximum;
+        }
+        return (upper.toBigInteger().subtract(lower.toBigInteger()))
+                .divide(maximum.toBigInteger().subtract(minimum.toBigInteger())).doubleValue();
+    }
+
+    @Override
     public boolean isSumDefined()
     {
         return false;

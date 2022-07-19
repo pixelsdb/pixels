@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.core.TypeDescription;
 
 import java.math.BigDecimal;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * This is the general stats to be used by Trino and pixels-optimizer.
  *
@@ -66,6 +68,35 @@ public class GeneralRangeStats implements RangeStats<Double>
     public boolean hasMaximum()
     {
         return hasMaximum;
+    }
+
+    @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        if (!this.hasMinimum || !this.hasMaximum)
+        {
+            return -1;
+        }
+        double lower = minimum;
+        double upper = maximum;
+        if (lowerBound != null)
+        {
+            lower = (double) lowerBound;
+        }
+        if (upperBound != null)
+        {
+            upper = (double) upperBound;
+        }
+        checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
+        if (lower < minimum)
+        {
+            lower = minimum;
+        }
+        if (upper > maximum)
+        {
+            upper = maximum;
+        }
+        return (upper - lower) / (maximum - minimum);
     }
 
     public static GeneralRangeStats fromStatsRecorder(TypeDescription type, IntegerStatsRecorder statsRecorder)

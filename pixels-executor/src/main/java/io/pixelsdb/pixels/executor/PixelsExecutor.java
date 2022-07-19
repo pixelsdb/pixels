@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
@@ -1084,7 +1085,8 @@ public class PixelsExecutor
      */
     private List<JoinInput> getPartitionedJoinInputs(
             JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
-            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo) throws MetadataException
+            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo)
+            throws MetadataException, InvalidProtocolBufferException
     {
         boolean postPartition = false;
         PartitionInfo postPartitionInfo = null;

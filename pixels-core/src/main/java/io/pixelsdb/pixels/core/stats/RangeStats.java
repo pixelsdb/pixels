@@ -39,4 +39,14 @@ public interface RangeStats<T>
      * @return true if the maximum value is present.
      */
     boolean hasMaximum();
+
+    /**
+     * Get the estimation of selectivity given the selection range.
+     * @param lowerBound the Pixels native value for the lower bound of the range, null if not lower bounded
+     * @param lowerInclusive true if the lower bound is included
+     * @param upperBound the Pixels native value for the upper bound of the range, null if not upper bounded
+     * @param upperInclusive true if the upper bound is included
+     * @return the estimated selectivity, for example 0.05 means 5%, negative if the selectivity can not be estimated
+     */
+    double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive);
 }
