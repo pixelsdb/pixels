@@ -699,6 +699,8 @@ public class PixelsExecutor
                             (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+                    // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                    rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                     int outputId = 0;
                     for (int i = 0; i < rightInputSplits.size();)
                     {
@@ -796,6 +798,8 @@ public class PixelsExecutor
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                         join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
+                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                 int outputId = 0;
                 for (int i = 0; i < rightInputSplits.size();)
                 {
@@ -831,6 +835,8 @@ public class PixelsExecutor
                         join.getLeftColumnAlias(), join.getRightProjection(), join.getLeftProjection(),
                         postPartition, postPartitionInfo);
 
+                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                leftInputSplits = adjustInputSplitsForBroadcastJoin(rightTable, leftTable, leftInputSplits);
                 int outputId = 0;
                 for (int i = 0; i < leftInputSplits.size();)
                 {
@@ -1153,6 +1159,60 @@ public class PixelsExecutor
         return joinInputs.build();
     }
 
+    private List<InputSplit> adjustInputSplitsForBroadcastJoin(Table smallTable, Table largeTable,
+                                                               List<InputSplit> largeInputSplits)
+            throws InvalidProtocolBufferException, MetadataException
+    {
+        double smallSelectivity = JoinAdvisor.Instance().getTableSelectivity(smallTable);
+        double largeSelectivity = JoinAdvisor.Instance().getTableSelectivity(largeTable);
+        if (smallSelectivity >= 0 && largeSelectivity > 0 && smallSelectivity < largeSelectivity)
+        {
+            // Adjust the input split size if the small table has a lower selectivity.
+            int numSplits = largeInputSplits.size();
+            int numInputInfos = 0;
+            ImmutableList.Builder<InputInfo> inputInfosBuilder = ImmutableList.builder();
+            for (InputSplit inputSplit : largeInputSplits)
+            {
+                numInputInfos += inputSplit.getInputInfos().size();
+                inputInfosBuilder.addAll(inputSplit.getInputInfos());
+            }
+            int splitSize = numInputInfos / numSplits;
+            if (numInputInfos % numSplits > 0)
+            {
+                splitSize++;
+            }
+            if (smallSelectivity / largeSelectivity < 0.25)
+            {
+                // Do not adjust too aggressively.
+                logger.info("adjust split size of table '" + largeTable.getTableName() +
+                        "' from " + splitSize + " to " + splitSize*2);
+                splitSize *= 2;
+            }
+            else
+            {
+                logger.info("input splits no need to adjust");
+                return largeInputSplits;
+            }
+            List<InputInfo> inputInfos = inputInfosBuilder.build();
+            ImmutableList.Builder<InputSplit> inputSplitsBuilder = ImmutableList.builder();
+            for (int i = 0; i < numInputInfos; )
+            {
+                ImmutableList.Builder<InputInfo> builder = ImmutableList.builderWithExpectedSize(splitSize);
+                for (int j = 0; j < splitSize && i < numInputInfos; ++j, ++i)
+                {
+                    builder.add(inputInfos.get(i));
+                }
+                inputSplitsBuilder.add(new InputSplit(builder.build()));
+            }
+            return inputSplitsBuilder.build();
+        }
+        else
+        {
+            logger.info("input splits no need to adjust");
+            return largeInputSplits;
+        }
+    }
+
     private List<InputSplit> getInputSplits(BaseTable table) throws MetadataException, IOException
     {
         requireNonNull(table, "table is null");
@@ -1195,6 +1255,7 @@ public class PixelsExecutor
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 splitSize = bestSplitPattern.getSplitSize();
+                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
                 double selectivity = JoinAdvisor.Instance().getTableSelectivity(table);
                 if (selectivity >= 0)
                 {
@@ -1211,6 +1272,7 @@ public class PixelsExecutor
                         splitSize = splitsIndex.getMaxSplitSize();
                     }
                 }
+                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " after adjustment");
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();

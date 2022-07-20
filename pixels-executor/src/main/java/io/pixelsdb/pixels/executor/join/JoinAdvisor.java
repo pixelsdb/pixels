@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.join;
 
+import com.alibaba.fastjson.JSON;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
@@ -232,6 +233,12 @@ public class JoinAdvisor
                     ByteBuffer buffer = column.getRecordStats();
                     PixelsProto.ColumnStatistic columnStats = PixelsProto.ColumnStatistic.parseFrom(buffer);
                     double s = columnFilter.getSelectivity(column.getNullFraction(), column.getCardinality(), columnStats);
+                    if (columnStats.hasDateStatistics())
+                    {
+                        PixelsProto.DateStatistic dateStatistic = columnStats.getDateStatistics();
+                        logger.info("column " + column.getName() + " min: " + dateStatistic.getMinimum() + ", max: " + dateStatistic.getMaximum()
+                        + ", selectivity: " + s + ", columnFilter: " + JSON.toJSONString(columnFilter));
+                    }
                     if (s >= 0 && s < selectivity)
                     {
                         // Use the minimum selectivity of the columns as the selectivity on this table.

@@ -25,9 +25,9 @@ package io.pixelsdb.pixels.core.stats;
  * 2021-04-25
  * @author hank
  */
-public interface DateColumnStats extends RangeStats<Long>
+public interface DateColumnStats extends RangeStats<Integer>
 {
-    Long getMinimum();
+    Integer getMinimum();
 
-    Long getMaximum();
+    Integer getMaximum();
 }

@@ -64,7 +64,10 @@ public abstract class Operator
      */
     public abstract OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
-    public interface OutputCollection { }
+    public interface OutputCollection
+    {
+        long getCumulativeDurationMs();
+    }
 
     public static void waitForCompletion(CompletableFuture<?>[] stageOutputs)
     {

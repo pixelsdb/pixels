@@ -250,5 +250,30 @@ public class AggregationOperator extends Operator
         {
             this.finalAggrOutput = finalAggrOutput;
         }
+
+        @Override
+        public long getCumulativeDurationMs()
+        {
+            long duration = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    duration += output.getDurationMs();
+                }
+            }
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    duration += output.getDurationMs();
+                }
+            }
+            if (this.finalAggrOutput != null)
+            {
+                duration += finalAggrOutput.getDurationMs();
+            }
+            return duration;
+        }
     }
 }

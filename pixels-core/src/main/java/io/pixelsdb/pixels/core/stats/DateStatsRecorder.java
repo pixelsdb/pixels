@@ -37,8 +37,8 @@ public class DateStatsRecorder
 {
     private boolean hasMinimum = false;
     private boolean hasMaximum = false;
-    private long minimum = Integer.MIN_VALUE;
-    private long maximum = Integer.MAX_VALUE;
+    private int minimum = Integer.MIN_VALUE;
+    private int maximum = Integer.MAX_VALUE;
 
     DateStatsRecorder() { }
 
@@ -154,11 +154,11 @@ public class DateStatsRecorder
                 PixelsProto.DateStatistic.newBuilder();
         if (hasMinimum)
         {
-            dateBuilder.setMinimum((int) minimum);
+            dateBuilder.setMinimum(minimum);
         }
         if (hasMaximum)
         {
-            dateBuilder.setMaximum((int) maximum);
+            dateBuilder.setMaximum(maximum);
         }
         builder.setDateStatistics(dateBuilder);
         builder.setNumberOfValues(numberOfValues);
@@ -166,13 +166,13 @@ public class DateStatsRecorder
     }
 
     @Override
-    public Long getMinimum()
+    public Integer getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public Long getMaximum()
+    public Integer getMaximum()
     {
         return maximum;
     }
@@ -196,15 +196,15 @@ public class DateStatsRecorder
         {
             return -1;
         }
-        long lower = minimum;
-        long upper = maximum;
+        int lower = minimum;
+        int upper = maximum;
         if (lowerBound != null)
         {
-            lower = (long) lowerBound;
+            lower = (int) lowerBound;
         }
         if (upperBound != null)
         {
-            upper = (long) upperBound;
+            upper = (int) upperBound;
         }
         checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
         if (lower < minimum)

@@ -179,6 +179,20 @@ public class SingleStageJoinOperator extends JoinOperator
             this.joinOutputs = joinOutputs;
         }
 
+        @Override
+        public long getCumulativeDurationMs()
+        {
+            long duration = super.getCumulativeDurationMs();
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    duration += output.getDurationMs();
+                }
+            }
+            return duration;
+        }
+
         public Output[] getJoinOutputs()
         {
             return joinOutputs;

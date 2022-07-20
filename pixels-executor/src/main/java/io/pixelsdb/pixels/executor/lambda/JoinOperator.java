@@ -102,5 +102,20 @@ public abstract class JoinOperator extends Operator
         {
             this.largeChild = largeChild;
         }
+
+        @Override
+        public long getCumulativeDurationMs()
+        {
+            long duration = 0;
+            if (this.smallChild != null)
+            {
+                duration += smallChild.getCumulativeDurationMs();
+            }
+            if (this.largeChild != null)
+            {
+                duration += largeChild.getCumulativeDurationMs();
+            }
+            return duration;
+        }
     }
 }

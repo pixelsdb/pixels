@@ -175,8 +175,8 @@ public class ColumnFilter<T extends Comparable<T>>
                 case BYTE:
                     for (Range<T> range : this.filter.ranges)
                     {
-                        T lower = range.lowerBound.type != Bound.Type.UNBOUNDED ? null : range.lowerBound.value;
-                        T upper = range.upperBound.type != Bound.Type.UNBOUNDED ? null : range.upperBound.value;
+                        T lower = range.lowerBound.type != Bound.Type.UNBOUNDED ? range.lowerBound.value : null;
+                        T upper = range.upperBound.type != Bound.Type.UNBOUNDED ? range.upperBound.value : null;
                         double s = rangeStats.getSelectivity(
                                 lower, range.lowerBound.type == Bound.Type.INCLUDED,
                                 upper, range.upperBound.type == Bound.Type.INCLUDED);
@@ -190,10 +190,10 @@ public class ColumnFilter<T extends Comparable<T>>
                 case FLOAT:
                     for (Range<T> range : this.filter.ranges)
                     {
-                        Double lower = range.lowerBound.type != Bound.Type.UNBOUNDED ? null :
-                                Double.longBitsToDouble((Long) range.lowerBound.value);
-                        Double upper = range.upperBound.type != Bound.Type.UNBOUNDED ? null :
-                                Double.longBitsToDouble((Long) range.upperBound.value);
+                        Double lower = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                                Double.longBitsToDouble((Long) range.lowerBound.value) : null;
+                        Double upper = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                                Double.longBitsToDouble((Long) range.upperBound.value) : null;
                         double s = rangeStats.getSelectivity(
                                 lower, range.lowerBound.type == Bound.Type.INCLUDED,
                                 upper, range.upperBound.type == Bound.Type.INCLUDED);
