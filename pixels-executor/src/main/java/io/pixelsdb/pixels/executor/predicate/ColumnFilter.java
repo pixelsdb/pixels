@@ -180,7 +180,7 @@ public class ColumnFilter<T extends Comparable<T>>
                         double s = rangeStats.getSelectivity(
                                 lower, range.lowerBound.type == Bound.Type.INCLUDED,
                                 upper, range.upperBound.type == Bound.Type.INCLUDED);
-                        if (s >= 0)
+                        if (s > 0)
                         {
                             selectivity += s;
                         }

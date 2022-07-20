@@ -66,6 +66,8 @@ public class JoinAdvisor
     private final double broadcastThresholdRows;
     private final double partitionSizeBytes;
     private final double partitionSizeRows;
+    private final boolean selectivityEnabled;
+
     /**
      * schemaTableName -> (columnName -> column)
      */
@@ -85,6 +87,8 @@ public class JoinAdvisor
         this.partitionSizeBytes = Long.parseLong(partitionSizeMB) * 1024L * 1024L;
         String partitionSizeRows = configFactory.getProperty("join.partition.size.rows");
         this.partitionSizeRows = Long.parseLong(partitionSizeRows);
+        this.selectivityEnabled = Boolean.parseBoolean(
+                configFactory.getProperty("executor.selectivity.enabled"));
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
@@ -159,7 +163,8 @@ public class JoinAdvisor
         int numFromSize = (int) Math.ceil(selectivity * largeTableSize / partitionSizeBytes);
         int numFromRows = (int) Math.ceil(selectivity * largeTableRowCount / partitionSizeRows);
         // Limit the partition size by choosing the maximum number of partitions.
-        return Math.max(numFromSize, numFromRows);
+        // TODO: estimate the join selectivity more accurately using histogram.
+        return Math.max(Math.max(numFromSize, numFromRows), 8);
     }
 
     private double getTableInputSize(Table table) throws MetadataException
@@ -205,12 +210,17 @@ public class JoinAdvisor
         return Math.max(getTableRowCount(leftTable), getTableRowCount(rightTable));
     }
 
-    protected double getTableSelectivity(Table table) throws MetadataException, InvalidProtocolBufferException
+    public double getTableSelectivity(Table table) throws MetadataException, InvalidProtocolBufferException
     {
+        if (!this.selectivityEnabled)
+        {
+            return 1.0;
+        }
+
         if (table.getTableType() == BASE)
         {
             Map<String, Column> columnMap = getColumnMap((BaseTable) table);
-            double selectivity = 1;
+            double selectivity = 1.0;
             TableScanFilter tableScanFilter = ((BaseTable) table).getFilter();
             String[] columnsToRead = table.getColumnNames();
             for (int i = 0; i < columnsToRead.length; ++i)

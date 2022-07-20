@@ -17,4 +17,6 @@ public interface SplitsIndex
     SplitPattern search(ColumnSet columnSet);
 
     int getVersion();
+
+    int getMaxSplitSize();
 }

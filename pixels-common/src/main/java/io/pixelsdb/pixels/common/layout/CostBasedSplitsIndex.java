@@ -135,7 +135,7 @@ public class CostBasedSplitsIndex implements SplitsIndex
         }
         else
         {
-            int splitSize = (int) Math.ceil(SPLIT_SIZE_BYTES / sumChunkSize);
+            int splitSize = (int) Math.round(SPLIT_SIZE_BYTES / sumChunkSize);
             // round the split size to be the power of 2.
             splitSize = Integer.highestOneBit(splitSize - 1) << 1;
             if (splitSize <= maxSplitSize)
@@ -155,6 +155,12 @@ public class CostBasedSplitsIndex implements SplitsIndex
     public int getVersion()
     {
         return version;
+    }
+
+    @Override
+    public int getMaxSplitSize()
+    {
+        return maxSplitSize;
     }
 
     public void setVersion(int version)

@@ -126,7 +126,7 @@ public class DateStatsRecorder
             }
             if (dateStat.hasMaximum)
             {
-                if (hasMinimum)
+                if (hasMaximum)
                 {
                     if (dateStat.getMaximum() > maximum)
                     {

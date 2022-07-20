@@ -1194,8 +1194,23 @@ public class PixelsExecutor
                     }
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
-                // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestSplitPattern.getSplitSize();
+                double selectivity = JoinAdvisor.Instance().getTableSelectivity(table);
+                if (selectivity >= 0)
+                {
+                    // Increasing split size according to the selectivity.
+                    if (selectivity < 0.25)
+                    {
+                        splitSize *= 4;
+                    } else if (selectivity < 0.5)
+                    {
+                        splitSize *= 2;
+                    }
+                    if (splitSize > splitsIndex.getMaxSplitSize())
+                    {
+                        splitSize = splitsIndex.getMaxSplitSize();
+                    }
+                }
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
