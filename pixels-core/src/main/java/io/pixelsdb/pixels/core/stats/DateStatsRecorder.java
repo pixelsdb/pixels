@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 
 import java.sql.Date;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 
 /**
@@ -36,8 +37,8 @@ public class DateStatsRecorder
 {
     private boolean hasMinimum = false;
     private boolean hasMaximum = false;
-    private long minimum = Integer.MIN_VALUE;
-    private long maximum = Integer.MAX_VALUE;
+    private int minimum = Integer.MIN_VALUE;
+    private int maximum = Integer.MAX_VALUE;
 
     DateStatsRecorder() { }
 
@@ -125,7 +126,7 @@ public class DateStatsRecorder
             }
             if (dateStat.hasMaximum)
             {
-                if (hasMinimum)
+                if (hasMaximum)
                 {
                     if (dateStat.getMaximum() > maximum)
                     {
@@ -153,11 +154,11 @@ public class DateStatsRecorder
                 PixelsProto.DateStatistic.newBuilder();
         if (hasMinimum)
         {
-            dateBuilder.setMinimum((int) minimum);
+            dateBuilder.setMinimum(minimum);
         }
         if (hasMaximum)
         {
-            dateBuilder.setMaximum((int) maximum);
+            dateBuilder.setMaximum(maximum);
         }
         builder.setDateStatistics(dateBuilder);
         builder.setNumberOfValues(numberOfValues);
@@ -165,13 +166,13 @@ public class DateStatsRecorder
     }
 
     @Override
-    public Long getMinimum()
+    public Integer getMinimum()
     {
         return minimum;
     }
 
     @Override
-    public Long getMaximum()
+    public Integer getMaximum()
     {
         return maximum;
     }
@@ -186,6 +187,35 @@ public class DateStatsRecorder
     public boolean hasMaximum()
     {
         return hasMaximum;
+    }
+
+    @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        if (!this.hasMinimum || !this.hasMaximum)
+        {
+            return -1;
+        }
+        int lower = minimum;
+        int upper = maximum;
+        if (lowerBound != null)
+        {
+            lower = (int) lowerBound;
+        }
+        if (upperBound != null)
+        {
+            upper = (int) upperBound;
+        }
+        checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
+        if (lower < minimum)
+        {
+            lower = minimum;
+        }
+        if (upper > maximum)
+        {
+            upper = maximum;
+        }
+        return (upper - lower) / (double) (maximum - minimum);
     }
 
     @Override

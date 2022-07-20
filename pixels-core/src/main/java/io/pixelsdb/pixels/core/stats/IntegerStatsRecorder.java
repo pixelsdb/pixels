@@ -21,6 +21,8 @@ package io.pixelsdb.pixels.core.stats;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * pixels
  *
@@ -204,6 +206,35 @@ public class IntegerStatsRecorder
     public boolean hasMaximum()
     {
         return hasMaximum;
+    }
+
+    @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        if (!this.hasMinimum || !this.hasMaximum)
+        {
+            return -1;
+        }
+        long lower = minimum;
+        long upper = maximum;
+        if (lowerBound != null)
+        {
+            lower = (long) lowerBound;
+        }
+        if (upperBound != null)
+        {
+            upper = (long) upperBound;
+        }
+        checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
+        if (lower < minimum)
+        {
+            lower = minimum;
+        }
+        if (upper > maximum)
+        {
+            upper = maximum;
+        }
+        return (upper - lower) / (double) (maximum - minimum);
     }
 
     @Override

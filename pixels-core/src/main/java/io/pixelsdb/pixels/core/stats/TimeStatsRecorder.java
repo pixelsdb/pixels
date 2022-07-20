@@ -23,6 +23,8 @@ import io.pixelsdb.pixels.core.PixelsProto;
 
 import java.sql.Time;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * pixels
  *
@@ -188,6 +190,35 @@ public class TimeStatsRecorder
     public boolean hasMaximum()
     {
         return hasMaximum;
+    }
+
+    @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        if (!this.hasMinimum || !this.hasMaximum)
+        {
+            return -1;
+        }
+        int lower = minimum;
+        int upper = maximum;
+        if (lowerBound != null)
+        {
+            lower = (int) lowerBound;
+        }
+        if (upperBound != null)
+        {
+            upper = (int) upperBound;
+        }
+        checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
+        if (lower < minimum)
+        {
+            lower = minimum;
+        }
+        if (upper > maximum)
+        {
+            upper = maximum;
+        }
+        return (upper - lower) / (double) (maximum - minimum);
     }
 
     @Override

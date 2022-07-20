@@ -28,7 +28,7 @@ public class InvertedSplitsIndex implements SplitsIndex
 {
     private int version;
 
-    private final int defaultSplitSize;
+    private final int maxSplitSize;
 
     /**
      * key: column name;
@@ -40,9 +40,9 @@ public class InvertedSplitsIndex implements SplitsIndex
 
     private List<String> columnOrder;
 
-    public InvertedSplitsIndex(List<String> columnOrder, List<SplitPattern> patterns, int defaultSplitSize)
+    public InvertedSplitsIndex(List<String> columnOrder, List<SplitPattern> patterns, int maxSplitSize)
     {
-        this.defaultSplitSize = defaultSplitSize;
+        this.maxSplitSize = maxSplitSize;
         this.columnOrder = new ArrayList<>(columnOrder);
         this.querySplitPatterns = new ArrayList<>(patterns);
         this.bitMapIndex = new HashMap<>(this.columnOrder.size());
@@ -69,7 +69,7 @@ public class InvertedSplitsIndex implements SplitsIndex
         if (columnSet.isEmpty())
         {
             bestPattern = new SplitPattern();
-            bestPattern.setSplitSize(this.defaultSplitSize);
+            bestPattern.setSplitSize(this.maxSplitSize);
             return bestPattern;
         }
 
@@ -117,6 +117,11 @@ public class InvertedSplitsIndex implements SplitsIndex
             }
         }
 
+        if (bestPattern.getSplitSize() > maxSplitSize)
+        {
+            bestPattern.setSplitSize(maxSplitSize);
+        }
+
         return bestPattern;
     }
 
@@ -124,6 +129,12 @@ public class InvertedSplitsIndex implements SplitsIndex
     public int getVersion()
     {
         return version;
+    }
+
+    @Override
+    public int getMaxSplitSize()
+    {
+        return maxSplitSize;
     }
 
     public void setVersion(int version)

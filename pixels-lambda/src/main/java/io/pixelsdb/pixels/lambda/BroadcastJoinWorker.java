@@ -41,7 +41,6 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -294,9 +293,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             it.remove();
                         } else
                         {
+                            TimeUnit.MILLISECONDS.sleep(10);
                             continue;
                         }
-                    } catch (IOException e)
+                    } catch (Exception e)
                     {
                         throw new PixelsWorkerException(
                                 "failed to check the existence of the left table input file '" +
@@ -378,9 +378,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             it.remove();
                         } else
                         {
+                            TimeUnit.MILLISECONDS.sleep(10);
                             continue;
                         }
-                    } catch (IOException e)
+                    } catch (Exception e)
                     {
                         throw new PixelsWorkerException(
                                 "failed to check the existence of the right table input file '" +
@@ -477,9 +478,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             it.remove();
                         } else
                         {
+                            TimeUnit.MILLISECONDS.sleep(10);
                             continue;
                         }
-                    } catch (IOException e)
+                    } catch (Exception e)
                     {
                         throw new PixelsWorkerException(
                                 "failed to check the existence of the right table input file '" +

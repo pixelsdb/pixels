@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
@@ -214,7 +215,7 @@ public class PixelsExecutor
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
                 String fileName = computeFinalAggrInServer && !preAggregate ? finalOutputBase : intermediateBase;
-                fileName += "partial_aggr_" + outputId++;
+                fileName += (outputId++) + "/partial_aggr";
                 StorageInfo storageInfo;
                 if (computeFinalAggrInServer && !preAggregate)
                 {
@@ -312,7 +313,7 @@ public class PixelsExecutor
                 preAggrInput.setParallelism(IntraWorkerParallelism);
 
                 String fileName = computeFinalAggrInServer ? finalOutputBase : intermediateBase;
-                fileName += "pre_aggr_" + outputId++;
+                fileName += (outputId++) + "/pre_aggr";
                 preAggrInput.setOutput(new OutputInfo(fileName, false,
                         outputStorageInfo, true));
                 finalAggrInputFilesBuilder.add(fileName);
@@ -431,7 +432,7 @@ public class PixelsExecutor
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
@@ -698,12 +699,14 @@ public class PixelsExecutor
                             (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+                    // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                    rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                     int outputId = 0;
                     for (int i = 0; i < rightInputSplits.size();)
                     {
                         ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                                 .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                         for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
                         {
                             inputsBuilder.add(rightInputSplits.get(i));
@@ -775,8 +778,8 @@ public class PixelsExecutor
             }
 
             int internalParallelism = IntraWorkerParallelism;
-            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty())// &&
-                    //rightTable.getFilter().isEmpty() && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
+            if (leftTable.getTableType() == BASE && ((BaseTable) leftTable).getFilter().isEmpty() &&
+                    rightTable.getFilter().isEmpty())// && (leftInputSplits.size() <= 128 && rightInputSplits.size() <= 128))
             {
                 /*
                  * This is used to reduce the latency of join result writing, by increasing the
@@ -795,12 +798,14 @@ public class PixelsExecutor
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                         join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
+                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                 int outputId = 0;
                 for (int i = 0; i < rightInputSplits.size();)
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                             .builderWithExpectedSize(internalParallelism);
-                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                     for (int j = 0; j < internalParallelism && i < rightInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(rightInputSplits.get(i));
@@ -830,12 +835,14 @@ public class PixelsExecutor
                         join.getLeftColumnAlias(), join.getRightProjection(), join.getLeftProjection(),
                         postPartition, postPartitionInfo);
 
+                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
+                leftInputSplits = adjustInputSplitsForBroadcastJoin(rightTable, leftTable, leftInputSplits);
                 int outputId = 0;
                 for (int i = 0; i < leftInputSplits.size();)
                 {
                     ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                             .builderWithExpectedSize(internalParallelism);
-                    ImmutableList<String> outputs = ImmutableList.of("join_" + outputId++);
+                    ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
                     for (int j = 0; j < internalParallelism && i < leftInputSplits.size(); ++j, ++i)
                     {
                         inputsBuilder.add(leftInputSplits.get(i));
@@ -884,7 +891,7 @@ public class PixelsExecutor
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
@@ -911,14 +918,14 @@ public class PixelsExecutor
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
                         leftTable, leftInputSplits, leftKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + leftTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
                         leftTable, leftKeyColumnIds, leftPartitionInputs);
 
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
                         rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/part-");
+                                joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
                         rightTable, rightKeyColumnIds, rightPartitionInputs);
 
@@ -1063,7 +1070,7 @@ public class PixelsExecutor
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
             }
             partitionInput.setTableInfo(tableInfo);
-            partitionInput.setOutput(new OutputInfo(outputBase + outputId++, false,
+            partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", false,
                     new StorageInfo(InputStorage, null, null, null), true));
             partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
@@ -1084,7 +1091,8 @@ public class PixelsExecutor
      */
     private List<JoinInput> getPartitionedJoinInputs(
             JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
-            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo) throws MetadataException
+            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo)
+            throws MetadataException, InvalidProtocolBufferException
     {
         boolean postPartition = false;
         PartitionInfo postPartitionInfo = null;
@@ -1113,11 +1121,11 @@ public class PixelsExecutor
         {
             ImmutableList.Builder<String> outputFileNames = ImmutableList
                     .builderWithExpectedSize(IntraWorkerParallelism);
-            outputFileNames.add("join_" + i);
+            outputFileNames.add(i + "/join");
             if (joinedTable.getJoin().getJoinType() == JoinType.EQUI_LEFT ||
                     joinedTable.getJoin().getJoinType() == JoinType.EQUI_FULL)
             {
-                outputFileNames.add("join_" + i + "_left");
+                outputFileNames.add(i + "/join_left");
             }
 
             String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
@@ -1149,6 +1157,60 @@ public class PixelsExecutor
             joinInputs.add(joinInput);
         }
         return joinInputs.build();
+    }
+
+    private List<InputSplit> adjustInputSplitsForBroadcastJoin(Table smallTable, Table largeTable,
+                                                               List<InputSplit> largeInputSplits)
+            throws InvalidProtocolBufferException, MetadataException
+    {
+        double smallSelectivity = JoinAdvisor.Instance().getTableSelectivity(smallTable);
+        double largeSelectivity = JoinAdvisor.Instance().getTableSelectivity(largeTable);
+        if (smallSelectivity >= 0 && largeSelectivity > 0 && smallSelectivity < largeSelectivity)
+        {
+            // Adjust the input split size if the small table has a lower selectivity.
+            int numSplits = largeInputSplits.size();
+            int numInputInfos = 0;
+            ImmutableList.Builder<InputInfo> inputInfosBuilder = ImmutableList.builder();
+            for (InputSplit inputSplit : largeInputSplits)
+            {
+                numInputInfos += inputSplit.getInputInfos().size();
+                inputInfosBuilder.addAll(inputSplit.getInputInfos());
+            }
+            int splitSize = numInputInfos / numSplits;
+            if (numInputInfos % numSplits > 0)
+            {
+                splitSize++;
+            }
+            if (smallSelectivity / largeSelectivity < 0.25)
+            {
+                // Do not adjust too aggressively.
+                logger.info("adjust split size of table '" + largeTable.getTableName() +
+                        "' from " + splitSize + " to " + splitSize*2);
+                splitSize *= 2;
+            }
+            else
+            {
+                logger.info("input splits no need to adjust");
+                return largeInputSplits;
+            }
+            List<InputInfo> inputInfos = inputInfosBuilder.build();
+            ImmutableList.Builder<InputSplit> inputSplitsBuilder = ImmutableList.builder();
+            for (int i = 0; i < numInputInfos; )
+            {
+                ImmutableList.Builder<InputInfo> builder = ImmutableList.builderWithExpectedSize(splitSize);
+                for (int j = 0; j < splitSize && i < numInputInfos; ++j, ++i)
+                {
+                    builder.add(inputInfos.get(i));
+                }
+                inputSplitsBuilder.add(new InputSplit(builder.build()));
+            }
+            return inputSplitsBuilder.build();
+        }
+        else
+        {
+            logger.info("input splits no need to adjust");
+            return largeInputSplits;
+        }
     }
 
     private List<InputSplit> getInputSplits(BaseTable table) throws MetadataException, IOException
@@ -1192,8 +1254,25 @@ public class PixelsExecutor
                     }
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
-                // log.info("bestPattern: " + bestPattern.toString());
                 splitSize = bestSplitPattern.getSplitSize();
+                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
+                double selectivity = JoinAdvisor.Instance().getTableSelectivity(table);
+                if (selectivity >= 0)
+                {
+                    // Increasing split size according to the selectivity.
+                    if (selectivity < 0.25)
+                    {
+                        splitSize *= 4;
+                    } else if (selectivity < 0.5)
+                    {
+                        splitSize *= 2;
+                    }
+                    if (splitSize > splitsIndex.getMaxSplitSize())
+                    {
+                        splitSize = splitsIndex.getMaxSplitSize();
+                    }
+                }
+                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " after adjustment");
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();

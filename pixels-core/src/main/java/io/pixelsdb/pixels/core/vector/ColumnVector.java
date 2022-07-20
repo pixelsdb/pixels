@@ -242,6 +242,18 @@ public abstract class ColumnVector implements AutoCloseable
     public abstract boolean elementEquals(int index, int otherIndex, ColumnVector other);
 
     /**
+     * Compare the elements in this and the other column vector.
+     * <b>Note</b> that null value is considered smaller than any values including null.
+     *
+     * @param index the index in this column vector
+     * @param otherIndex the index in the other column vector
+     * @param other the other column vector
+     * @return 1 if the element in this vector is larger, 0 if the two elements are equivalent, and
+     * -1 if the element in this vector is smaller.
+     */
+    public abstract int compareElement(int index, int otherIndex, ColumnVector other);
+
+    /**
      * Resets the column to default state
      * - fills the isNull array with false
      * - sets noNulls to true

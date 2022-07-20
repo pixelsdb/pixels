@@ -102,7 +102,7 @@ public class WorkerCommon
                 {
                     while (!exists(s3, leftPath))
                     {
-                        TimeUnit.MILLISECONDS.sleep(100);
+                        TimeUnit.MILLISECONDS.sleep(50);
                     }
                 }
                 PixelsReader reader = getReader(leftPath, storage);
@@ -120,7 +120,7 @@ public class WorkerCommon
                 {
                     while (!exists(s3, rightPath))
                     {
-                        TimeUnit.MILLISECONDS.sleep(100);
+                        TimeUnit.MILLISECONDS.sleep(50);
                     }
                 }
                 PixelsReader reader = getReader(rightPath, storage);
@@ -179,7 +179,7 @@ public class WorkerCommon
         {
             while (!exists(storage, path))
             {
-                TimeUnit.MILLISECONDS.sleep(100);
+                TimeUnit.MILLISECONDS.sleep(50);
             }
         }
         PixelsReader reader = getReader(path, storage);

@@ -232,9 +232,9 @@ public class BinaryColumnVector extends ColumnVector
             int p = this.start[i];
             for (int j = this.start[i] + this.lens[i] - 1; j >= p; j--)
             {
-                h = 31 * h + (int)this.vector[i][j];
+                h = 524287 * h + (int)this.vector[i][j];
             }
-            hashCode[i] = 31 * hashCode[i] + h;
+            hashCode[i] = 524287 * hashCode[i] + h;
         }
         return hashCode;
     }
@@ -260,6 +260,29 @@ public class BinaryColumnVector extends ColumnVector
             return true;
         }
         return false;
+    }
+
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        BinaryColumnVector otherVector = (BinaryColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            if (this.lens[index] != otherVector.lens[otherIndex])
+            {
+                return Integer.compare(this.lens[index], otherVector.lens[otherIndex]);
+            }
+            int start = this.start[index], otherStart = otherVector.start[otherIndex];
+            for (int i = 0; i < this.lens[index]; ++i)
+            {
+                if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
+                {
+                    return Byte.compare(this.vector[index][start+i], otherVector.vector[otherIndex][otherStart+i]);
+                }
+            }
+            return 0;
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     /**

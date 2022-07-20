@@ -24,7 +24,10 @@ import com.alibaba.fastjson.annotation.JSONCreator;
 import com.alibaba.fastjson.annotation.JSONField;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.google.common.reflect.TypeToken;
+import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.stats.RangeStats;
+import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
@@ -33,6 +36,9 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Created at: 07/04/2022
@@ -126,6 +132,101 @@ public class ColumnFilter<T extends Comparable<T>>
                 excludes.add(discrete.value);
             }
         }
+    }
+
+    /**
+     * Get the estimation of the selectivity of this column filter.
+     * @param nullFraction the fraction of the null values in this column
+     * @param cardinality the cardinality of this column
+     * @param columnStats the statistics of this column, mainly the min/max values
+     * @return the estimated selectivity, for example 0.05 means 5%, negative if the selectivity can not be estimated
+     */
+    public double getSelectivity(double nullFraction, long cardinality, PixelsProto.ColumnStatistic columnStats)
+    {
+        checkArgument(nullFraction >= 0 && nullFraction <= 1, "nullFraction is not in the range [0, 1]");
+        checkArgument(cardinality >= 0, "cardinality is negative");
+        requireNonNull(columnStats, "stats is null");
+        if (this.filter.isAll)
+        {
+            return 1.0;
+        }
+        if (this.filter.isNone)
+        {
+            return 0.0;
+        }
+        double selectivity = 0.0;
+        if (this.filter.allowNull)
+        {
+            selectivity += nullFraction;
+        }
+        StatsRecorder stats = StatsRecorder.create(columnType, columnStats);
+        if (this.filter.getRangeCount() > 0 && stats instanceof RangeStats<?>)
+        {
+            RangeStats<?> rangeStats = (RangeStats<?>) stats;
+            switch (columnType)
+            {
+                case DATE:
+                case TIME:
+                case TIMESTAMP:
+                case LONG:
+                case DECIMAL:
+                case INT:
+                case SHORT:
+                case BYTE:
+                    for (Range<T> range : this.filter.ranges)
+                    {
+                        T lower = range.lowerBound.type != Bound.Type.UNBOUNDED ? range.lowerBound.value : null;
+                        T upper = range.upperBound.type != Bound.Type.UNBOUNDED ? range.upperBound.value : null;
+                        double s = rangeStats.getSelectivity(
+                                lower, range.lowerBound.type == Bound.Type.INCLUDED,
+                                upper, range.upperBound.type == Bound.Type.INCLUDED);
+                        if (s > 0)
+                        {
+                            selectivity += s;
+                        }
+                    }
+                    break;
+                case DOUBLE:
+                case FLOAT:
+                    for (Range<T> range : this.filter.ranges)
+                    {
+                        Double lower = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                                Double.longBitsToDouble((Long) range.lowerBound.value) : null;
+                        Double upper = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                                Double.longBitsToDouble((Long) range.upperBound.value) : null;
+                        double s = rangeStats.getSelectivity(
+                                lower, range.lowerBound.type == Bound.Type.INCLUDED,
+                                upper, range.upperBound.type == Bound.Type.INCLUDED);
+                        if (s >= 0)
+                        {
+                            selectivity += s;
+                        }
+                    }
+                    break;
+                default:
+                    selectivity = -1;
+                    break;
+            }
+        }
+
+        if (selectivity < 0)
+        {
+            return selectivity;
+        }
+
+        if (this.filter.getDiscreteValueCount() > 0)
+        {
+            checkArgument(this.filter.getDiscreteValueCount() <= cardinality,
+                    "the discrete value count is larger than the cardinality of this column");
+            selectivity += (this.filter.getDiscreteValueCount() / (double) cardinality);
+        }
+
+        if (selectivity > 1)
+        {
+            selectivity = 1;
+        }
+
+        return selectivity;
     }
 
     public String getColumnName()

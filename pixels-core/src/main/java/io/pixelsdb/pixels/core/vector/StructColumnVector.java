@@ -181,6 +181,25 @@ public class StructColumnVector extends ColumnVector
     }
 
     @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        StructColumnVector otherVector = (StructColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            for (int i = 0; i < this.fields.length; ++i)
+            {
+                int c = this.fields[i].compareElement(index, otherIndex, otherVector.fields[i]);
+                if (c != 0)
+                {
+                    return c;
+                }
+            }
+            return 0;
+        }
+        return this.isNull[index] ? -1 : 1;
+    }
+
+    @Override
     public void reset()
     {
         super.reset();

@@ -194,6 +194,12 @@ public class StringStatsRecorder
         return maximum != null;
     }
 
+    @Override
+    public double getSelectivity(Object lowerBound, boolean lowerInclusive, Object upperBound, boolean upperInclusive)
+    {
+        throw new UnsupportedOperationException("selectivity is not supported on string columns");
+    }
+
     /**
      * Get the total length of all strings
      *

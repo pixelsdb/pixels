@@ -98,9 +98,8 @@ public class CostBasedSplitsIndex implements SplitsIndex
             double rowsPerRowGroup = table.getRowCount() / numRowGroups;
             checkArgument(rowsPerRowGroup > 0,
                     "Number of rows per row-group must > 0.");
-            int splitSizeCap = (int) Math.ceil(SPLIT_SIZE_ROWS / rowsPerRowGroup);
-            // round the split size to be the power of 2.
-            splitSizeCap = Integer.highestOneBit(splitSizeCap - 1) << 1;
+            // Round the split size cap to the nearest power of 2.
+            int splitSizeCap = round(SPLIT_SIZE_ROWS / rowsPerRowGroup);
             this.maxSplitSize = Math.min(maxSplitSize, splitSizeCap);
         }
         else
@@ -129,32 +128,50 @@ public class CostBasedSplitsIndex implements SplitsIndex
             }
         }
 
-        if (sumChunkSize >= SPLIT_SIZE_BYTES)
+        // Round the split size to the nearest power of 2.
+        int splitSize = round(SPLIT_SIZE_BYTES / sumChunkSize);
+        if (splitSize <= maxSplitSize)
         {
-            bestPattern.setSplitSize(1);
+            bestPattern.setSplitSize(splitSize);
         }
         else
         {
-            int splitSize = (int) Math.ceil(SPLIT_SIZE_BYTES / sumChunkSize);
-            // round the split size to be the power of 2.
-            splitSize = Integer.highestOneBit(splitSize - 1) << 1;
-            if (splitSize <= maxSplitSize)
-            {
-                bestPattern.setSplitSize(splitSize);
-            }
-            else
-            {
-                bestPattern.setSplitSize(maxSplitSize);
-            }
+            bestPattern.setSplitSize(maxSplitSize);
         }
 
         return bestPattern;
+    }
+
+    /**
+     * Round the origin number to the nearest power of two.
+     * @param origin the origin number
+     * @return the rounded integer
+     */
+    private static int round(double origin)
+    {
+        int rounded1 = (int) Math.ceil(origin);
+        if (rounded1 == 1)
+        {
+            return rounded1;
+        }
+        int rounded2 = Integer.highestOneBit(rounded1 - 1) << 1;
+        if (origin /rounded2 < 0.75)
+        {
+            return rounded2 >> 1;
+        }
+        return rounded2;
     }
 
     @Override
     public int getVersion()
     {
         return version;
+    }
+
+    @Override
+    public int getMaxSplitSize()
+    {
+        return maxSplitSize;
     }
 
     public void setVersion(int version)

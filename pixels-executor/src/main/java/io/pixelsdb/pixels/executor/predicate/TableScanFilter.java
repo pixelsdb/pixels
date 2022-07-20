@@ -77,6 +77,11 @@ public class TableScanFilter
         return columnFilters;
     }
 
+    /**
+     * Get the column filter on the column.
+     * @param columnId the index of the column in the scan result
+     * @return null if there is no filter on this column
+     */
     public ColumnFilter getColumnFilter(int columnId)
     {
         return columnFilters.get(columnId);

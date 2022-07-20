@@ -423,9 +423,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                             it.remove();
                         } else
                         {
+                            TimeUnit.MILLISECONDS.sleep(10);
                             continue;
                         }
-                    } catch (IOException e)
+                    } catch (Exception e)
                     {
                         throw new PixelsWorkerException(
                                 "failed to check the existence of the right table input file '" +

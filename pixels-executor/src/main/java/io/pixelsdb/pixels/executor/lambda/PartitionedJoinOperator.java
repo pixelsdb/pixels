@@ -271,6 +271,27 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             this.largePartitionOutputs = largePartitionOutputs;
         }
 
+        @Override
+        public long getCumulativeDurationMs()
+        {
+            long duration = super.getCumulativeDurationMs();
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    duration += output.getDurationMs();
+                }
+            }
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    duration += output.getDurationMs();
+                }
+            }
+            return duration;
+        }
+
         public Output[] getSmallPartitionOutputs()
         {
             return smallPartitionOutputs;

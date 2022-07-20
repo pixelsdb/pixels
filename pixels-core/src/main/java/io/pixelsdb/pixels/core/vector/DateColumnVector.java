@@ -106,7 +106,7 @@ public class DateColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 31 * hashCode[i] + this.dates[i];
+            hashCode[i] = 524287 * hashCode[i] + this.dates[i];
         }
         return hashCode;
     }
@@ -120,7 +120,17 @@ public class DateColumnVector extends ColumnVector
             return this.dates[index] == otherVector.dates[otherIndex];
         }
         return false;
+    }
 
+    @Override
+    public int compareElement(int index, int otherIndex, ColumnVector other)
+    {
+        DateColumnVector otherVector = (DateColumnVector) other;
+        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        {
+            return Integer.compare(this.dates[index], otherVector.dates[otherIndex]);
+        }
+        return this.isNull[index] ? -1 : 1;
     }
 
     /**

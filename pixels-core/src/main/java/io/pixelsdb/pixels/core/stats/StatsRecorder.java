@@ -280,6 +280,50 @@ public class StatsRecorder
         }
     }
 
+    public static StatsRecorder create(TypeDescription.Category category, PixelsProto.ColumnStatistic statistic)
+    {
+        switch (category)
+        {
+            case BOOLEAN:
+                return new BooleanStatsRecorder(statistic);
+            case BYTE:
+            case SHORT:
+            case INT:
+            case LONG:
+                return new IntegerStatsRecorder(statistic);
+            case DECIMAL:
+                /**
+                 * Issue #208:
+                 * To be compatible with Presto, use IntegerColumnStats for decimal.
+                 * Decimal and its statistics in Presto are represented as long. If
+                 * needed in other places, integer statistics can be converted to double
+                 * using the precision and scale from the type in the file footer.
+                 */
+                if (statistic.hasIntStatistics())
+                    return new IntegerStatsRecorder(statistic);
+                else
+                    return new Integer128StatsRecorder(statistic);
+            case FLOAT:
+            case DOUBLE:
+                return new DoubleStatsRecorder(statistic);
+            case STRING:
+            case CHAR:
+            case VARCHAR:
+                return new StringStatsRecorder(statistic);
+            case DATE:
+                return new DateStatsRecorder(statistic);
+            case TIME:
+                return new TimeStatsRecorder(statistic);
+            case TIMESTAMP:
+                return new TimestampStatsRecorder(statistic);
+            case BINARY:
+            case VARBINARY:
+                return new BinaryStatsRecorder(statistic);
+            default:
+                return new StatsRecorder(statistic);
+        }
+    }
+
     /**
      * Cast the range stats to general range stats according to the type of the columns.
      *
