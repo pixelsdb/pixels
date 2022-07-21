@@ -1078,9 +1078,9 @@ public class PixelsExecutor
         checkArgument(originColumnsToRead.length == partitionProjection.length,
                 "originColumnsToRead and partitionProjection are not of the same length");
         int len = 0;
-        for (int i = 0; i < partitionProjection.length; ++i)
+        for (boolean b : partitionProjection)
         {
-            if (partitionProjection[i])
+            if (b)
             {
                 len++;
             }
@@ -1103,9 +1103,9 @@ public class PixelsExecutor
         checkArgument(originProjection.length == partitionProjection.length,
                 "originProjection and partitionProjection are not of the same length");
         int len = 0;
-        for (int i = 0; i < partitionProjection.length; ++i)
+        for (boolean b : partitionProjection)
         {
-            if (partitionProjection[i])
+            if (b)
             {
                 len++;
             }
@@ -1118,13 +1118,15 @@ public class PixelsExecutor
                 projection[j++] = originProjection[i];
             }
         }
-        return partitionProjection;
+        return projection;
     }
 
     private int[] rewriteColumnIdsForPartitionedJoin(int[] originColumnIds, boolean[] partitionProjection)
     {
         requireNonNull(originColumnIds, "originProjection is null");
         requireNonNull(partitionProjection, "partitionProjection is null");
+        checkArgument(originColumnIds.length <= partitionProjection.length,
+                "originColumnIds has more elements than partitionProjection");
         Map<Integer, Integer> columnIdMap = new HashMap<>();
         for (int i = 0, j = 0; i < partitionProjection.length; ++i)
         {
