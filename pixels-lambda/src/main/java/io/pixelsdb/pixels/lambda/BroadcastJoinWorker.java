@@ -285,7 +285,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 InputInfo input = it.next();
                 if (checkExistence)
                 {
-                    long start = System.currentTimeMillis();
                     try
                     {
                         if (exists(s3, input.getPath()))
@@ -302,8 +301,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                 "failed to check the existence of the left table input file '" +
                                 input.getPath() + "'", e);
                     }
-                    long end = System.currentTimeMillis();
-                    logger.info("duration of existence check: " + (end - start));
                 }
                 else
                 {
@@ -370,7 +367,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 InputInfo input = it.next();
                 if (checkExistence)
                 {
-                    long start = System.currentTimeMillis();
                     try
                     {
                         if (exists(s3, input.getPath()))
@@ -387,8 +383,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                                 "failed to check the existence of the right table input file '" +
                                         input.getPath() + "'", e);
                     }
-                    long end = System.currentTimeMillis();
-                    logger.info("duration of existence check: " + (end - start));
                 }
                 else
                 {

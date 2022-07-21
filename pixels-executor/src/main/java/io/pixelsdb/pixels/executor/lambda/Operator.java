@@ -71,6 +71,11 @@ public abstract class Operator
 
     public static void waitForCompletion(CompletableFuture<?>[] stageOutputs)
     {
+        waitForCompletion(stageOutputs, StageCompletionRatio);
+    }
+
+    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
+    {
         requireNonNull(stageOutputs, "stageOutputs is null");
 
         if (stageOutputs.length == 0)
@@ -93,7 +98,7 @@ public abstract class Operator
                 }
             }
 
-            if (completed / stageOutputs.length >= StageCompletionRatio)
+            if (completed / stageOutputs.length >= completionRatio)
             {
                 break;
             }

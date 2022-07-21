@@ -40,7 +40,6 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -415,7 +414,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 InputInfo input = it.next();
                 if (checkExistence)
                 {
-                    long start = System.currentTimeMillis();
                     try
                     {
                         if (exists(s3, input.getPath()))
@@ -432,8 +430,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                                 "failed to check the existence of the right table input file '" +
                                 input.getPath() + "'", e);
                     }
-                    long end = System.currentTimeMillis();
-                    logger.info("duration of existence check: " + (end - start));
                 }
                 else
                 {
@@ -454,7 +450,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    int scannedRows = 0, joinedRows = 0;
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
                     do
@@ -462,7 +457,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                         rowBatch = recordReader.readBatch(rowBatchSize);
                         rightFilter.doFilter(rowBatch, filtered, tmp);
                         rowBatch.applyFilter(filtered);
-                        scannedRows += rowBatch.size;
                         if (rowBatch.size > 0)
                         {
                             List<VectorizedRowBatch> joinedBatches = currJoiner.join(rowBatch);
@@ -471,13 +465,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                                 if (!joined.isEmpty())
                                 {
                                     nextJoiner.populateLeftTable(joined);
-                                    joinedRows += joined.size;
                                 }
                             }
                         }
                     } while (!rowBatch.endOfFile);
-                    logger.info("number of scanned rows: " + scannedRows +
-                            ", number of joined rows: " + joinedRows);
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +

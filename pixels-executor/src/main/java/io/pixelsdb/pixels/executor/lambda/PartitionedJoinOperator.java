@@ -155,7 +155,8 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
             smallChildOutputs = smallChild.execute();
-            largeChild.execute();
+            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
+            waitForCompletion(largeChildOutputs, 0.05);
             return smallChildOutputs;
         }
         else if (smallChild != null)
@@ -171,6 +172,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                 largePartitionOutputs[i++] = InvokerFactory.Instance()
                         .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
+            waitForCompletion(largePartitionOutputs, 0.05);
             return smallChildOutputs;
         }
         else if (largeChild != null)
@@ -185,7 +187,8 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                 smallPartitionOutputs[i++] = InvokerFactory.Instance()
                         .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
-            largeChild.execute();
+            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
+            waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
             return smallPartitionOutputs;
         }
         else
@@ -205,6 +208,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                 largePartitionOutputs[i++] = InvokerFactory.Instance()
                         .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
+            waitForCompletion(largePartitionOutputs, 0.05);
             return smallPartitionOutputs;
         }
     }

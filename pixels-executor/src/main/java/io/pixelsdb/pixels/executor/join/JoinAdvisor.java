@@ -144,25 +144,25 @@ public class JoinAdvisor
     public int getNumPartition(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException, InvalidProtocolBufferException
     {
-        double largeTableSize;
-        double largeTableRowCount;
-        if (joinEndian == JoinEndian.LARGE_LEFT)
-        {
-            largeTableSize = getTableInputSize(leftTable);
-            largeTableRowCount = getTableRowCount(leftTable);
-        }
-        else
-        {
-            largeTableSize = getTableInputSize(rightTable);
-            largeTableRowCount = getTableRowCount(rightTable);
-        }
+        double totalSize = 0;
         double leftSelectivity = getTableSelectivity(leftTable);
         double rightSelectivity = getTableSelectivity(rightTable);
         logger.info("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
         logger.info("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
-        double selectivity = Math.min(leftSelectivity, rightSelectivity);
-        int numFromSize = (int) Math.ceil(selectivity * largeTableSize / partitionSizeBytes);
-        int numFromRows = (int) Math.ceil(selectivity * largeTableRowCount / partitionSizeRows);
+        totalSize += getTableInputSize(leftTable) * leftSelectivity;
+        totalSize += getTableInputSize(rightTable) * rightSelectivity;
+        double largeTableRowCount;
+        if (joinEndian == JoinEndian.LARGE_LEFT)
+        {
+            largeTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
+        }
+        else
+        {
+            largeTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
+        }
+
+        int numFromSize = (int) Math.ceil(totalSize / partitionSizeBytes);
+        int numFromRows = (int) Math.ceil(largeTableRowCount / partitionSizeRows);
         // Limit the partition size by choosing the maximum number of partitions.
         // TODO: estimate the join selectivity more accurately using histogram.
         return Math.max(Math.max(numFromSize, numFromRows), 8);
