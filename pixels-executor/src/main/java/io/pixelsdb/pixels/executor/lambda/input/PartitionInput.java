@@ -42,6 +42,11 @@ public class PartitionInput extends Input
      */
     private ScanTableInfo tableInfo;
     /**
+     * If a column from the table's columnToRead appears in the partition output,
+     * the corresponding element in this array would be true, and vice versa.
+     */
+    private boolean[] projection;
+    /**
      * The information of the partition output.
      */
     private OutputInfo output;
@@ -55,11 +60,12 @@ public class PartitionInput extends Input
      */
     public PartitionInput() { }
 
-    public PartitionInput(long queryId, ScanTableInfo tableInfo,
+    public PartitionInput(long queryId, ScanTableInfo tableInfo, boolean[] projection,
                           OutputInfo output, PartitionInfo partitionInfo)
     {
         this.queryId = queryId;
         this.tableInfo = tableInfo;
+        this.projection = projection;
         this.output = output;
         this.partitionInfo = partitionInfo;
     }
@@ -82,6 +88,16 @@ public class PartitionInput extends Input
     public void setTableInfo(ScanTableInfo tableInfo)
     {
         this.tableInfo = tableInfo;
+    }
+
+    public boolean[] getProjection()
+    {
+        return projection;
+    }
+
+    public void setProjection(boolean[] projection)
+    {
+        this.projection = projection;
     }
 
     public OutputInfo getOutput()

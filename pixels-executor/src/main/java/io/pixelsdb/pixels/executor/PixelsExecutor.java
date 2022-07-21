@@ -25,8 +25,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.layout.*;
-import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Order;
 import io.pixelsdb.pixels.common.metadata.domain.Projections;
@@ -46,10 +46,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.executor.plan.Table.TableType.*;
@@ -510,6 +507,8 @@ public class PixelsExecutor
             }
             else
             {
+                // FIXME: this is possible, the small-left broadcast join might not be chained successfully
+                //  (e.g., TPC-H q8 with all joins using broadcast)
                 throw new InvalidArgumentException("the small-left child is not a broadcast chain join whereas the " +
                         "current join is a broadcast join, such a join plan is invalid");
             }
@@ -533,7 +532,8 @@ public class PixelsExecutor
 
             int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
-                    joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
+                    joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
+                    null, null);
             PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
                     null, null, joinInputs, joinAlgo);
 
@@ -888,16 +888,19 @@ public class PixelsExecutor
                         leftPartitionedFiles, IntraWorkerParallelism,
                         leftTable.getColumnNames(), leftKeyColumnIds);
 
+                boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
+
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
-                        rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
+                        rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
 
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
-                        rightTable, rightKeyColumnIds, rightPartitionInputs);
+                        rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
 
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
-                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
+                        null, rightPartitionProjection);
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -915,22 +918,25 @@ public class PixelsExecutor
             else
             {
                 // partition both tables. in this case, the operator's child must be null.
+                boolean[] leftPartitionProjection = getPartitionProjection(leftTable, join.getLeftProjection());
                 List<PartitionInput> leftPartitionInputs = getPartitionInputs(
-                        leftTable, leftInputSplits, leftKeyColumnIds, numPartition,
+                        leftTable, leftInputSplits, leftKeyColumnIds, leftPartitionProjection, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + leftTable.getTableName() + "/");
                 PartitionedTableInfo leftTableInfo = getPartitionedTableInfo(
-                        leftTable, leftKeyColumnIds, leftPartitionInputs);
+                        leftTable, leftKeyColumnIds, leftPartitionInputs, leftPartitionProjection);
 
+                boolean[] rightPartitionProjection = getPartitionProjection(rightTable, join.getRightProjection());
                 List<PartitionInput> rightPartitionInputs = getPartitionInputs(
-                        rightTable, rightInputSplits, rightKeyColumnIds, numPartition,
+                        rightTable, rightInputSplits, rightKeyColumnIds, rightPartitionProjection, numPartition,
                         IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
                                 joinedTable.getTableName() + "/" + rightTable.getTableName() + "/");
                 PartitionedTableInfo rightTableInfo = getPartitionedTableInfo(
-                        rightTable, rightKeyColumnIds, rightPartitionInputs);
+                        rightTable, rightKeyColumnIds, rightPartitionInputs, rightPartitionProjection);
 
                 List<JoinInput> joinInputs = getPartitionedJoinInputs(
-                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo);
+                        joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
+                        leftPartitionProjection, rightPartitionProjection);
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
@@ -1027,8 +1033,116 @@ public class PixelsExecutor
         return tableInfo;
     }
 
+    /**
+     * Get the partition projection for the bast table that is to be partitioned.
+     * If a column only exists in the filters but does not exist in the join projection
+     * (corresponding element is true), then the corresponding element in the partition
+     * projection is false. Otherwise, it is true.
+     *
+     * @param table the base table
+     * @param joinProjection the join projection
+     * @return the partition projection for the partition operator
+     */
+    private boolean[] getPartitionProjection(Table table, boolean[] joinProjection)
+    {
+        String[] columnsToRead = table.getColumnNames();
+        boolean[] projection = new boolean[columnsToRead.length];
+        if (table.getTableType() == BASE)
+        {
+            TableScanFilter tableScanFilter = ((BaseTable)table).getFilter();
+            Set<Integer> filterColumnIds = tableScanFilter.getColumnFilters().keySet();
+            for (int i = 0; i < columnsToRead.length; ++i)
+            {
+                if (!joinProjection[i] && filterColumnIds.contains(i))
+                {
+                    checkArgument(columnsToRead[i].equals(tableScanFilter.getColumnFilter(i).getColumnName()),
+                            "the column name in the table and the filter do not match");
+                    projection[i] = false;
+                } else
+                {
+                    projection[i] = true;
+                }
+            }
+        }
+        else
+        {
+            Arrays.fill(projection, true);
+        }
+        return projection;
+    }
+
+    private String[] rewriteColumnsToReadForPartitionedJoin(String[] originColumnsToRead, boolean[] partitionProjection)
+    {
+        requireNonNull(originColumnsToRead, "originColumnsToRead is null");
+        requireNonNull(partitionProjection, "partitionProjection is null");
+        checkArgument(originColumnsToRead.length == partitionProjection.length,
+                "originColumnsToRead and partitionProjection are not of the same length");
+        int len = 0;
+        for (int i = 0; i < partitionProjection.length; ++i)
+        {
+            if (partitionProjection[i])
+            {
+                len++;
+            }
+        }
+        String[] columnsToRead = new String[len];
+        for (int i = 0, j = 0; i < partitionProjection.length; ++i)
+        {
+            if (partitionProjection[i])
+            {
+                columnsToRead[j++] = originColumnsToRead[i];
+            }
+        }
+        return columnsToRead;
+    }
+
+    private boolean[] rewriteProjectionForPartitionedJoin(boolean[] originProjection, boolean[] partitionProjection)
+    {
+        requireNonNull(originProjection, "originProjection is null");
+        requireNonNull(partitionProjection, "partitionProjection is null");
+        checkArgument(originProjection.length == partitionProjection.length,
+                "originProjection and partitionProjection are not of the same length");
+        int len = 0;
+        for (int i = 0; i < partitionProjection.length; ++i)
+        {
+            if (partitionProjection[i])
+            {
+                len++;
+            }
+        }
+        boolean[] projection = new boolean[len];
+        for (int i = 0, j = 0; i < partitionProjection.length; ++i)
+        {
+            if (partitionProjection[i])
+            {
+                projection[j++] = originProjection[i];
+            }
+        }
+        return partitionProjection;
+    }
+
+    private int[] rewriteColumnIdsForPartitionedJoin(int[] originColumnIds, boolean[] partitionProjection)
+    {
+        requireNonNull(originColumnIds, "originProjection is null");
+        requireNonNull(partitionProjection, "partitionProjection is null");
+        Map<Integer, Integer> columnIdMap = new HashMap<>();
+        for (int i = 0, j = 0; i < partitionProjection.length; ++i)
+        {
+            if (partitionProjection[i])
+            {
+                columnIdMap.put(i, j++);
+            }
+        }
+        int[] columnIds = new int[originColumnIds.length];
+        for (int i = 0; i < originColumnIds.length; ++i)
+        {
+            columnIds[i] = columnIdMap.get(originColumnIds[i]);
+        }
+        return columnIds;
+    }
+
     private PartitionedTableInfo getPartitionedTableInfo(
-            Table table, int[] keyColumnIds, List<PartitionInput> partitionInputs)
+            Table table, int[] keyColumnIds, List<PartitionInput> partitionInputs, boolean[] partitionProjection)
     {
         ImmutableList.Builder<String> rightPartitionedFiles = ImmutableList.builder();
         for (PartitionInput partitionInput : partitionInputs)
@@ -1036,12 +1150,15 @@ public class PixelsExecutor
             rightPartitionedFiles.add(partitionInput.getOutput().getPath());
         }
 
+        int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
+        String[] newColumnsToRead = rewriteColumnsToReadForPartitionedJoin(table.getColumnNames(), partitionProjection);
+
         return new PartitionedTableInfo(table.getTableName(), table.getTableType() == BASE,
-                rightPartitionedFiles.build(), IntraWorkerParallelism, table.getColumnNames(), keyColumnIds);
+                rightPartitionedFiles.build(), IntraWorkerParallelism, newColumnsToRead, newKeyColumnIds);
     }
 
-    private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits,
-                                                    int[] keyColumnIds, int numPartition, String outputBase)
+    private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits, int[] keyColumnIds,
+                                                    boolean[] partitionProjection, int numPartition, String outputBase)
     {
         ImmutableList.Builder<PartitionInput> partitionInputsBuilder = ImmutableList.builder();
         int outputId = 0;
@@ -1070,9 +1187,11 @@ public class PixelsExecutor
                         TableScanFilter.empty(inputTable.getSchemaName(), inputTable.getTableName())));
             }
             partitionInput.setTableInfo(tableInfo);
+            partitionInput.setProjection(partitionProjection);
             partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", false,
                     new StorageInfo(InputStorage, null, null, null), true));
-            partitionInput.setPartitionInfo(new PartitionInfo(keyColumnIds, numPartition));
+            int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
+            partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));
             partitionInputsBuilder.add(partitionInput);
         }
 
@@ -1080,18 +1199,21 @@ public class PixelsExecutor
     }
 
     /**
-     * Get the join inputs of a partitioned join, given the left and right children.
+     * Get the join inputs of a partitioned join, given the left and right partitioned tables.
      * @param joinedTable this joined table
      * @param parent the parent of this joined table
      * @param numPartition the number of partitions
-     * @param leftTableInfo the left table
-     * @param rightTableInfo the right table
+     * @param leftTableInfo the left partitioned table
+     * @param rightTableInfo the right partitioned table
+     * @param leftPartitionProjection the partition projection of the left table, null if not exists
+     * @param rightPartitionProjection the partition projection of the right table, null if not exists
      * @return the join input of this join
      * @throws MetadataException
      */
     private List<JoinInput> getPartitionedJoinInputs(
             JoinedTable joinedTable, Optional<JoinedTable> parent, int numPartition,
-            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo)
+            PartitionedTableInfo leftTableInfo, PartitionedTableInfo rightTableInfo,
+            boolean[] leftPartitionProjection, boolean[] rightPartitionProjection)
             throws MetadataException, InvalidProtocolBufferException
     {
         boolean postPartition = false;
@@ -1134,13 +1256,17 @@ public class PixelsExecutor
                     new StorageInfo(IntermediateStorage, null, null, null),
                     true, outputFileNames.build());
 
+            boolean[] leftProjection = leftPartitionProjection == null ? joinedTable.getJoin().getLeftProjection() :
+                    rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getLeftProjection(), leftPartitionProjection);
+            boolean[] rightProjection = rightPartitionProjection == null ? joinedTable.getJoin().getRightProjection() :
+                    rewriteProjectionForPartitionedJoin(joinedTable.getJoin().getRightProjection(), rightPartitionProjection);
+
             PartitionedJoinInput joinInput;
             if (joinedTable.getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType(),
                         joinedTable.getJoin().getLeftColumnAlias(), joinedTable.getJoin().getRightColumnAlias(),
-                        joinedTable.getJoin().getLeftProjection(), joinedTable.getJoin().getRightProjection(),
-                        postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
+                        leftProjection, rightProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
                  joinInput = new PartitionedJoinInput(queryId, leftTableInfo, rightTableInfo, joinInfo,
                          false, null, output);
             }
@@ -1148,8 +1274,7 @@ public class PixelsExecutor
             {
                 PartitionedJoinInfo joinInfo = new PartitionedJoinInfo(joinedTable.getJoin().getJoinType().flip(),
                         joinedTable.getJoin().getRightColumnAlias(), joinedTable.getJoin().getLeftColumnAlias(),
-                        joinedTable.getJoin().getRightProjection(), joinedTable.getJoin().getLeftProjection(),
-                        postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
+                        rightProjection, leftProjection, postPartition, postPartitionInfo, numPartition, ImmutableList.of(i));
                 joinInput = new PartitionedJoinInput(queryId, rightTableInfo, leftTableInfo, joinInfo,
                         false, null, output);
             }
