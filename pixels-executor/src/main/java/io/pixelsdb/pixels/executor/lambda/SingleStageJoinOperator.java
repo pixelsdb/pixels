@@ -130,7 +130,8 @@ public class SingleStageJoinOperator extends JoinOperator
         }
         if (largeChild != null)
         {
-            largeChild.execute();
+            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
+            waitForCompletion(largeChildOutputs, 0.05);
         }
         if (smallChildOutputs != null)
         {

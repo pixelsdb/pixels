@@ -20,14 +20,15 @@
 package io.pixelsdb.pixels.core.stats;
 
 /**
- * pixels
+ * Extends RangeStats<Long> for the compatibility with Trino.
+ * In trino, they want to get min/max in long.
  *
  * 2021-04-25
  * @author hank
  */
-public interface DateColumnStats extends RangeStats<Integer>
+public interface DateColumnStats extends RangeStats<Long>
 {
-    Integer getMinimum();
+    Long getMinimum();
 
-    Integer getMaximum();
+    Long getMaximum();
 }

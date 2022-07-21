@@ -114,13 +114,13 @@ public class DateStatsRecorder
             {
                 if (hasMinimum)
                 {
-                    if (dateStat.getMinimum() < minimum)
+                    if (dateStat.minimum < minimum)
                     {
-                        minimum = dateStat.getMinimum();
+                        minimum = dateStat.minimum;
                     }
                 } else
                 {
-                    minimum = dateStat.getMinimum();
+                    minimum = dateStat.minimum;
                     hasMinimum = true;
                 }
             }
@@ -128,13 +128,13 @@ public class DateStatsRecorder
             {
                 if (hasMaximum)
                 {
-                    if (dateStat.getMaximum() > maximum)
+                    if (dateStat.maximum > maximum)
                     {
-                        maximum = dateStat.getMaximum();
+                        maximum = dateStat.maximum;
                     }
                 } else
                 {
-                    maximum = dateStat.getMaximum();
+                    maximum = dateStat.maximum;
                     hasMaximum = true;
                 }
             }
@@ -166,15 +166,15 @@ public class DateStatsRecorder
     }
 
     @Override
-    public Integer getMinimum()
+    public Long getMinimum()
     {
-        return minimum;
+        return (long) minimum;
     }
 
     @Override
-    public Integer getMaximum()
+    public Long getMaximum()
     {
-        return maximum;
+        return (long) maximum;
     }
 
     @Override
