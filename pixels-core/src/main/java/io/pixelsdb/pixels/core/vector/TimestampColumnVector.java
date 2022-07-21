@@ -136,7 +136,7 @@ public class TimestampColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 524287 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 32));
+            hashCode[i] = 524287 * hashCode[i] + (int)(this.times[i] ^ (this.times[i] >>> 16));
         }
         return hashCode;
     }

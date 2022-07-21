@@ -252,7 +252,7 @@ public class DecimalColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 524287 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 32));
+            hashCode[i] = 524287 * hashCode[i] + (int)(this.vector[i] ^ (this.vector[i] >>> 16));
         }
         return hashCode;
     }

@@ -583,8 +583,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                     throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
                 }
-                logger.info("finish processing: " + rightPartitioned + " in " +
-                        (System.currentTimeMillis() - start) + "ms");
             }
         }
 
