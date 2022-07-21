@@ -188,7 +188,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                         .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
             }
             CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
-            waitForCompletion(largeChildOutputs, 0.05);
+            waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
             return smallPartitionOutputs;
         }
         else

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.executor.lambda;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 
@@ -31,6 +32,14 @@ import java.util.concurrent.ExecutionException;
  */
 public abstract class JoinOperator extends Operator
 {
+    protected static final double LargeSideCompletionRatio;
+
+    static
+    {
+        String ratio = ConfigFactory.Instance().getProperty("join.large.side.completion.ratio");
+        LargeSideCompletionRatio = Double.parseDouble(ratio);
+    }
+
     public abstract List<JoinInput> getJoinInputs();
 
     public abstract JoinAlgorithm getJoinAlgo();
