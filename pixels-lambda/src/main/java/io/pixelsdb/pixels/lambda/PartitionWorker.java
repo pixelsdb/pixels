@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
-import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
@@ -36,6 +35,7 @@ import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.PartitionOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.executor.scan.Scanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +80,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             logger.info("table '" + event.getTableInfo().getTableName() +
                     "', number of partitions (" + numPartition + ")");
             int[] keyColumnIds = event.getPartitionInfo().getKeyColumnIds();
+            boolean[] projection = event.getProjection();
             checkArgument(event.getOutput().getStorageInfo().getScheme() == Storage.Scheme.s3,
                     "the storage scheme for the partition result must be s3");
             String outputPath = event.getOutput().getPath();
@@ -102,7 +103,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                     try
                     {
                         partitionFile(queryId, scanInputs, columnsToRead, filter,
-                                keyColumnIds, partitioned, writerSchema);
+                                keyColumnIds, projection, partitioned, writerSchema);
                     }
                     catch (Exception e)
                     {
@@ -164,17 +165,21 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
      *
      * @param queryId the query id used by I/O scheduler
      * @param scanInputs the information of the files to scan
-     * @param cols the included columns
+     * @param columnsToRead the columns to be read from the input files
      * @param filter the filer for the scan
      * @param keyColumnIds the ids of the partition key columns
+     * @param projection the projection for the partition
      * @param partitionResult the partition result
      * @param writerSchema the schema to be used for the partition result writer
      */
     private void partitionFile(long queryId, List<InputInfo> scanInputs,
-                             String[] cols, TableScanFilter filter, int[] keyColumnIds,
-                             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
-                             AtomicReference<TypeDescription> writerSchema)
+                               String[] columnsToRead, TableScanFilter filter,
+                               int[] keyColumnIds, boolean[] projection,
+                               List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
+                               AtomicReference<TypeDescription> writerSchema)
     {
+        Scanner scanner = null;
+        Partitioner partitioner = null;
         for (InputInfo inputInfo : scanInputs)
         {
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
@@ -188,25 +193,28 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
 
-                PixelsReaderOption option = getReaderOption(queryId, cols, inputInfo);
+                PixelsReaderOption option = getReaderOption(queryId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
 
-                Partitioner partitioner = new Partitioner(partitionResult.size(), rowBatchSize,
-                        rowBatchSchema, keyColumnIds);
-
+                if (scanner == null)
+                {
+                    scanner = new Scanner(rowBatchSize, rowBatchSchema, columnsToRead, projection, filter);
+                }
+                if (partitioner == null)
+                {
+                    partitioner = new Partitioner(partitionResult.size(), rowBatchSize,
+                            scanner.getOutputSchema(), keyColumnIds);
+                }
                 if (writerSchema.get() == null)
                 {
-                    writerSchema.weakCompareAndSet(null, rowBatchSchema);
+                    writerSchema.weakCompareAndSet(null, scanner.getOutputSchema());
                 }
-                Bitmap filtered = new Bitmap(rowBatchSize, true);
-                Bitmap tmp = new Bitmap(rowBatchSize, false);
+
                 do
                 {
-                    rowBatch = recordReader.readBatch(rowBatchSize);
-                    filter.doFilter(rowBatch, filtered, tmp);
-                    rowBatch.applyFilter(filtered);
+                    rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
                     if (rowBatch.size > 0)
                     {
                         Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
@@ -219,18 +227,21 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                         }
                     }
                 } while (!rowBatch.endOfFile);
-                VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
-                for (int hash = 0; hash < tailBatches.length; ++hash)
-                {
-                    if (!tailBatches[hash].isEmpty())
-                    {
-                        partitionResult.get(hash).add(tailBatches[hash]);
-                    }
-                }
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the file '" +
                         inputInfo.getPath() + "' and output the partitioning result", e);
+            }
+        }
+        if (partitioner != null)
+        {
+            VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+            for (int hash = 0; hash < tailBatches.length; ++hash)
+            {
+                if (!tailBatches[hash].isEmpty())
+                {
+                    partitionResult.get(hash).add(tailBatches[hash]);
+                }
             }
         }
     }

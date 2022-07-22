@@ -82,7 +82,6 @@ public class Scanner
      */
     public VectorizedRowBatch filterAndProject(VectorizedRowBatch inputRowBatch)
     {
-        requireNonNull(inputRowBatch, "inputRowBatch is null");
         if (!inputRowBatch.isEmpty())
         {
             this.filter.doFilter(inputRowBatch, filtered, tmp);
