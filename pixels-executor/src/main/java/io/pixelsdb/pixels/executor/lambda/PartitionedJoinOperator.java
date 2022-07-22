@@ -24,9 +24,12 @@ import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -39,16 +42,17 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PartitionedJoinOperator extends SingleStageJoinOperator
 {
+    private static final Logger logger = LogManager.getLogger(PartitionedJoinOperator.class);
     protected final List<PartitionInput> smallPartitionInputs;
     protected final List<PartitionInput> largePartitionInputs;
     protected CompletableFuture<?>[] smallPartitionOutputs = null;
     protected CompletableFuture<?>[] largePartitionOutputs = null;
 
-    public PartitionedJoinOperator(List<PartitionInput> smallPartitionInputs,
+    public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
                                    List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
-        super(joinInputs, joinAlgo);
+        super(name, joinInputs, joinAlgo);
         if (joinAlgo != JoinAlgorithm.PARTITIONED && joinAlgo != JoinAlgorithm.PARTITIONED_CHAIN)
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is not supported");
@@ -118,99 +122,134 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
     /**
      * Execute this join operator.
      *
-     * @return the join outputs.
+     * @return the completable future of the completable futures of the join outputs.
      */
     @Override
-    public CompletableFuture<?>[] execute()
+    public CompletableFuture<CompletableFuture<?>[]> execute()
     {
-        waitForCompletion(executePrev());
-        joinOutputs = new CompletableFuture[joinInputs.size()];
-        for (int i = 0; i < joinInputs.size(); ++i)
+        return executePrev().handle((result, exception) ->
         {
-            if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            if (exception != null)
             {
-                joinOutputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                throw new CompletionException("failed to complete the previous stages", exception);
             }
-            else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+            joinOutputs = new CompletableFuture[joinInputs.size()];
+            for (int i = 0; i < joinInputs.size(); ++i)
             {
-                joinOutputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                if (joinAlgo == JoinAlgorithm.PARTITIONED)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                }
+                else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInputs.get(i));
+                }
+                else
+                {
+                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+                }
             }
-            else
-            {
-                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
-            }
-        }
-        return joinOutputs;
+
+            logger.info("invoke " + this.getName());
+            return joinOutputs;
+        });
     }
 
     @Override
-    public CompletableFuture<?>[] executePrev()
+    public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<?>[] smallChildOutputs;
-        if (smallChild != null && largeChild != null)
+        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
+        operatorService.execute(() ->
         {
-            // both children exist, we should execute both children and wait for the small child.
-            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
-            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallChildOutputs = smallChild.execute();
-            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
-            waitForCompletion(largeChildOutputs, 0.05);
-            return smallChildOutputs;
-        }
-        else if (smallChild != null)
-        {
-            // only small child exists, we should invoke the large table partitioning and wait for the small child.
-            checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
-            checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            smallChildOutputs = smallChild.execute();
-            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
-            int i = 0;
-            for (PartitionInput partitionInput : largePartitionInputs)
+            try
             {
-                largePartitionOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                CompletableFuture<CompletableFuture<?>[]> smallChildFuture = null;
+                CompletableFuture<CompletableFuture<?>[]> largeChildFuture = null;
+                if (smallChild != null && largeChild != null)
+                {
+                    // both children exist, we should execute both children and wait for the small child.
+                    checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+                    checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+                    smallChildFuture = smallChild.execute();
+                    largeChildFuture = largeChild.execute();
+                    waitForCompletion(smallChildFuture.join());
+                    waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
+                    prevStagesFuture.complete(null);
+                } else if (smallChild != null)
+                {
+                    // only small child exists, we should invoke the large table partitioning and wait for the small child.
+                    checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
+                    checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
+                    smallChildFuture = smallChild.execute();
+                    largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+                    int i = 0;
+                    for (PartitionInput partitionInput : largePartitionInputs)
+                    {
+                        largePartitionOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                    }
+
+                    logger.info("invoke large partition of " + this.getName());
+
+                    waitForCompletion(smallChildFuture.join());
+                    waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
+                    prevStagesFuture.complete(null);
+                } else if (largeChild != null)
+                {
+                    // only large child exists, we should invoke and wait for the small table partitioning.
+                    checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
+                    checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
+                    smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
+                    int i = 0;
+                    for (PartitionInput partitionInput : smallPartitionInputs)
+                    {
+                        smallPartitionOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                    }
+
+                    logger.info("invoke small partition of " + this.getName());
+
+                    largeChildFuture = largeChild.execute();
+                    waitForCompletion(smallPartitionOutputs);
+                    waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
+                    prevStagesFuture.complete(null);
+                } else
+                {
+                    // no children exist, partition both tables and wait for the small table partitioning.
+                    smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
+                    int i = 0;
+                    for (PartitionInput partitionInput : smallPartitionInputs)
+                    {
+                        smallPartitionOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                    }
+
+                    logger.info("invoke small partition of " + this.getName());
+
+                    largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
+                    i = 0;
+                    for (PartitionInput partitionInput : largePartitionInputs)
+                    {
+                        largePartitionOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                    }
+
+                    logger.info("invoke large partition of " + this.getName());
+
+                    waitForCompletion(smallPartitionOutputs);
+                    waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
+                    prevStagesFuture.complete(null);
+                }
             }
-            waitForCompletion(largePartitionOutputs, 0.05);
-            return smallChildOutputs;
-        }
-        else if (largeChild != null)
-        {
-            // only large child exists, we should invoke and wait for the small table partitioning.
-            checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
-            checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
-            int i = 0;
-            for (PartitionInput partitionInput : smallPartitionInputs)
+            catch (InterruptedException e)
             {
-                smallPartitionOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
+                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
-            waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
-            return smallPartitionOutputs;
-        }
-        else
-        {
-            // no children exist, partition both tables and wait for the small table partitioning.
-            smallPartitionOutputs = new CompletableFuture[smallPartitionInputs.size()];
-            int i = 0;
-            for (PartitionInput partitionInput : smallPartitionInputs)
-            {
-                smallPartitionOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
-            }
-            largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
-            i = 0;
-            for (PartitionInput partitionInput : largePartitionInputs)
-            {
-                largePartitionOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
-            }
-            waitForCompletion(largePartitionOutputs, 0.05);
-            return smallPartitionOutputs;
-        }
+        });
+
+        return prevStagesFuture;
     }
 
     @Override

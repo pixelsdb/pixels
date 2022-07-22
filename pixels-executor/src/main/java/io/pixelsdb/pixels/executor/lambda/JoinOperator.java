@@ -40,6 +40,11 @@ public abstract class JoinOperator extends Operator
         LargeSideCompletionRatio = Double.parseDouble(ratio);
     }
 
+    public JoinOperator(String name)
+    {
+        super(name);
+    }
+
     public abstract List<JoinInput> getJoinInputs();
 
     public abstract JoinAlgorithm getJoinAlgo();

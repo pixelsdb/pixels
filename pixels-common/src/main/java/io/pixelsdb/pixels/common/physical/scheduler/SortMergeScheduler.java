@@ -163,7 +163,7 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
-    protected class RequestFuture implements Comparable<RequestFuture>
+    protected static class RequestFuture implements Comparable<RequestFuture>
     {
         public Request request;
         public CompletableFuture<ByteBuffer> future;
@@ -181,7 +181,7 @@ public class SortMergeScheduler implements Scheduler
         }
     }
 
-    protected class MergedRequest
+    protected static class MergedRequest
     {
         private final long queryId;
         private final long start;
@@ -292,7 +292,7 @@ public class SortMergeScheduler implements Scheduler
      * Combination of MergedRequest and PhysicalReader,
      * it is used by the RetryPolicy.
      */
-    protected class MergedRequestReader
+    protected static class MergedRequestReader
     {
         private MergedRequest request;
         private PhysicalReader reader;
@@ -312,7 +312,7 @@ public class SortMergeScheduler implements Scheduler
      *     We future confirm that retry helps keep the large query performance stable.
      * </p>
      */
-    protected class RetryPolicy
+    protected static class RetryPolicy
     {
         private final int maxRetryNum;
         private final int intervalMs;
