@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -40,16 +42,17 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 public class PartitionedJoinOperator extends SingleStageJoinOperator
 {
+    private static final Logger logger = LogManager.getLogger(PartitionedJoinOperator.class);
     protected final List<PartitionInput> smallPartitionInputs;
     protected final List<PartitionInput> largePartitionInputs;
     protected CompletableFuture<?>[] smallPartitionOutputs = null;
     protected CompletableFuture<?>[] largePartitionOutputs = null;
 
-    public PartitionedJoinOperator(List<PartitionInput> smallPartitionInputs,
+    public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
                                    List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
-        super(joinInputs, joinAlgo);
+        super(name, joinInputs, joinAlgo);
         if (joinAlgo != JoinAlgorithm.PARTITIONED && joinAlgo != JoinAlgorithm.PARTITIONED_CHAIN)
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is not supported");
@@ -148,6 +151,8 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                     throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
                 }
             }
+
+            logger.info("invoke " + this.getName());
             return joinOutputs;
         });
     }
@@ -185,6 +190,9 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                         largePartitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
+
+                    logger.info("invoke large partition of " + this.getName());
+
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
                     prevStagesFuture.complete(null);
@@ -200,6 +208,9 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                         smallPartitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
+
+                    logger.info("invoke small partition of " + this.getName());
+
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallPartitionOutputs);
                     waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
@@ -214,6 +225,9 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                         smallPartitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
+
+                    logger.info("invoke small partition of " + this.getName());
+
                     largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
                     i = 0;
                     for (PartitionInput partitionInput : largePartitionInputs)
@@ -221,6 +235,9 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                         largePartitionOutputs[i++] = InvokerFactory.Instance()
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
+
+                    logger.info("invoke large partition of " + this.getName());
+
                     waitForCompletion(smallPartitionOutputs);
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
                     prevStagesFuture.complete(null);

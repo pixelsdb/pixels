@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -37,20 +39,23 @@ import java.util.concurrent.ExecutionException;
  */
 public class SingleStageJoinOperator extends JoinOperator
 {
+    private static final Logger logger = LogManager.getLogger(SingleStageJoinOperator.class);
     protected final List<JoinInput> joinInputs;
     protected final JoinAlgorithm joinAlgo;
     protected JoinOperator smallChild = null;
     protected JoinOperator largeChild = null;
     protected CompletableFuture<?>[] joinOutputs = null;
 
-    public SingleStageJoinOperator(JoinInput joinInput, JoinAlgorithm joinAlgo)
+    public SingleStageJoinOperator(String name, JoinInput joinInput, JoinAlgorithm joinAlgo)
     {
+        super(name);
         this.joinInputs = ImmutableList.of(joinInput);
         this.joinAlgo = joinAlgo;
     }
 
-    public SingleStageJoinOperator(List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
+    public SingleStageJoinOperator(String name, List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
+        super(name);
         this.joinInputs = ImmutableList.copyOf(joinInputs);
         this.joinAlgo = joinAlgo;
     }
@@ -123,6 +128,8 @@ public class SingleStageJoinOperator extends JoinOperator
                     throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
                 }
             }
+
+            logger.info("invoke " + this.getName());
             return joinOutputs;
         });
     }

@@ -43,6 +43,21 @@ public abstract class Operator
         Runtime.getRuntime().addShutdownHook(new Thread(operatorService::shutdownNow));
     }
 
+    private final String name;
+
+    public Operator(String name)
+    {
+        this.name = name;
+    }
+
+    /**
+     * @return the name of the operator
+     */
+    public String getName()
+    {
+        return name;
+    }
+
     /**
      * Execute this operator recursively.
      *

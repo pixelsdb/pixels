@@ -72,10 +72,11 @@ public class AggregationOperator extends Operator
      */
     private CompletableFuture<?>[] finalAggrOutput = null;
 
-    public AggregationOperator(AggregationInput finalAggrInput,
+    public AggregationOperator(String name, AggregationInput finalAggrInput,
                                List<AggregationInput> preAggrInputs,
                                List<ScanInput> scanInputs)
     {
+        super(name);
         this.finalAggrInput = requireNonNull(finalAggrInput, "aggregateInput is null");
         if (preAggrInputs == null || preAggrInputs.isEmpty())
         {

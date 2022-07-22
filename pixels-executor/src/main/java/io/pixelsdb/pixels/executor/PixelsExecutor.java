@@ -345,7 +345,7 @@ public class PixelsExecutor
         finalAggrInput.setOutput(new OutputInfo(finalOutputBase + "final_aggr",
                 false, storageInfo, true));
 
-        AggregationOperator aggregationOperator = new AggregationOperator(
+        AggregationOperator aggregationOperator = new AggregationOperator(aggregatedTable.getTableName(),
                 finalAggrInput, preAggrInputsBuilder.build(), scanInputsBuilder.build());
         aggregationOperator.setChild(joinOperator);
 
@@ -452,7 +452,7 @@ public class PixelsExecutor
                     }
 
                     SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                            joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                     // The right operator must be set as the large child.
                     joinOperator.setLargeChild(rightOperator);
                     return joinOperator;
@@ -491,6 +491,7 @@ public class PixelsExecutor
                     }
 
                     PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
+                            joinedTable.getTableName(),
                             rightJoinOperator.getSmallPartitionInputs(),
                             rightJoinOperator.getLargePartitionInputs(),
                             joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
@@ -535,7 +536,7 @@ public class PixelsExecutor
                     joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
                     null, null);
             PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
-                    null, null, joinInputs, joinAlgo);
+                    joinedTable.getTableName(), null, null, joinInputs, joinAlgo);
 
             joinOperator.setSmallChild(leftOperator);
             joinOperator.setLargeChild(rightOperator);
@@ -633,7 +634,8 @@ public class PixelsExecutor
                 chainJoinInfos.add(chainJoinInfo);
                 broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
 
-                return new SingleStageJoinOperator(broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
+                return new SingleStageJoinOperator(joinedTable.getTableName(),
+                        broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
             }
         }
         else
@@ -728,7 +730,8 @@ public class PixelsExecutor
                         joinInputs.add(complete);
                     }
 
-                    return new SingleStageJoinOperator(joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
+                    return new SingleStageJoinOperator(joinedTable.getTableName(),
+                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
                 }
             }
             // get the leftInputSplits or leftPartitionedFiles from childJoinInputs.
@@ -864,7 +867,7 @@ public class PixelsExecutor
                 }
             }
             SingleStageJoinOperator joinOperator =
-                    new SingleStageJoinOperator(joinInputs.build(), joinAlgo);
+                    new SingleStageJoinOperator(joinedTable.getTableName(), joinInputs.build(), joinAlgo);
             if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
             {
                 joinOperator.setSmallChild(childOperator);
@@ -904,13 +907,13 @@ public class PixelsExecutor
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(
+                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
                             null, rightPartitionInputs, joinInputs, joinAlgo);
                     joinOperator.setSmallChild(childOperator);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(
+                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
                             rightPartitionInputs, null, joinInputs, joinAlgo);
                     joinOperator.setLargeChild(childOperator);
                 }
@@ -940,12 +943,12 @@ public class PixelsExecutor
 
                 if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
                 {
-                    joinOperator = new PartitionedJoinOperator(
+                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
                             leftPartitionInputs, rightPartitionInputs, joinInputs, joinAlgo);
                 }
                 else
                 {
-                    joinOperator = new PartitionedJoinOperator(
+                    joinOperator = new PartitionedJoinOperator(joinedTable.getTableName(),
                             rightPartitionInputs, leftPartitionInputs, joinInputs, joinAlgo);
                 }
             }
