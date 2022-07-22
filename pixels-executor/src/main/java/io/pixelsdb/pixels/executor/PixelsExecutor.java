@@ -1085,6 +1085,11 @@ public class PixelsExecutor
                 len++;
             }
         }
+        if (len == partitionProjection.length)
+        {
+            return originColumnsToRead;
+        }
+
         String[] columnsToRead = new String[len];
         for (int i = 0, j = 0; i < partitionProjection.length; ++i)
         {
@@ -1110,6 +1115,11 @@ public class PixelsExecutor
                 len++;
             }
         }
+        if (len == partitionProjection.length)
+        {
+            return originProjection;
+        }
+
         boolean[] projection = new boolean[len];
         for (int i = 0, j = 0; i < partitionProjection.length; ++i)
         {
@@ -1135,6 +1145,11 @@ public class PixelsExecutor
                 columnIdMap.put(i, j++);
             }
         }
+        if (columnIdMap.size() == partitionProjection.length)
+        {
+            return originColumnIds;
+        }
+
         int[] columnIds = new int[originColumnIds.length];
         for (int i = 0; i < originColumnIds.length; ++i)
         {

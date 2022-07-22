@@ -226,12 +226,6 @@ public class VectorizedRowBatch implements AutoCloseable
      */
     public VectorizedRowBatch applyProjection(boolean[] projection, int projectionSize)
     {
-        requireNonNull(projection, "projection is null");
-        checkArgument(this.cols.length == projection.length,
-                "this.cols.length does not equal projection.length");
-        checkArgument(projection.length >= projectionSize && projectionSize >=0,
-                "projection.length must be greater or equal to projectionSize, and projectionSize must be non-negative");
-
         ColumnVector[] newCols = new ColumnVector[projectionSize];
         for (int i = 0, j = 0; i < this.cols.length; ++i)
         {
