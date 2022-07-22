@@ -21,8 +21,7 @@ package io.pixelsdb.pixels.executor.lambda;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -34,27 +33,31 @@ import static java.util.Objects.requireNonNull;
 public abstract class Operator
 {
     protected static final double StageCompletionRatio;
+    protected static final ExecutorService operatorService = Executors.newCachedThreadPool();
 
     static
     {
         StageCompletionRatio = Double.parseDouble(
                 ConfigFactory.Instance().getProperty("executor.stage.completion.ratio"));
+
+        Runtime.getRuntime().addShutdownHook(new Thread(operatorService::shutdownNow));
     }
 
     /**
      * Execute this operator recursively.
      *
-     * @return the completable futures of the execution outputs.
+     * @return the completable future that completes when this operator is complete, and
+     * provides the computable futures of the outputs of this operator
      */
-    public abstract CompletableFuture<?>[] execute();
+    public abstract CompletableFuture<CompletableFuture<?>[]> execute();
 
     /**
      * Execute the previous stages (if any) before the last stage, recursively.
-     * And return the completable futures of the outputs of the previous states that
-     * we should wait for completion.
+     * And return the completable future that completes when the previous states are complete.
+     *
      * @return empty array if the previous stages do not exist or do not need to be wait for
      */
-    public abstract CompletableFuture<?>[] executePrev();
+    public abstract CompletableFuture<Void> executePrev();
 
     /**
      * This method collects the outputs of the operator. It may block until the join
@@ -69,12 +72,13 @@ public abstract class Operator
         long getCumulativeDurationMs();
     }
 
-    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs)
+    public static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException
     {
         waitForCompletion(stageOutputs, StageCompletionRatio);
     }
 
     public static void waitForCompletion(CompletableFuture<?>[] stageOutputs, double completionRatio)
+            throws InterruptedException
     {
         requireNonNull(stageOutputs, "stageOutputs is null");
 
@@ -102,6 +106,7 @@ public abstract class Operator
             {
                 break;
             }
+            TimeUnit.MILLISECONDS.sleep(10);
         }
     }
 }

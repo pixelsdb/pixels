@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -93,51 +94,76 @@ public class SingleStageJoinOperator extends JoinOperator
     /**
      * Execute this join operator.
      *
-     * @return the join outputs.
+     * @return the completable future of the completable futures of the join outputs.
      */
     @Override
-    public CompletableFuture<?>[] execute()
+    public CompletableFuture<CompletableFuture<?>[]> execute()
     {
-        waitForCompletion(executePrev());
-        joinOutputs = new CompletableFuture[joinInputs.size()];
-        for (int i = 0; i < joinInputs.size(); ++i)
+        return executePrev().handle((result, exception) ->
         {
-            if (joinAlgo == JoinAlgorithm.BROADCAST)
+            if (exception != null)
             {
-                joinOutputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInputs.get(i));
+                throw new CompletionException("failed to complete the previous stages", exception);
             }
-            else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
+            joinOutputs = new CompletableFuture[joinInputs.size()];
+            for (int i = 0; i < joinInputs.size(); ++i)
             {
-                joinOutputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInputs.get(i));
+                if (joinAlgo == JoinAlgorithm.BROADCAST)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.BROADCAST_JOIN).invoke(joinInputs.get(i));
+                }
+                else if (joinAlgo == JoinAlgorithm.BROADCAST_CHAIN)
+                {
+                    joinOutputs[i] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.BROADCAST_CHAIN_JOIN).invoke(joinInputs.get(i));
+                }
+                else
+                {
+                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+                }
             }
-            else
-            {
-                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
-            }
-        }
-        return joinOutputs;
+            return joinOutputs;
+        });
     }
 
     @Override
-    public CompletableFuture<?>[] executePrev()
+    public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<?>[] smallChildOutputs = null;
-        if (smallChild != null)
+        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
+        operatorService.execute(() ->
         {
-            smallChildOutputs = smallChild.execute();
-        }
-        if (largeChild != null)
-        {
-            CompletableFuture<?>[] largeChildOutputs = largeChild.execute();
-            waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
-        }
-        if (smallChildOutputs != null)
-        {
-            return smallChildOutputs;
-        }
-        return new CompletableFuture[0];
+            try
+            {
+                CompletableFuture<CompletableFuture<?>[]> smallChildFuture = null;
+                if (smallChild != null)
+                {
+                    smallChildFuture = smallChild.execute();
+                }
+                CompletableFuture<CompletableFuture<?>[]> largeChildFuture = null;
+                if (largeChild != null)
+                {
+                    largeChildFuture = largeChild.execute();
+                }
+                if (smallChildFuture != null)
+                {
+                    CompletableFuture<?>[] smallChildOutputs = smallChildFuture.join();
+                    waitForCompletion(smallChildOutputs);
+                }
+                if (largeChildFuture != null)
+                {
+                    CompletableFuture<?>[] largeChildOutputs = largeChildFuture.join();
+                    waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
+                }
+                prevStagesFuture.complete(null);
+            }
+            catch (InterruptedException e)
+            {
+                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
+            }
+        });
+
+        return prevStagesFuture;
     }
 
     @Override

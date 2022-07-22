@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -126,55 +127,85 @@ public class AggregationOperator extends Operator
     }
 
     @Override
-    public CompletableFuture<?>[] execute()
+    public CompletableFuture<CompletableFuture<?>[]> execute()
     {
-        waitForCompletion(executePrev());
-        requireNonNull(this.finalAggrInput, "finalAggrInput is null");
-        this.finalAggrOutput = new CompletableFuture[1];
-        this.finalAggrOutput[0] = InvokerFactory.Instance()
-                .getInvoker(WorkerType.AGGREGATION).invoke(this.finalAggrInput);
-        return this.finalAggrOutput;
+        return executePrev().handle((result, exception) ->
+        {
+            if (exception != null)
+            {
+                throw new CompletionException("failed to complete the previous stages", exception);
+            }
+
+            requireNonNull(this.finalAggrInput, "finalAggrInput is null");
+            this.finalAggrOutput = new CompletableFuture[1];
+            this.finalAggrOutput[0] = InvokerFactory.Instance()
+                    .getInvoker(WorkerType.AGGREGATION).invoke(this.finalAggrInput);
+            return this.finalAggrOutput;
+        });
     }
 
     @Override
-    public CompletableFuture<?>[] executePrev()
+    public CompletableFuture<Void> executePrev()
     {
-        if (this.child != null)
+        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
+        operatorService.execute(() ->
         {
-            checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
-            this.scanOutputs = new CompletableFuture[0];
-            this.child.execute();
-        }
-        else
-        {
-            checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
-            this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
-            int i = 0;
-            for (ScanInput scanInput : this.scanInputs)
+            try
             {
-                this.scanOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.SCAN).invoke(scanInput);
+                CompletableFuture<CompletableFuture<?>[]> childFuture = null;
+                if (this.child != null)
+                {
+                    checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
+                    this.scanOutputs = new CompletableFuture[0];
+                    childFuture = this.child.execute();
+                } else
+                {
+                    checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
+                    this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
+                    int i = 0;
+                    for (ScanInput scanInput : this.scanInputs)
+                    {
+                        this.scanOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.SCAN).invoke(scanInput);
+                    }
+                }
+
+                if (childFuture != null)
+                {
+                    waitForCompletion(childFuture.join());
+                }
+                if (this.scanOutputs.length > 0)
+                {
+                    waitForCompletion(this.scanOutputs);
+                }
+
+                if (this.preAggrInputs.isEmpty())
+                {
+                    this.preAggrOutputs = new CompletableFuture[0];
+                } else
+                {
+                    this.preAggrOutputs = new CompletableFuture[this.preAggrInputs.size()];
+                    int i = 0;
+                    for (AggregationInput preAggrInput : this.preAggrInputs)
+                    {
+                        this.preAggrOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
+                    }
+                }
+                if (this.preAggrOutputs.length > 0)
+                {
+                    waitForCompletion(this.preAggrOutputs);
+                }
+
+                prevStagesFuture.complete(null);
             }
-        }
-        if (this.preAggrInputs.isEmpty())
-        {
-            this.preAggrOutputs = new CompletableFuture[0];
-        }
-        else
-        {
-            this.preAggrOutputs = new CompletableFuture[this.preAggrInputs.size()];
-            int i = 0;
-            for (AggregationInput preAggrInput : this.preAggrInputs)
+            catch (InterruptedException e)
             {
-                this.preAggrOutputs[i++] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
+                throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-        }
-        if (this.preAggrOutputs.length > 0)
-        {
-            return this.preAggrOutputs;
-        }
-        return this.scanOutputs;
+        });
+
+        return prevStagesFuture;
     }
 
     @Override
