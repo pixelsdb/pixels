@@ -95,20 +95,21 @@ public class JoinAdvisor
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException, InvalidProtocolBufferException
     {
+        // Table size is used to estimate the read cost, it should NOT be multiplied by the selectivity.
         double smallTableSize;
         long smallTableRows;
         if (joinEndian == JoinEndian.SMALL_LEFT)
         {
             double selectivity = getTableSelectivity(leftTable);
             logger.info("selectivity on table '" + leftTable.getTableName() + "': " + selectivity);
-            smallTableSize = getTableInputSize(leftTable) * selectivity;
+            smallTableSize = getTableInputSize(leftTable);
             smallTableRows = (long) (getTableRowCount(leftTable) * selectivity);
         }
         else
         {
             double selectivity = getTableSelectivity(rightTable);
             logger.info("selectivity on table '" + rightTable.getTableName() + "': " + selectivity);
-            smallTableSize = getTableInputSize(rightTable) * selectivity;
+            smallTableSize = getTableInputSize(rightTable);
             smallTableRows = (long) (getTableRowCount(rightTable) * selectivity);
         }
         if (smallTableSize >= broadcastThresholdBytes || smallTableRows > broadcastThresholdRows)
@@ -131,13 +132,42 @@ public class JoinAdvisor
         logger.info("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
         long leftTableRowCount = (long) (getTableRowCount(leftTable) * leftSelectivity);
         long rightTableRowCount = (long) (getTableRowCount(rightTable) * rightSelectivity);
-        if (leftTableRowCount < rightTableRowCount)
+
+        double leftTableSize = getTableInputSize(leftTable);
+        double rightTableSize = getTableInputSize(rightTable);
+        if ((leftTableSize < broadcastThresholdBytes && leftTableRowCount < broadcastThresholdRows) &&
+                (rightTableSize < broadcastThresholdBytes && rightTableRowCount < broadcastThresholdRows))
         {
+            // Either table can be broadcast, mark the table with fewer rows as the small table.
+            if (leftTableRowCount < rightTableRowCount)
+            {
+                return JoinEndian.SMALL_LEFT;
+            }
+            else
+            {
+                return JoinEndian.LARGE_LEFT;
+            }
+        }
+        else if (leftTableSize < broadcastThresholdBytes && leftTableRowCount < broadcastThresholdRows)
+        {
+            // Only the left table can be broadcast, mark it as the small table.
             return JoinEndian.SMALL_LEFT;
+        }
+        else if (rightTableSize < broadcastThresholdBytes && rightTableRowCount < broadcastThresholdRows)
+        {
+            // Only the left table can be broadcast, mark it as the small table.
+            return JoinEndian.LARGE_LEFT;
         }
         else
         {
-            return JoinEndian.LARGE_LEFT;
+            // This join would be partitioned join, mark the table with fewer rows as the small table.
+            if (leftTableRowCount < rightTableRowCount)
+            {
+                return JoinEndian.SMALL_LEFT;
+            } else
+            {
+                return JoinEndian.LARGE_LEFT;
+            }
         }
     }
 
