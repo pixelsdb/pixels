@@ -549,6 +549,17 @@ public class PixelsExecutor
         }
     }
 
+    /**
+     * Get the join operator of a single left-deep pipeline of joins. All the nodes (joins) in this pipeline
+     * have a base table on its right child. Thus, if one node is a join, then it must be the left child of
+     * it parent.
+     *
+     * @param joinedTable the root of the pipeline of joins
+     * @param parent the parent, if present, of this pipeline
+     * @return the root join operator for this pipeline
+     * @throws IOException
+     * @throws MetadataException
+     */
     protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
@@ -689,8 +700,17 @@ public class PixelsExecutor
                         * the current join must be the left child of the parent. Therefore, we can use the left key
                         * column ids of the parent as the post partitioning key column ids.
                         * */
-                        postPartitionInfo = new PartitionInfo(
-                                parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+                        postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
+
+                        /*
+                         * For broadcast and broadcast chain join, if every worker in its parent has to
+                         * read the outputs of this join, we try to adjust the input splits of its large table.
+                         *
+                         * If the parent is a large-left broadcast join (small-left broadcast join does not go into
+                         * this branch). The outputs of this join will be split into multiple workers and there is
+                         * no need to adjust the input splits for this join.
+                         */
+                        rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                     }
                     JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                             join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
@@ -701,8 +721,6 @@ public class PixelsExecutor
                             (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
 
                     ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
-                    rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
                     int outputId = 0;
                     for (int i = 0; i < rightInputSplits.size();)
                     {
@@ -801,8 +819,21 @@ public class PixelsExecutor
                 JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
                         join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
 
-                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
-                rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
+                if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED ||
+                        (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                                parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)))
+                {
+                    /*
+                     * For broadcast and broadcast chain join, if every worker in its parent has to
+                     * read the outputs of this join, we try to adjust the input splits of its large table.
+                     *
+                     * This join is the left child of its parent, therefore, if the parent is a partitioned
+                     * join or small-left broadcast join, the outputs of this join will be read by every
+                     * worker of the parent.
+                     */
+                    rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
+                }
+
                 int outputId = 0;
                 for (int i = 0; i < rightInputSplits.size();)
                 {
@@ -838,8 +869,21 @@ public class PixelsExecutor
                         join.getLeftColumnAlias(), join.getRightProjection(), join.getLeftProjection(),
                         postPartition, postPartitionInfo);
 
-                // For broadcast and broadcast chain join, we try to adjust the input splits of the large table.
-                leftInputSplits = adjustInputSplitsForBroadcastJoin(rightTable, leftTable, leftInputSplits);
+                if (parent.isPresent() && (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED ||
+                        (parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
+                                parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)))
+                {
+                    /*
+                     * For broadcast and broadcast chain join, if every worker in its parent has to
+                     * read the outputs of this join, we try to adjust the input splits of its large table.
+                     *
+                     * This join is the left child of its parent, therefore, if the parent is a partitioned
+                     * join or small-left broadcast join, the outputs of this join will be read by every
+                     * worker of the parent.
+                     */
+                    leftInputSplits = adjustInputSplitsForBroadcastJoin(rightTable, leftTable, leftInputSplits);
+                }
+
                 int outputId = 0;
                 for (int i = 0; i < leftInputSplits.size();)
                 {
@@ -1304,10 +1348,25 @@ public class PixelsExecutor
         return joinInputs.build();
     }
 
+    /**
+     * Adjust the input splits for a broadcast join, if
+     * @param smallTable
+     * @param largeTable
+     * @param largeInputSplits
+     * @return
+     * @throws InvalidProtocolBufferException
+     * @throws MetadataException
+     */
     private List<InputSplit> adjustInputSplitsForBroadcastJoin(Table smallTable, Table largeTable,
                                                                List<InputSplit> largeInputSplits)
             throws InvalidProtocolBufferException, MetadataException
     {
+        int numWorkers = largeInputSplits.size() / IntraWorkerParallelism;
+        if (numWorkers <= 32)
+        {
+            // There are less than 32 workers, they are not likely to affect the performance.
+            return largeInputSplits;
+        }
         double smallSelectivity = JoinAdvisor.Instance().getTableSelectivity(smallTable);
         double largeSelectivity = JoinAdvisor.Instance().getTableSelectivity(largeTable);
         if (smallSelectivity >= 0 && largeSelectivity > 0 && smallSelectivity < largeSelectivity)
@@ -1321,29 +1380,28 @@ public class PixelsExecutor
                 numInputInfos += inputSplit.getInputInfos().size();
                 inputInfosBuilder.addAll(inputSplit.getInputInfos());
             }
-            int splitSize = numInputInfos / numSplits;
+            int inputInfosPerSplit = numInputInfos / numSplits;
             if (numInputInfos % numSplits > 0)
             {
-                splitSize++;
+                inputInfosPerSplit++;
             }
             if (smallSelectivity / largeSelectivity < 0.25)
             {
                 // Do not adjust too aggressively.
-                logger.info("adjust split size of table '" + largeTable.getTableName() +
-                        "' from " + splitSize + " to " + splitSize*2);
-                splitSize *= 2;
+                logger.info("increasing the split size of table '" + largeTable.getTableName() +
+                        "' by factor of 2");
+                inputInfosPerSplit *= 2;
             }
             else
             {
-                logger.info("input splits no need to adjust");
                 return largeInputSplits;
             }
             List<InputInfo> inputInfos = inputInfosBuilder.build();
             ImmutableList.Builder<InputSplit> inputSplitsBuilder = ImmutableList.builder();
             for (int i = 0; i < numInputInfos; )
             {
-                ImmutableList.Builder<InputInfo> builder = ImmutableList.builderWithExpectedSize(splitSize);
-                for (int j = 0; j < splitSize && i < numInputInfos; ++j, ++i)
+                ImmutableList.Builder<InputInfo> builder = ImmutableList.builderWithExpectedSize(inputInfosPerSplit);
+                for (int j = 0; j < inputInfosPerSplit && i < numInputInfos; ++j, ++i)
                 {
                     builder.add(inputInfos.get(i));
                 }
@@ -1353,7 +1411,6 @@ public class PixelsExecutor
         }
         else
         {
-            logger.info("input splits no need to adjust");
             return largeInputSplits;
         }
     }
