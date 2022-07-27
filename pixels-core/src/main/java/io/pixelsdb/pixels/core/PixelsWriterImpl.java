@@ -41,6 +41,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
@@ -91,6 +96,8 @@ public class PixelsWriterImpl implements PixelsWriter
 
     private final PhysicalWriter physicalWriter;
     private final List<TypeDescription> children;
+
+    private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
 
     private PixelsWriterImpl(
             TypeDescription schema,
@@ -375,12 +382,7 @@ public class PixelsWriterImpl implements PixelsWriter
          */
         curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
-        ColumnVector[] cvs = rowBatch.cols;
-        for (int i = 0; i < cvs.length; i++)
-        {
-            ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
-        }
+        writeColumnVectors(rowBatch.cols, rowBatch.size);
         // If the current row group size has exceeded the row group size, write current row group.
         if (curRowGroupDataLength >= rowGroupSize)
         {
@@ -410,12 +412,33 @@ public class PixelsWriterImpl implements PixelsWriter
         hashValueIsSet = true;
         curRowGroupDataLength = 0;
         curRowGroupNumOfRows += rowBatch.size;
-        ColumnVector[] cvs = rowBatch.cols;
-        for (int i = 0; i < cvs.length; i++)
+        writeColumnVectors(rowBatch.cols, rowBatch.size);
+    }
+
+    private void writeColumnVectors(ColumnVector[] columnVectors, int rowBatchSize)
+    {
+        CompletableFuture<?>[] futures = new CompletableFuture[columnVectors.length];
+        AtomicInteger dataLength = new AtomicInteger(0);
+        for (int i = 0; i < columnVectors.length; ++i)
         {
+            CompletableFuture<Void> future = new CompletableFuture<>();
             ColumnWriter writer = columnWriters[i];
-            curRowGroupDataLength += writer.write(cvs[i], rowBatch.size);
+            ColumnVector columnVector = columnVectors[i];
+            columnWriterService.execute(() ->
+            {
+                try
+                {
+                    dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
+                    future.complete(null);
+                } catch (IOException e)
+                {
+                    throw new CompletionException("failed to write column vector", e);
+                }
+            });
+            futures[i] = future;
         }
+        CompletableFuture.allOf(futures).join();
+        curRowGroupDataLength += dataLength.get();
     }
 
     /**
@@ -436,6 +459,8 @@ public class PixelsWriterImpl implements PixelsWriter
             {
                 cw.close();
             }
+            columnWriterService.shutdown();
+            columnWriterService.shutdownNow();
         }
         catch (IOException e)
         {
