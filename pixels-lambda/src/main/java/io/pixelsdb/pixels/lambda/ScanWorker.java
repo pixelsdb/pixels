@@ -112,7 +112,6 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
 
-
             Aggregator aggregator;
             if (partialAggregationPresent)
             {

@@ -35,8 +35,8 @@ public class Output
     private int outputDurationMs;
     private int readRequests;
     private int writeRequests;
-    private int readMB;
-    private int writeMB;
+    private long readBytes;
+    private long writeBytes;
 
     public String getRequestId()
     {
@@ -138,23 +138,23 @@ public class Output
         this.writeRequests = writeRequests;
     }
 
-    public int getReadMB()
+    public long getReadBytes()
     {
-        return readMB;
+        return readBytes;
     }
 
-    public void setReadMB(int readMB)
+    public void setReadBytes(long readBytes)
     {
-        this.readMB = readMB;
+        this.readBytes = readBytes;
     }
 
-    public int getWriteMB()
+    public long getWriteBytes()
     {
-        return writeMB;
+        return writeBytes;
     }
 
-    public void setWriteMB(int writeMB)
+    public void setWriteBytes(long writeBytes)
     {
-        this.writeMB = writeMB;
+        this.writeBytes = writeBytes;
     }
 }
