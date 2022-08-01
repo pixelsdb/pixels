@@ -121,12 +121,14 @@ public class PhysicalS3Reader extends AbstractS3Reader
             });
         }
 
+        super.numRequests.incrementAndGet();
+
         try
         {
             /**
              * Issue #128:
              * We tried to use thenApplySync using the clientService executor,
-             * it does not help improving the query performance.
+             * it does not help improve the query performance.
              */
             return future.thenApply(resp ->
             {

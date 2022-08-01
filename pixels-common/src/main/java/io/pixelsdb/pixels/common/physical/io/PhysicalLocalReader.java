@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created at: 30/08/2021
@@ -38,6 +39,7 @@ public class PhysicalLocalReader implements PhysicalReader
     private final String path;
     private final long id;
     private final RandomAccessFile raf;
+    private final AtomicInteger numRequests;
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException
     {
@@ -57,17 +59,20 @@ public class PhysicalLocalReader implements PhysicalReader
         this.path = path;
         this.raf = this.local.openRaf(path);
         this.id = this.local.getFileId(path);
+        this.numRequests = new AtomicInteger(1);
     }
 
     @Override
     public long getFileLength() throws IOException
     {
+        numRequests.incrementAndGet();
         return raf.length();
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
+        numRequests.incrementAndGet();
         raf.seek(desired);
     }
 
@@ -76,6 +81,7 @@ public class PhysicalLocalReader implements PhysicalReader
     {
         ByteBuffer buffer = ByteBuffer.allocate(length);
         raf.readFully(buffer.array());
+        numRequests.incrementAndGet();
         return buffer;
     }
 
@@ -83,12 +89,14 @@ public class PhysicalLocalReader implements PhysicalReader
     public void readFully(byte[] buffer) throws IOException
     {
         raf.readFully(buffer);
+        numRequests.incrementAndGet();
     }
 
     @Override
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
         raf.readFully(buffer, offset, length);
+        numRequests.incrementAndGet();
     }
 
     /**
@@ -109,18 +117,21 @@ public class PhysicalLocalReader implements PhysicalReader
     @Override
     public long readLong() throws IOException
     {
+        numRequests.incrementAndGet();
         return raf.readLong();
     }
 
     @Override
     public int readInt() throws IOException
     {
+        numRequests.incrementAndGet();
         return raf.readInt();
     }
 
     @Override
     public void close() throws IOException
     {
+        numRequests.incrementAndGet();
         this.raf.close();
     }
 
@@ -166,5 +177,11 @@ public class PhysicalLocalReader implements PhysicalReader
     public Storage.Scheme getStorageScheme()
     {
         return local.getScheme();
+    }
+
+    @Override
+    public int getNumReadRequests()
+    {
+        return numRequests.get();
     }
 }

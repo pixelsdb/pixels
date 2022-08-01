@@ -63,4 +63,8 @@ public interface PixelsWriter
      * @return
      */
     int getRowGroupNum();
+
+    int getNumWriteRequests();
+
+    long getCompletedBytes();
 }

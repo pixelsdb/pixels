@@ -30,6 +30,13 @@ public class Output
     private String errorMessage;
     private long startTimeMs;
     private int durationMs;
+    private int inputDurationMs;
+    private int computeDurationMs;
+    private int outputDurationMs;
+    private int readRequests;
+    private int writeRequests;
+    private int readMB;
+    private int writeMB;
 
     public String getRequestId()
     {
@@ -79,5 +86,75 @@ public class Output
     public void setDurationMs(int durationMs)
     {
         this.durationMs = durationMs;
+    }
+
+    public int getInputDurationMs()
+    {
+        return inputDurationMs;
+    }
+
+    public void setInputDurationMs(int inputDurationMs)
+    {
+        this.inputDurationMs = inputDurationMs;
+    }
+
+    public int getComputeDurationMs()
+    {
+        return computeDurationMs;
+    }
+
+    public void setComputeDurationMs(int computeDurationMs)
+    {
+        this.computeDurationMs = computeDurationMs;
+    }
+
+    public int getOutputDurationMs()
+    {
+        return outputDurationMs;
+    }
+
+    public void setOutputDurationMs(int outputDurationMs)
+    {
+        this.outputDurationMs = outputDurationMs;
+    }
+
+    public int getReadRequests()
+    {
+        return readRequests;
+    }
+
+    public void setReadRequests(int readRequests)
+    {
+        this.readRequests = readRequests;
+    }
+
+    public int getWriteRequests()
+    {
+        return writeRequests;
+    }
+
+    public void setWriteRequests(int writeRequests)
+    {
+        this.writeRequests = writeRequests;
+    }
+
+    public int getReadMB()
+    {
+        return readMB;
+    }
+
+    public void setReadMB(int readMB)
+    {
+        this.readMB = readMB;
+    }
+
+    public int getWriteMB()
+    {
+        return writeMB;
+    }
+
+    public void setWriteMB(int writeMB)
+    {
+        this.writeMB = writeMB;
     }
 }

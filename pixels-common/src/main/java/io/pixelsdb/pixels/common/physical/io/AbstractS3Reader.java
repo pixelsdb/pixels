@@ -34,6 +34,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -81,6 +82,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     protected final String pathStr;
     protected final long id;
     protected final AtomicLong position;
+    protected final AtomicInteger numRequests;
     protected final long length;
     protected final S3Client client;
 
@@ -104,6 +106,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
         this.pathStr = path;
         this.id = this.s3.getFileId(path);
         this.length = this.s3.getStatus(path).getLength();
+        this.numRequests = new AtomicInteger(1);
         this.position = new AtomicLong(0);
         this.client = this.s3.getClient();
         this.enableAsync = Boolean.parseBoolean(ConfigFactory.Instance()
@@ -152,6 +155,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
                 client.getObject(request, ResponseTransformer.toBytes());
         try
         {
+            this.numRequests.incrementAndGet();
             this.position.addAndGet(len);
             return ByteBuffer.wrap(response.asByteArrayUnsafe());
         } catch (Exception e)
@@ -250,5 +254,11 @@ public abstract class AbstractS3Reader implements PhysicalReader
     public Storage.Scheme getStorageScheme()
     {
         return s3.getScheme();
+    }
+
+    @Override
+    public int getNumReadRequests()
+    {
+        return numRequests.get();
     }
 }

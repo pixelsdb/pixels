@@ -1064,6 +1064,16 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     }
 
     @Override
+    public int getNumReadRequests()
+    {
+        if (physicalReader == null)
+        {
+            return 0;
+        }
+        return physicalReader.getNumReadRequests();
+    }
+
+    @Override
     public long getReadTimeNanos()
     {
         return readTimeNanos;

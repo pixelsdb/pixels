@@ -126,4 +126,10 @@ public class PhysicalLocalWriter implements PhysicalWriter
     {
         return path;
     }
+
+    @Override
+    public int getBufferSize()
+    {
+        return Constants.LOCAL_BUFFER_SIZE;
+    }
 }

@@ -35,8 +35,7 @@ import java.nio.ByteBuffer;
  * @author guodong
  * @author hank
  */
-public class PhysicalHDFSWriter
-        implements PhysicalWriter
+public class PhysicalHDFSWriter implements PhysicalWriter
 {
     private static final Logger LOGGER = LogManager.getLogger(PhysicalHDFSWriter.class);
 
@@ -125,6 +124,12 @@ public class PhysicalHDFSWriter
     public String getPath()
     {
         return path;
+    }
+
+    @Override
+    public int getBufferSize()
+    {
+        return Constants.HDFS_BUFFER_SIZE;
     }
 
     public long getBlockSize()

@@ -35,25 +35,26 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author guodong
  * @author hank
  */
-public class PhysicalHDFSReader
-        implements PhysicalReader
+public class PhysicalHDFSReader implements PhysicalReader
 {
     private final HDFS hdfs;
     private final String path;
     private final FSDataInputStream rawReader;
     private final List<BlockWrapper> blocks;
-    private static Comparator<BlockWrapper> comp;
+    private static final Comparator<BlockWrapper> comp;
+    private final AtomicInteger numRequests;
 
     private class BlockWrapper
     {
-        private long startOffset;
-        private long blockSize;
-        private ExtendedBlock block;
+        private final long startOffset;
+        private final long blockSize;
+        private final ExtendedBlock block;
 
         public BlockWrapper(long startOffset, long blockSize)
         {
@@ -115,6 +116,7 @@ public class PhysicalHDFSReader
         }
         this.path = path;
         this.rawReader = (FSDataInputStream) hdfs.open(path);
+        this.numRequests = new AtomicInteger(1);
         HdfsDataInputStream hdis = null;
         if (this.rawReader instanceof HdfsDataInputStream)
         {
@@ -125,8 +127,7 @@ public class PhysicalHDFSReader
                 this.blocks = new ArrayList<>();
                 for (LocatedBlock block : locatedBlocks)
                 {
-                    this.blocks.add(
-                            new BlockWrapper(block.getStartOffset(),
+                    this.blocks.add(new BlockWrapper(block.getStartOffset(),
                                     block.getBlockSize(), block.getBlock()));
                 }
                 Collections.sort(this.blocks, comp);
@@ -154,23 +155,27 @@ public class PhysicalHDFSReader
     @Override
     public long getFileLength() throws IOException
     {
+        numRequests.incrementAndGet();
         return hdfs.getStatus(path).getLength();
     }
 
     public void seek(long desired) throws IOException
     {
         rawReader.seek(desired);
+        numRequests.incrementAndGet();
     }
 
     @Override
     public long readLong() throws IOException
     {
+        numRequests.incrementAndGet();
         return rawReader.readLong();
     }
 
     @Override
     public int readInt() throws IOException
     {
+        numRequests.incrementAndGet();
         return rawReader.readInt();
     }
 
@@ -179,6 +184,7 @@ public class PhysicalHDFSReader
     {
         ByteBuffer buffer = ByteBuffer.allocate(length);
         rawReader.readFully(buffer.array());
+        numRequests.incrementAndGet();
         return buffer;
     }
 
@@ -186,12 +192,14 @@ public class PhysicalHDFSReader
     public void readFully(byte[] buffer) throws IOException
     {
         rawReader.readFully(buffer);
+        numRequests.incrementAndGet();
     }
 
     @Override
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
         rawReader.readFully(buffer, offset, length);
+        numRequests.incrementAndGet();
     }
 
     /**
@@ -213,6 +221,7 @@ public class PhysicalHDFSReader
     public void close() throws IOException
     {
         rawReader.close();
+        numRequests.incrementAndGet();
     }
 
     @Override
@@ -238,6 +247,7 @@ public class PhysicalHDFSReader
     {
         if (this.blocks != null)
         {
+            numRequests.incrementAndGet();
             BlockWrapper key = new BlockWrapper(this.rawReader.getPos(), 1);
             int i = Collections.binarySearch(blocks, key, comp);
             return this.blocks.get(i).getBlock().getBlockId();
@@ -257,5 +267,11 @@ public class PhysicalHDFSReader
     public Storage.Scheme getStorageScheme()
     {
         return hdfs.getScheme();
+    }
+
+    @Override
+    public int getNumReadRequests()
+    {
+        return numRequests.get();
     }
 }

@@ -68,4 +68,6 @@ public interface PhysicalWriter
     void flush() throws IOException;
 
     String getPath();
+
+    int getBufferSize();
 }

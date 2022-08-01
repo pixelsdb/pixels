@@ -139,6 +139,11 @@ public interface PixelsRecordReader
 
     long getCompletedBytes();
 
+    /**
+     * @return the number of requests sent to the storage (exclude cache)
+     */
+    int getNumReadRequests();
+
     long getReadTimeNanos();
 
     /**

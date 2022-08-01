@@ -81,6 +81,7 @@ public class PixelsWriterImpl implements PixelsWriter
     private long fileContentLength;
     private int fileRowNum;
 
+    private long writtenBytes = 0L;
     private long curRowGroupOffset = 0L;
     private long curRowGroupFooterOffset = 0L;
     private long curRowGroupNumOfRows = 0L;
@@ -334,6 +335,22 @@ public class PixelsWriterImpl implements PixelsWriter
         return this.rowGroupInfoList.size();
     }
 
+    @Override
+    public int getNumWriteRequests()
+    {
+        if (physicalWriter == null)
+        {
+            return 0;
+        }
+        return (int) Math.ceil(writtenBytes / (double) physicalWriter.getBufferSize());
+    }
+
+    @Override
+    public long getCompletedBytes()
+    {
+        return writtenBytes;
+    }
+
     public int getPixelStride()
     {
         return pixelStride;
@@ -501,6 +518,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 {
                     byte[] rowGroupBuffer = writer.getColumnChunkContent();
                     physicalWriter.append(rowGroupBuffer, 0, rowGroupBuffer.length);
+                    writtenBytes += rowGroupBuffer.length;
                 }
                 physicalWriter.flush();
             }
@@ -556,6 +574,7 @@ public class PixelsWriterImpl implements PixelsWriter
             byte[] footerBuffer = rowGroupFooter.toByteArray();
             physicalWriter.prepare(footerBuffer.length);
             curRowGroupFooterOffset = physicalWriter.append(footerBuffer, 0, footerBuffer.length);
+            writtenBytes += footerBuffer.length;
             physicalWriter.flush();
         }
         catch (IOException e)
@@ -639,6 +658,7 @@ public class PixelsWriterImpl implements PixelsWriter
         ByteBuffer tailOffsetBuffer = ByteBuffer.allocate(Long.BYTES);
         tailOffsetBuffer.putLong(tailOffset);
         physicalWriter.append(tailOffsetBuffer);
+        writtenBytes += fileTailLen;
         physicalWriter.flush();
     }
 }
