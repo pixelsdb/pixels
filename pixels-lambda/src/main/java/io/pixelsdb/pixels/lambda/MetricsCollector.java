@@ -28,47 +28,85 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class MetricsCollector
 {
-    AtomicInteger numReadRequests = new AtomicInteger(0);
-    AtomicInteger numWriteRequests = new AtomicInteger(0);
-    AtomicLong readBytes = new AtomicLong(0);
-    AtomicLong writeBytes = new AtomicLong(0);
-    AtomicInteger inputDurationMs = new AtomicInteger(0);
-    AtomicInteger outputDurationMs = new AtomicInteger(0);
-    AtomicInteger computeDurationMs = new AtomicInteger(0);
-
-    public AtomicInteger getNumReadRequests()
+    public static class Timer
     {
-        return numReadRequests;
+        private long duration = 0;
+        private long startTime = 0L;
+
+        public Timer start()
+        {
+            startTime = System.nanoTime();
+            return this;
+        }
+
+        /**
+         * @return the cumulative duration of this timer
+         */
+        public long stop()
+        {
+            long endTime = System.nanoTime();
+            duration += endTime - startTime;
+            return duration;
+        }
+
+        public long getDuration()
+        {
+            return duration;
+        }
     }
 
-    public AtomicInteger getNumWriteRequests()
+    private final AtomicInteger numReadRequests = new AtomicInteger(0);
+    private final AtomicInteger numWriteRequests = new AtomicInteger(0);
+    private final AtomicLong readBytes = new AtomicLong(0);
+    private final AtomicLong writeBytes = new AtomicLong(0);
+    private final AtomicLong inputCostNs = new AtomicLong(0);
+    private final AtomicLong outputCostNs = new AtomicLong(0);
+    private final AtomicLong computeCostNs = new AtomicLong(0);
+
+    public void clear()
     {
-        return numWriteRequests;
+        numReadRequests.set(0);
+        numWriteRequests.set(0);
+        readBytes.set(0);
+        writeBytes.set(0);
+        inputCostNs.set(0);
+        outputCostNs.set(0);
+        computeCostNs.set(0);
     }
 
-    public AtomicLong getReadBytes()
+    public int getNumReadRequests()
     {
-        return readBytes;
+        return numReadRequests.get();
     }
 
-    public AtomicLong getWriteBytes()
+    public int getNumWriteRequests()
     {
-        return writeBytes;
+        return numWriteRequests.get();
     }
 
-    public AtomicInteger getInputDurationMs()
+    public long getReadBytes()
     {
-        return inputDurationMs;
+        return readBytes.get();
     }
 
-    public AtomicInteger getOutputDurationMs()
+    public long getWriteBytes()
     {
-        return outputDurationMs;
+        return writeBytes.get();
     }
 
-    public AtomicInteger getComputeDurationMs()
+    public long getInputCostNs()
     {
-        return computeDurationMs;
+        return inputCostNs.get();
+    }
+
+    public long getOutputCostNs()
+    {
+        return outputCostNs.get();
+    }
+
+    public long getComputeCostNs()
+    {
+        return computeCostNs.get();
     }
 
     public void addNumReadRequests(int numReadRequests)
@@ -91,18 +129,18 @@ public class MetricsCollector
         this.writeBytes.addAndGet(writeBytes);
     }
 
-    public void addInputDurationMs(int inputDurationMs)
+    public void addInputCostNs(long inputDurationNs)
     {
-        this.inputDurationMs.addAndGet(inputDurationMs);
+        this.inputCostNs.addAndGet(inputDurationNs);
     }
 
-    public void addOutputDurationMs(int outputDurationMs)
+    public void addOutputCostNs(long outputDurationNs)
     {
-        this.outputDurationMs.addAndGet(outputDurationMs);
+        this.outputCostNs.addAndGet(outputDurationNs);
     }
 
-    public void addComputeDurationMs(int computeDurationMs)
+    public void addComputeCostNs(long computeDurationNs)
     {
-        this.computeDurationMs.addAndGet(computeDurationMs);
+        this.computeCostNs.addAndGet(computeDurationNs);
     }
 }

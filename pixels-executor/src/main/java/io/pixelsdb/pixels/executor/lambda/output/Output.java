@@ -30,11 +30,11 @@ public class Output
     private String errorMessage;
     private long startTimeMs;
     private int durationMs;
-    private int inputDurationMs;
-    private int computeDurationMs;
-    private int outputDurationMs;
-    private int readRequests;
-    private int writeRequests;
+    private int inputCostMs;
+    private int computeCostMs;
+    private int outputCostMs;
+    private int numReadRequests;
+    private int numWriteRequests;
     private long readBytes;
     private long writeBytes;
 
@@ -88,54 +88,54 @@ public class Output
         this.durationMs = durationMs;
     }
 
-    public int getInputDurationMs()
+    public int getInputCostMs()
     {
-        return inputDurationMs;
+        return inputCostMs;
     }
 
-    public void setInputDurationMs(int inputDurationMs)
+    public void setInputCostMs(int inputCostMs)
     {
-        this.inputDurationMs = inputDurationMs;
+        this.inputCostMs = inputCostMs;
     }
 
-    public int getComputeDurationMs()
+    public int getComputeCostMs()
     {
-        return computeDurationMs;
+        return computeCostMs;
     }
 
-    public void setComputeDurationMs(int computeDurationMs)
+    public void setComputeCostMs(int computeCostMs)
     {
-        this.computeDurationMs = computeDurationMs;
+        this.computeCostMs = computeCostMs;
     }
 
-    public int getOutputDurationMs()
+    public int getOutputCostMs()
     {
-        return outputDurationMs;
+        return outputCostMs;
     }
 
-    public void setOutputDurationMs(int outputDurationMs)
+    public void setOutputCostMs(int outputCostMs)
     {
-        this.outputDurationMs = outputDurationMs;
+        this.outputCostMs = outputCostMs;
     }
 
-    public int getReadRequests()
+    public int getNumReadRequests()
     {
-        return readRequests;
+        return numReadRequests;
     }
 
-    public void setReadRequests(int readRequests)
+    public void setNumReadRequests(int numReadRequests)
     {
-        this.readRequests = readRequests;
+        this.numReadRequests = numReadRequests;
     }
 
-    public int getWriteRequests()
+    public int getNumWriteRequests()
     {
-        return writeRequests;
+        return numWriteRequests;
     }
 
-    public void setWriteRequests(int writeRequests)
+    public void setNumWriteRequests(int numWriteRequests)
     {
-        this.writeRequests = writeRequests;
+        this.numWriteRequests = numWriteRequests;
     }
 
     public long getReadBytes()

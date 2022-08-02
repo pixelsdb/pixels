@@ -330,7 +330,7 @@ public class PixelsWriterImpl implements PixelsWriter
     }
 
     @Override
-    public int getRowGroupNum()
+    public int getNumRowGroup()
     {
         return this.rowGroupInfoList.size();
     }

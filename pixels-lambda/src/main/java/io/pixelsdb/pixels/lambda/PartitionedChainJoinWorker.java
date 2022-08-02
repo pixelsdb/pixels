@@ -64,6 +64,7 @@ import static java.util.Objects.requireNonNull;
 public class PartitionedChainJoinWorker implements RequestHandler<PartitionedChainJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionedChainJoinWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public JoinOutput handleRequest(PartitionedChainJoinInput event, Context context)
@@ -75,6 +76,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
         joinOutput.setRequestId(context.getAwsRequestId());
         joinOutput.setSuccessful(true);
         joinOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -118,9 +120,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                     "currently, left or full outer join is not supported in partitioned chain join");
             List<Integer> hashValues = event.getJoinInfo().getHashValues();
             int numPartition = event.getJoinInfo().getNumPartition();
-            logger.info("small table '" + event.getSmallTable().getTableName() +
-                    "', large table '" + event.getLargeTable().getTableName() +
-                    "', number of partitions (" + numPartition + ")");
+            logger.info("small table: " + event.getSmallTable().getTableName() +
+                    ", large table: " + event.getLargeTable().getTableName() +
+                    ", number of partitions (" + numPartition + ")");
 
             MultiOutputInfo outputInfo = event.getOutput();
             StorageInfo storageInfo = outputInfo.getStorageInfo();
@@ -139,7 +141,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
 
             if (partitionOutput)
             {
-                logger.info("post partition num: " + outputPartitionInfo.getNumPartition());
+                requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
             }
 
             try
@@ -164,59 +166,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                     rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
             // build the chain joiner.
             Joiner chainJoiner = buildChainJoiner(queryId, threadPool, chainTables, chainJoinInfos,
-                    partitionJoiner.getJoinedSchema());
-
-            if (chainJoiner.getSmallTableSize() == 0)
-            {
-                // the result of the chain joins is empty, no need to continue the join.
-                joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-                return joinOutput;
-            }
-
-            // build the hash table for the left partitioned table.
-            List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
-            int leftSplitSize = leftPartitioned.size() / leftParallelism;
-            if (leftPartitioned.size() % leftParallelism > 0)
-            {
-                leftSplitSize++;
-            }
-            for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
-            {
-                List<String> parts = new LinkedList<>();
-                for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
-                {
-                    parts.add(leftPartitioned.get(j));
-                }
-                leftFutures.add(threadPool.submit(() -> {
-                    try
-                    {
-                        buildHashTable(queryId, partitionJoiner, parts, leftCols, hashValues, numPartition);
-                    }
-                    catch (Exception e)
-                    {
-                        throw new PixelsWorkerException("error during hash table construction", e);
-                    }
-                }));
-            }
-            for (Future future : leftFutures)
-            {
-                future.get();
-            }
-            logger.info("hash table size of small partitioned table '" +
-                    event.getSmallTable().getTableName() + "': " + partitionJoiner.getSmallTableSize());
-
-            if (partitionJoiner.getSmallTableSize() == 0)
-            {
-                // the left table is empty, no need to continue the join.
-                joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-                return joinOutput;
-            }
-            // scan the right table and do the join.
-            int rightSplitSize = rightPartitioned.size() / rightParallelism;
-            if (rightPartitioned.size() % rightParallelism > 0)
-            {
-                rightSplitSize++;
-            }
+                    partitionJoiner.getJoinedSchema(), metricsCollector);
+            logger.info("chain hash table size: " + chainJoiner.getSmallTableSize() + ", duration (ns): " +
+                    (metricsCollector.getInputCostNs() + metricsCollector.getComputeCostNs()));
 
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
             if (partitionOutput)
@@ -231,42 +183,86 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 result.add(new ConcurrentLinkedQueue<>());
             }
 
-            for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
+            // build the hash table for the left partitioned table.
+            if (chainJoiner.getSmallTableSize() > 0)
             {
-                List<String> parts = new LinkedList<>();
-                for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
+                List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
+                int leftSplitSize = leftPartitioned.size() / leftParallelism;
+                if (leftPartitioned.size() % leftParallelism > 0)
                 {
-                    parts.add(rightPartitioned.get(j));
+                    leftSplitSize++;
                 }
-                threadPool.execute(() -> {
+                for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
+                {
+                    List<String> parts = new LinkedList<>();
+                    for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
+                    {
+                        parts.add(leftPartitioned.get(j));
+                    }
+                    leftFutures.add(threadPool.submit(() -> {
+                        try
+                        {
+                            buildHashTable(queryId, partitionJoiner, parts, leftCols, hashValues, numPartition, metricsCollector);
+                        } catch (Exception e)
+                        {
+                            throw new PixelsWorkerException("error during hash table construction", e);
+                        }
+                    }));
+                }
+                for (Future future : leftFutures)
+                {
+                    future.get();
+                }
+                logger.info("hash table size: " + partitionJoiner.getSmallTableSize() + ", duration (ns): " +
+                        (metricsCollector.getInputCostNs() + metricsCollector.getComputeCostNs()));
+
+                // scan the right table and do the join.
+                if (partitionJoiner.getSmallTableSize() > 0)
+                {
+                    int rightSplitSize = rightPartitioned.size() / rightParallelism;
+                    if (rightPartitioned.size() % rightParallelism > 0)
+                    {
+                        rightSplitSize++;
+                    }
+
+                    for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
+                    {
+                        List<String> parts = new LinkedList<>();
+                        for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
+                        {
+                            parts.add(rightPartitioned.get(j));
+                        }
+                        threadPool.execute(() -> {
+                            try
+                            {
+                                int numJoinedRows = partitionOutput ?
+                                        joinWithRightTableAndPartition(
+                                                queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
+                                                numPartition, outputPartitionInfo, result, metricsCollector) :
+                                        joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
+                                                hashValues, numPartition, result.get(0), metricsCollector);
+                            } catch (Exception e)
+                            {
+                                throw new PixelsWorkerException("error during hash join", e);
+                            }
+                        });
+                    }
+                    threadPool.shutdown();
                     try
                     {
-                        int numJoinedRows = partitionOutput ?
-                                joinWithRightTableAndPartition(
-                                        queryId, partitionJoiner, chainJoiner, parts, rightCols, hashValues,
-                                        numPartition, outputPartitionInfo, result) :
-                                joinWithRightTable(queryId, partitionJoiner, chainJoiner, parts, rightCols,
-                                        hashValues, numPartition, result.get(0));
-                    }
-                    catch (Exception e)
+                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                    } catch (InterruptedException e)
                     {
-                        throw new PixelsWorkerException("error during hash join", e);
+                        throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
                     }
-                });
-            }
-            threadPool.shutdown();
-            try
-            {
-                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-            } catch (InterruptedException e)
-            {
-                throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+                }
             }
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
             {
                 PixelsWriter pixelsWriter;
+                MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 if (partitionOutput)
                 {
                     pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
@@ -297,7 +293,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                     }
                 }
                 pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
                 if (storageInfo.getScheme() == Storage.Scheme.minio)
                 {
                     while (!minio.exists(outputPath))
@@ -306,6 +302,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
+                metricsCollector.addOutputCostNs(writeCostTimer.stop());
+                metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+                metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the partitioned file '" +
@@ -313,6 +312,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(joinOutput, metricsCollector);
             return joinOutput;
         } catch (Exception e)
         {
@@ -324,10 +324,9 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
         }
     }
 
-    private static Joiner buildChainJoiner(long queryId, ExecutorService executor,
-                                      List<BroadcastTableInfo> chainTables,
-                                      List<ChainJoinInfo> chainJoinInfos,
-                                      TypeDescription lastResultSchema)
+    private static Joiner buildChainJoiner(
+            long queryId, ExecutorService executor, List<BroadcastTableInfo> chainTables,
+            List<ChainJoinInfo> chainJoinInfos, TypeDescription lastResultSchema, MetricsCollector metricsCollector)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(chainTables, "chainTables is null");
@@ -339,16 +338,19 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             BroadcastTableInfo t1 = chainTables.get(0);
             BroadcastTableInfo t2 = chainTables.get(1);
             ChainJoinInfo currChainJoin = chainJoinInfos.get(0);
-            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, currChainJoin);
+            MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, currChainJoin, metricsCollector);
             for (int i = 1; i < chainTables.size() - 1; ++i)
             {
                 BroadcastTableInfo currRightTable = chainTables.get(i);
                 BroadcastTableInfo nextChainTable = chainTables.get(i+1);
+                readCostTimer.start();
                 TypeDescription nextTableSchema = getFileSchema(s3,
                         nextChainTable.getInputSplits().get(0).getInputInfos().get(0).getPath(),
                         !nextChainTable.isBase());
                 TypeDescription nextResultSchema = getResultSchema(
                         nextTableSchema, nextChainTable.getColumnsToRead());
+                readCostTimer.stop();
 
                 ChainJoinInfo nextChainJoin = chainJoinInfos.get(i);
                 Joiner nextJoiner = new Joiner(nextChainJoin.getJoinType(),
@@ -357,7 +359,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         nextResultSchema, nextChainJoin.getLargeColumnAlias(),
                         nextChainJoin.getLargeProjection(), nextChainTable.getKeyColumnIds());
 
-                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable);
+                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable, metricsCollector);
                 currJoiner = nextJoiner;
                 currChainJoin = nextChainJoin;
             }
@@ -368,7 +370,8 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                     lastChainJoin.getSmallProjection(), currChainJoin.getKeyColumnIds(),
                     lastResultSchema, lastChainJoin.getLargeColumnAlias(),
                     lastChainJoin.getLargeProjection(), lastChainJoin.getKeyColumnIds());
-            chainJoin(queryId, executor, currJoiner, finalJoiner, lastChainTable);
+            chainJoin(queryId, executor, currJoiner, finalJoiner, lastChainTable, metricsCollector);
+            metricsCollector.addInputCostNs(readCostTimer.getDuration());
             return finalJoiner;
         } catch (Exception e)
         {
@@ -387,15 +390,17 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
      * @param hashValues the hash values that are processed by this join worker
      * @param numPartition the total number of partitions
      * @param joinResult the container of the join result
+     * @param metricsCollector the collector of the performance metrics
      * @return the number of joined rows produced in this split
      */
-    protected static int joinWithRightTable(long queryId,
-                                            Joiner partitionedJoiner, Joiner chainJoiner,
-                                            List<String> rightParts, String[] rightCols,
-                                            List<Integer> hashValues, int numPartition,
-                                            ConcurrentLinkedQueue<VectorizedRowBatch> joinResult)
+    protected static int joinWithRightTable(
+            long queryId, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
+            List<Integer> hashValues, int numPartition, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
+            MetricsCollector metricsCollector)
     {
         int joinedRows = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -417,8 +422,10 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                             rightPartitioned + "' of the right table", e);
                 }
 
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
+                    readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                     Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
                     for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
@@ -434,9 +441,14 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rightRowBatch;
+                        readCostTimer.start();
                         PixelsRecordReader recordReader = pixelsReader.read(option);
+                        readCostTimer.stop();
                         checkArgument(recordReader.isValid(), "failed to get record reader");
+                        metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                        metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
+                        computeCostTimer.start();
                         do
                         {
                             rightRowBatch = recordReader.readBatch(rowBatchSize);
@@ -462,6 +474,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                 }
                             }
                         } while (!rightRowBatch.endOfFile);
+                        computeCostTimer.stop();
                     }
                 } catch (Exception e)
                 {
@@ -471,6 +484,8 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             }
         }
 
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
         return joinedRows;
     }
 
@@ -486,19 +501,20 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
      * @param numPartition the total number of partitions
      * @param postPartitionInfo the partition information of post partitioning
      * @param partitionResult the container of the join and post partitioning result
+     * @param metricsCollector the collector of the performance metrics
      * @return the number of joined rows produced in this split
      */
-    protected static int joinWithRightTableAndPartition(long queryId,
-                                                        Joiner partitionedJoiner, Joiner chainJoiner,
-                                                        List<String> rightParts, String[] rightCols,
-                                                        List<Integer> hashValues, int numPartition,
-                                                        PartitionInfo postPartitionInfo,
-                                                        List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult)
+    protected static int joinWithRightTableAndPartition(
+            long queryId, Joiner partitionedJoiner, Joiner chainJoiner, List<String> rightParts, String[] rightCols,
+            List<Integer> hashValues, int numPartition, PartitionInfo postPartitionInfo,
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, MetricsCollector metricsCollector)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
                 rowBatchSize, chainJoiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
         int joinedRows = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -520,8 +536,10 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                             rightPartitioned + "' of the right table", e);
                 }
 
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
+                    readCostTimer.stop();
                     checkArgument(pixelsReader.isPartitioned(), "pixels file is not partitioned");
                     Set<Integer> rightHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
                     for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
@@ -537,9 +555,14 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rightBatch;
+                        readCostTimer.start();
                         PixelsRecordReader recordReader = pixelsReader.read(option);
+                        readCostTimer.stop();
                         checkArgument(recordReader.isValid(), "failed to get record reader");
+                        metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                        metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
+                        computeCostTimer.start();
                         do
                         {
                             rightBatch = recordReader.readBatch(rowBatchSize);
@@ -570,6 +593,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                                 }
                             }
                         } while (!rightBatch.endOfFile);
+                        computeCostTimer.stop();
                     }
                 } catch (Exception e)
                 {
@@ -588,6 +612,8 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             }
         }
 
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
         return joinedRows;
     }
 }

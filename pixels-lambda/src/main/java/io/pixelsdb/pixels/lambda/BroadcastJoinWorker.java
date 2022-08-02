@@ -58,6 +58,7 @@ import static java.util.Objects.requireNonNull;
 public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(BroadcastJoinWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
@@ -69,6 +70,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         joinOutput.setRequestId(context.getAwsRequestId());
         joinOutput.setSuccessful(true);
         joinOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -114,6 +116,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
             boolean encoding = outputInfo.isEncoding();
 
+            logger.info("small table: " + event.getSmallTable().getTableName() +
+                    "', large table: " + event.getLargeTable().getTableName());
+
             try
             {
                 if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
@@ -128,6 +133,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
 
             boolean partitionOutput = event.getJoinInfo().isPostPartition();
             PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
+            if (partitionOutput)
+            {
+                requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
+            }
 
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
@@ -146,7 +155,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 leftFutures.add(threadPool.submit(() -> {
                     try
                     {
-                        buildHashTable(queryId, joiner, inputs, !leftTable.isBase(), leftCols, leftFilter);
+                        buildHashTable(queryId, joiner, inputs, !leftTable.isBase(), leftCols, leftFilter, metricsCollector);
                     }
                     catch (Exception e)
                     {
@@ -158,7 +167,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getSmallTableSize());
+            logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
+                    (metricsCollector.getInputCostNs() + metricsCollector.getComputeCostNs()));
 
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
             if (partitionOutput)
@@ -174,38 +184,41 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
 
             // scan the right table and do the join.
-            for (InputSplit inputSplit : rightInputs)
+            if (joiner.getSmallTableSize() > 0)
             {
-                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                threadPool.execute(() -> {
-                    try
-                    {
-                        int numJoinedRows = partitionOutput ?
-                                joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
-                                        outputPartitionInfo, result) :
-                                joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
-                                        rightFilter, result.get(0));
-                    }
-                    catch (Exception e)
-                    {
-                        throw new PixelsWorkerException("error during broadcast join", e);
-                    }
-                });
-            }
-            threadPool.shutdown();
-            try
-            {
-                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-            } catch (InterruptedException e)
-            {
-                throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+                for (InputSplit inputSplit : rightInputs)
+                {
+                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                    threadPool.execute(() -> {
+                        try
+                        {
+                            int numJoinedRows = partitionOutput ?
+                                    joinWithRightTableAndPartition(
+                                            queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
+                                            outputPartitionInfo, result, metricsCollector) :
+                                    joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
+                                            rightFilter, result.get(0), metricsCollector);
+                        } catch (Exception e)
+                        {
+                            throw new PixelsWorkerException("error during broadcast join", e);
+                        }
+                    });
+                }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+                }
             }
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
             {
                 PixelsWriter pixelsWriter;
+                MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 if (partitionOutput)
                 {
                     pixelsWriter = getWriter(joiner.getJoinedSchema(),
@@ -237,7 +250,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     }
                 }
                 pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
                 if (storageInfo.getScheme() == Storage.Scheme.minio)
                 {
                     while (!minio.exists(outputPath))
@@ -246,6 +259,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
+                metricsCollector.addOutputCostNs(writeCostTimer.stop());
+                metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+                metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Exception e)
             {
                 throw new PixelsWorkerException(
@@ -253,6 +269,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(joinOutput, metricsCollector);
             return joinOutput;
         } catch (Exception e)
         {
@@ -274,10 +291,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param checkExistence whether check the existence of the input files
      * @param leftCols the column names of the left table
      * @param leftFilter the table scan filter on the left table
+     * @param metricsCollector the collector of the performance metrics
      */
-    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs,
-                                      boolean checkExistence, String[] leftCols, TableScanFilter leftFilter)
+    public static void buildHashTable(long queryId, Joiner joiner, List<InputInfo> leftInputs, boolean checkExistence,
+                                      String[] leftCols, TableScanFilter leftFilter, MetricsCollector metricsCollector)
     {
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!leftInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
@@ -306,6 +326,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 {
                     it.remove();
                 }
+
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -320,9 +342,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, leftCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
+                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
+                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
+
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    computeCostTimer.start();
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
@@ -333,6 +360,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             joiner.populateLeftTable(rowBatch);
                         }
                     } while (!rowBatch.endOfFile);
+                    computeCostTimer.stop();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the left table input file '" +
@@ -340,6 +368,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
     }
 
     /**
@@ -353,13 +383,16 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param rightCols the column names of the right table
      * @param rightFilter the table scan filter on the right table
      * @param joinResult the container of the join result
+     * @param metricsCollector the collector of the performance metrics
      * @return the number of joined rows produced in this split
      */
-    public static int joinWithRightTable(long queryId, Joiner joiner, List<InputInfo> rightInputs,
-                                         boolean checkExistence, String[] rightCols, TableScanFilter rightFilter,
-                                         ConcurrentLinkedQueue<VectorizedRowBatch> joinResult)
+    public static int joinWithRightTable(
+            long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence, String[] rightCols,
+            TableScanFilter rightFilter, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult, MetricsCollector metricsCollector)
     {
         int joinedRows = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -389,6 +422,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     it.remove();
                 }
 
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -402,10 +436,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
+                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
+                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    computeCostTimer.start();
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
@@ -424,6 +462,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             }
                         }
                     } while (!rowBatch.endOfFile);
+                    computeCostTimer.stop();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -432,6 +471,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             }
         }
 
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
         return joinedRows;
     }
 
@@ -447,17 +488,20 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
      * @param rightFilter the table scan filter on the right table
      * @param postPartitionInfo the partition information of post partitioning
      * @param partitionResult the container of the join and post partitioning result
+     * @param metricsCollector the collector of the performance metrics
      * @return the number of joined rows produced in this split
      */
     public static int joinWithRightTableAndPartition(
             long queryId, Joiner joiner, List<InputInfo> rightInputs, boolean checkExistence,
             String[] rightCols, TableScanFilter rightFilter, PartitionInfo postPartitionInfo,
-            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult)
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, MetricsCollector metricsCollector)
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
                 rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
         int joinedRows = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -487,6 +531,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     it.remove();
                 }
 
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -500,10 +545,14 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
+                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
+                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    computeCostTimer.start();
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
@@ -526,6 +575,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                             }
                         }
                     } while (!rowBatch.endOfFile);
+                    computeCostTimer.stop();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -542,6 +592,9 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 partitionResult.get(hash).add(tailBatches[hash]);
             }
         }
+
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
         return joinedRows;
     }
 }

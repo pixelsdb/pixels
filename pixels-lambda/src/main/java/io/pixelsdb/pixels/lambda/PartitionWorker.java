@@ -57,6 +57,7 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
@@ -67,6 +68,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
         partitionOutput.setRequestId(context.getAwsRequestId());
         partitionOutput.setSuccessful(true);
         partitionOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -120,6 +122,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 throw new PixelsWorkerException("interrupted while waiting for the termination of partitioning", e);
             }
 
+            MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
             if (writerSchema.get() == null)
             {
                 InputInfo inputInfo = inputSplits.get(0).getInputInfos().get(0);
@@ -146,8 +149,12 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             partitionOutput.setHashValues(hashValues);
 
             pixelsWriter.close();
+            metricsCollector.addOutputCostNs(writeCostTimer.stop());
+            metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+            metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
 
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(partitionOutput, metricsCollector);
             return partitionOutput;
         }
         catch (Exception e)
@@ -180,8 +187,11 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
     {
         Scanner scanner = null;
         Partitioner partitioner = null;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         for (InputInfo inputInfo : scanInputs)
         {
+            readCostTimer.start();
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -197,6 +207,9 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
+                readCostTimer.stop();
+                metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                 if (scanner == null)
                 {
@@ -212,6 +225,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                     writerSchema.weakCompareAndSet(null, scanner.getOutputSchema());
                 }
 
+                computeCostTimer.start();
                 do
                 {
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
@@ -227,6 +241,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                         }
                     }
                 } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the file '" +
@@ -244,5 +259,8 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 }
             }
         }
+
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
     }
 }

@@ -61,6 +61,7 @@ import static java.util.Objects.requireNonNull;
 public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJoinInput, JoinOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(BroadcastChainJoinWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public JoinOutput handleRequest(BroadcastChainJoinInput event, Context context)
@@ -72,6 +73,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
         joinOutput.setRequestId(context.getAwsRequestId());
         joinOutput.setSuccessful(true);
         joinOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -113,6 +115,8 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             }
             boolean encoding = outputInfo.isEncoding();
 
+            logger.info("large table: " + event.getLargeTable().getTableName());
+
             try
             {
                 if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
@@ -127,22 +131,16 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
 
             boolean partitionOutput = event.getJoinInfo().isPostPartition();
             PartitionInfo outputPartitionInfo = event.getJoinInfo().getPostPartitionInfo();
-
             if (partitionOutput)
             {
-                logger.info("post partition num: " + outputPartitionInfo.getNumPartition());
+                requireNonNull(outputPartitionInfo, "outputPartitionInfo is null");
             }
 
             // build the joiner.
-            Joiner joiner = buildJoiner(queryId, threadPool, chainTables, chainJoinInfos, rightTable, lastJoinInfo);
-
-            // scan the right table and do the join.
-            if (joiner.getSmallTableSize() == 0)
-            {
-                // the result of the left chain joins is empty, no need to continue the join.
-                joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-                return joinOutput;
-            }
+            Joiner joiner = buildJoiner(queryId, threadPool, chainTables, chainJoinInfos,
+                    rightTable, lastJoinInfo, metricsCollector);
+            logger.info("chain hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
+                    (metricsCollector.getInputCostNs() + metricsCollector.getComputeCostNs()));
 
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
             if (partitionOutput)
@@ -157,38 +155,42 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 result.add(new ConcurrentLinkedQueue<>());
             }
 
-            for (InputSplit inputSplit : rightInputs)
+            // scan the right table and do the join.
+            if (joiner.getSmallTableSize() > 0)
             {
-                List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
-                threadPool.execute(() -> {
-                    try
-                    {
-                        int numJoinedRows = partitionOutput ?
-                                joinWithRightTableAndPartition(
-                                        queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
-                                        outputPartitionInfo, result) :
-                                joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
-                                        rightFilter, result.get(0));
-                    }
-                    catch (Exception e)
-                    {
-                        throw new PixelsWorkerException("error during broadcast join", e);
-                    }
-                });
-            }
-            threadPool.shutdown();
-            try
-            {
-                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
-            } catch (InterruptedException e)
-            {
-                throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+                for (InputSplit inputSplit : rightInputs)
+                {
+                    List<InputInfo> inputs = new LinkedList<>(inputSplit.getInputInfos());
+                    threadPool.execute(() -> {
+                        try
+                        {
+                            int numJoinedRows = partitionOutput ?
+                                    joinWithRightTableAndPartition(
+                                            queryId, joiner, inputs, !rightTable.isBase(), rightCols, rightFilter,
+                                            outputPartitionInfo, result, metricsCollector) :
+                                    joinWithRightTable(queryId, joiner, inputs, !rightTable.isBase(), rightCols,
+                                            rightFilter, result.get(0), metricsCollector);
+                        } catch (Exception e)
+                        {
+                            throw new PixelsWorkerException("error during broadcast join", e);
+                        }
+                    });
+                }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the termination of join", e);
+                }
             }
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
             {
                 PixelsWriter pixelsWriter;
+                MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 if (partitionOutput)
                 {
                     pixelsWriter = getWriter(joiner.getJoinedSchema(),
@@ -220,7 +222,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     }
                 }
                 pixelsWriter.close();
-                joinOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                joinOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
                 if (storageInfo.getScheme() == Storage.Scheme.minio)
                 {
                     while (!minio.exists(outputPath))
@@ -229,6 +231,9 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
+                metricsCollector.addOutputCostNs(writeCostTimer.stop());
+                metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+                metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             } catch (Exception e)
             {
                 throw new PixelsWorkerException(
@@ -236,6 +241,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             }
 
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(joinOutput, metricsCollector);
             return joinOutput;
         } catch (Exception e)
         {
@@ -256,34 +262,36 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param chainJoinInfos the information of the chain joins between the left tables
      * @param rightTable the information of the right table, a.k.a., the last table to join with
      * @param lastJoinInfo the information of the last join
+     * @param metricsCollector the collector of the performance metrics
      * @return the joiner of the last join
      */
-    private static Joiner buildJoiner(long queryId, ExecutorService executor,
-                               List<BroadcastTableInfo> leftTables,
-                               List<ChainJoinInfo> chainJoinInfos,
-                               BroadcastTableInfo rightTable,
-                               JoinInfo lastJoinInfo)
+    private static Joiner buildJoiner(
+            long queryId, ExecutorService executor, List<BroadcastTableInfo> leftTables, List<ChainJoinInfo> chainJoinInfos,
+            BroadcastTableInfo rightTable, JoinInfo lastJoinInfo, MetricsCollector metricsCollector)
     {
         try
         {
+            MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
             BroadcastTableInfo t1 = leftTables.get(0);
             BroadcastTableInfo t2 = leftTables.get(1);
-            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, chainJoinInfos.get(0));
+            Joiner currJoiner = buildFirstJoiner(queryId, executor, t1, t2, chainJoinInfos.get(0), metricsCollector);
             for (int i = 1; i < leftTables.size() - 1; ++i)
             {
                 BroadcastTableInfo currRightTable = leftTables.get(i);
                 BroadcastTableInfo nextTable = leftTables.get(i+1);
+                readCostTimer.start();
                 TypeDescription nextTableSchema = getFileSchema(s3,
                         nextTable.getInputSplits().get(0).getInputInfos().get(0).getPath(), !nextTable.isBase());
                 ChainJoinInfo currJoinInfo = chainJoinInfos.get(i-1);
                 ChainJoinInfo nextJoinInfo = chainJoinInfos.get(i);
                 TypeDescription nextResultSchema = getResultSchema(nextTableSchema, nextTable.getColumnsToRead());
+                readCostTimer.stop();
                 Joiner nextJoiner = new Joiner(nextJoinInfo.getJoinType(),
                         currJoiner.getJoinedSchema(), nextJoinInfo.getSmallColumnAlias(),
                         nextJoinInfo.getSmallProjection(), currJoinInfo.getKeyColumnIds(),
                         nextResultSchema, nextJoinInfo.getLargeColumnAlias(),
                         nextJoinInfo.getLargeProjection(), nextTable.getKeyColumnIds());
-                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable);
+                chainJoin(queryId, executor, currJoiner, nextJoiner, currRightTable, metricsCollector);
                 currJoiner = nextJoiner;
             }
             ChainJoinInfo lastChainJoin = chainJoinInfos.get(chainJoinInfos.size()-1);
@@ -296,7 +304,8 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     lastJoinInfo.getSmallProjection(), lastChainJoin.getKeyColumnIds(),
                     rightResultSchema, lastJoinInfo.getLargeColumnAlias(),
                     lastJoinInfo.getLargeProjection(), rightTable.getKeyColumnIds());
-            chainJoin(queryId, executor, currJoiner, finalJoiner, lastLeftTable);
+            chainJoin(queryId, executor, currJoiner, finalJoiner, lastLeftTable, metricsCollector);
+            metricsCollector.addInputCostNs(readCostTimer.getDuration());
             return finalJoiner;
         } catch (Exception e)
         {
@@ -311,17 +320,18 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param t1 the information of the first left table
      * @param t2 the information of the second left table
      * @param joinInfo the information of the join between t1 and t2
+     * @param metricsCollector the collector of the performance metrics
      * @return the joiner of the first join
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    protected static Joiner buildFirstJoiner(long queryId, ExecutorService executor,
-                                    BroadcastTableInfo t1,
-                                    BroadcastTableInfo t2,
-                                    ChainJoinInfo joinInfo) throws ExecutionException, InterruptedException
+    protected static Joiner buildFirstJoiner(
+            long queryId, ExecutorService executor, BroadcastTableInfo t1, BroadcastTableInfo t2,
+            ChainJoinInfo joinInfo, MetricsCollector metricsCollector) throws ExecutionException, InterruptedException
     {
         AtomicReference<TypeDescription> t1Schema = new AtomicReference<>();
         AtomicReference<TypeDescription> t2Schema = new AtomicReference<>();
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer().start();
         getFileSchema(executor, s3, t1Schema, t2Schema,
                 t1.getInputSplits().get(0).getInputInfos().get(0).getPath(),
                 t2.getInputSplits().get(0).getInputInfos().get(0).getPath(), !(t1.isBase() && t2.isBase()));
@@ -330,6 +340,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 joinInfo.getSmallProjection(), t1.getKeyColumnIds(),
                 getResultSchema(t2Schema.get(), t2.getColumnsToRead()), joinInfo.getLargeColumnAlias(),
                 joinInfo.getLargeProjection(), t2.getKeyColumnIds());
+        metricsCollector.addInputCostNs(readCostTimer.stop());
         List<Future> leftFutures = new ArrayList<>();
         TableScanFilter t1Filter = JSON.parseObject(t1.getFilter(), TableScanFilter.class);
         for (InputSplit inputSplit : t1.getInputSplits())
@@ -338,7 +349,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             leftFutures.add(executor.submit(() -> {
                 try
                 {
-                    buildHashTable(queryId, joiner, inputs, !t1.isBase(), t1.getColumnsToRead(), t1Filter);
+                    buildHashTable(queryId, joiner, inputs, !t1.isBase(), t1.getColumnsToRead(), t1Filter, metricsCollector);
                 }
                 catch (Exception e)
                 {
@@ -362,11 +373,13 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param currJoiner the joiner of the two left tables
      * @param nextJoiner the joiner of the next join
      * @param currRightTable the right table in the two left tables
+     * @param metricsCollector the collector of the performance metrics
      * @throws ExecutionException
      * @throws InterruptedException
      */
     protected static void chainJoin(long queryId, ExecutorService executor, Joiner currJoiner, Joiner nextJoiner,
-                           BroadcastTableInfo currRightTable) throws ExecutionException, InterruptedException
+                                    BroadcastTableInfo currRightTable, MetricsCollector metricsCollector)
+            throws ExecutionException, InterruptedException
     {
         TableScanFilter currRigthFilter = JSON.parseObject(currRightTable.getFilter(), TableScanFilter.class);
         List<Future> rightFutures = new ArrayList<>();
@@ -377,7 +390,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 try
                 {
                     chainJoinSplit(queryId, currJoiner, nextJoiner, inputs, !currRightTable.isBase(),
-                            currRightTable.getColumnsToRead(), currRigthFilter);
+                            currRightTable.getColumnsToRead(), currRigthFilter, metricsCollector);
                 }
                 catch (Exception e)
                 {
@@ -402,11 +415,14 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
      * @param checkExistence whether check the existence of the input files
      * @param rightCols the column names of the right one of the two left tables
      * @param rightFilter the filter of the right one of the two left tables
+     * @param metricsCollector the collector of the performance metrics
      */
-    private static void chainJoinSplit(long queryId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs,
-                                boolean checkExistence, String[] rightCols, TableScanFilter rightFilter)
+    private static void chainJoinSplit(
+            long queryId, Joiner currJoiner, Joiner nextJoiner, List<InputInfo> rightInputs, boolean checkExistence,
+            String[] rightCols, TableScanFilter rightFilter, MetricsCollector metricsCollector)
     {
-        int numInputs = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -435,7 +451,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 {
                     it.remove();
                 }
-                numInputs++;
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
@@ -449,9 +465,14 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
+                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
+                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
+                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
+
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
+                    computeCostTimer.start();
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
@@ -469,6 +490,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                             }
                         }
                     } while (!rowBatch.endOfFile);
+                    computeCostTimer.stop();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -476,6 +498,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 }
             }
         }
-        logger.info("number of inputs for chain table: " + numInputs);
+        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addInputCostNs(readCostTimer.getDuration());
     }
 }
