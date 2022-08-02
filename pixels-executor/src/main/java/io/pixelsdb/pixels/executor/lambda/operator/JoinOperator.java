@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.operator;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
@@ -70,7 +70,7 @@ public abstract class JoinOperator extends Operator
      * It can be serialized to a json string or deserialized to an object from json string
      * by fastjson or other feasible json libraries.
      */
-    public static class JoinOutputCollection implements OutputCollection
+    public static abstract class JoinOutputCollection implements OutputCollection
     {
         protected JoinAlgorithm joinAlgo;
         protected OutputCollection smallChild;
@@ -130,6 +130,66 @@ public abstract class JoinOperator extends Operator
                 duration += largeChild.getCumulativeDurationMs();
             }
             return duration;
+        }
+
+        @Override
+        public int getTotalNumReadRequests()
+        {
+            int numReadRequests = 0;
+            if (this.smallChild != null)
+            {
+                numReadRequests += smallChild.getTotalNumReadRequests();
+            }
+            if (this.largeChild != null)
+            {
+                numReadRequests += largeChild.getTotalNumReadRequests();
+            }
+            return numReadRequests;
+        }
+
+        @Override
+        public int getTotalNumWriteRequests()
+        {
+            int numWriteRequests = 0;
+            if (this.smallChild != null)
+            {
+                numWriteRequests += smallChild.getTotalNumWriteRequests();
+            }
+            if (this.largeChild != null)
+            {
+                numWriteRequests += largeChild.getTotalNumWriteRequests();
+            }
+            return numWriteRequests;
+        }
+
+        @Override
+        public long getTotalReadBytes()
+        {
+            long readBytes = 0;
+            if (this.smallChild != null)
+            {
+                readBytes += smallChild.getTotalReadBytes();
+            }
+            if (this.largeChild != null)
+            {
+                readBytes += largeChild.getTotalReadBytes();
+            }
+            return readBytes;
+        }
+
+        @Override
+        public long getTotalWriteBytes()
+        {
+            long writeBytes = 0;
+            if (this.smallChild != null)
+            {
+                writeBytes += smallChild.getTotalWriteBytes();
+            }
+            if (this.largeChild != null)
+            {
+                writeBytes += largeChild.getTotalWriteBytes();
+            }
+            return writeBytes;
         }
     }
 }

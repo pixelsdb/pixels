@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.lambda.JoinOperator;
+import io.pixelsdb.pixels.executor.lambda.operator.JoinOperator;
 import io.pixelsdb.pixels.executor.plan.BaseTable;
 import io.pixelsdb.pixels.executor.plan.Join;
 import io.pixelsdb.pixels.executor.plan.JoinEndian;

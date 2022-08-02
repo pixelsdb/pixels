@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.operator;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
@@ -85,6 +85,20 @@ public abstract class Operator
     public interface OutputCollection
     {
         long getCumulativeDurationMs();
+
+        int getTotalNumReadRequests();
+
+        int getTotalNumWriteRequests();
+
+        long getTotalReadBytes();
+
+        long getTotalWriteBytes();
+
+        long getLayerInputCostMs();
+
+        long getLayerComputeCostMs();
+
+        long getLayerOutputCostMs();
     }
 
     public static void waitForCompletion(CompletableFuture<?>[] stageOutputs) throws InterruptedException

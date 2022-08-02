@@ -17,10 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
@@ -333,6 +335,186 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                 }
             }
             return duration;
+        }
+
+        @Override
+        public int getTotalNumReadRequests()
+        {
+            int numReadRequests = super.getTotalNumReadRequests();
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            return numReadRequests;
+        }
+
+        @Override
+        public int getTotalNumWriteRequests()
+        {
+            int numWriteRequests = super.getTotalNumWriteRequests();
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            return numWriteRequests;
+        }
+
+        @Override
+        public long getTotalReadBytes()
+        {
+            long readBytes = super.getTotalReadBytes();
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    readBytes += output.getReadBytes();
+                }
+            }
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    readBytes += output.getReadBytes();
+                }
+            }
+            return readBytes;
+        }
+
+        @Override
+        public long getTotalWriteBytes()
+        {
+            long writeBytes = super.getTotalWriteBytes();
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    writeBytes += output.getWriteBytes();
+                }
+            }
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    writeBytes += output.getWriteBytes();
+                }
+            }
+            return writeBytes;
+        }
+
+        @Override
+        public long getLayerInputCostMs()
+        {
+            return super.getLayerInputCostMs();
+        }
+
+        @Override
+        public long getLayerComputeCostMs()
+        {
+            return super.getLayerComputeCostMs();
+        }
+
+        @Override
+        public long getLayerOutputCostMs()
+        {
+            return super.getLayerOutputCostMs();
+        }
+
+        public long getSmallPartitionInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    inputCostMs += output.getInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        public long getSmallPartitionComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    computeCostMs += output.getComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        public long getSmallPartitionOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.smallPartitionOutputs != null)
+            {
+                for (Output output : smallPartitionOutputs)
+                {
+                    outputCostMs += output.getOutputCostMs();
+                }
+            }
+            return outputCostMs;
+        }
+
+        public long getLargePartitionInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    inputCostMs += output.getInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        public long getLargePartitionComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    computeCostMs += output.getComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        public long getLargePartitionOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.largePartitionOutputs != null)
+            {
+                for (Output output : largePartitionOutputs)
+                {
+                    outputCostMs += output.getOutputCostMs();
+                }
+            }
+            return outputCostMs;
         }
 
         public Output[] getSmallPartitionOutputs()

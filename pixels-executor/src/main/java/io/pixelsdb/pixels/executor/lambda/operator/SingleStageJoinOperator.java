@@ -17,10 +17,12 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.input.JoinInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
 import org.apache.logging.log4j.LogManager;
@@ -225,6 +227,104 @@ public class SingleStageJoinOperator extends JoinOperator
                 }
             }
             return duration;
+        }
+
+        @Override
+        public int getTotalNumReadRequests()
+        {
+            int numReadRequests = super.getTotalNumReadRequests();
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            return numReadRequests;
+        }
+
+        @Override
+        public int getTotalNumWriteRequests()
+        {
+            int numWriteRequests = super.getTotalNumWriteRequests();
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            return numWriteRequests;
+        }
+
+        @Override
+        public long getTotalReadBytes()
+        {
+            long readBytes = super.getTotalReadBytes();
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    readBytes += output.getReadBytes();
+                }
+            }
+            return readBytes;
+        }
+
+        @Override
+        public long getTotalWriteBytes()
+        {
+            long writeBytes = super.getTotalWriteBytes();
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    writeBytes += output.getWriteBytes();
+                }
+            }
+            return writeBytes;
+        }
+
+        @Override
+        public long getLayerInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    inputCostMs += output.getInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        @Override
+        public long getLayerComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    computeCostMs += output.getComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        @Override
+        public long getLayerOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.joinOutputs != null)
+            {
+                for (Output output : joinOutputs)
+                {
+                    outputCostMs += output.getOutputCostMs();
+                }
+            }
+            return outputCostMs;
         }
 
         public Output[] getJoinOutputs()
