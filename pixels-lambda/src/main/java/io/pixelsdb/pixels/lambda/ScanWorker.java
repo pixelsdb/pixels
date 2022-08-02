@@ -233,9 +233,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeTimer = new MetricsCollector.Timer();
-        for (int i = 0; i < scanInputs.size(); ++i)
+        for (InputInfo inputInfo : scanInputs)
         {
-            InputInfo inputInfo = scanInputs.get(i);
             readCostTimer.start();
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
@@ -256,7 +255,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 metricsCollector.addReadBytes(recordReader.getCompletedBytes());
                 metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
-                if(scanner == null)
+                if (scanner == null)
                 {
                     scanner = new Scanner(rowBatchSize, rowBatchSchema, columnsToRead, scanProjection, filter);
                 }
@@ -278,8 +277,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         if (partialAggregate)
                         {
                             aggregator.aggregate(rowBatch);
-                        }
-                        else
+                        } else
                         {
                             writeCostTimer.start();
                             pixelsWriter.addRowBatch(rowBatch);
