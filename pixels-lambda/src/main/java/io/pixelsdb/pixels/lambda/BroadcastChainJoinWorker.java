@@ -361,7 +361,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
         {
             future.get();
         }
-        logger.info("first left table: " + t1.getTableName() + ", hash table size: " + joiner.getSmallTableSize());
+        logger.info("first left table: " + t1.getTableName());
         return joiner;
     }
 

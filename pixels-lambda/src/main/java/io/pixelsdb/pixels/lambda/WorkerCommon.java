@@ -350,7 +350,7 @@ public class WorkerCommon
         output.setComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));
         output.setOutputCostMs((int) Math.round(collector.getOutputCostNs() / 1000_000.0));
         output.setReadBytes(collector.getReadBytes());
-        output.setWriteBytes(output.getWriteBytes());
+        output.setWriteBytes(collector.getWriteBytes());
         output.setNumReadRequests(collector.getNumReadRequests());
         output.setNumWriteRequests(collector.getNumWriteRequests());
     }

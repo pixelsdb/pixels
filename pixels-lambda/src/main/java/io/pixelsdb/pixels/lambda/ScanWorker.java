@@ -269,6 +269,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 }
 
                 computeTimer.start();
+                writeCostTimer.start();
                 do
                 {
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
@@ -279,12 +280,11 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                             aggregator.aggregate(rowBatch);
                         } else
                         {
-                            writeCostTimer.start();
                             pixelsWriter.addRowBatch(rowBatch);
-                            writeCostTimer.stop();
                         }
                     }
                 } while (!rowBatch.endOfFile);
+                writeCostTimer.stop();
                 computeTimer.stop();
             } catch (Exception e)
             {
@@ -295,7 +295,6 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         // Finished scanning all the files in the split.
         try
         {
-            long computeCostNs = computeTimer.getDuration() - writeCostTimer.getDuration();
             int numRowGroup = 0;
             if (pixelsWriter != null)
             {
@@ -312,11 +311,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 writeCostTimer.stop();
                 metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
                 metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                metricsCollector.addOutputCostNs(writeCostTimer.getDuration());
                 numRowGroup = pixelsWriter.getNumRowGroup();
             }
+            else
+            {
+                metricsCollector.addComputeCostNs(computeTimer.getDuration());
+            }
             metricsCollector.addInputCostNs(readCostTimer.getDuration());
-            metricsCollector.addComputeCostNs(computeCostNs);
-            metricsCollector.addOutputCostNs(writeCostTimer.getDuration());
+
+
             return numRowGroup;
         } catch (Exception e)
         {
