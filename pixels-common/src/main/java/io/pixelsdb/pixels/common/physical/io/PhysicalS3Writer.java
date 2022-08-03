@@ -22,14 +22,13 @@ package io.pixelsdb.pixels.common.physical.io;
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
+import io.pixelsdb.pixels.common.utils.Constants;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
-
-import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
 /**
  * The physical readers for AWS S3 compatible storage systems.
@@ -65,7 +64,7 @@ public class PhysicalS3Writer implements PhysicalWriter
         this.pathStr = path;
         this.position = 0L;
         this.client = s3.getClient();
-        this.out = this.s3.create(path, overwrite, S3_BUFFER_SIZE);
+        this.out = this.s3.create(path, overwrite, Constants.S3_BUFFER_SIZE);
     }
 
     /**
@@ -143,5 +142,11 @@ public class PhysicalS3Writer implements PhysicalWriter
     public String getPath()
     {
         return pathStr;
+    }
+
+    @Override
+    public int getBufferSize()
+    {
+        return Constants.S3_BUFFER_SIZE;
     }
 }

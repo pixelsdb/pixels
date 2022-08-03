@@ -17,9 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.lambda;
+package io.pixelsdb.pixels.executor.lambda.operator;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
+import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.input.AggregationInput;
 import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
@@ -306,6 +308,214 @@ public class AggregationOperator extends Operator
                 duration += finalAggrOutput.getDurationMs();
             }
             return duration;
+        }
+
+        @Override
+        public int getTotalNumReadRequests()
+        {
+            int numReadRequests = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    numReadRequests += output.getNumReadRequests();
+                }
+            }
+            if (this.finalAggrOutput != null)
+            {
+                numReadRequests += finalAggrOutput.getNumReadRequests();
+            }
+            return numReadRequests;
+        }
+
+        @Override
+        public int getTotalNumWriteRequests()
+        {
+            int numWriteRequests = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    numWriteRequests += output.getNumWriteRequests();
+                }
+            }
+            if (this.finalAggrOutput != null)
+            {
+                numWriteRequests += finalAggrOutput.getNumWriteRequests();
+            }
+            return numWriteRequests;
+        }
+
+        @Override
+        public long getTotalReadBytes()
+        {
+            long readBytes = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    readBytes += output.getReadBytes();
+                }
+            }
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    readBytes += output.getReadBytes();
+                }
+            }
+            if (this.finalAggrOutput != null)
+            {
+                readBytes += finalAggrOutput.getReadBytes();
+            }
+            return readBytes;
+        }
+
+        @Override
+        public long getTotalWriteBytes()
+        {
+            long writeBytes = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    writeBytes += output.getWriteBytes();
+                }
+            }
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    writeBytes += output.getWriteBytes();
+                }
+            }
+            if (this.finalAggrOutput != null)
+            {
+                writeBytes += finalAggrOutput.getWriteBytes();
+            }
+            return writeBytes;
+        }
+
+        @Override
+        public long getLayerInputCostMs()
+        {
+            if (this.finalAggrOutput != null)
+            {
+                return finalAggrOutput.getInputCostMs();
+            }
+            return 0;
+        }
+
+        @Override
+        public long getLayerComputeCostMs()
+        {
+            if (this.finalAggrOutput != null)
+            {
+                return finalAggrOutput.getComputeCostMs();
+            }
+            return 0;
+        }
+
+        @Override
+        public long getLayerOutputCostMs()
+        {
+            if (this.finalAggrOutput != null)
+            {
+                return finalAggrOutput.getOutputCostMs();
+            }
+            return 0;
+        }
+
+        public long getScanInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    inputCostMs += output.getInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        public long getScanComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    computeCostMs += output.getComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        public long getScanOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.scanOutputs != null)
+            {
+                for (Output output : scanOutputs)
+                {
+                    outputCostMs += output.getOutputCostMs();
+                }
+            }
+            return outputCostMs;
+        }
+
+        public long getPreAggrInputCostMs()
+        {
+            long inputCostMs = 0;
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    inputCostMs += output.getInputCostMs();
+                }
+            }
+            return inputCostMs;
+        }
+
+        public long getPreAggrComputeCostMs()
+        {
+            long computeCostMs = 0;
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    computeCostMs += output.getComputeCostMs();
+                }
+            }
+            return computeCostMs;
+        }
+
+        public long getPreAggrOutputCostMs()
+        {
+            long outputCostMs = 0;
+            if (this.preAggrOutputs != null)
+            {
+                for (Output output : preAggrOutputs)
+                {
+                    outputCostMs += output.getOutputCostMs();
+                }
+            }
+            return outputCostMs;
         }
     }
 }

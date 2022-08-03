@@ -62,5 +62,9 @@ public interface PixelsWriter
      * Get the number of row groups that have been written into this file.
      * @return
      */
-    int getRowGroupNum();
+    int getNumRowGroup();
+
+    int getNumWriteRequests();
+
+    long getCompletedBytes();
 }

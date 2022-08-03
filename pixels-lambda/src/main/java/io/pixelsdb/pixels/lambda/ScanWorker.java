@@ -63,6 +63,7 @@ import static java.util.Objects.requireNonNull;
 public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(ScanWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public ScanOutput handleRequest(ScanInput event, Context context)
@@ -73,6 +74,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         scanOutput.setRequestId(context.getAwsRequestId());
         scanOutput.setSuccessful(true);
         scanOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -111,7 +113,6 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             }
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-
 
             Aggregator aggregator;
             if (partialAggregationPresent)
@@ -173,6 +174,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             if (partialAggregationPresent)
             {
                 String outputPath = event.getOutput().getPath();
+                MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
                         storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3,
                         outputPath, encoding, false, null);
@@ -186,10 +188,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
-                scanOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+                metricsCollector.addOutputCostNs(writeCostTimer.stop());
+                scanOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
             }
 
             scanOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(scanOutput, metricsCollector);
             return scanOutput;
         } catch (Exception e)
         {
@@ -226,11 +230,17 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         {
             requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
         }
-        for (int i = 0; i < scanInputs.size(); ++i)
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
+        for (InputInfo inputInfo : scanInputs)
         {
-            InputInfo inputInfo = scanInputs.get(i);
+            readCostTimer.start();
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
+                readCostTimer.stop();
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
                     continue;
@@ -239,23 +249,25 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-
                 PixelsReaderOption option = getReaderOption(queryId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
 
-                if(scanner == null)
+                if (scanner == null)
                 {
                     scanner = new Scanner(rowBatchSize, rowBatchSchema, columnsToRead, scanProjection, filter);
                 }
                 if (pixelsWriter == null && !partialAggregate)
                 {
+                    writeCostTimer.start();
                     pixelsWriter = getWriter(scanner.getOutputSchema(),
                             outputScheme == Storage.Scheme.minio ? minio : s3,
                             outputPath, encoding, false, null);
+                    writeCostTimer.stop();
                 }
 
+                computeCostTimer.start();
                 do
                 {
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
@@ -264,13 +276,17 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         if (partialAggregate)
                         {
                             aggregator.aggregate(rowBatch);
-                        }
-                        else
+                        } else
                         {
                             pixelsWriter.addRowBatch(rowBatch);
                         }
                     }
                 } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the file '" +
@@ -280,8 +296,12 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         // Finished scanning all the files in the split.
         try
         {
+            int numRowGroup = 0;
             if (pixelsWriter != null)
             {
+                // This is a pure scan without aggregation, compute time is the file writing time.
+                writeCostTimer.add(computeCostTimer.getElapsedNs());
+                writeCostTimer.start();
                 pixelsWriter.close();
                 if (outputScheme == Storage.Scheme.minio)
                 {
@@ -291,9 +311,20 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         TimeUnit.MILLISECONDS.sleep(10);
                     }
                 }
-                return pixelsWriter.getRowGroupNum();
+                writeCostTimer.stop();
+                metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+                metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                metricsCollector.addOutputCostNs(writeCostTimer.getElapsedNs());
+                numRowGroup = pixelsWriter.getNumRowGroup();
             }
-            return 0;
+            else
+            {
+                metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
+            }
+            metricsCollector.addReadBytes(readBytes);
+            metricsCollector.addNumReadRequests(numReadRequests);
+            metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+            return numRowGroup;
         } catch (Exception e)
         {
             throw new PixelsWorkerException(

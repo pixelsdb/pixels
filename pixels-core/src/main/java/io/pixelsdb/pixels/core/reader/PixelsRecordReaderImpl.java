@@ -593,7 +593,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 }
             }
             // read cached chunks
-            long cacheReadStartNano = System.nanoTime();
+//            long cacheReadStartNano = System.nanoTime();
             for (ColumnletId columnletId : cacheChunks)
             {
                 short rgId = columnletId.rowGroupId;
@@ -626,8 +626,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     this.cacheReadBytes += columnlet.capacity();
                 }
             }
-            long cacheReadEndNano = System.nanoTime();
-            long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
+//            long cacheReadEndNano = System.nanoTime();
+//            long cacheReadCost = cacheReadEndNano - cacheReadStartNano;
             /*
             // We used deal with null or empty cache chunk here to get more accurate cacheReadCost.
             // In Issue #67 (patch), we moved this logic into the above loop for better performance.
@@ -1061,6 +1061,16 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     public long getCompletedBytes()
     {
         return diskReadBytes + cacheReadBytes;
+    }
+
+    @Override
+    public int getNumReadRequests()
+    {
+        if (physicalReader == null)
+        {
+            return 0;
+        }
+        return physicalReader.getNumReadRequests();
     }
 
     @Override

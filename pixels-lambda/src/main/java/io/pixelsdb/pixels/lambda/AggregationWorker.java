@@ -58,6 +58,7 @@ import static java.util.Objects.requireNonNull;
 public class AggregationWorker implements RequestHandler<AggregationInput, AggregationOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(AggregationWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public AggregationOutput handleRequest(AggregationInput event, Context context)
@@ -69,6 +70,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
         aggregationOutput.setRequestId(context.getAwsRequestId());
         aggregationOutput.setSuccessful(true);
         aggregationOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -117,8 +119,8 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 throw new PixelsWorkerException("failed to initialize MinIO storage", e);
             }
 
+            // prepare the input schema and column ids for the aggregation.
             String[] includeCols = ObjectArrays.concat(groupKeyColumnNames, resultColumnNames, String.class);
-            logger.info("start get output schema");
             TypeDescription inputSchema = getFileSchema(s3, inputFiles.get(0), true);
             checkArgument(inputSchema.getChildren().size() == includeCols.length,
                     "input file does not contain the correct number of columns");
@@ -133,10 +135,11 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             {
                 aggrColumnIds[i] = columnId++;
             }
+
+            // start aggregation.
             Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema,
                     groupKeyColumnNames, groupKeyColumnIds, groupKeyColumnProj,
                     aggrColumnIds, resultColumnNames, resultColumnTypes, functionTypes);
-            logger.info("start scan and aggregate");
             for (int i = 0; i <  inputFiles.size(); )
             {
                 List<String> files = new LinkedList<>();
@@ -148,7 +151,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 threadPool.execute(() -> {
                     try
                     {
-                        aggregate(queryId, files, includeCols, aggregator);
+                        aggregate(queryId, files, includeCols, aggregator, metricsCollector);
                     }
                     catch (Exception e)
                     {
@@ -165,8 +168,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 throw new PixelsWorkerException("interrupted while waiting for the termination of aggregation", e);
             }
 
-            logger.info("start write aggregation result");
-
+            MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
             PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
                     outputStorage.getScheme() == Storage.Scheme.minio ? minio : s3,
                     outputPath, encoding, false, null);
@@ -180,9 +182,12 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     TimeUnit.MILLISECONDS.sleep(10);
                 }
             }
-            aggregationOutput.addOutput(outputPath, pixelsWriter.getRowGroupNum());
+            metricsCollector.addOutputCostNs(writeCostTimer.stop());
+            metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+            metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+            aggregationOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
             aggregationOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
-
+            setPerfMetrics(aggregationOutput, metricsCollector);
             return aggregationOutput;
         } catch (Exception e)
         {
@@ -201,12 +206,18 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
      * @param inputFiles the paths of the files to read and aggregate
      * @param columnsToRead the columns to read from the input files
      * @param aggregator the aggregator for the partial aggregation
-     * @return the number of rows that are read from input files.
+     * @param metricsCollector the collector of the performance metrics
+     * @return the number of rows that are read from input files
      */
-    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead, Aggregator aggregator)
+    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead,
+                          Aggregator aggregator, MetricsCollector metricsCollector)
     {
         requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
         int numRows = 0;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!inputFiles.isEmpty())
         {
             for (Iterator<String> it = inputFiles.iterator(); it.hasNext(); )
@@ -225,12 +236,13 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException(
-                            "failed to check the existence of the input partial aggregation file '" +
-                            inputFile + "'", e);
+                            "failed to check the existence of the input partial aggregation file '" + inputFile + "'", e);
                 }
 
+                readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(inputFile, s3))
                 {
+                    readCostTimer.stop();
                     PixelsReaderOption option = new PixelsReaderOption();
                     option.queryId(queryId);
                     option.includeCols(columnsToRead);
@@ -240,6 +252,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     VectorizedRowBatch rowBatch;
 
+                    computeCostTimer.start();
                     do
                     {
                         rowBatch = recordReader.readBatch(rowBatchSize);
@@ -249,6 +262,11 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                             aggregator.aggregate(rowBatch);
                         }
                     } while (!rowBatch.endOfFile);
+                    computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to read the input partial aggregation file '" +
@@ -256,6 +274,11 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 }
             }
         }
+
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return numRows;
     }
 }

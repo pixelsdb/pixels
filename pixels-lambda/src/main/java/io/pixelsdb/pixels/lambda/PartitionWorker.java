@@ -57,6 +57,7 @@ import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 public class PartitionWorker implements RequestHandler<PartitionInput, PartitionOutput>
 {
     private static final Logger logger = LoggerFactory.getLogger(PartitionWorker.class);
+    private final MetricsCollector metricsCollector = new MetricsCollector();
 
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
@@ -67,6 +68,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
         partitionOutput.setRequestId(context.getAwsRequestId());
         partitionOutput.setSuccessful(true);
         partitionOutput.setErrorMessage("");
+        metricsCollector.clear();
 
         try
         {
@@ -120,6 +122,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 throw new PixelsWorkerException("interrupted while waiting for the termination of partitioning", e);
             }
 
+            MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
             if (writerSchema.get() == null)
             {
                 InputInfo inputInfo = inputSplits.get(0).getInputInfos().get(0);
@@ -146,8 +149,12 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             partitionOutput.setHashValues(hashValues);
 
             pixelsWriter.close();
+            metricsCollector.addOutputCostNs(writeCostTimer.stop());
+            metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+            metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
 
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
+            setPerfMetrics(partitionOutput, metricsCollector);
             return partitionOutput;
         }
         catch (Exception e)
@@ -180,10 +187,16 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
     {
         Scanner scanner = null;
         Partitioner partitioner = null;
+        MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         for (InputInfo inputInfo : scanInputs)
         {
+            readCostTimer.start();
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
+                readCostTimer.stop();
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
                     continue;
@@ -192,7 +205,6 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-
                 PixelsReaderOption option = getReaderOption(queryId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
@@ -212,6 +224,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                     writerSchema.weakCompareAndSet(null, scanner.getOutputSchema());
                 }
 
+                computeCostTimer.start();
                 do
                 {
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
@@ -227,6 +240,11 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                         }
                     }
                 } while (!rowBatch.endOfFile);
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the file '" +
@@ -244,5 +262,9 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
                 }
             }
         }
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
     }
 }

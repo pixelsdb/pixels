@@ -30,6 +30,13 @@ public class Output
     private String errorMessage;
     private long startTimeMs;
     private int durationMs;
+    private int inputCostMs;
+    private int computeCostMs;
+    private int outputCostMs;
+    private int numReadRequests;
+    private int numWriteRequests;
+    private long readBytes;
+    private long writeBytes;
 
     public String getRequestId()
     {
@@ -79,5 +86,75 @@ public class Output
     public void setDurationMs(int durationMs)
     {
         this.durationMs = durationMs;
+    }
+
+    public int getInputCostMs()
+    {
+        return inputCostMs;
+    }
+
+    public void setInputCostMs(int inputCostMs)
+    {
+        this.inputCostMs = inputCostMs;
+    }
+
+    public int getComputeCostMs()
+    {
+        return computeCostMs;
+    }
+
+    public void setComputeCostMs(int computeCostMs)
+    {
+        this.computeCostMs = computeCostMs;
+    }
+
+    public int getOutputCostMs()
+    {
+        return outputCostMs;
+    }
+
+    public void setOutputCostMs(int outputCostMs)
+    {
+        this.outputCostMs = outputCostMs;
+    }
+
+    public int getNumReadRequests()
+    {
+        return numReadRequests;
+    }
+
+    public void setNumReadRequests(int numReadRequests)
+    {
+        this.numReadRequests = numReadRequests;
+    }
+
+    public int getNumWriteRequests()
+    {
+        return numWriteRequests;
+    }
+
+    public void setNumWriteRequests(int numWriteRequests)
+    {
+        this.numWriteRequests = numWriteRequests;
+    }
+
+    public long getReadBytes()
+    {
+        return readBytes;
+    }
+
+    public void setReadBytes(long readBytes)
+    {
+        this.readBytes = readBytes;
+    }
+
+    public long getWriteBytes()
+    {
+        return writeBytes;
+    }
+
+    public void setWriteBytes(long writeBytes)
+    {
+        this.writeBytes = writeBytes;
     }
 }

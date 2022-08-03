@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.output.Output;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -341,5 +342,16 @@ public class WorkerCommon
             }
         }
         return option;
+    }
+
+    public static void setPerfMetrics(Output output, MetricsCollector collector)
+    {
+        output.setInputCostMs((int) Math.round(collector.getInputCostNs() / 1000_000.0));
+        output.setComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));
+        output.setOutputCostMs((int) Math.round(collector.getOutputCostNs() / 1000_000.0));
+        output.setReadBytes(collector.getReadBytes());
+        output.setWriteBytes(collector.getWriteBytes());
+        output.setNumReadRequests(collector.getNumReadRequests());
+        output.setNumWriteRequests(collector.getNumWriteRequests());
     }
 }
