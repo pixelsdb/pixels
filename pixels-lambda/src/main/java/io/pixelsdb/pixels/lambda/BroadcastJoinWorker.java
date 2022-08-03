@@ -298,6 +298,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     {
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!leftInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
@@ -330,6 +332,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
+                    readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
                         continue;
@@ -342,10 +345,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, leftCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
-                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -361,6 +361,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } while (!rowBatch.endOfFile);
                     computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the left table input file '" +
@@ -368,8 +372,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
     }
 
     /**
@@ -393,6 +399,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         int joinedRows = 0;
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -425,6 +433,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
+                    readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
                         continue;
@@ -436,10 +445,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
-                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -463,6 +469,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } while (!rowBatch.endOfFile);
                     computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -470,9 +480,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 }
             }
         }
-
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return joinedRows;
     }
 
@@ -502,6 +513,8 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
         int joinedRows = 0;
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -534,6 +547,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
+                    readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
                         continue;
@@ -545,10 +559,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
-                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -576,6 +587,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                         }
                     } while (!rowBatch.endOfFile);
                     computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -592,9 +607,10 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                 partitionResult.get(hash).add(tailBatches[hash]);
             }
         }
-
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return joinedRows;
     }
 }

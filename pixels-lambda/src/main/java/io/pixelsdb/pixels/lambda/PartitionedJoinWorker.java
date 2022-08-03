@@ -357,6 +357,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     {
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!leftParts.isEmpty())
         {
             for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
@@ -397,12 +399,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         PixelsReaderOption option = getReaderOption(queryId, leftCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
-                        readCostTimer.start();
                         PixelsRecordReader recordReader = pixelsReader.read(option);
-                        readCostTimer.stop();
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                        metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                         computeCostTimer.start();
                         do
@@ -414,6 +412,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                             }
                         } while (!rowBatch.endOfFile);
                         computeCostTimer.stop();
+                        computeCostTimer.minus(recordReader.getReadTimeNanos());
+                        readCostTimer.add(recordReader.getReadTimeNanos());
+                        readBytes += recordReader.getCompletedBytes();
+                        numReadRequests += recordReader.getNumReadRequests();
                     }
                 } catch (Exception e)
                 {
@@ -422,8 +424,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
             }
         }
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
     }
 
     /**
@@ -446,6 +450,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         int joinedRows = 0;
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -486,12 +492,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
-                        readCostTimer.start();
                         PixelsRecordReader recordReader = pixelsReader.read(option);
-                        readCostTimer.stop();
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                        metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                         computeCostTimer.start();
                         do
@@ -511,6 +513,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                             }
                         } while (!rowBatch.endOfFile);
                         computeCostTimer.stop();
+                        computeCostTimer.minus(recordReader.getReadTimeNanos());
+                        readCostTimer.add(recordReader.getReadTimeNanos());
+                        readBytes += recordReader.getCompletedBytes();
+                        numReadRequests += recordReader.getNumReadRequests();
                     }
                 } catch (Exception e)
                 {
@@ -519,9 +525,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 }
             }
         }
-
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return joinedRows;
     }
 
@@ -549,6 +556,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         int joinedRows = 0;
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
@@ -589,12 +598,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         PixelsReaderOption option = getReaderOption(queryId, rightCols, pixelsReader,
                                 hashValue, numPartition);
                         VectorizedRowBatch rowBatch;
-                        readCostTimer.start();
                         PixelsRecordReader recordReader = pixelsReader.read(option);
-                        readCostTimer.stop();
                         checkArgument(recordReader.isValid(), "failed to get record reader");
-                        metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                        metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                         computeCostTimer.start();
                         do
@@ -618,6 +623,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                             }
                         } while (!rowBatch.endOfFile);
                         computeCostTimer.stop();
+                        computeCostTimer.minus(recordReader.getReadTimeNanos());
+                        readCostTimer.add(recordReader.getReadTimeNanos());
+                        readBytes += recordReader.getCompletedBytes();
+                        numReadRequests += recordReader.getNumReadRequests();
                     }
                 } catch (Exception e)
                 {
@@ -635,9 +644,10 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                 partitionResult.get(hash).add(tailBatches[hash]);
             }
         }
-
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return joinedRows;
     }
 }

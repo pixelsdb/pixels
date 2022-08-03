@@ -30,7 +30,7 @@ public class MetricsCollector
 {
     public static class Timer
     {
-        private long duration = 0;
+        private long elapsedNs = 0;
         private long startTime = 0L;
 
         public Timer start()
@@ -45,13 +45,23 @@ public class MetricsCollector
         public long stop()
         {
             long endTime = System.nanoTime();
-            duration += endTime - startTime;
-            return duration;
+            elapsedNs += endTime - startTime;
+            return elapsedNs;
         }
 
-        public long getDuration()
+        public void add(long timeNs)
         {
-            return duration;
+            this.elapsedNs += timeNs;
+        }
+
+        public void minus(long timeNs)
+        {
+            this.elapsedNs -= timeNs;
+        }
+
+        public long getElapsedNs()
+        {
+            return elapsedNs;
         }
     }
 

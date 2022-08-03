@@ -216,6 +216,8 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
         int numRows = 0;
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!inputFiles.isEmpty())
         {
             for (Iterator<String> it = inputFiles.iterator(); it.hasNext(); )
@@ -240,6 +242,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(inputFile, s3))
                 {
+                    readCostTimer.stop();
                     PixelsReaderOption option = new PixelsReaderOption();
                     option.queryId(queryId);
                     option.includeCols(columnsToRead);
@@ -248,9 +251,6 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     option.tolerantSchemaEvolution(true);
                     PixelsRecordReader recordReader = pixelsReader.read(option);
                     VectorizedRowBatch rowBatch;
-                    readCostTimer.stop();
-                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     computeCostTimer.start();
                     do
@@ -263,6 +263,10 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                         }
                     } while (!rowBatch.endOfFile);
                     computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to read the input partial aggregation file '" +
@@ -271,8 +275,10 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             }
         }
 
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
         return numRows;
     }
 }

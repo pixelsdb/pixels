@@ -232,12 +232,15 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
         }
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer();
-        MetricsCollector.Timer computeTimer = new MetricsCollector.Timer();
+        MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         for (InputInfo inputInfo : scanInputs)
         {
             readCostTimer.start();
             try (PixelsReader pixelsReader = getReader(inputInfo.getPath(), s3))
             {
+                readCostTimer.stop();
                 if (inputInfo.getRgStart() >= pixelsReader.getRowGroupNum())
                 {
                     continue;
@@ -246,14 +249,10 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 {
                     inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
                 }
-
                 PixelsReaderOption option = getReaderOption(queryId, columnsToRead, inputInfo);
                 PixelsRecordReader recordReader = pixelsReader.read(option);
                 TypeDescription rowBatchSchema = recordReader.getResultSchema();
                 VectorizedRowBatch rowBatch;
-                readCostTimer.stop();
-                metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                 if (scanner == null)
                 {
@@ -268,8 +267,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     writeCostTimer.stop();
                 }
 
-                computeTimer.start();
-                writeCostTimer.start();
+                computeCostTimer.start();
                 do
                 {
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(rowBatchSize));
@@ -284,8 +282,11 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         }
                     }
                 } while (!rowBatch.endOfFile);
-                writeCostTimer.stop();
-                computeTimer.stop();
+                computeCostTimer.stop();
+                computeCostTimer.minus(recordReader.getReadTimeNanos());
+                readCostTimer.add(recordReader.getReadTimeNanos());
+                readBytes += recordReader.getCompletedBytes();
+                numReadRequests += recordReader.getNumReadRequests();
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to scan the file '" +
@@ -298,6 +299,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             int numRowGroup = 0;
             if (pixelsWriter != null)
             {
+                // This is a pure scan without aggregation, compute time is the file writing time.
+                writeCostTimer.add(computeCostTimer.getElapsedNs());
                 writeCostTimer.start();
                 pixelsWriter.close();
                 if (outputScheme == Storage.Scheme.minio)
@@ -311,16 +314,16 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 writeCostTimer.stop();
                 metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
                 metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-                metricsCollector.addOutputCostNs(writeCostTimer.getDuration());
+                metricsCollector.addOutputCostNs(writeCostTimer.getElapsedNs());
                 numRowGroup = pixelsWriter.getNumRowGroup();
             }
             else
             {
-                metricsCollector.addComputeCostNs(computeTimer.getDuration());
+                metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
             }
-            metricsCollector.addInputCostNs(readCostTimer.getDuration());
-
-
+            metricsCollector.addReadBytes(readBytes);
+            metricsCollector.addNumReadRequests(numReadRequests);
+            metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
             return numRowGroup;
         } catch (Exception e)
         {

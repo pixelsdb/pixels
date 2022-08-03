@@ -305,7 +305,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     rightResultSchema, lastJoinInfo.getLargeColumnAlias(),
                     lastJoinInfo.getLargeProjection(), rightTable.getKeyColumnIds());
             chainJoin(queryId, executor, currJoiner, finalJoiner, lastLeftTable, metricsCollector);
-            metricsCollector.addInputCostNs(readCostTimer.getDuration());
+            metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
             return finalJoiner;
         } catch (Exception e)
         {
@@ -423,6 +423,8 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
     {
         MetricsCollector.Timer readCostTimer = new MetricsCollector.Timer();
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
         while (!rightInputs.isEmpty())
         {
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
@@ -454,6 +456,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
+                    readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
                         continue;
@@ -465,10 +468,7 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                     PixelsReaderOption option = getReaderOption(queryId, rightCols, input);
                     VectorizedRowBatch rowBatch;
                     PixelsRecordReader recordReader = pixelsReader.read(option);
-                    readCostTimer.stop();
                     checkArgument(recordReader.isValid(), "failed to get record reader");
-                    metricsCollector.addReadBytes(recordReader.getCompletedBytes());
-                    metricsCollector.addNumReadRequests(recordReader.getNumReadRequests());
 
                     Bitmap filtered = new Bitmap(rowBatchSize, true);
                     Bitmap tmp = new Bitmap(rowBatchSize, false);
@@ -491,6 +491,10 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                         }
                     } while (!rowBatch.endOfFile);
                     computeCostTimer.stop();
+                    computeCostTimer.minus(recordReader.getReadTimeNanos());
+                    readCostTimer.add(recordReader.getReadTimeNanos());
+                    readBytes += recordReader.getCompletedBytes();
+                    numReadRequests += recordReader.getNumReadRequests();
                 } catch (Exception e)
                 {
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
@@ -498,7 +502,9 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
                 }
             }
         }
-        metricsCollector.addComputeCostNs(computeCostTimer.getDuration());
-        metricsCollector.addInputCostNs(readCostTimer.getDuration());
+        metricsCollector.addReadBytes(readBytes);
+        metricsCollector.addNumReadRequests(numReadRequests);
+        metricsCollector.addComputeCostNs(computeCostTimer.getElapsedNs());
+        metricsCollector.addInputCostNs(readCostTimer.getElapsedNs());
     }
 }
