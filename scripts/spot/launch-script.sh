@@ -20,10 +20,10 @@ instance_id=$(get_instance_id)
 sed -i "s/instance-id-dummy/$instance_id/g" /home/ubuntu/opt/trino-server/etc/node.properties
 
 echo "start trino"
-sudo /home/ubuntu/opt/trino-server/bin/launcher start
+su ubuntu -c "/home/ubuntu/opt/trino-server/bin/launcher start"
 
 echo "start node_exporter"
-screen -d -S node_exporter -m /home/ubuntu/opt/node_exporter/start-node-exporter.sh
+su ubuntu -c "screen -d -S node_exporter -m /home/ubuntu/opt/node_exporter/start-node-exporter.sh"
 
 # keep checking termination state to activate termination hook for gracefully shutting down trino
 nohup /root/termination-handler.sh &
