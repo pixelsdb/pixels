@@ -346,11 +346,11 @@ public class WorkerCommon
 
     public static void setPerfMetrics(Output output, MetricsCollector collector)
     {
-        output.setInputCostMs((int) Math.round(collector.getInputCostNs() / 1000_000.0));
-        output.setComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));
-        output.setOutputCostMs((int) Math.round(collector.getOutputCostNs() / 1000_000.0));
-        output.setReadBytes(collector.getReadBytes());
-        output.setWriteBytes(collector.getWriteBytes());
+        output.setCumulativeInputCostMs((int) Math.round(collector.getInputCostNs() / 1000_000.0));
+        output.setCumulativeComputeCostMs((int) Math.round(collector.getComputeCostNs() / 1000_000.0));
+        output.setCumulativeOutputCostMs((int) Math.round(collector.getOutputCostNs() / 1000_000.0));
+        output.setTotalReadBytes(collector.getReadBytes());
+        output.setTotalWriteBytes(collector.getWriteBytes());
         output.setNumReadRequests(collector.getNumReadRequests());
         output.setNumWriteRequests(collector.getNumWriteRequests());
     }

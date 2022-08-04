@@ -101,14 +101,14 @@ public class JoinAdvisor
         if (joinEndian == JoinEndian.SMALL_LEFT)
         {
             double selectivity = getTableSelectivity(leftTable);
-            logger.info("selectivity on table '" + leftTable.getTableName() + "': " + selectivity);
+            logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + selectivity);
             smallTableSize = getTableInputSize(leftTable);
             smallTableRows = (long) (getTableRowCount(leftTable) * selectivity);
         }
         else
         {
             double selectivity = getTableSelectivity(rightTable);
-            logger.info("selectivity on table '" + rightTable.getTableName() + "': " + selectivity);
+            logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + selectivity);
             smallTableSize = getTableInputSize(rightTable);
             smallTableRows = (long) (getTableRowCount(rightTable) * selectivity);
         }
@@ -128,8 +128,8 @@ public class JoinAdvisor
         // Use row count instead of input size, because building hash table is the main cost.
         double leftSelectivity = getTableSelectivity(leftTable);
         double rightSelectivity = getTableSelectivity(rightTable);
-        logger.info("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
-        logger.info("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
+        logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
+        logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
         long leftTableRowCount = (long) (getTableRowCount(leftTable) * leftSelectivity);
         long rightTableRowCount = (long) (getTableRowCount(rightTable) * rightSelectivity);
 
@@ -177,8 +177,8 @@ public class JoinAdvisor
         double totalSize = 0;
         double leftSelectivity = getTableSelectivity(leftTable);
         double rightSelectivity = getTableSelectivity(rightTable);
-        logger.info("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
-        logger.info("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
+        logger.debug("selectivity on table '" + leftTable.getTableName() + "': " + leftSelectivity);
+        logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
         totalSize += getTableInputSize(leftTable) * leftSelectivity;
         totalSize += getTableInputSize(rightTable) * rightSelectivity;
         double largeTableRowCount;
@@ -266,7 +266,7 @@ public class JoinAdvisor
                     if (columnStats.hasDateStatistics())
                     {
                         PixelsProto.DateStatistic dateStatistic = columnStats.getDateStatistics();
-                        logger.info("column " + column.getName() + " min: " + dateStatistic.getMinimum() + ", max: " + dateStatistic.getMaximum()
+                        logger.debug("column " + column.getName() + " min: " + dateStatistic.getMinimum() + ", max: " + dateStatistic.getMaximum()
                         + ", selectivity: " + s + ", columnFilter: " + JSON.toJSONString(columnFilter));
                     }
                     if (s >= 0 && s < selectivity)

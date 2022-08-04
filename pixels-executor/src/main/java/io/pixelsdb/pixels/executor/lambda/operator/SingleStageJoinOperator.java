@@ -131,7 +131,7 @@ public class SingleStageJoinOperator extends JoinOperator
                 }
             }
 
-            logger.info("invoke " + this.getName());
+            logger.debug("invoke " + this.getName());
             return joinOutputs;
         });
     }
@@ -265,7 +265,7 @@ public class SingleStageJoinOperator extends JoinOperator
             {
                 for (Output output : joinOutputs)
                 {
-                    readBytes += output.getReadBytes();
+                    readBytes += output.getTotalReadBytes();
                 }
             }
             return readBytes;
@@ -279,7 +279,7 @@ public class SingleStageJoinOperator extends JoinOperator
             {
                 for (Output output : joinOutputs)
                 {
-                    writeBytes += output.getWriteBytes();
+                    writeBytes += output.getTotalWriteBytes();
                 }
             }
             return writeBytes;
@@ -293,7 +293,7 @@ public class SingleStageJoinOperator extends JoinOperator
             {
                 for (Output output : joinOutputs)
                 {
-                    inputCostMs += output.getInputCostMs();
+                    inputCostMs += output.getCumulativeInputCostMs();
                 }
             }
             return inputCostMs;
@@ -307,7 +307,7 @@ public class SingleStageJoinOperator extends JoinOperator
             {
                 for (Output output : joinOutputs)
                 {
-                    computeCostMs += output.getComputeCostMs();
+                    computeCostMs += output.getCumulativeComputeCostMs();
                 }
             }
             return computeCostMs;
@@ -321,7 +321,7 @@ public class SingleStageJoinOperator extends JoinOperator
             {
                 for (Output output : joinOutputs)
                 {
-                    outputCostMs += output.getOutputCostMs();
+                    outputCostMs += output.getCumulativeOutputCostMs();
                 }
             }
             return outputCostMs;

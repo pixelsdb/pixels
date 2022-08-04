@@ -1388,7 +1388,7 @@ public class PixelsExecutor
             if (smallSelectivity / largeSelectivity < 0.25)
             {
                 // Do not adjust too aggressively.
-                logger.info("increasing the split size of table '" + largeTable.getTableName() +
+                logger.debug("increasing the split size of table '" + largeTable.getTableName() +
                         "' by factor of 2");
                 inputInfosPerSplit *= 2;
             }
@@ -1457,7 +1457,7 @@ public class PixelsExecutor
                 }
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 splitSize = bestSplitPattern.getSplitSize();
-                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
+                logger.debug("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
                 double selectivity = JoinAdvisor.Instance().getTableSelectivity(table);
                 if (selectivity >= 0)
                 {
@@ -1474,7 +1474,7 @@ public class PixelsExecutor
                         splitSize = splitsIndex.getMaxSplitSize();
                     }
                 }
-                logger.info("split size for table '" + table.getTableName() + "': " + splitSize + " after adjustment");
+                logger.debug("split size for table '" + table.getTableName() + "': " + splitSize + " after adjustment");
             }
             logger.debug("using split size: " + splitSize);
             int rowGroupNum = splits.getNumRowGroupInBlock();
