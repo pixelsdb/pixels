@@ -368,19 +368,19 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : scanOutputs)
                 {
-                    readBytes += output.getReadBytes();
+                    readBytes += output.getTotalReadBytes();
                 }
             }
             if (this.preAggrOutputs != null)
             {
                 for (Output output : preAggrOutputs)
                 {
-                    readBytes += output.getReadBytes();
+                    readBytes += output.getTotalReadBytes();
                 }
             }
             if (this.finalAggrOutput != null)
             {
-                readBytes += finalAggrOutput.getReadBytes();
+                readBytes += finalAggrOutput.getTotalReadBytes();
             }
             return readBytes;
         }
@@ -393,19 +393,19 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : scanOutputs)
                 {
-                    writeBytes += output.getWriteBytes();
+                    writeBytes += output.getTotalWriteBytes();
                 }
             }
             if (this.preAggrOutputs != null)
             {
                 for (Output output : preAggrOutputs)
                 {
-                    writeBytes += output.getWriteBytes();
+                    writeBytes += output.getTotalWriteBytes();
                 }
             }
             if (this.finalAggrOutput != null)
             {
-                writeBytes += finalAggrOutput.getWriteBytes();
+                writeBytes += finalAggrOutput.getTotalWriteBytes();
             }
             return writeBytes;
         }
@@ -415,7 +415,7 @@ public class AggregationOperator extends Operator
         {
             if (this.finalAggrOutput != null)
             {
-                return finalAggrOutput.getInputCostMs();
+                return finalAggrOutput.getCumulativeInputCostMs();
             }
             return 0;
         }
@@ -425,7 +425,7 @@ public class AggregationOperator extends Operator
         {
             if (this.finalAggrOutput != null)
             {
-                return finalAggrOutput.getComputeCostMs();
+                return finalAggrOutput.getCumulativeComputeCostMs();
             }
             return 0;
         }
@@ -435,7 +435,7 @@ public class AggregationOperator extends Operator
         {
             if (this.finalAggrOutput != null)
             {
-                return finalAggrOutput.getOutputCostMs();
+                return finalAggrOutput.getCumulativeOutputCostMs();
             }
             return 0;
         }
@@ -447,7 +447,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : scanOutputs)
                 {
-                    inputCostMs += output.getInputCostMs();
+                    inputCostMs += output.getCumulativeInputCostMs();
                 }
             }
             return inputCostMs;
@@ -460,7 +460,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : scanOutputs)
                 {
-                    computeCostMs += output.getComputeCostMs();
+                    computeCostMs += output.getCumulativeComputeCostMs();
                 }
             }
             return computeCostMs;
@@ -473,7 +473,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : scanOutputs)
                 {
-                    outputCostMs += output.getOutputCostMs();
+                    outputCostMs += output.getCumulativeOutputCostMs();
                 }
             }
             return outputCostMs;
@@ -486,7 +486,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : preAggrOutputs)
                 {
-                    inputCostMs += output.getInputCostMs();
+                    inputCostMs += output.getCumulativeInputCostMs();
                 }
             }
             return inputCostMs;
@@ -499,7 +499,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : preAggrOutputs)
                 {
-                    computeCostMs += output.getComputeCostMs();
+                    computeCostMs += output.getCumulativeComputeCostMs();
                 }
             }
             return computeCostMs;
@@ -512,7 +512,7 @@ public class AggregationOperator extends Operator
             {
                 for (Output output : preAggrOutputs)
                 {
-                    outputCostMs += output.getOutputCostMs();
+                    outputCostMs += output.getCumulativeOutputCostMs();
                 }
             }
             return outputCostMs;

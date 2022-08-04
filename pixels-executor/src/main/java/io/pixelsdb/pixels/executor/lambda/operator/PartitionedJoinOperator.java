@@ -154,7 +154,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                 }
             }
 
-            logger.info("invoke " + this.getName());
+            logger.debug("invoke " + this.getName());
             return joinOutputs;
         });
     }
@@ -193,7 +193,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
 
-                    logger.info("invoke large partition of " + this.getName());
+                    logger.debug("invoke large partition of " + this.getName());
 
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
@@ -211,7 +211,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
 
-                    logger.info("invoke small partition of " + this.getName());
+                    logger.debug("invoke small partition of " + this.getName());
 
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallPartitionOutputs);
@@ -228,7 +228,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
 
-                    logger.info("invoke small partition of " + this.getName());
+                    logger.debug("invoke small partition of " + this.getName());
 
                     largePartitionOutputs = new CompletableFuture[largePartitionInputs.size()];
                     i = 0;
@@ -238,7 +238,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
                                 .getInvoker(WorkerType.PARTITION).invoke((partitionInput));
                     }
 
-                    logger.info("invoke large partition of " + this.getName());
+                    logger.debug("invoke large partition of " + this.getName());
 
                     waitForCompletion(smallPartitionOutputs);
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
@@ -387,14 +387,14 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    readBytes += output.getReadBytes();
+                    readBytes += output.getTotalReadBytes();
                 }
             }
             if (this.largePartitionOutputs != null)
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    readBytes += output.getReadBytes();
+                    readBytes += output.getTotalReadBytes();
                 }
             }
             return readBytes;
@@ -408,14 +408,14 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    writeBytes += output.getWriteBytes();
+                    writeBytes += output.getTotalWriteBytes();
                 }
             }
             if (this.largePartitionOutputs != null)
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    writeBytes += output.getWriteBytes();
+                    writeBytes += output.getTotalWriteBytes();
                 }
             }
             return writeBytes;
@@ -446,7 +446,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    inputCostMs += output.getInputCostMs();
+                    inputCostMs += output.getCumulativeInputCostMs();
                 }
             }
             return inputCostMs;
@@ -459,7 +459,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    computeCostMs += output.getComputeCostMs();
+                    computeCostMs += output.getCumulativeComputeCostMs();
                 }
             }
             return computeCostMs;
@@ -472,7 +472,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    outputCostMs += output.getOutputCostMs();
+                    outputCostMs += output.getCumulativeOutputCostMs();
                 }
             }
             return outputCostMs;
@@ -485,7 +485,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    inputCostMs += output.getInputCostMs();
+                    inputCostMs += output.getCumulativeInputCostMs();
                 }
             }
             return inputCostMs;
@@ -498,7 +498,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    computeCostMs += output.getComputeCostMs();
+                    computeCostMs += output.getCumulativeComputeCostMs();
                 }
             }
             return computeCostMs;
@@ -511,7 +511,7 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    outputCostMs += output.getOutputCostMs();
+                    outputCostMs += output.getCumulativeOutputCostMs();
                 }
             }
             return outputCostMs;

@@ -53,14 +53,14 @@ public class TransContext
         this.queryTransContext = new ConcurrentHashMap<>();
     }
 
-    public void beginQuery(QueryTransInfo info)
+    public synchronized void beginQuery(QueryTransInfo info)
     {
         requireNonNull(info, "query transaction info is null");
         checkArgument(info.getQueryStatus() == QueryTransInfo.Status.PENDING);
         this.queryTransContext.put(info.getQueryId(), info);
     }
 
-    public void commitQuery(long queryId)
+    public synchronized void commitQuery(long queryId)
     {
         QueryTransInfo info = this.queryTransContext.remove(queryId);
         if (info != null)
@@ -69,7 +69,7 @@ public class TransContext
         }
     }
 
-    public void rollbackQuery(long queryId)
+    public synchronized void rollbackQuery(long queryId)
     {
         QueryTransInfo info = this.queryTransContext.remove(queryId);
         if (info != null)
@@ -78,15 +78,23 @@ public class TransContext
         }
     }
 
-    public QueryTransInfo getQueryTransInfo(long queryId)
+    public synchronized QueryTransInfo getQueryTransInfo(long queryId)
     {
         return this.queryTransContext.get(queryId);
     }
 
-    public boolean isTerminated(long queryId)
+    public synchronized boolean isTerminated(long queryId)
     {
         QueryTransInfo info =  this.queryTransContext.get(queryId);
         return info == null || info.getQueryStatus() == QueryTransInfo.Status.COMMIT ||
                 info.getQueryStatus() == QueryTransInfo.Status.ROLLBACK;
+    }
+
+    /**
+     * @return the number of concurrent queries at this moment.
+     */
+    public synchronized int getTransConcurrency()
+    {
+        return this.queryTransContext.size();
     }
 }

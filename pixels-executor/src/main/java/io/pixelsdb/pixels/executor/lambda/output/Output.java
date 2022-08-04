@@ -30,13 +30,13 @@ public class Output
     private String errorMessage;
     private long startTimeMs;
     private int durationMs;
-    private int inputCostMs;
-    private int computeCostMs;
-    private int outputCostMs;
+    private int cumulativeInputCostMs;
+    private int cumulativeComputeCostMs;
+    private int cumulativeOutputCostMs;
     private int numReadRequests;
     private int numWriteRequests;
-    private long readBytes;
-    private long writeBytes;
+    private long totalReadBytes;
+    private long totalWriteBytes;
 
     public String getRequestId()
     {
@@ -88,34 +88,34 @@ public class Output
         this.durationMs = durationMs;
     }
 
-    public int getInputCostMs()
+    public int getCumulativeInputCostMs()
     {
-        return inputCostMs;
+        return cumulativeInputCostMs;
     }
 
-    public void setInputCostMs(int inputCostMs)
+    public void setCumulativeInputCostMs(int cumulativeInputCostMs)
     {
-        this.inputCostMs = inputCostMs;
+        this.cumulativeInputCostMs = cumulativeInputCostMs;
     }
 
-    public int getComputeCostMs()
+    public int getCumulativeComputeCostMs()
     {
-        return computeCostMs;
+        return cumulativeComputeCostMs;
     }
 
-    public void setComputeCostMs(int computeCostMs)
+    public void setCumulativeComputeCostMs(int cumulativeComputeCostMs)
     {
-        this.computeCostMs = computeCostMs;
+        this.cumulativeComputeCostMs = cumulativeComputeCostMs;
     }
 
-    public int getOutputCostMs()
+    public int getCumulativeOutputCostMs()
     {
-        return outputCostMs;
+        return cumulativeOutputCostMs;
     }
 
-    public void setOutputCostMs(int outputCostMs)
+    public void setCumulativeOutputCostMs(int cumulativeOutputCostMs)
     {
-        this.outputCostMs = outputCostMs;
+        this.cumulativeOutputCostMs = cumulativeOutputCostMs;
     }
 
     public int getNumReadRequests()
@@ -138,23 +138,23 @@ public class Output
         this.numWriteRequests = numWriteRequests;
     }
 
-    public long getReadBytes()
+    public long getTotalReadBytes()
     {
-        return readBytes;
+        return totalReadBytes;
     }
 
-    public void setReadBytes(long readBytes)
+    public void setTotalReadBytes(long totalReadBytes)
     {
-        this.readBytes = readBytes;
+        this.totalReadBytes = totalReadBytes;
     }
 
-    public long getWriteBytes()
+    public long getTotalWriteBytes()
     {
-        return writeBytes;
+        return totalWriteBytes;
     }
 
-    public void setWriteBytes(long writeBytes)
+    public void setTotalWriteBytes(long totalWriteBytes)
     {
-        this.writeBytes = writeBytes;
+        this.totalWriteBytes = totalWriteBytes;
     }
 }
