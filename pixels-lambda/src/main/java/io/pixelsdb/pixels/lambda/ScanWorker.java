@@ -49,7 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
@@ -102,14 +102,14 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinIO(event.getOutput().getStorageInfo().getEndpoint(),
+                    ConfigMinio(event.getOutput().getStorageInfo().getEndpoint(),
                             event.getOutput().getStorageInfo().getAccessKey(),
                             event.getOutput().getStorageInfo().getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
             {
-                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize Minio storage", e);
             }
             String[] includeCols = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);

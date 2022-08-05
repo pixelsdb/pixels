@@ -38,19 +38,19 @@ import static io.pixelsdb.pixels.common.utils.Constants.*;
 import static java.util.Objects.requireNonNull;
 
 /**
- * For MinIO, we assume that each table is stored in a separate folder
+ * For Minio, we assume that each table is stored in a separate folder
  * (i.e., a prefix or empty object in a bucket). And all the pixels
  * files in this table are stored as individual objects in the folder.
  * <br/>
- * To reduce the size of dependencies, we use AWS S3 SDK to access MinIO.
+ * To reduce the size of dependencies, we use AWS S3 SDK to access Minio.
  * <br/>
  *
  * @author hank
  * Created at: 09/04/2022
  */
-public final class MinIO extends AbstractS3
+public final class Minio extends AbstractS3
 {
-    // private static Logger logger = LogManager.getLogger(MinIO.class);
+    // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
     private static String MinIOEndpoint = null;
@@ -71,19 +71,19 @@ public final class MinIO extends AbstractS3
     }
 
     /**
-     * Set the configurations for MinIO. If any configuration is different from the default (null) or
-     * previous value, the MinIO storage instance in StorageFactory is reloaded for the configuration
-     * changes to take effect. In this case, the previous MinIO storage instance acquired from the
+     * Set the configurations for Minio. If any configuration is different from the default (null) or
+     * previous value, the Minio storage instance in StorageFactory is reloaded for the configuration
+     * changes to take effect. In this case, the previous Minio storage instance acquired from the
      * StorageFactory can be used without any impact.
      * <br/>
      * If the configurations are not changed, this method is a no-op.
      *
-     * @param endpoint the new endpoint of MinIO
-     * @param accessKey the new access key of MinIO
-     * @param secretKey the new secret key of MinIO
+     * @param endpoint the new endpoint of Minio
+     * @param accessKey the new access key of Minio
+     * @param secretKey the new secret key of Minio
      * @throws IOException
      */
-    public static void ConfigMinIO(String endpoint, String accessKey, String secretKey) throws IOException
+    public static void ConfigMinio(String endpoint, String accessKey, String secretKey) throws IOException
     {
         requireNonNull(endpoint, "endpoint is null");
         requireNonNull(accessKey, "accessKey is null");
@@ -100,11 +100,11 @@ public final class MinIO extends AbstractS3
         }
     }
 
-    public MinIO()
+    public Minio()
     {
-        requireNonNull(MinIOEndpoint, "MinIO endpoint is not set");
-        requireNonNull(MinIOAccessKey, "MinIO access key is not set");
-        requireNonNull(MinIOSecretKey, "MinIO secret key is not set");
+        requireNonNull(MinIOEndpoint, "Minio endpoint is not set");
+        requireNonNull(MinIOAccessKey, "Minio access key is not set");
+        requireNonNull(MinIOSecretKey, "Minio secret key is not set");
 
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))

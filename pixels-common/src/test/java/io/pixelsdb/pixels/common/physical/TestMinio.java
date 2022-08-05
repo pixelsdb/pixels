@@ -27,18 +27,18 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
 
 /**
  * @author hank
  * Created at: 10/04/2022
  */
-public class TestMinIO
+public class TestMinio
 {
     @Test
     public void testReadWrite() throws IOException
     {
-        ConfigMinIO("http://localhost:9000", "minio", "password");
+        ConfigMinio("http://localhost:9000", "minio", "password");
         Storage minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
         List<String> files = minio.listPaths("test/");
         for (String file : files)

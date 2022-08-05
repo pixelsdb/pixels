@@ -47,7 +47,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
@@ -110,13 +110,13 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             {
                 if (minio == null && outputStorage.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinIO(outputStorage.getEndpoint(), outputStorage.getAccessKey(),
+                    ConfigMinio(outputStorage.getEndpoint(), outputStorage.getAccessKey(),
                             outputStorage.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
             {
-                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize Minio storage", e);
             }
 
             // prepare the input schema and column ids for the aggregation.

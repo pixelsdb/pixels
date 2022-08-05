@@ -26,19 +26,19 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * The physical reader for MinIO.
+ * The physical reader for Minio.
  * <br/>
  * According to some brief tests, the performance of accessing
- * MinIO using Amazon S3AsyncClient is much worse than using S3Client.
+ * Minio using Amazon S3AsyncClient is much worse than using S3Client.
  * Therefore, we only support synchronous read here.
  * <br/>
  *
  * @author hank
  * Created at: 10/04/2022
  */
-public class PhysicalMinIOReader extends AbstractS3Reader
+public class PhysicalMinioReader extends AbstractS3Reader
 {
-    public PhysicalMinIOReader(Storage storage, String path) throws IOException
+    public PhysicalMinioReader(Storage storage, String path) throws IOException
     {
         super(storage, path);
         this.enableAsync = false;
@@ -47,7 +47,7 @@ public class PhysicalMinIOReader extends AbstractS3Reader
     @Override
     public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
     {
-        throw new UnsupportedOperationException("Asynchronous read is not supported for MinIO.");
+        throw new UnsupportedOperationException("Asynchronous read is not supported for Minio.");
     }
 
     @Override

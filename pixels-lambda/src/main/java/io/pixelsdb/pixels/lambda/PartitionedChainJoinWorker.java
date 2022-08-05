@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.physical.storage.MinIO.ConfigMinIO;
+import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
 import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.buildFirstJoiner;
 import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.chainJoin;
 import static io.pixelsdb.pixels.lambda.PartitionedJoinWorker.buildHashTable;
@@ -148,12 +148,12 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             {
                 if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinIO(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                    ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
             } catch (Exception e)
             {
-                throw new PixelsWorkerException("failed to initialize MinIO storage", e);
+                throw new PixelsWorkerException("failed to initialize Minio storage", e);
             }
 
             // build the joiner.

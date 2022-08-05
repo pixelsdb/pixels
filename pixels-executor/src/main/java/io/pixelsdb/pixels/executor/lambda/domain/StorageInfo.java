@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.executor.lambda.domain;
 import io.pixelsdb.pixels.common.physical.Storage;
 
 /**
- * The information of the storage endpoint, such as S3 or MinIO.
+ * The information of the storage endpoint, such as S3 or Minio.
  * @author hank
  * @date 06/07/2022
  */

@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
-import io.pixelsdb.pixels.common.physical.storage.MinIO;
+import io.pixelsdb.pixels.common.physical.storage.Minio;
 import io.pixelsdb.pixels.common.physical.storage.S3;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
@@ -161,7 +161,7 @@ public class StorageFactory
                 storage = new S3();
                 break;
             case minio:
-                storage = new MinIO();
+                storage = new Minio();
                 break;
             default:
                 throw new IOException("Unknown storage scheme: " + scheme.name());

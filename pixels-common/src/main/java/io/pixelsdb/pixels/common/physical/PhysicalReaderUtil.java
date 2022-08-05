@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.physical;
 
 import io.pixelsdb.pixels.common.physical.io.PhysicalHDFSReader;
 import io.pixelsdb.pixels.common.physical.io.PhysicalLocalReader;
-import io.pixelsdb.pixels.common.physical.io.PhysicalMinIOReader;
+import io.pixelsdb.pixels.common.physical.io.PhysicalMinioReader;
 import io.pixelsdb.pixels.common.physical.io.PhysicalS3Reader;
 
 import java.io.IOException;
@@ -56,7 +56,7 @@ public class PhysicalReaderUtil
                 reader = new PhysicalS3Reader(storage, path);
                 break;
             case minio:
-                reader = new PhysicalMinIOReader(storage, path);
+                reader = new PhysicalMinioReader(storage, path);
                 break;
             default:
                 throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");

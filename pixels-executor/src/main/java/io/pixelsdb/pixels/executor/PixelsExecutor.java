@@ -74,7 +74,6 @@ public class PixelsExecutor
     private final boolean projectionReadEnabled;
     private final boolean orderedPathEnabled;
     private final boolean compactPathEnabled;
-    private final boolean computeFinalAggrInServer;
     private final Storage storage;
     private final long queryId;
 
@@ -122,7 +121,6 @@ public class PixelsExecutor
                 Integer.parseInt(config.getProperty("metadata.server.port")));
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
-        this.computeFinalAggrInServer = Boolean.parseBoolean(config.getProperty("aggregation.compute.final.in.server"));
         this.orderedPathEnabled = orderedPathEnabled;
         this.compactPathEnabled = compactPathEnabled;
         this.storage = StorageFactory.Instance().getStorage(InputStorage);
@@ -153,8 +151,6 @@ public class PixelsExecutor
                 "aggregatedTable.aggregation is null");
         Table originTable = requireNonNull(aggregation.getOriginTable(),
                 "aggregation.originTable is null");
-        OutputEndPoint endPoint = requireNonNull(aggregation.getOutputEndPoint(),
-                "aggregation.outputEndPoint is null");
 
         PartialAggregationInfo partialAggregationInfo = new PartialAggregationInfo();
         partialAggregationInfo.setGroupKeyColumnAlias(aggregation.getGroupKeyColumnAlias());
@@ -163,12 +159,6 @@ public class PixelsExecutor
         partialAggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
         partialAggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
         partialAggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
-
-        String finalOutputBase = endPoint.getFolder();
-        if (!finalOutputBase.endsWith("/"))
-        {
-            finalOutputBase += "/";
-        }
 
         String intermediateBase = IntermediateFolder + queryId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
@@ -211,18 +201,8 @@ public class PixelsExecutor
                 scanInput.setScanProjection(scanProjection);
                 scanInput.setPartialAggregationPresent(true);
                 scanInput.setPartialAggregationInfo(partialAggregationInfo);
-                String fileName = computeFinalAggrInServer && !preAggregate ? finalOutputBase : intermediateBase;
-                fileName += (outputId++) + "/partial_aggr";
-                StorageInfo storageInfo;
-                if (computeFinalAggrInServer && !preAggregate)
-                {
-                    storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
-                            endPoint.getAccessKey(), endPoint.getSecretKey());
-                }
-                else
-                {
-                    storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-                }
+                String fileName = intermediateBase + (outputId++) + "/partial_aggr";
+                StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
                 scanInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
                 scanInputsBuilder.add(scanInput);
                 partialAggrFilesBuilder.add(fileName);
@@ -244,23 +224,13 @@ public class PixelsExecutor
             {
                 joinInput.setPartialAggregationPresent(true);
                 joinInput.setPartialAggregationInfo(partialAggregationInfo);
-                String folder = computeFinalAggrInServer && !preAggregate ? finalOutputBase : intermediateBase;
                 String fileName = "partial_aggr_" + outputId++;
                 MultiOutputInfo outputInfo = joinInput.getOutput();
-                StorageInfo storageInfo;
-                if (computeFinalAggrInServer && !preAggregate)
-                {
-                    storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
-                            endPoint.getAccessKey(), endPoint.getSecretKey());
-                }
-                else
-                {
-                    storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-                }
+                StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
                 outputInfo.setStorageInfo(storageInfo);
-                outputInfo.setPath(folder);
+                outputInfo.setPath(intermediateBase);
                 outputInfo.setFileNames(ImmutableList.of(fileName));
-                partialAggrFilesBuilder.add(folder + fileName);
+                partialAggrFilesBuilder.add(intermediateBase + fileName);
             }
         }
         else
@@ -296,23 +266,11 @@ public class PixelsExecutor
                 preAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
                 preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
                         null, null, null));
-                StorageInfo outputStorageInfo;
-                if (computeFinalAggrInServer)
-                {
-                    outputStorageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
-                            endPoint.getAccessKey(), endPoint.getSecretKey());
-                }
-                else
-                {
-                    outputStorageInfo = new StorageInfo(IntermediateStorage,
-                            null, null, null);
-                }
+                StorageInfo outputStorageInfo = new StorageInfo(IntermediateStorage, null, null, null);
                 preAggrInput.setParallelism(IntraWorkerParallelism);
 
-                String fileName = computeFinalAggrInServer ? finalOutputBase : intermediateBase;
-                fileName += (outputId++) + "/pre_aggr";
-                preAggrInput.setOutput(new OutputInfo(fileName, false,
-                        outputStorageInfo, true));
+                String fileName = intermediateBase + (outputId++) + "/pre_aggr";
+                preAggrInput.setOutput(new OutputInfo(fileName, false, outputStorageInfo, true));
                 finalAggrInputFilesBuilder.add(fileName);
                 preAggrInputsBuilder.add(preAggrInput);
             }
@@ -330,20 +288,11 @@ public class PixelsExecutor
         finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
         finalAggrInput.setResultColumnTypes(aggregation.getResultColumnTypes());
         finalAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
-        StorageInfo storageInfo = new StorageInfo(endPoint.getScheme(), endPoint.getEndPoint(),
-                endPoint.getAccessKey(), endPoint.getSecretKey());
-        if (computeFinalAggrInServer)
-        {
-            finalAggrInput.setInputStorage(storageInfo);
-        }
-        else
-        {
-            finalAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
-                    null, null, null));
-        }
+        StorageInfo outputStorageInfo = new StorageInfo(IntermediateStorage, null, null, null);
+        finalAggrInput.setInputStorage(new StorageInfo(IntermediateStorage, null, null, null));
         finalAggrInput.setParallelism(IntraWorkerParallelism);
-        finalAggrInput.setOutput(new OutputInfo(finalOutputBase + "final_aggr",
-                false, storageInfo, true));
+        finalAggrInput.setOutput(new OutputInfo(intermediateBase + "final_aggr",
+                false, outputStorageInfo, true));
 
         AggregationOperator aggregationOperator = new AggregationOperator(aggregatedTable.getTableName(),
                 finalAggrInput, preAggrInputsBuilder.build(), scanInputsBuilder.build());

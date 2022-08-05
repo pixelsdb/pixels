@@ -10,20 +10,35 @@ function get_instance_id {
     echo $(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 }
 
+function get_private_ip {
+    echo $(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+}
+
 # start trino node
 # replace dummies in configurations
-# ~/trino-server-375/etc/config.properties replace coordinator-ip-dummy to <coord_private_ip>
+# ~/opt/trino-server-375/etc/config.properties replace coordinator-ip-dummy with the private ip of coordinator
 sed -i 's/coordinator-ip-dummy/172.31.33.182/g' /home/ubuntu/opt/trino-server/etc/config.properties
 
-# ~/trino-server-375/etc/node.properties replace instance-id-dummy to <instance id>
+# ~/opt/trino-server-375/etc/node.properties replace instance-id-dummy with the real instance id
 instance_id=$(get_instance_id)
 sed -i "s/instance-id-dummy/$instance_id/g" /home/ubuntu/opt/trino-server/etc/node.properties
+
+# ~/opt/trino-server-375/etc/catalog/pixels.properties replace private-ip-dummy with the real private ip
+private_ip=$(get_private_ip)
+sed -i "s/private-ip-dummy/$private_ip/g" /home/ubuntu/opt/trino-server/etc/catalog/pixels.properties
+
+# ~/opt/trino-server-375/etc/catalog/pixels.properties set output.scheme to minio
+private_ip=$(get_private_ip)
+sed -i "s/scheme_dummy/minio/g" /home/ubuntu/opt/trino-server/etc/catalog/pixels.properties
 
 echo "start trino"
 su ubuntu -c "/home/ubuntu/opt/trino-server/bin/launcher start"
 
 echo "start node_exporter"
 su ubuntu -c "screen -d -S node_exporter -m /home/ubuntu/opt/node_exporter/start-node-exporter.sh"
+
+echo "start minio_server"
+su ubuntu -c "screen -d -S minio_server -m /home/ubuntu/opt/minio-server/minio server --console-address :9090 /home/ubuntu/opt/minio-server/data/"
 
 # keep checking termination state to activate termination hook for gracefully shutting down trino
 nohup /root/termination-handler.sh &
