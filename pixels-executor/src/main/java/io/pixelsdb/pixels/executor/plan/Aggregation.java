@@ -60,10 +60,6 @@ public class Aggregation
      */
     private final FunctionType[] functionTypes;
     /**
-     * The information of the output endpoint of the aggregation result.
-     */
-    private final OutputEndPoint outputEndPoint;
-    /**
      * The origin table that the aggregation is performed.
      */
     private final Table originTable;
@@ -71,8 +67,7 @@ public class Aggregation
     public Aggregation(String[] groupKeyColumnAlias, String[] resultColumnAlias,
                        String[] resultColumnTypes, boolean[] groupKeyColumnProjection,
                        int[] groupKeyColumnIds, int[] aggregateColumnIds,
-                       FunctionType[] functionTypes, OutputEndPoint outputEndPoint,
-                       Table originTable)
+                       FunctionType[] functionTypes, Table originTable)
     {
         this.groupKeyColumnAlias = groupKeyColumnAlias;
         this.resultColumnAlias = resultColumnAlias;
@@ -81,7 +76,6 @@ public class Aggregation
         this.groupKeyColumnIds = groupKeyColumnIds;
         this.aggregateColumnIds = aggregateColumnIds;
         this.functionTypes = functionTypes;
-        this.outputEndPoint = outputEndPoint;
         this.originTable = originTable;
     }
 
@@ -118,11 +112,6 @@ public class Aggregation
     public FunctionType[] getFunctionTypes()
     {
         return functionTypes;
-    }
-
-    public OutputEndPoint getOutputEndPoint()
-    {
-        return outputEndPoint;
     }
 
     public Table getOriginTable()
