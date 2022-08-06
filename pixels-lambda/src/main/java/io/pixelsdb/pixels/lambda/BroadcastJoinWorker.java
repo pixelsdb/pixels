@@ -41,6 +41,7 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -305,36 +306,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<InputInfo> it = leftInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                if (checkExistence)
-                {
-                    try
-                    {
-                        if (exists(s3, input.getPath()))
-                        {
-                            it.remove();
-                        } else
-                        {
-                            TimeUnit.MILLISECONDS.sleep(10);
-                            continue;
-                        }
-                    } catch (Exception e)
-                    {
-                        throw new PixelsWorkerException(
-                                "failed to check the existence of the left table input file '" +
-                                input.getPath() + "'", e);
-                    }
-                }
-                else
-                {
-                    it.remove();
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
+                        it.remove();
                         continue;
                     }
                     if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum() ||
@@ -365,10 +343,25 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     readCostTimer.add(recordReader.getReadTimeNanos());
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (checkExistence && e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the left table input file '" +
                             input.getPath() + "' and build the hash table", e);
+                }
+            }
+            if (checkExistence && !leftInputs.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the input files");
                 }
             }
         }
@@ -406,36 +399,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                if (checkExistence)
-                {
-                    try
-                    {
-                        if (exists(s3, input.getPath()))
-                        {
-                            it.remove();
-                        } else
-                        {
-                            TimeUnit.MILLISECONDS.sleep(10);
-                            continue;
-                        }
-                    } catch (Exception e)
-                    {
-                        throw new PixelsWorkerException(
-                                "failed to check the existence of the right table input file '" +
-                                        input.getPath() + "'", e);
-                    }
-                }
-                else
-                {
-                    it.remove();
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
+                        it.remove();
                         continue;
                     }
                     if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
@@ -473,10 +443,25 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     readCostTimer.add(recordReader.getReadTimeNanos());
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (checkExistence && e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
                             input.getPath() + "' and do the join", e);
+                }
+            }
+            if (checkExistence && !rightInputs.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the input files");
                 }
             }
         }
@@ -520,36 +505,13 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             for (Iterator<InputInfo> it = rightInputs.iterator(); it.hasNext(); )
             {
                 InputInfo input = it.next();
-                if (checkExistence)
-                {
-                    try
-                    {
-                        if (exists(s3, input.getPath()))
-                        {
-                            it.remove();
-                        } else
-                        {
-                            TimeUnit.MILLISECONDS.sleep(10);
-                            continue;
-                        }
-                    } catch (Exception e)
-                    {
-                        throw new PixelsWorkerException(
-                                "failed to check the existence of the right table input file '" +
-                                input.getPath() + "'", e);
-                    }
-                }
-                else
-                {
-                    it.remove();
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(input.getPath(), s3))
                 {
                     readCostTimer.stop();
                     if (input.getRgStart() >= pixelsReader.getRowGroupNum())
                     {
+                        it.remove();
                         continue;
                     }
                     if (input.getRgStart() + input.getRgLength() >= pixelsReader.getRowGroupNum())
@@ -591,10 +553,25 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
                     readCostTimer.add(recordReader.getReadTimeNanos());
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (checkExistence && e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the right table input file '" +
                             input.getPath() + "' and do the join", e);
+                }
+            }
+            if (checkExistence && !rightInputs.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the input files");
                 }
             }
         }

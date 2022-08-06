@@ -41,6 +41,7 @@ import io.pixelsdb.pixels.executor.lambda.output.JoinOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -364,22 +365,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = leftParts.iterator(); it.hasNext(); )
             {
                 String leftPartitioned = it.next();
-                try
-                {
-                    if (exists(s3, leftPartitioned))
-                    {
-                        it.remove();
-                    } else
-                    {
-                        TimeUnit.MILLISECONDS.sleep(10);
-                        continue;
-                    }
-                } catch (Exception e)
-                {
-                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
-                            leftPartitioned + "' of the left table", e);
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(leftPartitioned, s3))
                 {
@@ -417,10 +402,25 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         readBytes += recordReader.getCompletedBytes();
                         numReadRequests += recordReader.getNumReadRequests();
                     }
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             leftPartitioned + "' and build the hash table", e);
+                }
+            }
+            if (!leftParts.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the partitioned files");
                 }
             }
         }
@@ -457,22 +457,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
                 String rightPartitioned = it.next();
-                try
-                {
-                    if (exists(s3, rightPartitioned))
-                    {
-                        it.remove();
-                    } else
-                    {
-                        TimeUnit.MILLISECONDS.sleep(10);
-                        continue;
-                    }
-                } catch (Exception e)
-                {
-                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
-                            rightPartitioned + "' of the right table", e);
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
@@ -518,10 +502,25 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         readBytes += recordReader.getCompletedBytes();
                         numReadRequests += recordReader.getNumReadRequests();
                     }
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
+                }
+            }
+            if (!rightParts.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the partitioned files");
                 }
             }
         }
@@ -563,22 +562,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
             {
                 String rightPartitioned = it.next();
-                try
-                {
-                    if (exists(s3, rightPartitioned))
-                    {
-                        it.remove();
-                    } else
-                    {
-                        TimeUnit.MILLISECONDS.sleep(10);
-                        continue;
-                    }
-                } catch (Exception e)
-                {
-                    throw new PixelsWorkerException("failed to check the existence of the partitioned file '" +
-                            rightPartitioned + "' of the right table", e);
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(rightPartitioned, s3))
                 {
@@ -627,11 +610,26 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         readCostTimer.add(recordReader.getReadTimeNanos());
                         readBytes += recordReader.getCompletedBytes();
                         numReadRequests += recordReader.getNumReadRequests();
+                        it.remove();
                     }
                 } catch (Exception e)
                 {
+                    if (e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to scan the partitioned file '" +
                             rightPartitioned + "' and do the join", e);
+                }
+            }
+            if (!rightParts.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the partitioned files");
                 }
             }
         }

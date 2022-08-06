@@ -39,6 +39,7 @@ import io.pixelsdb.pixels.executor.lambda.output.AggregationOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -223,22 +224,6 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             for (Iterator<String> it = inputFiles.iterator(); it.hasNext(); )
             {
                 String inputFile = it.next();
-                try
-                {
-                    if (exists(s3, inputFile))
-                    {
-                        it.remove();
-                    } else
-                    {
-                        TimeUnit.MILLISECONDS.sleep(10);
-                        continue;
-                    }
-                } catch (Exception e)
-                {
-                    throw new PixelsWorkerException(
-                            "failed to check the existence of the input partial aggregation file '" + inputFile + "'", e);
-                }
-
                 readCostTimer.start();
                 try (PixelsReader pixelsReader = getReader(inputFile, s3))
                 {
@@ -267,10 +252,25 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     readCostTimer.add(recordReader.getReadTimeNanos());
                     readBytes += recordReader.getCompletedBytes();
                     numReadRequests += recordReader.getNumReadRequests();
+                    it.remove();
                 } catch (Exception e)
                 {
+                    if (e instanceof IOException)
+                    {
+                        continue;
+                    }
                     throw new PixelsWorkerException("failed to read the input partial aggregation file '" +
                             inputFile + "' and perform aggregation", e);
+                }
+            }
+            if (!inputFiles.isEmpty())
+            {
+                try
+                {
+                    TimeUnit.MILLISECONDS.sleep(100);
+                } catch (InterruptedException e)
+                {
+                    throw new PixelsWorkerException("interrupted while waiting for the input files");
                 }
             }
         }
