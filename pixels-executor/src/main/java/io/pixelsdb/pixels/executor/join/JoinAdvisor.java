@@ -181,18 +181,21 @@ public class JoinAdvisor
         logger.debug("selectivity on table '" + rightTable.getTableName() + "': " + rightSelectivity);
         totalSize += getTableInputSize(leftTable) * leftSelectivity;
         totalSize += getTableInputSize(rightTable) * rightSelectivity;
+        double smallTableRowCount;
         double largeTableRowCount;
-        if (joinEndian == JoinEndian.LARGE_LEFT)
+        if (joinEndian == JoinEndian.SMALL_LEFT)
         {
-            largeTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
+            smallTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
+            largeTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
         }
         else
         {
-            largeTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
+            smallTableRowCount = getTableRowCount(rightTable) * rightSelectivity;
+            largeTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
         }
 
         int numFromSize = (int) Math.ceil(totalSize / partitionSizeBytes);
-        int numFromRows = (int) Math.ceil(largeTableRowCount / partitionSizeRows);
+        int numFromRows = (int) Math.ceil((smallTableRowCount + 0.1 * largeTableRowCount) / partitionSizeRows);
         // Limit the partition size by choosing the maximum number of partitions.
         // TODO: estimate the join selectivity more accurately using histogram.
         return Math.max(Math.max(numFromSize, numFromRows), 8);
