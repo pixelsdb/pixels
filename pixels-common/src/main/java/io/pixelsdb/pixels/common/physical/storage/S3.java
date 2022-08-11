@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
@@ -123,7 +124,7 @@ public final class S3 extends AbstractS3
                 .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
                         .maxConcurrency(maxConcurrency))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
-                        .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec)).retryPolicy(RetryMode.ADAPTIVE)
                         .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                         .build()).build();
 

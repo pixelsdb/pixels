@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical.io;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
@@ -27,7 +28,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
 
@@ -76,12 +81,33 @@ public class S3OutputStream extends OutputStream
     /**
      * Collection of the etags for the parts that have been uploaded
      */
-    private final List<CompletedPart> parts;
+    private final ConcurrentLinkedQueue<CompletableFuture<CompletedPart>> parts;
+
+    /**
+     * The number of parts to upload
+     */
+    private final AtomicInteger numParts = new AtomicInteger(0);
 
     /**
      * indicates whether the stream is still open / valid
      */
     private boolean open;
+
+    /**
+     * The number of UploadPart requests that are executing
+     */
+    private final AtomicInteger concurrency = new AtomicInteger(0);
+
+    private static final ExecutorService uploadService;
+
+    private static final int maxConcurrency;
+
+    static
+    {
+        maxConcurrency = Integer.parseInt(ConfigFactory.Instance().getProperty("s3.client.service.threads"));
+        uploadService = Executors.newFixedThreadPool(maxConcurrency);
+        Runtime.getRuntime().addShutdownHook(new Thread(uploadService::shutdownNow));
+    }
 
     /**
      * Creates a new S3 OutputStream
@@ -110,7 +136,7 @@ public class S3OutputStream extends OutputStream
         this.key = key;
         this.buffer = new byte[bufferSize];
         this.position = 0;
-        this.parts = new ArrayList<>();
+        this.parts = new ConcurrentLinkedQueue<>();
         this.open = true;
     }
 
@@ -180,22 +206,34 @@ public class S3OutputStream extends OutputStream
 
     protected void uploadPart() throws IOException
     {
-        UploadPartRequest request = UploadPartRequest.builder()
-                .bucket(this.bucket)
-                .key(this.key)
-                .uploadId(this.uploadId)
-                .partNumber(this.parts.size() + 1).build();
-        UploadPartResponse response = this.s3Client.uploadPart(request, RequestBody.fromByteBuffer(
-                ByteBuffer.wrap(buffer, 0, position)));
-        try
+        while (this.concurrency.get() >= maxConcurrency)
         {
-            String etag = response.eTag();
-            CompletedPart part = CompletedPart.builder().partNumber(this.parts.size() + 1).eTag(etag).build();
-            this.parts.add(part);
-        } catch (Exception e)
-        {
-            throw new IOException("Failed to upload part.", e);
+            try
+            {
+                TimeUnit.MILLISECONDS.sleep(10);
+            } catch (InterruptedException e)
+            {
+                // do nothing
+            }
         }
+        this.concurrency.incrementAndGet();
+        int partNumber = numParts.incrementAndGet();
+        RequestBody requestBody = RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position));
+        CompletableFuture<CompletedPart> future = new CompletableFuture<>();
+        uploadService.execute(() ->
+        {
+            UploadPartRequest uploadPartRequest = UploadPartRequest.builder()
+                    .bucket(this.bucket)
+                    .key(this.key)
+                    .uploadId(this.uploadId)
+                    .partNumber(partNumber).build();
+            UploadPartResponse uploadPartResponse = this.s3Client.uploadPart(uploadPartRequest, requestBody);
+            String etag = uploadPartResponse.eTag();
+            CompletedPart part = CompletedPart.builder().partNumber(partNumber).eTag(etag).build();
+            future.complete(part);
+            this.concurrency.decrementAndGet();
+        });
+        this.parts.add(future);
     }
 
     @Override
@@ -210,16 +248,23 @@ public class S3OutputStream extends OutputStream
                 {
                     uploadPart();
                 }
+                List<CompletedPart> partList = new ArrayList<>(this.parts.size());
+                for (CompletableFuture<CompletedPart> part : this.parts)
+                {
+                    try
+                    {
+                        partList.add(part.get());
+                    } catch (Exception e)
+                    {
+                        throw new IOException("failed to execute the UploadPart request", e);
+                    }
+                }
+                Collections.sort(partList, Comparator.comparingInt(CompletedPart::partNumber));
                 CompletedMultipartUpload completedMultipartUpload = CompletedMultipartUpload.builder()
-                        .parts(this.parts)
-                        .build();
+                        .parts(partList).build();
                 CompleteMultipartUploadRequest completeMultipartUploadRequest =
-                        CompleteMultipartUploadRequest.builder()
-                                .bucket(this.bucket)
-                                .key(this.key)
-                                .uploadId(uploadId)
-                                .multipartUpload(completedMultipartUpload)
-                                .build();
+                        CompleteMultipartUploadRequest.builder().bucket(this.bucket).key(this.key)
+                                .uploadId(uploadId).multipartUpload(completedMultipartUpload).build();
                 this.s3Client.completeMultipartUpload(completeMultipartUploadRequest);
             } else
             {

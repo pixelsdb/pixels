@@ -71,7 +71,7 @@ public class TestS3
     public void testS3OutputStream() throws IOException
     {
         S3Client s3 = S3Client.builder().build();
-        InputStream input = new FileInputStream("/home/hank/Downloads/pixels/20220306043329_1.pxl");
+        InputStream input = new FileInputStream("/home/hank/pixels.zip");
         OutputStream output = new S3OutputStream(s3, "pixels-dias-empty", "object-6");
         IOUtils.copyBytes(input, output, 1024*1024, true);
     }
