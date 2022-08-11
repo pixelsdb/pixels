@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical.scheduler;
 
-import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -45,14 +44,14 @@ public class RetryPolicy
     private volatile boolean stopped = false;
 
     private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
-    private static final int TRANSFER_RATE_BPMS = 10240; // 10KB/ms
+    private static final int TRANSFER_RATE_BPMS = 8192; // 8KB/ms, i.e., 8MB/s
 
     /**
      * Create a retry policy, which is running as a daemon thread, for retrying the timed out requests.
      * The policy will periodically check the request queue and find requests to retry.
      * @param intervalMs the interval in milliseconds of two subsequent request queue checks.
      */
-    protected RetryPolicy(int intervalMs)
+    public RetryPolicy(int intervalMs)
     {
         this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
         this.intervalMs = intervalMs;
@@ -89,18 +88,12 @@ public class RetryPolicy
                             it.remove();
                             continue;
                         }
-                        if (TransContext.Instance().isTerminated(request.getQueryId()))
-                        {
-                            /**
-                             * Issue #139:
-                             * The query has been terminated (e.g., canceled or completed),
-                             * give up retrying.
-                             */
-                            it.remove();
-                            continue;
-                        }
                         // retry request.
-                        request.execute();
+                        if (!request.execute())
+                        {
+                            // no need to continue retrying
+                            it.remove();
+                        }
                     }
                 }
                 try
@@ -142,7 +135,7 @@ public class RetryPolicy
         return FIRST_BYTE_LATENCY_MS + length / TRANSFER_RATE_BPMS;
     }
 
-    protected void monitor(ExecutableRequest request)
+    public void monitor(ExecutableRequest request)
     {
         this.requests.add(request);
     }
@@ -157,8 +150,10 @@ public class RetryPolicy
 
         int getRetried();
 
-        long getQueryId();
-
+        /**
+         * Try to execute this request.
+         * @return true if retry monitoring should continue, false if no need to retry
+         */
         boolean execute();
     }
 }

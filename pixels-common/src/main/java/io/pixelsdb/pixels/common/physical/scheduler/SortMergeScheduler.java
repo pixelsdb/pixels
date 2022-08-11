@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.physical.scheduler;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
+import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -326,16 +327,18 @@ public class SortMergeScheduler implements Scheduler
         }
 
         @Override
-        public long getQueryId()
-        {
-            return this.request.queryId;
-        }
-
-        @Override
         public boolean execute()
         {
+            if (TransContext.Instance().isTerminated(request.queryId))
+            {
+                /**
+                 * Issue #139:
+                 * If the query has been terminated (e.g., canceled or completed), give up retrying.
+                 */
+                return false;
+            }
             String path = this.reader.getPath();
-            logger.debug("try to execute request: path='" + path + "', start=" +
+            logger.debug("retry read request: path='" + path + "', start=" +
                     this.request.start + ", length=" + this.request.getLength());
             try
             {
@@ -360,7 +363,7 @@ public class SortMergeScheduler implements Scheduler
             {
                 this.request.retried++;
             }
-            return false;
+            return true;
         }
     }
 }
