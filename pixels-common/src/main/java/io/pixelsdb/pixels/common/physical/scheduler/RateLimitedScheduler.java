@@ -159,7 +159,7 @@ public class RateLimitedScheduler extends SortMergeScheduler
                 });
                 if (enableRetry)
                 {
-                    this.retryPolicy.monitor(merged, reader);
+                    this.retryPolicy.monitor(new MergedExecutableRequest(merged, reader));
                 }
             }
         }
