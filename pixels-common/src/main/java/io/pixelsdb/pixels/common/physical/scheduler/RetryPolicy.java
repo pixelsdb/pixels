@@ -44,7 +44,7 @@ public class RetryPolicy
     private volatile boolean stopped = false;
 
     private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
-    private static final int TRANSFER_RATE_BPMS = 8192; // 8KB/ms, i.e., 8MB/s
+    private static final int TRANSFER_RATE_BPMS = 4096; // 4KB/ms, i.e., 4MB/s
 
     /**
      * Create a retry policy, which is running as a daemon thread, for retrying the timed out requests.
@@ -102,7 +102,7 @@ public class RetryPolicy
                     Thread.sleep(this.intervalMs);
                 } catch (InterruptedException e)
                 {
-                    logger.error("Retry policy is interrupted during sleeping", e);
+                    logger.error("Retry policy is interrupted, exiting", e);
                     break;
                 }
             }

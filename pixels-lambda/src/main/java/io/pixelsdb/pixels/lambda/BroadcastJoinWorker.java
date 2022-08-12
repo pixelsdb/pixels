@@ -81,7 +81,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-
             BroadcastTableInfo leftTable = event.getSmallTable();
             List<InputSplit> leftInputs = leftTable.getInputSplits();
             requireNonNull(leftInputs, "leftInputs is null");

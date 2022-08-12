@@ -223,7 +223,7 @@ public class S3OutputStream extends OutputStream
         this.position = 0;
     }
 
-    protected void uploadPart() throws IOException
+    protected void uploadPart()
     {
         while (this.concurrency.get() >= maxConcurrency)
         {
@@ -396,7 +396,11 @@ public class S3OutputStream extends OutputStream
         @Override
         public boolean execute()
         {
-            logger.debug("retry UploadPart request: upload id='" + this.request.uploadId() + "', bucket=" +
+            if (partCompleteFuture.isDone())
+            {
+                return false;
+            }
+            logger.debug("retry UploadPart request: part number=" + this.partNumber + ", bucket=" +
                     this.request.bucket() + ", key=" + this.request.key());
             try
             {
