@@ -85,7 +85,6 @@ public class BroadcastChainJoinWorker implements RequestHandler<BroadcastChainJo
             // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-
             List<BroadcastTableInfo> chainTables = event.getChainTables();
             List<ChainJoinInfo> chainJoinInfos = event.getChainJoinInfos();
             requireNonNull(chainTables, "chainTables is null");

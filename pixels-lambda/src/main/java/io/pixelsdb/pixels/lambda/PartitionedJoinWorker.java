@@ -81,7 +81,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             // String requestId = context.getAwsRequestId();
 
             long queryId = event.getQueryId();
-
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
             requireNonNull(leftPartitioned, "leftPartitioned is null");
             checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");

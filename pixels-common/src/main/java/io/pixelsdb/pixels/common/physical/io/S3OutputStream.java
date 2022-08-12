@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.common.physical.io;
 
+import io.pixelsdb.pixels.common.physical.scheduler.RetryPolicy;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
@@ -48,6 +51,8 @@ import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
  */
 public class S3OutputStream extends OutputStream
 {
+    private static final Logger logger = LogManager.getLogger(S3OutputStream.class);
+
     /**
      * The bucket-name on Amazon S3
      */
@@ -102,11 +107,25 @@ public class S3OutputStream extends OutputStream
 
     private static final int maxConcurrency;
 
+    private static final boolean enableRetry;
+    private static final RetryPolicy retryPolicy;
+
     static
     {
         maxConcurrency = Integer.parseInt(ConfigFactory.Instance().getProperty("s3.client.service.threads"));
         uploadService = Executors.newFixedThreadPool(maxConcurrency);
         Runtime.getRuntime().addShutdownHook(new Thread(uploadService::shutdownNow));
+
+        enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
+        if (enableRetry)
+        {
+            int interval = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.retry.interval.ms"));
+            retryPolicy = new RetryPolicy(interval);
+        }
+        else
+        {
+            retryPolicy = null;
+        }
     }
 
     /**
@@ -204,7 +223,7 @@ public class S3OutputStream extends OutputStream
         this.position = 0;
     }
 
-    protected void uploadPart() throws IOException
+    protected void uploadPart()
     {
         while (this.concurrency.get() >= maxConcurrency)
         {
@@ -219,6 +238,7 @@ public class S3OutputStream extends OutputStream
         this.concurrency.incrementAndGet();
         int partNumber = numParts.incrementAndGet();
         RequestBody requestBody = RequestBody.fromByteBuffer(ByteBuffer.wrap(buffer, 0, position));
+        int length = position;
         CompletableFuture<CompletedPart> future = new CompletableFuture<>();
         uploadService.execute(() ->
         {
@@ -227,7 +247,18 @@ public class S3OutputStream extends OutputStream
                     .key(this.key)
                     .uploadId(this.uploadId)
                     .partNumber(partNumber).build();
+            UploadExecutableRequest retryRequest = null;
+            if (enableRetry)
+            {
+                retryRequest = new UploadExecutableRequest(
+                        s3Client, uploadPartRequest, requestBody, length, partNumber, future, System.currentTimeMillis());
+                retryPolicy.monitor(retryRequest);
+            }
             UploadPartResponse uploadPartResponse = this.s3Client.uploadPart(uploadPartRequest, requestBody);
+            if (enableRetry)
+            {
+                retryRequest.complete();
+            }
             String etag = uploadPartResponse.eTag();
             CompletedPart part = CompletedPart.builder().partNumber(partNumber).eTag(etag).build();
             future.complete(part);
@@ -305,6 +336,88 @@ public class S3OutputStream extends OutputStream
         if (!this.open)
         {
             throw new IllegalStateException("Closed");
+        }
+    }
+
+    public static class UploadExecutableRequest implements RetryPolicy.ExecutableRequest
+    {
+        private final S3Client s3Client;
+        private final UploadPartRequest request;
+        private final RequestBody requestBody;
+        private final int contentLength;
+        private final int partNumber;
+        private final CompletableFuture<CompletedPart> partCompleteFuture;
+        private final long startTimeMs;
+        private volatile long completeTimeMs = -1;
+        private int retried = 0;
+
+        public UploadExecutableRequest(
+                S3Client s3Client, UploadPartRequest request, RequestBody requestBody, int contentLength,
+                int partNumber, CompletableFuture<CompletedPart> partCompleteFuture, long startTimeMs)
+        {
+            this.s3Client = s3Client;
+            this.request = request;
+            this.requestBody = requestBody;
+            this.contentLength = contentLength;
+            this.partNumber = partNumber;
+            this.partCompleteFuture = partCompleteFuture;
+            this.startTimeMs = startTimeMs;
+        }
+
+        @Override
+        public long getStartTimeMs()
+        {
+            return this.startTimeMs;
+        }
+
+        @Override
+        public long getCompleteTimeMs()
+        {
+            return this.completeTimeMs;
+        }
+
+        @Override
+        public int getLength()
+        {
+            return this.contentLength;
+        }
+
+        @Override
+        public int getRetried()
+        {
+            return this.retried;
+        }
+
+        public void complete()
+        {
+            this.completeTimeMs = System.currentTimeMillis();
+        }
+
+        @Override
+        public boolean execute()
+        {
+            if (partCompleteFuture.isDone())
+            {
+                return false;
+            }
+            logger.debug("retry UploadPart request: part number=" + this.partNumber + ", bucket=" +
+                    this.request.bucket() + ", key=" + this.request.key());
+            try
+            {
+                UploadPartResponse uploadPartResponse = this.s3Client.uploadPart(request, requestBody);
+                String etag = uploadPartResponse.eTag();
+                CompletedPart part = CompletedPart.builder().partNumber(partNumber).eTag(etag).build();
+                this.completeTimeMs = System.currentTimeMillis();
+                partCompleteFuture.complete(part);
+            } catch (Exception e)
+            {
+                logger.error("Failed to execute UploadPart request");
+            }
+            finally
+            {
+                this.retried++;
+            }
+            return true;
         }
     }
 }

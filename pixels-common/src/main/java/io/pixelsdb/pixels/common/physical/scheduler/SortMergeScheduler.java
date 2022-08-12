@@ -30,9 +30,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * SortMerge scheduler firstly sorts the requests in the batch by the start offset,
@@ -42,7 +41,7 @@ import java.util.concurrent.*;
  */
 public class SortMergeScheduler implements Scheduler
 {
-    private static Logger logger = LogManager.getLogger(SortMergeScheduler.class);
+    private static final Logger logger = LogManager.getLogger(SortMergeScheduler.class);
     private static SortMergeScheduler instance;
     private static int MaxGap;
 
@@ -148,7 +147,7 @@ public class SortMergeScheduler implements Scheduler
                 });
                 if (enableRetry)
                 {
-                    this.retryPolicy.monitor(merged, reader);
+                    this.retryPolicy.monitor(new MergedExecutableRequest(merged, reader));
                 }
             }
         }
@@ -292,151 +291,79 @@ public class SortMergeScheduler implements Scheduler
      * Combination of MergedRequest and PhysicalReader,
      * it is used by the RetryPolicy.
      */
-    protected static class MergedRequestReader
+    protected static class MergedExecutableRequest implements RetryPolicy.ExecutableRequest
     {
-        private MergedRequest request;
-        private PhysicalReader reader;
+        private final MergedRequest request;
+        private final PhysicalReader reader;
 
-        protected MergedRequestReader(MergedRequest request, PhysicalReader reader)
+        protected MergedExecutableRequest(MergedRequest request, PhysicalReader reader)
         {
             this.request = request;
             this.reader = reader;
         }
-    }
 
-    /**
-     * The retry policy that retries timeout read requests for a given number of times at most.
-     * The timeout is determined by a cost model.
-     * <p>
-     *     Issue #142:
-     *     We future confirm that retry helps keep the large query performance stable.
-     * </p>
-     */
-    protected static class RetryPolicy
-    {
-        private final int maxRetryNum;
-        private final int intervalMs;
-        private final ConcurrentLinkedQueue<MergedRequestReader> requestReaders;
-        ThreadGroup monitorThreadGroup;
-        private final ExecutorService monitorService;
-
-        private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
-        private static final int TRANSFER_RATE_BPMS = 10240; // 10KB/ms
-
-        /**
-         * Create a retry policy, which is running as a daemon thread, for retrying the timed out requests.
-         * The policy will periodically check the request queue and find requests to retry.
-         * @param intervalMs the interval in milliseconds of two subsequent request queue checks.
-         */
-        protected RetryPolicy(int intervalMs)
+        @Override
+        public long getStartTimeMs()
         {
-            this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
-            this.intervalMs = intervalMs;
-            this.requestReaders = new ConcurrentLinkedQueue<>();
+            return this.request.startTimeMs;
+        }
 
-            // Issue #133: set the monitor thread as daemon thread with max priority.
-            this.monitorThreadGroup = new ThreadGroup("pixels.retry.monitor");
-            this.monitorThreadGroup.setMaxPriority(Thread.MAX_PRIORITY);
-            this.monitorThreadGroup.setDaemon(true);
-            this.monitorService = Executors.newSingleThreadExecutor(runnable -> {
-                Thread thread = new Thread(monitorThreadGroup, runnable);
-                thread.setDaemon(true);
-                thread.setPriority(Thread.MAX_PRIORITY);
-                return thread;
-            });
+        @Override
+        public long getCompleteTimeMs()
+        {
+            return this.request.completeTimeMs;
+        }
 
-            this.monitorService.execute(() ->
+        @Override
+        public int getLength()
+        {
+            return this.request.length;
+        }
+
+        @Override
+        public int getRetried()
+        {
+            return this.request.retried;
+        }
+
+        @Override
+        public boolean execute()
+        {
+            if (TransContext.Instance().isTerminated(request.queryId))
             {
-                while (true)
+                /**
+                 * Issue #139:
+                 * If the query has been terminated (e.g., canceled or completed), give up retrying.
+                 */
+                return false;
+            }
+            String path = this.reader.getPath();
+            logger.debug("retry read request: path='" + path + "', start=" +
+                    this.request.start + ", length=" + this.request.getLength());
+            try
+            {
+                this.request.startTimeMs = System.currentTimeMillis();
+                this.reader.readAsync(this.request.start, request.getLength()).thenAccept(resp ->
                 {
-                    long currentTimeMs = System.currentTimeMillis();
-                    for (Iterator<MergedRequestReader> it = requestReaders.iterator(); it.hasNext(); )
+                    if (resp != null)
                     {
-                        MergedRequestReader requestReader = it.next();
-                        MergedRequest request = requestReader.request;
-                        if (request.completeTimeMs > 0)
-                        {
-                            // request has completed.
-                            it.remove();
-                        } else if (currentTimeMs - request.startTimeMs > timeoutMs(request.getLength()))
-                        {
-                            if (request.retried >= maxRetryNum)
-                            {
-                                // give up retrying.
-                                it.remove();
-                                continue;
-                            }
-                            if (TransContext.Instance().isTerminated(request.queryId))
-                            {
-                                /**
-                                 * Issue #139:
-                                 * The query has been terminated (e.g., canceled or completed),
-                                 * give up retrying.
-                                 */
-                                it.remove();
-                                continue;
-                            }
-                            // retry request.
-                            String path = requestReader.reader.getPath();
-                            logger.debug("Retry request: path='" + path + "', start=" +
-                                    request.start + ", length=" + request.getLength());
-                            try
-                            {
-                                request.startTimeMs = System.currentTimeMillis();
-                                requestReader.reader.readAsync(request.start, request.getLength()).thenAccept(resp ->
-                                {
-                                    if (resp != null)
-                                    {
-                                        request.completeTimeMs = System.currentTimeMillis();
-                                        request.complete(resp);
-                                    }
-                                    else
-                                    {
-                                        logger.error("Asynchronous read from path '" +
-                                                path + "' got null response.");
-                                    }
-                                });
-                            } catch (IOException e)
-                            {
-                                logger.error("Failed to read asynchronously from path '" +
-                                        path + "'.");
-                            }
-                            finally
-                            {
-                                /**
-                                 * The retried request does not be removed here.
-                                 * It will be remove when:
-                                 * 1. the retry complete on time, or
-                                 * 2. the max number of retries has been reached.
-                                 */
-                                request.retried++;
-                            }
-                        }
+                        this.request.completeTimeMs = System.currentTimeMillis();
+                        this.request.complete(resp);
                     }
-                    try
+                    else
                     {
-                        // sleep for some time, to release the cpu.
-                        Thread.sleep(this.intervalMs);
-                    } catch (InterruptedException e)
-                    {
-                        logger.error("Retry policy is interrupted during sleep.", e);
+                        logger.error("Asynchronous read from path '" + path + "' got null response.");
                     }
-                }
-            });
-
-            this.monitorService.shutdown();
-
-            Runtime.getRuntime().addShutdownHook(new Thread(monitorService::shutdownNow));
-        }
-
-        private int timeoutMs(int length)
-        {
-            return FIRST_BYTE_LATENCY_MS + length/TRANSFER_RATE_BPMS;
-        }
-
-        protected void monitor(MergedRequest request, PhysicalReader reader)
-        {
-            this.requestReaders.add(new MergedRequestReader(request, reader));
+                });
+            } catch (IOException e)
+            {
+                logger.error("Failed to read asynchronously from path '" + path + "'.");
+            }
+            finally
+            {
+                this.request.retried++;
+            }
+            return true;
         }
     }
 }
