@@ -317,24 +317,24 @@ public class PartitionedJoinOperator extends SingleStageJoinOperator
         }
 
         @Override
-        public long getCumulativeDurationMs()
+        public long getTotalGBMs()
         {
-            long duration = super.getCumulativeDurationMs();
+            long totalGBMs = super.getTotalGBMs();
             if (this.smallPartitionOutputs != null)
             {
                 for (Output output : smallPartitionOutputs)
                 {
-                    duration += output.getDurationMs();
+                    totalGBMs += output.getGBMs();
                 }
             }
             if (this.largePartitionOutputs != null)
             {
                 for (Output output : largePartitionOutputs)
                 {
-                    duration += output.getDurationMs();
+                    totalGBMs += output.getGBMs();
                 }
             }
-            return duration;
+            return totalGBMs;
         }
 
         @Override

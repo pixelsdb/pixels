@@ -206,27 +206,25 @@ public class SingleStageJoinOperator extends JoinOperator
 
         public SingleStageJoinOutputCollection() { }
 
-        public SingleStageJoinOutputCollection(JoinAlgorithm joinAlgo,
-                                               OutputCollection smallChild,
-                                               OutputCollection largeChild,
-                                               Output[] joinOutputs)
+        public SingleStageJoinOutputCollection(
+                JoinAlgorithm joinAlgo, OutputCollection smallChild, OutputCollection largeChild, Output[] joinOutputs)
         {
             super(joinAlgo, smallChild, largeChild);
             this.joinOutputs = joinOutputs;
         }
 
         @Override
-        public long getCumulativeDurationMs()
+        public long getTotalGBMs()
         {
-            long duration = super.getCumulativeDurationMs();
+            long totalGBMs = super.getTotalGBMs();
             if (this.joinOutputs != null)
             {
                 for (Output output : joinOutputs)
                 {
-                    duration += output.getDurationMs();
+                    totalGBMs += output.getGBMs();
                 }
             }
-            return duration;
+            return totalGBMs;
         }
 
         @Override

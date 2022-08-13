@@ -286,28 +286,28 @@ public class AggregationOperator extends Operator
         }
 
         @Override
-        public long getCumulativeDurationMs()
+        public long getTotalGBMs()
         {
-            long duration = 0;
+            long totalGBMs = 0;
             if (this.scanOutputs != null)
             {
                 for (Output output : scanOutputs)
                 {
-                    duration += output.getDurationMs();
+                    totalGBMs += output.getGBMs();
                 }
             }
             if (this.preAggrOutputs != null)
             {
                 for (Output output : preAggrOutputs)
                 {
-                    duration += output.getDurationMs();
+                    totalGBMs += output.getGBMs();
                 }
             }
             if (this.finalAggrOutput != null)
             {
-                duration += finalAggrOutput.getDurationMs();
+                totalGBMs += finalAggrOutput.getGBMs();
             }
-            return duration;
+            return totalGBMs;
         }
 
         @Override

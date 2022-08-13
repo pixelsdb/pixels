@@ -118,18 +118,18 @@ public abstract class JoinOperator extends Operator
         }
 
         @Override
-        public long getCumulativeDurationMs()
+        public long getTotalGBMs()
         {
-            long duration = 0;
+            long totalGBMs= 0;
             if (this.smallChild != null)
             {
-                duration += smallChild.getCumulativeDurationMs();
+                totalGBMs += smallChild.getTotalGBMs();
             }
             if (this.largeChild != null)
             {
-                duration += largeChild.getCumulativeDurationMs();
+                totalGBMs += largeChild.getTotalGBMs();
             }
-            return duration;
+            return totalGBMs;
         }
 
         @Override
