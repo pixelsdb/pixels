@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.core.utils;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.junit.Test;
 
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -32,16 +34,27 @@ import java.util.UUID;
  */
 public class TestStringRedBlackTree
 {
+    private static long getGCTime()
+    {
+        long gc = 0;
+        for (GarbageCollectorMXBean bean : ManagementFactory.getGarbageCollectorMXBeans())
+        {
+            gc += bean.getCollectionTime();
+        }
+        return gc;
+    }
+
     @Test
     public void test()
     {
         StringRedBlackTree dict = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 1000_000; ++i)
+        for (int i = 0; i < 10_000_000; ++i)
         {
             dict.add(UUID.randomUUID().toString().getBytes(), 0, 36);
         }
         System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println(getGCTime());
     }
 
     @Test
@@ -49,22 +62,24 @@ public class TestStringRedBlackTree
     {
         TreeMap<ByteBuffer, Integer> dict = new TreeMap<>();
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 1000_000; ++i)
+        for (int i = 0; i < 10_000_000; ++i)
         {
             dict.put(ByteBuffer.wrap(UUID.randomUUID().toString().getBytes()), i);
         }
         System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println(getGCTime());
     }
 
     @Test
     public void testDictionary()
     {
-        Dictionary dict = new Dictionary();
+        Dictionary dict = new Dictionary(Constants.INIT_DICT_SIZE);
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 1000_000; ++i)
+        for (int i = 0; i < 10_000_000; ++i)
         {
             dict.add(UUID.randomUUID().toString().getBytes());
         }
         System.out.println(System.currentTimeMillis() - startTime);
+        System.out.println(getGCTime());
     }
 }

@@ -96,7 +96,7 @@ public class ByteColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 524287 * hashCode[i] + this.vector[i];
+            hashCode[i] = 31 * hashCode[i] + this.vector[i];
         }
         return hashCode;
     }

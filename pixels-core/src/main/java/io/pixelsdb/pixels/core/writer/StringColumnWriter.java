@@ -55,7 +55,7 @@ public class StringColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
     private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
-    private final Dictionary dictionary = new Dictionary();
+    private final Dictionary dictionary = new Dictionary(Constants.INIT_DICT_SIZE);
     private boolean futureUseDictionaryEncoding;
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;

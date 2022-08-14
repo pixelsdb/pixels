@@ -106,7 +106,7 @@ public class DateColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 524287 * hashCode[i] + (this.dates[i] ^ (this.dates[i] >>> 16));
+            hashCode[i] = 31 * hashCode[i] + (this.dates[i] ^ (this.dates[i] >>> 16));
         }
         return hashCode;
     }

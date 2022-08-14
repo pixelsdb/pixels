@@ -232,9 +232,9 @@ public class BinaryColumnVector extends ColumnVector
             int p = this.start[i];
             for (int j = this.start[i] + this.lens[i] - 1; j >= p; j--)
             {
-                h = 524287 * h + (int)this.vector[i][j];
+                h = 31 * h + (int)this.vector[i][j];
             }
-            hashCode[i] = 524287 * hashCode[i] + h;
+            hashCode[i] = 31 * hashCode[i] + h;
         }
         return hashCode;
     }

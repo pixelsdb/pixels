@@ -29,8 +29,23 @@ import java.util.*;
  */
 public class Dictionary
 {
-    private final SortedMap<KeyBuffer, Integer> dict = new TreeMap<>();
+    private final int NUM_DICTIONARIES = 41;
+    private final List<Map<KeyBuffer, Integer>> dictionaries;
     private int originalPosition = 0;
+
+    public Dictionary(int initialCapacity)
+    {
+        int capacity = initialCapacity / NUM_DICTIONARIES;
+        if (initialCapacity % NUM_DICTIONARIES > 0)
+        {
+            capacity++;
+        }
+        this.dictionaries = new ArrayList<>(NUM_DICTIONARIES);
+        for (int i = 0; i < NUM_DICTIONARIES; ++i)
+        {
+            this.dictionaries.add(new HashMap<>(capacity));
+        }
+    }
 
     public int add(byte[] keyContent)
     {
@@ -40,29 +55,36 @@ public class Dictionary
     public int add(byte[] keyContent, int offset, int length)
     {
         KeyBuffer keyBuffer = KeyBuffer.wrap(keyContent, offset, length);
-        Integer position = this.dict.get(keyBuffer);
+        int dictId = keyBuffer.hashCode() % NUM_DICTIONARIES;
+        Map<KeyBuffer, Integer> dict = this.dictionaries.get(dictId < 0 ? -dictId : dictId);
+        Integer position = dict.get(keyBuffer);
         if (position != null)
         {
             return position;
         }
-        this.dict.put(keyBuffer, this.originalPosition);
+        dict.put(keyBuffer, this.originalPosition);
         return this.originalPosition++;
     }
 
     public int size()
     {
-        return this.dict.size();
+        return originalPosition;
     }
 
     public void clear()
     {
-        this.dict.clear();
+        for (Map<KeyBuffer, Integer> dict : this.dictionaries)
+        {
+            dict.clear();
+        }
+        this.dictionaries.clear();
     }
 
     public void visit(Visitor visitor) throws IOException
     {
         VisitorContextImpl visitorContext = new VisitorContextImpl();
-        for (Map.Entry<KeyBuffer, Integer> entry : this.dict.entrySet())
+        for (Map<KeyBuffer, Integer> dict : this.dictionaries)
+        for (Map.Entry<KeyBuffer, Integer> entry : dict.entrySet())
         {
             KeyBuffer key = entry.getKey();
             visitorContext.set(key.keyContent, key.offset, key.length, entry.getValue());
@@ -102,16 +124,28 @@ public class Dictionary
         @Override
         public boolean equals(Object o)
         {
-            KeyBuffer keyBuffer = (KeyBuffer) o;
-            return offset == keyBuffer.offset && length == keyBuffer.length &&
-                    Arrays.equals(keyContent, keyBuffer.keyContent);
+            KeyBuffer that = (KeyBuffer) o;
+            if (this.length != that.length)
+            {
+                return false;
+            }
+            int n = this.offset + this.length;
+            for (int i = this.offset, j = that.offset; i < n; ++i, ++j)
+            {
+                if (this.keyContent[i] != that.keyContent[j])
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
         public int hashCode()
         {
-            int result = Objects.hash(offset, length);
-            result = 31 * result + Arrays.hashCode(keyContent);
+            int result = 31 + Integer.hashCode(this.length), n = this.offset + this.length;
+            for (int i = this.offset; i < n; ++i)
+                result = 31 * result + this.keyContent[i];
             return result;
         }
 

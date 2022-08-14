@@ -101,7 +101,7 @@ public class TimeColumnVector extends ColumnVector
             {
                 continue;
             }
-            hashCode[i] = 524287 * hashCode[i] + (this.times[i] ^ (this.times[i] >>> 16));
+            hashCode[i] = 31 * hashCode[i] + (this.times[i] ^ (this.times[i] >>> 16));
         }
         return hashCode;
     }

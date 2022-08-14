@@ -289,7 +289,7 @@ public class LongDecimalColumnVector extends ColumnVector
             hash = 0x9E3779B185EBCA87L;
             hash = (hash ^ this.vector[i*2]) * 0xC2B2AE3D27D4EB4FL;
             hash = (hash ^ this.vector[i*2+1]) * 0xC2B2AE3D27D4EB4FL;
-            hashCode[i] = 524287 * hashCode[i] + Long.hashCode(hash);
+            hashCode[i] = 31 * hashCode[i] + Long.hashCode(hash);
         }
         return hashCode;
     }
