@@ -23,8 +23,8 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
+import io.pixelsdb.pixels.core.utils.Dictionary;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
-import io.pixelsdb.pixels.core.utils.StringRedBlackTree;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
@@ -55,7 +55,7 @@ public class StringColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
     private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
-    private final StringRedBlackTree dictionary = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
+    private final Dictionary dictionary = new Dictionary();
     private boolean futureUseDictionaryEncoding;
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
@@ -248,13 +248,13 @@ public class StringColumnWriter extends BaseColumnWriter
         originsFieldOffset = outputStream.size();
 
         // recursively visit the red black tree, and fill origins field, get starts array and orders array
-        dictionary.visit(new StringRedBlackTree.Visitor()
+        dictionary.visit(new Dictionary.Visitor()
         {
             private int initStart = 0;
             private int currentId = 0;
 
             @Override
-            public void visit(StringRedBlackTree.VisitorContext context)
+            public void visit(Dictionary.VisitorContext context)
                     throws IOException
             {
                 context.writeBytes(outputStream);

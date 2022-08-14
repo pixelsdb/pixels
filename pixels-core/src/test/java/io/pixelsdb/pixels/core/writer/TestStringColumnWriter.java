@@ -45,7 +45,7 @@ public class TestStringColumnWriter
         StringColumnWriter stringColumnWriter = new StringColumnWriter(
                 TypeDescription.createString(), 10000, true);
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 10000; ++i)
+        for (int i = 0; i < 1000; ++i)
         {
             stringColumnWriter.write(stringColumnVector, stringColumnVector.getLength());
         }

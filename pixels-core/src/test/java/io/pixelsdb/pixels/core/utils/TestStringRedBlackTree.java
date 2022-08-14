@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.utils;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -46,12 +47,23 @@ public class TestStringRedBlackTree
     @Test
     public void testTreeMap()
     {
-        System.out.println(UUID.randomUUID().toString());
-        TreeMap<String, Integer> dict = new TreeMap<>();
+        TreeMap<ByteBuffer, Integer> dict = new TreeMap<>();
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 1000_000; ++i)
         {
-            dict.put(UUID.randomUUID().toString(), i);
+            dict.put(ByteBuffer.wrap(UUID.randomUUID().toString().getBytes()), i);
+        }
+        System.out.println(System.currentTimeMillis() - startTime);
+    }
+
+    @Test
+    public void testDictionary()
+    {
+        Dictionary dict = new Dictionary();
+        long startTime = System.currentTimeMillis();
+        for (int i = 0; i < 1000_000; ++i)
+        {
+            dict.add(UUID.randomUUID().toString().getBytes());
         }
         System.out.println(System.currentTimeMillis() - startTime);
     }
