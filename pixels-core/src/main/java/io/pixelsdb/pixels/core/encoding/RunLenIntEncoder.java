@@ -36,8 +36,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author guodong
  * @author hank
  */
-public class RunLenIntEncoder
-        extends Encoder
+public class RunLenIntEncoder extends Encoder
 {
     private EncodingType encodingType;
     private int numLiterals;

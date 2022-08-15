@@ -27,7 +27,7 @@ import java.util.*;
  */
 public class HashTable implements Iterable<Tuple>
 {
-    private final int NUM_HASH_TABLES = 31;
+    private final int NUM_HASH_TABLES = 41;
     private final List<HashMap<Tuple, Tuple>> hashTables;
     private int size = 0;
 

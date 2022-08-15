@@ -30,6 +30,7 @@ public class Output
     private String errorMessage;
     private long startTimeMs;
     private int durationMs;
+    private int memoryMB;
     private int cumulativeInputCostMs;
     private int cumulativeComputeCostMs;
     private int cumulativeOutputCostMs;
@@ -86,6 +87,24 @@ public class Output
     public void setDurationMs(int durationMs)
     {
         this.durationMs = durationMs;
+    }
+
+    public int getMemoryMB()
+    {
+        return memoryMB;
+    }
+
+    public void setMemoryMB(int memoryMB)
+    {
+        this.memoryMB = memoryMB;
+    }
+
+    /**
+     * @return the GB-ms billed for this function request
+     */
+    public long getGBMs()
+    {
+        return Math.round(this.durationMs * (this.memoryMB / 1024.0d));
     }
 
     public int getCumulativeInputCostMs()

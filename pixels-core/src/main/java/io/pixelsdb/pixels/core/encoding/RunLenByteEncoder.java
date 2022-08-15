@@ -29,8 +29,7 @@ import java.io.IOException;
  *
  * @author guodong
  */
-public class RunLenByteEncoder
-        extends Encoder
+public class RunLenByteEncoder extends Encoder
 {
     private static final int MIN_REPEAT_SIZE = 3;
     private static final int MAX_LITERAL_SIZE = 128;

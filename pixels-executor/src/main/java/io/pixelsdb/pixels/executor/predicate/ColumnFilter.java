@@ -684,18 +684,14 @@ public class ColumnFilter<T extends Comparable<T>>
     private int byteArrayCmp(byte[] b1, int start1, int len1, byte[] b2, int start2, int len2)
     {
         int lim = len1 < len2 ? len1 : len2;
-        byte c1, c2; // We only support ASCII characters, would not overflow.
-        int k = start1, j = start2;
-        while (k < lim)
+        int c; // We only support ASCII characters, would not overflow.
+        for (int i = start1, j = start2; i < lim; ++i, ++j)
         {
-            c1 = b1[k];
-            c2 = b2[j];
-            if (c1 != c2)
+            c = b1[i] - b2[j];
+            if (c != 0)
             {
-                return c1 - c2;
+                return c;
             }
-            k++;
-            j++;
         }
         return len1 - len2;
     }

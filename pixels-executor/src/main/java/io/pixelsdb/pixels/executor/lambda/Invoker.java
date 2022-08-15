@@ -22,7 +22,11 @@ package io.pixelsdb.pixels.executor.lambda;
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.executor.lambda.input.Input;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.lambda.model.GetFunctionConfigurationRequest;
+import software.amazon.awssdk.services.lambda.model.GetFunctionConfigurationResponse;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
@@ -35,11 +39,18 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class Invoker
 {
+    private static final Logger logger = LogManager.getLogger(Invoker.class);
+
     private final String functionName;
+    private final int memoryMB;
 
     protected Invoker(String functionName)
     {
         this.functionName = functionName;
+        GetFunctionConfigurationResponse response = Lambda.Instance().getAsyncClient().getFunctionConfiguration(
+                GetFunctionConfigurationRequest.builder().functionName(functionName).build()).join();
+        this.memoryMB = response.memorySize();
+        logger.info("function '" + this.functionName + "' memory size: " + this.memoryMB);
     }
 
     protected abstract Output parseOutput(String outputJson);
@@ -69,6 +80,7 @@ public abstract class Invoker
                         throw new RuntimeException("failed to parse response payload, length=" +
                                 response.payload().asByteArray().length);
                     }
+                    output.setMemoryMB(this.memoryMB);
                     return output;
                 }
                 else
@@ -79,5 +91,15 @@ public abstract class Invoker
             }
             throw new RuntimeException("failed to get response", err);
         });
+    }
+
+    public String getFunctionName()
+    {
+        return functionName;
+    }
+
+    public int getMemoryMB()
+    {
+        return memoryMB;
     }
 }

@@ -35,8 +35,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  * @author guodong
  * @author hank
  */
-public class RunLenIntDecoder
-        extends IntDecoder
+public class RunLenIntDecoder extends IntDecoder
 {
     private static final Logger LOGGER = LogManager.getLogger(RunLenIntDecoder.class);
 

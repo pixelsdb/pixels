@@ -78,13 +78,13 @@ public abstract class Operator
      * This method collects the outputs of the operator. It may block until the join
      * completes, therefore it should not be called in the query execution thread. Otherwise,
      * it will block the query execution.
-     * @return the out
+     * @return the outputs of the workers in this operator
      */
     public abstract OutputCollection collectOutputs() throws ExecutionException, InterruptedException;
 
     public interface OutputCollection
     {
-        long getCumulativeDurationMs();
+        long getTotalGBMs();
 
         int getTotalNumReadRequests();
 

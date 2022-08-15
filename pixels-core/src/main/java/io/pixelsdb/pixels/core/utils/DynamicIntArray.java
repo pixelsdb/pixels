@@ -53,8 +53,7 @@ public final class DynamicIntArray
     public DynamicIntArray(int chunkSize)
     {
         this.chunkSize = chunkSize;
-
-        data = new int[INIT_CHUNKS][];
+        this.data = new int[INIT_CHUNKS][];
     }
 
     /**

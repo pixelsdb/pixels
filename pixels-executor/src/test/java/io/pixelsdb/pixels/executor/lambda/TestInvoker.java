@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,30 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.core.encoding;
+package io.pixelsdb.pixels.executor.lambda;
 
-import java.io.IOException;
+import org.junit.Test;
 
 /**
- * @author guodong
  * @author hank
+ * @date 8/12/22
  */
-public class RunLenByteDecoder extends Decoder
+public class TestInvoker
 {
-    @Override
-    public boolean hasNext()
-            throws IOException
+    @Test
+    public void test()
     {
-        return false;
-    }
-
-    @Override
-    public void close()
-    {
-    }
-
-    public byte next()
-    {
-        return (byte) 1;
+        int memorySize = InvokerFactory.Instance().getInvoker(WorkerType.PARTITIONED_JOIN).getMemoryMB();
+        System.out.println(memorySize);
     }
 }
