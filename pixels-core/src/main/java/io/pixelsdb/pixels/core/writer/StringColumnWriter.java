@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntEncoder;
 import io.pixelsdb.pixels.core.utils.Dictionary;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
+import io.pixelsdb.pixels.core.utils.HashTableDictionary;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
@@ -55,7 +56,7 @@ public class StringColumnWriter extends BaseColumnWriter
 {
     private final long[] curPixelVector = new long[pixelStride];      // current vector holding encoded values of string
     private final DynamicIntArray lensArray = new DynamicIntArray();  // lengths of each string when un-encoded
-    private final Dictionary dictionary = new Dictionary(Constants.INIT_DICT_SIZE);
+    private final Dictionary dictionary = new HashTableDictionary(Constants.INIT_DICT_SIZE);
     private boolean futureUseDictionaryEncoding;
     private boolean currentUseDictionaryEncoding;
     private boolean doneDictionaryEncodingCheck = false;
@@ -260,7 +261,7 @@ public class StringColumnWriter extends BaseColumnWriter
                 context.writeBytes(outputStream);
                 starts[currentId] = initStart;
                 initStart += context.getLength();
-                orders[context.getOriginalPosition()] = currentId++;
+                orders[context.getKeyPosition()] = currentId++;
             }
         });
 

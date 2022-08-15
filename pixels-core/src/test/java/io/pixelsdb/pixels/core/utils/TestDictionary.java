@@ -32,7 +32,7 @@ import java.util.UUID;
  * @author hank
  * @date 8/13/22
  */
-public class TestStringRedBlackTree
+public class TestDictionary
 {
     private static long getGCTime()
     {
@@ -45,9 +45,9 @@ public class TestStringRedBlackTree
     }
 
     @Test
-    public void test()
+    public void testRedBlackTree()
     {
-        StringRedBlackTree dict = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
+        Dictionary dict = new StringRedBlackTree(Constants.INIT_DICT_SIZE);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 10_000_000; ++i)
         {
@@ -71,9 +71,9 @@ public class TestStringRedBlackTree
     }
 
     @Test
-    public void testDictionary()
+    public void testHashTable()
     {
-        Dictionary dict = new Dictionary(Constants.INIT_DICT_SIZE);
+        Dictionary dict = new HashTableDictionary(Constants.INIT_DICT_SIZE);
         long startTime = System.currentTimeMillis();
         for (int i = 0; i < 10_000_000; ++i)
         {

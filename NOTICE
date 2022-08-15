@@ -12,17 +12,17 @@ Licensed under the Apache License, Version 2.0.
 
 2. Apache ORC
 Licensed under the Apache License, Version 2.0.
-* Column vectors and TypeDescription in pixels-core are derived from the corresponding implementations in Apache ORC.
+* Column vectors, TypeDescription, decoding/encoding in pixels-core are partially derived from the corresponding implementations in Apache ORC.
 
 
 3. Apache Hadoop
 Licensed under the Apache License, Version 2.0.
-* Text and a part of EncodingUtils in pixels-core are derived from the corresponding implementations in hadoop-common.
+* EncodingUtils in pixels-core is derived from the corresponding implementations in hadoop-common.
 
 
 4. Apache Curator
 Licensed under the Apache License, Version 2.0.
-* Some methods in StringUtil in pixels-common are derived from curator-client.
+* StringUtil in pixels-common is partially derived from curator-client.
 
 
 5. Facebook Presto

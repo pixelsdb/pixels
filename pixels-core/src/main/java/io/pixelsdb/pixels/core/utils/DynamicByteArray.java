@@ -228,31 +228,6 @@ public final class DynamicByteArray
     }
 
     /**
-     * Set a text value from the bytes in this dynamic array.
-     *
-     * @param result the value to set
-     * @param offset the start of the bytes to copy
-     * @param length the number of bytes to copy
-     */
-    public void setText(Text result, int offset, int length)
-    {
-        result.clear();
-        StringBuilder builder = new StringBuilder();
-        builder.append(new String());
-        int currentChunk = offset / chunkSize;
-        int currentOffset = offset % chunkSize;
-        int currentLength = Math.min(length, chunkSize - currentOffset);
-        while (length > 0)
-        {
-            result.append(data[currentChunk], currentOffset, currentLength);
-            length -= currentLength;
-            currentChunk += 1;
-            currentOffset = 0;
-            currentLength = Math.min(length, chunkSize - currentOffset);
-        }
-    }
-
-    /**
      * Write out a range of this dynamic array to an output stream.
      *
      * @param out    the stream to write to

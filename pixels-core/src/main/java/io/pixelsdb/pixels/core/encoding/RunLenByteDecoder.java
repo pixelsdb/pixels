@@ -25,8 +25,7 @@ import java.io.IOException;
  * @author guodong
  * @author hank
  */
-public class RunLenByteDecoder
-        extends Decoder
+public class RunLenByteDecoder extends Decoder
 {
     @Override
     public boolean hasNext()
