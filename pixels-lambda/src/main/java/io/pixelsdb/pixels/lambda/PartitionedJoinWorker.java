@@ -556,7 +556,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
         MetricsCollector.Timer computeCostTimer = new MetricsCollector.Timer();
         long readBytes = 0L;
         int numReadRequests = 0;
-        logger.info("join with right table.");
         while (!rightParts.isEmpty())
         {
             for (Iterator<String> it = rightParts.iterator(); it.hasNext(); )
