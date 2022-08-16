@@ -70,7 +70,6 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
     @Override
     public JoinOutput handleRequest(PartitionedChainJoinInput event, Context context)
     {
-        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -159,8 +158,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getFileSchema(threadPool, s3, leftSchema, rightSchema,
-                    leftPartitioned.get(0), rightPartitioned.get(0), true);
+            getFileSchemaFromPaths(threadPool, s3, leftSchema, rightSchema, leftPartitioned, rightPartitioned);
             Joiner partitionJoiner = new Joiner(joinType,
                     leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
                     rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
@@ -345,9 +343,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 BroadcastTableInfo currRightTable = chainTables.get(i);
                 BroadcastTableInfo nextChainTable = chainTables.get(i+1);
                 readCostTimer.start();
-                TypeDescription nextTableSchema = getFileSchema(s3,
-                        nextChainTable.getInputSplits().get(0).getInputInfos().get(0).getPath(),
-                        !nextChainTable.isBase());
+                TypeDescription nextTableSchema = WorkerCommon.getFileSchemaFromSplits(s3, nextChainTable.getInputSplits());
                 TypeDescription nextResultSchema = getResultSchema(
                         nextTableSchema, nextChainTable.getColumnsToRead());
                 readCostTimer.stop();
