@@ -609,8 +609,8 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
                         readCostTimer.add(recordReader.getReadTimeNanos());
                         readBytes += recordReader.getCompletedBytes();
                         numReadRequests += recordReader.getNumReadRequests();
-                        it.remove();
                     }
+                    it.remove();
                 } catch (Exception e)
                 {
                     if (e instanceof IOException)
