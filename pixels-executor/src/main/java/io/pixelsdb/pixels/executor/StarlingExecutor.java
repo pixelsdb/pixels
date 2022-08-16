@@ -56,11 +56,11 @@ import static java.util.Objects.requireNonNull;
  * The serverless executor of join and aggregation.
  *
  * @author hank
- * @date 07/05/2022
+ * @date 15/08/2022
  */
-public class PixelsExecutor
+public class StarlingExecutor
 {
-    private static final Logger logger = LogManager.getLogger(PixelsExecutor.class);
+    private static final Logger logger = LogManager.getLogger(StarlingExecutor.class);
     private static final Storage.Scheme InputStorage;
     private static final Storage.Scheme IntermediateStorage;
     private static final String IntermediateFolder;
@@ -107,10 +107,10 @@ public class PixelsExecutor
      * @param compactPathEnabled whether compact path is enabled
      * @throws IOException
      */
-    public PixelsExecutor(long queryId,
-                          Table rootTable,
-                          boolean orderedPathEnabled,
-                          boolean compactPathEnabled) throws IOException
+    public StarlingExecutor(long queryId,
+                            Table rootTable,
+                            boolean orderedPathEnabled,
+                            boolean compactPathEnabled) throws IOException
     {
         this.queryId = queryId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
@@ -324,138 +324,66 @@ public class PixelsExecutor
         JoinOperator leftOperator, rightOperator;
         if (joinAlgo == JoinAlgorithm.BROADCAST)
         {
-            /*
-            * The current join is a broadcast join.
-            * The left side must be an incomplete broadcast chain join, in this case, we should either complete
-            * the broadcast join if the right side is a broadcast or broadcast chain join, or build a partitioned
-            * chain join if the right side is a partitioned join.
-            * */
             leftOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             rightOperator = getJoinOperator((JoinedTable) rightTable, Optional.empty());
-            if (leftOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN)
+            boolean postPartition = false;
+            PartitionInfo postPartitionInfo = null;
+            if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
             {
-                boolean postPartition = false;
-                PartitionInfo postPartitionInfo = null;
-                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
+                // Note: we must use the parent to calculate the number of partitions for post partitioning.
+                postPartition = true;
+                int numPartition = JoinAdvisor.Instance().getNumPartition(
+                        parent.get().getJoin().getLeftTable(),
+                        parent.get().getJoin().getRightTable(),
+                        parent.get().getJoin().getJoinEndian());
+
+                // Check if the current table if the left child or the right child of parent.
+                if (joinedTable == parent.get().getJoin().getLeftTable())
                 {
-                    // Note: we must use the parent to calculate the number of partitions for post partitioning.
-                    postPartition = true;
-                    int numPartition = JoinAdvisor.Instance().getNumPartition(
-                            parent.get().getJoin().getLeftTable(),
-                            parent.get().getJoin().getRightTable(),
-                            parent.get().getJoin().getJoinEndian());
-
-                    // Check if the current table if the left child or the right child of parent.
-                    if (joinedTable == parent.get().getJoin().getLeftTable())
-                    {
-                        postPartitionInfo = new PartitionInfo(
-                                parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
-                    }
-                    else
-                    {
-                        postPartitionInfo = new PartitionInfo(
-                                parent.get().getJoin().getRightKeyColumnIds(), numPartition);
-                    }
-                }
-
-                checkArgument(leftOperator.getJoinInputs().size() == 1,
-                        "there should be exact one incomplete chain join input in the child operator");
-                BroadcastChainJoinInput broadcastChainJoinInput =
-                        (BroadcastChainJoinInput) leftOperator.getJoinInputs().get(0);
-
-                if (rightOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST ||
-                        rightOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN)
-                {
-                    List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
-                    List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
-                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(),
-                            join.getRightColumnAlias(), join.getLeftProjection(),
-                            join.getRightProjection(), postPartition, postPartitionInfo);
-
-                    ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    int outputId = 0;
-                    for (InputSplit rightInputSplit : rightInputSplits)
-                    {
-                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
-                        BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
-                                rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
-
-                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/";
-                        MultiOutputInfo output = new MultiOutputInfo(path,
-                                new StorageInfo(IntermediateStorage, null, null, null),
-                                true, outputs);
-
-                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
-                                .setLargeTable(rightTableInfo)
-                                .setJoinInfo(joinInfo)
-                                .setOutput(output).build();
-
-                        joinInputs.add(complete);
-                    }
-
-                    SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
-                            joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
-                    // The right operator must be set as the large child.
-                    joinOperator.setLargeChild(rightOperator);
-                    return joinOperator;
-                }
-                else if (rightOperator.getJoinAlgo() == JoinAlgorithm.PARTITIONED)
-                {
-                    /*
-                     * Create a new partitioned chain join operator from the right operator,
-                     * replace the join inputs with the partitioned chain join inputs,
-                     * drop the right operator and return the new operator.
-                     */
-                    PartitionedJoinOperator rightJoinOperator = (PartitionedJoinOperator) rightOperator;
-                    List<JoinInput> rightJoinInputs = rightJoinOperator.getJoinInputs();
-
-                    List<BroadcastTableInfo> chainTables = broadcastChainJoinInput.getChainTables();
-                    List<ChainJoinInfo> chainJoinInfos = broadcastChainJoinInput.getChainJoinInfos();
-                    ChainJoinInfo lastChainJoinInfo = new ChainJoinInfo(joinType,
-                            join.getLeftColumnAlias(), join.getRightColumnAlias(), join.getRightKeyColumnIds(),
-                            join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
-                    // chainJoinInfos in broadcastChainJoin is mutable, thus we can add element directly.
-                    chainJoinInfos.add(lastChainJoinInfo);
-
-                    ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    for (JoinInput joinInput : rightJoinInputs)
-                    {
-                        PartitionedJoinInput rightJoinInput = (PartitionedJoinInput) joinInput;
-                        PartitionedChainJoinInput chainJoinInput = new PartitionedChainJoinInput();
-                        chainJoinInput.setQueryId(queryId);
-                        chainJoinInput.setJoinInfo(rightJoinInput.getJoinInfo());
-                        chainJoinInput.setOutput(rightJoinInput.getOutput());
-                        chainJoinInput.setSmallTable(rightJoinInput.getSmallTable());
-                        chainJoinInput.setLargeTable(rightJoinInput.getLargeTable());
-                        chainJoinInput.setChainTables(chainTables);
-                        chainJoinInput.setChainJoinInfos(chainJoinInfos);
-                        joinInputs.add(chainJoinInput);
-                    }
-
-                    PartitionedJoinOperator joinOperator = new PartitionedJoinOperator(
-                            joinedTable.getTableName(),
-                            rightJoinOperator.getSmallPartitionInputs(),
-                            rightJoinOperator.getLargePartitionInputs(),
-                            joinInputs.build(), JoinAlgorithm.PARTITIONED_CHAIN);
-                    // Set the children of the right operator as the children of the current join operator.
-                    joinOperator.setSmallChild(rightJoinOperator.getSmallChild());
-                    joinOperator.setLargeChild(rightJoinOperator.getLargeChild());
-                    return joinOperator;
+                    postPartitionInfo = new PartitionInfo(
+                            parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
                 }
                 else
                 {
-                    throw new InvalidArgumentException("the large-right child is a/an '" + rightOperator.getJoinAlgo() +
-                            "' join which is invalid, only BROADCAST, BROADCAST_CHAIN, or PARTITIONED joins are accepted");
+                    postPartitionInfo = new PartitionInfo(
+                            parent.get().getJoin().getRightKeyColumnIds(), numPartition);
                 }
             }
-            else
+
+            List<JoinInput> leftJoinInputs = leftOperator.getJoinInputs();
+            List<InputSplit> leftInputSplits = getBroadcastInputSplits(leftJoinInputs);
+            BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
+                    leftTable, leftInputSplits, join.getLeftKeyColumnIds());
+            JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(),
+                    join.getRightColumnAlias(), join.getLeftProjection(),
+                    join.getRightProjection(), postPartition, postPartitionInfo);
+
+            List<JoinInput> rightJoinInputs = rightOperator.getJoinInputs();
+            List<InputSplit> rightInputSplits = getBroadcastInputSplits(rightJoinInputs);
+            ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
+            int outputId = 0;
+            for (InputSplit rightInputSplit : rightInputSplits)
             {
-                // FIXME: this is possible, the small-left broadcast join might not be chained successfully
-                //  (e.g., TPC-H q8 with all joins using broadcast)
-                throw new InvalidArgumentException("the small-left child is not a broadcast chain join whereas the " +
-                        "current join is a broadcast join, such a join plan is invalid");
+                ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
+                BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
+                        rightTable, ImmutableList.of(rightInputSplit), join.getRightKeyColumnIds());
+
+                String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
+                        joinedTable.getTableName() + "/";
+                MultiOutputInfo output = new MultiOutputInfo(path,
+                        new StorageInfo(IntermediateStorage, null, null, null),
+                        true, outputs);
+
+                BroadcastJoinInput joinInput = new BroadcastJoinInput(queryId, leftTableInfo, rightTableInfo,
+                        joinInfo, false, null, output);
+                joinInputs.add(joinInput);
             }
+
+            SingleStageJoinOperator joinOperator = new SingleStageJoinOperator(
+                    joinedTable.getTableName(), joinInputs.build(), JoinAlgorithm.BROADCAST);
+            joinOperator.setSmallChild(leftOperator);
+            joinOperator.setLargeChild(rightOperator);
+            return joinOperator;
         }
         else if (joinAlgo == JoinAlgorithm.PARTITIONED)
         {
@@ -546,155 +474,11 @@ public class PixelsExecutor
         {
             // get the leftInputSplits from metadata.
             leftInputSplits = getInputSplits((BaseTable) leftTable);
-            // check if there is a chain join.
-            if (joinAlgo == JoinAlgorithm.BROADCAST && parent.isPresent() &&
-                    parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
-                    parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
-            {
-                /*
-                 * Chain join is found, and this is the first broadcast join in the chain.
-                 * In this case, we build an incomplete chain join with only two left tables and one ChainJoinInfo.
-                 */
-                BroadcastTableInfo leftTableInfo = getBroadcastTableInfo(
-                        leftTable, leftInputSplits, join.getLeftKeyColumnIds());
-                BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
-                        rightTable, rightInputSplits, join.getRightKeyColumnIds());
-                ChainJoinInfo chainJoinInfo;
-                List<BroadcastTableInfo> chainTableInfos = new ArrayList<>();
-                // deal with join endian, ensure that small table is on the left.
-                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
-                {
-                    chainJoinInfo = new ChainJoinInfo(
-                            joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                            parent.get().getJoin().getLeftKeyColumnIds(), join.getLeftProjection(),
-                            join.getRightProjection(), false, null);
-                    chainTableInfos.add(leftTableInfo);
-                    chainTableInfos.add(rightTableInfo);
-                }
-                else
-                {
-                    chainJoinInfo = new ChainJoinInfo(
-                            joinType.flip(), join.getRightColumnAlias(), join.getLeftColumnAlias(),
-                            parent.get().getJoin().getLeftKeyColumnIds(), join.getRightProjection(),
-                            join.getLeftProjection(), false, null);
-                    chainTableInfos.add(rightTableInfo);
-                    chainTableInfos.add(leftTableInfo);
-                }
-
-                BroadcastChainJoinInput broadcastChainJoinInput = new BroadcastChainJoinInput();
-                broadcastChainJoinInput.setQueryId(queryId);
-                broadcastChainJoinInput.setChainTables(chainTableInfos);
-                List<ChainJoinInfo> chainJoinInfos = new ArrayList<>();
-                chainJoinInfos.add(chainJoinInfo);
-                broadcastChainJoinInput.setChainJoinInfos(chainJoinInfos);
-
-                return new SingleStageJoinOperator(joinedTable.getTableName(),
-                        broadcastChainJoinInput, JoinAlgorithm.BROADCAST_CHAIN);
-            }
         }
         else
         {
             childOperator = getJoinOperator((JoinedTable) leftTable, Optional.of(joinedTable));
             requireNonNull(childOperator, "failed to get child operator");
-            // check if there is an incomplete chain join.
-            if (childOperator.getJoinAlgo() == JoinAlgorithm.BROADCAST_CHAIN &&
-                    joinAlgo == JoinAlgorithm.BROADCAST &&
-                    join.getJoinEndian() == JoinEndian.SMALL_LEFT)
-            {
-                // the current join is still a broadcast join, thus the left child is an incomplete chain join.
-                if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.BROADCAST &&
-                        parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)
-                {
-                    /*
-                     * The parent is still a small-left broadcast join, continue chain join construction by
-                     * adding the right table of the current join into the left tables of the chain join
-                     */
-                    BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
-                            rightTable, rightInputSplits, join.getRightKeyColumnIds());
-                    ChainJoinInfo chainJoinInfo = new ChainJoinInfo(
-                            joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                            parent.get().getJoin().getLeftKeyColumnIds(), join.getLeftProjection(),
-                            join.getRightProjection(), false, null);
-                    checkArgument(childOperator.getJoinInputs().size() == 1,
-                            "there should be exact one incomplete chain join input in the child operator");
-                    BroadcastChainJoinInput broadcastChainJoinInput =
-                            (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
-                    broadcastChainJoinInput.getChainTables().add(rightTableInfo);
-                    broadcastChainJoinInput.getChainJoinInfos().add(chainJoinInfo);
-                    // no need to create a new operator.
-                    return childOperator;
-                }
-                else
-                {
-                    // The parent is not present or is not a small-left broadcast join, complete chain join construction.
-                    boolean postPartition = false;
-                    PartitionInfo postPartitionInfo = null;
-                    if (parent.isPresent() && parent.get().getJoin().getJoinAlgo() == JoinAlgorithm.PARTITIONED)
-                    {
-                        // Note: we must use the parent to calculate the number of partitions for post partitioning.
-                        postPartition = true;
-                        int numPartition = JoinAdvisor.Instance().getNumPartition(
-                                parent.get().getJoin().getLeftTable(),
-                                parent.get().getJoin().getRightTable(),
-                                parent.get().getJoin().getJoinEndian());
-
-                        /*
-                        * If the program reaches here, as this is on a single-pipeline and the parent is present,
-                        * the current join must be the left child of the parent. Therefore, we can use the left key
-                        * column ids of the parent as the post partitioning key column ids.
-                        * */
-                        postPartitionInfo = new PartitionInfo(parent.get().getJoin().getLeftKeyColumnIds(), numPartition);
-
-                        /*
-                         * For broadcast and broadcast chain join, if every worker in its parent has to
-                         * read the outputs of this join, we try to adjust the input splits of its large table.
-                         *
-                         * If the parent is a large-left broadcast join (small-left broadcast join does not go into
-                         * this branch). The outputs of this join will be split into multiple workers and there is
-                         * no need to adjust the input splits for this join.
-                         */
-                        rightInputSplits = adjustInputSplitsForBroadcastJoin(leftTable, rightTable, rightInputSplits);
-                    }
-                    JoinInfo joinInfo = new JoinInfo(joinType, join.getLeftColumnAlias(), join.getRightColumnAlias(),
-                            join.getLeftProjection(), join.getRightProjection(), postPartition, postPartitionInfo);
-
-                    checkArgument(childOperator.getJoinInputs().size() == 1,
-                            "there should be exact one incomplete chain join input in the child operator");
-                    BroadcastChainJoinInput broadcastChainJoinInput =
-                            (BroadcastChainJoinInput) childOperator.getJoinInputs().get(0);
-
-                    ImmutableList.Builder<JoinInput> joinInputs = ImmutableList.builder();
-                    int outputId = 0;
-                    for (int i = 0; i < rightInputSplits.size();)
-                    {
-                        ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                                .builderWithExpectedSize(IntraWorkerParallelism);
-                        ImmutableList<String> outputs = ImmutableList.of((outputId++) + "/join");
-                        for (int j = 0; j < IntraWorkerParallelism && i < rightInputSplits.size(); ++j, ++i)
-                        {
-                            inputsBuilder.add(rightInputSplits.get(i));
-                        }
-                        BroadcastTableInfo rightTableInfo = getBroadcastTableInfo(
-                                rightTable, inputsBuilder.build(), join.getRightKeyColumnIds());
-
-                        String path = IntermediateFolder + queryId + "/" + joinedTable.getSchemaName() + "/" +
-                                joinedTable.getTableName() + "/";
-                        MultiOutputInfo output = new MultiOutputInfo(path,
-                                new StorageInfo(IntermediateStorage, null, null, null),
-                                true, outputs);
-
-                        BroadcastChainJoinInput complete = broadcastChainJoinInput.toBuilder()
-                                .setLargeTable(rightTableInfo)
-                                .setJoinInfo(joinInfo)
-                                .setOutput(output).build();
-
-                        joinInputs.add(complete);
-                    }
-
-                    return new SingleStageJoinOperator(joinedTable.getTableName(),
-                            joinInputs.build(), JoinAlgorithm.BROADCAST_CHAIN);
-                }
-            }
             // get the leftInputSplits or leftPartitionedFiles from childJoinInputs.
             List<JoinInput> childJoinInputs = childOperator.getJoinInputs();
             if (joinAlgo == JoinAlgorithm.BROADCAST)
@@ -767,7 +551,7 @@ public class PixelsExecutor
                                 parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)))
                 {
                     /*
-                     * For broadcast and broadcast chain join, if every worker in its parent has to
+                     * For broadcast join, if every worker in its parent has to
                      * read the outputs of this join, we try to adjust the input splits of its large table.
                      *
                      * This join is the left child of its parent, therefore, if the parent is a partitioned
@@ -817,7 +601,7 @@ public class PixelsExecutor
                                 parent.get().getJoin().getJoinEndian() == JoinEndian.SMALL_LEFT)))
                 {
                     /*
-                     * For broadcast and broadcast chain join, if every worker in its parent has to
+                     * For broadcast join, if every worker in its parent has to
                      * read the outputs of this join, we try to adjust the input splits of its large table.
                      *
                      * This join is the left child of its parent, therefore, if the parent is a partitioned
@@ -990,9 +774,8 @@ public class PixelsExecutor
             }
             /*
             * We make each input file as an input split, thus the number of broadcast join workers
-            * will be the same as the number of workers of the child join. This provides better
-            * parallelism and is required by partitioned chain join.
-            * */
+            * will be the same as the number of workers of the child join. This provides better parallelism.
+            */
             for (String fileName : output.getFileNames())
             {
                 InputInfo inputInfo = new InputInfo(base + fileName, 0, -1);
