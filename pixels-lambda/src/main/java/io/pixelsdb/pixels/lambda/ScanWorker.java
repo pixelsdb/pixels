@@ -118,8 +118,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             if (partialAggregationPresent)
             {
                 logger.info("start get output schema");
-                TypeDescription inputSchema = getFileSchema(s3,
-                        inputSplits.get(0).getInputInfos().get(0).getPath(), false);
+                TypeDescription inputSchema = WorkerCommon.getFileSchemaFromSplits(s3, inputSplits);
                 inputSchema = getResultSchema(inputSchema, includeCols);
                 PartialAggregationInfo partialAggregationInfo = event.getPartialAggregationInfo();
                 requireNonNull(partialAggregationInfo, "event.partialAggregationInfo is null");

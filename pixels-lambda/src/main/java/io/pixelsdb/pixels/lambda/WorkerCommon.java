@@ -26,13 +26,13 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.executor.lambda.domain.InputInfo;
+import io.pixelsdb.pixels.executor.lambda.domain.InputSplit;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +51,6 @@ public class WorkerCommon
     private static final Logger logger = LoggerFactory.getLogger(WorkerCommon.class);
     private static final PixelsFooterCache footerCache = new PixelsFooterCache();
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
-    public static final Set<String> existFiles = ConcurrentHashMap.newKeySet();
     public static Storage s3;
     public static Storage minio;
     public static final int rowBatchSize;
@@ -81,55 +80,36 @@ public class WorkerCommon
      * @param storage the storage instance
      * @param leftSchema the atomic reference to return the schema of the left table
      * @param rightSchema the atomic reference to return the schema of the right table
-     * @param leftPath the path of an input file of the left table
-     * @param rightPath the path of an input file of the right table
-     * @param checkExistence whether check the existence of the input files
+     * @param leftInputSplits the input splits of the left table
+     * @param rightInputSplits the input splits of the right table
      */
-    public static void getFileSchema(ExecutorService executor, Storage storage,
+    public static void getFileSchemaFromSplits(ExecutorService executor, Storage storage,
                                      AtomicReference<TypeDescription> leftSchema,
                                      AtomicReference<TypeDescription> rightSchema,
-                                     String leftPath, String rightPath, boolean checkExistence)
+                                     List<InputSplit> leftInputSplits, List<InputSplit> rightInputSplits)
     {
         requireNonNull(executor, "executor is null");
         requireNonNull(storage, "storage is null");
         requireNonNull(leftSchema, "leftSchema is null");
         requireNonNull(rightSchema, "rightSchema is null");
-        requireNonNull(leftPath, "leftPath is null");
-        requireNonNull(rightPath, "rightPath is null");
+        requireNonNull(leftInputSplits, "leftInputSplits is null");
+        requireNonNull(rightInputSplits, "rightInputSplits is null");
         Future<?> leftFuture = executor.submit(() -> {
             try
             {
-                if (checkExistence)
-                {
-                    while (!exists(s3, leftPath))
-                    {
-                        TimeUnit.MILLISECONDS.sleep(50);
-                    }
-                }
-                PixelsReader reader = getReader(leftPath, storage);
-                leftSchema.set(reader.getFileSchema());
-                reader.close();
+                leftSchema.set(getFileSchemaFromSplits(storage, leftInputSplits));
             } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the left table file '" + leftPath + "'", e);
+                logger.error("failed to read the file schema for the left table", e);
             }
         });
         Future<?> rightFuture = executor.submit(() -> {
             try
             {
-                if (checkExistence)
-                {
-                    while (!exists(s3, rightPath))
-                    {
-                        TimeUnit.MILLISECONDS.sleep(50);
-                    }
-                }
-                PixelsReader reader = getReader(rightPath, storage);
-                rightSchema.set(reader.getFileSchema());
-                reader.close();
+                rightSchema.set(getFileSchemaFromSplits(storage, rightInputSplits));
             } catch (IOException | InterruptedException e)
             {
-                logger.error("failed to read the schema of the right table file '" + rightPath + "'", e);
+                logger.error("failed to read the file schema for the right table", e);
             }
         });
         try
@@ -143,50 +123,132 @@ public class WorkerCommon
     }
 
     /**
-     * Check whether the given path exists in the storage.
-     * @param storage the storage
-     * @param path the given path
-     * @return true if the path exists
-     * @throws IOException
+     * Read the schemas of the two joined tables, concurrently using the executor, thus
+     * to reduce the latency of the schema reading.
+     *
+     * @param executor the executor, a.k.a., the thread pool.
+     * @param storage the storage instance
+     * @param leftSchema the atomic reference to return the schema of the left table
+     * @param rightSchema the atomic reference to return the schema of the right table
+     * @param leftPaths the paths of the input files of the left table
+     * @param rightPaths the paths of the input files of the right table
      */
-    public static boolean exists(Storage storage, String path) throws IOException
+    public static void getFileSchemaFromPaths(ExecutorService executor, Storage storage,
+                                              AtomicReference<TypeDescription> leftSchema,
+                                              AtomicReference<TypeDescription> rightSchema,
+                                              List<String> leftPaths, List<String> rightPaths)
     {
-        if (existFiles.contains(path))
+        requireNonNull(executor, "executor is null");
+        requireNonNull(storage, "storage is null");
+        requireNonNull(leftSchema, "leftSchema is null");
+        requireNonNull(rightSchema, "rightSchema is null");
+        requireNonNull(leftPaths, "leftPaths is null");
+        requireNonNull(rightPaths, "rightPaths is null");
+        Future<?> leftFuture = executor.submit(() -> {
+            try
+            {
+                leftSchema.set(getFileSchemaFromPaths(storage, leftPaths));
+            } catch (IOException | InterruptedException e)
+            {
+                logger.error("failed to read the file schema for the left table", e);
+            }
+        });
+        Future<?> rightFuture = executor.submit(() -> {
+            try
+            {
+                rightSchema.set(getFileSchemaFromPaths(storage, rightPaths));
+            } catch (IOException | InterruptedException e)
+            {
+                logger.error("failed to read the file schema for the right table", e);
+            }
+        });
+        try
         {
-            return true;
-        }
-
-        if (storage.exists(path))
+            leftFuture.get();
+            rightFuture.get();
+        } catch (Exception e)
         {
-            existFiles.add(path);
-            return true;
+            logger.error("interrupted while waiting for the termination of schema read", e);
         }
-        return false;
     }
 
     /**
      * Read the schemas of the table.
      *
      * @param storage the storage instance
-     * @param path the path of an input file of the table
-     * @param checkExistence whether check the existence of the input files
+     * @param inputSplits the list of input info of the input files of the table
+     * @return the file schema of the table
      */
-    public static TypeDescription getFileSchema(Storage storage, String path, boolean checkExistence)
+    public static TypeDescription getFileSchemaFromSplits(Storage storage, List<InputSplit> inputSplits)
             throws IOException, InterruptedException
     {
         requireNonNull(storage, "storage is null");
-        requireNonNull(path, "path is null");
-        if (checkExistence)
+        requireNonNull(inputSplits, "inputSplits is null");
+        while (true)
         {
-            while (!exists(storage, path))
+            for (InputSplit inputSplit : inputSplits)
             {
-                TimeUnit.MILLISECONDS.sleep(50);
+                String checkedPath = null;
+                for (InputInfo inputInfo : inputSplit.getInputInfos())
+                {
+                    if (checkedPath != null && checkedPath.equals(inputInfo.getPath()))
+                    {
+                        continue;
+                    }
+                    try
+                    {
+                        checkedPath = inputInfo.getPath();
+                        PixelsReader reader = getReader(checkedPath, storage);
+                        TypeDescription fileSchema = reader.getFileSchema();
+                        reader.close();
+                        return fileSchema;
+                    } catch (Exception e)
+                    {
+                        if (e instanceof IOException)
+                        {
+                            continue;
+                        }
+                        throw new IOException("failed to read file schema", e);
+                    }
+                }
             }
+            TimeUnit.MILLISECONDS.sleep(200);
         }
-        PixelsReader reader = getReader(path, storage);
-        TypeDescription fileSchema = reader.getFileSchema();
-        reader.close();
-        return fileSchema;
+    }
+    
+    /**
+     * Read the schemas of the table.
+     *
+     * @param storage the storage instance
+     * @param paths the list of paths of the input files of the table
+     * @return the file schema of the table
+     */
+    public static TypeDescription getFileSchemaFromPaths(Storage storage, List<String> paths)
+            throws IOException, InterruptedException
+    {
+        requireNonNull(storage, "storage is null");
+        requireNonNull(paths, "paths is null");
+        while (true)
+        {
+            for (String path : paths)
+            {
+                try
+                {
+                    PixelsReader reader = getReader(path, storage);
+                    TypeDescription fileSchema = reader.getFileSchema();
+                    reader.close();
+                    return fileSchema;
+                } catch (Exception e)
+                {
+                    if (e instanceof IOException)
+                    {
+                        continue;
+                    }
+                    throw new IOException("failed to read file schema", e);
+                }
+            }
+            TimeUnit.MILLISECONDS.sleep(200);
+        }
     }
 
     /**

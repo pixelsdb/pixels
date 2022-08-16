@@ -125,8 +125,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
             MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
             if (writerSchema.get() == null)
             {
-                InputInfo inputInfo = inputSplits.get(0).getInputInfos().get(0);
-                TypeDescription fileSchema = getFileSchema(s3, inputInfo.getPath(), false);
+                TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(s3, inputSplits);
                 TypeDescription resultSchema = getResultSchema(fileSchema, columnsToRead);
                 writerSchema.set(resultSchema);
             }

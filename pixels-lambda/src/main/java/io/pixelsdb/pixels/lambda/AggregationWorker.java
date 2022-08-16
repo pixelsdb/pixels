@@ -64,7 +64,6 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
     @Override
     public AggregationOutput handleRequest(AggregationInput event, Context context)
     {
-        existFiles.clear();
         AggregationOutput aggregationOutput = new AggregationOutput();
         long startTime = System.currentTimeMillis();
         aggregationOutput.setStartTimeMs(startTime);
@@ -122,7 +121,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
 
             // prepare the input schema and column ids for the aggregation.
             String[] includeCols = ObjectArrays.concat(groupKeyColumnNames, resultColumnNames, String.class);
-            TypeDescription inputSchema = getFileSchema(s3, inputFiles.get(0), true);
+            TypeDescription inputSchema = getFileSchemaFromPaths(s3, inputFiles);
             checkArgument(inputSchema.getChildren().size() == includeCols.length,
                     "input file does not contain the correct number of columns");
             int[] groupKeyColumnIds = new int[groupKeyColumnNames.length];

@@ -64,7 +64,6 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
     @Override
     public JoinOutput handleRequest(BroadcastJoinInput event, Context context)
     {
-        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -141,9 +140,7 @@ public class BroadcastJoinWorker implements RequestHandler<BroadcastJoinInput, J
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getFileSchema(threadPool, s3, leftSchema, rightSchema,
-                    leftInputs.get(0).getInputInfos().get(0).getPath(),
-                    rightInputs.get(0).getInputInfos().get(0).getPath(), !(leftTable.isBase() && rightTable.isBase()));
+            getFileSchemaFromSplits(threadPool, s3, leftSchema, rightSchema, leftInputs, rightInputs);
             Joiner joiner = new Joiner(joinType,
                     getResultSchema(leftSchema.get(), leftCols), leftColAlias, leftProjection, leftKeyColumnIds,
                     getResultSchema(rightSchema.get(), rightCols), rightColAlias, rightProjection, rightKeyColumnIds);

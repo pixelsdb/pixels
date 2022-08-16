@@ -64,7 +64,6 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
     @Override
     public JoinOutput handleRequest(PartitionedJoinInput event, Context context)
     {
-        existFiles.clear();
         JoinOutput joinOutput = new JoinOutput();
         long startTime = System.currentTimeMillis();
         joinOutput.setStartTimeMs(startTime);
@@ -148,8 +147,7 @@ public class PartitionedJoinWorker implements RequestHandler<PartitionedJoinInpu
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            getFileSchema(threadPool, s3, leftSchema, rightSchema,
-                    leftPartitioned.get(0), rightPartitioned.get(0), true);
+            getFileSchemaFromPaths(threadPool, s3, leftSchema, rightSchema, leftPartitioned, rightPartitioned);
             Joiner joiner = new Joiner(joinType,
                     leftSchema.get(), leftColAlias, leftProjection, leftKeyColumnIds,
                     rightSchema.get(), rightColAlias, rightProjection, rightKeyColumnIds);
