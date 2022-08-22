@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
+import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
@@ -114,6 +115,12 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                             outputStorage.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                 }
+                else if (redis == null && outputStorage.getScheme() == Storage.Scheme.redis)
+                {
+                    ConfigRedis(outputStorage.getEndpoint(), outputStorage.getAccessKey(),
+                            outputStorage.getSecretKey());
+                    redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
+                }
             } catch (Exception e)
             {
                 throw new PixelsWorkerException("failed to initialize Minio storage", e);
@@ -170,7 +177,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
 
             MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
             PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
-                    outputStorage.getScheme() == Storage.Scheme.minio ? minio : s3,
+                    getStorage(outputStorage.getScheme()),
                     outputPath, encoding, false, null);
             aggregator.writeAggrOutput(pixelsWriter);
             pixelsWriter.close();

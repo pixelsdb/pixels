@@ -77,6 +77,12 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- TODO: remove netty-buffer dependency from pixels-core -->
         <dependency>
             <groupId>io.netty</groupId>

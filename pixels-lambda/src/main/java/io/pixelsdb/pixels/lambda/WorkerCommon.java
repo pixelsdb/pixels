@@ -53,6 +53,7 @@ public class WorkerCommon
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     public static Storage s3;
     public static Storage minio;
+    public static Storage redis;
     public static final int rowBatchSize;
     private static final int pixelStride;
     private static final int rowGroupSize;
@@ -70,6 +71,20 @@ public class WorkerCommon
         {
             logger.error("failed to initialize AWS S3 storage", e);
         }
+    }
+
+    public static Storage getStorage(Storage.Scheme scheme)
+    {
+        switch (scheme)
+        {
+            case s3:
+                return s3;
+            case minio:
+                return minio;
+            case redis:
+                return redis;
+        }
+        throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
     }
 
     /**

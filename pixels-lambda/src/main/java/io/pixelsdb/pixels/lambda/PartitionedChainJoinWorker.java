@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
+import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
 import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.buildFirstJoiner;
 import static io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker.chainJoin;
 import static io.pixelsdb.pixels.lambda.PartitionedJoinWorker.buildHashTable;
@@ -149,6 +150,11 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 {
                     ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                }
+                else if (redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
+                {
+                    ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                    redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
                 }
             } catch (Exception e)
             {
@@ -264,7 +270,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 if (partitionOutput)
                 {
                     pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
-                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            getStorage(storageInfo.getScheme()), outputPath,
                             encoding, true, Arrays.stream(
                                     outputPartitionInfo.getKeyColumnIds()).boxed().
                                     collect(Collectors.toList()));
@@ -282,7 +288,7 @@ public class PartitionedChainJoinWorker implements RequestHandler<PartitionedCha
                 } else
                 {
                     pixelsWriter = getWriter(chainJoiner.getJoinedSchema(),
-                            storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3, outputPath,
+                            getStorage(storageInfo.getScheme()), outputPath,
                             encoding, false, null);
                     ConcurrentLinkedQueue<VectorizedRowBatch> rowBatches = result.get(0);
                     for (VectorizedRowBatch rowBatch : rowBatches)
