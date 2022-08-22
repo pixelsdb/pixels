@@ -35,10 +35,10 @@ public class TestRedis
     @Test
     public void testReadWrite() throws IOException
     {
-        ConfigRedis("http://localhost:6379", "", "");
+        ConfigRedis("localhost:6379", "", "");
         Storage redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
 
-        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(redis, "test", true);
+        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(redis, "test1", true);
 
         byte[] buffer = new byte[4096];
         buffer[1] = 2;
@@ -48,7 +48,7 @@ public class TestRedis
         }
         writer.close();
 
-        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(redis, "test");
+        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(redis, "test1");
         int length = (int) (reader.getFileLength());
         System.out.println(length);
         Arrays.fill(buffer, (byte) 0);

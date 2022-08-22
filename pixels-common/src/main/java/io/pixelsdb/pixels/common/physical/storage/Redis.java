@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical.storage;
 
-import com.google.common.collect.ImmutableList;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -30,8 +29,10 @@ import redis.clients.jedis.JedisPooled;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
 import static io.pixelsdb.pixels.common.physical.storage.AbstractS3.EnableCache;
@@ -50,6 +51,8 @@ public class Redis implements Storage
 
     private static String hostName = "localhost";
     private static int port = 6379;
+    private static String userName = "";
+    private static String password = "";
 
     static
     {
@@ -93,6 +96,8 @@ public class Redis implements Storage
         {
             hostName = splits[0];
             port = Integer.parseInt(splits[1]);
+            userName = accessKey;
+            password = secretKey;
             StorageFactory.Instance().reload(Scheme.redis);
         }
     }
@@ -101,7 +106,7 @@ public class Redis implements Storage
 
     public Redis ()
     {
-        this.jedis = new JedisPooled(hostName, port);
+        this.jedis = new JedisPooled(hostName, port, userName, password);
     }
 
     @Override
@@ -138,24 +143,23 @@ public class Redis implements Storage
     public List<Status> listStatus(String path) throws IOException
     {
         path = dropSchemePrefix(path);
-        long length = this.jedis.strlen(path);
-        if (length > 0)
+        Set<String> keys = this.jedis.keys(path + "*");
+        List<Status> statuses = new ArrayList<>(keys.size());
+        for (String key : keys)
         {
+            long length = this.jedis.strlen(key);
             Status status = new Status(path, length, false, 1);
-            return ImmutableList.of(status);
+            statuses.add(status);
         }
-        return ImmutableList.of();
+        return statuses;
     }
 
     @Override
     public List<String> listPaths(String path) throws IOException
     {
         path = dropSchemePrefix(path);
-        if (this.jedis.exists(path))
-        {
-            return ImmutableList.of(path);
-        }
-        return ImmutableList.of();
+        Set<String> keys = this.jedis.keys(path + "*");
+        return new ArrayList<>(keys);
     }
 
     @Override
@@ -228,7 +232,12 @@ public class Redis implements Storage
     public boolean delete(String path, boolean recursive) throws IOException
     {
         path = dropSchemePrefix(path);
-        return this.jedis.del(path) == 1;
+        Set<String> keys = this.jedis.keys(path + "*");
+        for (String key : keys)
+        {
+            this.jedis.del(key);
+        }
+        return true;
     }
 
     @Override
