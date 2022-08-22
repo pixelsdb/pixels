@@ -127,9 +127,15 @@ public class RedisOutputStream extends OutputStream
         this.assertOpen();
     }
 
-    protected void flushBufferAndRewind() throws IOException
+    protected void flushBufferAndRewind()
     {
-        this.jedis.append(this.path, this.buffer);
+        byte[] buf = this.buffer;
+        if (this.position < this.buffer.length)
+        {
+            buf = new byte[this.position];
+            System.arraycopy(this.buffer, 0, buf, 0, this.position);
+        }
+        this.jedis.append(this.path, buf);
         this.position = 0;
     }
 
