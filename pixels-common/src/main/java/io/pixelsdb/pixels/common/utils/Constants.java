@@ -31,6 +31,7 @@ public final class Constants
     public static final int HDFS_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int LOCAL_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int S3_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int REDIS_BUFFER_SIZE = 8 * 1024 * 1024;
 
     public static final int MIN_REPEAT = 3;
     public static final int MAX_SCOPE = 512;
@@ -62,4 +63,8 @@ public final class Constants
     public static final String MINIO_ID_KEY = "pixels_storage_minio_id";
     // the prefix for keys of minio metadata (i.e. file path -> file id).
     public static final String MINIO_META_PREFIX = "pixels_storage_minio_meta:";
+
+    public static final String REDIS_ID_KEY = "pixels_storage_redis_id";
+    // the prefix for keys of redis metadata (i.e. file path -> file id).
+    public static final String REDIS_META_PREFIX = "pixels_storage_redis_meta:";
 }

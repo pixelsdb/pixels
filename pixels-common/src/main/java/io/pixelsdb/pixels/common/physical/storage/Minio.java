@@ -53,9 +53,9 @@ public final class Minio extends AbstractS3
     // private static Logger logger = LogManager.getLogger(Minio.class);
     private static final String SchemePrefix = Scheme.minio.name() + "://";
 
-    private static String MinIOEndpoint = null;
-    private static String MinIOAccessKey = null;
-    private static String MinIOSecretKey = null;
+    private static String minIOEndpoint = null;
+    private static String minIOAccessKey = null;
+    private static String minIOSecretKey = null;
 
     static
     {
@@ -89,31 +89,31 @@ public final class Minio extends AbstractS3
         requireNonNull(accessKey, "accessKey is null");
         requireNonNull(secretKey, "secretKey is null");
 
-        if (!Objects.equals(MinIOEndpoint, endpoint) ||
-                !Objects.equals(MinIOAccessKey, accessKey) ||
-                !Objects.equals(MinIOSecretKey, secretKey))
+        if (!Objects.equals(minIOEndpoint, endpoint) ||
+                !Objects.equals(minIOAccessKey, accessKey) ||
+                !Objects.equals(minIOSecretKey, secretKey))
         {
-            MinIOEndpoint = endpoint;
-            MinIOAccessKey = accessKey;
-            MinIOSecretKey = secretKey;
+            minIOEndpoint = endpoint;
+            minIOAccessKey = accessKey;
+            minIOSecretKey = secretKey;
             StorageFactory.Instance().reload(Scheme.minio);
         }
     }
 
     public Minio()
     {
-        requireNonNull(MinIOEndpoint, "Minio endpoint is not set");
-        requireNonNull(MinIOAccessKey, "Minio access key is not set");
-        requireNonNull(MinIOSecretKey, "Minio secret key is not set");
+        requireNonNull(minIOEndpoint, "Minio endpoint is not set");
+        requireNonNull(minIOAccessKey, "Minio access key is not set");
+        requireNonNull(minIOSecretKey, "Minio secret key is not set");
 
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
                 .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
                 .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                 .maxConnections(MaxRequestConcurrency))
-                .endpointOverride(URI.create(MinIOEndpoint))
+                .endpointOverride(URI.create(minIOEndpoint))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(MinIOAccessKey, MinIOSecretKey))).build();
+                        AwsBasicCredentials.create(minIOAccessKey, minIOSecretKey))).build();
     }
 
     @Override

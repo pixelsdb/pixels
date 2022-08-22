@@ -43,7 +43,8 @@ public interface Storage
         hdfs,  // HDFS
         file,  // local fs
         s3,    // Amazon S3
-        minio; // Minio
+        minio, // Minio
+        redis; // Redis
 
         /**
          * Case insensitive parsing from String to enum value.

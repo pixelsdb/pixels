@@ -71,6 +71,12 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- protobuf -->
         <dependency>
             <groupId>com.google.protobuf</groupId>

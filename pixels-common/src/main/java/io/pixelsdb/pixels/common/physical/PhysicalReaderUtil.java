@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.io.PhysicalHDFSReader;
-import io.pixelsdb.pixels.common.physical.io.PhysicalLocalReader;
-import io.pixelsdb.pixels.common.physical.io.PhysicalMinioReader;
-import io.pixelsdb.pixels.common.physical.io.PhysicalS3Reader;
+import io.pixelsdb.pixels.common.physical.io.*;
 
 import java.io.IOException;
 
@@ -57,6 +54,9 @@ public class PhysicalReaderUtil
                 break;
             case minio:
                 reader = new PhysicalMinioReader(storage, path);
+                break;
+            case redis:
+                reader = new PhysicalRedisReader(storage, path);
                 break;
             default:
                 throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
