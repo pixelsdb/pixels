@@ -83,6 +83,10 @@ public class Redis implements Storage
         requireNonNull(accessKey, "accessKey is null");
         requireNonNull(secretKey, "secretKey is null");
 
+        if (endpoint.contains("://"))
+        {
+            endpoint = endpoint.substring(endpoint.indexOf("://") + 3);
+        }
         String[] splits = endpoint.split(":");
 
         if (!Objects.equals(hostName, splits[0]) || port != Integer.parseInt(splits[1]))
@@ -206,9 +210,16 @@ public class Redis implements Storage
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         path = dropSchemePrefix(path);
-        if (!overwrite && this.jedis.exists(path))
+        if (this.jedis.exists(path))
         {
-            throw new IOException("Path '" + path + "' already exists.");
+            if (!overwrite)
+            {
+                throw new IOException("Path '" + path + "' already exists.");
+            }
+            else
+            {
+                this.jedis.del(path);
+            }
         }
         return new DataOutputStream(new RedisOutputStream(this.jedis, path, bufferSize));
     }
