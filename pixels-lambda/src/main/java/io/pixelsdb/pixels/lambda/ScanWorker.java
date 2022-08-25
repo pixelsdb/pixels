@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
+import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
 import static io.pixelsdb.pixels.lambda.WorkerCommon.*;
 import static java.util.Objects.requireNonNull;
 
@@ -102,10 +103,13 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
             {
                 if (minio == null && storageInfo.getScheme() == Storage.Scheme.minio)
                 {
-                    ConfigMinio(event.getOutput().getStorageInfo().getEndpoint(),
-                            event.getOutput().getStorageInfo().getAccessKey(),
-                            event.getOutput().getStorageInfo().getSecretKey());
+                    ConfigMinio(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
                     minio = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
+                }
+                else if (redis == null && storageInfo.getScheme() == Storage.Scheme.redis)
+                {
+                    ConfigRedis(storageInfo.getEndpoint(), storageInfo.getAccessKey(), storageInfo.getSecretKey());
+                    redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
                 }
             } catch (Exception e)
             {
@@ -175,7 +179,7 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 String outputPath = event.getOutput().getPath();
                 MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
-                        storageInfo.getScheme() == Storage.Scheme.minio ? minio : s3,
+                        getStorage(storageInfo.getScheme()),
                         outputPath, encoding, false, null);
                 aggregator.writeAggrOutput(pixelsWriter);
                 pixelsWriter.close();

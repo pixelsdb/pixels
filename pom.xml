@@ -59,6 +59,7 @@
         <dep.ozone.version>0.5.0-beta</dep.ozone.version>
         <dep.awssdk.version>2.17.231</dep.awssdk.version>
         <dep.awssdk.preview.version>2.17.231-PREVIEW</dep.awssdk.preview.version>
+        <dep.jedis.version>4.2.0</dep.jedis.version>
 
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
@@ -315,6 +316,19 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>aws-crt-client</artifactId>
                 <version>${dep.awssdk.preview.version}</version>
+            </dependency>
+
+            <!-- jedis -->
+            <dependency>
+                <groupId>redis.clients</groupId>
+                <artifactId>jedis</artifactId>
+                <version>${dep.jedis.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-api</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>

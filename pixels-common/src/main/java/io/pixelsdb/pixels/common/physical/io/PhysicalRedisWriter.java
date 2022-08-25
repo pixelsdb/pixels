@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -21,71 +21,57 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
+import io.pixelsdb.pixels.common.physical.storage.Redis;
 import io.pixelsdb.pixels.common.utils.Constants;
-import software.amazon.awssdk.services.s3.S3Client;
+import redis.clients.jedis.JedisPooled;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 /**
  * The physical writers for AWS S3 compatible storage systems.
  *
  * @author hank
- * Created at: 06/09/2021
+ * @date 8/22/22
  */
-public class PhysicalS3Writer implements PhysicalWriter
+public class PhysicalRedisWriter implements PhysicalWriter
 {
-    private AbstractS3 s3;
-    private AbstractS3.Path path;
-    private String pathStr;
+    private Redis redis;
+    private byte[] path;
     private long position;
-    private S3Client client;
+    private JedisPooled jedis;
     private OutputStream out;
 
-    public PhysicalS3Writer(Storage storage, String path, boolean overwrite) throws IOException
+    public PhysicalRedisWriter(Storage storage, String path, boolean overwrite) throws IOException
     {
-        if (storage instanceof AbstractS3)
+        if (storage instanceof Redis)
         {
-            this.s3 = (AbstractS3) storage;
+            this.redis = (Redis) storage;
         }
         else
         {
-            throw new IOException("Storage is not S3.");
+            throw new IOException("Storage is not Redis.");
         }
         if (path.contains("://"))
         {
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new AbstractS3.Path(path);
-        this.pathStr = path;
+        this.path = path.getBytes(StandardCharsets.UTF_8);
         this.position = 0L;
-        this.client = s3.getClient();
-        this.out = this.s3.create(path, overwrite, Constants.S3_BUFFER_SIZE);
+        this.jedis = this.redis.getJedis();
+        this.out = this.redis.create(path, overwrite, Constants.REDIS_BUFFER_SIZE);
     }
 
-    /**
-     * Prepare the writer to ensure the length can fit into current block.
-     *
-     * @param length length of content.
-     * @return starting offset after preparing. If -1, means prepare has failed,
-     * due to the specified length cannot fit into current block.
-     */
     @Override
     public long prepare(int length) throws IOException
     {
         return position;
     }
 
-    /**
-     * Append content to the file.
-     *
-     * @param buffer content buffer.
-     * @return start offset of content in the file.
-     */
     @Override
     public long append(ByteBuffer buffer) throws IOException
     {
@@ -101,14 +87,6 @@ public class PhysicalS3Writer implements PhysicalWriter
         return append(buffer.array(), buffer.arrayOffset() + buffer.position(), length);
     }
 
-    /**
-     * Append content to the file.
-     *
-     * @param buffer content buffer container
-     * @param offset start offset of actual content buffer
-     * @param length length of actual content buffer
-     * @return start offset of content in the file.
-     */
     @Override
     public long append(byte[] buffer, int offset, int length) throws IOException
     {
@@ -118,20 +96,13 @@ public class PhysicalS3Writer implements PhysicalWriter
         return start;
     }
 
-    /**
-     * Close writer.
-     */
     @Override
     public void close() throws IOException
     {
         this.out.close();
         // Don't close the client as it is external.
-        // this.client.close();
     }
 
-    /**
-     * Flush writer.
-     */
     @Override
     public void flush() throws IOException
     {
@@ -141,12 +112,12 @@ public class PhysicalS3Writer implements PhysicalWriter
     @Override
     public String getPath()
     {
-        return pathStr;
+        return new String(this.path, StandardCharsets.UTF_8);
     }
 
     @Override
     public int getBufferSize()
     {
-        return Constants.S3_BUFFER_SIZE;
+        return Constants.REDIS_BUFFER_SIZE;
     }
 }

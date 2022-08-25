@@ -20,10 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.physical.storage.HDFS;
-import io.pixelsdb.pixels.common.physical.storage.LocalFS;
-import io.pixelsdb.pixels.common.physical.storage.Minio;
-import io.pixelsdb.pixels.common.physical.storage.S3;
+import io.pixelsdb.pixels.common.physical.storage.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -162,6 +159,9 @@ public class StorageFactory
                 break;
             case minio:
                 storage = new Minio();
+                break;
+            case redis:
+                storage = new Redis();
                 break;
             default:
                 throw new IOException("Unknown storage scheme: " + scheme.name());

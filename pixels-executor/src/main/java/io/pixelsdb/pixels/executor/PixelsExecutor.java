@@ -1024,9 +1024,9 @@ public class PixelsExecutor
     }
 
     /**
-     * Get the partition projection for the bast table that is to be partitioned.
+     * Get the partition projection for the base table that is to be partitioned.
      * If a column only exists in the filters but does not exist in the join projection
-     * (corresponding element is true), then the corresponding element in the partition
+     * (corresponding element is false), then the corresponding element in the partition
      * projection is false. Otherwise, it is true.
      *
      * @param table the base table

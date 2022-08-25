@@ -61,6 +61,7 @@ import static java.util.Objects.requireNonNull;
 public class StarlingExecutor
 {
     private static final Logger logger = LogManager.getLogger(StarlingExecutor.class);
+    private static final boolean enablePartitionProjection = false;
     private static final Storage.Scheme InputStorage;
     private static final Storage.Scheme IntermediateStorage;
     private static final String IntermediateFolder;
@@ -807,9 +808,9 @@ public class StarlingExecutor
     }
 
     /**
-     * Get the partition projection for the bast table that is to be partitioned.
+     * Get the partition projection for the base table that is to be partitioned.
      * If a column only exists in the filters but does not exist in the join projection
-     * (corresponding element is true), then the corresponding element in the partition
+     * (corresponding element is false), then the corresponding element in the partition
      * projection is false. Otherwise, it is true.
      *
      * @param table the base table
@@ -820,6 +821,12 @@ public class StarlingExecutor
     {
         String[] columnsToRead = table.getColumnNames();
         boolean[] projection = new boolean[columnsToRead.length];
+        if (!enablePartitionProjection)
+        {
+            Arrays.fill(projection, true);
+            return projection;
+        }
+
         if (table.getTableType() == BASE)
         {
             TableScanFilter tableScanFilter = ((BaseTable)table).getFilter();
@@ -846,6 +853,11 @@ public class StarlingExecutor
 
     private String[] rewriteColumnsToReadForPartitionedJoin(String[] originColumnsToRead, boolean[] partitionProjection)
     {
+        if (!enablePartitionProjection)
+        {
+            return originColumnsToRead;
+        }
+
         requireNonNull(originColumnsToRead, "originColumnsToRead is null");
         requireNonNull(partitionProjection, "partitionProjection is null");
         checkArgument(originColumnsToRead.length == partitionProjection.length,
@@ -876,6 +888,11 @@ public class StarlingExecutor
 
     private boolean[] rewriteProjectionForPartitionedJoin(boolean[] originProjection, boolean[] partitionProjection)
     {
+        if (!enablePartitionProjection)
+        {
+            return originProjection;
+        }
+
         requireNonNull(originProjection, "originProjection is null");
         requireNonNull(partitionProjection, "partitionProjection is null");
         checkArgument(originProjection.length == partitionProjection.length,
@@ -906,6 +923,11 @@ public class StarlingExecutor
 
     private int[] rewriteColumnIdsForPartitionedJoin(int[] originColumnIds, boolean[] partitionProjection)
     {
+        if (!enablePartitionProjection)
+        {
+            return originColumnIds;
+        }
+
         requireNonNull(originColumnIds, "originProjection is null");
         requireNonNull(partitionProjection, "partitionProjection is null");
         checkArgument(originColumnIds.length <= partitionProjection.length,
