@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
 import static io.pixelsdb.pixels.common.physical.storage.AbstractS3.EnableCache;
 import static io.pixelsdb.pixels.common.utils.Constants.REDIS_ID_KEY;
@@ -106,7 +107,16 @@ public class Redis implements Storage
 
     public Redis ()
     {
-        this.jedis = new JedisPooled(hostName, port, userName, password);
+        if (password == null || password.isEmpty())
+        {
+            checkArgument(userName == null || userName.isEmpty() || userName.equals("default"),
+                    "user name must be null, empty, or 'default' when password is not defined");
+            this.jedis = new JedisPooled(hostName, port);
+        }
+        else
+        {
+            this.jedis = new JedisPooled(hostName, port, userName, password);
+        }
     }
 
     @Override
