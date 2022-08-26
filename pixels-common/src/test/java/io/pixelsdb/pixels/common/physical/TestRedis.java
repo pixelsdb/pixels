@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
@@ -35,15 +36,17 @@ public class TestRedis
     @Test
     public void testReadWrite() throws IOException
     {
-        ConfigRedis("localhost:6379", "", "");
+        ConfigRedis("localhost:6379", "default", "");
         Storage redis = StorageFactory.Instance().getStorage(Storage.Scheme.redis);
 
         PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(redis, "test1", true);
 
         byte[] buffer = new byte[4096];
-        buffer[1] = 2;
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
         for (int i = 0; i < 1024 * 100; ++i)
         {
+            byteBuffer.position(0);
+            byteBuffer.putInt(i);
             writer.append(buffer, 0, buffer.length);
         }
         writer.close();
@@ -52,8 +55,10 @@ public class TestRedis
         int length = (int) (reader.getFileLength());
         System.out.println(length);
         Arrays.fill(buffer, (byte) 0);
+        reader.seek(4096*1024*99+4096*5);
         reader.readFully(buffer, 0, 4096);
-        System.out.println(buffer[1]);
+        byteBuffer = ByteBuffer.wrap(buffer);
+        System.out.println(byteBuffer.getInt());
         reader.close();
     }
 }
