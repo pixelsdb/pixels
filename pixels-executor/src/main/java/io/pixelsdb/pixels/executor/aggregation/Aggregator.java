@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.executor.aggregation.function.FunctionFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -38,7 +39,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class Aggregator
 {
-    private final HashMap<AggrTuple, AggrTuple> hashTable = new HashMap<>();
+    private final Map<AggrTuple, AggrTuple> aggrTable = new HashMap<>();
     private final int batchSize;
     private final TypeDescription outputSchema;
     private final int[] groupKeyColumnIds;
@@ -117,7 +118,7 @@ public class Aggregator
         while (builder.hasNext())
         {
             AggrTuple input = builder.next();
-            AggrTuple baseTuple = this.hashTable.get(input);
+            AggrTuple baseTuple = this.aggrTable.get(input);
             if (baseTuple != null)
             {
                 baseTuple.aggregate(input);
@@ -131,7 +132,7 @@ public class Aggregator
                     functions[i] = this.aggrFunctions[i].buildCopy();
                 }
                 input.initFunctions(functions);
-                this.hashTable.put(input, input);
+                this.aggrTable.put(input, input);
             }
         }
     }
@@ -139,7 +140,7 @@ public class Aggregator
     public boolean writeAggrOutput(PixelsWriter pixelsWriter) throws IOException
     {
         VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
-        for (AggrTuple output : this.hashTable.values())
+        for (AggrTuple output : this.aggrTable.values())
         {
             if (outputRowBatch.isFull())
             {
@@ -162,6 +163,6 @@ public class Aggregator
 
     public void clear()
     {
-        this.hashTable.clear();
+        this.aggrTable.clear();
     }
 }

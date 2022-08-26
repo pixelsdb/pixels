@@ -81,6 +81,75 @@ public class AggrTuple extends Tuple
     }
 
     @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj)
+        {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass())
+        {
+            return false;
+        }
+        Tuple other = (Tuple) obj;
+        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+        {
+            return false;
+        }
+        for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
+        {
+            ColumnVector thisVector = this.commonFields.columns[this.commonFields.keyColumnIds[i]];
+            ColumnVector otherVector = other.commonFields.columns[other.commonFields.keyColumnIds[i]];
+            if (thisVector.isNull[this.rowId] && otherVector.isNull[other.rowId])
+            {
+                /**
+                 * In SQL, NULL values in group by are considered equal. This is different from
+                 * the rules for filters and joins. Thus, we do a special processing here.
+                 */
+                continue;
+            }
+            // We only support equi-joins, thus null value is considered not equal to anything.
+            if (!thisVector.elementEquals(this.rowId, other.rowId, otherVector))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int compareTo(Tuple other)
+    {
+        if (this == other)
+        {
+            return 0;
+        }
+        if (this.commonFields.keyColumnIds.length != other.commonFields.keyColumnIds.length)
+        {
+            return Integer.compare(this.commonFields.keyColumnIds.length, other.commonFields.keyColumnIds.length);
+        }
+        for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)
+        {
+            ColumnVector thisVector = this.commonFields.columns[this.commonFields.keyColumnIds[i]];
+            ColumnVector otherVector = other.commonFields.columns[other.commonFields.keyColumnIds[i]];
+            if (thisVector.isNull[this.rowId] && otherVector.isNull[other.rowId])
+            {
+                /**
+                 * In SQL, NULL values in group by are considered equal. This is different from
+                 * the rules for filters and joins. Thus, we do a special processing here.
+                 */
+                continue;
+            }
+            int c = thisVector.compareElement(this.rowId, other.rowId, otherVector);
+            if (c != 0)
+            {
+                return c;
+            }
+        }
+        return 0;
+    }
+
+    @Override
     protected int writeTo(VectorizedRowBatch rowBatch, int start)
     {
         for (int i = 0; i < this.commonFields.keyColumnIds.length; ++i)

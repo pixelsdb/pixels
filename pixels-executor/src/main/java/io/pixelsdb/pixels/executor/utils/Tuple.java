@@ -67,11 +67,11 @@ public class Tuple implements Comparable<Tuple>
     /**
      * The index of this tuple in the corresponding row batch.
      */
-    protected final int rowId;
+    public final int rowId;
     /**
      * The common fields that are shared by all the tuples from the same row batch.
      */
-    protected final CommonFields commonFields;
+    public final CommonFields commonFields;
     /**
      * The left-table tuple that is joined with this tuple.
      * For equal join, the joined tuples should have the same join-key value.
