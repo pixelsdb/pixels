@@ -250,6 +250,10 @@ public class BinaryColumnVector extends ColumnVector
                 return false;
             }
             int start = this.start[index], otherStart = otherVector.start[otherIndex];
+            if (this.vector[index] == otherVector.vector[otherIndex] && start == otherStart)
+            {
+                return true;
+            }
             for (int i = 0; i < this.lens[index]; ++i)
             {
                 if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
@@ -273,6 +277,10 @@ public class BinaryColumnVector extends ColumnVector
                 return Integer.compare(this.lens[index], otherVector.lens[otherIndex]);
             }
             int start = this.start[index], otherStart = otherVector.start[otherIndex];
+            if (this.vector[index] == otherVector.vector[otherIndex] && start == otherStart)
+            {
+                return 0;
+            }
             for (int i = 0; i < this.lens[index]; ++i)
             {
                 if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
