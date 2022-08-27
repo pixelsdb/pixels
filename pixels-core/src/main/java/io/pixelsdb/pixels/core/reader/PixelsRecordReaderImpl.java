@@ -167,6 +167,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         // check RGStart and RGLen are within the range of actual number of row groups
         int rgNum = footer.getRowGroupInfosCount();
+
+        if (rgNum == 0)
+        {
+            checkValid = true;
+            endOfFile = true;
+            return;
+        }
+
         if (RGStart >= rgNum)
         {
             checkValid = false;
