@@ -234,6 +234,11 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 try (PixelsReader pixelsReader = getReader(inputFile, s3))
                 {
                     readCostTimer.stop();
+                    if (pixelsReader.getRowGroupNum() == 0)
+                    {
+                        it.remove();
+                        continue;
+                    }
                     PixelsReaderOption option = new PixelsReaderOption();
                     option.queryId(queryId);
                     option.includeCols(columnsToRead);

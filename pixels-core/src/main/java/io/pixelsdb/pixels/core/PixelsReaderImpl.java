@@ -249,8 +249,7 @@ public class PixelsReaderImpl
         }
 //        LOGGER.debug("create a recordReader with enableCache as " + enableCache);
         PixelsRecordReader recordReader = new PixelsRecordReaderImpl(physicalReader, postScript, footer, option,
-                enableMetrics, metricsDir, enableCache, cacheOrder,
-                pixelsCacheReader, pixelsFooterCache);
+                enableMetrics, metricsDir, enableCache, cacheOrder, pixelsCacheReader, pixelsFooterCache);
         recordReaders.add(recordReader);
         return recordReader;
     }
