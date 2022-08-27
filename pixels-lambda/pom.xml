@@ -144,7 +144,7 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>pixels-lambda</id>
+                        <id>pixels-lambda-workers</id>
                         <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
@@ -155,7 +155,7 @@
                                     <include>io.pixelsdb:*</include>
                                 </includes>
                             </artifactSet>
-                            <finalName>pixels-lambda</finalName>
+                            <finalName>pixels-lambda-workers</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-lambda/target</outputDirectory>
                             <transformers>
                                 <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer">

@@ -105,20 +105,22 @@ public class PixelsExecutor
      * @param rootTable the join plan
      * @param orderedPathEnabled whether ordered path is enabled
      * @param compactPathEnabled whether compact path is enabled
+     * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public PixelsExecutor(long queryId,
-                          Table rootTable,
+    public PixelsExecutor(long queryId, Table rootTable,
                           boolean orderedPathEnabled,
-                          boolean compactPathEnabled) throws IOException
+                          boolean compactPathEnabled,
+                          Optional<MetadataService> metadataService) throws IOException
     {
         this.queryId = queryId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
         checkArgument(rootTable.getTableType() == JOINED || rootTable.getTableType() == AGGREGATED,
                 "currently, PixelsExecutor only supports join and aggregation");
         this.config = ConfigFactory.Instance();
-        this.metadataService = new MetadataService(config.getProperty("metadata.server.host"),
-                Integer.parseInt(config.getProperty("metadata.server.port")));
+        this.metadataService = metadataService.orElseGet(() ->
+                new MetadataService(config.getProperty("metadata.server.host"),
+                        Integer.parseInt(config.getProperty("metadata.server.port"))));
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.orderedPathEnabled = orderedPathEnabled;
@@ -264,8 +266,7 @@ public class PixelsExecutor
                 preAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
                 preAggrInput.setResultColumnTypes(aggregation.getResultColumnTypes());
                 preAggrInput.setFunctionTypes(aggregation.getFunctionTypes());
-                preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage,
-                        null, null, null));
+                preAggrInput.setInputStorage(new StorageInfo(IntermediateStorage, null, null, null));
                 StorageInfo outputStorageInfo = new StorageInfo(IntermediateStorage, null, null, null);
                 preAggrInput.setParallelism(IntraWorkerParallelism);
 

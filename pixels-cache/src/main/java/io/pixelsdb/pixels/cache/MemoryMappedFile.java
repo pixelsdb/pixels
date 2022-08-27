@@ -31,18 +31,19 @@
  */
 package io.pixelsdb.pixels.cache;
 
-import sun.misc.Unsafe;
 import sun.nio.ch.FileChannelImpl;
 
 import java.io.FileDescriptor;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
 
 /**
  * This class has been tested.
@@ -56,10 +57,8 @@ import java.nio.channels.FileChannel;
 @SuppressWarnings("restriction")
 public class MemoryMappedFile
 {
-    private static final Unsafe unsafe;
     private static final Method mmap;
     private static final Method unmmap;
-    private static final ByteOrder order;
     // this is from sun.nio.ch.Util
     private static volatile Constructor<?> directByteBufferRConstructor = null;
     private static final int BYTE_ARRAY_OFFSET;
@@ -71,13 +70,9 @@ public class MemoryMappedFile
     {
         try
         {
-            Field singleOneInstanceField = Unsafe.class.getDeclaredField("theUnsafe");
-            singleOneInstanceField.setAccessible(true);
-            unsafe = (Unsafe) singleOneInstanceField.get(null);
             mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
             unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
-            order = ByteOrder.nativeOrder();
         }
         catch (Exception e)
         {
@@ -171,7 +166,7 @@ public class MemoryMappedFile
 
     public static ByteOrder getOrder()
     {
-        return order;
+        return nativeOrder;
     }
 
     /**

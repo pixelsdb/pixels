@@ -182,15 +182,18 @@ public class Joiner
      *
      * @param smallBatch a row batch from the left (a.k.a., small) table
      */
-    public synchronized void populateLeftTable(VectorizedRowBatch smallBatch)
+    public void populateLeftTable(VectorizedRowBatch smallBatch)
     {
         requireNonNull(smallBatch, "smallBatch is null");
         checkArgument(smallBatch.size > 0, "smallBatch is empty");
         Tuple.Builder builder = new Tuple.Builder(smallBatch, this.smallKeyColumnIds, this.smallProjection);
-        while (builder.hasNext())
+        synchronized (this.smallTable)
         {
-            Tuple tuple = builder.next();
-            this.smallTable.put(tuple);
+            while (builder.hasNext())
+            {
+                Tuple tuple = builder.next();
+                this.smallTable.put(tuple);
+            }
         }
     }
 

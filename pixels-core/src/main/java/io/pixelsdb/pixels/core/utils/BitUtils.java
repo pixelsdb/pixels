@@ -235,4 +235,15 @@ public class BitUtils
             bitsLeft = 8;
         }
     }
+
+    /**
+     * Copied from io.airlift.slice.
+     * Turns a long representing a sequence of 8 bytes read in little-endian order
+     * into a number that when compared produces the same effect as comparing the
+     * original sequence of bytes lexicographically
+     */
+    public static long longBytesToLong(long bytes)
+    {
+        return Long.reverseBytes(bytes) ^ Long.MIN_VALUE;
+    }
 }

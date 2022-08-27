@@ -24,7 +24,10 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import java.nio.charset.StandardCharsets;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
+import static io.pixelsdb.pixels.core.utils.BitUtils.longBytesToLong;
 import static java.util.Objects.requireNonNull;
+import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 
 /**
  * BinaryColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
@@ -225,14 +228,19 @@ public class BinaryColumnVector extends ColumnVector
             {
                 continue;
             }
-            /**
-             * The same as ByteBuffer.hashCode().
-             */
-            int h = 1;
-            int p = this.start[i];
-            for (int j = this.start[i] + this.lens[i] - 1; j >= p; j--)
+            int h = 1, len = this.lens[i];
+            long address = ARRAY_BYTE_BASE_OFFSET + this.start[i], word;
+            while (len >= Long.BYTES)
             {
-                h = 31 * h + (int)this.vector[i][j];
+                word = unsafe.getLong(this.vector[i], address);
+                h = 31 * h + (int) (word ^ word >>> 32);
+                address += Long.BYTES;
+                len -= Long.BYTES;
+            }
+            int offset = (int) (address - ARRAY_BYTE_BASE_OFFSET);
+            while (len-- > 0)
+            {
+                h = h * 31 + (int) this.vector[i][offset++];
             }
             hashCode[i] = 31 * hashCode[i] + h;
         }
@@ -240,57 +248,103 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     @Override
-    public boolean elementEquals(int index, int otherIndex, ColumnVector other)
+    public boolean elementEquals(int thisIndex, int thatIndex, ColumnVector thatVector)
     {
-        BinaryColumnVector otherVector = (BinaryColumnVector) other;
-        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        BinaryColumnVector that = (BinaryColumnVector) thatVector;
+        if (!this.isNull[thisIndex] && !that.isNull[thatIndex])
         {
-            if (this.lens[index] != otherVector.lens[otherIndex])
+            if (this.lens[thisIndex] != that.lens[thatIndex])
             {
                 return false;
             }
-            int start = this.start[index], otherStart = otherVector.start[otherIndex];
-            if (this.vector[index] == otherVector.vector[otherIndex] && start == otherStart)
+
+            int thisStart = this.start[thisIndex], thatStart = that.start[thatIndex];
+            if (this.vector[thisIndex] == that.vector[thatIndex] && thisStart == thatStart)
             {
                 return true;
             }
-            for (int i = 0; i < this.lens[index]; ++i)
+
+            int compareLen = this.lens[thisIndex];
+            long thisAddress = ARRAY_BYTE_BASE_OFFSET + thisStart;
+            long thatAddress = ARRAY_BYTE_BASE_OFFSET + thatStart;
+            long thisWord, thatWord;
+
+            while (compareLen >= Long.BYTES)
             {
-                if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
+                thisWord = unsafe.getLong(this.vector[thisIndex], thisAddress);
+                thatWord = unsafe.getLong(that.vector[thatIndex], thatAddress);
+                if (thisWord != thatWord)
+                {
+                    return false;
+                }
+                thisAddress += Long.BYTES;
+                thatAddress += Long.BYTES;
+                compareLen -= Long.BYTES;
+            }
+
+            thisStart = (int) (thisAddress - ARRAY_BYTE_BASE_OFFSET);
+            thatStart = (int) (thatAddress - ARRAY_BYTE_BASE_OFFSET);
+
+            while (compareLen-- > 0)
+            {
+                if (this.vector[thisIndex][thisStart++] != that.vector[thatIndex][thatStart++])
                 {
                     return false;
                 }
             }
+
             return true;
         }
         return false;
     }
 
     @Override
-    public int compareElement(int index, int otherIndex, ColumnVector other)
+    public int compareElement(int thisIndex, int thatIndex, ColumnVector thatVector)
     {
-        BinaryColumnVector otherVector = (BinaryColumnVector) other;
-        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
+        BinaryColumnVector that = (BinaryColumnVector) thatVector;
+        if (!this.isNull[thisIndex] && !that.isNull[thatIndex])
         {
-            if (this.lens[index] != otherVector.lens[otherIndex])
-            {
-                return Integer.compare(this.lens[index], otherVector.lens[otherIndex]);
-            }
-            int start = this.start[index], otherStart = otherVector.start[otherIndex];
-            if (this.vector[index] == otherVector.vector[otherIndex] && start == otherStart)
+            int thisStart = this.start[thisIndex], thatStart = that.start[thatIndex];
+            int thisLen = this.lens[thisIndex], thatLen = that.lens[thatIndex];
+            if (this.vector[thisIndex] == that.vector[thatIndex] && thisStart == thatStart && thisLen == thatLen)
             {
                 return 0;
             }
-            for (int i = 0; i < this.lens[index]; ++i)
+
+            int compareLen = Math.min(thisLen, thatLen);
+            long thisAddress = ARRAY_BYTE_BASE_OFFSET + thisStart;
+            long thatAddress = ARRAY_BYTE_BASE_OFFSET + thatStart;
+            long thisWord, thatWord;
+
+            while (compareLen >= Long.BYTES)
             {
-                if (this.vector[index][start+i] != otherVector.vector[otherIndex][otherStart+i])
+                thisWord = unsafe.getLong(this.vector[thisIndex], thisAddress);
+                thatWord = unsafe.getLong(that.vector[thatIndex], thatAddress);
+                if (thisWord != thatWord)
                 {
-                    return Byte.compare(this.vector[index][start+i], otherVector.vector[otherIndex][otherStart+i]);
+                    return longBytesToLong(thisWord) < longBytesToLong(thatWord) ? -1 : 1;
+                }
+                thisAddress += Long.BYTES;
+                thatAddress += Long.BYTES;
+                compareLen -= Long.BYTES;
+            }
+
+            thisStart = (int) (thisAddress - ARRAY_BYTE_BASE_OFFSET);
+            thatStart = (int) (thatAddress - ARRAY_BYTE_BASE_OFFSET);
+
+            int c;
+            while (compareLen-- > 0)
+            {
+                c = (this.vector[thisIndex][thisStart++] & 0xFF) - (that.vector[thatIndex][thatStart++] & 0xFF);
+                if (c != 0)
+                {
+                    return c;
                 }
             }
-            return 0;
+
+            return Integer.compare(thisLen, thatLen);
         }
-        return this.isNull[index] ? -1 : 1;
+        return this.isNull[thisIndex] ? -1 : 1;
     }
 
     /**
