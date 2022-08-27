@@ -28,6 +28,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
+import static io.pixelsdb.pixels.core.utils.BitUtils.longBytesToLong;
+import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
+
 /**
  * @author hank
  * @date 8/13/22
@@ -132,16 +136,34 @@ public class HashTableDictionary implements Dictionary
         @Override
         public int compareTo(KeyBuffer that)
         {
-            int n = this.offset + (this.length < that.length ? this.length : that.length);
-            int c;
-            for (int i = this.offset, j = that.offset; i < n; ++i, ++j)
+            int compareLen = this.length < that.length ? this.length : that.length;
+            long thisAddress = ARRAY_BYTE_BASE_OFFSET + this.offset;
+            long thatAddress = ARRAY_BYTE_BASE_OFFSET + that.offset;
+            while (compareLen >= Long.BYTES)
             {
-                c = this.bytes[i] - that.bytes[j];
+                long thisWord = unsafe.getLong(this.bytes, thisAddress);
+                long thatWord = unsafe.getLong(that.bytes, thatAddress);
+                if (thisWord != thatWord)
+                {
+                    return longBytesToLong(thisWord) < longBytesToLong(thatWord) ? -1 : 1;
+                }
+                thisAddress += Long.BYTES;
+                thatAddress += Long.BYTES;
+                compareLen -= Long.BYTES;
+            }
+
+            int c;
+            int thisOffset = (int) (thisAddress - ARRAY_BYTE_BASE_OFFSET);
+            int thatOffset = (int) (thatAddress - ARRAY_BYTE_BASE_OFFSET);
+            while (compareLen-- > 0)
+            {
+                c = (this.bytes[thisOffset++] & 0xFF) - (that.bytes[thatOffset++] & 0xFF);
                 if (c != 0)
                 {
                     return c;
                 }
             }
+
             return this.length - that.length;
         }
 
@@ -153,23 +175,57 @@ public class HashTableDictionary implements Dictionary
             {
                 return false;
             }
-            int n = this.offset + this.length;
-            for (int i = this.offset, j = that.offset; i < n; ++i, ++j)
+
+            long thisAddress = ARRAY_BYTE_BASE_OFFSET + this.offset;
+            long thatAddress = ARRAY_BYTE_BASE_OFFSET + that.offset;
+            int compareLen = this.length;
+            long thisWord, thatWord;
+
+            while (compareLen >= Long.BYTES)
             {
-                if (this.bytes[i] != that.bytes[j])
+                thisWord = unsafe.getLong(this.bytes, thisAddress);
+                thatWord = unsafe.getLong(that.bytes, thatAddress);
+                if (thisWord != thatWord)
+                {
+                    return false;
+                }
+                thisAddress += Long.BYTES;
+                thatAddress += Long.BYTES;
+                compareLen -= Long.BYTES;
+            }
+
+            int thisOffset = (int) (thisAddress - ARRAY_BYTE_BASE_OFFSET);
+            int thatOffset = (int) (thatAddress - ARRAY_BYTE_BASE_OFFSET);
+            while (compareLen-- > 0)
+            {
+                if (this.bytes[thisOffset++] != that.bytes[thatOffset++])
                 {
                     return false;
                 }
             }
+
             return true;
         }
 
         @Override
         public int hashCode()
         {
-            int result = 31 + Integer.hashCode(this.length), n = this.offset + this.length;
-            for (int i = this.offset; i < n; ++i)
-                result = 31 * result + this.bytes[i];
+            int result = 31 + Integer.hashCode(this.length), len = this.length;
+
+            long address = ARRAY_BYTE_BASE_OFFSET + this.offset, word;
+            while (len >= Long.BYTES)
+            {
+                word = unsafe.getLong(this.bytes, address);
+                result = 31 * result + (int) (word ^ word >>> 32);
+                address += Long.BYTES;
+                len -= Long.BYTES;
+            }
+            int i = (int) (address - ARRAY_BYTE_BASE_OFFSET);
+            while (len-- > 0)
+            {
+                result = result * 31 + (int) this.bytes[i++];
+            }
+
             return result;
         }
 

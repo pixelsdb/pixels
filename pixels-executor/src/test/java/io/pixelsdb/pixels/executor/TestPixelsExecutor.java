@@ -93,7 +93,7 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem", join3);
 
         PixelsExecutor joinExecutor = new PixelsExecutor(
-                123456, root, false, true);
+                123456, root, false, true, Optional.empty());
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
     }
@@ -184,7 +184,7 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer", join5);
 
         PixelsExecutor joinExecutor = new PixelsExecutor(
-                123456, root, false, true);
+                123456, root, false, true, Optional.empty());
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
     }
@@ -258,7 +258,7 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_part", join4);
 
         PixelsExecutor joinExecutor = new PixelsExecutor(
-                123456, root, false, true);
+                123456, root, false, true, Optional.empty());
 
         JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
     }

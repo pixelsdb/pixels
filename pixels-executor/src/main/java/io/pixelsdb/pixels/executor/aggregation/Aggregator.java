@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.executor.aggregation.function.Function;
 import io.pixelsdb.pixels.executor.aggregation.function.FunctionFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +40,8 @@ import static java.util.Objects.requireNonNull;
  */
 public class Aggregator
 {
-    private final Map<AggrTuple, AggrTuple> aggrTable = new HashMap<>();
+    private final int NUM_AGGR_TABLES = 41;
+    private final List<Map<AggrTuple, AggrTuple>> aggrTables;
     private final int batchSize;
     private final TypeDescription outputSchema;
     private final int[] groupKeyColumnIds;
@@ -102,6 +104,12 @@ public class Aggregator
             this.aggrFunctions[i] = FunctionFactory.Instance().createFunction(
                     functionTypes[i], inputTypes.get(aggrColumnIds[i]), outputType);
         }
+
+        this.aggrTables = new ArrayList<>(NUM_AGGR_TABLES);
+        for (int i = 0; i < NUM_AGGR_TABLES; ++i)
+        {
+            this.aggrTables.add(new HashMap<>());
+        }
     }
 
     /**
@@ -111,28 +119,32 @@ public class Aggregator
      *
      * @param inputRowBatch the row batch of the aggregation input
      */
-    public synchronized void aggregate(VectorizedRowBatch inputRowBatch)
+    public void aggregate(VectorizedRowBatch inputRowBatch)
     {
         AggrTuple.Builder builder = new AggrTuple.Builder(
                 inputRowBatch, this.groupKeyColumnIds, this.groupKeyColumnProjection, this.aggrColumnIds);
-        while (builder.hasNext())
+        synchronized (this.aggrTables)
         {
-            AggrTuple input = builder.next();
-            AggrTuple baseTuple = this.aggrTable.get(input);
-            if (baseTuple != null)
+            while (builder.hasNext())
             {
-                baseTuple.aggregate(input);
-            }
-            else
-            {
-                // Create the functions.
-                Function[] functions = new Function[this.aggrFunctions.length];
-                for (int i = 0; i < this.aggrFunctions.length; ++i)
+                AggrTuple input = builder.next();
+                int index = input.hashCode() % NUM_AGGR_TABLES;
+                Map<AggrTuple, AggrTuple> aggrTable = this.aggrTables.get(index < 0 ? -index : index);
+                AggrTuple baseTuple = aggrTable.get(input);
+                if (baseTuple != null)
                 {
-                    functions[i] = this.aggrFunctions[i].buildCopy();
+                    baseTuple.aggregate(input);
+                } else
+                {
+                    // Create the functions.
+                    Function[] functions = new Function[this.aggrFunctions.length];
+                    for (int i = 0; i < this.aggrFunctions.length; ++i)
+                    {
+                        functions[i] = this.aggrFunctions[i].buildCopy();
+                    }
+                    input.initFunctions(functions);
+                    aggrTable.put(input, input);
                 }
-                input.initFunctions(functions);
-                this.aggrTable.put(input, input);
             }
         }
     }
@@ -140,14 +152,17 @@ public class Aggregator
     public boolean writeAggrOutput(PixelsWriter pixelsWriter) throws IOException
     {
         VectorizedRowBatch outputRowBatch = this.outputSchema.createRowBatch(this.batchSize);
-        for (AggrTuple output : this.aggrTable.values())
+        for (Map<AggrTuple, AggrTuple> aggrTable : this.aggrTables)
         {
-            if (outputRowBatch.isFull())
+            for (AggrTuple output : aggrTable.values())
             {
-                pixelsWriter.addRowBatch(outputRowBatch);
-                outputRowBatch.reset();
+                if (outputRowBatch.isFull())
+                {
+                    pixelsWriter.addRowBatch(outputRowBatch);
+                    outputRowBatch.reset();
+                }
+                output.writeTo(outputRowBatch);
             }
-            output.writeTo(outputRowBatch);
         }
         if (!outputRowBatch.isEmpty())
         {
@@ -163,6 +178,10 @@ public class Aggregator
 
     public void clear()
     {
-        this.aggrTable.clear();
+        for (Map<AggrTuple, AggrTuple> aggrTable : this.aggrTables)
+        {
+            aggrTable.clear();
+        }
+        this.aggrTables.clear();
     }
 }
