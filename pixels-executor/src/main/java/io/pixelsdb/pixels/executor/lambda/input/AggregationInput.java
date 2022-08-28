@@ -47,6 +47,18 @@ public class AggregationInput extends Input
      */
     private int numPartition;
     /**
+     * The name of the columns to read from the input files.
+     */
+    private String[] columnsToRead;
+    /**
+     * The column ids of the group-key columns in the input files.
+     */
+    private int[] groupKeyColumnIds;
+    /**
+     * The column ids of the aggregate columns in the input files.
+     */
+    private int[] aggregateColumnIds;
+    /**
      * The column names of the group-key columns in the aggregation result.
      */
     private String[] groupKeyColumnNames;
@@ -92,6 +104,7 @@ public class AggregationInput extends Input
     public AggregationInput() { }
 
     public AggregationInput(long queryId, boolean inputPartitioned, List<Integer> hashValues, int numPartition,
+                            String[] columnsToRead, int[] groupKeyColumnIds, int[] aggregateColumnIds,
                             String[] groupKeyColumnNames, boolean[] groupKeyColumnProjection, String[] resultColumnNames,
                             String[] resultColumnTypes, FunctionType[] functionTypes, List<String> inputFiles,
                             StorageInfo inputStorage, int parallelism, OutputInfo output)
@@ -100,6 +113,9 @@ public class AggregationInput extends Input
         this.inputPartitioned = inputPartitioned;
         this.hashValues = hashValues;
         this.numPartition = numPartition;
+        this.columnsToRead = columnsToRead;
+        this.groupKeyColumnIds = groupKeyColumnIds;
+        this.aggregateColumnIds = aggregateColumnIds;
         this.groupKeyColumnNames = groupKeyColumnNames;
         this.groupKeyColumnProjection = groupKeyColumnProjection;
         this.resultColumnNames = resultColumnNames;
@@ -149,6 +165,36 @@ public class AggregationInput extends Input
     public void setNumPartition(int numPartition)
     {
         this.numPartition = numPartition;
+    }
+
+    public String[] getColumnsToRead()
+    {
+        return columnsToRead;
+    }
+
+    public void setColumnsToRead(String[] columnsToRead)
+    {
+        this.columnsToRead = columnsToRead;
+    }
+
+    public int[] getGroupKeyColumnIds()
+    {
+        return groupKeyColumnIds;
+    }
+
+    public void setGroupKeyColumnIds(int[] groupKeyColumnIds)
+    {
+        this.groupKeyColumnIds = groupKeyColumnIds;
+    }
+
+    public int[] getAggregateColumnIds()
+    {
+        return aggregateColumnIds;
+    }
+
+    public void setAggregateColumnIds(int[] aggregateColumnIds)
+    {
+        this.aggregateColumnIds = aggregateColumnIds;
     }
 
     public String[] getGroupKeyColumnNames()

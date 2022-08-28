@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.lambda;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ObjectArrays;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -99,6 +98,12 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
 
             FunctionType[] functionTypes = requireNonNull(event.getFunctionTypes(),
                     "event.functionTypes is null");
+            String[] columnsToRead = requireNonNull(event.getColumnsToRead(),
+                    "event.columnsToRead is null");
+            int[] groupKeyColumnIds = requireNonNull(event.getGroupKeyColumnIds(),
+                    "event.groupKeyColumnIds is null");
+            int[] aggrColumnIds = requireNonNull(event.getAggregateColumnIds(),
+                    "event.aggregateColumnIds is null");
             String[] groupKeyColumnNames = requireNonNull(event.getGroupKeyColumnNames(),
                     "event.groupKeyColumnIds is null");
             String[] resultColumnNames = requireNonNull(event.getResultColumnNames(),
@@ -138,22 +143,9 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 throw new PixelsWorkerException("failed to initialize Minio storage", e);
             }
 
-            // prepare the input schema and column ids for the aggregation.
-            String[] includeCols = ObjectArrays.concat(groupKeyColumnNames, resultColumnNames, String.class);
             TypeDescription inputSchema = getFileSchemaFromPaths(s3, inputFiles);
-            checkArgument(inputSchema.getChildren().size() == includeCols.length,
+            checkArgument(inputSchema.getChildren().size() == columnsToRead.length,
                     "input file does not contain the correct number of columns");
-            int[] groupKeyColumnIds = new int[groupKeyColumnNames.length];
-            int columnId = 0;
-            for (int i = 0; i < groupKeyColumnIds.length; ++i)
-            {
-                groupKeyColumnIds[i] = columnId++;
-            }
-            int[] aggrColumnIds = new int[resultColumnNames.length];
-            for (int i = 0; i < aggrColumnIds.length; ++i)
-            {
-                aggrColumnIds[i] = columnId++;
-            }
 
             // start aggregation.
             Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema, groupKeyColumnNames,
@@ -170,7 +162,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 threadPool.execute(() -> {
                     try
                     {
-                        aggregate(queryId, files, includeCols, hashValues, numPartition, aggregator, metricsCollector);
+                        aggregate(queryId, files, columnsToRead, hashValues, numPartition, aggregator, metricsCollector);
                     }
                     catch (Exception e)
                     {
@@ -283,8 +275,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     }
                     else
                     {
-                        checkArgument(hashValues.isEmpty() != pixelsReader.isPartitioned(),
-                                "input file must be partitioned if hashValues is not empty, and vice versa");
+                        checkArgument(pixelsReader.isPartitioned(), "input file is not partitioned");
                         Set<Integer> existHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
                         for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
                         {

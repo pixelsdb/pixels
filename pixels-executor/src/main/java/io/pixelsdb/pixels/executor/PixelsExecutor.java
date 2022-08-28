@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ObjectArrays;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
@@ -165,10 +166,10 @@ public class PixelsExecutor
         partialAggregationInfo.setPartition(true);
         partialAggregationInfo.setNumPartition(16);
 
-        String intermediateBase = IntermediateFolder + queryId + "/" +
+        final String intermediateBase = IntermediateFolder + queryId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
-        ImmutableList.Builder<String> partialAggrFilesBuilder = ImmutableList.builder();
+        ImmutableList.Builder<String> aggrInputFilesBuilder = ImmutableList.builder();
         ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
         JoinOperator joinOperator = null;
         if (originTable.getTableType() == BASE)
@@ -203,7 +204,7 @@ public class PixelsExecutor
                 StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
                 scanInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
                 scanInputsBuilder.add(scanInput);
-                partialAggrFilesBuilder.add(fileName);
+                aggrInputFilesBuilder.add(fileName);
             }
         }
         else if (originTable.getTableType() == JOINED)
@@ -222,16 +223,29 @@ public class PixelsExecutor
                 outputInfo.setStorageInfo(storageInfo);
                 outputInfo.setPath(intermediateBase);
                 outputInfo.setFileNames(ImmutableList.of(fileName));
-                partialAggrFilesBuilder.add(intermediateBase + fileName);
+                aggrInputFilesBuilder.add(intermediateBase + fileName);
             }
         }
         else
         {
             throw new InvalidArgumentException("origin table for aggregation must be base or joined table");
         }
-        // build the pre-aggregation inputs.
-        List<String> partialAggrFiles = partialAggrFilesBuilder.build();
+        // build the final-aggregation inputs.
+        List<String> aggrInputFiles = aggrInputFilesBuilder.build();
         ImmutableList.Builder<AggregationInput> finalAggrInputsBuilder = ImmutableList.builder();
+        int columnId = 0;
+        int[] groupKeyColumnIds = new int[aggregation.getGroupKeyColumnAlias().length];
+        for (int i = 0; i < groupKeyColumnIds.length; ++i)
+        {
+            groupKeyColumnIds[i] = columnId++;
+        }
+        int[] aggrColumnIds = new int[aggregation.getResultColumnAlias().length];
+        for (int i = 0; i < aggrColumnIds.length; ++i)
+        {
+            aggrColumnIds[i] = columnId++;
+        }
+        String[] columnsToRead = ObjectArrays.concat(
+                aggregation.getGroupKeyColumnAlias(), aggregation.getResultColumnAlias(), String.class);
         for (int hash = 0; hash < 16; ++hash)
         {
             AggregationInput finalAggrInput = new AggregationInput();
@@ -239,7 +253,10 @@ public class PixelsExecutor
             finalAggrInput.setInputPartitioned(true);
             finalAggrInput.setHashValues(ImmutableList.of(hash));
             finalAggrInput.setNumPartition(16);
-            finalAggrInput.setInputFiles(partialAggrFiles);
+            finalAggrInput.setInputFiles(aggrInputFiles);
+            finalAggrInput.setColumnsToRead(columnsToRead);
+            finalAggrInput.setGroupKeyColumnIds(groupKeyColumnIds);
+            finalAggrInput.setAggregateColumnIds(aggrColumnIds);
             finalAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
             finalAggrInput.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
             finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());

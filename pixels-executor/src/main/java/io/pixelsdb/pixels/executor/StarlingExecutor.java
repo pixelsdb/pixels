@@ -146,7 +146,7 @@ public class StarlingExecutor
         }
     }
 
-    private AggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)
+    private StarlingAggregationOperator getAggregationOperator(AggregatedTable aggregatedTable)
             throws IOException, MetadataException
     {
         requireNonNull(aggregatedTable, "aggregatedTable is null");
@@ -166,11 +166,13 @@ public class StarlingExecutor
         partialAggregationInfo.setPartition(true);
         partialAggregationInfo.setNumPartition(16);
 
-        String intermediateBase = IntermediateFolder + queryId + "/" +
+        PartitionInfo partitionInfo = new PartitionInfo(aggregation.getGroupKeyColumnIds(), 16);
+
+        final String intermediateBase = IntermediateFolder + queryId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
 
-        ImmutableList.Builder<String> partialAggrFilesBuilder = ImmutableList.builder();
-        ImmutableList.Builder<ScanInput> scanInputsBuilder = ImmutableList.builder();
+        ImmutableList.Builder<String> AggrInputFilesBuilder = ImmutableList.builder();
+        ImmutableList.Builder<PartitionInput> partitionInputsBuilder = ImmutableList.builder();
         JoinOperator joinOperator = null;
         if (originTable.getTableType() == BASE)
         {
@@ -182,8 +184,8 @@ public class StarlingExecutor
 
             for (int i = 0; i < inputSplits.size(); )
             {
-                ScanInput scanInput = new ScanInput();
-                scanInput.setQueryId(queryId);
+                PartitionInput partitionInput = new PartitionInput();
+                partitionInput.setQueryId(queryId);
                 ScanTableInfo tableInfo = new ScanTableInfo();
                 ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
                         .builderWithExpectedSize(IntraWorkerParallelism);
@@ -196,15 +198,14 @@ public class StarlingExecutor
                 tableInfo.setColumnsToRead(originTable.getColumnNames());
                 tableInfo.setTableName(originTable.getTableName());
                 tableInfo.setFilter(JSON.toJSONString(((BaseTable) originTable).getFilter()));
-                scanInput.setTableInfo(tableInfo);
-                scanInput.setScanProjection(scanProjection);
-                scanInput.setPartialAggregationPresent(true);
-                scanInput.setPartialAggregationInfo(partialAggregationInfo);
-                String fileName = intermediateBase + (outputId++) + "/partial_aggr";
+                partitionInput.setTableInfo(tableInfo);
+                partitionInput.setProjection(scanProjection);
+                partitionInput.setPartitionInfo(partitionInfo);
+                String fileName = intermediateBase + (outputId++) + "/part";
                 StorageInfo storageInfo = new StorageInfo(IntermediateStorage, null, null, null);
-                scanInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
-                scanInputsBuilder.add(scanInput);
-                partialAggrFilesBuilder.add(fileName);
+                partitionInput.setOutput(new OutputInfo(fileName, false, storageInfo, true));
+                partitionInputsBuilder.add(partitionInput);
+                AggrInputFilesBuilder.add(fileName);
             }
         }
         else if (originTable.getTableType() == JOINED)
@@ -223,15 +224,15 @@ public class StarlingExecutor
                 outputInfo.setStorageInfo(storageInfo);
                 outputInfo.setPath(intermediateBase);
                 outputInfo.setFileNames(ImmutableList.of(fileName));
-                partialAggrFilesBuilder.add(intermediateBase + fileName);
+                AggrInputFilesBuilder.add(intermediateBase + fileName);
             }
         }
         else
         {
             throw new InvalidArgumentException("origin table for aggregation must be base or joined table");
         }
-        // build the pre-aggregation inputs.
-        List<String> partialAggrFiles = partialAggrFilesBuilder.build();
+        // build the final-aggregation inputs.
+        List<String> aggrInputFiles = AggrInputFilesBuilder.build();
         ImmutableList.Builder<AggregationInput> finalAggrInputsBuilder = ImmutableList.builder();
         for (int hash = 0; hash < 16; ++hash)
         {
@@ -240,7 +241,10 @@ public class StarlingExecutor
             finalAggrInput.setInputPartitioned(true);
             finalAggrInput.setHashValues(ImmutableList.of(hash));
             finalAggrInput.setNumPartition(16);
-            finalAggrInput.setInputFiles(partialAggrFiles);
+            finalAggrInput.setInputFiles(aggrInputFiles);
+            finalAggrInput.setColumnsToRead(originTable.getColumnNames());
+            finalAggrInput.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
+            finalAggrInput.setAggregateColumnIds(aggregation.getAggregateColumnIds());
             finalAggrInput.setGroupKeyColumnNames(aggregation.getGroupKeyColumnAlias());
             finalAggrInput.setGroupKeyColumnProjection(aggregation.getGroupKeyColumnProjection());
             finalAggrInput.setResultColumnNames(aggregation.getResultColumnAlias());
@@ -254,8 +258,8 @@ public class StarlingExecutor
             finalAggrInputsBuilder.add(finalAggrInput);
         }
 
-        AggregationOperator aggregationOperator = new AggregationOperator(aggregatedTable.getTableName(),
-                finalAggrInputsBuilder.build(), scanInputsBuilder.build());
+        StarlingAggregationOperator aggregationOperator = new StarlingAggregationOperator(aggregatedTable.getTableName(),
+                finalAggrInputsBuilder.build(), partitionInputsBuilder.build());
         aggregationOperator.setChild(joinOperator);
 
         return aggregationOperator;
