@@ -23,7 +23,7 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.executor.lambda.InvokerFactory;
 import io.pixelsdb.pixels.executor.lambda.WorkerType;
 import io.pixelsdb.pixels.executor.lambda.input.AggregationInput;
-import io.pixelsdb.pixels.executor.lambda.input.ScanInput;
+import io.pixelsdb.pixels.executor.lambda.input.PartitionInput;
 import io.pixelsdb.pixels.executor.lambda.output.Output;
 
 import java.util.List;
@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @date 05/07/2022
  */
-public class AggregationOperator extends Operator
+public class StarlingAggregationOperator extends Operator
 {
     /**
      * The inputs of the final aggregation workers that aggregate the
@@ -46,37 +46,38 @@ public class AggregationOperator extends Operator
      */
     private final List<AggregationInput> finalAggrInputs;
     /**
-     * The scan inputs of the scan workers that produce the partial aggregation
-     * results. It should be empty if child is not null.
+     * The inputs of the partition workers that shuffle that bast table.
+     * It should be empty if child is not null.
      */
-    private final List<ScanInput> scanInputs;
+    private final List<PartitionInput> partitionInputs;
     /**
      * The child operator that produce the partial aggregation results. It
      * should be null if scanInputs is not empty.
      */
     private Operator child = null;
     /**
-     * The outputs of the scan workers.
+     * The outputs of the partition workers.
      */
-    private CompletableFuture<?>[] scanOutputs = null;
+    private CompletableFuture<?>[] partitionOutputs = null;
     /**
      * The outputs of the final aggregation workers.
      */
     private CompletableFuture<?>[] finalAggrOutputs = null;
 
-    public AggregationOperator(String name, List<AggregationInput> finalAggrInputs, List<ScanInput> scanInputs)
+    public StarlingAggregationOperator(String name, List<AggregationInput> finalAggrInputs,
+                                       List<PartitionInput> partitionInputs)
     {
         super(name);
         requireNonNull(finalAggrInputs, "finalAggrInputs is null");
         checkArgument(!finalAggrInputs.isEmpty(), "finalAggrInputs is empty");
         this.finalAggrInputs = ImmutableList.copyOf(finalAggrInputs);
-        if (scanInputs == null || scanInputs.isEmpty())
+        if (partitionInputs == null || partitionInputs.isEmpty())
         {
-            this.scanInputs = ImmutableList.of();
+            this.partitionInputs = ImmutableList.of();
         }
         else
         {
-            this.scanInputs = ImmutableList.copyOf(scanInputs);
+            this.partitionInputs = ImmutableList.copyOf(partitionInputs);
         }
     }
 
@@ -85,23 +86,23 @@ public class AggregationOperator extends Operator
         return finalAggrInputs;
     }
 
-    public List<ScanInput> getScanInputs()
+    public List<PartitionInput> getPartitionInputs()
     {
-        return scanInputs;
+        return partitionInputs;
     }
 
     public void setChild(Operator child)
     {
         if (child == null)
         {
-            checkArgument(!this.scanInputs.isEmpty(),
-                    "scanInputs must be non-empty if child is set to null");
+            checkArgument(!this.partitionInputs.isEmpty(),
+                    "partitionInputs must be non-empty if child is set to null");
             this.child = null;
         }
         else
         {
-            checkArgument(this.scanInputs.isEmpty(),
-                    "scanInputs must be empty if child is set to non-null");
+            checkArgument(this.partitionInputs.isEmpty(),
+                    "partitionInputs must be empty if child is set to non-null");
             this.child = child;
         }
     }
@@ -146,18 +147,18 @@ public class AggregationOperator extends Operator
                 CompletableFuture<CompletableFuture<?>[]> childFuture = null;
                 if (this.child != null)
                 {
-                    checkArgument(this.scanInputs.isEmpty(), "scanInputs is not empty");
-                    this.scanOutputs = new CompletableFuture[0];
+                    checkArgument(this.partitionInputs.isEmpty(), "partitionInputs is not empty");
+                    this.partitionOutputs = new CompletableFuture[0];
                     childFuture = this.child.execute();
                 } else
                 {
-                    checkArgument(!this.scanInputs.isEmpty(), "scanInputs is empty");
-                    this.scanOutputs = new CompletableFuture[this.scanInputs.size()];
+                    checkArgument(!this.partitionInputs.isEmpty(), "partitionInputs is empty");
+                    this.partitionOutputs = new CompletableFuture[this.partitionInputs.size()];
                     int i = 0;
-                    for (ScanInput scanInput : this.scanInputs)
+                    for (PartitionInput partitionInput : this.partitionInputs)
                     {
-                        this.scanOutputs[i++] = InvokerFactory.Instance()
-                                .getInvoker(WorkerType.SCAN).invoke(scanInput);
+                        this.partitionOutputs[i++] = InvokerFactory.Instance()
+                                .getInvoker(WorkerType.PARTITION).invoke(partitionInput);
                     }
                 }
 
@@ -165,9 +166,9 @@ public class AggregationOperator extends Operator
                 {
                     waitForCompletion(childFuture.join());
                 }
-                if (this.scanOutputs.length > 0)
+                if (this.partitionOutputs.length > 0)
                 {
-                    waitForCompletion(this.scanOutputs);
+                    waitForCompletion(this.partitionOutputs);
                 }
 
                 prevStagesFuture.complete(null);
@@ -186,14 +187,14 @@ public class AggregationOperator extends Operator
     {
         AggregationOutputCollection outputCollection = new AggregationOutputCollection();
 
-        if (this.scanOutputs.length > 0)
+        if (this.partitionOutputs.length > 0)
         {
-            Output[] outputs = new Output[this.scanOutputs.length];
-            for (int i = 0; i < this.scanOutputs.length; ++i)
+            Output[] outputs = new Output[this.partitionOutputs.length];
+            for (int i = 0; i < this.partitionOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.scanOutputs[i].get();
+                outputs[i] = (Output) this.partitionOutputs[i].get();
             }
-            outputCollection.setScanOutputs(outputs);
+            outputCollection.setPartitionOutputs(outputs);
         }
         if (this.finalAggrOutputs != null && this.finalAggrOutputs.length > 0)
         {
@@ -209,25 +210,25 @@ public class AggregationOperator extends Operator
 
     public static class AggregationOutputCollection implements OutputCollection
     {
-        private Output[] scanOutputs = null;
+        private Output[] partitionOutputs = null;
         private Output[] finalAggrOutputs = null;
 
         public AggregationOutputCollection() { }
 
-        public AggregationOutputCollection(Output[] scanOutputs, Output[] preAggrOutputs)
+        public AggregationOutputCollection(Output[] partitionOutputs, Output[] preAggrOutputs)
         {
-            this.scanOutputs = scanOutputs;
+            this.partitionOutputs = partitionOutputs;
             this.finalAggrOutputs = preAggrOutputs;
         }
 
-        public Output[] getScanOutputs()
+        public Output[] getPartitionOutputs()
         {
-            return scanOutputs;
+            return partitionOutputs;
         }
 
-        public void setScanOutputs(Output[] scanOutputs)
+        public void setPartitionOutputs(Output[] partitionOutputs)
         {
-            this.scanOutputs = scanOutputs;
+            this.partitionOutputs = partitionOutputs;
         }
 
         public Output[] getFinalAggrOutputs()
@@ -244,9 +245,9 @@ public class AggregationOperator extends Operator
         public long getTotalGBMs()
         {
             long totalGBMs = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     totalGBMs += output.getGBMs();
                 }
@@ -265,9 +266,9 @@ public class AggregationOperator extends Operator
         public int getTotalNumReadRequests()
         {
             int numReadRequests = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     numReadRequests += output.getNumReadRequests();
                 }
@@ -286,9 +287,9 @@ public class AggregationOperator extends Operator
         public int getTotalNumWriteRequests()
         {
             int numWriteRequests = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     numWriteRequests += output.getNumWriteRequests();
                 }
@@ -307,9 +308,9 @@ public class AggregationOperator extends Operator
         public long getTotalReadBytes()
         {
             long readBytes = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     readBytes += output.getTotalReadBytes();
                 }
@@ -328,9 +329,9 @@ public class AggregationOperator extends Operator
         public long getTotalWriteBytes()
         {
             long writeBytes = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     writeBytes += output.getTotalWriteBytes();
                 }
@@ -387,12 +388,12 @@ public class AggregationOperator extends Operator
             return outputCostMs;
         }
 
-        public long getScanInputCostMs()
+        public long getPartitionInputCostMs()
         {
             long inputCostMs = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     inputCostMs += output.getCumulativeInputCostMs();
                 }
@@ -400,12 +401,12 @@ public class AggregationOperator extends Operator
             return inputCostMs;
         }
 
-        public long getScanComputeCostMs()
+        public long getPartitionComputeCostMs()
         {
             long computeCostMs = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     computeCostMs += output.getCumulativeComputeCostMs();
                 }
@@ -413,12 +414,12 @@ public class AggregationOperator extends Operator
             return computeCostMs;
         }
 
-        public long getScanOutputCostMs()
+        public long getPartitionOutputCostMs()
         {
             long outputCostMs = 0;
-            if (this.scanOutputs != null)
+            if (this.partitionOutputs != null)
             {
-                for (Output output : scanOutputs)
+                for (Output output : partitionOutputs)
                 {
                     outputCostMs += output.getCumulativeOutputCostMs();
                 }

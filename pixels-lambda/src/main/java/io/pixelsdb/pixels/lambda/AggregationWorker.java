@@ -21,9 +21,10 @@ package io.pixelsdb.pixels.lambda;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.google.common.collect.ObjectArrays;
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -40,9 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -80,6 +79,18 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
             ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2);
 
             long queryId = event.getQueryId();
+            boolean inputPartitioned = event.isInputPartitioned();
+            List<Integer> hashValues;
+            int numPartition = event.getNumPartition();
+            if (inputPartitioned)
+            {
+                hashValues = requireNonNull(event.getHashValues(), "event.hashValues is null");
+                checkArgument(!hashValues.isEmpty(), "event.hashValues is empty");
+            }
+            else
+            {
+                hashValues = ImmutableList.of();
+            }
             List<String> inputFiles = requireNonNull(event.getInputFiles(), "event.inputFiles is null");
             StorageInfo inputStorage = requireNonNull(event.getInputStorage(), "event.inputStorage is null");
             checkArgument(inputStorage.getScheme() == Storage.Scheme.s3,
@@ -87,6 +98,12 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
 
             FunctionType[] functionTypes = requireNonNull(event.getFunctionTypes(),
                     "event.functionTypes is null");
+            String[] columnsToRead = requireNonNull(event.getColumnsToRead(),
+                    "event.columnsToRead is null");
+            int[] groupKeyColumnIds = requireNonNull(event.getGroupKeyColumnIds(),
+                    "event.groupKeyColumnIds is null");
+            int[] aggrColumnIds = requireNonNull(event.getAggregateColumnIds(),
+                    "event.aggregateColumnIds is null");
             String[] groupKeyColumnNames = requireNonNull(event.getGroupKeyColumnNames(),
                     "event.groupKeyColumnIds is null");
             String[] resultColumnNames = requireNonNull(event.getResultColumnNames(),
@@ -126,27 +143,14 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 throw new PixelsWorkerException("failed to initialize Minio storage", e);
             }
 
-            // prepare the input schema and column ids for the aggregation.
-            String[] includeCols = ObjectArrays.concat(groupKeyColumnNames, resultColumnNames, String.class);
             TypeDescription inputSchema = getFileSchemaFromPaths(s3, inputFiles);
-            checkArgument(inputSchema.getChildren().size() == includeCols.length,
+            checkArgument(inputSchema.getChildren().size() == columnsToRead.length,
                     "input file does not contain the correct number of columns");
-            int[] groupKeyColumnIds = new int[groupKeyColumnNames.length];
-            int columnId = 0;
-            for (int i = 0; i < groupKeyColumnIds.length; ++i)
-            {
-                groupKeyColumnIds[i] = columnId++;
-            }
-            int[] aggrColumnIds = new int[resultColumnNames.length];
-            for (int i = 0; i < aggrColumnIds.length; ++i)
-            {
-                aggrColumnIds[i] = columnId++;
-            }
 
             // start aggregation.
-            Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema,
-                    groupKeyColumnNames, groupKeyColumnIds, groupKeyColumnProj,
-                    aggrColumnIds, resultColumnNames, resultColumnTypes, functionTypes);
+            Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema, groupKeyColumnNames,
+                    groupKeyColumnIds, groupKeyColumnProj, aggrColumnIds, resultColumnNames,
+                    resultColumnTypes, functionTypes, false, 0);
             for (int i = 0; i <  inputFiles.size(); )
             {
                 List<String> files = new LinkedList<>();
@@ -158,7 +162,7 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                 threadPool.execute(() -> {
                     try
                     {
-                        aggregate(queryId, files, includeCols, aggregator, metricsCollector);
+                        aggregate(queryId, files, columnsToRead, hashValues, numPartition, aggregator, metricsCollector);
                     }
                     catch (Exception e)
                     {
@@ -212,12 +216,15 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
      * @param queryId the query id used by I/O scheduler
      * @param inputFiles the paths of the files to read and aggregate
      * @param columnsToRead the columns to read from the input files
+     * @param hashValues the hashValues of the partitions to be read from the input files,
+     *                   empty if input files are not partitioned
+     * @param numPartition the number of partitions for the input files
      * @param aggregator the aggregator for the partial aggregation
      * @param metricsCollector the collector of the performance metrics
      * @return the number of rows that are read from input files
      */
-    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead,
-                          Aggregator aggregator, MetricsCollector metricsCollector)
+    private int aggregate(long queryId, List<String> inputFiles, String[] columnsToRead, List<Integer> hashValues,
+                          int numPartition, Aggregator aggregator, MetricsCollector metricsCollector)
     {
         requireNonNull(aggregator, "aggregator is null whereas partialAggregate is true");
         int numRows = 0;
@@ -239,30 +246,69 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                         it.remove();
                         continue;
                     }
-                    PixelsReaderOption option = new PixelsReaderOption();
-                    option.queryId(queryId);
-                    option.includeCols(columnsToRead);
-                    option.rgRange(0, -1);
-                    option.skipCorruptRecords(true);
-                    option.tolerantSchemaEvolution(true);
-                    PixelsRecordReader recordReader = pixelsReader.read(option);
-                    VectorizedRowBatch rowBatch;
-
-                    computeCostTimer.start();
-                    do
+                    if (hashValues.isEmpty())
                     {
-                        rowBatch = recordReader.readBatch(rowBatchSize);
-                        if (rowBatch.size > 0)
+                        PixelsReaderOption option = new PixelsReaderOption();
+                        option.queryId(queryId);
+                        option.includeCols(columnsToRead);
+                        option.rgRange(0, -1);
+                        option.skipCorruptRecords(true);
+                        option.tolerantSchemaEvolution(true);
+                        PixelsRecordReader recordReader = pixelsReader.read(option);
+                        VectorizedRowBatch rowBatch;
+
+                        computeCostTimer.start();
+                        do
                         {
-                            numRows += rowBatch.size;
-                            aggregator.aggregate(rowBatch);
+                            rowBatch = recordReader.readBatch(rowBatchSize);
+                            if (rowBatch.size > 0)
+                            {
+                                numRows += rowBatch.size;
+                                aggregator.aggregate(rowBatch);
+                            }
+                        } while (!rowBatch.endOfFile);
+                        computeCostTimer.stop();
+                        computeCostTimer.minus(recordReader.getReadTimeNanos());
+                        readCostTimer.add(recordReader.getReadTimeNanos());
+                        readBytes += recordReader.getCompletedBytes();
+                        numReadRequests += recordReader.getNumReadRequests();
+                    }
+                    else
+                    {
+                        checkArgument(pixelsReader.isPartitioned(), "input file is not partitioned");
+                        Set<Integer> existHashValues = new HashSet<>(pixelsReader.getRowGroupNum());
+                        for (PixelsProto.RowGroupInformation rgInfo : pixelsReader.getRowGroupInfos())
+                        {
+                            existHashValues.add(rgInfo.getPartitionInfo().getHashValue());
                         }
-                    } while (!rowBatch.endOfFile);
-                    computeCostTimer.stop();
-                    computeCostTimer.minus(recordReader.getReadTimeNanos());
-                    readCostTimer.add(recordReader.getReadTimeNanos());
-                    readBytes += recordReader.getCompletedBytes();
-                    numReadRequests += recordReader.getNumReadRequests();
+                        for (int hashValue : hashValues)
+                        {
+                            if (!existHashValues.contains(hashValue))
+                            {
+                                continue;
+                            }
+                            PixelsReaderOption option = getReaderOption(queryId, columnsToRead, pixelsReader,
+                                    hashValue, numPartition);
+                            PixelsRecordReader recordReader = pixelsReader.read(option);
+                            VectorizedRowBatch rowBatch;
+
+                            computeCostTimer.start();
+                            do
+                            {
+                                rowBatch = recordReader.readBatch(rowBatchSize);
+                                if (rowBatch.size > 0)
+                                {
+                                    numRows += rowBatch.size;
+                                    aggregator.aggregate(rowBatch);
+                                }
+                            } while (!rowBatch.endOfFile);
+                            computeCostTimer.stop();
+                            computeCostTimer.minus(recordReader.getReadTimeNanos());
+                            readCostTimer.add(recordReader.getReadTimeNanos());
+                            readBytes += recordReader.getCompletedBytes();
+                            numReadRequests += recordReader.getNumReadRequests();
+                        }
+                    }
                     it.remove();
                 } catch (Exception e)
                 {
