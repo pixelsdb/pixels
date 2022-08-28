@@ -35,6 +35,18 @@ public class AggregationInput extends Input
 {
     private long queryId;
     /**
+     * Whether the input files are partitioned.
+     */
+    private boolean inputPartitioned;
+    /**
+     * The hash values to be processed by this aggregation worker.
+     */
+    private List<Integer> hashValues;
+    /**
+     * The number of partitions in the input files.
+     */
+    private int numPartition;
+    /**
      * The column names of the group-key columns in the aggregation result.
      */
     private String[] groupKeyColumnNames;
@@ -79,13 +91,15 @@ public class AggregationInput extends Input
      */
     public AggregationInput() { }
 
-    public AggregationInput(long queryId, String[] groupKeyColumnNames,
-                            boolean[] groupKeyColumnProjection,
-                            String[] resultColumnNames, String[] resultColumnTypes,
-                            FunctionType[] functionTypes, List<String> inputFiles,
+    public AggregationInput(long queryId, boolean inputPartitioned, List<Integer> hashValues, int numPartition,
+                            String[] groupKeyColumnNames, boolean[] groupKeyColumnProjection, String[] resultColumnNames,
+                            String[] resultColumnTypes, FunctionType[] functionTypes, List<String> inputFiles,
                             StorageInfo inputStorage, int parallelism, OutputInfo output)
     {
         this.queryId = queryId;
+        this.inputPartitioned = inputPartitioned;
+        this.hashValues = hashValues;
+        this.numPartition = numPartition;
         this.groupKeyColumnNames = groupKeyColumnNames;
         this.groupKeyColumnProjection = groupKeyColumnProjection;
         this.resultColumnNames = resultColumnNames;
@@ -105,6 +119,36 @@ public class AggregationInput extends Input
     public void setQueryId(long queryId)
     {
         this.queryId = queryId;
+    }
+
+    public boolean isInputPartitioned()
+    {
+        return inputPartitioned;
+    }
+
+    public void setInputPartitioned(boolean inputPartitioned)
+    {
+        this.inputPartitioned = inputPartitioned;
+    }
+
+    public List<Integer> getHashValues()
+    {
+        return hashValues;
+    }
+
+    public void setHashValues(List<Integer> hashValues)
+    {
+        this.hashValues = hashValues;
+    }
+
+    public int getNumPartition()
+    {
+        return numPartition;
+    }
+
+    public void setNumPartition(int numPartition)
+    {
+        this.numPartition = numPartition;
     }
 
     public String[] getGroupKeyColumnNames()

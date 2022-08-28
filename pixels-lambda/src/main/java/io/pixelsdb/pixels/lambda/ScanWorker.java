@@ -134,7 +134,9 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                         partialAggregationInfo.getAggregateColumnIds(),
                         partialAggregationInfo.getResultColumnAlias(),
                         partialAggregationInfo.getResultColumnTypes(),
-                        partialAggregationInfo.getFunctionTypes());
+                        partialAggregationInfo.getFunctionTypes(),
+                        partialAggregationInfo.isPartition(),
+                        partialAggregationInfo.getNumPartition());
             }
             else
             {
@@ -179,8 +181,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                 String outputPath = event.getOutput().getPath();
                 MetricsCollector.Timer writeCostTimer = new MetricsCollector.Timer().start();
                 PixelsWriter pixelsWriter = getWriter(aggregator.getOutputSchema(),
-                        getStorage(storageInfo.getScheme()),
-                        outputPath, encoding, false, null);
+                        getStorage(storageInfo.getScheme()), outputPath, encoding,
+                        aggregator.isPartition(), aggregator.getGroupKeyColumnIdsInResult());
                 aggregator.writeAggrOutput(pixelsWriter);
                 pixelsWriter.close();
                 if (storageInfo.getScheme() == Storage.Scheme.minio)
@@ -192,6 +194,8 @@ public class ScanWorker implements RequestHandler<ScanInput, ScanOutput>
                     }
                 }
                 metricsCollector.addOutputCostNs(writeCostTimer.stop());
+                metricsCollector.addWriteBytes(pixelsWriter.getCompletedBytes());
+                metricsCollector.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
                 scanOutput.addOutput(outputPath, pixelsWriter.getNumRowGroup());
             }
 

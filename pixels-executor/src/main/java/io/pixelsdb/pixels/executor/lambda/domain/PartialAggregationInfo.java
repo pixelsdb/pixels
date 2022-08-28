@@ -54,13 +54,23 @@ public class PartialAggregationInfo
     private FunctionType[] functionTypes;
 
     /**
+     * Whether the partial aggregation result should be partitioned.
+     */
+    private boolean partition;
+    /**
+     * The number of partitions for the aggregations result.
+     */
+    private int numPartition;
+
+    /**
      * Default constructor for Jackson.
      */
     public PartialAggregationInfo() { }
 
     public PartialAggregationInfo(String[] groupKeyColumnAlias, String[] resultColumnAlias,
                                   String[] resultColumnTypes, int[] groupKeyColumnIds,
-                                  int[] aggregateColumnIds, FunctionType[] functionTypes)
+                                  int[] aggregateColumnIds, FunctionType[] functionTypes,
+                                  boolean partition, int numPartition)
     {
         this.groupKeyColumnAlias = groupKeyColumnAlias;
         this.resultColumnAlias = resultColumnAlias;
@@ -68,6 +78,8 @@ public class PartialAggregationInfo
         this.groupKeyColumnIds = groupKeyColumnIds;
         this.aggregateColumnIds = aggregateColumnIds;
         this.functionTypes = functionTypes;
+        this.partition = partition;
+        this.numPartition = numPartition;
     }
 
     public String[] getGroupKeyColumnAlias()
@@ -128,5 +140,25 @@ public class PartialAggregationInfo
     public void setFunctionTypes(FunctionType[] functionTypes)
     {
         this.functionTypes = functionTypes;
+    }
+
+    public boolean isPartition()
+    {
+        return partition;
+    }
+
+    public void setPartition(boolean partition)
+    {
+        this.partition = partition;
+    }
+
+    public int getNumPartition()
+    {
+        return numPartition;
+    }
+
+    public void setNumPartition(int numPartition)
+    {
+        this.numPartition = numPartition;
     }
 }

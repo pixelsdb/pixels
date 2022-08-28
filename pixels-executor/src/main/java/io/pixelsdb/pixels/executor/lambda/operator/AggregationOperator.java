@@ -41,15 +41,10 @@ import static java.util.Objects.requireNonNull;
 public class AggregationOperator extends Operator
 {
     /**
-     * The input of the final aggregation worker that produce the
-     * final aggregation result.
-     */
-    private final AggregationInput finalAggrInput;
-    /**
-     * The inputs of the aggregation workers that pre-aggregate the
+     * The inputs of the final aggregation workers that aggregate the
      * partial aggregation results produced by the child or the scan workers.
      */
-    private final List<AggregationInput> preAggrInputs;
+    private final List<AggregationInput> finalAggrInputs;
     /**
      * The scan inputs of the scan workers that produce the partial aggregation
      * results. It should be empty if child is not null.
@@ -65,29 +60,16 @@ public class AggregationOperator extends Operator
      */
     private CompletableFuture<?>[] scanOutputs = null;
     /**
-     * The outputs of the pre-aggregation workers.
+     * The outputs of the final aggregation workers.
      */
-    private CompletableFuture<?>[] preAggrOutputs = null;
-    /**
-     * The output of the final aggregation worker.
-     * There should be only one element in this array.
-     */
-    private CompletableFuture<?>[] finalAggrOutput = null;
+    private CompletableFuture<?>[] finalAggrOutputs = null;
 
-    public AggregationOperator(String name, AggregationInput finalAggrInput,
-                               List<AggregationInput> preAggrInputs,
-                               List<ScanInput> scanInputs)
+    public AggregationOperator(String name, List<AggregationInput> finalAggrInputs, List<ScanInput> scanInputs)
     {
         super(name);
-        this.finalAggrInput = requireNonNull(finalAggrInput, "aggregateInput is null");
-        if (preAggrInputs == null || preAggrInputs.isEmpty())
-        {
-            this.preAggrInputs = ImmutableList.of();
-        }
-        else
-        {
-            this.preAggrInputs = ImmutableList.copyOf(preAggrInputs);
-        }
+        requireNonNull(finalAggrInputs, "finalAggrInputs is null");
+        checkArgument(!finalAggrInputs.isEmpty(), "finalAggrInputs is empty");
+        this.finalAggrInputs = ImmutableList.copyOf(finalAggrInputs);
         if (scanInputs == null || scanInputs.isEmpty())
         {
             this.scanInputs = ImmutableList.of();
@@ -98,14 +80,9 @@ public class AggregationOperator extends Operator
         }
     }
 
-    public AggregationInput getFinalAggrInput()
+    public List<AggregationInput> getFinalAggrInputs()
     {
-        return finalAggrInput;
-    }
-
-    public List<AggregationInput> getPreAggrInputs()
-    {
-        return preAggrInputs;
+        return finalAggrInputs;
     }
 
     public List<ScanInput> getScanInputs()
@@ -139,11 +116,22 @@ public class AggregationOperator extends Operator
                 throw new CompletionException("failed to complete the previous stages", exception);
             }
 
-            requireNonNull(this.finalAggrInput, "finalAggrInput is null");
-            this.finalAggrOutput = new CompletableFuture[1];
-            this.finalAggrOutput[0] = InvokerFactory.Instance()
-                    .getInvoker(WorkerType.AGGREGATION).invoke(this.finalAggrInput);
-            return this.finalAggrOutput;
+            try
+            {
+                this.finalAggrOutputs = new CompletableFuture[this.finalAggrInputs.size()];
+                int i = 0;
+                for (AggregationInput preAggrInput : this.finalAggrInputs)
+                {
+                    this.finalAggrOutputs[i++] = InvokerFactory.Instance()
+                            .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
+                }
+                waitForCompletion(this.finalAggrOutputs);
+            } catch (InterruptedException e)
+            {
+                throw new CompletionException("interrupted when waiting for the completion of this operator", e);
+            }
+
+            return this.finalAggrOutputs;
         });
     }
 
@@ -182,24 +170,6 @@ public class AggregationOperator extends Operator
                     waitForCompletion(this.scanOutputs);
                 }
 
-                if (this.preAggrInputs.isEmpty())
-                {
-                    this.preAggrOutputs = new CompletableFuture[0];
-                } else
-                {
-                    this.preAggrOutputs = new CompletableFuture[this.preAggrInputs.size()];
-                    int i = 0;
-                    for (AggregationInput preAggrInput : this.preAggrInputs)
-                    {
-                        this.preAggrOutputs[i++] = InvokerFactory.Instance()
-                                .getInvoker(WorkerType.AGGREGATION).invoke(preAggrInput);
-                    }
-                }
-                if (this.preAggrOutputs.length > 0)
-                {
-                    waitForCompletion(this.preAggrOutputs);
-                }
-
                 prevStagesFuture.complete(null);
             }
             catch (InterruptedException e)
@@ -215,10 +185,7 @@ public class AggregationOperator extends Operator
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         AggregationOutputCollection outputCollection = new AggregationOutputCollection();
-        if (this.finalAggrOutput != null)
-        {
-            outputCollection.setFinalAggrOutput((Output) this.finalAggrOutput[0].get());
-        }
+
         if (this.scanOutputs.length > 0)
         {
             Output[] outputs = new Output[this.scanOutputs.length];
@@ -228,14 +195,14 @@ public class AggregationOperator extends Operator
             }
             outputCollection.setScanOutputs(outputs);
         }
-        if (this.preAggrOutputs.length > 0)
+        if (this.finalAggrOutputs.length > 0)
         {
-            Output[] outputs = new Output[this.preAggrOutputs.length];
-            for (int i = 0; i < this.preAggrOutputs.length; ++i)
+            Output[] outputs = new Output[this.finalAggrOutputs.length];
+            for (int i = 0; i < this.finalAggrOutputs.length; ++i)
             {
-                outputs[i] = (Output) this.preAggrOutputs[i].get();
+                outputs[i] = (Output) this.finalAggrOutputs[i].get();
             }
-            outputCollection.setPreAggrOutputs(outputs);
+            outputCollection.setFinalAggrOutputs(outputs);
         }
         return outputCollection;
     }
@@ -243,16 +210,14 @@ public class AggregationOperator extends Operator
     public static class AggregationOutputCollection implements OutputCollection
     {
         private Output[] scanOutputs = null;
-        private Output[] preAggrOutputs = null;
-        private Output finalAggrOutput = null;
+        private Output[] finalAggrOutputs = null;
 
         public AggregationOutputCollection() { }
 
-        public AggregationOutputCollection(Output[] scanOutputs, Output[] preAggrOutputs, Output finalAggrOutput)
+        public AggregationOutputCollection(Output[] scanOutputs, Output[] preAggrOutputs)
         {
             this.scanOutputs = scanOutputs;
-            this.preAggrOutputs = preAggrOutputs;
-            this.finalAggrOutput = finalAggrOutput;
+            this.finalAggrOutputs = preAggrOutputs;
         }
 
         public Output[] getScanOutputs()
@@ -265,24 +230,14 @@ public class AggregationOperator extends Operator
             this.scanOutputs = scanOutputs;
         }
 
-        public Output[] getPreAggrOutputs()
+        public Output[] getFinalAggrOutputs()
         {
-            return preAggrOutputs;
+            return finalAggrOutputs;
         }
 
-        public void setPreAggrOutputs(Output[] preAggrOutputs)
+        public void setFinalAggrOutputs(Output[] preAggrOutputs)
         {
-            this.preAggrOutputs = preAggrOutputs;
-        }
-
-        public Output getFinalAggrOutput()
-        {
-            return finalAggrOutput;
-        }
-
-        public void setFinalAggrOutput(Output finalAggrOutput)
-        {
-            this.finalAggrOutput = finalAggrOutput;
+            this.finalAggrOutputs = preAggrOutputs;
         }
 
         @Override
@@ -296,16 +251,12 @@ public class AggregationOperator extends Operator
                     totalGBMs += output.getGBMs();
                 }
             }
-            if (this.preAggrOutputs != null)
+            if (this.finalAggrOutputs != null)
             {
-                for (Output output : preAggrOutputs)
+                for (Output output : finalAggrOutputs)
                 {
                     totalGBMs += output.getGBMs();
                 }
-            }
-            if (this.finalAggrOutput != null)
-            {
-                totalGBMs += finalAggrOutput.getGBMs();
             }
             return totalGBMs;
         }
@@ -321,16 +272,12 @@ public class AggregationOperator extends Operator
                     numReadRequests += output.getNumReadRequests();
                 }
             }
-            if (this.preAggrOutputs != null)
+            if (this.finalAggrOutputs != null)
             {
-                for (Output output : preAggrOutputs)
+                for (Output output : finalAggrOutputs)
                 {
                     numReadRequests += output.getNumReadRequests();
                 }
-            }
-            if (this.finalAggrOutput != null)
-            {
-                numReadRequests += finalAggrOutput.getNumReadRequests();
             }
             return numReadRequests;
         }
@@ -346,16 +293,12 @@ public class AggregationOperator extends Operator
                     numWriteRequests += output.getNumWriteRequests();
                 }
             }
-            if (this.preAggrOutputs != null)
+            if (this.finalAggrOutputs != null)
             {
-                for (Output output : preAggrOutputs)
+                for (Output output : finalAggrOutputs)
                 {
                     numWriteRequests += output.getNumWriteRequests();
                 }
-            }
-            if (this.finalAggrOutput != null)
-            {
-                numWriteRequests += finalAggrOutput.getNumWriteRequests();
             }
             return numWriteRequests;
         }
@@ -371,16 +314,12 @@ public class AggregationOperator extends Operator
                     readBytes += output.getTotalReadBytes();
                 }
             }
-            if (this.preAggrOutputs != null)
+            if (this.finalAggrOutputs != null)
             {
-                for (Output output : preAggrOutputs)
+                for (Output output : finalAggrOutputs)
                 {
                     readBytes += output.getTotalReadBytes();
                 }
-            }
-            if (this.finalAggrOutput != null)
-            {
-                readBytes += finalAggrOutput.getTotalReadBytes();
             }
             return readBytes;
         }
@@ -396,16 +335,12 @@ public class AggregationOperator extends Operator
                     writeBytes += output.getTotalWriteBytes();
                 }
             }
-            if (this.preAggrOutputs != null)
+            if (this.finalAggrOutputs != null)
             {
-                for (Output output : preAggrOutputs)
+                for (Output output : finalAggrOutputs)
                 {
                     writeBytes += output.getTotalWriteBytes();
                 }
-            }
-            if (this.finalAggrOutput != null)
-            {
-                writeBytes += finalAggrOutput.getTotalWriteBytes();
             }
             return writeBytes;
         }
@@ -413,31 +348,43 @@ public class AggregationOperator extends Operator
         @Override
         public long getLayerInputCostMs()
         {
-            if (this.finalAggrOutput != null)
+            long inputCostMs = 0;
+            if (this.finalAggrOutputs != null)
             {
-                return finalAggrOutput.getCumulativeInputCostMs();
+                for (Output output : finalAggrOutputs)
+                {
+                    inputCostMs += output.getCumulativeInputCostMs();
+                }
             }
-            return 0;
+            return inputCostMs;
         }
 
         @Override
         public long getLayerComputeCostMs()
         {
-            if (this.finalAggrOutput != null)
+            long computeCostMs = 0;
+            if (this.finalAggrOutputs != null)
             {
-                return finalAggrOutput.getCumulativeComputeCostMs();
+                for (Output output : finalAggrOutputs)
+                {
+                    computeCostMs += output.getCumulativeComputeCostMs();
+                }
             }
-            return 0;
+            return computeCostMs;
         }
 
         @Override
         public long getLayerOutputCostMs()
         {
-            if (this.finalAggrOutput != null)
+            long outputCostMs = 0;
+            if (this.finalAggrOutputs != null)
             {
-                return finalAggrOutput.getCumulativeOutputCostMs();
+                for (Output output : finalAggrOutputs)
+                {
+                    outputCostMs += output.getCumulativeOutputCostMs();
+                }
             }
-            return 0;
+            return outputCostMs;
         }
 
         public long getScanInputCostMs()
@@ -472,45 +419,6 @@ public class AggregationOperator extends Operator
             if (this.scanOutputs != null)
             {
                 for (Output output : scanOutputs)
-                {
-                    outputCostMs += output.getCumulativeOutputCostMs();
-                }
-            }
-            return outputCostMs;
-        }
-
-        public long getPreAggrInputCostMs()
-        {
-            long inputCostMs = 0;
-            if (this.preAggrOutputs != null)
-            {
-                for (Output output : preAggrOutputs)
-                {
-                    inputCostMs += output.getCumulativeInputCostMs();
-                }
-            }
-            return inputCostMs;
-        }
-
-        public long getPreAggrComputeCostMs()
-        {
-            long computeCostMs = 0;
-            if (this.preAggrOutputs != null)
-            {
-                for (Output output : preAggrOutputs)
-                {
-                    computeCostMs += output.getCumulativeComputeCostMs();
-                }
-            }
-            return computeCostMs;
-        }
-
-        public long getPreAggrOutputCostMs()
-        {
-            long outputCostMs = 0;
-            if (this.preAggrOutputs != null)
-            {
-                for (Output output : preAggrOutputs)
                 {
                     outputCostMs += output.getCumulativeOutputCostMs();
                 }

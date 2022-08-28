@@ -60,7 +60,7 @@ public class TestAggregator
                 new String[] {"o_custkey_1", "o_orderstatus_2", "o_orderdate_3"},
                 new int[] {1, 2, 3}, new boolean[] {true, true, true}, new int[] {0},
                 new String[] {"sum_o_orderkey_0"}, new String[] {"bigint"},
-                new FunctionType[] {FunctionType.SUM});
+                new FunctionType[] {FunctionType.SUM}, false, 0);
         VectorizedRowBatch rowBatch;
         do
         {
