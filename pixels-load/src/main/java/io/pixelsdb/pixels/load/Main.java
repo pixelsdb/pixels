@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.load;
 
+import com.facebook.presto.jdbc.PrestoDriver;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
@@ -35,6 +36,7 @@ import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
 import io.pixelsdb.pixels.core.stats.StatsRecorder;
+import io.trino.jdbc.TrinoDriver;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.ArgumentParser;
 import net.sourceforge.argparse4j.inf.ArgumentParserException;
@@ -670,6 +672,7 @@ public class Main
                     }
 
                     int rowGroupCount = 0;
+                    long rowCount = 0;
                     for (String path : files)
                     {
                         PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
@@ -679,6 +682,7 @@ public class Main
                         PixelsProto.Footer fileFooter = pixelsReader.getFooter();
                         int numRowGroup = pixelsReader.getRowGroupNum();
                         rowGroupCount += numRowGroup;
+                        rowCount += pixelsReader.getNumberOfRows();
                         List<PixelsProto.Type> types = fileFooter.getTypesList();
                         for (int i = 0; i < numRowGroup; ++i)
                         {
@@ -713,11 +717,49 @@ public class Main
                         pixelsReader.close();
                     }
 
+                    ConfigFactory instance = ConfigFactory.Instance();
+                    Properties properties = new Properties();
+                    properties.setProperty("user", instance.getProperty("presto.user"));
+                    // properties.setProperty("password", instance.getProperty("presto.password"));
+                    properties.setProperty("SSL", instance.getProperty("presto.ssl"));
+                    properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:false");
+                    String jdbc = instance.getProperty("presto.pixels.jdbc.url");
+                    try
+                    {
+                        DriverManager.registerDriver(new TrinoDriver());
+                        DriverManager.registerDriver(new PrestoDriver());
+                    } catch (SQLException e)
+                    {
+                        e.printStackTrace();
+                    }
+
                     for (Column column : columns)
                     {
-                        column.setChunkSize(column.getSize()/rowGroupCount);
+                        column.setChunkSize(column.getSize() / rowGroupCount);
                         column.setRecordStats(columnStatsMap.get(column.getName())
                                 .serialize().build().toByteString().asReadOnlyByteBuffer());
+                        String sql = "SELECT COUNT(DISTINCT(" + column.getName() + ")) AS cardinality, " +
+                                "SUM(CASE WHEN " + column.getName() + " IS NULL THEN 1 ELSE 0 END) AS null_count " +
+                                "FROM " + tableName;
+                        try (Connection connection = DriverManager.getConnection(jdbc, properties))
+                        {
+                            Statement statement = connection.createStatement();
+                            ResultSet resultSet = statement.executeQuery(sql);
+                            if (resultSet.next())
+                            {
+                                long cardinality = resultSet.getLong("cardinality");
+                                double nullFraction = resultSet.getLong("null_count") / (double) rowCount;
+                                System.out.println(column.getName() + " cardinality: " + cardinality +
+                                        ", null fraction: " + nullFraction);
+                                column.setCardinality(cardinality);
+                                column.setNullFraction(nullFraction);
+                            }
+                            resultSet.close();
+                            statement.close();
+                        } catch (SQLException e)
+                        {
+                            e.printStackTrace();
+                        }
                         metadataService.updateColumn(column);
                     }
 

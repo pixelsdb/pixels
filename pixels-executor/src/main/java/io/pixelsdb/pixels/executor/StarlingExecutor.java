@@ -66,7 +66,6 @@ public class StarlingExecutor
     private static final Storage.Scheme IntermediateStorage;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
-    private static final int PreAggrThreshold;
 
     private final Table rootTable;
     private final ConfigFactory config;
@@ -92,8 +91,6 @@ public class StarlingExecutor
         IntermediateFolder = storageFolder;
         IntraWorkerParallelism = Integer.parseInt(ConfigFactory.Instance()
                 .getProperty("executor.intra.worker.parallelism"));
-        PreAggrThreshold = Integer.parseInt(ConfigFactory.Instance()
-                .getProperty("aggregation.pre-aggregate.threshold"));
     }
 
     /**

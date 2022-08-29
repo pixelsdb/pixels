@@ -53,6 +53,7 @@
 
         <!-- query engines -->
         <dep.presto.version>0.215</dep.presto.version>
+        <dep.trino.version>375</dep.trino.version>
 
         <!-- storage systems -->
         <dep.hadoop.version>3.3.1</dep.hadoop.version>
@@ -131,11 +132,18 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- presto -->
+            <!-- presto-jdbc -->
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-jdbc</artifactId>
                 <version>${dep.presto.version}</version>
+            </dependency>
+
+            <!-- trino-jdbc -->
+            <dependency>
+                <groupId>io.trino</groupId>
+                <artifactId>trino-jdbc</artifactId>
+                <version>${dep.trino.version}</version>
             </dependency>
 
             <!-- prometheus -->
