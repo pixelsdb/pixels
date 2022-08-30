@@ -35,7 +35,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Splits;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.executor.join.JoinAdvisor;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
@@ -159,9 +158,9 @@ public class PixelsExecutor
         partialAggregationInfo.setGroupKeyColumnIds(aggregation.getGroupKeyColumnIds());
         partialAggregationInfo.setAggregateColumnIds(aggregation.getAggregateColumnIds());
         partialAggregationInfo.setFunctionTypes(aggregation.getFunctionTypes());
-        // TODO: calculate num partition from statistics.
-        partialAggregationInfo.setPartition(true);
-        partialAggregationInfo.setNumPartition(16);
+        int numPartitions = PlanOptimizer.Instance().getAggrNumPartitions(aggregatedTable);
+        partialAggregationInfo.setPartition(numPartitions > 1);
+        partialAggregationInfo.setNumPartition(numPartitions);
 
         final String intermediateBase = IntermediateFolder + queryId + "/" +
                 aggregatedTable.getSchemaName() + "/" + aggregatedTable.getTableName() + "/";
@@ -243,13 +242,13 @@ public class PixelsExecutor
         }
         String[] columnsToRead = ObjectArrays.concat(
                 aggregation.getGroupKeyColumnAlias(), aggregation.getResultColumnAlias(), String.class);
-        for (int hash = 0; hash < 16; ++hash)
+        for (int hash = 0; hash < numPartitions; ++hash)
         {
             AggregationInput finalAggrInput = new AggregationInput();
             finalAggrInput.setQueryId(queryId);
-            finalAggrInput.setInputPartitioned(true);
+            finalAggrInput.setInputPartitioned(numPartitions > 1);
             finalAggrInput.setHashValues(ImmutableList.of(hash));
-            finalAggrInput.setNumPartition(16);
+            finalAggrInput.setNumPartition(numPartitions);
             finalAggrInput.setInputFiles(aggrInputFiles);
             finalAggrInput.setColumnsToRead(columnsToRead);
             finalAggrInput.setGroupKeyColumnIds(groupKeyColumnIds);
@@ -313,7 +312,7 @@ public class PixelsExecutor
                 {
                     // Note: we must use the parent to calculate the number of partitions for post partitioning.
                     postPartition = true;
-                    int numPartition = JoinAdvisor.Instance().getNumPartition(
+                    int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
                             parent.get().getJoin().getLeftTable(),
                             parent.get().getJoin().getRightTable(),
                             parent.get().getJoin().getJoinEndian());
@@ -447,7 +446,7 @@ public class PixelsExecutor
                     rightPartitionedFiles, IntraWorkerParallelism,
                     rightTable.getColumnNames(), rightKeyColumnIds);
 
-            int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
+            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(leftTable, rightTable, join.getJoinEndian());
             List<JoinInput> joinInputs = getPartitionedJoinInputs(
                     joinedTable, parent, numPartition, leftTableInfo, rightTableInfo,
                     null, null);
@@ -606,7 +605,7 @@ public class PixelsExecutor
                     {
                         // Note: we must use the parent to calculate the number of partitions for post partitioning.
                         postPartition = true;
-                        int numPartition = JoinAdvisor.Instance().getNumPartition(
+                        int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
                                 parent.get().getJoin().getLeftTable(),
                                 parent.get().getJoin().getRightTable(),
                                 parent.get().getJoin().getJoinEndian());
@@ -696,7 +695,7 @@ public class PixelsExecutor
             {
                 postPartition = true;
                 // Note: we must use the parent to calculate the number of partitions for post partitioning.
-                int numPartition = JoinAdvisor.Instance().getNumPartition(
+                int numPartition = PlanOptimizer.Instance().getJoinNumPartition(
                         parent.get().getJoin().getLeftTable(),
                         parent.get().getJoin().getRightTable(),
                         parent.get().getJoin().getJoinEndian());
@@ -842,7 +841,7 @@ public class PixelsExecutor
         {
             // process partitioned join.
             PartitionedJoinOperator joinOperator;
-            int numPartition = JoinAdvisor.Instance().getNumPartition(leftTable, rightTable, join.getJoinEndian());
+            int numPartition = PlanOptimizer.Instance().getJoinNumPartition(leftTable, rightTable, join.getJoinEndian());
             if (childOperator != null)
             {
                 // left side is post partitioned, thus we only partition the right table.
@@ -1202,7 +1201,7 @@ public class PixelsExecutor
         {
             postPartition = true;
             // Note: DO NOT use numPartition as the number of partitions for post partitioning.
-            int numPostPartition = JoinAdvisor.Instance().getNumPartition(
+            int numPostPartition = PlanOptimizer.Instance().getJoinNumPartition(
                     parent.get().getJoin().getLeftTable(),
                     parent.get().getJoin().getRightTable(),
                     parent.get().getJoin().getJoinEndian());
@@ -1285,8 +1284,8 @@ public class PixelsExecutor
             // There are less than 32 workers, they are not likely to affect the performance.
             return largeInputSplits;
         }
-        double smallSelectivity = JoinAdvisor.Instance().getTableSelectivity(smallTable);
-        double largeSelectivity = JoinAdvisor.Instance().getTableSelectivity(largeTable);
+        double smallSelectivity = PlanOptimizer.Instance().getTableSelectivity(smallTable);
+        double largeSelectivity = PlanOptimizer.Instance().getTableSelectivity(largeTable);
         if (smallSelectivity >= 0 && largeSelectivity > 0 && smallSelectivity < largeSelectivity)
         {
             // Adjust the input split size if the small table has a lower selectivity.
@@ -1376,7 +1375,7 @@ public class PixelsExecutor
                 SplitPattern bestSplitPattern = splitsIndex.search(columnSet);
                 splitSize = bestSplitPattern.getSplitSize();
                 logger.debug("split size for table '" + table.getTableName() + "': " + splitSize + " from splits index");
-                double selectivity = JoinAdvisor.Instance().getTableSelectivity(table);
+                double selectivity = PlanOptimizer.Instance().getTableSelectivity(table);
                 if (selectivity >= 0)
                 {
                     // Increasing split size according to the selectivity.

@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.join;
+package io.pixelsdb.pixels.executor.plan;
 
 import com.alibaba.fastjson.JSON;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -28,10 +28,7 @@ import io.pixelsdb.pixels.common.metadata.SchemaTableName;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
-import io.pixelsdb.pixels.executor.plan.BaseTable;
-import io.pixelsdb.pixels.executor.plan.JoinEndian;
-import io.pixelsdb.pixels.executor.plan.JoinedTable;
-import io.pixelsdb.pixels.executor.plan.Table;
+import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.predicate.ColumnFilter;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import org.apache.logging.log4j.LogManager;
@@ -39,6 +36,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -47,17 +45,17 @@ import static io.pixelsdb.pixels.executor.plan.Table.TableType.BASE;
 import static io.pixelsdb.pixels.executor.plan.Table.TableType.JOINED;
 
 /**
- * The advisor for serverless joins.
+ * The optimizer for serverless query plan.
  *
  * @author hank
  * @date 6/20/22
  */
-public class JoinAdvisor
+public class PlanOptimizer
 {
-    private static final Logger logger = LogManager.getLogger(JoinAdvisor.class);
-    private static final JoinAdvisor instance = new JoinAdvisor();
+    private static final Logger logger = LogManager.getLogger(PlanOptimizer.class);
+    private static final PlanOptimizer instance = new PlanOptimizer();
 
-    public static JoinAdvisor Instance()
+    public static PlanOptimizer Instance()
     {
         return instance;
     }
@@ -65,16 +63,17 @@ public class JoinAdvisor
     private final MetadataService metadataService;
     private final double broadcastThresholdBytes;
     private final double broadcastThresholdRows;
-    private final double partitionSizeBytes;
-    private final double partitionSizeRows;
+    private final double joinPartitionSizeBytes;
+    private final double joinPartitionSizeRows;
     private final boolean selectivityEnabled;
+    private final double aggrPartitionSizeRows;
 
     /**
      * schemaTableName -> (columnName -> column)
      */
     private final Map<SchemaTableName, Map<String, Column>> columnStatisticCache = new HashMap<>();
 
-    private JoinAdvisor()
+    private PlanOptimizer()
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
         String host = configFactory.getProperty("metadata.server.host");
@@ -84,12 +83,14 @@ public class JoinAdvisor
         broadcastThresholdBytes = Long.parseLong(thresholdMB) * 1024L * 1024L;
         String thresholdRows = configFactory.getProperty("join.broadcast.threshold.rows");
         broadcastThresholdRows = Long.parseLong(thresholdRows);
-        String partitionSizeMB = configFactory.getProperty("join.partition.size.mb");
-        this.partitionSizeBytes = Long.parseLong(partitionSizeMB) * 1024L * 1024L;
-        String partitionSizeRows = configFactory.getProperty("join.partition.size.rows");
-        this.partitionSizeRows = Long.parseLong(partitionSizeRows);
+        String joinPartitionSizeMB = configFactory.getProperty("join.partition.size.mb");
+        this.joinPartitionSizeBytes = Long.parseLong(joinPartitionSizeMB) * 1024L * 1024L;
+        String joinPartitionSizeRows = configFactory.getProperty("join.partition.size.rows");
+        this.joinPartitionSizeRows = Long.parseLong(joinPartitionSizeRows);
         this.selectivityEnabled = Boolean.parseBoolean(
                 configFactory.getProperty("executor.selectivity.enabled"));
+        String aggrPartitionSizeRows = configFactory.getProperty("aggr.partition.size.rows");
+        this.aggrPartitionSizeRows = Long.parseLong(aggrPartitionSizeRows);
     }
 
     public JoinAlgorithm getJoinAlgorithm(Table leftTable, Table rightTable, JoinEndian joinEndian)
@@ -171,7 +172,7 @@ public class JoinAdvisor
         }
     }
 
-    public int getNumPartition(Table leftTable, Table rightTable, JoinEndian joinEndian)
+    public int getJoinNumPartition(Table leftTable, Table rightTable, JoinEndian joinEndian)
             throws MetadataException, InvalidProtocolBufferException
     {
         double totalSize = 0;
@@ -194,11 +195,129 @@ public class JoinAdvisor
             largeTableRowCount = getTableRowCount(leftTable) * leftSelectivity;
         }
 
-        int numFromSize = (int) Math.ceil(totalSize / partitionSizeBytes);
-        int numFromRows = (int) Math.ceil((smallTableRowCount + 0.1 * largeTableRowCount) / partitionSizeRows);
+        int numFromSize = (int) Math.ceil(totalSize / joinPartitionSizeBytes);
+        int numFromRows = (int) Math.ceil((smallTableRowCount + 0.1 * largeTableRowCount) / joinPartitionSizeRows);
         // Limit the partition size by choosing the maximum number of partitions.
         // TODO: estimate the join selectivity more accurately using histogram.
         return Math.max(Math.max(numFromSize, numFromRows), 8);
+    }
+
+    public int getAggrNumPartitions(AggregatedTable table) throws MetadataException
+    {
+        Table originTable = table.getAggregation().getOriginTable();
+        int[] groupKeyColumnIds = table.getAggregation().getGroupKeyColumnIds();
+        long cardinality = getTableCardinality(originTable, groupKeyColumnIds);
+        int numPartitions = (int) (cardinality / aggrPartitionSizeRows);
+        if (cardinality % aggrPartitionSizeRows > 0)
+        {
+            numPartitions++;
+        }
+        return numPartitions;
+    }
+
+    private long getTableCardinality(Table table, int[] keyColumnIds) throws MetadataException
+    {
+        if (table.getTableType() == BASE)
+        {
+            Map<String, Column> columnMap = getColumnMap((BaseTable) table);
+            long cardinality = 0;
+            for (int columnId : keyColumnIds)
+            {
+                String columnName = table.getColumnNames()[columnId];
+                if (columnMap.get(columnName).getCardinality() > cardinality)
+                {
+                    cardinality = columnMap.get(columnName).getCardinality();
+                }
+            }
+            return cardinality;
+        }
+        else if (table.getTableType() == JOINED)
+        {
+            JoinedTable joinedTable = (JoinedTable) table;
+            Join join = joinedTable.getJoin();
+            long cardinality = 0;
+            for (int columnId : keyColumnIds)
+            {
+                String columnName = joinedTable.getColumnNames()[columnId];
+                List<Integer> leftKeyColumnIds = new LinkedList<>();
+                List<Integer> rightKeyColumnIds = new LinkedList<>();
+                if (join.getJoinEndian() == JoinEndian.SMALL_LEFT)
+                {
+                    if (columnId < join.getLeftColumnAlias().length)
+                    {
+                        checkArgument(join.getLeftColumnAlias()[columnId].equals(columnName),
+                                "wrong column alias id for left table");
+                        int leftColumnId = getColumnIdFromAliasId(join.getLeftProjection(), columnId);
+                        leftKeyColumnIds.add(leftColumnId);
+                    }
+                    else
+                    {
+                        int rightAliasId = columnId - join.getLeftColumnAlias().length;
+                        checkArgument(join.getRightColumnAlias()[rightAliasId].equals(columnName),
+                                "wrong column alias id for right table");
+                        int rightColumnId = getColumnIdFromAliasId(join.getRightProjection(), rightAliasId);
+                        rightKeyColumnIds.add(rightColumnId);
+                    }
+                }
+                else
+                {
+                    if (columnId < join.getRightColumnAlias().length)
+                    {
+                        checkArgument(join.getRightColumnAlias()[columnId].equals(columnName),
+                                "wrong column alias id for right table");
+                        int rightColumnId = getColumnIdFromAliasId(join.getRightProjection(), columnId);
+                        rightKeyColumnIds.add(rightColumnId);
+                    }
+                    else
+                    {
+                        int leftAliasId = columnId - join.getRightColumnAlias().length;
+                        checkArgument(join.getLeftColumnAlias()[leftAliasId].equals(columnName),
+                                "wrong column alias id for left table");
+                        int leftColumnId = getColumnIdFromAliasId(join.getLeftProjection(), leftAliasId);
+                        leftKeyColumnIds.add(leftColumnId);
+                    }
+                }
+                if (!leftKeyColumnIds.isEmpty())
+                {
+                    long columnCard = getTableCardinality(join.getLeftTable(),
+                            leftKeyColumnIds.stream().mapToInt(Integer::intValue).toArray());
+                    if (columnCard > cardinality)
+                    {
+                        cardinality = columnCard;
+                    }
+                }
+                if (!rightKeyColumnIds.isEmpty())
+                {
+                    long columnCard = getTableCardinality(join.getRightTable(),
+                            rightKeyColumnIds.stream().mapToInt(Integer::intValue).toArray());
+                    if (columnCard > cardinality)
+                    {
+                        cardinality = columnCard;
+                    }
+                }
+            }
+            return cardinality;
+        }
+        else
+        {
+            throw new UnsupportedOperationException("originTable type " + table.getTableType() + " is not supported.");
+        }
+    }
+
+    private int getColumnIdFromAliasId(boolean[] projection, int aliasId)
+    {
+        for (int i = 0, j = 0; i < projection.length; ++i)
+        {
+            if (j == aliasId)
+            {
+                return i;
+            }
+            if (projection[i])
+            {
+                j++;
+            }
+        }
+        return -1;
     }
 
     private double getTableInputSize(Table table) throws MetadataException
