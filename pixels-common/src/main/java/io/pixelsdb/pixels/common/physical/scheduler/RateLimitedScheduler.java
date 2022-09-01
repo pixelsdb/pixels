@@ -144,8 +144,8 @@ public class RateLimitedScheduler extends SortMergeScheduler
                     }
                     else
                     {
-                        logger.error("Failed to read asynchronously from path '" +
-                                path + "'.");
+                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
+                                merged.getStart() + ", length=" + merged.getLength());
                     }
                 });
                 if (enableRetry)

@@ -102,18 +102,29 @@ public final class Minio extends AbstractS3
 
     public Minio()
     {
+        connect();
+    }
+
+    private void connect()
+    {
         requireNonNull(minIOEndpoint, "Minio endpoint is not set");
         requireNonNull(minIOAccessKey, "Minio access key is not set");
         requireNonNull(minIOSecretKey, "Minio secret key is not set");
 
         this.s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
-                .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
-                .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
-                .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
-                .maxConnections(MaxRequestConcurrency))
+                        .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
+                        .maxConnections(MaxRequestConcurrency))
                 .endpointOverride(URI.create(minIOEndpoint))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(minIOAccessKey, minIOSecretKey))).build();
+    }
+
+    @Override
+    public void reconnect()
+    {
+        connect();
     }
 
     @Override

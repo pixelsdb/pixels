@@ -59,9 +59,9 @@ public final class S3 extends AbstractS3
 
     private final static boolean enableRequestDiversion;
 
-    private final S3AsyncClient s3Async;
-    private final S3AsyncClient s3Async1M;
-    private final S3AsyncClient s3Async10M;
+    private S3AsyncClient s3Async;
+    private S3AsyncClient s3Async1M;
+    private S3AsyncClient s3Async10M;
 
     static
     {
@@ -87,6 +87,11 @@ public final class S3 extends AbstractS3
     }
 
     public S3()
+    {
+        connect();
+    }
+
+    private void connect()
     {
         String[] concurrencyAssign = null;
         if (enableRequestDiversion)
@@ -156,6 +161,12 @@ public final class S3 extends AbstractS3
                 .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
                 .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                 .maxConnections(MaxRequestConcurrency)).build();
+    }
+
+    @Override
+    public void reconnect()
+    {
+        connect();
     }
 
     @Override

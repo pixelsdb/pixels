@@ -78,7 +78,8 @@ public class NoopScheduler implements Scheduler
                     }
                     else
                     {
-                        logger.error("Failed to read asynchronously from path '" + path + "'.");
+                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
+                                request.start + ", length=" + request.length);
                     }
                 });
             }
