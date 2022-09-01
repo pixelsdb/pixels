@@ -66,7 +66,6 @@ public class WorkerCommon
         try
         {
             s3 = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-
         } catch (Exception e)
         {
             logger.error("failed to initialize AWS S3 storage", e);
