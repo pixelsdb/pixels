@@ -44,12 +44,13 @@ public class FunctionFactory
         {
             case SUM:
                 return createSum(inputType, outputType);
+            case COUNT:
+                return new Count();
             default:
                 // TODO: support more function types.
                 throw new UnsupportedOperationException(
                         "function type '" + functionType +"' is not supported");
         }
-
     }
 
     private Function createSum(TypeDescription inputType, TypeDescription outputType)

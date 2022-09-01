@@ -91,7 +91,7 @@ public final class S3 extends AbstractS3
         connect();
     }
 
-    private void connect()
+    private synchronized void connect()
     {
         String[] concurrencyAssign = null;
         if (enableRequestDiversion)

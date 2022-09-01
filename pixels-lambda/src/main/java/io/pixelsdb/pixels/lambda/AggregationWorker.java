@@ -148,6 +148,13 @@ public class AggregationWorker implements RequestHandler<AggregationInput, Aggre
                     "input file does not contain the correct number of columns");
 
             // start aggregation.
+            for (int i = 0; i < functionTypes.length; ++i)
+            {
+                if (functionTypes[i] == FunctionType.COUNT)
+                {
+                    functionTypes[i] = FunctionType.SUM;
+                }
+            }
             Aggregator aggregator = new Aggregator(rowBatchSize, inputSchema, groupKeyColumnNames,
                     groupKeyColumnIds, groupKeyColumnProj, aggrColumnIds, resultColumnNames,
                     resultColumnTypes, functionTypes, false, 0);
