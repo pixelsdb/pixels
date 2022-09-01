@@ -54,8 +54,8 @@ public class SortMergeScheduler implements Scheduler
         return instance;
     }
 
-    private RetryPolicy retryPolicy;
-    private final boolean enableRetry;
+    protected RetryPolicy retryPolicy;
+    protected final boolean enableRetry;
 
     protected SortMergeScheduler()
     {

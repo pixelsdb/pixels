@@ -63,8 +63,6 @@ public class RateLimitedScheduler extends SortMergeScheduler
     private RateLimiter mbpsRateLimiter;
     private RateLimiter rpsRateLimiter;
     private final Random random;
-    private RetryPolicy retryPolicy;
-    private final boolean enableRetry;
 
     protected RateLimitedScheduler()
     {
@@ -99,13 +97,6 @@ public class RateLimitedScheduler extends SortMergeScheduler
         rpsRateLimiter = RateLimiter.create(rpsRateLimit);
 
         random = new Random(System.nanoTime());
-
-        this.enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
-        if (this.enableRetry)
-        {
-            int interval = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.retry.interval.ms"));
-            this.retryPolicy = new RetryPolicy(interval);
-        }
     }
 
     @Override
