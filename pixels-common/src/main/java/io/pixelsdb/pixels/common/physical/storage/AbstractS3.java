@@ -86,6 +86,8 @@ public abstract class AbstractS3 implements Storage
 
     public AbstractS3() { }
 
+    public abstract void reconnect();
+
     public static class Path
     {
         public String bucket = null;

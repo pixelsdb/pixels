@@ -39,8 +39,7 @@ public class RetryPolicy
     private final int maxRetryNum;
     private final int intervalMs;
     private final ConcurrentLinkedQueue<ExecutableRequest> requests;
-    ThreadGroup monitorThreadGroup;
-    private final ExecutorService monitorService;
+    private ExecutorService monitorService;
     private volatile boolean stopped = false;
 
     private static final int FIRST_BYTE_LATENCY_MS = 1000; // 1000ms
@@ -56,11 +55,16 @@ public class RetryPolicy
         this.maxRetryNum = Integer.parseInt(ConfigFactory.Instance().getProperty("read.request.max.retry.num"));
         this.intervalMs = intervalMs;
         this.requests = new ConcurrentLinkedQueue<>();
+        this.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
+    }
 
+    private void start()
+    {
         // Issue #133: set the monitor thread as daemon thread with max priority.
-        this.monitorThreadGroup = new ThreadGroup("pixels.retry.monitor");
-        this.monitorThreadGroup.setMaxPriority(Thread.MAX_PRIORITY);
-        this.monitorThreadGroup.setDaemon(true);
+        ThreadGroup monitorThreadGroup = new ThreadGroup("pixels.retry.monitor");
+        monitorThreadGroup.setMaxPriority(Thread.MAX_PRIORITY);
+        monitorThreadGroup.setDaemon(true);
         this.monitorService = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(monitorThreadGroup, runnable);
             thread.setDaemon(true);
@@ -99,7 +103,7 @@ public class RetryPolicy
                 try
                 {
                     // sleep for some time, to release the cpu.
-                    Thread.sleep(this.intervalMs);
+                    TimeUnit.MILLISECONDS.sleep(this.intervalMs);
                 } catch (InterruptedException e)
                 {
                     logger.error("Retry policy is interrupted, exiting", e);
@@ -109,8 +113,6 @@ public class RetryPolicy
         });
 
         this.monitorService.shutdown();
-
-        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
     private void stop()

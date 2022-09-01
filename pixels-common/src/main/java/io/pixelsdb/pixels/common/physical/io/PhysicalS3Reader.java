@@ -51,9 +51,9 @@ public class PhysicalS3Reader extends AbstractS3Reader
     private final static int LEN_10M = 1024*1024*10;
     private final static int ADAPTIVE_READ_TH = 2*1024*1024;
 
-    private final S3AsyncClient asyncClient;
-    private final S3AsyncClient asyncClient1M;
-    private final S3AsyncClient asyncClient10M;
+    private S3AsyncClient asyncClient;
+    private S3AsyncClient asyncClient1M;
+    private S3AsyncClient asyncClient10M;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
@@ -62,6 +62,11 @@ public class PhysicalS3Reader extends AbstractS3Reader
         {
             throw new IOException("Storage is not S3.");
         }
+        initClients();
+    }
+
+    private void initClients()
+    {
         S3 s3 = (S3) this.s3;
         this.asyncClient = s3.getAsyncClient();
         if (S3.isRequestDiversionEnabled())
@@ -130,17 +135,17 @@ public class PhysicalS3Reader extends AbstractS3Reader
              * We tried to use thenApplySync using the clientService executor,
              * it does not help improve the query performance.
              */
-            return future.thenApply(resp ->
+            return future.handle((resp, err) ->
             {
-                if (resp != null)
+                if (err != null)
                 {
-                    return ByteBuffer.wrap(resp.asByteArrayUnsafe());
+                    logger.error("Failed to complete the asynchronous read, range=" +
+                            request.range() + ", retrying with sync client.", err);
+                    s3.reconnect();
+                    initClients();
+                    resp = client.getObject(request, ResponseTransformer.toBytes());
                 }
-                else
-                {
-                    logger.error("Failed complete the asynchronous read.");
-                    return null;
-                }
+                return ByteBuffer.wrap(resp.asByteArrayUnsafe());
             });
         } catch (Exception e)
         {

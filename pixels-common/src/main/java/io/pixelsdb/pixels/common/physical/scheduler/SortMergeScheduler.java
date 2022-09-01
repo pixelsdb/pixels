@@ -141,8 +141,8 @@ public class SortMergeScheduler implements Scheduler
                     }
                     else
                     {
-                        logger.error("Asynchronous read from path '" +
-                                path + "' got null response.");
+                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
+                                merged.getStart() + ", length=" + merged.getLength());
                     }
                 });
                 if (enableRetry)
@@ -288,8 +288,7 @@ public class SortMergeScheduler implements Scheduler
     }
 
     /**
-     * Combination of MergedRequest and PhysicalReader,
-     * it is used by the RetryPolicy.
+     * Combination of MergedRequest and PhysicalReader. It is used by the RetryPolicy.
      */
     protected static class MergedExecutableRequest implements RetryPolicy.ExecutableRequest
     {
@@ -338,12 +337,10 @@ public class SortMergeScheduler implements Scheduler
                 return false;
             }
             String path = this.reader.getPath();
-            logger.debug("retry read request: path='" + path + "', start=" +
-                    this.request.start + ", length=" + this.request.getLength());
             try
             {
                 this.request.startTimeMs = System.currentTimeMillis();
-                this.reader.readAsync(this.request.start, request.getLength()).thenAccept(resp ->
+                this.reader.readAsync(this.request.start, request.length).thenAccept(resp ->
                 {
                     if (resp != null)
                     {
@@ -352,7 +349,8 @@ public class SortMergeScheduler implements Scheduler
                     }
                     else
                     {
-                        logger.error("Asynchronous read from path '" + path + "' got null response.");
+                        logger.error("Retry asynchronous read from path '" + path + "' got null response, start=" +
+                                this.request.start + ", length=" + this.request.length);
                     }
                 });
             } catch (IOException e)
