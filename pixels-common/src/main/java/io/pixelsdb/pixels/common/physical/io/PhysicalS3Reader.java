@@ -52,8 +52,6 @@ public class PhysicalS3Reader extends AbstractS3Reader
     private final static int ADAPTIVE_READ_TH = 2*1024*1024;
 
     private S3AsyncClient asyncClient;
-    private S3AsyncClient asyncClient1M;
-    private S3AsyncClient asyncClient10M;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
@@ -69,15 +67,6 @@ public class PhysicalS3Reader extends AbstractS3Reader
     {
         S3 s3 = (S3) this.s3;
         this.asyncClient = s3.getAsyncClient();
-        if (S3.isRequestDiversionEnabled())
-        {
-            this.asyncClient1M = s3.getAsyncClient1M();
-            this.asyncClient10M = s3.getAsyncClient10M();
-        }
-        else
-        {
-            this.asyncClient1M = this.asyncClient10M = null;
-        }
 
         if (!useAsyncClient)
         {
@@ -98,23 +87,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
         CompletableFuture<ResponseBytes<GetObjectResponse>> future;
         if (useAsyncClient && len < ADAPTIVE_READ_TH)
         {
-            if (S3.isRequestDiversionEnabled())
-            {
-                if (len < LEN_1M)
-                {
-                    future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
-                } else if (len < LEN_10M)
-                {
-                    future = asyncClient1M.getObject(request, AsyncResponseTransformer.toBytes());
-                } else
-                {
-                    future = asyncClient10M.getObject(request, AsyncResponseTransformer.toBytes());
-                }
-            }
-            else
-            {
-                future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
-            }
+            future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
         }
         else
         {
@@ -141,6 +114,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
                 {
                     logger.error("Failed to complete the asynchronous read, range=" +
                             request.range() + ", retrying with sync client.", err);
+                    // Issue #350: it is fine if multiple threads reconnect to S3 for multiple time.
                     s3.reconnect();
                     initClients();
                     resp = client.getObject(request, ResponseTransformer.toBytes());

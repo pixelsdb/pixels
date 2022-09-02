@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
 import io.pixelsdb.pixels.common.exception.StorageException;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -57,11 +56,7 @@ public final class S3 extends AbstractS3
     private static final Logger logger = LogManager.getLogger(S3.class);
     private static final String SchemePrefix = Scheme.s3.name() + "://";
 
-    private final static boolean enableRequestDiversion;
-
     private S3AsyncClient s3Async;
-    private S3AsyncClient s3Async1M;
-    private S3AsyncClient s3Async10M;
 
     static
     {
@@ -75,15 +70,6 @@ public final class S3 extends AbstractS3
 
             InitId(S3_ID_KEY);
         }
-
-        enableRequestDiversion = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("s3.enable.request.diversion"));
-        logger.info("Request diversion enabled: " + enableRequestDiversion);
-    }
-
-    public static boolean isRequestDiversionEnabled()
-    {
-        return enableRequestDiversion;
     }
 
     public S3()
@@ -93,14 +79,6 @@ public final class S3 extends AbstractS3
 
     private synchronized void connect()
     {
-        String[] concurrencyAssign = null;
-        if (enableRequestDiversion)
-        {
-            String assign = ConfigFactory.Instance().getProperty("s3.request.concurrency.assign");
-            logger.info("Request concurrency assignment: " + assign);
-            concurrencyAssign = assign.split(":");
-        }
-
         /*
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
@@ -111,50 +89,13 @@ public final class S3 extends AbstractS3
                         .maxConcurrency(maxRequestConcurrency).maxPendingConnectionAcquires(maxPendingRequests)).build();
         */
 
-        int maxConcurrency, maxConcurrency1M, maxConcurrency10M;
-        if (enableRequestDiversion)
-        {
-            maxConcurrency = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[0]));
-            maxConcurrency1M = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[1]));
-            maxConcurrency10M = (int) (MaxRequestConcurrency /100.0*Integer.parseInt(concurrencyAssign[2]));
-        }
-        else
-        {
-            maxConcurrency = MaxRequestConcurrency;
-            maxConcurrency1M = 0;
-            maxConcurrency10M = 0;
-        }
-
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
-                        .maxConcurrency(maxConcurrency))
+                        .maxConcurrency(MaxRequestConcurrency))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec)).retryPolicy(RetryMode.ADAPTIVE)
                         .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
                         .build()).build();
-
-        if (enableRequestDiversion)
-        {
-            s3Async1M = S3AsyncClient.builder()
-                    .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
-                            .maxConcurrency(maxConcurrency1M))
-                    .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
-                            .build()).build();
-
-            s3Async10M = S3AsyncClient.builder()
-                    .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
-                            .maxConcurrency(maxConcurrency10M))
-                    .overrideConfiguration(ClientOverrideConfiguration.builder()
-                            .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec))
-                            .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
-                            .build()).build();
-        }
-        else
-        {
-            s3Async1M = s3Async10M = null;
-        }
 
         s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
@@ -216,14 +157,6 @@ public final class S3 extends AbstractS3
         {
             s3Async.close();
         }
-        if (s3Async1M != null)
-        {
-            s3Async1M.close();
-        }
-        if (s3Async10M != null)
-        {
-            s3Async10M.close();
-        }
     }
 
     @Override
@@ -254,15 +187,5 @@ public final class S3 extends AbstractS3
     public S3AsyncClient getAsyncClient()
     {
         return s3Async;
-    }
-
-    public S3AsyncClient getAsyncClient1M()
-    {
-        return s3Async1M;
-    }
-
-    public S3AsyncClient getAsyncClient10M()
-    {
-        return s3Async10M;
     }
 }
