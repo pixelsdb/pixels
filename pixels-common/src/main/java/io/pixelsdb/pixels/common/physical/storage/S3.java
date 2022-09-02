@@ -79,8 +79,6 @@ public final class S3 extends AbstractS3
 
     private synchronized void connect()
     {
-        String[] concurrencyAssign = null;
-
         /*
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
