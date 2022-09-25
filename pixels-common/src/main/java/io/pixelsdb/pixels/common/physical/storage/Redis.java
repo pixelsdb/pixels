@@ -38,6 +38,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
 import static io.pixelsdb.pixels.common.physical.storage.AbstractS3.EnableCache;
 import static io.pixelsdb.pixels.common.utils.Constants.REDIS_ID_KEY;
+import static io.pixelsdb.pixels.common.utils.Constants.REDIS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -76,9 +77,9 @@ public class Redis implements Storage
      * <br/>
      * If the configurations are not changed, this method is a no-op.
      *
-     * @param endpoint the new endpoint of Minio
-     * @param accessKey the new access key of Minio
-     * @param secretKey the new secret key of Minio
+     * @param endpoint the new endpoint of Redis
+     * @param accessKey the new access key of Redis
+     * @param secretKey the new secret key of Redis
      * @throws IOException
      */
     public static void ConfigRedis(String endpoint, String accessKey, String secretKey) throws IOException
@@ -140,7 +141,7 @@ public class Redis implements Storage
         return SchemePrefix + path;
     }
 
-    private String dropSchemePrefix(String path) throws IOException
+    private String dropSchemePrefix(String path)
     {
         if (path.startsWith(SchemePrefix))
         {
@@ -192,7 +193,7 @@ public class Redis implements Storage
         path = dropSchemePrefix(path);
         if (EnableCache)
         {
-            KeyValue kv = EtcdUtil.Instance().getKeyValue(path);
+            KeyValue kv = EtcdUtil.Instance().getKeyValue(getPathKey(path));
             return Long.parseLong(kv.getValue().toString(StandardCharsets.UTF_8));
         }
         else
@@ -200,6 +201,11 @@ public class Redis implements Storage
             // Issue #222: return an arbitrary id when cache is disable.
             return path.hashCode();
         }
+    }
+
+    private String getPathKey(String path)
+    {
+        return REDIS_META_PREFIX + path;
     }
 
     @Override

@@ -403,7 +403,7 @@ public abstract class AbstractS3 implements Storage
         {
             if (!recursive)
             {
-                throw new IOException("Non-recursive deletion is not supported in S3-like storage.");
+                throw new IOException("Non-recursive deletion of directory is not supported in S3-like storage.");
             }
             // The ListObjects S3 API, which is used by listStatus, is already recursive.
             List<Status> statuses = this.listStatus(path);
@@ -437,7 +437,7 @@ public abstract class AbstractS3 implements Storage
                 s3.deleteObject(request);
             } catch (Exception e)
             {
-                throw new IOException("Failed to delete object '" + p.bucket + "/" + p.key + "' from S3.", e);
+                throw new IOException("Failed to delete object '" + p + "' from S3.", e);
             }
         }
         if (EnableCache)
@@ -460,11 +460,11 @@ public abstract class AbstractS3 implements Storage
         Path destPath = new Path(dest);
         if (!srcPath.valid)
         {
-            throw new IOException("Path '" + src + "' is not valid.");
+            throw new IOException("Path '" + src + "' is invalid.");
         }
         if (!destPath.valid)
         {
-            throw new IOException("Path '" + dest + "' is not valid.");
+            throw new IOException("Path '" + dest + "' is invalid.");
         }
         if (!this.existsInS3(srcPath))
         {
@@ -475,10 +475,8 @@ public abstract class AbstractS3 implements Storage
             throw new IOException("Path '" + dest + "' already exists.");
         }
         CopyObjectRequest copyReq = CopyObjectRequest.builder()
-                .copySource(srcPath.toString())
-                .destinationBucket(destPath.bucket)
-                .destinationKey(destPath.key)
-                .build();
+                .sourceBucket(srcPath.bucket).sourceKey(srcPath.key)
+                .destinationBucket(destPath.bucket).destinationKey(destPath.key).build();
         try
         {
             s3.copyObject(copyReq);

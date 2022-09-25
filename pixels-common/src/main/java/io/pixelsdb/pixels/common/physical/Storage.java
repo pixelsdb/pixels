@@ -44,7 +44,8 @@ public interface Storage
         file,  // local fs
         s3,    // Amazon S3
         minio, // Minio
-        redis; // Redis
+        redis, // Redis
+        gcs;   // google cloud storage
 
         /**
          * Case insensitive parsing from String to enum value.

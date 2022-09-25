@@ -111,7 +111,7 @@ public class S3InputStream extends InputStream
     public int read() throws IOException
     {
         this.assertOpen();
-        if (bufferPosition >= this.buffer.length)
+        if (this.buffer == null || bufferPosition >= this.buffer.length)
         {
             if (populateBuffer() < 0)
             {
