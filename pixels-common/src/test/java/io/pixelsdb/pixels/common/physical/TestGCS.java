@@ -30,6 +30,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
 
 import static io.pixelsdb.pixels.common.utils.Constants.GCS_BUFFER_SIZE;
 
@@ -115,5 +116,38 @@ public class TestGCS
         System.out.println(buffer[0]);
         System.out.println(buffer[2]);
         storage.close();
+    }
+
+    @Test
+    public void testGCSReader() throws IOException, ExecutionException, InterruptedException
+    {
+        GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
+        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+                io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
+        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, "pixels-test/hello-world/test1");
+        long start = System.currentTimeMillis();
+        ByteBuffer buffer = reader.readAsync(2, 8).get();
+        System.out.println(buffer.get(0));
+        System.out.println(buffer.get(1));
+        System.out.println(System.currentTimeMillis() - start);
+    }
+
+    @Test
+    public void testGCSWriter() throws IOException, ExecutionException, InterruptedException
+    {
+        GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
+        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+                io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
+        PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(
+                storage, "pixels-test/hello-world/test1", true);
+        long start = System.currentTimeMillis();
+        writer.prepare(1024*1024);
+        byte[] buffer = new byte[1024*1024];
+        Arrays.fill(buffer, (byte) 0);
+        buffer[2] = 2;
+        writer.append(buffer, 0, 1024*1024);
+        writer.flush();
+        writer.close();
+        System.out.println(System.currentTimeMillis() - start);
     }
 }
