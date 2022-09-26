@@ -468,7 +468,7 @@ public class GCS implements Storage
         return new Path(path).isFolder;
     }
 
-    public com.google.cloud.storage.Storage getGCS()
+    public com.google.cloud.storage.Storage getClient()
     {
         return this.gcs;
     }

@@ -19,15 +19,15 @@
  */
 package io.pixelsdb.pixels.common.physical.io;
 
+import com.google.cloud.ReadChannel;
+import com.google.cloud.storage.BlobId;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
+import io.pixelsdb.pixels.common.physical.storage.AbstractS3.Path;
+import io.pixelsdb.pixels.common.physical.storage.GCS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.sync.ResponseTransformer;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -36,19 +36,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The abstract class for the physical readers of AWS S3 compatible storage systems.
+ * The physical readers of Google Cloud Storage.
  *
  * @author hank
- * Created at: 10/04/2022
+ * Created at: 25/09/2022
  */
-public abstract class AbstractS3Reader implements PhysicalReader
+public class PhysicalGCSReader implements PhysicalReader
 {
-    /*
-     * The implementations of most methods in this class are from its subclass PhysicalS3Reader.
-     */
-
+    private static final Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
     protected boolean enableAsync = false;
-    protected boolean useAsyncClient = false;
     protected static final ExecutorService clientService;
 
     static
@@ -75,50 +71,41 @@ public abstract class AbstractS3Reader implements PhysicalReader
         Runtime.getRuntime().addShutdownHook(new Thread(clientService::shutdownNow));
     }
 
-    protected final AbstractS3 s3;
-    protected final AbstractS3.Path path;
+    protected final GCS gcs;
+    protected final Path path;
     protected final String pathStr;
     protected final long id;
     protected final long length;
-    protected final S3Client client;
+    protected final com.google.cloud.storage.Storage client;
+    protected final ReadChannel readChannel;
     protected long position;
     protected int numRequests;
 
-    public AbstractS3Reader(Storage storage, String path) throws IOException
+    public PhysicalGCSReader(Storage storage, String path) throws IOException
     {
-        // instanceof tells if an object is an instance of a class or its parent classes.
-        if (storage instanceof AbstractS3)
+        if (storage instanceof GCS)
         {
-            this.s3 = (AbstractS3) storage;
+            gcs = (GCS) storage;
         }
         else
         {
-            throw new IOException("Storage is not S3 compatible.");
+            throw new IOException("Storage is not GCS.");
         }
         if (path.contains("://"))
         {
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new AbstractS3.Path(path);
+        this.path = new Path(path);
         this.pathStr = path;
-        this.id = this.s3.getFileId(path);
-        this.length = this.s3.getStatus(path).getLength();
+        this.id = this.gcs.getFileId(path);
+        this.length = this.gcs.getStatus(path).getLength();
         this.numRequests = 1;
         this.position = 0L;
-        this.client = this.s3.getClient();
+        this.client = this.gcs.getClient();
+        this.readChannel = this.client.reader(BlobId.of(this.path.bucket, this.path.key));
         this.enableAsync = Boolean.parseBoolean(ConfigFactory.Instance()
-                .getProperty("s3.enable.async"));
-        this.useAsyncClient = Boolean.parseBoolean(ConfigFactory.Instance()
-                .getProperty("s3.use.async.client"));
-    }
-
-    protected String toRange(long start, int length)
-    {
-        assert start >= 0 && length > 0;
-        StringBuilder builder = new StringBuilder("bytes=");
-        builder.append(start).append('-').append(start+length-1);
-        return builder.toString();
+                .getProperty("gcs.enable.async"));
     }
 
     @Override
@@ -150,13 +137,12 @@ public abstract class AbstractS3Reader implements PhysicalReader
 
         try
         {
-            GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
-                .key(path.key).range(toRange(position, len)).build();
-            ResponseBytes<GetObjectResponse> response =
-                client.getObject(request, ResponseTransformer.toBytes());
+            this.readChannel.seek(this.position);
+            ByteBuffer buffer = ByteBuffer.allocate(len);
+            this.readChannel.read(buffer);
             this.numRequests++;
             this.position += len;
-            return ByteBuffer.wrap(response.asByteArrayUnsafe());
+            return buffer;
         } catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);
@@ -166,15 +152,28 @@ public abstract class AbstractS3Reader implements PhysicalReader
     @Override
     public void readFully(byte[] buffer) throws IOException
     {
-        ByteBuffer byteBuffer = readFully(buffer.length);
-        System.arraycopy(byteBuffer.array(), 0, buffer, 0, buffer.length);
+        readFully(buffer, 0, buffer.length);
     }
 
     @Override
     public void readFully(byte[] buffer, int off, int len) throws IOException
     {
-        ByteBuffer byteBuffer = readFully(len);
-        System.arraycopy(byteBuffer.array(), 0, buffer, off, len);
+        if (this.position + len > this.length)
+        {
+            throw new IOException("Current position " + this.position + " plus " +
+                    len + " exceeds object length " + this.length + ".");
+        }
+
+        try
+        {
+            this.readChannel.seek(this.position);
+            this.readChannel.read(ByteBuffer.wrap(buffer, off, len));
+            this.numRequests++;
+            this.position += len;
+        } catch (Exception e)
+        {
+            throw new IOException("Failed to read object.", e);
+        }
     }
 
     /**
@@ -187,7 +186,33 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     @Override
-    abstract public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException;
+    public CompletableFuture<ByteBuffer> readAsync(long off, int len) throws IOException
+    {
+        if (off + len > this.length)
+        {
+            throw new IOException("Offset " + off + " plus " +
+                    len + " exceeds object length " + this.length + ".");
+        }
+        CompletableFuture<ByteBuffer> future;
+        future = new CompletableFuture<>();
+        clientService.execute(() -> {
+            try (ReadChannel reader = this.client.reader(BlobId.of(this.path.bucket, this.path.key)))
+            {
+                reader.seek(off);
+                ByteBuffer buffer = ByteBuffer.allocate(len);
+                reader.read(buffer);
+                future.complete(buffer);
+            } catch (IOException e)
+            {
+                future.completeExceptionally(e);
+                logger.error("Failed to complete the asynchronous read, offset=" +
+                        off + ", length= " + len + ".", e);
+            }
+        });
+
+        this.numRequests++;
+        return future;
+    }
 
     @Override
     public long readLong() throws IOException
@@ -204,7 +229,13 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     @Override
-    abstract public void close() throws IOException;
+    public void close() throws IOException
+    {
+        if (this.readChannel != null)
+        {
+            this.readChannel.close();
+        }
+    }
 
     @Override
     public String getPath()
@@ -239,7 +270,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
      * @throws IOException
      */
     @Override
-    public long getBlockId() throws IOException
+    public long getBlockId()
     {
         return this.id;
     }
@@ -252,7 +283,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     @Override
     public Storage.Scheme getStorageScheme()
     {
-        return s3.getScheme();
+        return Storage.Scheme.gcs;
     }
 
     @Override
