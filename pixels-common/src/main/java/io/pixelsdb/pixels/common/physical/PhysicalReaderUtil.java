@@ -58,6 +58,9 @@ public class PhysicalReaderUtil
             case redis:
                 reader = new PhysicalRedisReader(storage, path);
                 break;
+            case gcs:
+                reader = new PhysicalGCSReader(storage, path);
+                break;
             default:
                 throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
         }

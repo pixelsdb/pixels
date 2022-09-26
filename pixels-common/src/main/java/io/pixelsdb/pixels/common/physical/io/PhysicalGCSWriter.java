@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -21,9 +21,9 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
+import io.pixelsdb.pixels.common.physical.storage.AbstractS3.Path;
+import io.pixelsdb.pixels.common.physical.storage.GCS;
 import io.pixelsdb.pixels.common.utils.Constants;
-import software.amazon.awssdk.services.s3.S3Client;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,40 +31,40 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 /**
- * The physical writers for AWS S3 compatible storage systems.
+ * The physical writers for Google Cloud Storage.
  *
  * @author hank
- * Created at: 06/09/2021
+ * Created at: 25/09/2022
  */
-public class PhysicalS3Writer implements PhysicalWriter
+public class PhysicalGCSWriter implements PhysicalWriter
 {
-    private AbstractS3 s3;
-    private AbstractS3.Path path;
-    private final String pathStr;
+    private GCS gcs;
+    private Path path;
+    private String pathStr;
     private long position;
-    private S3Client client;
-    private final OutputStream out;
+    private com.google.cloud.storage.Storage client;
+    private OutputStream out;
 
-    public PhysicalS3Writer(Storage storage, String path, boolean overwrite) throws IOException
+    public PhysicalGCSWriter(Storage storage, String path, boolean overwrite) throws IOException
     {
-        if (storage instanceof AbstractS3)
+        if (storage instanceof GCS)
         {
-            this.s3 = (AbstractS3) storage;
+            this.gcs = (GCS) storage;
         }
         else
         {
-            throw new IOException("Storage is not S3.");
+            throw new IOException("Storage is not GCS.");
         }
         if (path.contains("://"))
         {
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new AbstractS3.Path(path);
+        this.path = new Path(path);
         this.pathStr = path;
         this.position = 0L;
-        this.client = s3.getClient();
-        this.out = this.s3.create(path, overwrite, Constants.S3_BUFFER_SIZE);
+        this.client = this.gcs.getClient();
+        this.out = this.gcs.create(path, overwrite, Constants.GCS_BUFFER_SIZE);
     }
 
     /**
@@ -147,6 +147,6 @@ public class PhysicalS3Writer implements PhysicalWriter
     @Override
     public int getBufferSize()
     {
-        return Constants.S3_BUFFER_SIZE;
+        return Constants.GCS_BUFFER_SIZE;
     }
 }

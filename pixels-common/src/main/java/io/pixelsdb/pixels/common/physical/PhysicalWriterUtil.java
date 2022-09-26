@@ -19,10 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.io.PhysicalHDFSWriter;
-import io.pixelsdb.pixels.common.physical.io.PhysicalLocalWriter;
-import io.pixelsdb.pixels.common.physical.io.PhysicalRedisWriter;
-import io.pixelsdb.pixels.common.physical.io.PhysicalS3Writer;
+import io.pixelsdb.pixels.common.physical.io.*;
 
 import java.io.IOException;
 
@@ -74,6 +71,9 @@ public class PhysicalWriterUtil
                 break;
             case redis:
                 writer = new PhysicalRedisWriter(storage, path, overwrite);
+                break;
+            case gcs:
+                writer = new PhysicalGCSWriter(storage, path, overwrite);
                 break;
             default:
                 throw new IOException("Storage scheme '" +

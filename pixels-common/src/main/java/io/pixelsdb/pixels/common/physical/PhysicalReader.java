@@ -25,11 +25,11 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
 /**
+ * Note that PhysicalReader should not be shared by multiple threads.
  * @author guodong
  * @author hank
  */
-public interface PhysicalReader
-        extends Closeable
+public interface PhysicalReader extends Closeable
 {
     long getFileLength() throws IOException;
 

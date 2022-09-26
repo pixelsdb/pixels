@@ -163,6 +163,9 @@ public class StorageFactory
             case redis:
                 storage = new Redis();
                 break;
+            case gcs:
+                storage = new GCS();
+                break;
             default:
                 throw new IOException("Unknown storage scheme: " + scheme.name());
         }

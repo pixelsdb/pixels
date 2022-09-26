@@ -61,6 +61,7 @@
         <dep.awssdk.version>2.17.231</dep.awssdk.version>
         <dep.awssdk.preview.version>2.17.231-PREVIEW</dep.awssdk.preview.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
+        <dep.gcp.version>26.1.2</dep.gcp.version>
 
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
@@ -324,6 +325,15 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>aws-crt-client</artifactId>
                 <version>${dep.awssdk.preview.version}</version>
+            </dependency>
+
+            <!-- google cloud -->
+            <dependency>
+                <groupId>com.google.cloud</groupId>
+                <artifactId>libraries-bom</artifactId>
+                <version>${dep.gcp.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- jedis -->

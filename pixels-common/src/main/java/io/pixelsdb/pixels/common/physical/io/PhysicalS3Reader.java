@@ -99,7 +99,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
             });
         }
 
-        super.numRequests.incrementAndGet();
+        super.numRequests++;
 
         try
         {

@@ -32,6 +32,7 @@ public final class Constants
     public static final int LOCAL_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int S3_BUFFER_SIZE = 8 * 1024 * 1024;
     public static final int REDIS_BUFFER_SIZE = 8 * 1024 * 1024;
+    public static final int GCS_BUFFER_SIZE = 8 * 1024 * 1024;
 
     public static final int MIN_REPEAT = 3;
     public static final int MAX_SCOPE = 512;
@@ -67,4 +68,8 @@ public final class Constants
     public static final String REDIS_ID_KEY = "pixels_storage_redis_id";
     // the prefix for keys of redis metadata (i.e. file path -> file id).
     public static final String REDIS_META_PREFIX = "pixels_storage_redis_meta:";
+
+    public static final String GCS_ID_KEY = "pixels_storage_gcs_id";
+    // the prefix for keys of gcs metadata (i.e. file path -> file id).
+    public static final String GCS_META_PREFIX = "pixels_storage_gcs_meta:";
 }
