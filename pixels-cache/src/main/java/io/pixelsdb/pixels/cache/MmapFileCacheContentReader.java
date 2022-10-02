@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 
+// TODO: shall it be autoclosable?
+// TODO: what is the endianess of each reader and writer?
 public class MmapFileCacheContentReader implements CacheContentReader {
     private final MemoryMappedFile content;
 

@@ -10,12 +10,6 @@ gen:
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.PixelsNativeCacheReader
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.HashIndexReader
 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexRewriter
-	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.NativeDiskCacheContentReader
-
-disk_content_reader:
-	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_NativeDiskCacheContentReader.c -o io_pixelsdb_pixels_cache_NativeDiskCacheContentReader.o
-	gcc  ${CFLAGS} -shared -fPIC -o ../../../libDiskCacheContentReader.so io_pixelsdb_pixels_cache_NativeDiskCacheContentReader.o -lc
-
 
 disc:
 	javap -s -p target/yeeef/Address.class
