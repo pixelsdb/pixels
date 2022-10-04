@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-// generate fake cache data based on the cache index
+// generate fake cache data based on the cache index file
+// TODO: move util classes to util package
 public class FakeCacheGenerator {
     List<PixelsCacheKey> pixelsCacheKeys;
     List<PixelsCacheIdx> pixelsCacheIdxs;
