@@ -99,6 +99,7 @@ public class RadixIndexWriter implements CacheIndexWriter {
         out.setBytes(currentIndexOffset, node.getEdge()); // edge
         currentIndexOffset += node.getEdge().length;
         windowWriteBytes += nodeBytes.length + node.getEdge().length;
+        // below code can be used to limit write bandwidth, leaving more bandwidth for the reader
 //        if (windowWriteBytes / 1024.0 / 1024 / ((System.currentTimeMillis() - startTime) / 1000.0) > bandwidthLimit) {
 //            double writeMib = windowWriteBytes / 1024.0 / 1024;
 //            double expectTimeMili = writeMib / bandwidthLimit * 1000;
@@ -122,7 +123,7 @@ public class RadixIndexWriter implements CacheIndexWriter {
     @Override
     public void clear() {
         this.radix.removeAll();
-    }
+    }   
 
     @Override
     public long flush() {
