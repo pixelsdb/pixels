@@ -3,7 +3,7 @@
 #include "byteswap.h"
 #include "utils.h"
 #include "memory_mapped_file.h"
-#include "io_pixelsdb_pixels_cache_CacheIndexRewriter.h"
+#include "io_pixelsdb_pixels_cache_utils_RadixIndexEndianRewriter.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12
@@ -72,7 +72,7 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
   }
 }
 
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_CacheIndexRewriter_rewrite(JNIEnv *env, jobject obj)
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_utils_RadixIndexEndianRewriter_rewrite(JNIEnv *env, jobject obj)
 {
   MemoryMappedFile indexFile = build_mmap_f(env, obj, "indexFile");
 
