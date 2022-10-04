@@ -29,11 +29,15 @@ public class TestHashIndexReader {
             // read some chars
             byte[] buf = new byte[5];
             ByteBuffer wrapBuf = ByteBuffer.wrap(buf);
-            indexDiskFile.seek(0);
+            indexDiskFile.seek(24);
             indexDiskFile.read(buf);
             Charset utf8 = StandardCharsets.UTF_8;
             System.out.println(utf8.decode(wrapBuf));
-            indexFile.getBytes(0, buf, 0, 5);
+            for(int i = 0; i < buf.length; ++i) {
+                System.out.println(buf[i]);
+            }
+
+            indexFile.getBytes(24, buf, 0, 5);
             wrapBuf.position(0);
             System.out.println(utf8.decode(wrapBuf));
 
@@ -44,16 +48,15 @@ public class TestHashIndexReader {
 
             // try to read the int
             // Note: the RandomAccessFile read everything from big-endian
-            System.out.println("mmap " + indexFile.getInt(0));
-            indexDiskFile.seek(0);
+            //      while mmap default read little-endian
+            System.out.println("mmap " + indexFile.getInt(16));
+            indexDiskFile.seek(16);
             System.out.println("disk " + indexDiskFile.readInt());
 
-            System.out.println("mmap " + indexFile.getLong(0));
-            indexDiskFile.seek(0);
+            System.out.println("mmap " + indexFile.getLong(16));
+            indexDiskFile.seek(16);
             System.out.println("disk " + indexDiskFile.readLong());
 
-            HashIndexReader reader = new HashIndexReader(indexFile);
-            HashIndexDiskReader diskReader = new HashIndexDiskReader(indexDiskFile);
         } catch (Exception e) {
             e.printStackTrace();
         }

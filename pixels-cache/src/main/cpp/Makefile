@@ -6,10 +6,10 @@ clean:
 	rm *.so; rm -r target/*; rm *.o
 
 gen:
-	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexSerializer
-	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.PixelsNativeCacheReader
-	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.HashIndexReader
-	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexRewriter
+# 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexSerializer
+# 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.PixelsNativeCacheReader
+	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.NativeHashIndexReader
+# 	javah -d . -cp ../../../target/pixels-cache-0.1.0-SNAPSHOT.jar io.pixelsdb.pixels.cache.CacheIndexRewriter
 
 disc:
 	javap -s -p target/yeeef/Address.class
@@ -23,8 +23,8 @@ reader:
 	gcc ${CFLAGS} -shared -fPIC -o ../../../libreader.so io_pixelsdb_pixels_cache_PixelsNativeCacheReader.o -lc
 
 hash_index:
-	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_HashIndexReader.c -o io_pixelsdb_pixels_cache_HashIndexReader.o
-	gcc ${CFLAGS} -shared -fPIC -o ../../../libHashIndexReader.so io_pixelsdb_pixels_cache_HashIndexReader.o -lc
+	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_NativeHashIndexReader.c -o io_pixelsdb_pixels_cache_NativeHashIndexReader.o
+	gcc ${CFLAGS} -shared -fPIC -o ../../../libHashIndexReader.so io_pixelsdb_pixels_cache_NativeHashIndexReader.o -lc
 
 rewriter:
 	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux io_pixelsdb_pixels_cache_CacheIndexRewriter.c -o io_pixelsdb_pixels_cache_CacheIndexRewriter.o

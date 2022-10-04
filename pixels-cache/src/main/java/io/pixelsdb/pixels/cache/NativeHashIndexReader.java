@@ -24,7 +24,7 @@ public class NativeHashIndexReader implements AutoCloseable, CacheIndexReader {
     NativeHashIndexReader(MemoryMappedFile indexFile)
     {
         this.indexFile = indexFile;
-        this.tableSize = (int) indexFile.getLong(0);
+        this.tableSize = (int) indexFile.getLong(16);
         System.out.println("tableSize=" + tableSize);
         System.out.println("cacheIdxAddr=" + cacheIdxBufAddr);
     }

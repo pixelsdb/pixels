@@ -5,7 +5,7 @@
 #include "memory_mapped_file.h"
 #include "io_pixelsdb_pixels_cache_HashIndexReader.h"
 
-#define INDEX_HASH_OFFSET 8
+#define INDEX_HASH_HEAD_OFFSET 24 // 16 + 8
 #define KEY_LEN 12       // long + short + short
 #define CACHE_IDX_LEN 12 // long + int
 #define KV_SIZE 24
@@ -20,7 +20,7 @@ int hashcode(const char* bytes, int size) {
   return var1;
 }
 
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_HashIndexReader_doNativeSearch
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_NativeHashIndexReader_doNativeSearch
   (JNIEnv *env, jobject this, jlong mmAddr, jlong mmSize, jlong blockId, jshort rowGroupId, jshort columnId, jlong retAddr_) {
   // static variable is not thread-safe!!!
   // static char* retAddr = NULL;
@@ -38,20 +38,19 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_HashIndexReader_doNativeSea
   memcpy(key + sizeof(blockId), &rowGroupId, sizeof(rowGroupId));
   memcpy(key + sizeof(blockId) + sizeof(rowGroupId), &columnId, sizeof(columnId));
 
-  int tableSize = (int) GET_LONG(indexFile, 0);
+  int tableSize = (int) GET_LONG(indexFile, 16);
 
   int hash = hashcode(key, KEY_LEN) & 0x7fffffff;
-  // printf("hash=%d\n", hash);
-  int bucket = hash & (tableSize - 1); // initial bucket
+  int bucket = hash % tableSize; // initial bucket
   int offset = bucket * KV_SIZE;
-  const char* kv = GET_BYTES(indexFile, offset + INDEX_HASH_OFFSET);
+  const char* kv = GET_BYTES(indexFile, offset + INDEX_HASH_HEAD_OFFSET);
   int cmp = memcmp(kv, key, KEY_LEN);
   for (int i = 1; cmp != 0; ++i) {
     // quadratic probing
     bucket += i * i;
-    bucket &= tableSize - 1;
+    bucket %= tableSize;
     offset = bucket * KV_SIZE;
-    kv = GET_BYTES(indexFile, offset + INDEX_HASH_OFFSET);
+    kv = GET_BYTES(indexFile, offset + INDEX_HASH_HEAD_OFFSET);
     if (memcmp(kv, zeros, KV_SIZE) == 0) {
       printf("cache miss! blk=%ld, rg=%d, col=%d, probe_i=%d, bucket=%d, offset=%d\n", blockId, rowGroupId, columnId, i, bucket, offset);
       return;
