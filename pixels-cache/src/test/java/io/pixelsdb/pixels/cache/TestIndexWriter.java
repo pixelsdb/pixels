@@ -45,7 +45,7 @@ public class TestIndexWriter {
     public void testHashIndexWriter() throws Exception {
         Configurator.setRootLevel(Level.DEBUG);
 
-        MemoryMappedFile hashIndex = new MemoryMappedFile("/dev/shm/pixels.hash-index2", 512000 * 24 * 2);
+        MemoryMappedFile hashIndex = new MemoryMappedFile("/dev/shm/pixels.hash-index-test", 512000 * 24 * 2);
         // write a new hash index
         CacheIndexWriter indexWriter = new HashIndexWriter(hashIndex);
         CacheIndexReader indexReader = new HashIndexReader(hashIndex);
