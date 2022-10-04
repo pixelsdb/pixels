@@ -1,7 +1,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "byteswap.h"
-#include "io_pixelsdb_pixels_cache_CacheIndexSerializer.h"
+#include "io_pixelsdb_pixels_cache_utils_RadixTreeDumper.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12
@@ -140,7 +140,7 @@ void dfs(MemoryMappedFile indexFile, long currentNodeOffset, unsigned char *keyB
   }
 }
 
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_CacheIndexSerializer_traverse(JNIEnv *env, jobject obj)
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_utils_RadixTreeDumper_nativeTraverse(JNIEnv *env, jobject obj)
 {
   MemoryMappedFile indexFile = build_mmap_f(env, obj);
   if (!valid(indexFile))
