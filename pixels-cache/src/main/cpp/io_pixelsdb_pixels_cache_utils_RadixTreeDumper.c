@@ -173,7 +173,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_utils_RadixTreeDumper_nativ
   printf("currentNodeChildrenNum=%u, currentNodeEdgeSize=%u\n", currentNodeChildrenNum, currentNodeEdgeSize);
   const char *nodeData = getBytes(indexFile, currentNodeOffset + 4);
 
-  FILE* out = fopen("./tmp.txt", "w");
+  FILE* out = fopen("./dumpedCache.txt", "w");
   char keyBuf[12] = {0};
   dfs(indexFile, currentNodeOffset, keyBuf, 0, out);
   fclose(out);
