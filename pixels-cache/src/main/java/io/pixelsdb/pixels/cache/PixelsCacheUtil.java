@@ -75,6 +75,7 @@ public class PixelsCacheUtil
      * for metadata header, but we start radix tree from offset 16 for word alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
+    // TODO: add comment
     public static final int PARTITION_INDEX_META_SIZE = 32;
     /**
      * We use the first 16 bytes in the cache file {magic(6)+status(2)+size(8)} for
@@ -244,35 +245,36 @@ public class PixelsCacheUtil
         indexFile.setIntVolatile(6, 0);
     }
 
-    // blocking call
+     // blocking call
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
-//        indexFile.setByteVolatile(6, (byte) 1);
-//        final int sleepMs = 10;
-//        int waitMs = 0;
-//        int readCount = indexFile.getIntVolatile(6) & READER_COUNT_MASK;
-//        while (readCount > 0) // polling to see if something is finished
-//        {
-//            /**
-//             * Wait for the existing readers to finish.
-//             * As rw flag has been set, there will be no new readers,
-//             * the existing readers should finished cache reading in
-//             * 10s (10000ms). If the reader can not finish cache reading
-//             * in 10s, it is considered as failed.
-//             */
-//            Thread.sleep(sleepMs);
-//            waitMs += sleepMs;
-//            if (waitMs > CACHE_READ_LEASE_MS)
-//            {
-//                // clear reader count to continue writing.
-//                logger.debug(String.format("waitms(%d) > CACHE_READ_LEASE_MS(%d), readCount=",
-//                        waitMs, CACHE_READ_LEASE_MS), readCount);
-//                indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
-//                break;
-//            }
-//            readCount = indexFile.getIntVolatile(6) & READER_COUNT_MASK;
-//        }
+        indexFile.setByteVolatile(6, (byte) 1);
+        final int sleepMs = 10;
+        int waitMs = 0;
+        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0) // polling to see if something is finished
+        {
+            /**
+             * Wait for the existing readers to finish.
+             * As rw flag has been set, there will be no new readers,
+             * the existing readers should finished cache reading in
+             * 10s (10000ms). If the reader can not finish cache reading
+             * in 10s, it is considered as failed.
+             */
+            Thread.sleep(sleepMs);
+            waitMs += sleepMs;
+            if (waitMs > CACHE_READ_LEASE_MS)
+            {
+                // clear reader count to continue writing.
+                indexFile.setIntVolatile(6, ZERO_READER_COUNT_WITH_RW_FLAG);
+                break;
+            }
+        }
+    }
+
+    // eliminate reader count, so writer only sleep for LEASE*2 time
+    public static void beginIndexWriteNoReaderCount(MemoryMappedFile indexFile) throws InterruptedException
+    {
         Thread.sleep(CACHE_READ_LEASE_MS * 2);
     }
 
