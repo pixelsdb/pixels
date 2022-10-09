@@ -9,7 +9,7 @@ import java.nio.ByteOrder;
 public class NativeRadixIndexReader implements AutoCloseable, CacheIndexReader {
 
     static {
-        System.loadLibrary("reader");
+        System.loadLibrary("RadixIndexReader");
     }
     private static final Logger logger = LogManager.getLogger(NativeRadixIndexReader.class);
 

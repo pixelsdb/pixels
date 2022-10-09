@@ -3,7 +3,7 @@
 #include "string.h"
 #include "byteswap.h"
 #include "memory_mapped_file.h"
-#include "io_pixelsdb_pixels_cache_PixelsNativeCacheReader.h"
+#include "io_pixelsdb_pixels_cache_NativeRadixIndexReader.h"
 
 #define INDEX_RADIX_OFFSET 16
 #define KEY_LEN 12       // long + short + short
@@ -21,7 +21,7 @@ void buildKeyBuf(char *keyBuf, unsigned long blockId, unsigned short rowGroupId,
   memcpy(keyBuf + 10, &columnId_, 2);
 }
 
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_PixelsNativeCacheReader_search(JNIEnv *env, jobject obj, jlong addr, jlong size, jobject retBuf, jlong blockId, jshort rowGroupId, jshort columnId)
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_cache_NativeRadixIndexReader_search(JNIEnv *env, jobject obj, jlong addr, jlong size, jobject retBuf, jlong blockId, jshort rowGroupId, jshort columnId)
 {
   MemoryMappedFile indexFile = (MemoryMappedFile){(char *)addr, size};
   char keyBuf[KEY_LEN] = {0};
