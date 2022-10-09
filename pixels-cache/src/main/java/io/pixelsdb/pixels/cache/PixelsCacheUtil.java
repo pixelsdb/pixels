@@ -75,7 +75,9 @@ public class PixelsCacheUtil
      * for metadata header, but we start radix tree from offset 16 for word alignment.
      */
     public static final int INDEX_RADIX_OFFSET = 16;
-    // TODO: add comment
+    /**
+     * {magic(6)+partitions{2}+subRegionBytes(8)+version(4)+freeAndStart(4)}
+     */
     public static final int PARTITION_INDEX_META_SIZE = 32;
     /**
      * We use the first 16 bytes in the cache file {magic(6)+status(2)+size(8)} for
