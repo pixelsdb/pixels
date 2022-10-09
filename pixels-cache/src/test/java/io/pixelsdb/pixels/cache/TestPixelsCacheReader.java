@@ -31,22 +31,10 @@ public class TestPixelsCacheReader
 
     @Test
     public void testSimpleSearchAndGet() throws Exception {
-        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
-
-        PixelsCacheKey key = new PixelsCacheKey(1073747711, (short) 0, (short) 191);
-        PixelsCacheReader cacheReader = PixelsCacheReader
-                .newBuilder()
-                .setIndexFile(indexFile)
-                .build();
-        System.out.println(cacheReader.search(key.blockId, key.rowGroupId, key.columnId));
-    }
-
-    @Test
-    public void testNativeSearchAndGet() throws Exception {
         MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
 
         PixelsCacheKey key = new PixelsCacheKey(1073747711, (short) 0, (short) 191);
-        PixelsNativeCacheReader cacheReader = PixelsNativeCacheReader
+        PixelsCacheReader cacheReader = PixelsCacheReader
                 .newBuilder()
                 .setIndexFile(indexFile)
                 .build();
