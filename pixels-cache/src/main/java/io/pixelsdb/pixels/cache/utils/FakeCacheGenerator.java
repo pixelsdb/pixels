@@ -1,4 +1,7 @@
-package io.pixelsdb.pixels.cache;
+package io.pixelsdb.pixels.cache.utils;
+
+import io.pixelsdb.pixels.cache.PixelsCacheIdx;
+import io.pixelsdb.pixels.cache.PixelsCacheKey;
 
 import java.io.*;
 import java.nio.file.Path;
@@ -8,7 +11,6 @@ import java.util.Arrays;
 import java.util.List;
 
 // generate fake cache data based on the cache index file
-// TODO: move util classes to util package
 public class FakeCacheGenerator {
     List<PixelsCacheKey> pixelsCacheKeys;
     List<PixelsCacheIdx> pixelsCacheIdxs;
@@ -83,7 +85,7 @@ public class FakeCacheGenerator {
 
     public static void main(String[] args) throws IOException {
         System.out.println("Working Directory = " + System.getProperty("user.dir"));
-        FakeCacheGenerator gen = new FakeCacheGenerator("pixels-cache/tmp.txt");
+        FakeCacheGenerator gen = new FakeCacheGenerator("pixels-cache/dumpedCache.txt");
         gen.gen("/mnt/nvme1n1/pixels.cache");
 //        gen.gen("/scratch/yeeef/pixels-cache/pixels.cache");
 //        gen.genFiles("/scratch/yeeef/pixels-cache/cache_fs");
