@@ -225,6 +225,8 @@ public class TestPartitionCacheWriter {
 
     }
 
+    // incremental load will update the cache based on last free+start version, you can run it multiple times
+    // by "static" we mean that only after incremental load, we use a reader to check the sanity of the data
     void testStaticIncrementalLoadIndex(String indexType) throws Exception {
         PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
         String hostName = "diascld34";
@@ -281,6 +283,74 @@ public class TestPartitionCacheWriter {
             }
         }
 
+    }
+
+    // by "dynamic", we mean that reader + writer at the same time
+    public void testDynamicIncrementalLoadIndex(String indexType) throws Exception {
+        int nReaders = 32;
+        String hostName = "diascld34";
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        // 1 reader continuously randomly read all keys
+        // 1 writer write the partitions once
+        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+        MemoryMappedFile indexDiskFile = new MemoryMappedFile(cacheConfig.getIndexDiskLocation(), realIndexSize);
+        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
+
+        SettableFuture<Integer> finish = SettableFuture.create();
+
+        for (int i = 0; i < nReaders; ++i) {
+            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setIndexType(indexType).setCacheFile(cacheFile).setIndexFile(indexFile).build();
+            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
+            readExecutor.submit(() -> {
+                Random random = new Random();
+                int cnt = 0;
+                while (!finish.isDone()) {
+                    int index = random.nextInt(pixelsCacheKeys.size());
+
+                    PixelsCacheIdx readed = reader.search(pixelsCacheKeys.get(index));
+                    if (readed != null) {
+                        assert (readed.length == pixelsCacheIdxs.get(index).length);
+                        cnt++;
+
+                    } else {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(pixelsCacheKeys.get(index).rowGroupId);
+                        keyBuf.putShort(pixelsCacheKeys.get(index).columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println(partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    }
+                }
+                System.out.println("=================================================");
+                System.out.println("read " + cnt + " keys");
+                System.out.println("=================================================");
+
+            });
+        }
+
+        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
+        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
+                .setPartitions(cacheConfig.getPartitions())
+                .setCacheSize(cacheConfig.getCacheSize())
+                .setIndexLocation(cacheConfig.getIndexLocation())
+                .setIndexSize(cacheConfig.getIndexSize())
+                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setOverwrite(false) // dont overwrite
+                .setWriteContent(false)
+                .setIndexType(indexType)
+                .setHostName(hostName)
+                .setCacheConfig(cacheConfig)
+                .build();
+
+        // build files
+        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
+        // build cacheColumnletOrders
+        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+
+        finish.set(1);
     }
 
     @Test
@@ -463,73 +533,6 @@ public class TestPartitionCacheWriter {
 //        config.addProperty("index.disk.location", "/scratch/yeeef/pixels-cache/partitioned/pixels.hash-index");
         config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
         testDynamicIncrementalLoadIndex("hash");
-    }
-
-    public void testDynamicIncrementalLoadIndex(String indexType) throws Exception {
-        int nReaders = 32;
-        String hostName = "diascld34";
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        // 1 reader continuously randomly read all keys
-        // 1 writer write the partitions once
-        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
-        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
-
-        MemoryMappedFile indexDiskFile = new MemoryMappedFile(cacheConfig.getIndexDiskLocation(), realIndexSize);
-        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
-        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
-
-        SettableFuture<Integer> finish = SettableFuture.create();
-
-        for (int i = 0; i < nReaders; ++i) {
-            PartitionCacheReader reader = PartitionCacheReader.newBuilder().setIndexType(indexType).setCacheFile(cacheFile).setIndexFile(indexFile).build();
-            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
-            readExecutor.submit(() -> {
-                Random random = new Random();
-                int cnt = 0;
-                while (!finish.isDone()) {
-                    int index = random.nextInt(pixelsCacheKeys.size());
-
-                    PixelsCacheIdx readed = reader.search(pixelsCacheKeys.get(index));
-                    if (readed != null) {
-                        assert (readed.length == pixelsCacheIdxs.get(index).length);
-                        cnt++;
-
-                    } else {
-                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                        keyBuf.putShort(pixelsCacheKeys.get(index).rowGroupId);
-                        keyBuf.putShort(pixelsCacheKeys.get(index).columnId);
-                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                        System.out.println(partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
-                    }
-                }
-                System.out.println("=================================================");
-                System.out.println("read " + cnt + " keys");
-                System.out.println("=================================================");
-
-            });
-        }
-
-        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
-        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
-                .setPartitions(cacheConfig.getPartitions())
-                .setCacheSize(cacheConfig.getCacheSize())
-                .setIndexLocation(cacheConfig.getIndexLocation())
-                .setIndexSize(cacheConfig.getIndexSize())
-                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
-                .setOverwrite(false) // dont overwrite
-                .setWriteContent(false)
-                .setIndexType(indexType)
-                .setHostName(hostName)
-                .setCacheConfig(cacheConfig)
-                .build();
-
-        // build files
-        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert (writer.incrementalLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
-
-        finish.set(1);
     }
 
     @Test
