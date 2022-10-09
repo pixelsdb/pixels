@@ -11,7 +11,7 @@ import java.util.List;
 public class Mock implements Storage {
 
     public Mock() {
-        // read the tmp.txt
+        // read the dumpedCache.txt
     }
 
     @Override

@@ -19,7 +19,7 @@ public class TestIndexWriter {
 
     @Before
     public void loadMockData() throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
+        BufferedReader br = new BufferedReader(new FileReader("dumpedCache.txt"));
         String line = br.readLine();
         String idxString = "";
         String keyString = "";

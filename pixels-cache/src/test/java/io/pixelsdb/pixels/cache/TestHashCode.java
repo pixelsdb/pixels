@@ -27,7 +27,7 @@ public class TestHashCode {
     }
     @Test
     public void testHashPartition() {
-        // read the tmp.txt file
+        // read the dumpedCache.txt file
         int dataSize = 512000;
         double loadFactor = 0.5f;
         int partitions = 32;
@@ -48,7 +48,7 @@ public class TestHashCode {
         BufferedReader reader;
         try {
             reader = new BufferedReader(new FileReader(
-                    "tmp.txt"));
+                    "dumpedCache.txt"));
             String line = reader.readLine();
             while (line != null) {
                 String[] keys = line.split(";")[1].split("-");
@@ -108,7 +108,7 @@ public class TestHashCode {
 
     @Test
     public void testHashPartitionOnRgAndCol() {
-        // read the tmp.txt file
+        // read the dumpedCache.txt file
         int partitions = 16;
         int[] partitionKeys = new int[partitions];
         long[] partitionSizes = new long[partitions];
@@ -127,7 +127,7 @@ public class TestHashCode {
         BufferedReader reader;
         try {
             reader = new BufferedReader(new FileReader(
-                    "tmp.txt"));
+                    "dumpedCache.txt"));
             String line = reader.readLine();
             while (line != null) {
                 String[] keys = line.split(";")[1].split("-");
@@ -185,7 +185,7 @@ public class TestHashCode {
 
     @Test
     public void hashOnKeyBuffer() {
-        // read the tmp.txt file
+        // read the dumpedCache.txt file
         Map<Integer, Integer> hashCodes = new HashMap<>();
         Map<Integer, Integer> hashBuckets = new HashMap<>();
         int dataSize = 512000;
@@ -197,7 +197,7 @@ public class TestHashCode {
         int total = 0;
         try {
             reader = new BufferedReader(new FileReader(
-                    "tmp.txt"));
+                    "dumpedCache.txt"));
             String line = reader.readLine();
             while (line != null) {
                 String[] keys = line.split(";")[1].split("-");

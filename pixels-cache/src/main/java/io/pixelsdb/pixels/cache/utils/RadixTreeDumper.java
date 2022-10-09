@@ -23,7 +23,7 @@ public class RadixTreeDumper {
     }
 
     // traverse the index
-    // TODO: currently the output file name is fixed to tmp.txt in c file
+    // TODO: currently the output file name is fixed to dumpedCache.txt in c file
     public native void nativeTraverse();
 
 

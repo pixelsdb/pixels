@@ -33,7 +33,7 @@ public class BenchmarkCacheReader {
 
     @Before
     public void loadMockData() throws IOException {
-        BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
+        BufferedReader br = new BufferedReader(new FileReader("dumpedCache.txt"));
         String line = br.readLine();
         String idxString = "";
         String keyString = "";
@@ -481,7 +481,7 @@ public class BenchmarkCacheReader {
     @Test // read; w/o protocol; single
     public void benchmarkSinglePartitionRead() throws Exception {
         int nReaders = 8;
-        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
+        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
         MemoryMappedFile cacheFile = new MemoryMappedFile("/mnt/nvme1n1/pixels.cache", 70L * 1024 * 1024 * 1024);
 //        MemoryMappedFile cacheFile = new MemoryMappedFile("/mnt/nvme1n1/partitioned/pixels.cache", 70L * 1024 * 1024 * 1024);
 
@@ -556,7 +556,7 @@ public class BenchmarkCacheReader {
     @Test // read; w/o protocol; not-partitioned
     public void benchmarkSinglePartitionRead__() throws Exception {
         int nReaders = 8;
-        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index.bak", 102400000);
+        MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
         MemoryMappedFile cacheFile = new MemoryMappedFile("/mnt/nvme1n1/pixels.cache", 70L * 1024 * 1024 * 1024);
         SettableFuture<Integer> finish = SettableFuture.create();
         List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
