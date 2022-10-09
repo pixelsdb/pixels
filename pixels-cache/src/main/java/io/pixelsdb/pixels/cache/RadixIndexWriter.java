@@ -123,7 +123,7 @@ public class RadixIndexWriter implements CacheIndexWriter {
     @Override
     public void clear() {
         this.radix.removeAll();
-    }   
+    }
 
     @Override
     public long flush() {
