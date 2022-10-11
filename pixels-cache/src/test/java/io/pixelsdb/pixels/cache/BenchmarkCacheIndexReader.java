@@ -2,7 +2,6 @@ package io.pixelsdb.pixels.cache;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -285,7 +284,7 @@ public class BenchmarkCacheIndexReader {
             return new CacheIndexReader() {
                 @Override
                 public PixelsCacheIdx read(PixelsCacheKey key) {
-                    return reader.complexsearch(key);
+                    return reader.searchWithReaderCount(key);
                 }
             };
 //            return new CacheReaderAdaptor(reader);
@@ -394,7 +393,7 @@ public class BenchmarkCacheIndexReader {
             return new CacheIndexReader() {
                 @Override
                 public PixelsCacheIdx read(PixelsCacheKey key) {
-                    return reader.complexsearch(key);
+                    return reader.searchWithReaderCount(key);
                 }
             };
         });

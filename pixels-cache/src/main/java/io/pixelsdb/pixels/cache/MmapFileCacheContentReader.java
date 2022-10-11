@@ -14,6 +14,11 @@ public class MmapFileCacheContentReader implements CacheContentReader {
     }
 
     @Override
+    public ByteBuffer readZeroCopy(PixelsCacheIdx idx) throws IOException {
+        return content.getDirectByteBuffer(idx.offset, idx.length);
+    }
+
+    @Override
     public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
         read(idx, buf.array(), 0);
     }

@@ -13,8 +13,13 @@ import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-// TODO: it can be general as PartitionIndexReader regardless of whether radix or hash
-// Protocol is a over-design, dont do this.
+/**
+ * Author: yeeef
+ * CacheReader which conforms to the partitioned protocol
+ * it assumes both cache index and content region is already a memory-mapped file TODO: it can be refactored
+ * it is agnostic to the type of the index, either hash or radix can be used
+ * TODO: rename class name to Pixels_____
+ */
 public class PartitionCacheReader implements CacheReader {
     private static final Logger logger = LogManager.getLogger(PartitionRadixIndexReader.class);
     private final MemoryMappedFile indexWholeRegion;
@@ -49,9 +54,6 @@ public class PartitionCacheReader implements CacheReader {
         this.contentReaders = contentReaders;
     }
 
-    // TODO: the verification of whether we can read shall be done where? I think this protocol verifier shall be
-    //        decoupled
-
     public PixelsCacheIdx naivesearch(PixelsCacheKey key) {
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
         partitionHashKeyBuf.putShort(2, key.columnId);
@@ -62,6 +64,7 @@ public class PartitionCacheReader implements CacheReader {
         return reader.read(key);
     }
 
+    // optimized protocol without reader count
     public PixelsCacheIdx search(PixelsCacheKey key) {
         // retrieve freePhysical + startPhysical
         partitionHashKeyBuf.putShort(0, key.rowGroupId);
@@ -85,7 +88,7 @@ public class PartitionCacheReader implements CacheReader {
             lease = System.currentTimeMillis();
 
         } while (rwflag > 0);
-        // the loop will exit if rw_flag=0 and we have increased the rw_count atomically at the same time.
+        // the loop will exit if rw_flag=0
         int version = PixelsCacheUtil.getIndexVersion(indexSubRegion);
         // now we have the access to the region.
         logger.trace("physical partition=" + physicalPartition);
@@ -93,15 +96,15 @@ public class PartitionCacheReader implements CacheReader {
         PixelsCacheIdx cacheIdx = reader.read(key);
 
         // check the lease, version and read_count
-        if (version != PixelsCacheUtil.getIndexVersion(indexSubRegion) || System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS) {
+        if (version != PixelsCacheUtil.getIndexVersion(indexSubRegion) ||
+                System.currentTimeMillis() - lease > PixelsCacheUtil.CACHE_READ_LEASE_MS) {
             // it is a staggler reader, abort the read
-            logger.debug("read aborted elapsed=" + (System.currentTimeMillis() - lease) + "ms partition=" + logicalPartition);
+            logger.debug("read aborted elapsed=" +
+                    (System.currentTimeMillis() - lease) + "ms partition=" + logicalPartition);
             return null;
         }
 
-        // end indexRead, the cacheIdx is a valid thing to return, we just tries to decrease the read_count
-        // it is possible that read_count will be forced to
-        // if reader count is already <= 0, nothing will be done, just return
+        // end indexRead, the cacheIdx is a valid thing to return
         return cacheIdx;
     }
 
@@ -184,8 +187,11 @@ public class PartitionCacheReader implements CacheReader {
         return true;
     }
 
+    // complex search is a variant version of the protocol, it also checks the reader count
+    // in search, we have an optimized protocol which only relies on timing to reduce contention
+    // between readers
     // this method is supposed to be used with test
-    public PixelsCacheIdx complexsearch(PixelsCacheKey key) {
+    public PixelsCacheIdx searchWithReaderCount(PixelsCacheKey key) {
         ReadLease lease = prepareRead(key);
 
         logger.trace("physical partition=" + lease.physicalPartition);
@@ -200,15 +206,14 @@ public class PartitionCacheReader implements CacheReader {
             return null;
     }
 
-    // TODO: mmap file shall be closed by the caller, not me?
     // return a direct buffer
-    public ByteBuffer get(PixelsCacheKey key) {
+    public ByteBuffer getZeroCopy(PixelsCacheKey key) {
         // TODO: 这个方案是有缺陷的! 因为返回的只是一个地址的拷贝, 在 reader 实际 process 的时候, writer 是有可能重写这部分区域的
         ReadLease lease = prepareRead(key);
 
         logger.trace("physical partition=" + lease.physicalPartition);
         CacheIndexReader reader = readers[lease.physicalPartition];
-        MemoryMappedFile content = cacheSubRegions[lease.physicalPartition];
+        CacheContentReader contentReader = contentReaders[lease.physicalPartition];
 
         PixelsCacheIdx cacheIdx = reader.read(key);
         if (cacheIdx == null) {
@@ -216,22 +221,25 @@ public class PartitionCacheReader implements CacheReader {
             return null;
         }
 
-        byte[] buf = new byte[cacheIdx.length];
-        content.getBytes(cacheIdx.offset, buf, 0, cacheIdx.length);
-        ByteBuffer ret = ByteBuffer.wrap(buf);
-        if (endRead(lease))
-            return ret;
-        else
+        try {
+            ByteBuffer ret = contentReader.readZeroCopy(cacheIdx);
+            if (endRead(lease))
+                return ret;
+            else
+                return null;
+        } catch (IOException e) {
+            e.printStackTrace();
             return null;
+        }
     }
 
     // TODO: what if buf.length is not enough to hold?
+    // TODO: make the simpleGet as ligitimate get method
     public int get(PixelsCacheKey key, byte[] buf, int size) {
         ReadLease lease = prepareRead(key);
         logger.trace("physical partition=" + lease.physicalPartition);
         CacheIndexReader reader = readers[lease.physicalPartition];
         CacheContentReader contentReader = contentReaders[lease.physicalPartition];
-        MemoryMappedFile content = cacheSubRegions[lease.physicalPartition];
 
         PixelsCacheIdx cacheIdx = reader.read(key);
         if (cacheIdx == null) {
@@ -240,15 +248,15 @@ public class PartitionCacheReader implements CacheReader {
         }
         try {
             contentReader.read(cacheIdx, buf);
+            if (endRead(lease)) {
+                return size;
+            }
+            else
+                return 0;
         } catch (IOException e) {
             e.printStackTrace();
-        }
-//        content.getBytes(cacheIdx.offset, buf, 0, size);
-        if (endRead(lease)) {
-            return size;
-        }
-        else
             return 0;
+        }
     }
 
     // w/o protocol

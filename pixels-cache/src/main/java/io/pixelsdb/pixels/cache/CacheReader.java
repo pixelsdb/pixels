@@ -15,10 +15,7 @@ public interface CacheReader {
     // or the input parameter could be a DynamicArray which resizes itself.
     // TODO: caller should make sure the size is sufficient, we do the experiment first with this api
     int get(PixelsCacheKey key, byte[] buf, int size) throws IOException;
-    // TODO
-    default ByteBuffer get(PixelsCacheKey key) throws IOException {
-        byte[] buf = new byte[4096];
-        get(key, buf, buf.length);
-        return ByteBuffer.wrap(buf);
-    }
+
+    // Note: this is not safe, as the writer might begin to write the returned ByteBuffer
+    ByteBuffer getZeroCopy(PixelsCacheKey key) throws IOException;
 }

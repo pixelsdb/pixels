@@ -14,6 +14,11 @@ public class DiskCacheContentReader implements CacheContentReader {
     }
 
     @Override
+    public ByteBuffer readZeroCopy(PixelsCacheIdx idx) throws IOException {
+        throw new IOException("disk content reader dont support zero copy");
+    }
+
+    @Override
     public void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
         read(idx, buf.array(), 0);
     }

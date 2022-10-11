@@ -12,13 +12,6 @@ public class SimpleCacheReader implements CacheReader {
         this.contentReader = contentReader;
     }
 
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId) throws IOException {
-        PixelsCacheIdx idx = indexReader.read(new PixelsCacheKey(blockId, rowGroupId, columnId));
-        byte[] buf = new byte[idx.length];
-        contentReader.read(idx, buf);
-        return ByteBuffer.wrap(buf);
-    }
-
     public int naiveget(PixelsCacheKey key, byte[] buf, int size) throws IOException {
 
         PixelsCacheIdx cacheIdx = indexReader.read(key);
@@ -45,7 +38,8 @@ public class SimpleCacheReader implements CacheReader {
     }
 
     @Override
-    public ByteBuffer get(PixelsCacheKey key) throws IOException {
-        return get(key.blockId, key.rowGroupId, key.columnId);
+    public ByteBuffer getZeroCopy(PixelsCacheKey key) throws IOException {
+        PixelsCacheIdx idx = indexReader.read(key);
+        return contentReader.readZeroCopy(idx);
     }
 }

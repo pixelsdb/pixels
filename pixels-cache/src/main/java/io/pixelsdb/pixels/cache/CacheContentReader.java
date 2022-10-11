@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 public interface CacheContentReader {
     // caller should guarantee that buf.length is enough to hold the CacheIndex
     void read(PixelsCacheIdx idx, byte[] buf) throws IOException;
+
+    ByteBuffer readZeroCopy(PixelsCacheIdx idx) throws IOException;
     default void read(PixelsCacheIdx idx, ByteBuffer buf) throws IOException {
         read(idx, buf.array());
     }
