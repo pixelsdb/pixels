@@ -110,9 +110,13 @@ public class BenchmarkCacheReader {
         }
 
     }
+    // Note: for cacheReader test, the bandwidth and latency is bounded by the cache content read.
+    //       so we can use radix and complex protocol to test the performance
 
-    @Test // read; w/ protocol; partitioned; radix
-    public void benchmarkProtocolPartitionedRead() throws Exception {
+    // Note: xxxx2 means different layout of the index and cache.
+
+    @Test // read; w/ complex protocol; partitioned; radix
+    public void benchmarkProtocolPartitionedRadixRead() throws Exception {
         int nReaders = 8;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
         // 1 reader continuously randomly read all keys
@@ -183,7 +187,81 @@ public class BenchmarkCacheReader {
 
     }
 
-    @Test // read; w/ protocol; partitioned; hash
+    @Test // read; w/ complex protocol; partitioned; radix; disk content reader
+    public void benchmarkProtocolPartitionedRadixRead2() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+
+        int nReaders = 8;
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        // 1 reader continuously randomly read all keys
+        // 1 writer write the partitions once
+        SettableFuture<Integer> finish = SettableFuture.create();
+        List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
+            Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
+                        .setIndexLocation(cacheConfig.getIndexLocation()).build2();
+                Random random = new Random(System.nanoTime());
+                byte[] buf = new byte[4096];
+                // metrics
+                long start = System.nanoTime();
+                long totalBytes = 0;
+                long io = 0;
+                while (!finish.isDone()) {
+                    int index = random.nextInt(pixelsCacheKeys.size());
+                    PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+                    PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+                    if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
+                    int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
+                    if (readBytes <= 0) {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(cacheKey.rowGroupId);
+                        keyBuf.putShort(cacheKey.columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println("readBytes=0 " + partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    } else {
+                        totalBytes += readBytes;
+                        io++;
+                    }
+                }
+                long end = System.nanoTime();
+                double elapsed = (double) (end - start) / (double) 1e6;
+
+                BenchmarkResult result = new BenchmarkResult(io, totalBytes, elapsed);
+                System.out.println(result);
+                return result;
+            });
+            futures.add(future);
+        }
+
+        Thread.sleep(durationMilis);
+        finish.set(1);
+        List<BenchmarkResult> results = new ArrayList<>(nReaders);
+        for (int i = 0; i < nReaders; ++i) {
+            results.add(futures.get(i).get());
+        }
+        double totalIOPS = 0.0;
+        double totalBandwidthMB = 0.0;
+        double totalBandwidthMiB = 0.0;
+
+        double averageLatency = 0.0;
+        for (BenchmarkResult res : results) {
+            totalIOPS += res.iops;
+            totalBandwidthMB += res.bandwidthMb;
+            totalBandwidthMiB += res.bandwidthMib;
+            averageLatency += res.latency;
+        }
+        averageLatency /= nReaders;
+        System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
+
+    }
+
+    @Test // read; w/ complex protocol; partitioned; hash
     public void benchmarkProtocolPartitionedHashRead() throws Exception {
         ConfigFactory config = ConfigFactory.Instance();
         config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
@@ -260,7 +338,7 @@ public class BenchmarkCacheReader {
 
     }
 
-    @Test // read; w/ simple protocol; partitioned
+    @Test // read; w/ optimized protocol(no reader count); partitioned
     public void benchmarkSimpleProtocolPartitionedRead() throws Exception {
         int nReaders = 8;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
@@ -404,81 +482,8 @@ public class BenchmarkCacheReader {
 
     }
 
-    @Test // read; w/ complex protocol; partitioned; radix; disk content reader
-    public void benchmarkPartitionedRead2() throws Exception {
-        ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
-        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
-        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
-
-        int nReaders = 1;
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        // 1 reader continuously randomly read all keys
-        // 1 writer write the partitions once
-        SettableFuture<Integer> finish = SettableFuture.create();
-        List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
-        for (int i = 0; i < nReaders; ++i) {
-            ExecutorService readExecutor = Executors.newSingleThreadExecutor();
-            Future<BenchmarkResult> future = readExecutor.submit(() -> {
-                PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
-                        .setIndexLocation(cacheConfig.getIndexLocation()).build2();
-                Random random = new Random(System.nanoTime());
-                byte[] buf = new byte[1024 * 1024];
-                // metrics
-                long start = System.nanoTime();
-                long totalBytes = 0;
-                long io = 0;
-                while (!finish.isDone()) {
-                    int index = random.nextInt(pixelsCacheKeys.size());
-                    PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
-                    PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
-                    while (buf.length < cacheIdx.length) buf = new byte[buf.length * 2];
-                    int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
-                    if (readBytes <= 0) {
-                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                        keyBuf.putShort(cacheKey.rowGroupId);
-                        keyBuf.putShort(cacheKey.columnId);
-                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                        System.out.println("readBytes=0 " + partition + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
-                    } else {
-                        totalBytes += readBytes;
-                        io++;
-                    }
-                }
-                long end = System.nanoTime();
-                double elapsed = (double) (end - start) / (double) 1e6;
-
-                BenchmarkResult result = new BenchmarkResult(io, totalBytes, elapsed);
-                System.out.println(result);
-                return result;
-            });
-            futures.add(future);
-        }
-
-        Thread.sleep(durationMilis);
-        finish.set(1);
-        List<BenchmarkResult> results = new ArrayList<>(nReaders);
-        for (int i = 0; i < nReaders; ++i) {
-            results.add(futures.get(i).get());
-        }
-        double totalIOPS = 0.0;
-        double totalBandwidthMB = 0.0;
-        double totalBandwidthMiB = 0.0;
-
-        double averageLatency = 0.0;
-        for (BenchmarkResult res : results) {
-            totalIOPS += res.iops;
-            totalBandwidthMB += res.bandwidthMb;
-            totalBandwidthMiB += res.bandwidthMib;
-            averageLatency += res.latency;
-        }
-        averageLatency /= nReaders;
-        System.out.println(String.format("threads=%d, totalIOPS=%f, bandwidth=%fMB(%fMiB), latency=%fms", nReaders, totalIOPS, totalBandwidthMB, totalBandwidthMiB, averageLatency));
-
-    }
-
-    @Test // read; w/o protocol; single
+    @Test // read; w/o protocol; single; radix; mmap content reader
     public void benchmarkSinglePartitionRead() throws Exception {
         int nReaders = 8;
         MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
@@ -552,22 +557,23 @@ public class BenchmarkCacheReader {
 
     }
 
-
-    @Test // read; w/o protocol; not-partitioned
-    public void benchmarkSinglePartitionRead__() throws Exception {
+    @Test // read; w/o protocol; single; radix; disk content reader; the bandwidth is doubled than mmap content reader
+    public void benchmarkSinglePartitionRead2() throws Exception {
         int nReaders = 8;
         MemoryMappedFile indexFile = new MemoryMappedFile("/dev/shm/pixels.index", 102400000);
         MemoryMappedFile cacheFile = new MemoryMappedFile("/mnt/nvme1n1/pixels.cache", 70L * 1024 * 1024 * 1024);
+//        MemoryMappedFile cacheFile = new MemoryMappedFile("/mnt/nvme1n1/partitioned/pixels.cache", 70L * 1024 * 1024 * 1024);
+
         SettableFuture<Integer> finish = SettableFuture.create();
         List<Future<BenchmarkResult>> futures = new ArrayList<>(nReaders);
         for (int i = 0; i < nReaders; ++i) {
-//            CacheIndexReader indexReader = new RadixIndexReader(indexFile);
-//            SimpleCacheReader reader = new SimpleCacheReader(indexReader, cacheFile);
-            CacheContentReader contentReader = new DiskCacheContentReader("/mnt/nvme1n1/pixels.cache");
-//            CacheContentReader contentReader = new MmapFileCacheContentReader(cacheFile);
 
             ExecutorService readExecutor = Executors.newSingleThreadExecutor();
             Future<BenchmarkResult> future = readExecutor.submit(() -> {
+                CacheIndexReader indexReader = new RadixIndexReader(indexFile);
+                CacheContentReader contentReader = new DiskCacheContentReader("/mnt/nvme1n1/pixels.cache");
+
+                SimpleCacheReader reader = new SimpleCacheReader(indexReader, contentReader);
                 Random random = new Random();
                 byte[] buf = new byte[4096];
                 // metrics
@@ -579,10 +585,16 @@ public class BenchmarkCacheReader {
                     PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
                     PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
                     if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
-                    contentReader.read(cacheIdx, buf);
-                    totalBytes += cacheIdx.length;
-                    io++;
-
+                    int readBytes = reader.naiveget(cacheKey, buf, cacheIdx.length);
+                    if (readBytes <= 0) {
+                        System.out.println("readBytes=0 " + " " + index + " " + pixelsCacheKeys.get(index) + " " + pixelsCacheIdxs.get(index));
+                    } else {
+//                        byte ele = buf[0];
+//                        System.out.println(ele + " " + cacheIdx.length);
+//                        for (int j = 0; j < cacheIdx.length; ++j) assert(buf[j] == ele);
+                        totalBytes += readBytes;
+                        io++;
+                    }
                 }
                 long end = System.nanoTime();
                 double elapsed = (double) (end - start) / (double) 1e6;
@@ -616,7 +628,7 @@ public class BenchmarkCacheReader {
 
     }
 
-    @Test // readers + 1 writer; w/ protocol; partitioned; radix
+    @Test // readers + 1 writer; w/ protocol; partitioned; radix; mmap content reader
     public void benchmarkProtocolReadAndWrite() throws Exception {
         int nReaders = 8;
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
