@@ -194,7 +194,7 @@ public class TestPartitionCacheReader {
         System.out.println(cacheKey);
         // the offset is expected to be different. since this offset is based on the original cache, we can use
         // length as an indicator
-        ByteBuffer buf = reader.get(cacheKey);
+        ByteBuffer buf = reader.getZeroCopy(cacheKey);
         assert(buf != null);
         byte ele = buf.get(0);
         System.out.println(ele);
@@ -228,7 +228,7 @@ public class TestPartitionCacheReader {
         System.out.println(cacheKey + " " + cacheIdx);
         // the offset is expected to be different. since this offset is based on the original cache, we can use
         // length as an indicator
-        ByteBuffer buf = reader.get(cacheKey);
+        ByteBuffer buf = reader.getZeroCopy(cacheKey);
         assert(buf != null);
     }
 
@@ -303,7 +303,7 @@ public class TestPartitionCacheReader {
 
             // the offset is expected to be different. since this offset is based on the original cache, we can use
             // length as an indicator
-            ByteBuffer buf = reader.get(cacheKey);
+            ByteBuffer buf = reader.getZeroCopy(cacheKey);
             assert(buf != null);
 //            byte ele = buf.get(0);
 //            for (int i = 1; i < cacheIdx.length; ++i) assert(buf.get(i) == ele);
@@ -350,7 +350,7 @@ public class TestPartitionCacheReader {
                 int cnt = 0;
                 while(!finish.isDone()) {
                     int index = random.nextInt(pixelsCacheKeys.size());
-                    ByteBuffer readed = reader.get(pixelsCacheKeys.get(index));
+                    ByteBuffer readed = reader.getZeroCopy(pixelsCacheKeys.get(index));
 
                     if (readed != null) {
 //                        assert(readed.length == pixelsCacheIdxs.get(index).length);
