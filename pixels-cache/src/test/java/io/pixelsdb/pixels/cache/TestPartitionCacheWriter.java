@@ -225,6 +225,135 @@ public class TestPartitionCacheWriter {
 
     }
 
+    void testBulkLoadIndexAndContent(String indexType) throws Exception {
+        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
+        String hostName = "diascld34";
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
+                .setPartitions(cacheConfig.getPartitions())
+                .setCacheSize(cacheConfig.getCacheSize())
+                .setIndexLocation(cacheConfig.getIndexLocation())
+                .setIndexSize(cacheConfig.getIndexSize())
+                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setOverwrite(true)
+                .setWriteContent(true)
+                .setHostName(hostName)
+                .setCacheConfig(cacheConfig)
+                .setIndexType(indexType)
+                .build();
+        // construct the layout and files
+        // build files
+        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
+        // build cacheColumnletOrders
+        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+
+        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
+        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
+
+//        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexDiskLocation(), realIndexSize);
+        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
+        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
+
+        PartitionCacheReader reader = PartitionCacheReader.newBuilder()
+                .setCacheFile(cacheFile).setIndexFile(indexFile).setIndexType(indexType).build();
+        // search the key
+        byte[] buf = new byte[40960];
+        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
+            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+
+            // the offset is expected to be different. since this offset is based on the original cache, we can use
+            // length as an indicator
+            if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
+            int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
+            if (readBytes == 0) {
+                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                keyBuf.putShort(cacheKey.rowGroupId);
+                keyBuf.putShort(cacheKey.columnId);
+                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                System.out.println("readBytes=0 " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
+            } else {
+                byte ele = buf[0];
+                for (int j = 0; j < readBytes; ++j) {
+                    if (ele != buf[j])  {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(cacheKey.rowGroupId);
+                        keyBuf.putShort(cacheKey.columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println("corrupted cache column chunk " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
+                        break;
+                    }
+                }
+            }
+        }
+
+    }
+
+    void testBulkLoadIndexAndContent2(String indexType) throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
+        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
+        String hostName = "diascld34";
+        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
+        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
+                .setPartitions(cacheConfig.getPartitions())
+                .setCacheSize(cacheConfig.getCacheSize())
+                .setIndexLocation(cacheConfig.getIndexLocation())
+                .setIndexSize(cacheConfig.getIndexSize())
+                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
+                .setOverwrite(true)
+                .setWriteContent(true)
+                .setHostName(hostName)
+                .setCacheConfig(cacheConfig)
+                .setIndexType(indexType)
+                .build2();
+        // construct the layout and files
+        // build files
+        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
+        // build cacheColumnletOrders
+        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
+        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+
+        PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
+                .setIndexLocation(cacheConfig.getIndexLocation()).setIndexType(indexType).build2();
+        // search the key
+        byte[] buf = new byte[40960];
+        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
+            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
+            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
+
+            // the offset is expected to be different. since this offset is based on the original cache, we can use
+            // length as an indicator
+            if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
+            int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
+            if (readBytes == 0) {
+                ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                keyBuf.putShort(cacheKey.rowGroupId);
+                keyBuf.putShort(cacheKey.columnId);
+                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                System.out.println("readBytes=0 " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
+            } else {
+                byte ele = buf[0];
+                for (int j = 0; j < readBytes; ++j) {
+                    if (ele != buf[j])  {
+                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
+                        keyBuf.putShort(cacheKey.rowGroupId);
+                        keyBuf.putShort(cacheKey.columnId);
+                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
+                        System.out.println("corrupted cache column chunk " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
+                        break;
+                    }
+                }
+            }
+        }
+
+    }
+
+
     // incremental load will update the cache based on last free+start version, you can run it multiple times
     // by "static" we mean that only after incremental load, we use a reader to check the sanity of the data
     void testStaticIncrementalLoadIndex(String indexType) throws Exception {
@@ -286,7 +415,7 @@ public class TestPartitionCacheWriter {
     }
 
     // by "dynamic", we mean that reader + writer at the same time
-    public void testDynamicIncrementalLoadIndex(String indexType) throws Exception {
+    void testDynamicIncrementalLoadIndex(String indexType) throws Exception {
         int nReaders = 32;
         String hostName = "diascld34";
         PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
@@ -359,7 +488,7 @@ public class TestPartitionCacheWriter {
     }
 
     @Test
-    public void testBulkLoadRadixIndex_2() throws Exception {
+    public void testBulkLoadRadixIndex2() throws Exception {
         ConfigFactory config = ConfigFactory.Instance();
 
         config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
@@ -380,130 +509,44 @@ public class TestPartitionCacheWriter {
     }
 
     @Test
-    public void testBulkLoadIndexAndContent() throws Exception {
-        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
-        String hostName = "diascld34";
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
-                .setPartitions(cacheConfig.getPartitions())
-                .setCacheSize(cacheConfig.getCacheSize())
-                .setIndexLocation(cacheConfig.getIndexLocation())
-                .setIndexSize(cacheConfig.getIndexSize())
-                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
-                .setOverwrite(true)
-                .setWriteContent(true)
-                .setHostName(hostName)
-                .setCacheConfig(cacheConfig)
-                .build();
-        // construct the layout and files
-        // build files
-        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
+    public void testBulkLoadHashIndex2() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.hash-index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
 
-        long realIndexSize = cacheConfig.getIndexSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.PARTITION_INDEX_META_SIZE;
-        long realCacheSize = cacheConfig.getCacheSize() / (cacheConfig.getPartitions()) * (cacheConfig.getPartitions() + 1) + PixelsCacheUtil.CACHE_DATA_OFFSET;
 
-//        MemoryMappedFile indexFile = new MemoryMappedFile(config.getIndexDiskLocation(), realIndexSize);
-        MemoryMappedFile indexFile = new MemoryMappedFile(cacheConfig.getIndexLocation(), realIndexSize);
-        MemoryMappedFile cacheFile = new MemoryMappedFile(cacheConfig.getCacheLocation(), realCacheSize);
-
-        PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheFile(cacheFile).setIndexFile(indexFile).build();
-        // search the key
-        byte[] buf = new byte[40960];
-        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
-            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
-            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
-
-            // the offset is expected to be different. since this offset is based on the original cache, we can use
-            // length as an indicator
-            if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
-            int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
-            if (readBytes == 0) {
-                ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                keyBuf.putShort(cacheKey.rowGroupId);
-                keyBuf.putShort(cacheKey.columnId);
-                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                System.out.println("readBytes=0 " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
-            } else {
-                byte ele = buf[0];
-                for (int j = 0; j < readBytes; ++j) {
-                    if (ele != buf[j])  {
-                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                        keyBuf.putShort(cacheKey.rowGroupId);
-                        keyBuf.putShort(cacheKey.columnId);
-                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                        System.out.println("corrupted cache column chunk " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
-                        break;
-                    }
-                }
-            }
-        }
-
+        testBulkLoadIndex2("hash");
     }
 
     @Test
-    public void testBulkLoadIndexAndContent2() throws Exception {
+    public void testBulkLoadRadixIndexAndContent() throws Exception {
+        testBulkLoadIndexAndContent("radix");
+    }
+
+    @Test
+    public void testBulkLoadHashIndexAndContent() throws Exception {
         ConfigFactory config = ConfigFactory.Instance();
 
-        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.index");
-        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.index");
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache/pixels.hash-index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned/pixels.hash-index");
+        config.addProperty("cache.location", "/mnt/nvme1n1/partitioned/pixels.cache");
+        testBulkLoadIndexAndContent("hash");
+    }
+
+    @Test
+    public void testBulkLoadRadixIndexAndContent2() throws Exception {
+        testBulkLoadIndexAndContent2("radix");
+    }
+
+    @Test
+    public void testBulkLoadHashIndexAndContent2() throws Exception {
+        ConfigFactory config = ConfigFactory.Instance();
+
+        config.addProperty("index.location", "/dev/shm/pixels-partitioned-cache-2/pixels.hash-index");
+        config.addProperty("index.disk.location", "/mnt/nvme1n1/partitioned-2/pixels.hash-index");
         config.addProperty("cache.location", "/mnt/nvme1n1/partitioned-2/pixels.cache");
-        PixelsPartitionCacheWriter.Builder builder = PixelsPartitionCacheWriter.newBuilder();
-        String hostName = "diascld34";
-        PixelsCacheConfig cacheConfig = new PixelsCacheConfig();
-        PixelsPartitionCacheWriter writer = builder.setCacheLocation(cacheConfig.getCacheLocation())
-                .setPartitions(cacheConfig.getPartitions())
-                .setCacheSize(cacheConfig.getCacheSize())
-                .setIndexLocation(cacheConfig.getIndexLocation())
-                .setIndexSize(cacheConfig.getIndexSize())
-                .setIndexDiskLocation(cacheConfig.getIndexDiskLocation())
-                .setOverwrite(true)
-                .setWriteContent(true)
-                .setHostName(hostName)
-                .setCacheConfig(cacheConfig)
-                .build2();
-        // construct the layout and files
-        // build files
-        Set<String> files = pixelsCacheKeys.stream().map(key -> String.valueOf(key.blockId)).collect(Collectors.toSet());
-        // build cacheColumnletOrders
-        Set<String> cacheColumnletOrders = pixelsCacheKeys.stream().map(key -> key.rowGroupId + ":" + key.columnId).collect(Collectors.toSet());
-        assert(writer.bulkLoad(623, new ArrayList<>(cacheColumnletOrders), files.toArray(new String[0])) == 0);
-
-        PartitionCacheReader reader = PartitionCacheReader.newBuilder().setCacheLocation(cacheConfig.getCacheLocation())
-                .setIndexLocation(cacheConfig.getIndexLocation()).build2();
-        // search the key
-        byte[] buf = new byte[40960];
-        for (int index = 0; index < pixelsCacheIdxs.size(); ++index) {
-            PixelsCacheIdx cacheIdx = pixelsCacheIdxs.get(index);
-            PixelsCacheKey cacheKey = pixelsCacheKeys.get(index);
-
-            // the offset is expected to be different. since this offset is based on the original cache, we can use
-            // length as an indicator
-            if (buf.length < cacheIdx.length) buf = new byte[cacheIdx.length];
-            int readBytes = reader.get(cacheKey, buf, cacheIdx.length);
-            if (readBytes == 0) {
-                ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                keyBuf.putShort(cacheKey.rowGroupId);
-                keyBuf.putShort(cacheKey.columnId);
-                int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                System.out.println("readBytes=0 " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
-            } else {
-                byte ele = buf[0];
-                for (int j = 0; j < readBytes; ++j) {
-                    if (ele != buf[j])  {
-                        ByteBuffer keyBuf = ByteBuffer.allocate(4);
-                        keyBuf.putShort(cacheKey.rowGroupId);
-                        keyBuf.putShort(cacheKey.columnId);
-                        int partition = PixelsCacheUtil.hashcode(keyBuf.array()) & 0x7fffffff % cacheConfig.getPartitions();
-                        System.out.println("corrupted cache column chunk " + partition + " " + index + " " + cacheKey + " " + cacheIdx);
-                        break;
-                    }
-                }
-            }
-        }
-
+        testBulkLoadIndexAndContent2("hash");
     }
 
     @Test
