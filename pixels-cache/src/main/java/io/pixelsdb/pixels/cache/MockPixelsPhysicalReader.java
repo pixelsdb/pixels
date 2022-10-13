@@ -10,6 +10,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 
+// TODO: how it used? I remember that I didn't do a clear refactor
 public class MockPixelsPhysicalReader {
     private static List<String> cacheIdxs = new ArrayList<>();
     private static List<String> cacheKeys = new ArrayList<>();
@@ -22,7 +23,7 @@ public class MockPixelsPhysicalReader {
     static {
         try {
             // read the mock file
-            BufferedReader br = new BufferedReader(new FileReader("tmp.txt"));
+            BufferedReader br = new BufferedReader(new FileReader("dumpedCache.txt"));
             String line = br.readLine();
             String idxString = "";
             String keyString = "";

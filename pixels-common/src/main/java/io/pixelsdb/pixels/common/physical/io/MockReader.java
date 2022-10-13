@@ -7,10 +7,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 public class MockReader implements PhysicalReader {
@@ -57,8 +54,9 @@ public class MockReader implements PhysicalReader {
 
     }
 
-    private long blockId;
-    private long length;
+    private final long blockId;
+    private final long length;
+    private final Random ran;
 
 
     public MockReader(Storage storage, String path) {
@@ -66,6 +64,7 @@ public class MockReader implements PhysicalReader {
         assert (storage.getScheme() == Storage.Scheme.mock);
         blockId = Long.parseLong(path);
         length = blkSizes.get(blockId);
+        ran = new Random();
     }
 
     @Override
@@ -85,7 +84,7 @@ public class MockReader implements PhysicalReader {
 
     @Override
     public void readFully(byte[] buffer) throws IOException {
-
+        Arrays.fill(buffer, (byte) ('A' + (ran.nextInt(26) % 26)));
     }
 
     @Override
@@ -130,7 +129,7 @@ public class MockReader implements PhysicalReader {
 
     @Override
     public long getBlockId() throws IOException {
-        return 0;
+        return blockId;
     }
 
     @Override

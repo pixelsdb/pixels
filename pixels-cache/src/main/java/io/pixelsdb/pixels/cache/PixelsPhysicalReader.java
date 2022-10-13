@@ -86,6 +86,34 @@ public class PixelsPhysicalReader
         return content;
     }
 
+    public byte[] read(short rowGroupId, short columnId)
+            throws IOException
+    {
+        PixelsProto.RowGroupFooter rowGroupFooter = readRowGroupFooter(rowGroupId);
+        PixelsProto.ColumnChunkIndex chunkIndex =
+                rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+        int physicalLen = (int) chunkIndex.getChunkLength();
+        long physicalOffset = chunkIndex.getChunkOffset();
+        return read(physicalOffset, physicalLen);
+
+    }
+
+    public int read(short rowGroupId, short columnId, byte[] columnlet) throws IOException
+    {
+        PixelsProto.RowGroupFooter rowGroupFooter = readRowGroupFooter(rowGroupId);
+        PixelsProto.ColumnChunkIndex chunkIndex =
+                rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntries(columnId);
+        int physicalLen = (int) chunkIndex.getChunkLength();
+        if (physicalLen > columnlet.length) {
+            return physicalLen;
+        }
+        long physicalOffset = chunkIndex.getChunkOffset();
+        physicalReader.seek(physicalOffset);
+        physicalReader.readFully(columnlet);
+        return physicalLen;
+
+    }
+
     public long getCurrentBlockId() throws IOException
     {
         return physicalReader.getBlockId();
