@@ -61,6 +61,9 @@ public class PhysicalReaderUtil
             case gcs:
                 reader = new PhysicalGCSReader(storage, path);
                 break;
+            case mock:
+                reader = new MockReader(storage, path);
+                break;
             default:
                 throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
         }

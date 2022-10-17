@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +41,11 @@ import java.nio.charset.StandardCharsets;
  *
  * @author guodong
  * @author hank
+ */
+
+/**
+ * partition index:
+ *  global_header: MAGIC(6 bytes), PARTITIONS(2 bytes), SUB_REGION_SIZE(8 bytes), VERSION(4 bytes), FREE(2 byte), FIRST_PARTITION(2 byte)
  */
 public class PixelsCacheUtil
 {
@@ -69,6 +76,10 @@ public class PixelsCacheUtil
      */
     public static final int INDEX_RADIX_OFFSET = 16;
     /**
+     * {magic(6)+partitions{2}+subRegionBytes(8)+version(4)+freeAndStart(4)}
+     */
+    public static final int PARTITION_INDEX_META_SIZE = 32;
+    /**
      * We use the first 16 bytes in the cache file {magic(6)+status(2)+size(8)} for
      * metadata header.
      */
@@ -77,7 +88,7 @@ public class PixelsCacheUtil
     /**
      * The length of cache read lease in millis.
      */
-    public static final int CACHE_READ_LEASE_MS = 1000;
+    public static final int CACHE_READ_LEASE_MS = 100;
 
     static
     {
@@ -124,12 +135,77 @@ public class PixelsCacheUtil
         }
     }
 
+    // method on metadata for partitioned cache
+    public static void initializePartitionMeta(MemoryMappedFile indexFile, short partitions, long subRegionBytes) {
+        setMagic(indexFile);
+        indexFile.setShort(6, partitions);
+        indexFile.setLong(8, subRegionBytes);
+        indexFile.setInt(16, 0); // version
+        short free = partitions;
+        short start = 0;
+        int freeAndStart = ((int) free) << 16 | ((int) start);
+        indexFile.setInt(20, freeAndStart);
+
+    }
+
+    public static void setPartitionedIndexFileVersion(MemoryMappedFile partitionedIndexFile, int version) {
+        partitionedIndexFile.setIntVolatile(16, version);
+    }
+
+    public static void setFirstAndFree(MemoryMappedFile partitionedIndexFile, short free, short start) {
+        int freeAndStart = ((int) free) << 16 | ((int) start);
+        partitionedIndexFile.setIntVolatile(20, freeAndStart);
+    }
+
+    public static int retrieveFirstAndFree(MemoryMappedFile partitionedIndexFile) {
+        return partitionedIndexFile.getIntVolatile(20);
+    }
+
+    public static int retrievePhysicalPartition(MemoryMappedFile partitionedIndexFile, int logicalPartition, int partitions) {
+        // atomically fetch the free + first
+        int freeAndFirst = partitionedIndexFile.getIntVolatile(20);
+        int first = freeAndFirst & 0x0000ffff;
+        int free = (freeAndFirst & 0xffff0000) >>> 16;
+        return logicalPartitionToPhyiscal(logicalPartition, free, first, partitions);
+    }
+
+    public static int logicalPartitionToPhyiscal(int logicalPartition, int freePhysicalPartition, int startPhysicalPartition, int partitions) {
+        if (logicalPartition >= partitions) {
+            throw new IndexOutOfBoundsException(String.format("logicalPartition=%d >= partitions=%d",logicalPartition, partitions));
+        }
+        int add = startPhysicalPartition + logicalPartition;
+        if (freePhysicalPartition < startPhysicalPartition) {
+            freePhysicalPartition += partitions + 1;
+        }
+        if (add >= freePhysicalPartition) return (add + 1) % (partitions + 1);
+        else return add % (partitions + 1);
+    }
+
+    // partitions does not count for the additional free partition
+//    public static int partitionBytes(long wholeSize, int partitions) {
+//        long partitionSize = wholeSize / partitions;
+//
+//    }
+
     public static void initialize(MemoryMappedFile indexFile, MemoryMappedFile cacheFile)
     {
         // init index
         setMagic(indexFile);
         clearIndexRWAndCount(indexFile);
         setIndexVersion(indexFile, 0);
+        // init cache
+        setMagic(cacheFile);
+        setCacheStatus(cacheFile, CacheStatus.EMPTY.getId());
+        setCacheSize(cacheFile, 0);
+    }
+
+    public static void initializeIndexFile(MemoryMappedFile indexFile) {
+        setMagic(indexFile);
+        clearIndexRWAndCount(indexFile);
+        setIndexVersion(indexFile, 0);
+    }
+
+    public static void initializeCacheFile(MemoryMappedFile cacheFile) {
         // init cache
         setMagic(cacheFile);
         setCacheStatus(cacheFile, CacheStatus.EMPTY.getId());
@@ -148,8 +224,20 @@ public class PixelsCacheUtil
         return new String(magic, StandardCharsets.UTF_8);
     }
 
+    public static String getMagic(RandomAccessFile file) throws IOException {
+        byte[] magic = new byte[6];
+        file.seek(0);
+        file.readFully(magic, 0, 6);
+        return new String(magic, StandardCharsets.UTF_8);
+    }
+
     public static boolean checkMagic(MemoryMappedFile file)
     {
+        String magic = getMagic(file);
+        return magic.equalsIgnoreCase(Constants.MAGIC);
+    }
+
+    public static boolean checkMagic(RandomAccessFile file) throws IOException {
         String magic = getMagic(file);
         return magic.equalsIgnoreCase(Constants.MAGIC);
     }
@@ -159,13 +247,14 @@ public class PixelsCacheUtil
         indexFile.setIntVolatile(6, 0);
     }
 
+     // blocking call
     public static void beginIndexWrite(MemoryMappedFile indexFile) throws InterruptedException
     {
         // Set the rw flag.
         indexFile.setByteVolatile(6, (byte) 1);
         final int sleepMs = 10;
         int waitMs = 0;
-        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0)
+        while ((indexFile.getIntVolatile(6) & READER_COUNT_MASK) > 0) // polling to see if something is finished
         {
             /**
              * Wait for the existing readers to finish.
@@ -183,6 +272,12 @@ public class PixelsCacheUtil
                 break;
             }
         }
+    }
+
+    // eliminate reader count, so writer only sleep for LEASE*2 time
+    public static void beginIndexWriteNoReaderCount(MemoryMappedFile indexFile) throws InterruptedException
+    {
+        Thread.sleep(CACHE_READ_LEASE_MS * 2);
     }
 
     public static void endIndexWrite(MemoryMappedFile indexFile)
@@ -384,5 +479,15 @@ public class PixelsCacheUtil
     public static long getCacheSize(MemoryMappedFile cacheFile)
     {
         return cacheFile.getLongVolatile(8);
+    }
+
+    public static int hashcode(byte[] bytes) {
+        int var1 = 1;
+
+        for(int var3 = 0; var3 < bytes.length; ++var3) {
+            var1 = 31 * var1 + bytes[var3];
+        }
+
+        return var1;
     }
 }

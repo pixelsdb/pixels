@@ -122,7 +122,7 @@ public class MemoryMappedFile
         return buffer;
     }
 
-    private static long roundTo4096(long i)
+    public static long roundTo4096(long i)
     {
         return (i + 0xfffL) & ~0xfffL;
     }
@@ -151,6 +151,21 @@ public class MemoryMappedFile
         this.loc = loc;
         this.size = roundTo4096(len);
         mapAndSetOffset();
+    }
+
+    private MemoryMappedFile(final String loc, long addr, long len) {
+        this.loc = loc;
+        this.size = len;
+        this.addr = addr;
+    }
+
+    // return a view of the MemoryMappedFile given a offset in bytes
+    public MemoryMappedFile regionView(final long offset, final long size) {
+
+        if (offset + size >= this.size) {
+            throw new IllegalArgumentException("offset=" + offset + " plus size=" + size +  " is bigger than this.size=" + this.size);
+        }
+        return new MemoryMappedFile(this.loc, this.addr + offset, size);
     }
 
     public void unmap()
@@ -334,6 +349,10 @@ public class MemoryMappedFile
         unsafe.copyMemory(null, pos + addr, data, BYTE_ARRAY_OFFSET + offset, length);
     }
 
+    public void getBytes(long pos, byte[] data) {
+        getBytes(pos, data, 0, data.length);
+    }
+
     /**
      * Get a direct byte buffer of data without memory copy.
      * The returned byte buffer is read only. Any read (get)
@@ -402,4 +421,7 @@ public class MemoryMappedFile
     {
         return size;
     }
+
+    public long getAddress() { return addr; }
+
 }

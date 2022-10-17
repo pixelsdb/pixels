@@ -166,6 +166,9 @@ public class StorageFactory
             case gcs:
                 storage = new GCS();
                 break;
+            case mock: 
+                storage = new Mock();
+                break;
             default:
                 throw new IOException("Unknown storage scheme: " + scheme.name());
         }

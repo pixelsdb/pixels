@@ -1,22 +1,3 @@
-/*
- * Copyright 2019 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
 package io.pixelsdb.pixels.cache;
 
 import org.apache.logging.log4j.LogManager;
@@ -24,22 +5,10 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.List;
 
-/**
- * pixels cache reader.
- * It is not thread safe.
- *
- * @author guodong
- * @author hank
- */
-public class PixelsCacheReader
-        implements AutoCloseable
-{
-    private static final Logger logger = LogManager.getLogger(PixelsCacheReader.class);
-    // private static CacheLogger cacheLogger = new CacheLogger();
+public class RadixIndexReader implements AutoCloseable, CacheIndexReader {
 
-    private final MemoryMappedFile cacheFile;
+    private static final Logger logger = LogManager.getLogger(RadixIndexReader.class);
     private final MemoryMappedFile indexFile;
 
     /**
@@ -65,138 +34,16 @@ public class PixelsCacheReader
 
     private ByteBuffer keyBuffer = ByteBuffer.allocate(PixelsCacheKey.SIZE).order(ByteOrder.BIG_ENDIAN);
 
-//    static
-//    {
-//        new Thread(cacheLogger).start();
-//    }
-
-    private PixelsCacheReader(MemoryMappedFile cacheFile, MemoryMappedFile indexFile)
-    {
-        this.cacheFile = cacheFile;
+    public RadixIndexReader(MemoryMappedFile indexFile) {
         this.indexFile = indexFile;
     }
 
-    public static class Builder
-    {
-        private MemoryMappedFile builderCacheFile;
-        private MemoryMappedFile builderIndexFile;
-
-        private Builder()
-        {
-        }
-
-        public PixelsCacheReader.Builder setCacheFile(MemoryMappedFile cacheFile)
-        {
-//            requireNonNull(cacheFile, "cache file is null");
-            this.builderCacheFile = cacheFile;
-
-            return this;
-        }
-
-        public PixelsCacheReader.Builder setIndexFile(MemoryMappedFile indexFile)
-        {
-//            requireNonNull(indexFile, "index file is null");
-            this.builderIndexFile = indexFile;
-
-            return this;
-        }
-
-        public PixelsCacheReader build()
-        {
-            return new PixelsCacheReader(builderCacheFile, builderIndexFile);
-        }
+    @Override
+    public PixelsCacheIdx read(PixelsCacheKey key) {
+        return search(key.blockId, key.rowGroupId, key.columnId);
     }
 
-    public static PixelsCacheReader.Builder newBuilder()
-    {
-        return new PixelsCacheReader.Builder();
-    }
-
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId)
-    {
-        return this.get(blockId, rowGroupId, columnId, true);
-    }
-
-    /**
-     * Read specified columnlet from cache.
-     * If cache is not hit, empty byte array is returned, and an access message is sent to the mq.
-     * If cache is hit, columnlet content is returned as byte array.
-     * This method may return NULL value. Be careful dealing with null!!!
-     *
-     * @param blockId    block id
-     * @param rowGroupId row group id
-     * @param columnId   column id
-     * @param direct get direct byte buffer if true
-     * @return columnlet content, null if failed to read cache.
-     */
-    public ByteBuffer get(long blockId, short rowGroupId, short columnId, boolean direct)
-    {
-        // search index file for columnlet id
-        PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
-
-        // check the rwFlag and increase readCount.
-        long lease = 0;
-        try
-        {
-            lease = PixelsCacheUtil.beginIndexRead(indexFile);
-        } catch (InterruptedException e)
-        {
-            logger.error("Failed to get read permission on index.", e);
-            /**
-             * Issue #88:
-             * In case of failure (e.g. reaches max cache reader count),
-             * return null here to stop reading cache, then the content
-             * will be read from disk.
-             */
-            return null;
-        }
-
-        ByteBuffer content = null;
-        // search cache key
-//        long searchBegin = System.nanoTime();
-        PixelsCacheIdx cacheIdx = search(keyBuffer);
-//        long searchEnd = System.nanoTime();
-//        cacheLogger.addSearchLatency(searchEnd - searchBegin);
-//        logger.debug("[cache search]: " + (searchEnd - searchBegin));
-        // if found, read content from cache
-//        long readBegin = System.nanoTime();
-        if (cacheIdx != null)
-        {
-            if (direct)
-            {
-                // read content
-                content = cacheFile.getDirectByteBuffer(cacheIdx.offset, cacheIdx.length);
-            }
-            else
-            {
-                content = ByteBuffer.allocate(cacheIdx.length);
-                // read content
-                cacheFile.getBytes(cacheIdx.offset, content.array(), 0, cacheIdx.length);
-            }
-        }
-
-        boolean cacheReadSuccess = PixelsCacheUtil.endIndexRead(indexFile, lease);
-
-//        long readEnd = System.nanoTime();
-//        cacheLogger.addReadLatency(readEnd - readBegin);
-//        logger.debug("[cache read]: " + (readEnd - readBegin));
-        if (cacheReadSuccess)
-        {
-            return content;
-        }
-        return null;
-    }
-
-    public void batchGet(List<ColumnletId> columnletIds, byte[][] container)
-    {
-        // TODO batch get cache items. merge cache accesses to reduce the number of jni invocation.
-    }
-
-    /**
-     * This interface is only used by TESTS, DO NOT USE.
-     * It will be removed soon!
-     */
-    public PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
+    private PixelsCacheIdx search(long blockId, short rowGroupId, short columnId)
     {
         PixelsCacheKey.getBytes(keyBuffer, blockId, rowGroupId, columnId);
 
@@ -314,17 +161,13 @@ public class PixelsCacheReader
         return null;
     }
 
-    public void close()
-    {
-        try
-        {
-//            logger.info("cache reader unmaps cache/index file");
-            cacheFile.unmap();
-            indexFile.unmap();
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
+    @Override
+    public void batchRead(PixelsCacheKey[] keys, PixelsCacheIdx[] results) {
+        throw new RuntimeException("not implemented yet");
+    }
+
+    @Override
+    public void close() throws Exception {
+        indexFile.unmap();
     }
 }
