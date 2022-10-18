@@ -68,8 +68,8 @@
         <dep.netty.version>4.1.68.Final</dep.netty.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.guava.version>29.0-jre</dep.guava.version>
-        <dep.protobuf.version>3.6.1</dep.protobuf.version>
-        <dep.grpc.version>1.27.1</dep.grpc.version>
+        <dep.protobuf.version>3.21.7</dep.protobuf.version>
+        <dep.grpc.version>1.49.1</dep.grpc.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
