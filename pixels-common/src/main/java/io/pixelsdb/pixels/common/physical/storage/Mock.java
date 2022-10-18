@@ -1,5 +1,6 @@
 package io.pixelsdb.pixels.common.physical.storage;
 
+import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 
@@ -45,12 +46,36 @@ public class Mock implements Storage {
     }
 
     @Override
+    public boolean hasLocality()
+    {
+        return Storage.super.hasLocality();
+    }
+
+    @Override
+    public List<Location> getLocations(String path) throws IOException
+    {
+        return Storage.super.getLocations(path);
+    }
+
+    @Override
+    public String[] getHosts(String path) throws IOException
+    {
+        return Storage.super.getHosts(path);
+    }
+
+    @Override
     public boolean mkdirs(String path) throws IOException {
         return false;
     }
 
     @Override
     public DataInputStream open(String path) throws IOException {
+        return null;
+    }
+
+    @Override
+    public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
+    {
         return null;
     }
 

@@ -136,4 +136,10 @@ public class MockReader implements PhysicalReader {
     public Storage.Scheme getStorageScheme() {
         return null;
     }
+
+    @Override
+    public int getNumReadRequests()
+    {
+        return 0;
+    }
 }
