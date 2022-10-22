@@ -1,4 +1,4 @@
-package io.pixelsdb.pixels.executor.plan;
+package io.pixelsdb.pixels.optimizer.plan;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.ObjectArrays;

@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor;
+package io.pixelsdb.pixels.optimizer;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
@@ -39,8 +39,8 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.lambda.domain.*;
 import io.pixelsdb.pixels.executor.lambda.input.*;
 import io.pixelsdb.pixels.executor.lambda.operator.*;
-import io.pixelsdb.pixels.executor.plan.*;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.optimizer.plan.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -48,7 +48,7 @@ import java.io.IOException;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.executor.plan.Table.TableType.*;
+import static io.pixelsdb.pixels.optimizer.plan.Table.TableType.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -57,9 +57,9 @@ import static java.util.Objects.requireNonNull;
  * @author hank
  * @date 15/08/2022
  */
-public class StarlingExecutor
+public class StarlingPlanner
 {
-    private static final Logger logger = LogManager.getLogger(StarlingExecutor.class);
+    private static final Logger logger = LogManager.getLogger(StarlingPlanner.class);
     private static final boolean enablePartitionProjection = false;
     private static final Storage.Scheme InputStorage;
     private static final Storage.Scheme IntermediateStorage;
@@ -105,15 +105,15 @@ public class StarlingExecutor
      * @param metadataService the metadata service to access Pixels metadata
      * @throws IOException
      */
-    public StarlingExecutor(long queryId, Table rootTable,
-                            boolean orderedPathEnabled,
-                            boolean compactPathEnabled,
-                            Optional<MetadataService> metadataService) throws IOException
+    public StarlingPlanner(long queryId, Table rootTable,
+                           boolean orderedPathEnabled,
+                           boolean compactPathEnabled,
+                           Optional<MetadataService> metadataService) throws IOException
     {
         this.queryId = queryId;
         this.rootTable = requireNonNull(rootTable, "rootTable is null");
         checkArgument(rootTable.getTableType() == JOINED || rootTable.getTableType() == AGGREGATED,
-                "currently, PixelsExecutor only supports join and aggregation");
+                "currently, StarlingPlanner only supports join and aggregation");
         this.config = ConfigFactory.Instance();
         this.metadataService = metadataService.orElseGet(() ->
                 new MetadataService(config.getProperty("metadata.server.host"),
@@ -391,7 +391,7 @@ public class StarlingExecutor
      * @throws IOException
      * @throws MetadataException
      */
-    protected JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
+    private JoinOperator getJoinOperator(JoinedTable joinedTable, Optional<JoinedTable> parent)
             throws IOException, MetadataException
     {
         requireNonNull(joinedTable, "joinedTable is null");

@@ -17,30 +17,27 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.plan;
+package io.pixelsdb.pixels.optimizer.plan;
 
 /**
- * The table that is used in joins.
+ * The endian of the join of a pair of tables.
+ * {@link #SMALL_LEFT} means the left table is the small table,
+ * whereas {@link #LARGE_LEFT} means the left table is the large table.
+ *
  * @author hank
- * @date 26/05/2022
+ * @date 07/06/2022
  */
-public interface Table
+public enum JoinEndian
 {
-    enum TableType
+    SMALL_LEFT,
+    LARGE_LEFT;
+
+    public JoinEndian flip()
     {
-        BASE, JOINED, AGGREGATED
+        if (this == SMALL_LEFT)
+        {
+            return LARGE_LEFT;
+        }
+        return SMALL_LEFT;
     }
-
-    public TableType getTableType();
-
-    public String getSchemaName();
-
-    public String getTableName();
-
-    public String getTableAlias();
-
-    /**
-     * @return the names of the columns that are read from the table.
-     */
-    public String[] getColumnNames();
 }
