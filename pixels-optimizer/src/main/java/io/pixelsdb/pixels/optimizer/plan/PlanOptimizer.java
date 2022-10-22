@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.plan;
+package io.pixelsdb.pixels.optimizer.plan;
 
 import com.alibaba.fastjson.JSON;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -41,8 +41,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.executor.plan.Table.TableType.BASE;
-import static io.pixelsdb.pixels.executor.plan.Table.TableType.JOINED;
+import static io.pixelsdb.pixels.optimizer.plan.Table.TableType.BASE;
+import static io.pixelsdb.pixels.optimizer.plan.Table.TableType.JOINED;
 
 /**
  * The optimizer for serverless query plan.

@@ -17,14 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor.plan;
+package io.pixelsdb.pixels.optimizer.plan;
 
 import com.google.common.collect.ImmutableList;
 
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.executor.plan.Table.TableType.BASE;
+import static io.pixelsdb.pixels.optimizer.plan.Table.TableType.BASE;
 import static java.util.Objects.requireNonNull;
 
 /**

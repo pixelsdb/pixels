@@ -17,17 +17,17 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.executor;
+package io.pixelsdb.pixels.optimizer;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
-import io.pixelsdb.pixels.executor.lambda.operator.JoinOperator;
-import io.pixelsdb.pixels.executor.plan.BaseTable;
-import io.pixelsdb.pixels.executor.plan.Join;
-import io.pixelsdb.pixels.executor.plan.JoinEndian;
-import io.pixelsdb.pixels.executor.plan.JoinedTable;
+import io.pixelsdb.pixels.executor.lambda.operator.Operator;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.optimizer.plan.BaseTable;
+import io.pixelsdb.pixels.optimizer.plan.Join;
+import io.pixelsdb.pixels.optimizer.plan.JoinEndian;
+import io.pixelsdb.pixels.optimizer.plan.JoinedTable;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -37,7 +37,7 @@ import java.util.Optional;
  * @author hank
  * @date 06/06/2022
  */
-public class TestPixelsExecutor
+public class TestPixelsPlanner
 {
     @Test
     public void testChainJoin() throws IOException, MetadataException
@@ -92,10 +92,10 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem",
                 "region_join_nation_join_supplier_join_lineitem", join3);
 
-        PixelsExecutor joinExecutor = new PixelsExecutor(
+        PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
-        JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
+        Operator joinOperator = joinExecutor.getRootOperator();
     }
 
     @Test
@@ -183,10 +183,10 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer",
                 "region_join_nation_join_supplier_join_lineitem_join_orders_join_customer", join5);
 
-        PixelsExecutor joinExecutor = new PixelsExecutor(
+        PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
-        JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
+        Operator joinOperator = joinExecutor.getRootOperator();
     }
 
     @Test
@@ -257,9 +257,9 @@ public class TestPixelsExecutor
                 "region_join_nation_join_supplier_join_lineitem_join_part",
                 "region_join_nation_join_supplier_join_lineitem_join_part", join4);
 
-        PixelsExecutor joinExecutor = new PixelsExecutor(
+        PixelsPlanner joinExecutor = new PixelsPlanner(
                 123456, root, false, true, Optional.empty());
 
-        JoinOperator joinOperator = joinExecutor.getJoinOperator(root, Optional.empty());
+        Operator joinOperator = joinExecutor.getRootOperator();
     }
 }
