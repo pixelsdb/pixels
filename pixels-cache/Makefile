@@ -31,6 +31,5 @@ hash_reader:
 	gcc ${CFLAGS} -c -fPIC -I${JAVA_HOME}/include -I${JAVA_HOME}/include/linux src/main/cpp/io_pixelsdb_pixels_cache_NativeHashIndexReader.c -o src/main/cpp/io_pixelsdb_pixels_cache_NativeHashIndexReader.o
 	gcc ${CFLAGS} -shared -fPIC -o libHashIndexReader.so src/main/cpp/io_pixelsdb_pixels_cache_NativeHashIndexReader.o -lc
 
-
 run:
 	java -cp ./target -Djava.library.path=. yeeef.Address
