@@ -13,17 +13,17 @@ The build may take tens of seconds to complete. After that, find the following j
 * `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
 * `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
 
-Pixels is compatible with different query engines, such as Presto, Trino, and Hive.
-However, for simplicity, we use Presto as an example here to illustrate how Pixels works with query engines in the data lakes.
+Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
+However, for simplicity, we use Trino as an example here to illustrate how Pixels works with query engines in the data lakes.
 
-To use Pixels in Presto, download [pixels-presto](https://github.com/pixelsdb/pixels-presto),
+To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino),
 and use `mvn package` to build it.
 Find the following zip files in the build target directories:
-* `pixels-presto-listener-*.zip`, this is the event listener plugin for Presto.
-* `pixels-presto-connector-*.zip`, this is the connector for Presto.
+* `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
+* `pixels-trino-connector-*.zip`, this is the connector for Trino.
 
-> **Note** that the Presto version we use only supports Java 8, thus pixels-presto should be built
-> using JDK 8.0.
+> **Note** that the Trino version we use only supports Java 11.0.11 or above, thus pixels-trino should be built
+> using JDK 11.0.11 or above.
 
 > If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
@@ -37,20 +37,20 @@ Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume.
 and install the following components.
 
 ### Install JDK
-Install JDK 8.0 in the EC2 instance:
+Install JDK 11.0 in the EC2 instance:
 ```bash
-sudo apt install openjdk-8-jdk openjdk-8-jre
+sudo apt install openjdk-11-jdk openjdk-11-jre
 ```
 Check the java version:
 ```bash
 java -version
 ```
-If the other version of JDK is in use, switch to JDK 8.0:
+If the other version of JDK is in use, switch to JDK 11:
 ```bash
 update-java-alternatives --list
-sudo update-java-alternatives --set /path/to/jdk-8.0
+sudo update-java-alternatives --set /path/to/jdk-11.0
 ```
-Oracle JDK 8.0 also works.
+Oracle JDK 11.0 or Azul Zulu JDK 11 also works.
 
 ### Setup AWS Credentials
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
@@ -180,23 +180,23 @@ and point it to the `etc/hadoop` directory under the home of Hadoop.
 Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.xml` from this directory.
 
 > Note that some default ports used by Hadoop
-> may conflict with the default ports used by Presto. In this case, modify the default port configuration
+> may conflict with the default ports used by Trino. In this case, modify the default port configuration
 > of either system.
 
-### Install Presto
-Presto is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Presto-0.215.
-Download and install Presto-0.215 following the instructions [here](https://prestodb.io/docs/0.215/installation/deployment.html).
+### Install Trino
+Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-375.
+Download and install Trino-375 following the instructions [here](https://trino.io/docs/375/installation/deployment.html).
 
-Here, we install Presto to `~/opt/presto-server-0.215` and create a link for it:
+Here, we install Trino to `~/opt/trino-server-375` and create a link for it:
 ```bash
-ln -s presto-server-0.215 presto-server
+ln -s trino-server-375 trino-server
 ```
-Then download [presto-cli](https://prestodb.io/docs/0.215/installation/cli.html) into `~/opt/presto-server/bin/`
+Then download [trino-cli](https://trino.io/docs/375/installation/cli.html) into `~/opt/trino-server/bin/`
 and give executable permission to it.
 
-There are two important directories in the home of presto-server: `etc` and `plugin`.
-Decompress `pixels-presto-listener-*.zip` and `pixels-presto-connector-*.zip` into the `plugin` directory.
-The `etc` directory contains the configuration files of Presto.
+There are two important directories in the home of trino-server: `etc` and `plugin`.
+Decompress `pixels-trino-listener-*.zip` and `pixels-trino-connector-*.zip` into the `plugin` directory.
+The `etc` directory contains the configuration files of Trino.
 In addition to the configurations mentioned in the official docs, add the following configurations
 for Pixels:
 * Create the listener config file named `event-listener.properties` in the `etc` directory, with the following content:
@@ -216,11 +216,28 @@ with the following content:
 ```properties
 connector.name=pixels
 pixels.config=/home/ubuntu/opt/pixels/pixels.properties
+
+# serverless config
+# lambda.switch can be on, off, auto
+lambda.switch=auto
+local.scan.concurrency=40
+clean.local.result=true
+output.scheme=output-scheme-dummy
+output.folder=output-folder-dummy
+output.endpoint=output-endpoint-dummy
+output.access.key=lambda
+output.secret.key=password
 ```
 `pixels.config` is used to specify the config file for Pixels, and has a higher priority than the config file under `PIXELS_HOME`.
-**Note** that `etc/catalog/pixels.proterties` under Presto's home is different from `PIXELS_HOME/pixels.properties`.
+**Note** that `etc/catalog/pixels.proterties` under Trino's home is different from `PIXELS_HOME/pixels.properties`.
+The other properties are related to serverless execution.
+In Trino, Pixels can projection, selection, join, and aggregation into AWS Lambda
+This feature can be turned on by setting `lambda.switch` to `auto` (adaptively enabled) or `on` (always enabled), `output.scheme` to the storage scheme of the intermediate files (e.g. s3),
+`output.folder` to the directory of the intermediate files, `output.endpoint` to the endpoint of the intermediate storage,
+and `output.access/secret.key` to the access/secret key of the intermediate storage.
 
-Some scripts in Presto may require python:
+
+Some scripts in Trino may require python:
 ```bash
 sudo apt-get install python
 ```
@@ -245,9 +262,9 @@ export PROMETHEUS_HOME=$HOME/opt/prometheus/
 export PATH=$PATH:$PROMETHEUS_HOME
 ```
 
-Enter the `etc` directory under the home of presto-server. Append this line to `jvm.config`:
+Enter the `etc` directory under the home of Trino-server. Append this line to `jvm.config`:
 ```bash
--javaagent:/home/ubuntu/opt/jmx_exporter/jmx_prometheus_javaagent-0.11.0.jar=9101:/home/ubuntu/opt/jmx_exporter/presto-jmx.yml
+-javaagent:/home/ubuntu/opt/jmx_exporter/jmx_prometheus_javaagent-0.11.0.jar=9101:/home/ubuntu/opt/jmx_exporter/trino-jmx.yml
 ```
 
 Start `node_exporter` and `prometheus` respectively, using the `start-*.sh` in their directories.
@@ -280,16 +297,16 @@ Then, start the daemons of Pixels using:
 ```
 The metadata server, coordinator, node manager, and metrics server, are running in the daemons.
 
-After starting Pixels, enter the home of presto-server and start Presto:
+After starting Pixels, enter the home of trino-server and start Trino:
 ```bash
 ./bin/launcher start
 ```
 
-Connect to presto-server using presto-cli:
+Connect to trino-server using trino-cli:
 ```bash
-./bin/presto --server localhost:8080 --catalog pixels
+./bin/trino --server localhost:8080 --catalog pixels
 ```
-Run `SHOW SCHEMAS` in presto-cli, the result should be as follows if everything is installed correctly.
+Run `SHOW SCHEMAS` in trino-cli, the result should be as follows if everything is installed correctly.
 ```sql
        Schema       
 --------------------
@@ -306,7 +323,7 @@ pinned by the cache.
 
 ## TPC-H Evaluation
 
-After starting Pixels and Presto, we can evaluate the performance of Pixels using TPC-H.
+After starting Pixels and Trino, we can evaluate the performance of Pixels using TPC-H.
 
 ### Prepare TPC-H
 
@@ -317,10 +334,10 @@ Here, we put the dataset in `/data/tpch/100g/`.
 The file(s) of each table are stored in a separate directory named by the table name.
 
 ### Create TPC-H Database
-Log in presto-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
+Log in trino-cli and use the SQL statements in `scripts/sql/tpch_schema.sql` to create the TPC-H database in Pixels.
 Change the value of the `storage` table property in the create-table statement to `hdfs` if HDFS is used as the 
 underlying storage system instead of S3.
-> Note that presto-cli can execute only one SQL statement at each time.
+> Note that trino-cli can execute only one SQL statement at each time.
 
 Then, use `SHOW SCHEMAS` and `SHOW TABLES` statements to check if the tpch database has been
 created successfully.
@@ -366,12 +383,12 @@ Otherwise, we can load the cached table into pixels-cache using:
 `layout_version` is the version of the table's layout that specifies the columns we want to cache.
 
 ### Run Queries
-Connect to presto-cli:
+Connect to trino-cli:
 ```bash
-cd ~/opt/presto-server
-./bin/presto --server localhost:8080 --catalog pixels --schema tpch
+cd ~/opt/trino-server
+./bin/trino --server localhost:8080 --catalog pixels --schema tpch
 ```
-Execute the TPC-H queries in presto-cli.
+Execute the TPC-H queries in trino-cli.
 
 ### Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
