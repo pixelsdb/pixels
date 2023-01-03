@@ -34,8 +34,8 @@ public class QueryQueues
         Cluster, Lambda, None // None means the query should wait for execution.
     }
 
-    private ArrayBlockingQueue<Long> clusterQueue;
-    private ArrayBlockingQueue<Long> lambdaQueue;
+    private final ArrayBlockingQueue<Long> clusterQueue;
+    private final ArrayBlockingQueue<Long> lambdaQueue;
 
     private QueryQueues(int clusterQueueCapacity, int lambdaQueueCapacity)
     {
