@@ -25,6 +25,9 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -53,6 +56,7 @@ public class TransContext
     private final Map<Long, QueryTransInfo> queryTransContext;
     private final CloudWatchCountMetrics cloudWatchCountMetrics;
     private final String metricsName;
+    private final ScheduledExecutorService metricsReporter;
     private int prevConcurrency = 0;
 
     private TransContext()
@@ -60,6 +64,12 @@ public class TransContext
         this.queryTransContext = new ConcurrentHashMap<>();
         this.cloudWatchCountMetrics = new CloudWatchCountMetrics();
         this.metricsName = ConfigFactory.Instance().getProperty("query.concurrency.metrics.name");
+        this.metricsReporter = Executors.newScheduledThreadPool(1);
+        int period = Integer.parseInt(ConfigFactory.Instance().getProperty("query.concurrency.report.period.sec"));
+        this.metricsReporter.scheduleAtFixedRate(() -> {
+            NamedCount count = new NamedCount(metricsName, queryTransContext.size());
+            cloudWatchCountMetrics.putCount(count);
+        }, 0, period, TimeUnit.SECONDS);
     }
 
     public synchronized void beginQuery(QueryTransInfo info)
