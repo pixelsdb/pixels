@@ -48,7 +48,7 @@ public class CloudWatchCountMetrics
         MetricsDimension = Dimension.builder().name(dimensionName).value(dimensionValue).build();
     }
 
-    private CloudWatchClient client = CloudWatchClient.builder().build();
+    private final CloudWatchClient client = CloudWatchClient.builder().build();
 
     public void putCount(NamedCount count)
     {

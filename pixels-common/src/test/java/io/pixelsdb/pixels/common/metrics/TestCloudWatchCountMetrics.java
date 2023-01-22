@@ -28,9 +28,25 @@ import org.junit.Test;
 public class TestCloudWatchCountMetrics
 {
     @Test
-    public void test()
+    public void testMultiple() throws InterruptedException
+    {
+        int[] concurrency = new int[] {1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+        //int[] concurrency = new int[] {3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 3, 3, 1};
+        CloudWatchCountMetrics metrics = new CloudWatchCountMetrics();
+        for (int i = 0; i < 21; ++i)
+        {
+            int finalI = i;
+            Thread thread = new Thread(() -> metrics.putCount(new NamedCount("query-concurrency", concurrency[finalI])));
+            thread.start();
+            Thread.sleep(10000);
+        }
+    }
+
+    @Test
+    public void testSingle()
     {
         CloudWatchCountMetrics metrics = new CloudWatchCountMetrics();
         metrics.putCount(new NamedCount("query-concurrency", 1));
+        metrics.putCount(new NamedCount("query-concurrency", 2));
     }
 }

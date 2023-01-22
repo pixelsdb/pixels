@@ -19,10 +19,6 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
-import io.pixelsdb.pixels.common.metrics.CloudWatchCountMetrics;
-import io.pixelsdb.pixels.common.metrics.NamedCount;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -51,15 +47,10 @@ public class TransContext
     }
 
     private final Map<Long, QueryTransInfo> queryTransContext;
-    private final CloudWatchCountMetrics cloudWatchCountMetrics;
-    private final String metricsName;
-    private int prevConcurrency = 0;
 
     private TransContext()
     {
         this.queryTransContext = new ConcurrentHashMap<>();
-        this.cloudWatchCountMetrics = new CloudWatchCountMetrics();
-        this.metricsName = ConfigFactory.Instance().getProperty("query.concurrency.metrics.name");
     }
 
     public synchronized void beginQuery(QueryTransInfo info)
@@ -67,13 +58,6 @@ public class TransContext
         requireNonNull(info, "query transaction info is null");
         checkArgument(info.getQueryStatus() == QueryTransInfo.Status.PENDING);
         this.queryTransContext.put(info.getQueryId(), info);
-        int concurrency = this.queryTransContext.size();
-        if (concurrency != prevConcurrency)
-        {
-            prevConcurrency = concurrency;
-            NamedCount count = new NamedCount(this.metricsName, concurrency);
-            this.cloudWatchCountMetrics.putCount(count);
-        }
     }
 
     public synchronized void commitQuery(long queryId)
