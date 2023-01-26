@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.core.vector;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
@@ -66,7 +67,7 @@ public class BinaryColumnVector extends ColumnVector
     private byte[] smallBuffer;
     private int smallBufferNextFree;
 
-    private int bufferAllocationCount;
+    private int bufferAllocationCount = 0;
 
     // Estimate that there will be 16 bytes per entry
     static final int DEFAULT_BUFFER_SIZE = 16 * VectorizedRowBatch.DEFAULT_SIZE;
@@ -113,7 +114,7 @@ public class BinaryColumnVector extends ColumnVector
          * FIXME: use encoded column vectors (i.e. lazy encoding) instead of decoded ones.
          */
         // Arrays.fill(vector, null);
-        initBuffer(0);
+        resetBuffer();
     }
 
     /**
@@ -141,13 +142,12 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     /**
-     * You must call initBuffer first before using setVal().
      * Provide the estimated number of bytes needed to hold
      * a full column vector worth of byte string data.
      *
      * @param estimatedValueSize Estimated size of buffer space needed
      */
-    public void initBuffer(int estimatedValueSize)
+    private void initBuffer(int estimatedValueSize)
     {
         nextFree = 0;
         smallBufferNextFree = 0;
@@ -158,10 +158,7 @@ public class BinaryColumnVector extends ColumnVector
             // Free up any previously allocated buffers that are referenced by vector
             if (bufferAllocationCount > 0)
             {
-                for (int idx = 0; idx < vector.length; ++idx)
-                {
-                    vector[idx] = null;
-                }
+                Arrays.fill(vector, null);
                 buffer = smallBuffer; // In case last row was a large bytes value
             }
         }
@@ -181,11 +178,34 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     /**
-     * Initialize buffer to default size.
+     * Reset the buffer for the next batch of new values added by setVal().
+     * Release any previously allocated old buffers.
      */
-    public void initBuffer()
+    private void resetBuffer()
     {
-        initBuffer(0);
+        nextFree = 0;
+        smallBufferNextFree = 0;
+        /* Issue #367:
+         * If buffer is null, it means that setVal is not yet used, hence it is not
+         * necessary to create a buffer.
+         */
+        if (buffer != null)
+        {
+            // Free up any previously allocated buffers that are referenced by vector
+            if (bufferAllocationCount > 0)
+            {
+                Arrays.fill(vector, null);
+            }
+            /* Issue #367:
+             * Always reset the buffer if it is not null, because buffer might be used outside
+             * BinaryColumnVector. If we do not create a new buffer, the content in the previous
+             * buffer, which is still being used outside, will be overwritten.
+             */
+            buffer = new byte[buffer.length];
+            memoryUsage += Byte.BYTES * buffer.length;
+            smallBuffer = buffer;
+        }
+        bufferAllocationCount = 0;
     }
 
     /**
@@ -364,7 +384,12 @@ public class BinaryColumnVector extends ColumnVector
         {
             writeIndex = elementNum + 1;
         }
-        if ((nextFree + length) > buffer.length)
+        if (buffer == null)
+        {
+            // Issue #367: Lazy allocation only when necessary (i.e., setVal is used instead of setRef).
+            initBuffer(0);
+        }
+        else if ((nextFree + length) > buffer.length)
         {
             increaseBufferSpace(length);
         }
@@ -670,7 +695,7 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void init()
     {
-        initBuffer(0);
+        // initBuffer(0);
     }
 
     @Override

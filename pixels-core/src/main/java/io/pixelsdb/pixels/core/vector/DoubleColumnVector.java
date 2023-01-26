@@ -283,7 +283,8 @@ public class DoubleColumnVector extends ColumnVector
     public void reset()
     {
         super.reset();
-        Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
+        // Issue #367: We should not rely on the vector to distinguish null values.
+        // Arrays.fill(vector, Double.doubleToLongBits(NULL_VALUE));
     }
 
     @Override
