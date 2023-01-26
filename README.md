@@ -22,8 +22,8 @@ Find the following zip files in the build target directories:
 * `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
 * `pixels-trino-connector-*.zip`, this is the connector for Trino.
 
-> **Note** that the Trino version we use only supports Java 11.0.11 or above, thus pixels-trino should be built
-> using JDK 11.0.11 or above.
+> **Note** that the Trino version we use only supports Java 17.0.3 or above, thus pixels-trino should be built
+> using JDK 17.0.3 or above.
 
 > If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
@@ -184,14 +184,14 @@ Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.x
 > of either system.
 
 ### Install Trino
-Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-375.
-Download and install Trino-375 following the instructions [here](https://trino.io/docs/375/installation/deployment.html).
+Trino is the recommended query engine that works with Pixels. Currently, Pixels is compatible with Trino-405.
+Download and install Trino-405 following the instructions [here](https://trino.io/docs/405/installation/deployment.html).
 
-Here, we install Trino to `~/opt/trino-server-375` and create a link for it:
+Here, we install Trino to `~/opt/trino-server-405` and create a link for it:
 ```bash
-ln -s trino-server-375 trino-server
+ln -s trino-server-405 trino-server
 ```
-Then download [trino-cli](https://trino.io/docs/375/installation/cli.html) into `~/opt/trino-server/bin/`
+Then download [trino-cli](https://trinodb.github.io/docs.trino.io/405/client/cli.html) into `~/opt/trino-server/bin/`
 and give executable permission to it.
 
 There are two important directories in the home of trino-server: `etc` and `plugin`.
