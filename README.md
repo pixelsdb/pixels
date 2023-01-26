@@ -37,20 +37,20 @@ Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume.
 and install the following components.
 
 ### Install JDK
-Install JDK 11.0 in the EC2 instance:
+Install JDK 17.0 in the EC2 instance:
 ```bash
-sudo apt install openjdk-11-jdk openjdk-11-jre
+sudo apt install openjdk-17-jdk openjdk-17-jre
 ```
 Check the java version:
 ```bash
 java -version
 ```
-If the other version of JDK is in use, switch to JDK 11:
+If the other version of JDK is in use, switch to JDK 17:
 ```bash
 update-java-alternatives --list
-sudo update-java-alternatives --set /path/to/jdk-11.0
+sudo update-java-alternatives --set /path/to/jdk-17.0
 ```
-Oracle JDK 11.0 or Azul Zulu JDK 11 also works.
+Oracle JDK 17.0 or Azul Zulu JDK 17 also works.
 
 ### Setup AWS Credentials
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
