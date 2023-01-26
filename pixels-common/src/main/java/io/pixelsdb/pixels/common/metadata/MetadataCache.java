@@ -61,7 +61,7 @@ public class MetadataCache
         return this.tableMap.get(schemaTableName);
     }
 
-    public void cacheTableColumns(SchemaTableName schemaTableName, List<Column> columns)
+    public synchronized void cacheTableColumns(SchemaTableName schemaTableName, List<Column> columns)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         requireNonNull(columns, "columns is null");
@@ -73,9 +73,14 @@ public class MetadataCache
      * @param schemaTableName the schema and table name of the table
      * @return null for cache miss
      */
-    public List<Column> getTableColumns(SchemaTableName schemaTableName)
+    public synchronized List<Column> getTableColumns(SchemaTableName schemaTableName)
     {
         requireNonNull(schemaTableName, "schemaTableName is null");
         return this.tableColumnsMap.get(schemaTableName);
+    }
+
+    public synchronized void dropCachedColumns()
+    {
+        this.tableColumnsMap.clear();
     }
 }
