@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.load;
 import com.facebook.presto.jdbc.PrestoDriver;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
@@ -176,7 +177,7 @@ public class Main
                     String loadingDataPath = ns.getString("loading_data_path");
 
                     int threadNum = Integer.parseInt(ns.getString("consumer_thread_num"));
-                    boolean producer = ns.getBoolean("producer");
+                    boolean producer = Boolean.parseBoolean(ns.getString("producer"));
 
                     if (!origin.endsWith("/"))
                     {
@@ -625,6 +626,10 @@ public class Main
                         .help("Specify the schema name");
                 argumentParser.addArgument("-t", "--table").required(true)
                         .help("Specify the table name");
+                argumentParser.addArgument("-o", "--ordered_enabled").setDefault(false)
+                        .help("Specify whether the ordered path is enabled");
+                argumentParser.addArgument("-c", "--compact_enabled").setDefault(true)
+                        .help("Specify whether the compact path is enabled");
 
                 Namespace ns = null;
                 try
@@ -642,6 +647,8 @@ public class Main
                     String dataDir = ns.getString("data");
                     String schemaName = ns.getString("schema");
                     String tableName = ns.getString("table");
+                    boolean orderedEnabled = Boolean.parseBoolean(ns.getString("ordered_enabled"));
+                    boolean compactEnabled = Boolean.parseBoolean(ns.getString("compact_enabled"));
 
                     if (!dataDir.endsWith("/"))
                     {
@@ -722,7 +729,8 @@ public class Main
                     properties.setProperty("user", instance.getProperty("presto.user"));
                     // properties.setProperty("password", instance.getProperty("presto.password"));
                     properties.setProperty("SSL", instance.getProperty("presto.ssl"));
-                    properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:false");
+                    properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:" + orderedEnabled);
+                    properties.setProperty("sessionProperties", "pixels.compact_path_enabled:" + compactEnabled);
                     String jdbc = instance.getProperty("presto.pixels.jdbc.url");
                     try
                     {
@@ -738,11 +746,21 @@ public class Main
                         column.setChunkSize(column.getSize() / rowGroupCount);
                         column.setRecordStats(columnStatsMap.get(column.getName())
                                 .serialize().build().toByteString().asReadOnlyByteBuffer());
-                        String sql = "SELECT COUNT(DISTINCT(" + column.getName() + ")) AS cardinality, " +
-                                "SUM(CASE WHEN " + column.getName() + " IS NULL THEN 1 ELSE 0 END) AS null_count " +
-                                "FROM " + tableName;
-                        try (Connection connection = DriverManager.getConnection(jdbc, properties))
+                        metadataService.updateColumn(column);
+                    }
+
+                    /* Set cardinality and null_fraction after the chunk size and column size,
+                     * because chunk size and column size must exist in the metadata when calculating
+                     * the cardinality and null_fraction using SQL queries.
+                     */
+                    MetadataCache.Instance().dropCachedColumns();
+                    try (Connection connection = DriverManager.getConnection(jdbc, properties))
+                    {
+                        for (Column column : columns)
                         {
+                            String sql = "SELECT COUNT(DISTINCT(" + column.getName() + ")) AS cardinality, " +
+                                    "SUM(CASE WHEN " + column.getName() + " IS NULL THEN 1 ELSE 0 END) AS null_count " +
+                                    "FROM " + tableName;
                             Statement statement = connection.createStatement();
                             ResultSet resultSet = statement.executeQuery(sql);
                             if (resultSet.next())
@@ -756,11 +774,11 @@ public class Main
                             }
                             resultSet.close();
                             statement.close();
-                        } catch (SQLException e)
-                        {
-                            e.printStackTrace();
+                            metadataService.updateColumn(column);
                         }
-                        metadataService.updateColumn(column);
+                    } catch (SQLException e)
+                    {
+                        e.printStackTrace();
                     }
 
                     long endTime = System.currentTimeMillis();

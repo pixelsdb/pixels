@@ -88,11 +88,9 @@ public class StorageFactory
      */
     public synchronized void reload() throws IOException
     {
-        this.storageImpls.clear();
         for (Storage.Scheme scheme : enabledSchemes)
         {
-            Storage storage = this.getStorage(scheme);
-            requireNonNull(storage, "failed to create Storage instance");
+            reload(scheme);
         }
     }
 
@@ -104,9 +102,14 @@ public class StorageFactory
      */
     public synchronized void reload(Storage.Scheme scheme) throws IOException
     {
-        this.storageImpls.remove(scheme);
-        Storage storage = this.getStorage(scheme);
+        Storage storage = this.storageImpls.remove(scheme);
+        if (storage != null)
+        {
+            storage.close();
+        }
+        storage = this.getStorage(scheme);
         requireNonNull(storage, "failed to create Storage instance");
+        this.storageImpls.put(scheme, storage);
     }
 
     /**
