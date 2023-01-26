@@ -29,10 +29,31 @@ import java.io.OutputStream;
  */
 public interface Dictionary
 {
+    /**
+     * Add a key (i.e., a string) into the dictionary.
+     * @param key the byte content of the key.
+     * @return the position (i.e., encoded id) of the key.
+     */
     int add(String key);
 
+    /**
+     * Add a key (i.e., a string) into the dictionary.
+     * Note that to reduce memory allocation and copying, key might be stored in the dictionary
+     * without copying, therefore the content in key should not be overwritten after being added.
+     * @param key the byte content of the key.
+     * @return the position (i.e., encoded id) of the key.
+     */
     int add(byte[] key);
 
+    /**
+     * Add a key (i.e., a string) into the dictionary.
+     * Note that to reduce memory allocation and copying, key might be stored in the dictionary
+     * without copying, therefore the content in key should not be overwritten after being added.
+     * @param key the byte content of the key.
+     * @param offset the starting offset of the key in the byte array.
+     * @param length the length in bytes of the key.
+     * @return the position (i.e., encoded id) of the key.
+     */
     int add(byte[] key, int offset, int length);
 
     /**

@@ -259,7 +259,8 @@ public class VectorizedRowBatch implements AutoCloseable
             if (vc != null)
             {
                 vc.reset();
-                vc.init();
+                // Issue #367: No need to init after reset.
+                // vc.init();
             }
         }
     }
