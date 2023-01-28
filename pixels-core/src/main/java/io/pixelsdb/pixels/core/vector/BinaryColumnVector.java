@@ -80,7 +80,6 @@ public class BinaryColumnVector extends ColumnVector
 
     /**
      * Use this constructor for normal operation.
-     * All column vectors should be the default size normally.
      */
     public BinaryColumnVector()
     {
@@ -88,8 +87,6 @@ public class BinaryColumnVector extends ColumnVector
     }
 
     /**
-     * Don't call this constructor except for testing purposes.
-     *
      * @param size number of elements in the column vector
      */
     public BinaryColumnVector(int size)

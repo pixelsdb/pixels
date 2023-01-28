@@ -149,7 +149,6 @@ public class StringColumnReader
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
             throws IOException
     {
-
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         if (offset == 0)
         {
@@ -171,11 +170,9 @@ public class StringColumnReader
             // read original bytes
             // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
             byte[] buffer = originsBuf.array();
-            // The available first byte in buffer should start from originsOffset.
-            // bufferStart is the first byte within buffer.
-            // DO NOT use originsOffset as bufferStart, as multiple input byte buffer read
-            // from disk (not from pixels cache) may share the same backing array, each of them starts
-            // from a different offset. originsOffset equals to originsBuf.arrayOffset() only when a
+            // DO NOT use originsOffset as bufferStart, as multiple input buffers read
+            // from disk (not from pixels cache) may share the same backing array, each starting
+            // from different offsets. originsOffset equals to originsBuf.arrayOffset() only when the
             // input buffer starts from the first byte of backing array.
             int bufferStart = originsBuf.arrayOffset();
             for (int i = 0; i < size; i++)
@@ -203,15 +200,7 @@ public class StringColumnReader
                 else
                 {
                     int originId = orders[(int) contentDecoder.next()];
-                    int tmpLen;
-                    if (originId < originNum - 1)
-                    {
-                        tmpLen = starts[originId + 1] - starts[originId];
-                    }
-                    else
-                    {
-                        tmpLen = startsOffset - originsOffset - starts[originId];
-                    }
+                    int tmpLen = starts[originId + 1] - starts[originId];
                     // use setRef instead of setVal to reduce memory copy.
                     columnVector.setRef(i + vectorIndex, buffer, bufferStart + starts[originId], tmpLen);
                 }
@@ -286,6 +275,10 @@ public class StringColumnReader
             contentBuf = inputBuffer.slice(0, originsOffset);
             if (this.inputBuffer.isDirect())
             {
+                /* If inputBuffer is direct, then it is from pixels cache.
+                 * Pixels cache may be updated by other threads when column chunk reading is finished.
+                 * Therefore, it is not safe if we do not copy from inputBuffer.
+                 */
                 byte[] bytes = new byte[startsOffset - originsOffset];
                 inputBuffer.getBytes(originsOffset, bytes, 0, startsOffset - originsOffset);
                 originsBuf = Unpooled.wrappedBuffer(bytes);
@@ -298,28 +291,35 @@ public class StringColumnReader
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
 
-            DynamicIntArray startsArray;
+            RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
             /**
              * Issue #124:
-             * Try to ensure that starts is large enough, so that to reduce GC.
+             * Try to avoid using dynamic array if dictionary size is known, so that to reduce GC.
              */
             if (encoding.hasDictionarySize())
             {
-                startsArray = new DynamicIntArray(encoding.getDictionarySize());
+                starts = new int[encoding.getDictionarySize() + 1];
+                int i = 0;
+                while (startsDecoder.hasNext())
+                {
+                    starts[i++] = (int) startsDecoder.next();
+                }
+                starts[i] = startsOffset - originsOffset - starts[i-1];
             }
             else
             {
+                DynamicIntArray startsArray;
                 startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
+                while (startsDecoder.hasNext())
+                {
+                    startsArray.add((int) startsDecoder.next());
+                }
+                startsArray.add(startsOffset - originsOffset - startsArray.get(startsArray.size())-1);
+                starts = startsArray.toArray();
             }
 
-            RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
-            while (startsDecoder.hasNext())
-            {
-                startsArray.add((int) startsDecoder.next());
-            }
-            this.originNum = startsArray.size();
+            this.originNum = starts.length - 1;
             RunLenIntDecoder ordersDecoder = new RunLenIntDecoder(new ByteBufInputStream(ordersBuf), false);
-            starts = startsArray.toArray();
             orders = new int[originNum];
             for (int i = 0; i < originNum && ordersDecoder.hasNext(); i++)
             {
