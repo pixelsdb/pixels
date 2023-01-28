@@ -100,6 +100,16 @@ public class DictionaryColumnVector extends ColumnVector
         ids[writeIndex++] = id;
     }
 
+    public void setId(int elementNum, int id)
+    {
+        if (elementNum >= writeIndex)
+        {
+            writeIndex = elementNum + 1;
+        }
+        this.ids[elementNum] = id;
+        this.isNull[elementNum] = false;
+    }
+
     @Override
     public int[] accumulateHashCode(int[] hashCode)
     {

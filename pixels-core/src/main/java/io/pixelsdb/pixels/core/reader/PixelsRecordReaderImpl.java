@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -99,7 +100,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      */
     private int[] resultColumns;
     /**
-     * The ith element is true if the ith element in resultColumns is encoded.
+     * The ith element is true if the ith column in the resultSchema use encoded column vectors.
      */
     private boolean[] resultColumnsEncoded;
     private int includedColumnNum = 0; // the number of columns to read.
@@ -114,6 +115,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
+    private boolean enableEncodedVector;
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
@@ -147,6 +149,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
+        this.enableEncodedVector = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("enable.encoded.column.vector"));
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
         //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");
@@ -492,7 +496,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         for (int i = 0; i < includedColumnNum; i++)
         {
             this.resultColumnsEncoded[i] = firstRgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
-                    PixelsProto.ColumnEncoding.Kind.NONE;
+                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
         }
 
         everPrepared = true;
@@ -982,9 +986,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     for (int i = 0; i < includedColumnNum; i++)
                     {
                         this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
-                                PixelsProto.ColumnEncoding.Kind.NONE;
+                                PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
                     }
-
                 }
                 // if end of file, set result vectorized row batch endOfFile
                 else

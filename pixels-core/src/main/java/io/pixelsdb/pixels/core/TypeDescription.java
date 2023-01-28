@@ -1002,10 +1002,10 @@ public final class TypeDescription
         return maxId;
     }
 
-    private ColumnVector createColumn(int maxSize, boolean... columnsEncoded)
+    private ColumnVector createColumn(int maxSize, boolean... useEncodedVector)
     {
-        requireNonNull(columnsEncoded, "columnsEncoded should not be null");
-        // the length of columnsEncoded is already checked, not need to check again.
+        requireNonNull(useEncodedVector, "columnsEncoded should not be null");
+        // the length of useEncodedVector is already checked, not need to check again.
         switch (category)
         {
             case BOOLEAN:
@@ -1034,7 +1034,7 @@ public final class TypeDescription
             case VARBINARY:
             case CHAR:
             case VARCHAR:
-                if (!columnsEncoded[0])
+                if (!useEncodedVector[0])
                 {
                     return new BinaryColumnVector(maxSize);
                 }
@@ -1047,7 +1047,7 @@ public final class TypeDescription
                 ColumnVector[] fieldVector = new ColumnVector[children.size()];
                 for (int i = 0; i < fieldVector.length; ++i)
                 {
-                    fieldVector[i] = children.get(i).createColumn(maxSize, columnsEncoded[i]);
+                    fieldVector[i] = children.get(i).createColumn(maxSize, useEncodedVector[i]);
                 }
                 return new StructColumnVector(maxSize, fieldVector);
             }
@@ -1056,20 +1056,20 @@ public final class TypeDescription
         }
     }
 
-    public VectorizedRowBatch createRowBatch(int maxSize, boolean... columnsEncoded)
+    public VectorizedRowBatch createRowBatch(int maxSize, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;
         if (category == Category.STRUCT)
         {
-            checkArgument(columnsEncoded.length == 0 || columnsEncoded.length == children.size(),
-                    "there must be 0 or children.size() elements in columnsEncoded");
+            checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == children.size(),
+                    "there must be 0 or children.size() elements in useEncodedVector");
             result = new VectorizedRowBatch(children.size(), maxSize);
             List<String> columnNames = new ArrayList<>();
             for (int i = 0; i < result.cols.length; ++i)
             {
                 String fieldName = fieldNames.get(i);
                 ColumnVector cv = children.get(i).createColumn(maxSize,
-                        columnsEncoded.length != 0 && columnsEncoded[i]);
+                        useEncodedVector.length != 0 && useEncodedVector[i]);
                 int originId = columnNames.indexOf(fieldName);
                 if (originId >= 0)
                 {
@@ -1085,10 +1085,10 @@ public final class TypeDescription
         }
         else
         {
-            checkArgument(columnsEncoded.length == 0 || columnsEncoded.length == 1,
-                    "for null structure type, there can be only 0 or 1 elements in columnEncoded");
+            checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
+                    "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
             result = new VectorizedRowBatch(1, maxSize);
-            result.cols[0] = createColumn(maxSize, columnsEncoded.length == 1 && columnsEncoded[0]);
+            result.cols[0] = createColumn(maxSize, useEncodedVector.length == 1 && useEncodedVector[0]);
         }
         result.reset();
         return result;
