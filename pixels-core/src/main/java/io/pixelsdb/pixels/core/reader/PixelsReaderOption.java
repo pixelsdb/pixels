@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.predicate.PixelsPredicate;
 import java.util.Optional;
 
 /**
- * @author guodong
+ * @author guodong, hank
  */
 public class PixelsReaderOption
 {
@@ -32,6 +32,7 @@ public class PixelsReaderOption
     private PixelsPredicate predicate = null;
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
+    private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
     private long queryId = -1L;
     private int rgStart = 0;
     private int rgLen = -1;     // -1 means reading to the end of the file
@@ -108,5 +109,15 @@ public class PixelsReaderOption
     public boolean isTolerantSchemaEvolution()
     {
         return tolerantSchemaEvolution;
+    }
+
+    public void enableEncodedColumnVector(boolean enableEncodedColumnVector)
+    {
+        this.enableEncodedColumnVector = enableEncodedColumnVector;
+    }
+
+    public boolean isEnableEncodedColumnVector()
+    {
+        return enableEncodedColumnVector;
     }
 }

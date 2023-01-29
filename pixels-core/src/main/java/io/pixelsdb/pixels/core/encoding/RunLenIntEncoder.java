@@ -31,7 +31,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 /**
  * pixels run length encoding
  * there are four kinds of encodings: SHORT_REPEAT, DIRECT, PATCHED_BASE, DELTA.
- * More details can be found at https://orc.apache.org/docs/run-length.html
+ * More details can be found at https://orc.apache.org/specification/ORCv1/
  *
  * @author guodong
  * @author hank

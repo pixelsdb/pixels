@@ -98,6 +98,10 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      * includedCols may be arbitrary, not related to the column order in schema.
      */
     private int[] resultColumns;
+    /**
+     * The ith element is true if the ith column in the resultSchema should use encoded column vectors.
+     */
+    private boolean[] resultColumnsEncoded;
     private int includedColumnNum = 0; // the number of columns to read.
     private int qualifiedRowNum = 0; // the number of qualified rows in this split.
     private boolean endOfFile = false;
@@ -110,6 +114,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     // buffers of each chunk in this file, arranged by chunk's row group id and column id
     private ByteBuffer[] chunkBuffers;
     private ColumnReader[] readers;      // column readers for each target columns
+    private boolean enableEncodedVector;
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
@@ -134,6 +139,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.queryId = option.getQueryId();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
+        this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
@@ -230,7 +236,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         // create result columns storing result column ids in user specified order
         this.resultColumns = new int[includedColumnNum];
-        for (int i = 0; i < optionColsIndices.size(); i++)
+        for (int i = 0; i < includedColumnNum; i++)
         {
             this.resultColumns[i] = optionColsIndices.get(i);
         }
@@ -483,6 +489,14 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     "only the last error is thrown, check the logs for more information.", e);
         }
 
+        this.resultColumnsEncoded = new boolean[includedColumnNum];
+        PixelsProto.RowGroupEncoding firstRgEncoding = rowGroupFooters[0].getRowGroupEncoding();
+        for (int i = 0; i < includedColumnNum; i++)
+        {
+            this.resultColumnsEncoded[i] = firstRgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                    PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+        }
+
         everPrepared = true;
         return true;
     }
@@ -508,7 +522,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
 
         if (!everPrepared)
         {
-            if (prepareRead() == false)
+            if (!prepareRead())
             {
                 throw new IOException("failed to prepare for read.");
             }
@@ -905,7 +919,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
@@ -913,7 +927,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             resultRowBatch = this.resultRowBatch;
         } else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
         }
 
@@ -965,6 +979,13 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 if (curRGIdx < targetRGNum)
                 {
                     rgRowCount = (int) footer.getRowGroupInfos(targetRGs[curRGIdx]).getNumberOfRows();
+                    // refresh resultColumnsEncoded for reading the column vectors in the next row group.
+                    PixelsProto.RowGroupEncoding rgEncoding = rowGroupFooters[curRGIdx].getRowGroupEncoding();
+                    for (int i = 0; i < includedColumnNum; i++)
+                    {
+                        this.resultColumnsEncoded[i] = rgEncoding.getColumnChunkEncodings(targetColumns[i]).getKind() !=
+                                PixelsProto.ColumnEncoding.Kind.NONE && enableEncodedVector;
+                    }
                 }
                 // if end of file, set result vectorized row batch endOfFile
                 else

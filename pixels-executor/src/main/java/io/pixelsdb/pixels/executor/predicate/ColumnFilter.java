@@ -346,9 +346,19 @@ public class ColumnFilter<T extends Comparable<T>>
             case CHAR:
             case VARBINARY:
             case BINARY:
-                BinaryColumnVector bicv = (BinaryColumnVector) columnVector;
-                doFilter(bicv.vector, bicv.start, bicv.lens, bicv.noNulls ? null :
-                        bicv.isNull, start, length, result);
+                if (columnVector instanceof BinaryColumnVector)
+                {
+                    BinaryColumnVector bicv = (BinaryColumnVector) columnVector;
+                    doFilter(bicv.vector, bicv.start, bicv.lens, bicv.noNulls ? null :
+                            bicv.isNull, start, length, result);
+                }
+                else
+                {
+                    // Issue #369: support filtering on dictionary column vector.
+                    DictionaryColumnVector dictcv = (DictionaryColumnVector) columnVector;
+                    doFilter(dictcv.dictArray, dictcv.dictOffsets, dictcv.ids,
+                            dictcv.noNulls ? null : dictcv.isNull, start, length, result);
+                }
                 return;
             case DATE:
                 DateColumnVector dacv = (DateColumnVector) columnVector;
@@ -797,6 +807,139 @@ public class ColumnFilter<T extends Comparable<T>>
                     {
                         if ((noNulls || !isNull[i]) && !excludes.contains(
                                 new String(vector[i], starts[i], lens[i], StandardCharsets.UTF_8)))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * This is used for {@link DictionaryColumnVector}.
+     * @param dictArray the backing array of the dictionary.
+     * @param dictOffsets the start offset of each value in the dictArray.
+     * @param ids the dictionary ids (i.e., indexes) of the elements in the column vector.
+     * @param isNull the isNull array of the elements in the column vector.
+     * @param start the start offset in the column vector to filter.
+     * @param length the number of elements to filter.
+     * @param result the filtering result.
+     */
+    private void doFilter(byte[] dictArray, int[] dictOffsets, int[] ids, boolean[] isNull,
+                          int start, int length, Bitmap result)
+    {
+        boolean noNulls = isNull == null;
+        int dictOffset, dictLength;
+        if (!this.filter.ranges.isEmpty())
+        {
+            for (Range<T> range : this.filter.ranges)
+            {
+                boolean lowerBounded = range.lowerBound.type != Bound.Type.UNBOUNDED;
+                boolean lowerIncluded = range.lowerBound.type == Bound.Type.INCLUDED;
+                byte[] lowerBound =  (lowerBounded ?
+                        (String) range.lowerBound.value : "").getBytes(StandardCharsets.UTF_8);
+                boolean upperBounded = range.upperBound.type != Bound.Type.UNBOUNDED;
+                boolean upperIncluded = range.upperBound.type == Bound.Type.INCLUDED;
+                byte[] upperBound = (range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        (String) range.upperBound.value : "").getBytes(StandardCharsets.UTF_8);
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (isNull[i])
+                        {
+                            result.set(i);
+                            continue;
+                        }
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        int cmp1 = lowerBounded ?
+                                byteArrayCmp(dictArray, dictOffset, dictLength, lowerBound, 0, lowerBound.length) : 1;
+                        int cmp2 = upperBounded ?
+                                byteArrayCmp(dictArray, dictOffset, dictLength, upperBound, 0, upperBound.length) : -1;
+                        if ((lowerIncluded ? cmp1 >= 0 : cmp1 > 0) && (upperIncluded ? cmp2 <= 0 : cmp2 < 0))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        if (!noNulls && isNull[i])
+                        {
+                            continue;
+                        }
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        int cmp1 = lowerBounded ?
+                                byteArrayCmp(dictArray, dictOffset, dictLength, lowerBound, 0, lowerBound.length) : 1;
+                        int cmp2 = upperBounded ?
+                                byteArrayCmp(dictArray, dictOffset, dictLength, upperBound, 0, upperBound.length) : -1;
+                        if ((lowerIncluded ? cmp1 >= 0 : cmp1 > 0) && (upperIncluded ? cmp2 <= 0 : cmp2 < 0))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (!includes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        if (isNull[i] || includes.contains(
+                                new String(dictArray, dictOffset, dictLength, StandardCharsets.UTF_8)))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        if ((noNulls || !isNull[i]) && includes.contains(
+                                new String(dictArray, dictOffset, dictLength, StandardCharsets.UTF_8)))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+            }
+            if (!excludes.isEmpty())
+            {
+                if (this.filter.allowNull && !noNulls)
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        if (isNull[i] || !excludes.contains(
+                                new String(dictArray, dictOffset, dictLength, StandardCharsets.UTF_8)))
+                        {
+                            result.set(i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = start; i < start + length; ++i)
+                    {
+                        dictOffset = dictOffsets[ids[i]];
+                        dictLength = dictOffsets[ids[i] + 1] - dictOffset;
+                        if ((noNulls || !isNull[i]) && !excludes.contains(
+                                new String(dictArray, dictOffset, dictLength, StandardCharsets.UTF_8)))
                         {
                             result.set(i);
                         }
