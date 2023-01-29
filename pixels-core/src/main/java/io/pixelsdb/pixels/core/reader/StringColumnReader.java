@@ -58,7 +58,7 @@ public class StringColumnReader
      */
     private int[] orders = null;
     /**
-     * elements' relative start offsets in origins.
+     * elements' ABSOLUTE start offsets in originsBuf.
      */
     private int[] starts = null;
     /**
@@ -166,7 +166,6 @@ public class StringColumnReader
             elementIndex = 0;
             isNullBitIndex = 8;
         }
-
         if (vector instanceof BinaryColumnVector)
         {
             BinaryColumnVector columnVector = (BinaryColumnVector) vector;
@@ -176,11 +175,6 @@ public class StringColumnReader
                 // read original bytes
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
                 byte[] buffer = originsBuf.array();
-                // DO NOT use originsOffset as bufferStart, as multiple input buffers read
-                // from disk (not from pixels cache) may share the same backing array, each starting
-                // from different offsets. originsOffset equals to originsBuf.arrayOffset() only when the
-                // input buffer starts from the first byte of backing array.
-                int bufferStart = originsBuf.arrayOffset();
                 for (int i = 0; i < size; i++)
                 {
                     if (elementIndex % pixelStride == 0)
@@ -207,7 +201,7 @@ public class StringColumnReader
                         int originId = orders[(int) contentDecoder.next()];
                         int tmpLen = starts[originId + 1] - starts[originId];
                         // use setRef instead of setVal to reduce memory copy.
-                        columnVector.setRef(i + vectorIndex, buffer, bufferStart + starts[originId], tmpLen);
+                        columnVector.setRef(i + vectorIndex, buffer, starts[originId], tmpLen);
                     }
                     if (hasNull)
                     {
@@ -268,9 +262,8 @@ public class StringColumnReader
                 columnVector.dictOffsets = starts;
             }
             checkArgument(columnVector.dictArray == originsBuf.array(),
-                    "dictionary is not consistent");
+                    "dictionaries from the column vector and the origins buffer are not consistent");
 
-            int bufferStart = originsBuf.arrayOffset();
             for (int i = 0; i < size; i++)
             {
                 if (elementIndex % pixelStride == 0)
@@ -295,8 +288,6 @@ public class StringColumnReader
                 } else
                 {
                     int originId = orders[(int) contentDecoder.next()];
-                    int tmpLen = starts[originId + 1] - starts[originId];
-                    // use setRef instead of setVal to reduce memory copy.
                     columnVector.setId(i + vectorIndex, originId);
                 }
                 if (hasNull)
@@ -347,6 +338,11 @@ public class StringColumnReader
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
             ByteBuf ordersBuf = inputBuffer.slice(ordersOffset, inputLength - ordersOffset);
 
+            // DO NOT use originsOffset as bufferStart, as multiple input buffers read
+            // from disk (not from pixels cache) may share the same backing array, each starting
+            // from different offsets. originsOffset equals to originsBuf.arrayOffset() only when the
+            // input buffer starts from the first byte of backing array.
+            int bufferStart = originsBuf.arrayOffset();
             RunLenIntDecoder startsDecoder = new RunLenIntDecoder(new ByteBufInputStream(startsBuf), false);
             /**
              * Issue #124:
@@ -358,9 +354,9 @@ public class StringColumnReader
                 int i = 0;
                 while (startsDecoder.hasNext())
                 {
-                    starts[i++] = (int) startsDecoder.next();
+                    starts[i++] = bufferStart + (int) startsDecoder.next();
                 }
-                starts[i] = startsOffset - originsOffset - starts[i-1];
+                starts[i] = bufferStart + startsOffset - originsOffset - starts[i-1];
             }
             else
             {
@@ -368,9 +364,9 @@ public class StringColumnReader
                 startsArray = new DynamicIntArray(DEFAULT_STARTS_SIZE);
                 while (startsDecoder.hasNext())
                 {
-                    startsArray.add((int) startsDecoder.next());
+                    startsArray.add(bufferStart + (int) startsDecoder.next());
                 }
-                startsArray.add(startsOffset - originsOffset - startsArray.get(startsArray.size())-1);
+                startsArray.add(bufferStart + startsOffset - originsOffset - startsArray.get(startsArray.size())-1);
                 starts = startsArray.toArray();
             }
 

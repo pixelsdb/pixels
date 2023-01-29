@@ -100,7 +100,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
      */
     private int[] resultColumns;
     /**
-     * The ith element is true if the ith column in the resultSchema use encoded column vectors.
+     * The ith element is true if the ith column in the resultSchema should use encoded column vectors.
      */
     private boolean[] resultColumnsEncoded;
     private int includedColumnNum = 0; // the number of columns to read.
