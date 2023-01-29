@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -140,6 +139,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.queryId = option.getQueryId();
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
+        this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
@@ -149,8 +149,6 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.pixelsFooterCache = pixelsFooterCache;
         this.fileName = this.physicalReader.getName();
         this.includedColumnTypes = new ArrayList<>();
-        this.enableEncodedVector = Boolean.parseBoolean(
-                ConfigFactory.Instance().getProperty("enable.encoded.column.vector"));
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContext.Instance().getQueryTransInfo(this.queryId),
         //         "The transaction context does not contain query (trans) id '" + this.queryId + "'");

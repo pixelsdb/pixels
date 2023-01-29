@@ -356,7 +356,7 @@ public class StringColumnReader
                 {
                     starts[i++] = bufferStart + (int) startsDecoder.next();
                 }
-                starts[i] = bufferStart + startsOffset - originsOffset - starts[i-1];
+                starts[i] = bufferStart + startsOffset - originsOffset;
             }
             else
             {
@@ -366,7 +366,7 @@ public class StringColumnReader
                 {
                     startsArray.add(bufferStart + (int) startsDecoder.next());
                 }
-                startsArray.add(bufferStart + startsOffset - originsOffset - startsArray.get(startsArray.size())-1);
+                startsArray.add(bufferStart + startsOffset - originsOffset);
                 starts = startsArray.toArray();
             }
 

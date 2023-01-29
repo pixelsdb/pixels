@@ -86,6 +86,36 @@ public class TestPixelsReaderBasic
     }
 
     @Test
+    public void testReadDictionary()
+    {
+        String path = "file:///home/hank/20230126155625_0.pxl";
+        PixelsReader reader;
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage("file");
+            reader = PixelsReaderImpl.newBuilder()
+                    .setStorage(storage)
+                    .setPath(path)
+                    .setPixelsFooterCache(new PixelsFooterCache())
+                    .build();
+            PixelsReaderOption option = new PixelsReaderOption();
+            option.skipCorruptRecords(true);
+            option.tolerantSchemaEvolution(true);
+            option.enableEncodedColumnVector(true);
+            option.includeCols(new String[]{"o_orderpriority"});
+            option.rgRange(0, 1);
+            option.queryId(1);
+            PixelsRecordReader recordReader = reader.read(option);
+            VectorizedRowBatch rowBatch = recordReader.readBatch(1000);
+            DictionaryColumnVector vector = (DictionaryColumnVector) rowBatch.cols[0];
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
     public void test0SmallNull()
     {
         String fileName = "test-small-null.pxl";
