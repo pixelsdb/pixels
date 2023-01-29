@@ -92,7 +92,6 @@ public class RdbViewDao extends ViewDao
                 .setSchemaId(schema.getId()).build();
                 return view;
             }
-
         } catch (SQLException e)
         {
             log.error("getByNameAndDB in RdbViewDao", e);
@@ -120,7 +119,6 @@ public class RdbViewDao extends ViewDao
                 views.add(view);
             }
             return views;
-
         } catch (SQLException e)
         {
             log.error("getByName in RdbViewDao", e);
@@ -152,7 +150,6 @@ public class RdbViewDao extends ViewDao
                 views.add(view);
             }
             return views;
-
         } catch (SQLException e)
         {
             log.error("getBySchema in RdbViewDao", e);
