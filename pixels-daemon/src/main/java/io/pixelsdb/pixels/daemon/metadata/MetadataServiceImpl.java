@@ -674,8 +674,23 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                 .setSchemaId(schema.getId()).build();
         if (viewDao.exists(view))
         {
-            headerBuilder.setErrorCode(METADATA_VIEW_EXIST).setErrorMsg("view '" +
-                    request.getSchemaName() + "." + request.getViewName() + "' already exist");
+            if (request.getUpdateIfExists())
+            {
+                if (viewDao.update(view))
+                {
+                    headerBuilder.setErrorCode(0).setErrorMsg("");
+                }
+                else
+                {
+                    headerBuilder.setErrorCode(METADATA_ADD_VIEW_FAILED).setErrorMsg("failed to update view '" +
+                            request.getSchemaName() + "." + request.getViewName() + "'");
+                }
+            }
+            else
+            {
+                headerBuilder.setErrorCode(METADATA_VIEW_EXIST).setErrorMsg("view '" +
+                        request.getSchemaName() + "." + request.getViewName() + "' already exist");
+            }
         }
         else
         {
@@ -781,6 +796,44 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
             header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
                     request.getSchemaName() + "' not found").build();
             response = MetadataProto.GetViewsResponse.newBuilder().setHeader(header).build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getView(MetadataProto.GetViewRequest request, StreamObserver<MetadataProto.GetViewResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetViewResponse response;
+        MetadataProto.Schema schema = schemaDao.getByName(request.getSchemaName());
+        MetadataProto.View view;
+
+        if(schema != null)
+        {
+            view = viewDao.getByNameAndSchema(request.getViewName(), schema);
+            if (view == null)
+            {
+                header = headerBuilder.setErrorCode(METADATA_VIEW_NOT_FOUND)
+                        .setErrorMsg("metadata server failed to get view '" +
+                                request.getSchemaName() + "." + request.getViewName() + "'").build();
+                response = MetadataProto.GetViewResponse.newBuilder()
+                        .setHeader(header).build();
+            }
+            else
+            {
+                header = headerBuilder.setErrorCode(0).setErrorMsg("").build();
+                response = MetadataProto.GetViewResponse.newBuilder()
+                        .setHeader(header).setView(view).build();
+            }
+        }
+        else
+        {
+            header = headerBuilder.setErrorCode(METADATA_SCHEMA_NOT_FOUND).setErrorMsg("schema '" +
+                    request.getSchemaName() + "' not found").build();
+            response = MetadataProto.GetViewResponse.newBuilder().setHeader(header).build();
         }
         responseObserver.onNext(response);
         responseObserver.onCompleted();

@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
+import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
 
 /**
  * Created by hank on 18-6-17.
@@ -96,7 +97,7 @@ public class MetadataService
             MetadataProto.GetTableResponse response = this.stub.getTable(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -124,7 +125,7 @@ public class MetadataService
             MetadataProto.GetTablesResponse response = this.stub.getTables(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -140,6 +141,38 @@ public class MetadataService
         return tables;
     }
 
+    public View getView(String schemaName, String viewName, boolean returnNullIfNotExists) throws MetadataException
+    {
+        View view = null;
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetViewRequest request = MetadataProto.GetViewRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaName(schemaName).setViewName(viewName).build();
+        try
+        {
+            MetadataProto.GetViewResponse response = this.stub.getView(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                if (returnNullIfNotExists && response.getHeader().getErrorCode() == METADATA_VIEW_NOT_FOUND)
+                {
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            view = new View(response.getView());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get views from metadata", e);
+        }
+        return view;
+    }
+
     public List<View> getViews(String schemaName) throws MetadataException
     {
         List<View> views = new ArrayList<>();
@@ -152,7 +185,7 @@ public class MetadataService
             MetadataProto.GetViewsResponse response = this.stub.getViews(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -472,7 +505,7 @@ public class MetadataService
         return true;
     }
 
-    public boolean createView(String schemaName, String viewName, String viewData) throws MetadataException
+    public boolean createView(String schemaName, String viewName, String viewData, boolean updateIfExists) throws MetadataException
     {
         assert schemaName != null && !schemaName.isEmpty();
         assert viewName != null && !viewName.isEmpty();
@@ -480,8 +513,8 @@ public class MetadataService
 
         String token = UUID.randomUUID().toString();
         MetadataProto.CreateViewRequest request = MetadataProto.CreateViewRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
-                .setSchemaName(schemaName).setViewName(viewName).setViewData(viewData).build();
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build()).setSchemaName(schemaName)
+                .setViewName(viewName).setViewData(viewData).setUpdateIfExists(updateIfExists).build();
         MetadataProto.CreateViewResponse response = this.stub.createView(request);
         if (response.getHeader().getErrorCode() != 0)
         {

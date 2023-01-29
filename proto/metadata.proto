@@ -48,6 +48,7 @@ service MetadataService {
     rpc CreateView (CreateViewRequest) returns (CreateViewResponse);
     rpc ExistView (ExistViewRequest) returns (ExistViewResponse);
     rpc GetViews (GetViewsRequest) returns (GetViewsResponse);
+    rpc GetView (GetViewRequest) returns (GetViewResponse);
     rpc DropView (DropViewRequest) returns (DropViewResponse);
 }
 
@@ -297,6 +298,17 @@ message GetViewsResponse {
     repeated View views = 2;
 }
 
+message GetViewRequest {
+    RequestHeader header = 1;
+    string schemaName = 2;
+    string viewName = 3;
+}
+
+message GetViewResponse {
+    ResponseHeader header = 1;
+    View view = 2;
+}
+
 message ExistViewRequest {
     RequestHeader header = 1;
     string schemaName = 2;
@@ -313,6 +325,7 @@ message CreateViewRequest {
     string schemaName = 2;
     string viewName = 3;
     string viewData = 4;
+    bool updateIfExists = 5;
 }
 
 message CreateViewResponse {
