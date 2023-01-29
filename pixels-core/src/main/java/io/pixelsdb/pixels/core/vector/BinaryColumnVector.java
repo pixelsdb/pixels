@@ -105,12 +105,8 @@ public class BinaryColumnVector extends ColumnVector
     public void reset()
     {
         super.reset();
-        /**
-         * Issue #140:
-         * Temporarily comment out this to avoid null pointer exception.
-         * FIXME: use encoded column vectors (i.e. lazy encoding) instead of decoded ones.
-         */
-        // Arrays.fill(vector, null);
+        // fill null to release memory.
+        Arrays.fill(vector, null);
         resetBuffer();
     }
 
