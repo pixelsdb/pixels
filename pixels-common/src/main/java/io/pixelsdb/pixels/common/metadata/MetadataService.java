@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_LAYOUT_NOT_FOUND;
+import static io.pixelsdb.pixels.common.error.ErrorCode.METADATA_VIEW_NOT_FOUND;
 
 /**
  * Created by hank on 18-6-17.
@@ -96,7 +97,7 @@ public class MetadataService
             MetadataProto.GetTableResponse response = this.stub.getTable(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -124,7 +125,7 @@ public class MetadataService
             MetadataProto.GetTablesResponse response = this.stub.getTables(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -140,7 +141,7 @@ public class MetadataService
         return tables;
     }
 
-    public View getView(String schemaName, String viewName) throws MetadataException
+    public View getView(String schemaName, String viewName, boolean returnNullIfNotExists) throws MetadataException
     {
         View view = null;
         String token = UUID.randomUUID().toString();
@@ -152,7 +153,11 @@ public class MetadataService
             MetadataProto.GetViewResponse response = this.stub.getView(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                if (returnNullIfNotExists && response.getHeader().getErrorCode() == METADATA_VIEW_NOT_FOUND)
+                {
+                    return null;
+                }
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
@@ -180,7 +185,7 @@ public class MetadataService
             MetadataProto.GetViewsResponse response = this.stub.getViews(request);
             if (response.getHeader().getErrorCode() != 0)
             {
-                throw new MetadataException("error code" + response.getHeader().getErrorCode()
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
                         + ", error message=" + response.getHeader().getErrorMsg());
             }
             if (!response.getHeader().getToken().equals(token))
