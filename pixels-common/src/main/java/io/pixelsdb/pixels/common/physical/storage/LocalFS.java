@@ -136,6 +136,10 @@ public final class LocalFS implements Storage
     public List<Status> listStatus(String path) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         File[] files = null;
         if (file.isDirectory())
@@ -166,6 +170,10 @@ public final class LocalFS implements Storage
     public List<String> listPaths(String path) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         File[] files = null;
         if (file.isDirectory())
@@ -216,6 +224,10 @@ public final class LocalFS implements Storage
     public boolean mkdirs(String path) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         if (!file.isDirectory())
         {
@@ -232,6 +244,10 @@ public final class LocalFS implements Storage
     public DataInputStream open(String path) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         if (file.isDirectory())
         {
@@ -257,6 +273,10 @@ public final class LocalFS implements Storage
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         if (file.isDirectory())
         {
@@ -283,6 +303,10 @@ public final class LocalFS implements Storage
     public RandomAccessFile openRaf(String path) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         if (file.isDirectory())
         {
@@ -299,6 +323,10 @@ public final class LocalFS implements Storage
     public boolean delete(String path, boolean recursive) throws IOException
     {
         Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
         File file = new File(p.realPath);
         boolean subDeleted = true;
         if (file.isDirectory())
@@ -348,18 +376,25 @@ public final class LocalFS implements Storage
     @Override
     public boolean exists(String path)
     {
-        return new File(new Path(path).realPath).exists();
+        Path p = new Path(path);
+        if (!p.valid)
+        {
+            return false;
+        }
+        return new File(p.realPath).exists();
     }
 
     @Override
     public boolean isFile(String path)
     {
-        return !new Path(path).isDir;
+        Path p = new Path(path);
+        return p.valid && !p.isDir;
     }
 
     @Override
     public boolean isDirectory(String path)
     {
-        return new Path(path).isDir;
+        Path p = new Path(path);
+        return p.valid && p.isDir;
     }
 }
