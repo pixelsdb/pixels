@@ -29,6 +29,12 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>5.13.0</version>
+        </dependency>
+
         <!-- ozone, if it is enabled,
         make sure that it is compatible with hadoop libs. -->
         <!--<dependency>
