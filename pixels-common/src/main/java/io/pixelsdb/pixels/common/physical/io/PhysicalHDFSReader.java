@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -200,21 +199,6 @@ public class PhysicalHDFSReader implements PhysicalReader
     {
         rawReader.readFully(buffer, offset, length);
         numRequests.incrementAndGet();
-    }
-
-    /**
-     * @return true if readAsync is supported.
-     */
-    @Override
-    public boolean supportsAsync()
-    {
-        return false;
-    }
-
-    @Override
-    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
-    {
-        throw new IOException("Asynchronous read is not supported for HDFS.");
     }
 
     @Override

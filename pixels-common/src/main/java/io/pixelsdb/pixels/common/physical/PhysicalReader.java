@@ -42,9 +42,23 @@ public interface PhysicalReader extends Closeable
     void readFully(byte[] buffer, int offset, int length) throws IOException;
 
     /**
+     * If direct I/O is supported, {@link #readFully(int)} will directly read from the file
+     * without going through the OS cache. This is currently supported on LocalFS.
+     *
+     * @return true if direct read is supported.
+     */
+    default boolean supportsDirect()
+    {
+        return false;
+    }
+
+    /**
      * @return true if readAsync is supported.
      */
-    boolean supportsAsync();
+    default boolean supportsAsync()
+    {
+        return false;
+    }
 
     /**
      * readAsync does not affect the position of this reader, and is not affected by seek().
@@ -53,7 +67,10 @@ public interface PhysicalReader extends Closeable
      * @return
      * @throws IOException
      */
-    CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException;
+    default CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
+    {
+        throw new UnsupportedOperationException("asynchronous read is not supported for " + getStorageScheme().name());
+    }
 
     long readLong() throws IOException;
 

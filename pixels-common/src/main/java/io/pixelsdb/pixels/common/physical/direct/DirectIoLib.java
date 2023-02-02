@@ -52,6 +52,7 @@ public class DirectIoLib
     private static boolean compatible;
     private static final int fsBlockSize;
     private static final long fsBlockNotMask;
+    private static int javaVersion = -1;
 
     private static Field pointerPeer = null;
     private static Constructor<?> directByteBufferRConstructor = null;
@@ -73,14 +74,46 @@ public class DirectIoLib
         {
             try
             {
+                List<Integer> versionNumbers = new ArrayList<Integer>();
+                for (String v : System.getProperty("java.version").split("\\.|-"))
+                {
+                    if (v.matches("\\d+"))
+                    {
+                        versionNumbers.add(Integer.parseInt(v));
+                    }
+                }
+                if (versionNumbers.get(0) == 1)
+                {
+                    if (versionNumbers.get(1) >= 8)
+                    {
+                        javaVersion = versionNumbers.get(1);
+                    }
+                } else if (versionNumbers.get(0) > 8)
+                {
+                    javaVersion = versionNumbers.get(0);
+                }
+                if (javaVersion < 0)
+                {
+                    throw new Exception(String.format("Java version: %s is not supported", System.getProperty("java.version")));
+                }
                 pointerPeer = Class.forName("com.sun.jna.Pointer").getDeclaredField("peer");
                 pointerPeer.setAccessible(true);
-                // this is from sun.nio.ch.Util.initDBBRConstructor
-                Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
-                Constructor<?> ctor = cl.getDeclaredConstructor(
-                        new Class<?>[] { int.class, long.class, FileDescriptor.class, Runnable.class } );
-                ctor.setAccessible(true);
-                directByteBufferRConstructor = ctor;
+
+                if (javaVersion <= 11)
+                {
+                    // this is from sun.nio.ch.Util.initDBBRConstructor
+                    Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
+                    directByteBufferRConstructor = cl.getDeclaredConstructor(
+                            new Class<?>[]{int.class, long.class, FileDescriptor.class, Runnable.class});
+                }
+                else
+                {
+                    // the creator of DirectByteBufferR is changed after java 11.
+                    Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
+                    directByteBufferRConstructor = cl.getDeclaredConstructor(
+                            new Class<?>[]{long.class, int.class});
+                }
+                directByteBufferRConstructor.setAccessible(true);
             } catch (Throwable e)
             {
                 logger.error("failed to reflect fields and methods", e);
@@ -100,7 +133,7 @@ public class DirectIoLib
                 List<Integer> versionNumbers = new ArrayList<Integer>();
                 for (String v : System.getProperty("os.version").split("\\.|-"))
                 {
-                    if (v.matches("\\d"))
+                    if (v.matches("\\d+"))
                     {
                         versionNumbers.add(Integer.parseInt(v));
                     }
@@ -186,8 +219,15 @@ public class DirectIoLib
         ByteBuffer buffer;
         try
         {
-            buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
-                    new Object[]{ size, addr, null, null });
+            if (javaVersion <= 11)
+            {
+                buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
+                        new Object[]{size, addr, null, null});
+            } else
+            {
+                buffer = ((ByteBuffer) directByteBufferRConstructor.newInstance(
+                        new Object[]{addr, size})).asReadOnlyBuffer();
+            }
         } catch (InstantiationException |
                 IllegalAccessException |
                 InvocationTargetException e)
@@ -253,12 +293,18 @@ public class DirectIoLib
         {
             flags |= O_RDWR | O_CREAT;
         }
-        int fd = open(path, flags);
-        if (fd < 0)
+        try
         {
-            throw new IOException("error opening " + path + ", got " + getLastError());
+            int fd = open(path, flags);
+            if (fd < 0)
+            {
+                throw new IOException("error opening " + path + ", got " + getLastError());
+            }
+            return fd;
+        } catch (Throwable e)
+        {
+            throw new IOException("error opening " + path + ", got " + getLastError(), e);
         }
-        return fd;
     }
 
     /**

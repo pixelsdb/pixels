@@ -27,7 +27,6 @@ import redis.clients.jedis.JedisPooled;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -121,18 +120,6 @@ public class PhysicalRedisReader implements PhysicalReader
     {
         ByteBuffer byteBuffer = readFully(len);
         System.arraycopy(byteBuffer.array(), 0, buffer, off, len);
-    }
-
-    @Override
-    public boolean supportsAsync()
-    {
-        return false;
-    }
-
-    @Override
-    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
-    {
-        throw new UnsupportedOperationException("Asynchronous read is not supported for Redis.");
     }
 
     @Override
