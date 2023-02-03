@@ -59,7 +59,6 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         {
             throw new IOException("failed to allocate buffer", e);
         }
-
     }
 
     @Override
@@ -85,7 +84,6 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     {
         ByteBuffer buffer = readDirect(b.length);
         buffer.get(b);
-        // ((DirectBuffer) buffer).cleaner().clean();
     }
 
     @Override

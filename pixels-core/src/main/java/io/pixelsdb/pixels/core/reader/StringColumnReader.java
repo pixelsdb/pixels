@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.core.reader;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.RunLenIntDecoder;
@@ -26,15 +29,10 @@ import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.utils.DynamicIntArray;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author guodong
@@ -256,13 +254,16 @@ public class StringColumnReader
         else if (vector instanceof DictionaryColumnVector)
         {
             DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
-            if (columnVector.dictArray == null)
+            if (columnVector.dictArray != originsBuf.array())
             {
+                if (columnVector.dictArray != null)
+                {
+                    throw new IOException("dictionary from vector: " + new String(columnVector.dictArray) +
+                            ", dictionary from origins: " + new String(originsBuf.array()));
+                }
                 columnVector.dictArray = originsBuf.array();
                 columnVector.dictOffsets = starts;
             }
-            checkArgument(columnVector.dictArray == originsBuf.array(),
-                    "dictionaries from the column vector and the origins buffer are not consistent");
 
             for (int i = 0; i < size; i++)
             {
