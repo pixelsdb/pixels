@@ -104,14 +104,14 @@ public class DirectIoLib
                     // this is from sun.nio.ch.Util.initDBBRConstructor
                     Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
-                            new Class<?>[]{int.class, long.class, FileDescriptor.class, Runnable.class});
+                            int.class, long.class, FileDescriptor.class, Runnable.class);
                 }
                 else
                 {
                     // the creator of DirectByteBufferR is changed after java 11.
                     Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
-                            new Class<?>[]{long.class, int.class});
+                            long.class, int.class);
                 }
                 directByteBufferRConstructor.setAccessible(true);
             } catch (Throwable e)
@@ -342,7 +342,6 @@ public class DirectIoLib
         return value & fsBlockNotMask;
     }
 
-
     /**
      * @see #blockStart(long)
      */
@@ -350,7 +349,6 @@ public class DirectIoLib
     {
         return (int) (value & fsBlockNotMask);
     }
-
 
     /**
      * Given <tt>value</tt>, find the smallest number greater than or equal
@@ -364,7 +362,6 @@ public class DirectIoLib
     {
         return (value + fsBlockSize - 1) & fsBlockNotMask;
     }
-
 
     /**
      * @see #blockEnd(long)
