@@ -38,12 +38,12 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
 public class DictionaryColumnVector extends ColumnVector
 {
     // The backing array of the dictionary. If dictArray is null, it means dictionary is not set (initialized).
-    public byte[] dictArray;
+    public byte[] dictArray = null;
 
     /* The start offset of each value in the dictionary. The last element is the length of the dictionary.
      * We currently do not support dictionary larger than 2GB, thus using int (not long) array for start.
      */
-    public int[] dictOffsets;
+    public int[] dictOffsets = null;
 
     /* The index of each data element in the dictionary.
      * E.g., there are 1000 data items in this column vector and 10 values in the dictionary, then ids has

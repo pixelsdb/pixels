@@ -33,17 +33,15 @@ package io.pixelsdb.pixels.cache;
 
 import sun.nio.ch.FileChannelImpl;
 
-import java.io.FileDescriptor;
 import java.io.RandomAccessFile;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
-import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
+import static io.pixelsdb.pixels.common.physical.direct.DirectIoLib.newDirectByteBufferR;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 
 /**
  * This class has been tested.
@@ -59,8 +57,6 @@ public class MemoryMappedFile
 {
     private static final Method mmap;
     private static final Method unmmap;
-    // this is from sun.nio.ch.Util
-    private static volatile Constructor<?> directByteBufferRConstructor = null;
     private static final int BYTE_ARRAY_OFFSET;
 
     private long addr, size;
@@ -78,22 +74,6 @@ public class MemoryMappedFile
         {
             throw new RuntimeException(e);
         }
-
-        // this is from sun.nio.ch.Util.initDBBRConstructor
-        try
-        {
-            Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
-            Constructor<?> ctor = cl.getDeclaredConstructor(
-                    new Class<?>[] { int.class, long.class, FileDescriptor.class, Runnable.class } );
-            ctor.setAccessible(true);
-            directByteBufferRConstructor = ctor;
-        } catch (ClassNotFoundException |
-                NoSuchMethodException |
-                IllegalArgumentException |
-                ClassCastException e)
-        {
-            throw new InternalError(e);
-        }
     }
 
     private static Method getMethod(Class<?> cls, String name, Class<?>... params)
@@ -102,24 +82,6 @@ public class MemoryMappedFile
         Method m = cls.getDeclaredMethod(name, params);
         m.setAccessible(true);
         return m;
-    }
-
-    // this is derived from sun.nio.ch.Util.newMappedByteBufferR
-    // create a read only direct byte buffer without memory copy.
-    static ByteBuffer newDirectByteBufferR(int size, long addr)
-    {
-        ByteBuffer buffer;
-        try
-        {
-            buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
-                    new Object[]{ size, addr, null, null });
-        } catch (InstantiationException |
-                IllegalAccessException |
-                InvocationTargetException e)
-        {
-            throw new InternalError(e);
-        }
-        return buffer;
     }
 
     public static long roundTo4096(long i)

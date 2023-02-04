@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.physical.storage;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
@@ -300,7 +301,7 @@ public final class LocalFS implements Storage
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
-    public RandomAccessFile openRaf(String path) throws IOException
+    public DirectRandomAccessFile openRaf(String path) throws IOException
     {
         Path p = new Path(path);
         if (!p.valid)
@@ -316,7 +317,7 @@ public final class LocalFS implements Storage
         {
             throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
-        return new RandomAccessFile(file, "r");
+        return new DirectRandomAccessFile(file, true);
     }
 
     @Override

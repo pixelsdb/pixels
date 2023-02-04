@@ -37,6 +37,7 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -174,8 +175,7 @@ public class PixelsReaderImpl
                 long fileTailOffset = fsReader.readLong();
                 int fileTailLength = (int) (fileLen - fileTailOffset - Long.BYTES);
                 fsReader.seek(fileTailOffset);
-                byte[] fileTailBuffer = new byte[fileTailLength];
-                fsReader.readFully(fileTailBuffer);
+                ByteBuffer fileTailBuffer = fsReader.readFully(fileTailLength);
                 fileTail = PixelsProto.FileTail.parseFrom(fileTailBuffer);
                 builderPixelsFooterCache.putFileTail(fileName, fileTail);
             }
@@ -227,9 +227,8 @@ public class PixelsReaderImpl
     {
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
         int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
-        byte[] footer = new byte[footerLength];
         physicalReader.seek(footerOffset);
-        physicalReader.readFully(footer);
+        ByteBuffer footer = physicalReader.readFully(footerLength);
         return PixelsProto.RowGroupFooter.parseFrom(footer);
     }
 

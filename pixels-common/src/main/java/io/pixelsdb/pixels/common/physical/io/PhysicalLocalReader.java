@@ -21,12 +21,11 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -38,7 +37,7 @@ public class PhysicalLocalReader implements PhysicalReader
     private final LocalFS local;
     private final String path;
     private final long id;
-    private final RandomAccessFile raf;
+    private final DirectRandomAccessFile raf;
     private final AtomicInteger numRequests;
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException
@@ -79,10 +78,10 @@ public class PhysicalLocalReader implements PhysicalReader
     @Override
     public ByteBuffer readFully(int length) throws IOException
     {
-        ByteBuffer buffer = ByteBuffer.allocate(length);
-        raf.readFully(buffer.array());
+        //ByteBuffer buffer = ByteBuffer.allocate(length);
+        //raf.readFully(buffer.array());
         numRequests.incrementAndGet();
-        return buffer;
+        return raf.readDirect(length);
     }
 
     @Override
@@ -100,18 +99,12 @@ public class PhysicalLocalReader implements PhysicalReader
     }
 
     /**
-     * @return true if readAsync is supported.
+     * @return true if readDirect is supported.
      */
     @Override
-    public boolean supportsAsync()
+    public boolean supportsDirect()
     {
-        return false;
-    }
-
-    @Override
-    public CompletableFuture<ByteBuffer> readAsync(long offset, int length) throws IOException
-    {
-        throw new IOException("Asynchronous read is not supported for local fs.");
+        return true;
     }
 
     @Override

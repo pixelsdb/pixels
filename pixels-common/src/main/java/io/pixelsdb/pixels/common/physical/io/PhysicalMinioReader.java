@@ -47,7 +47,7 @@ public class PhysicalMinioReader extends AbstractS3Reader
     @Override
     public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
     {
-        throw new UnsupportedOperationException("Asynchronous read is not supported for Minio.");
+        throw new UnsupportedOperationException("asynchronous read is not supported for Minio.");
     }
 
     @Override
