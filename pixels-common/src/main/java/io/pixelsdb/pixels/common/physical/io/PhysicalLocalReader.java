@@ -78,10 +78,7 @@ public class PhysicalLocalReader implements PhysicalReader
     @Override
     public ByteBuffer readFully(int length) throws IOException
     {
-        //ByteBuffer buffer = ByteBuffer.allocate(length);
-        //raf.readFully(buffer.array());
         numRequests.incrementAndGet();
-        //return buffer;
         return raf.readDirect(length);
     }
 
