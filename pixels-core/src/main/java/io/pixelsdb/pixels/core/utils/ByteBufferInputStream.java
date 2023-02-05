@@ -82,21 +82,20 @@ public class ByteBufferInputStream extends InputStream
             len = limit - position;
         }
 
-        if (isDirect)
+        /**
+         * Issue #377:
+         * Reading direct byte buffer as following does observe any performance gain:
+         * {@code
+         * long address = DirectIoLib.getAddress(byteBuffer);
+         * JvmUtils.unsafe.copyMemory(null, address + position,
+         *         b, ARRAY_BYTE_BASE_OFFSET + off, len);
+         * position += len;
+         * }
+         * Therefore, we do not distinguish direct or non-direct byte buffer here.
+         */
+        for (int i = off; i < off + len; i++)
         {
-            // ByteBuffer is not thread safe by itself, so I think it does not matter.
-            // Do not use mark as it has side effects for position().
-            int p = byteBuffer.position();
-            byteBuffer.get(b, off, len);
-            byteBuffer.position(p);
-            position += len;
-        }
-        else
-        {
-            for (int i = off; i < off + len; i++)
-            {
-                b[i] = byteBuffer.get(position++);
-            }
+            b[i] = byteBuffer.get(position++);
         }
 
         return len;
@@ -111,12 +110,16 @@ public class ByteBufferInputStream extends InputStream
     @Override
     public long skip(long n) throws IOException
     {
-        long newPos = position + n;
-        if (newPos > (limit - position))
+        if (n < 0)
+        {
+            // Issue #374: negative n does not have any effect.
+            return 0;
+        }
+        if (n > (limit - position))
         {
             n = limit - position;
         }
-        position += (int)n;
+        position += (int) n;
         return n;
     }
 }
