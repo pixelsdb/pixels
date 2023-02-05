@@ -274,14 +274,20 @@ public class SortMergeScheduler implements Scheduler
          */
         public void complete(ByteBuffer buffer)
         {
+            /**
+             * Issue #374:
+             * Buffer is returned by the I/O library.
+             * It is not ensured that the buffer's position is 0.
+             */
+            int offsetBase = buffer.position();
             for (int i = 0; i < size; ++i)
             {
                 /**
                  * Issue #114:
                  * Limit should be set before position.
                  */
-                buffer.limit(offsets.get(i) + lengths.get(i));
-                buffer.position(offsets.get(i));
+                buffer.limit(offsetBase + offsets.get(i) + lengths.get(i));
+                buffer.position(offsetBase + offsets.get(i));
                 futures.get(i).complete(buffer.slice());
             }
         }

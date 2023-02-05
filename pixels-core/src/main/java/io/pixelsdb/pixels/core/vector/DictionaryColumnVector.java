@@ -31,21 +31,29 @@ import static sun.misc.Unsafe.ARRAY_BYTE_BASE_OFFSET;
  * The dictionary encoded column vector for string or binary based data types.
  * This column vector is only used for reading string or binary data without decoding,
  * it does not implement the writing related methods.
+ * <p>
+ * <b>Note: {@link DictionaryColumnVector} can not contain data from multiple column chunks,</b>
+ * because only one dictionary is supported in this column vector.
+ * </p>
  *
  * Created at: 28/01/2023
  * Author: hank
  */
 public class DictionaryColumnVector extends ColumnVector
 {
-    // The backing array of the dictionary. If dictArray is null, it means dictionary is not set (initialized).
+    /**
+     * The backing array of the dictionary. If dictArray is null, it means dictionary is not set (initialized).
+     */
     public byte[] dictArray = null;
 
-    /* The start offset of each value in the dictionary. The last element is the length of the dictionary.
+    /**
+     * The start offset of each value in the dictionary. The last element is the length of the dictionary.
      * We currently do not support dictionary larger than 2GB, thus using int (not long) array for start.
      */
     public int[] dictOffsets = null;
 
-    /* The index of each data element in the dictionary.
+    /**
+     * The index of each data element in the dictionary.
      * E.g., there are 1000 data items in this column vector and 10 values in the dictionary, then ids has
      * 1000 elements, each in the range of 0 - 9, representing an index in the dictionary.
      */
@@ -157,7 +165,7 @@ public class DictionaryColumnVector extends ColumnVector
                 return false;
             }
 
-            if (this.dictArray == that.dictArray && thisStart == thatStart && thisLen == thatLen)
+            if (this.dictArray == that.dictArray && thisStart == thatStart)
             {
                 return true;
             }
@@ -312,10 +320,7 @@ public class DictionaryColumnVector extends ColumnVector
 
     public String toString(int row)
     {
-        if (isRepeating)
-        {
-            row = 0;
-        }
+        checkArgument(!isRepeating, "repeating is not supported on dictionary column vector");
         if (noNulls || !isNull[row])
         {
             int id = ids[row];
@@ -330,10 +335,7 @@ public class DictionaryColumnVector extends ColumnVector
     @Override
     public void stringifyValue(StringBuilder buffer, int row)
     {
-        if (isRepeating)
-        {
-            row = 0;
-        }
+        checkArgument(!isRepeating, "repeating is not supported on dictionary column vector");
         if (noNulls || !isNull[row])
         {
             buffer.append('"');

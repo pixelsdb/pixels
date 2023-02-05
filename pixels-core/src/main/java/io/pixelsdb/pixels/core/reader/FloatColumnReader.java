@@ -90,8 +90,8 @@ public class FloatColumnReader
             this.inputBuffer = input;
             // using little endian, for that float is encoded into int by little endian
             this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            inputIndex = 0;
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            inputIndex = inputBuffer.position();
+            isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;

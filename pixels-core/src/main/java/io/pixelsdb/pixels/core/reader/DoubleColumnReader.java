@@ -91,9 +91,9 @@ public class DoubleColumnReader
             this.inputBuffer = input;
             // using little endian, for that the long values were written in little endian
             this.inputBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            inputIndex = 0;
+            inputIndex = inputBuffer.position();
             // isNull
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputIndex + (int) chunkIndex.getIsNullOffset();
             // re-init
             hasNull = true;
             elementIndex = 0;

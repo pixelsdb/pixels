@@ -87,12 +87,12 @@ public class BooleanColumnReader
         ByteColumnVector columnVector = (ByteColumnVector) vector;
         if (offset == 0)
         {
-            bits = new byte[input.limit() * 8];
+            bits = new byte[input.remaining() * 8];
             // read content
             this.inputBuffer = input;
-            BitUtils.bitWiseDeCompact(bits, input, 0, input.limit());
+            BitUtils.bitWiseDeCompact(bits, input, input.position(), input.remaining());
             // read isNull
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNullOffset = input.position() + (int) chunkIndex.getIsNullOffset();
             // re-init
             bitsIndex = 0;
             hasNull = true;

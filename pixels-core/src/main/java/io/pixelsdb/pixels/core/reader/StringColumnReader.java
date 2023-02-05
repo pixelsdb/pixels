@@ -34,6 +34,8 @@ import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * @author guodong
  * @author hank
@@ -158,7 +160,7 @@ public class StringColumnReader
             }
             // no memory copy
             inputBuffer = Unpooled.wrappedBuffer(input);
-            readContent(input.limit(), encoding);
+            readContent(input.remaining(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
@@ -254,16 +256,13 @@ public class StringColumnReader
         else if (vector instanceof DictionaryColumnVector)
         {
             DictionaryColumnVector columnVector = (DictionaryColumnVector) vector;
-            if (columnVector.dictArray != originsBuf.array())
+            if (columnVector.dictArray == null)
             {
-                if (columnVector.dictArray != null)
-                {
-                    throw new IOException("dictionary from vector: " + new String(columnVector.dictArray) +
-                            ", dictionary from origins: " + new String(originsBuf.array()));
-                }
                 columnVector.dictArray = originsBuf.array();
                 columnVector.dictOffsets = starts;
             }
+            checkArgument(columnVector.dictArray == originsBuf.array(),
+                    "dictionaries from the column vector and the origins buffer are not consistent");
 
             for (int i = 0; i < size; i++)
             {
@@ -321,19 +320,25 @@ public class StringColumnReader
             inputBuffer.resetReaderIndex();
             // read buffers
             contentBuf = inputBuffer.slice(0, originsOffset);
-            if (this.inputBuffer.isDirect())
+            if (this.inputBuffer.hasArray())
             {
-                /* If inputBuffer is direct, then it is from pixels cache.
-                 * Pixels cache may be updated by other threads when column chunk reading is finished.
-                 * Therefore, it is not safe if we do not copy from inputBuffer.
+                originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
+            }
+            else
+            {
+                /**
+                 * Issue #374:
+                 * If inputBuffer is read from pixels-cache or LocalFS (using direct read),
+                 * in this case, it would be direct and is not backed by an array.
+                 * In Pixels, string types (i.e., char, varchar, string) are mapped to byte[] internally for
+                 * filtering, join, and aggregation.
+                 * we currently do not support ByteBuffer for these types, hence we have to copy the dictionary
+                 * int the direct inputBuffer into a byte array.
+                 * TODO: support ByteBuffer for string types.
                  */
                 byte[] bytes = new byte[startsOffset - originsOffset];
                 inputBuffer.getBytes(originsOffset, bytes, 0, startsOffset - originsOffset);
                 originsBuf = Unpooled.wrappedBuffer(bytes);
-            }
-            else
-            {
-                originsBuf = inputBuffer.slice(originsOffset, startsOffset - originsOffset);
             }
             // read starts and orders
             ByteBuf startsBuf = inputBuffer.slice(startsOffset, ordersOffset - startsOffset);
