@@ -98,9 +98,9 @@ public class TimeColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            inputStream = new ByteBufferInputStream(inputBuffer, 0, inputBuffer.limit());
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;

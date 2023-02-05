@@ -998,6 +998,15 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 //preRowInRG = curRowInRG = 0; // keep in sync with curRowInRG.
                 curRowInRG = 0;
             }
+            if (this.enableEncodedVector)
+            {
+                /**
+                 * Issue #374:
+                 * Dictionary column vector can not contain data from multiple column chunks,
+                 * hence we do not pad the row batch with rows from the next row group.
+                 */
+                break;
+            }
         }
 
         for (ColumnVector cv : columnVectors)

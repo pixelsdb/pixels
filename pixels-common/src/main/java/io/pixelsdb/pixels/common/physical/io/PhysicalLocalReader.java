@@ -81,6 +81,7 @@ public class PhysicalLocalReader implements PhysicalReader
         //ByteBuffer buffer = ByteBuffer.allocate(length);
         //raf.readFully(buffer.array());
         numRequests.incrementAndGet();
+        //return buffer;
         return raf.readDirect(length);
     }
 

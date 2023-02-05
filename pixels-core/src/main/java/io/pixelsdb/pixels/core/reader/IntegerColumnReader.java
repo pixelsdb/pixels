@@ -102,10 +102,10 @@ public class IntegerColumnReader
                 inputStream.close();
             }
             this.inputBuffer = input;
-            inputStream = new ByteBufferInputStream(inputBuffer, 0, inputBuffer.limit());
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
             decoder = new RunLenIntDecoder(inputStream, true);
             // isNull
-            isNullOffset = (int) chunkIndex.getIsNullOffset();
+            isNullOffset = inputBuffer.position() + (int) chunkIndex.getIsNullOffset();
             // re-init
             hasNull = true;
             elementIndex = 0;
