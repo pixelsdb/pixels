@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +55,8 @@ public class DirectIoLib
     private static final long fsBlockNotMask;
     private static int javaVersion = -1;
 
-    private static Field pointerPeer = null;
+    private static Field jnaPointerPeer = null;
+    private static Method directByteBufferAddress = null;
     private static Constructor<?> directByteBufferRConstructor = null;
 
     private static final int O_RDONLY = 00;
@@ -96,8 +98,6 @@ public class DirectIoLib
                 {
                     throw new Exception(String.format("Java version: %s is not supported", System.getProperty("java.version")));
                 }
-                pointerPeer = Class.forName("com.sun.jna.Pointer").getDeclaredField("peer");
-                pointerPeer.setAccessible(true);
 
                 if (javaVersion <= 11)
                 {
@@ -108,12 +108,19 @@ public class DirectIoLib
                 }
                 else
                 {
-                    // the creator of DirectByteBufferR is changed after java 11.
+                    /* the creator of DirectByteBufferR is changed after java 11 and is not compatible with java 8.
+                     * Therefore, we use DirectByteBuffer to create direct read only buffer.
+                     */
                     Class<?> cl = Class.forName("java.nio.DirectByteBuffer");
                     directByteBufferRConstructor = cl.getDeclaredConstructor(
                             long.class, int.class);
                 }
                 directByteBufferRConstructor.setAccessible(true);
+
+                jnaPointerPeer = Class.forName("com.sun.jna.Pointer").getDeclaredField("peer");
+                jnaPointerPeer.setAccessible(true);
+                directByteBufferAddress = Class.forName("java.nio.DirectByteBuffer").getDeclaredMethod("address");
+                directByteBufferAddress.setAccessible(true);
             } catch (Throwable e)
             {
                 logger.error("failed to reflect fields and methods", e);
@@ -209,7 +216,18 @@ public class DirectIoLib
 
     public static long getAddress(Pointer pointer) throws IllegalAccessException
     {
-        return (Long) pointerPeer.get(pointer);
+        return (Long) jnaPointerPeer.get(pointer);
+    }
+
+    public static long getAddress(ByteBuffer byteBuffer) throws InvocationTargetException, IllegalAccessException
+    {
+        if (byteBuffer.isDirect())
+        {
+            return (long) directByteBufferAddress.invoke(byteBuffer);
+        }
+        {
+            throw new IllegalAccessException("non direct byte buffer does not have absolute address");
+        }
     }
 
     // this is derived from sun.nio.ch.Util.newMappedByteBufferR
