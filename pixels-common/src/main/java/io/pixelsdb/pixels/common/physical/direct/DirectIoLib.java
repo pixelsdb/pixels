@@ -214,7 +214,7 @@ public class DirectIoLib
      *
      * @param size The number of bytes to allocate
      *
-     * @return 0 on success, one of the C error codes on failure.
+     * @return 0 on success, one of the error codes in errno.h (however, errno is not set) on failure.
      */
     private static native int posix_memalign(PointerByReference memptr, long alignment, long size);
 
@@ -280,23 +280,42 @@ public class DirectIoLib
      * former way. This also allows us to manually free the allocated large buffers in time, which further improves
      * the memory allocation performance.
      * </p>
-     * @param size the number of byte should be allocated at least.
+     * <p>
+     * Even if direct I/O is disabled, and the allocated buffer is not page aligned, this method allocates a multiple
+     * of block size for the buffer, so that {@link #read(int, long, DirectBuffer, int)} can read a multiple of blocks
+     * into the buffer. This is because we find that block aligned reads are more efficient.
+     * </p>
+     * @param size the number of byte should be allocated at least, must be positive.
      * @return
      */
-    public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException
+    public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException, IOException
     {
-        if (directIoEnabled)
+        if (size <= 0)
         {
+            throw new IllegalArgumentException("size must be positive");
+        }
+        // always allocate a multiple of block size.
+        int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
+        //if (directIoEnabled)
+        //{
             PointerByReference pointerToPointer = new PointerByReference();
             // allocate one additional block for read alignment.
-            int allocated = blockEnd(size) + fsBlockSize;
-            posix_memalign(pointerToPointer, fsBlockSize, allocated);
-            return new DirectBuffer(pointerToPointer.getValue(), size, allocated, false);
-        } else
-        {
-            Pointer pointer = malloc(size);
-            return new DirectBuffer(pointer, size, size, false);
-        }
+
+            int ret = posix_memalign(pointerToPointer, fsBlockSize, toAllocate);
+            if (ret != 0)
+            {
+                throw new IOException("failed to allocate aligned memory, error: " + strerror(ret));
+            }
+            return new DirectBuffer(pointerToPointer.getValue(), size, toAllocate, false);
+        //} else
+        //{
+            //Pointer pointer = malloc(toAllocate);
+            //if (pointer == Pointer.NULL)
+            //{
+            //    throw new IOException("failed to allocate memory, error: " + getLastError());
+            //}
+            //return new DirectBuffer(pointer, size, toAllocate, false);
+        //}
     }
 
     /**
@@ -310,21 +329,21 @@ public class DirectIoLib
      */
     public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
     {
-        if (directIoEnabled)
-        {
+        //if (directIoEnabled)
+        //{
             // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
             long fileOffsetAligned = blockStart(fileOffset);
             long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
             int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
             buffer.shift(((int) (fileOffset - fileOffsetAligned)));
             return read;
-        }
-        else
-        {
-            int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
-            buffer.shift(0);
-            return read;
-        }
+        //}
+        //else
+        //{
+            //int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
+            //buffer.shift(0);
+            //return read;
+        //}
     }
 
     /**

@@ -51,14 +51,14 @@ public class TestDirect
         long start = System.currentTimeMillis();
         for (int i = 0; i < 100000; ++i)
         {
-            DirectBuffer buffer = DirectIoLib.allocateBuffer(16);
+            DirectBuffer buffer = DirectIoLib.allocateBuffer(1);
             buffer.close();
         }
         System.out.println(System.currentTimeMillis() - start);
         start = System.currentTimeMillis();
         for (int i = 0; i < 100000; ++i)
         {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(16);
+            ByteBuffer buffer = ByteBuffer.allocateDirect(1);
             DirectBuffer directBuffer = new DirectBuffer(buffer, buffer.capacity(), true);
             directBuffer.close();
         }
