@@ -26,7 +26,7 @@ import java.math.BigDecimal;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * This is the general stats to be used by Trino and pixels-optimizer.
+ * This is the general stats to be used by Trino and pixels-planner.
  *
  * @author hank
  * @date 11/07/2022
