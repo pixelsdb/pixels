@@ -44,6 +44,15 @@ public class DirectBuffer implements Closeable
     private final int allocatedSize;
     private final boolean aligned;
 
+    /**
+     * Create a direct buffer from a pointer to the allocated direct memory.
+     * <b>Notice:</b> if aligned is false, {@link #close()} on this buffer is not responsible for freeing the memory.
+     * @param alignedPointer the pointer to the allocated memory.
+     * @param size the size of the valid window.
+     * @param allocatedSize the allocated size of the buffer.
+     * @param aligned whether the allocated memory is aligned to block size.
+     * @throws IllegalAccessException
+     */
     protected DirectBuffer(Pointer alignedPointer, int size, int allocatedSize, boolean aligned) throws IllegalAccessException
     {
         this.pointer = alignedPointer;
@@ -54,9 +63,18 @@ public class DirectBuffer implements Closeable
         this.aligned = aligned;
     }
 
+    /**
+     * Create a direct buffer from an allocated direct byte buffer.
+     * <b>Notice:</b> if aligned is false, {@link #close()} on this buffer is not responsible for freeing the memory.
+     * @param buffer the allocated direct byte buffer.
+     * @param size the size (i.e., capacity) of the direct byte buffer.
+     * @param aligned whether the allocated memory is aligned to block size.
+     * @throws IllegalAccessException
+     */
     protected DirectBuffer(ByteBuffer buffer, int size, boolean aligned) throws InvocationTargetException, IllegalAccessException
     {
         checkArgument(buffer.isDirect(), "buffer must be direct");
+        checkArgument(buffer.capacity() >= size, "the byte buffer is smaller than the given size");
         this.buffer = buffer.isReadOnly() ? buffer : buffer.asReadOnlyBuffer();
         this.address = DirectIoLib.getAddress(this.buffer);
         this.pointer = Pointer.createConstant(this.address);
@@ -65,15 +83,24 @@ public class DirectBuffer implements Closeable
         this.aligned = aligned;
     }
 
-    public void shift(int pos)
+    /**
+     * Shift the valid window in this buffer. This method should only be used if this buffer is aligned.
+     * @param startPosition the new starting position of the valid window.
+     */
+    public void shift(int startPosition)
     {
-        checkArgument(pos >= 0 && pos + this.size <= this.allocatedSize,
+        checkArgument(this.aligned, "shift should only be used on aligned direct buffer");
+        checkArgument(startPosition >= 0 && startPosition + this.size <= this.allocatedSize,
                 "shift leads to truncation which is not allowed");
         this.buffer.clear();
-        this.buffer.position(pos);
-        this.buffer.limit(pos + this.size);
+        this.buffer.position(startPosition);
+        this.buffer.limit(startPosition + this.size);
     }
 
+    /**
+     * Push the position of this buffer forward by delta bytes.
+     * @param delta the number of bytes, can be negative.
+     */
     public void forward(int delta)
     {
         checkArgument(this.buffer.position() + delta >= 0 &&

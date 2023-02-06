@@ -272,19 +272,19 @@ public class DirectIoLib
      */
     public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException
     {
-        if (directIoEnabled)
-        {
+        //if (directIoEnabled)
+        //{
             PointerByReference pointerToPointer = new PointerByReference();
             // allocate one additional block for read alignment.
-            int allocated = blockEnd(size) + fsBlockSize;
+            int allocated = blockEnd(size) + (directIoEnabled ? fsBlockSize : 0);
             posix_memalign(pointerToPointer, fsBlockSize, allocated);
             return new DirectBuffer(pointerToPointer.getValue(), size, allocated, true);
-        }
-        else
-        {
-            ByteBuffer buffer = ByteBuffer.allocateDirect(size);
-            return new DirectBuffer(buffer, size, false);
-        }
+        //}
+        //else
+        //{
+            //ByteBuffer buffer = ByteBuffer.allocateDirect(size);
+            //return new DirectBuffer(buffer, size, false);
+        //}
     }
 
     /**
@@ -310,7 +310,7 @@ public class DirectIoLib
         else
         {
             int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
-            buffer.reset();
+            buffer.shift(0);
             return read;
         }
     }

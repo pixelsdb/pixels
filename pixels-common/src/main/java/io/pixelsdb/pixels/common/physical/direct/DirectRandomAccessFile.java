@@ -101,11 +101,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, this.offset, buffer, len);
             this.seek(this.offset + len);
-            if (DirectIoLib.directIoEnabled)
-            {
-                // if direct io is disabled, the buffers are allocated and freed by JVM.
-                this.largeBuffers.add(buffer);
-            }
+            this.largeBuffers.add(buffer);
             return buffer.getBuffer();
         } catch (IllegalAccessException | InvocationTargetException e)
         {
