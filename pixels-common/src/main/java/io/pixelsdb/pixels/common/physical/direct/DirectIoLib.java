@@ -65,10 +65,6 @@ public class DirectIoLib
     private static Method directByteBufferAddress = null;
     private static Constructor<?> directByteBufferRConstructor = null;
 
-    /**
-     * A buffer larger than this threshold should be allocated as block aligned.
-     */
-    private static final int LARGE_BUFFER_THRESHOLD = 32768;
     private static final int O_RDONLY = 00;
     private static final int O_WRONLY = 01;
     private static final int O_RDWR = 02;
@@ -275,15 +271,10 @@ public class DirectIoLib
      * Allocate a direct buffer. If direct I/O is enabled, the allocated buffer is block aligned.
      * <b>REMEMBER</b> to free the allocated buffer by calling {@link #free(Pointer)}.
      * <p>
-     * We find that allocating memory using native mappings of <tt>posix_memalign</tt> or <tt>malloc</tt>is more
-     * efficient than allocating direct memory using {@link ByteBuffer#allocateDirect(int)}, so we always use the
-     * former way. This also allows us to manually free the allocated large buffers in time, which further improves
-     * the memory allocation performance.
-     * </p>
-     * <p>
-     * Even if direct I/O is disabled, and the allocated buffer is not page aligned, this method allocates a multiple
-     * of block size for the buffer, so that {@link #read(int, long, DirectBuffer, int)} can read a multiple of blocks
-     * into the buffer. This is because we find that block aligned reads are more efficient.
+     * We find that for non-aligned buffers, allocating memory using native mappings of <tt>malloc</tt>is more
+     * efficient than allocating direct memory using {@link ByteBuffer#allocateDirect(int)}, so we always use
+     * the former way. This also allows us to manually free the allocated large buffers in time, which further
+     * improves the memory allocation performance.
      * </p>
      * @param size the number of byte should be allocated at least, must be positive.
      * @return
@@ -295,27 +286,26 @@ public class DirectIoLib
             throw new IllegalArgumentException("size must be positive");
         }
         // always allocate a multiple of block size.
-        int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
-        //if (directIoEnabled)
-        //{
+        if (directIoEnabled)
+        {
             PointerByReference pointerToPointer = new PointerByReference();
             // allocate one additional block for read alignment.
-
+            int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
             int ret = posix_memalign(pointerToPointer, fsBlockSize, toAllocate);
             if (ret != 0)
             {
                 throw new IOException("failed to allocate aligned memory, error: " + strerror(ret));
             }
             return new DirectBuffer(pointerToPointer.getValue(), size, toAllocate, false);
-        //} else
-        //{
-            //Pointer pointer = malloc(toAllocate);
-            //if (pointer == Pointer.NULL)
-            //{
-            //    throw new IOException("failed to allocate memory, error: " + getLastError());
-            //}
-            //return new DirectBuffer(pointer, size, toAllocate, false);
-        //}
+        } else
+        {
+            Pointer pointer = malloc(size);
+            if (pointer == Pointer.NULL)
+            {
+                throw new IOException("failed to allocate memory, error: " + getLastError());
+            }
+            return new DirectBuffer(pointer, size, size, false);
+        }
     }
 
     /**
@@ -329,21 +319,21 @@ public class DirectIoLib
      */
     public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
     {
-        //if (directIoEnabled)
-        //{
+        if (directIoEnabled)
+        {
             // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
             long fileOffsetAligned = blockStart(fileOffset);
             long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
             int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
             buffer.shift(((int) (fileOffset - fileOffsetAligned)));
             return read;
-        //}
-        //else
-        //{
-            //int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
-            //buffer.shift(0);
-            //return read;
-        //}
+        }
+        else
+        {
+            int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
+            buffer.shift(0);
+            return read;
+        }
     }
 
     /**
