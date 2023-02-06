@@ -67,11 +67,19 @@ public class DirectBuffer implements Closeable
 
     public void shift(int pos)
     {
-        checkArgument(pos + this.size <= this.allocatedSize,
+        checkArgument(pos >= 0 && pos + this.size <= this.allocatedSize,
                 "shift leads to truncation which is not allowed");
         this.buffer.clear();
         this.buffer.position(pos);
         this.buffer.limit(pos + this.size);
+    }
+
+    public void forward(int delta)
+    {
+        checkArgument(this.buffer.position() + delta >= 0 &&
+                        this.buffer.position() + delta <= this.buffer.limit(),
+                "forward out of limit is not allowed");
+        this.buffer.position(this.buffer.position() + delta);
     }
 
     public void reset()

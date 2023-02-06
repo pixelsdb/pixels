@@ -50,7 +50,6 @@ import java.util.List;
 public class DirectIoLib
 {
     private static final Logger logger = LoggerFactory.getLogger(DirectIoLib.class);
-    private static boolean compatible;
     /**
      * The soft block size for use with transfer multiples and memory alignment multiples
      */
@@ -79,7 +78,7 @@ public class DirectIoLib
         fsBlockSize = Integer.parseInt(ConfigFactory.Instance().getProperty("localfs.block.size"));
         fsBlockNotMask = ~((long) fsBlockSize - 1);
         directIoEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.direct.io"));
-        compatible = false;
+        boolean compatible = false;
         try
         {
             try

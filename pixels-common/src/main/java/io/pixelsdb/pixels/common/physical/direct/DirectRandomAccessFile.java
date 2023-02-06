@@ -264,7 +264,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         if (this.bufferValid && offset > this.offset - this.smallBuffer.position() &&
                 offset < this.offset + this.smallBuffer.remaining())
         {
-            this.smallBuffer.shift(this.smallBuffer.position() + (int) (offset - this.offset));
+            this.smallBuffer.forward((int) (offset - this.offset));
         }
         else
         {
