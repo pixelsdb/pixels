@@ -42,36 +42,36 @@ public class DirectBuffer implements Closeable
     private final long address;
     private final int size;
     private final int allocatedSize;
-    private final boolean aligned;
+    private final boolean jvmManaged;
 
     /**
      * Create a direct buffer from a pointer to the allocated direct memory.
-     * <b>Notice:</b> if aligned is false, {@link #close()} on this buffer is not responsible for freeing the memory.
      * @param alignedPointer the pointer to the allocated memory.
      * @param size the size of the valid window.
      * @param allocatedSize the allocated size of the buffer.
-     * @param aligned whether the allocated memory is aligned to block size.
+     * @param jvmManaged whether the allocated memory is managed by JVM. If it is <b>TRUE</b>,
+     *                   the {@link #close()} method on this buffer is not responsible for freeing the memory.
      * @throws IllegalAccessException
      */
-    protected DirectBuffer(Pointer alignedPointer, int size, int allocatedSize, boolean aligned) throws IllegalAccessException
+    protected DirectBuffer(Pointer alignedPointer, int size, int allocatedSize, boolean jvmManaged) throws IllegalAccessException
     {
         this.pointer = alignedPointer;
         this.size = size;
         this.allocatedSize = allocatedSize;
         this.address = DirectIoLib.getAddress(alignedPointer);
         this.buffer = DirectIoLib.wrapReadOnlyDirectByteBuffer(allocatedSize, this.address);
-        this.aligned = aligned;
+        this.jvmManaged = jvmManaged;
     }
 
     /**
      * Create a direct buffer from an allocated direct byte buffer.
-     * <b>Notice:</b> if aligned is false, {@link #close()} on this buffer is not responsible for freeing the memory.
      * @param buffer the allocated direct byte buffer.
      * @param size the size (i.e., capacity) of the direct byte buffer.
-     * @param aligned whether the allocated memory is aligned to block size.
+     * @param jvmManaged whether the allocated memory is managed by JVM. If it is <b>TRUE</b>,
+     *                   the {@link #close()} method on this buffer is not responsible for freeing the memory.
      * @throws IllegalAccessException
      */
-    protected DirectBuffer(ByteBuffer buffer, int size, boolean aligned) throws InvocationTargetException, IllegalAccessException
+    protected DirectBuffer(ByteBuffer buffer, int size, boolean jvmManaged) throws InvocationTargetException, IllegalAccessException
     {
         checkArgument(buffer.isDirect(), "buffer must be direct");
         checkArgument(buffer.capacity() >= size, "the byte buffer is smaller than the given size");
@@ -80,7 +80,7 @@ public class DirectBuffer implements Closeable
         this.pointer = Pointer.createConstant(this.address);
         this.size = size;
         this.allocatedSize = size;
-        this.aligned = aligned;
+        this.jvmManaged = jvmManaged;
     }
 
     /**
@@ -89,7 +89,6 @@ public class DirectBuffer implements Closeable
      */
     public void shift(int startPosition)
     {
-        checkArgument(this.aligned, "shift should only be used on aligned direct buffer");
         checkArgument(startPosition >= 0 && startPosition + this.size <= this.allocatedSize,
                 "shift leads to truncation which is not allowed");
         this.buffer.clear();
@@ -114,9 +113,9 @@ public class DirectBuffer implements Closeable
         this.buffer.clear();
     }
 
-    public boolean isAligned()
+    public boolean isJvmManaged()
     {
-        return this.aligned;
+        return this.jvmManaged;
     }
 
     public ByteBuffer getBuffer()
@@ -197,9 +196,9 @@ public class DirectBuffer implements Closeable
     @Override
     public void close() throws IOException
     {
-        if (aligned)
+        if (!jvmManaged)
         {
-            // if buffer is not aligned, it is allocated and freed by JVM.
+            // free the memory if this buffer is not managed by JVM
             DirectIoLib.free(this.pointer);
         }
         this.pointer = null;

@@ -65,6 +65,10 @@ public class DirectIoLib
     private static Method directByteBufferAddress = null;
     private static Constructor<?> directByteBufferRConstructor = null;
 
+    /**
+     * A buffer larger than this threshold should be allocated as block aligned.
+     */
+    private static final int LARGE_BUFFER_THRESHOLD = 32768;
     private static final int O_RDONLY = 00;
     private static final int O_WRONLY = 01;
     private static final int O_RDWR = 02;
@@ -214,6 +218,8 @@ public class DirectIoLib
      */
     private static native int posix_memalign(PointerByReference memptr, long alignment, long size);
 
+    private static native Pointer malloc(long size);
+
     /**
      * @param ptr The pointer to the hunk of memory which needs freeing
      */
@@ -266,25 +272,31 @@ public class DirectIoLib
     }
 
     /**
-     * Allocate a byte buffer aligned to a multiple of block size.
-     * @param size
+     * Allocate a direct buffer. If direct I/O is enabled, the allocated buffer is block aligned.
+     * <b>REMEMBER</b> to free the allocated buffer by calling {@link #free(Pointer)}.
+     * <p>
+     * We find that allocating memory using native mappings of <tt>posix_memalign</tt> or <tt>malloc</tt>is more
+     * efficient than allocating direct memory using {@link ByteBuffer#allocateDirect(int)}, so we always use the
+     * former way. This also allows us to manually free the allocated large buffers in time, which further improves
+     * the memory allocation performance.
+     * </p>
+     * @param size the number of byte should be allocated at least.
      * @return
      */
     public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException
     {
-        //if (directIoEnabled)
-        //{
+        if (directIoEnabled)
+        {
             PointerByReference pointerToPointer = new PointerByReference();
             // allocate one additional block for read alignment.
-            int allocated = blockEnd(size) + (directIoEnabled ? fsBlockSize : 0);
+            int allocated = blockEnd(size) + fsBlockSize;
             posix_memalign(pointerToPointer, fsBlockSize, allocated);
-            return new DirectBuffer(pointerToPointer.getValue(), size, allocated, true);
-        //}
-        //else
-        //{
-            //ByteBuffer buffer = ByteBuffer.allocateDirect(size);
-            //return new DirectBuffer(buffer, size, false);
-        //}
+            return new DirectBuffer(pointerToPointer.getValue(), size, allocated, false);
+        } else
+        {
+            Pointer pointer = malloc(size);
+            return new DirectBuffer(pointer, size, size, false);
+        }
     }
 
     /**

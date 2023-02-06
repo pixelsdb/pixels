@@ -17,16 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.common.physical.direct;
 
-import io.pixelsdb.pixels.common.physical.direct.DirectBuffer;
-import io.pixelsdb.pixels.common.physical.direct.DirectIoLib;
-import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 
 /**
  * Created at: 02/02/2023
@@ -45,6 +43,26 @@ public class TestDirect
         {
             System.out.println(buffer.get());
         }
+    }
+
+    @Test
+    public void testMemoryAllocation() throws InvocationTargetException, IllegalAccessException, IOException
+    {
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; ++i)
+        {
+            DirectBuffer buffer = DirectIoLib.allocateBuffer(16);
+            buffer.close();
+        }
+        System.out.println(System.currentTimeMillis() - start);
+        start = System.currentTimeMillis();
+        for (int i = 0; i < 100000; ++i)
+        {
+            ByteBuffer buffer = ByteBuffer.allocateDirect(16);
+            DirectBuffer directBuffer = new DirectBuffer(buffer, buffer.capacity(), true);
+            directBuffer.close();
+        }
+        System.out.println(System.currentTimeMillis() - start);
     }
 
     @Test
