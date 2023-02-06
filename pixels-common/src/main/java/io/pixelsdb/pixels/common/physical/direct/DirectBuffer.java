@@ -23,35 +23,53 @@ import com.sun.jna.Pointer;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
+ * The buffer that is allocated from off-heap memory. We need more controls on the buffer,
+ * so we do not used jdk's DirectByteBuffer.
+ * <br/>
  * Created at: 02/02/2023
  * Author: hank
  */
-public class AlignedDirectBuffer implements Closeable
+public class DirectBuffer implements Closeable
 {
     private ByteBuffer buffer;
     private Pointer pointer;
     private final long address;
     private final int size;
     private final int allocatedSize;
+    private final boolean aligned;
 
-    protected AlignedDirectBuffer(Pointer alignedPointer, int size, int allocatedSize) throws IllegalAccessException
+    protected DirectBuffer(Pointer alignedPointer, int size, int allocatedSize, boolean aligned) throws IllegalAccessException
     {
         this.pointer = alignedPointer;
         this.size = size;
         this.allocatedSize = allocatedSize;
         this.address = DirectIoLib.getAddress(alignedPointer);
-        this.buffer = DirectIoLib.newDirectByteBufferR(allocatedSize, this.address);
+        this.buffer = DirectIoLib.wrapReadOnlyDirectByteBuffer(allocatedSize, this.address);
+        this.aligned = aligned;
+    }
+
+    protected DirectBuffer(ByteBuffer buffer, int size, boolean aligned) throws InvocationTargetException, IllegalAccessException
+    {
+        checkArgument(buffer.isDirect(), "buffer must be direct");
+        this.buffer = buffer.isReadOnly() ? buffer : buffer.asReadOnlyBuffer();
+        this.address = DirectIoLib.getAddress(this.buffer);
+        this.pointer = Pointer.createConstant(this.address);
+        this.size = size;
+        this.allocatedSize = size;
+        this.aligned = aligned;
     }
 
     public void shift(int pos)
     {
         checkArgument(pos + this.size <= this.allocatedSize,
                 "shift leads to truncation which is not allowed");
+        this.buffer.clear();
         this.buffer.position(pos);
         this.buffer.limit(pos + this.size);
     }
@@ -59,6 +77,11 @@ public class AlignedDirectBuffer implements Closeable
     public void reset()
     {
         this.buffer.clear();
+    }
+
+    public boolean isAligned()
+    {
+        return this.aligned;
     }
 
     public ByteBuffer getBuffer()
@@ -139,7 +162,11 @@ public class AlignedDirectBuffer implements Closeable
     @Override
     public void close() throws IOException
     {
-        DirectIoLib.free(this.pointer);
+        if (aligned)
+        {
+            // if buffer is not aligned, it is allocated and freed by JVM.
+            DirectIoLib.free(this.pointer);
+        }
         this.pointer = null;
         this.buffer = null;
     }

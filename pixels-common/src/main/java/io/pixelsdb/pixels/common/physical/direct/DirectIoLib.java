@@ -51,8 +51,15 @@ public class DirectIoLib
 {
     private static final Logger logger = LoggerFactory.getLogger(DirectIoLib.class);
     private static boolean compatible;
-    private static final int fsBlockSize;
+    /**
+     * The soft block size for use with transfer multiples and memory alignment multiples
+     */
+    public static final int fsBlockSize;
     private static final long fsBlockNotMask;
+    /**
+     * Whether direct io (i.e., o_direct) is enabled.
+     */
+    public static final boolean directIoEnabled;
     private static int javaVersion = -1;
 
     private static Field jnaPointerPeer = null;
@@ -71,6 +78,7 @@ public class DirectIoLib
     {
         fsBlockSize = Integer.parseInt(ConfigFactory.Instance().getProperty("localfs.block.size"));
         fsBlockNotMask = ~((long) fsBlockSize - 1);
+        directIoEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.direct.io"));
         compatible = false;
         try
         {
@@ -225,14 +233,17 @@ public class DirectIoLib
         {
             return (long) directByteBufferAddress.invoke(byteBuffer);
         }
-        {
-            throw new IllegalAccessException("non direct byte buffer does not have absolute address");
-        }
+        throw new IllegalAccessException("non direct byte buffer does not have absolute address");
     }
 
-    // this is derived from sun.nio.ch.Util.newMappedByteBufferR
-    // create a read only direct byte buffer without memory copy.
-    public static ByteBuffer newDirectByteBufferR(int size, long addr)
+    /**
+     * Wrap the absolute address as a read only byte buffer, without memory copy.
+     * This is derived from sun.nio.ch.Util.newMappedByteBufferR.
+     * @param size the capacity of the buffer.
+     * @param address the absolute address the buffer starts from.
+     * @return the wrapped buffer.
+     */
+    public static ByteBuffer wrapReadOnlyDirectByteBuffer(int size, long address)
     {
         ByteBuffer buffer;
         try
@@ -240,11 +251,11 @@ public class DirectIoLib
             if (javaVersion <= 11)
             {
                 buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
-                        new Object[]{size, addr, null, null});
+                        new Object[]{size, address, null, null});
             } else
             {
                 buffer = ((ByteBuffer) directByteBufferRConstructor.newInstance(
-                        new Object[]{addr, size})).asReadOnlyBuffer();
+                        new Object[]{address, size})).asReadOnlyBuffer();
             }
         } catch (InstantiationException |
                 IllegalAccessException |
@@ -260,33 +271,49 @@ public class DirectIoLib
      * @param size
      * @return
      */
-    public static AlignedDirectBuffer allocateAligned(int size) throws IllegalAccessException
+    public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException
     {
-        PointerByReference pointerToPointer = new PointerByReference();
-        // allocate one additional block for read alignment.
-        int allocated = blockEnd(size) + fsBlockSize;
-        posix_memalign(pointerToPointer, fsBlockSize, allocated);
-        return new AlignedDirectBuffer(pointerToPointer.getValue(), size, allocated);
+        if (directIoEnabled)
+        {
+            PointerByReference pointerToPointer = new PointerByReference();
+            // allocate one additional block for read alignment.
+            int allocated = blockEnd(size) + fsBlockSize;
+            posix_memalign(pointerToPointer, fsBlockSize, allocated);
+            return new DirectBuffer(pointerToPointer.getValue(), size, allocated, true);
+        }
+        else
+        {
+            ByteBuffer buffer = ByteBuffer.allocateDirect(size);
+            return new DirectBuffer(buffer, size, false);
+        }
     }
 
     /**
-     *
-     * @param fd A file discriptor to pass to native pread
+     * This method is used to read files that are opened by {@link #open(String, boolean)}..
+     * @param fd A file descriptor to pass to native pread
      * @param fileOffset The file offset at which to read
      * @param buffer he buffer into which to record the file read
      * @param length the number of bytes to read from the file
      * @return The number of bytes successfully read from the file
      * @throws IOException
      */
-    public static int readDirect(int fd, long fileOffset, AlignedDirectBuffer buffer, int length) throws IOException
+    public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
     {
-        // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
-        long fileOffsetAligned = blockStart(fileOffset);
-        long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
-        int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
-        buffer.reset();
-        buffer.shift(((int) (fileOffset - fileOffsetAligned)));
-        return read;
+        if (directIoEnabled)
+        {
+            // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
+            long fileOffsetAligned = blockStart(fileOffset);
+            long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
+            int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
+            buffer.shift(((int) (fileOffset - fileOffsetAligned)));
+            return read;
+        }
+        else
+        {
+            int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
+            buffer.reset();
+            return read;
+        }
     }
 
     /**
@@ -301,9 +328,9 @@ public class DirectIoLib
      * @return An integer file descriptor for the opened file
      * @throws IOException
      */
-    public static int openDirect(String path, boolean readOnly) throws IOException
+    public static int open(String path, boolean readOnly) throws IOException
     {
-        int flags = O_DIRECT;
+        int flags = directIoEnabled ? O_DIRECT : 0;
         if (readOnly)
         {
             flags |= O_RDONLY;
@@ -337,15 +364,6 @@ public class DirectIoLib
 
 
     // -- alignment logic utility methods
-
-    /**
-     * @return The soft block size for use with transfer multiples
-     * and memory alignment multiples
-     */
-    public static int blockSize()
-    {
-        return fsBlockSize;
-    }
 
     /**
      * Given <tt>value</tt>, find the largest number less than or equal

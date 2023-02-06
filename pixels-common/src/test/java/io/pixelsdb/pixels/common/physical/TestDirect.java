@@ -19,13 +19,14 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.direct.AlignedDirectBuffer;
+import io.pixelsdb.pixels.common.physical.direct.DirectBuffer;
 import io.pixelsdb.pixels.common.physical.direct.DirectIoLib;
 import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Created at: 02/02/2023
@@ -34,11 +35,11 @@ import java.io.IOException;
 public class TestDirect
 {
     @Test
-    public void testDirectIoLib() throws IOException, IllegalAccessException
+    public void testDirectIoLib() throws IOException, IllegalAccessException, InvocationTargetException
     {
-        int fd = DirectIoLib.openDirect("/home/hank/20230126155625_0.pxl", true);
-        AlignedDirectBuffer buffer = DirectIoLib.allocateAligned(8);
-        int read = DirectIoLib.readDirect(fd, 4094, buffer, 8);
+        int fd = DirectIoLib.open("/home/hank/20230126155625_0.pxl", true);
+        DirectBuffer buffer = DirectIoLib.allocateBuffer(8);
+        int read = DirectIoLib.read(fd, 4094, buffer, 8);
         System.out.println(read);
         for (int i = 0; i < 8; ++i)
         {

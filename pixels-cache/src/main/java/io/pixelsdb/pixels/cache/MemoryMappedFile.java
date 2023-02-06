@@ -39,7 +39,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
-import static io.pixelsdb.pixels.common.physical.direct.DirectIoLib.newDirectByteBufferR;
+import static io.pixelsdb.pixels.common.physical.direct.DirectIoLib.wrapReadOnlyDirectByteBuffer;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 
@@ -327,7 +327,7 @@ public class MemoryMappedFile
      */
     public ByteBuffer getDirectByteBuffer(long pos, int length)
     {
-        return newDirectByteBufferR(length, pos + addr);
+        return wrapReadOnlyDirectByteBuffer(length, pos + addr);
     }
 
     /**

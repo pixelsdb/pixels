@@ -26,6 +26,7 @@ import io.netty.buffer.Unpooled;
 import io.pixelsdb.pixels.common.physical.direct.DirectIoLib;
 import org.junit.Test;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 
 /**
@@ -36,11 +37,11 @@ import java.nio.ByteBuffer;
 public class TestByteBuf
 {
     @Test
-    public void testEndian() throws IllegalAccessException
+    public void testEndian() throws IllegalAccessException, InvocationTargetException
     {
         ByteBuffer buffer = ByteBuffer.allocate(10);
         System.out.println(buffer.order());
-        ByteBuffer buffer1 = DirectIoLib.allocateAligned(10).getBuffer();
+        ByteBuffer buffer1 = DirectIoLib.allocateBuffer(10).getBuffer();
         System.out.println(buffer1.order());
         assert buffer1.order() == buffer.order();
     }

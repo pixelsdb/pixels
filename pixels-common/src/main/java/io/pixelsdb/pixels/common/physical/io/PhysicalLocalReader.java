@@ -79,7 +79,7 @@ public class PhysicalLocalReader implements PhysicalReader
     public ByteBuffer readFully(int length) throws IOException
     {
         numRequests.incrementAndGet();
-        return raf.readDirect(length);
+        return raf.readFully(length);
     }
 
     @Override
