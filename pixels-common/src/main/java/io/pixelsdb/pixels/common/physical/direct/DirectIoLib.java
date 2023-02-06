@@ -271,10 +271,9 @@ public class DirectIoLib
      * Allocate a direct buffer. If direct I/O is enabled, the allocated buffer is block aligned.
      * <b>REMEMBER</b> to free the allocated buffer by calling {@link #free(Pointer)}.
      * <p>
-     * We find that for non-aligned buffers, allocating memory using native mappings of <tt>malloc</tt>is more
-     * efficient than allocating direct memory using {@link ByteBuffer#allocateDirect(int)}, so we always use
-     * the former way. This also allows us to manually free the allocated large buffers in time, which further
-     * improves the memory allocation performance.
+     * We find that for allocating direct memory, native mapping of <tt>malloc</tt> or <tt>posix_memalign</tt> is more
+     * efficient than {@link ByteBuffer#allocateDirect(int)}, so we always use the former way. This also allows us to
+     * manually free the allocated memory in time, which further improves the memory allocation performance.
      * </p>
      * @param size the number of byte should be allocated at least, must be positive.
      * @return
@@ -337,9 +336,9 @@ public class DirectIoLib
     }
 
     /**
-     * Use the <tt>open</tt> Linux system call and pass in the <tt>O_DIRECT</tt> flag.
-     * Currently, the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt>
-     * is <tt>true</tt>, and (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
+     * Use the <tt>open</tt> Linux system call and pass in the <tt>O_DIRECT</tt> flag when direct I/O is enabled.
+     * Currently, the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt> is <tt>true</tt>, and
+     * (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
      *
      * @param path The path to the file to open. If file does not exist, and we are opening
      *             with <tt>readOnly</tt>, this will throw an error. Otherwise, if it does
