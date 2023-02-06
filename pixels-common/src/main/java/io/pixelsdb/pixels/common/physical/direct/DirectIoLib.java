@@ -50,9 +50,15 @@ import java.util.List;
 public class DirectIoLib
 {
     private static final Logger logger = LoggerFactory.getLogger(DirectIoLib.class);
-    private static boolean compatible;
-    private static final int fsBlockSize;
+    /**
+     * The soft block size for use with transfer multiples and memory alignment multiples
+     */
+    public static final int fsBlockSize;
     private static final long fsBlockNotMask;
+    /**
+     * Whether direct io (i.e., o_direct) is enabled.
+     */
+    public static final boolean directIoEnabled;
     private static int javaVersion = -1;
 
     private static Field jnaPointerPeer = null;
@@ -71,7 +77,8 @@ public class DirectIoLib
     {
         fsBlockSize = Integer.parseInt(ConfigFactory.Instance().getProperty("localfs.block.size"));
         fsBlockNotMask = ~((long) fsBlockSize - 1);
-        compatible = false;
+        directIoEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.direct.io"));
+        boolean compatible = false;
         try
         {
             try
@@ -203,9 +210,11 @@ public class DirectIoLib
      *
      * @param size The number of bytes to allocate
      *
-     * @return 0 on success, one of the C error codes on failure.
+     * @return 0 on success, one of the error codes in errno.h (however, errno is not set) on failure.
      */
     private static native int posix_memalign(PointerByReference memptr, long alignment, long size);
+
+    private static native Pointer malloc(long size);
 
     /**
      * @param ptr The pointer to the hunk of memory which needs freeing
@@ -225,14 +234,17 @@ public class DirectIoLib
         {
             return (long) directByteBufferAddress.invoke(byteBuffer);
         }
-        {
-            throw new IllegalAccessException("non direct byte buffer does not have absolute address");
-        }
+        throw new IllegalAccessException("non direct byte buffer does not have absolute address");
     }
 
-    // this is derived from sun.nio.ch.Util.newMappedByteBufferR
-    // create a read only direct byte buffer without memory copy.
-    public static ByteBuffer newDirectByteBufferR(int size, long addr)
+    /**
+     * Wrap the absolute address as a read only byte buffer, without memory copy.
+     * This is derived from sun.nio.ch.Util.newMappedByteBufferR.
+     * @param size the capacity of the buffer.
+     * @param address the absolute address the buffer starts from.
+     * @return the wrapped buffer.
+     */
+    public static ByteBuffer wrapReadOnlyDirectByteBuffer(int size, long address)
     {
         ByteBuffer buffer;
         try
@@ -240,11 +252,11 @@ public class DirectIoLib
             if (javaVersion <= 11)
             {
                 buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
-                        new Object[]{size, addr, null, null});
+                        new Object[]{size, address, null, null});
             } else
             {
                 buffer = ((ByteBuffer) directByteBufferRConstructor.newInstance(
-                        new Object[]{addr, size})).asReadOnlyBuffer();
+                        new Object[]{address, size})).asReadOnlyBuffer();
             }
         } catch (InstantiationException |
                 IllegalAccessException |
@@ -256,43 +268,77 @@ public class DirectIoLib
     }
 
     /**
-     * Allocate a byte buffer aligned to a multiple of block size.
-     * @param size
+     * Allocate a direct buffer. If direct I/O is enabled, the allocated buffer is block aligned.
+     * <b>REMEMBER</b> to free the allocated buffer by calling {@link #free(Pointer)}.
+     * <p>
+     * We find that for allocating direct memory, native mapping of <tt>malloc</tt> or <tt>posix_memalign</tt> is more
+     * efficient than {@link ByteBuffer#allocateDirect(int)}, so we always use the former way. This also allows us to
+     * manually free the allocated memory in time, which further improves the memory allocation performance.
+     * </p>
+     * @param size the number of byte should be allocated at least, must be positive.
      * @return
      */
-    public static AlignedDirectBuffer allocateAligned(int size) throws IllegalAccessException
+    public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException, IOException
     {
-        PointerByReference pointerToPointer = new PointerByReference();
-        // allocate one additional block for read alignment.
-        int allocated = blockEnd(size) + fsBlockSize;
-        posix_memalign(pointerToPointer, fsBlockSize, allocated);
-        return new AlignedDirectBuffer(pointerToPointer.getValue(), size, allocated);
+        if (size <= 0)
+        {
+            throw new IllegalArgumentException("size must be positive");
+        }
+        // always allocate a multiple of block size.
+        if (directIoEnabled)
+        {
+            PointerByReference pointerToPointer = new PointerByReference();
+            // allocate one additional block for read alignment.
+            int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
+            int ret = posix_memalign(pointerToPointer, fsBlockSize, toAllocate);
+            if (ret != 0)
+            {
+                throw new IOException("failed to allocate aligned memory, error: " + strerror(ret));
+            }
+            return new DirectBuffer(pointerToPointer.getValue(), size, toAllocate, false);
+        } else
+        {
+            Pointer pointer = malloc(size);
+            if (pointer == Pointer.NULL)
+            {
+                throw new IOException("failed to allocate memory, error: " + getLastError());
+            }
+            return new DirectBuffer(pointer, size, size, false);
+        }
     }
 
     /**
-     *
-     * @param fd A file discriptor to pass to native pread
+     * This method is used to read files that are opened by {@link #open(String, boolean)}..
+     * @param fd A file descriptor to pass to native pread
      * @param fileOffset The file offset at which to read
      * @param buffer he buffer into which to record the file read
      * @param length the number of bytes to read from the file
      * @return The number of bytes successfully read from the file
      * @throws IOException
      */
-    public static int readDirect(int fd, long fileOffset, AlignedDirectBuffer buffer, int length) throws IOException
+    public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
     {
-        // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
-        long fileOffsetAligned = blockStart(fileOffset);
-        long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
-        int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
-        buffer.reset();
-        buffer.shift(((int) (fileOffset - fileOffsetAligned)));
-        return read;
+        if (directIoEnabled)
+        {
+            // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
+            long fileOffsetAligned = blockStart(fileOffset);
+            long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
+            int read = (int) pread(fd, buffer.getPointer(), toRead, fileOffsetAligned);
+            buffer.shift(((int) (fileOffset - fileOffsetAligned)));
+            return read;
+        }
+        else
+        {
+            int read = (int) pread(fd, buffer.getPointer(), length, fileOffset);
+            buffer.shift(0);
+            return read;
+        }
     }
 
     /**
-     * Use the <tt>open</tt> Linux system call and pass in the <tt>O_DIRECT</tt> flag.
-     * Currently, the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt>
-     * is <tt>true</tt>, and (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
+     * Use the <tt>open</tt> Linux system call and pass in the <tt>O_DIRECT</tt> flag when direct I/O is enabled.
+     * Currently, the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt> is <tt>true</tt>, and
+     * (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
      *
      * @param path The path to the file to open. If file does not exist, and we are opening
      *             with <tt>readOnly</tt>, this will throw an error. Otherwise, if it does
@@ -301,9 +347,9 @@ public class DirectIoLib
      * @return An integer file descriptor for the opened file
      * @throws IOException
      */
-    public static int openDirect(String path, boolean readOnly) throws IOException
+    public static int open(String path, boolean readOnly) throws IOException
     {
-        int flags = O_DIRECT;
+        int flags = directIoEnabled ? O_DIRECT : 0;
         if (readOnly)
         {
             flags |= O_RDONLY;
@@ -337,15 +383,6 @@ public class DirectIoLib
 
 
     // -- alignment logic utility methods
-
-    /**
-     * @return The soft block size for use with transfer multiples
-     * and memory alignment multiples
-     */
-    public static int blockSize()
-    {
-        return fsBlockSize;
-    }
 
     /**
      * Given <tt>value</tt>, find the largest number less than or equal

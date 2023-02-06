@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.io.DataInput;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
@@ -41,21 +42,21 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     private long length;
     private final int blockSize;
     private boolean bufferValid;
-    private AlignedDirectBuffer smallBuffer;
-    private LinkedList<AlignedDirectBuffer> largeBuffers = new LinkedList<>();
+    private DirectBuffer smallBuffer;
+    private LinkedList<DirectBuffer> largeBuffers = new LinkedList<>();
 
     public DirectRandomAccessFile(File file, boolean readOnly) throws IOException
     {
         this.file = file;
-        this.fd = DirectIoLib.openDirect(file.getPath(), readOnly);
+        this.fd = DirectIoLib.open(file.getPath(), readOnly);
         this.offset = 0;
         this.length = this.file.length();
-        this.blockSize = DirectIoLib.blockSize();
+        this.blockSize = DirectIoLib.fsBlockSize;
         this.bufferValid = false;
         try
         {
-            this.smallBuffer = DirectIoLib.allocateAligned(DirectIoLib.blockSize());
-        } catch (IllegalAccessException e)
+            this.smallBuffer = DirectIoLib.allocateBuffer(DirectIoLib.fsBlockSize);
+        } catch (IllegalAccessException | InvocationTargetException e)
         {
             throw new IOException("failed to allocate buffer", e);
         }
@@ -66,7 +67,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     {
         this.smallBuffer.close();
         this.smallBuffer = null;
-        for (AlignedDirectBuffer largeBuffer : this.largeBuffers)
+        for (DirectBuffer largeBuffer : this.largeBuffers)
         {
             largeBuffer.close();
         }
@@ -82,27 +83,27 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     @Override
     public void readFully(byte[] b) throws IOException
     {
-        ByteBuffer buffer = readDirect(b.length);
+        ByteBuffer buffer = readFully(b.length);
         buffer.get(b);
     }
 
     @Override
     public void readFully(byte[] b, int off, int len) throws IOException
     {
-        ByteBuffer buffer = readDirect(len);
+        ByteBuffer buffer = readFully(len);
         buffer.get(b, off, len);
     }
 
-    public ByteBuffer readDirect(int len) throws IOException
+    public ByteBuffer readFully(int len) throws IOException
     {
         try
         {
-            AlignedDirectBuffer buffer = DirectIoLib.allocateAligned(len);
-            DirectIoLib.readDirect(this.fd, this.offset, buffer, len);
+            DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
+            DirectIoLib.read(this.fd, this.offset, buffer, len);
             this.seek(this.offset + len);
             this.largeBuffers.add(buffer);
             return buffer.getBuffer();
-        } catch (IllegalAccessException e)
+        } catch (IllegalAccessException | InvocationTargetException e)
         {
             throw new IOException("failed to allocate buffer", e);
         }
@@ -123,8 +124,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
 
     private void populateBuffer() throws IOException
     {
-        this.smallBuffer.reset();
-        DirectIoLib.readDirect(this.fd, this.offset, this.smallBuffer, this.blockSize);
+        DirectIoLib.read(this.fd, this.offset, this.smallBuffer, this.blockSize);
         this.bufferValid = true;
     }
 
@@ -260,7 +260,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         if (this.bufferValid && offset > this.offset - this.smallBuffer.position() &&
                 offset < this.offset + this.smallBuffer.remaining())
         {
-            this.smallBuffer.shift(this.smallBuffer.position() + (int) (offset - this.offset));
+            this.smallBuffer.forward((int) (offset - this.offset));
         }
         else
         {
