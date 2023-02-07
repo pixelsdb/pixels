@@ -38,7 +38,6 @@
         <module>pixels-cache</module>
         <module>pixels-core</module>
         <module>pixels-daemon</module>
-        <module>pixels-tools</module>
         <module>pixels-lambda</module>
         <module>pixels-executor</module>
         <module>pixels-planner</module>
