@@ -7,7 +7,7 @@ Thus, it does not affect the maintainability and portability of the storage laye
 
 ## Build Pixels
 Install JDK (8.0 is recommended), and open Pixels as a maven project in IntelliJ. When the project is fully indexed and the dependencies are successfully downloaded,
-use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
+use `mvn package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 
 The build may take tens of seconds to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
 It will be used in the installation.
@@ -356,7 +356,7 @@ During data loading, Pixels will automatically create the folders in the bucket 
 
 We use `pixels-sink` to load data into Pixels tables.
 Get the source code of pixels-sink from [this link](https://github.com/pixelsdb/pixels-sink.git), open it as a maven project in IntelliJ,
-and `package` it using the maven plugin.
+and use `mvn package` to build it.
 Then, find `pixels-sink-*-full.jar` in `target` and put it into `PIXELS_HOME/sbin`.
 
 Under `PIXELS_HOME`, run pixels-sink:
