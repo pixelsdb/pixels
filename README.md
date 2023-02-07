@@ -6,12 +6,11 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK (8.0 is recommended), and open Pixels as a maven project in Intellij. When the project is fully indexed and the dependencies are successfully downloaded,
-use the maven's `package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
+Install JDK (8.0 is recommended), and open Pixels as a maven project in IntelliJ. When the project is fully indexed and the dependencies are successfully downloaded,
+use `mvn package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 
-The build may take tens of seconds to complete. After that, find the following jar files that will be used in the installation:
-* `pixels-daemon-*-full.jar` in `pixels-daemon/target`, this is the jar to run Pixels daemons;
-* `pixels-load-*-full.jar` in `pixels-load/target`, this is the jar to load data for Pixels.
+The build may take tens of seconds to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
+It will be used in the installation.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
 However, for simplicity, we use Trino as an example here to illustrate how Pixels works with query engines in the data lakes.
@@ -107,7 +106,7 @@ mkdir sbin
 mkdir var
 ```
 Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin` respectively.
-Put `pixels-daemon-*-full.jar` into `PIXELS_HOME` and `pixels-load-*-full.jar` into `PIXELS_HOME/sbin`.
+Put `pixels-daemon-*-full.jar` into `PIXELS_HOME`.
 Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
@@ -354,12 +353,18 @@ Change the bucket name if it already exists.
 During data loading, Pixels will automatically create the folders in the bucket to store the files in each table.
 
 ### Load Data
-Under `PIXELS_HOME`, run pixels-load:
+
+We use `pixels-sink` to load data into Pixels tables.
+Get the source code of pixels-sink from [this link](https://github.com/pixelsdb/pixels-sink.git), open it as a maven project in IntelliJ,
+and use `mvn package` to build it.
+Then, find `pixels-sink-*-full.jar` in `target` and put it into `PIXELS_HOME/sbin`.
+
+Under `PIXELS_HOME`, run pixels-sink:
 ```bash
-java -jar pixels-load-*-full.jar
+java -jar ./sbin/pixels-sink-*-full.jar
 ```
 
-Then use the following command in pixels-load to load data for the TPC-H tables:
+Then use the following command in pixels-sink to load data for the TPC-H tables:
 ```bash
 LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
@@ -392,7 +397,7 @@ Execute the TPC-H queries in trino-cli.
 
 ### Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
-In pixels-load, use the following command to compact the files in the ordered path of each table:
+In pixels-sink, use the following command to compact the files in the ordered path of each table:
 ```bash
 COMPACT -s tpch -t customer -l 1 -n no -c 2
 COMPACT -s tpch -t lineitem -l 2 -n no -c 16
