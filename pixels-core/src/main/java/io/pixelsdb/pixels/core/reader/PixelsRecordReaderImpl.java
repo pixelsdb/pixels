@@ -1062,17 +1062,11 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     }
 
     /**
-     * Get current row number
-     *
      * @return number of the row currently being read
      */
     @Override
-    public long getRowNumber()
+    public long getCompletedRows()
     {
-        if (!checkValid)
-        {
-            return -1L;
-        }
         return rowIndex;
     }
 
