@@ -111,13 +111,6 @@ public interface PixelsRecordReader
     boolean isEndOfFile ();
 
     /**
-     * Get current row number
-     *
-     * @return the number of the rows have been read
-     */
-    long getRowNumber();
-
-    /**
      * Seek to specified row
      *
      * @param rowIndex row index
@@ -137,6 +130,14 @@ public interface PixelsRecordReader
     boolean skip(long rowNum)
             throws IOException;
 
+    /**
+     * @return the number of the rows have been read
+     */
+    long getCompletedRows();
+
+    /**
+     * @return the number of bytes have been read
+     */
     long getCompletedBytes();
 
     /**
