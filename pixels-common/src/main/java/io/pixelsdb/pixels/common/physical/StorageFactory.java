@@ -82,11 +82,15 @@ public class StorageFactory
     }
 
     /**
-     * Recreate the Storage instances. This is only needed in the Presto connector.
+     * Recreate all the enabled Storage instances.
+     * <b>Be careful:</b> all the Storage enabled Storage must be configured well before
+     * calling this method. It is better to call {@link #reload(Storage.Scheme)} to reload
+     * the Storage that you are sure it is configured or does not need any dynamic configuration.
      *
      * @throws IOException
      */
-    public synchronized void reload() throws IOException
+    @Deprecated
+    public synchronized void reloadAll() throws IOException
     {
         for (Storage.Scheme scheme : enabledSchemes)
         {
