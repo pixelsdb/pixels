@@ -6,8 +6,9 @@ Moreover, all the storage optimizations in Pixels, including data layout reorder
 Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
 
 ## Build Pixels
-Install JDK (8.0 is recommended), and open Pixels as a maven project in IntelliJ. When the project is fully indexed and the dependencies are successfully downloaded,
-use `mvn package` command to build it. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
+Install JDK 8.0 and 17.0.3 or above (JDK 8 is recommended to build Pixels, whereas JDK 17 is required to build the Trino connector of Pixels and to run Trino), and open Pixels as a maven project in IntelliJ (with JDK 8.0). 
+When the project is fully indexed and the dependencies are successfully downloaded,
+use JDK 8.0 and `mvn install` to build and install it to local Maven repository. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
 
 The build may take tens of seconds to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
 It will be used in the installation.
@@ -15,14 +16,16 @@ It will be used in the installation.
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
 However, for simplicity, we use Trino as an example here to illustrate how Pixels works with query engines in the data lakes.
 
-To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino),
-and use `mvn package` to build it.
+To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
+and use JDK 17 and `mvn package` to build it.
+> **Note** that the Trino version we use requires Java 17.0.3 or above, thus pixels-trino should be built
+> using JDK 17.0.3 or above.
+
 Find the following zip files in the build target directories:
 * `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
 * `pixels-trino-connector-*.zip`, this is the connector for Trino.
 
-> **Note** that the Trino version we use only supports Java 17.0.3 or above, thus pixels-trino should be built
-> using JDK 17.0.3 or above.
+They will be used in the installation.
 
 > If you want to run the unit tests or the main classes in Intellij for debugging purpose, set the `PIXELS_HOME` environment
 > variable for `Junit` or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
@@ -32,11 +35,11 @@ Find the following zip files in the build target directories:
 
 ## Installation in AWS
 
-Create an EC2 Ubuntu-20.04 instance with x86 arch and at least 20GB root volume. 8GB or larger memory is recommended. Login the instance as `ubuntu` user, 
+Create an EC2 Ubuntu-20.04 or 22.04 instance with x86 arch and at least 20GB root volume. 8GB or larger memory is recommended. Login the instance as `ubuntu` user, 
 and install the following components.
 
 ### Install JDK
-Install JDK 17.0 in the EC2 instance:
+Install JDK 17.0 in the EC2 instance (JDK 8.0 is not needed as we have already built Pixels in local machine):
 ```bash
 sudo apt install openjdk-17-jdk openjdk-17-jre
 ```
