@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 
 /**
  * @author hank
@@ -52,7 +53,11 @@ public class CloudWatchCountMetrics
 
     public void putCount(NamedCount count)
     {
-        String time = ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+        /**
+         * Issue #385:
+         * AWS CloudWatch only supports timestamps with seconds precision, but some JDKs may provide higher precision by default.
+         */
+        String time = ZonedDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_INSTANT);
         Instant instant = Instant.parse(time);
         MetricDatum datum = MetricDatum.builder().metricName(count.getName()).unit(StandardUnit.COUNT)
                 .value((double) count.getCount()).timestamp(instant).dimensions(MetricsDimension).storageResolution(1).build();

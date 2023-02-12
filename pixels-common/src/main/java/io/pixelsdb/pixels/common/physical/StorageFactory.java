@@ -81,6 +81,11 @@ public class StorageFactory
         return ImmutableList.copyOf(this.enabledSchemes);
     }
 
+    public boolean isEnabled(Storage.Scheme scheme)
+    {
+        return this.enabledSchemes.contains(scheme);
+    }
+
     /**
      * Recreate all the enabled Storage instances.
      * <b>Be careful:</b> all the Storage enabled Storage must be configured well before
