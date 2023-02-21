@@ -463,6 +463,13 @@ public class RunLenIntDecoder extends IntDecoder
         }
     }
 
+    /**
+     * Read n bytes from the input stream, and parse them into long value using big endian.
+     * @param input the input stream.
+     * @param n n bytes.
+     * @return the long value.
+     * @throws IOException if an I/O error occurs.
+     */
     private long bytesToLongBE(InputStream input, int n)
             throws IOException
     {
@@ -486,6 +493,12 @@ public class RunLenIntDecoder extends IntDecoder
         return (val >>> 1) ^ -(val & 1);
     }
 
+    /**
+     * Read an unsigned long from the input stream, using little endian.
+     * @param in the input stream.
+     * @return the long value.
+     * @throws IOException if an I/O error occurs.
+     */
     private long readVulong(InputStream in)
             throws IOException
     {
@@ -500,11 +513,17 @@ public class RunLenIntDecoder extends IntDecoder
                 throw new EOFException("Reading Vulong past EOF");
             }
             result |= (0x7f & b) << offset;
-            offset += 7;
+            offset += 7; // every byte stores 7 bits in the long value
         } while (b >= 0x80);
         return result;
     }
 
+    /**
+     * Read a signed long from the input stream, using little endian.
+     * @param in the input stream.
+     * @return the long value.
+     * @throws IOException if an I/O error occurs.
+     */
     private long readVslong(InputStream in)
             throws IOException
     {

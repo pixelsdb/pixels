@@ -44,6 +44,11 @@ public class IntegerColumnReader
     private int isNullBitIndex = 0;
     private byte[] isNull = new byte[8];
 
+    /**
+     * True if the data type of the values is long (int64), otherwise the data type is int32.
+     */
+    private boolean isLong = false;
+
     IntegerColumnReader(TypeDescription type)
     {
         super(type);
@@ -110,6 +115,15 @@ public class IntegerColumnReader
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;
+            if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.NONE))
+            {
+                /**
+                 * Issue #394:
+                 * The position should not be pushed, because the first byte will be read
+                 * again for the first pixel (stride).
+                 */
+                isLong = inputBuffer.get(0) == (byte) 1;
+            }
         }
         // if run length encoded
         if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH))
@@ -153,8 +167,6 @@ public class IntegerColumnReader
         // if not encoded
         else
         {
-            byte firstByte = inputBuffer.get();
-            boolean isLong = firstByte == (byte) 1;
             // if long
             if (isLong)
             {
@@ -164,6 +176,8 @@ public class IntegerColumnReader
                     {
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                        // Read the first byte of the pixels (stride).
+                        isLong = inputBuffer.get() == (byte) 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
@@ -200,6 +214,8 @@ public class IntegerColumnReader
                     {
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+                        // Read the first byte of the pixels (stride).
+                        isLong = inputBuffer.get() == (byte) 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
