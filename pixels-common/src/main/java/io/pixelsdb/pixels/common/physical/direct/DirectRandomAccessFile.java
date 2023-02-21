@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
 /**
- * The random accessible file opened with o_direct flag.
+ * The random accessible file that can be opened with o_direct flag.
  * Currently, it is readonly.
  *
  * Created at: 02/02/2023

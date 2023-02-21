@@ -42,7 +42,7 @@ import java.util.List;
  * Partially referenced the implementation of Jaydio (https://github.com/smacke/jaydio),
  * which is implemented by Stephen Macke and licensed under Apache 2.0.
  * We replaced the complex buffer implementation with java direct byte buffer, thus we
- * can directly return the byte buffer to the calling problem with memory copying.
+ * can directly return the byte buffer to the calling program with memory copying.
  * <p>
  * Created at: 02/02/2023
  * Author: hank
@@ -380,7 +380,6 @@ public class DirectIoLib
     {
         return strerror(Native.getLastError());
     }
-
 
     // -- alignment logic utility methods
 
