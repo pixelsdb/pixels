@@ -23,7 +23,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import io.pixelsdb.pixels.common.physical.direct.DirectIoLib;
+import io.pixelsdb.pixels.common.physical.natives.DirectIoLib;
 import org.junit.Test;
 
 import java.io.IOException;

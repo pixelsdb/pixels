@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;

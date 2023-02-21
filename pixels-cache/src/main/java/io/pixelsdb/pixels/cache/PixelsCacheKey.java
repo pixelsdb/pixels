@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cache;
 
 import io.pixelsdb.pixels.cache.mq.Message;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;

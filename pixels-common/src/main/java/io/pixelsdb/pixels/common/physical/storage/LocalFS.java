@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.common.physical.storage;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 

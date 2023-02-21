@@ -29,7 +29,7 @@
  * We changed the visibility of some methods from protect to public,
  * and added direct (i.e. zero-copy) memory access.
  */
-package io.pixelsdb.pixels.cache;
+package io.pixelsdb.pixels.common.physical.natives;
 
 import sun.nio.ch.FileChannelImpl;
 
@@ -39,7 +39,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
-import static io.pixelsdb.pixels.common.physical.direct.DirectIoLib.wrapReadOnlyDirectByteBuffer;
+import static io.pixelsdb.pixels.common.physical.natives.DirectIoLib.wrapReadOnlyDirectByteBuffer;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
 import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
 

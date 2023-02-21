@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
 
 import java.io.IOException;

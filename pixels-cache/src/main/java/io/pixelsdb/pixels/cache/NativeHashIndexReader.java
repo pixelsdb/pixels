@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import sun.nio.ch.DirectBuffer;

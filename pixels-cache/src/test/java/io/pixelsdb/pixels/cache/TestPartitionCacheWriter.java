@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cache;
 
 import com.google.common.util.concurrent.SettableFuture;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;

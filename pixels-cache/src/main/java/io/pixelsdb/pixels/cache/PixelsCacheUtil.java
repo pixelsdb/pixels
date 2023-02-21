@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cache;
 
 import io.pixelsdb.pixels.common.exception.CacheException;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

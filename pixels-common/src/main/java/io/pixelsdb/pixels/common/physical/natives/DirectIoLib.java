@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.direct;
+package io.pixelsdb.pixels.common.physical.natives;
 
 import com.sun.jna.Native;
 import com.sun.jna.Platform;
