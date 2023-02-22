@@ -3,6 +3,7 @@ build
 target
 .classpath*
 .settings
+*.bak
 *.pxl
 *~
 *.iml
