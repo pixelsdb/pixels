@@ -37,6 +37,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.common.utils.JvmUtils.JavaVersion;
+
 /**
  * Mapping Linux I/O functions to native methods.
  * Partially referenced the implementation of Jaydio (https://github.com/smacke/jaydio),
@@ -59,7 +61,6 @@ public class DirectIoLib
      * Whether direct io (i.e., o_direct) is enabled.
      */
     public static final boolean DirectIoEnabled;
-    private static int javaVersion = -1;
 
     private static Field jnaPointerPeer = null;
     private static Method directByteBufferAddress = null;
@@ -83,30 +84,7 @@ public class DirectIoLib
         {
             try
             {
-                List<Integer> versionNumbers = new ArrayList<Integer>();
-                for (String v : System.getProperty("java.version").split("\\.|-"))
-                {
-                    if (v.matches("\\d+"))
-                    {
-                        versionNumbers.add(Integer.parseInt(v));
-                    }
-                }
-                if (versionNumbers.get(0) == 1)
-                {
-                    if (versionNumbers.get(1) >= 8)
-                    {
-                        javaVersion = versionNumbers.get(1);
-                    }
-                } else if (versionNumbers.get(0) > 8)
-                {
-                    javaVersion = versionNumbers.get(0);
-                }
-                if (javaVersion < 0)
-                {
-                    throw new Exception(String.format("Java version: %s is not supported", System.getProperty("java.version")));
-                }
-
-                if (javaVersion <= 11)
+                if (JavaVersion <= 11)
                 {
                     // this is from sun.nio.ch.Util.initDBBRConstructor
                     Class<?> cl = Class.forName("java.nio.DirectByteBufferR");
@@ -246,7 +224,7 @@ public class DirectIoLib
         ByteBuffer buffer;
         try
         {
-            if (javaVersion <= 11)
+            if (JavaVersion <= 11)
             {
                 buffer = (ByteBuffer) directByteBufferRConstructor.newInstance(
                         new Object[]{size, address, null, null});

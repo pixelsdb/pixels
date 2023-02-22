@@ -67,8 +67,18 @@ public class MemoryMappedFile
     {
         try
         {
-            mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
+            if (JavaVersion <= 11)
+            {
+                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class);
+            }
+            else
+            {
+                // Issue #393: Java 17 adds one additional parameter (i.e., isAsync) for persistent memory.
+                mmap = getMethod(FileChannelImpl.class, "map0", int.class, long.class, long.class, boolean.class);
+            }
+            mmap.setAccessible(true);
             unmmap = getMethod(FileChannelImpl.class, "unmap0", long.class, long.class);
+            unmmap.setAccessible(true);
             BYTE_ARRAY_OFFSET = unsafe.arrayBaseOffset(byte[].class);
         }
         catch (Exception e)
@@ -101,7 +111,15 @@ public class MemoryMappedFile
         final FileChannel ch = backingFile.getChannel();
         try
         {
-            this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
+            if (JavaVersion <= 11)
+            {
+                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
+            }
+            else
+            {
+                // Issue #393: isAsync (the last parameter) should be false as we do not use persistent memory.
+                this.addr = (long) mmap.invoke(ch, 1, 0L, this.size, false);
+            }
         }
         catch (Throwable e)
         {
