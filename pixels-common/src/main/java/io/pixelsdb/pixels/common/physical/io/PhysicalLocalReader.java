@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.common.physical.io;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
 
 import java.io.IOException;
@@ -37,7 +37,7 @@ public class PhysicalLocalReader implements PhysicalReader
     private final LocalFS local;
     private final String path;
     private final long id;
-    private final DirectRandomAccessFile raf;
+    private final PixelsRandomAccessFile raf;
     private final AtomicInteger numRequests;
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException

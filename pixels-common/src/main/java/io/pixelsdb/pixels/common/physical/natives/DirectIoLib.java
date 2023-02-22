@@ -53,12 +53,12 @@ public class DirectIoLib
     /**
      * The soft block size for use with transfer multiples and memory alignment multiples
      */
-    public static final int fsBlockSize;
+    public static final int FsBlockSize;
     private static final long fsBlockNotMask;
     /**
      * Whether direct io (i.e., o_direct) is enabled.
      */
-    public static final boolean directIoEnabled;
+    public static final boolean DirectIoEnabled;
     private static int javaVersion = -1;
 
     private static Field jnaPointerPeer = null;
@@ -75,9 +75,9 @@ public class DirectIoLib
 
     static
     {
-        fsBlockSize = Integer.parseInt(ConfigFactory.Instance().getProperty("localfs.block.size"));
-        fsBlockNotMask = ~((long) fsBlockSize - 1);
-        directIoEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.direct.io"));
+        FsBlockSize = Integer.parseInt(ConfigFactory.Instance().getProperty("localfs.block.size"));
+        fsBlockNotMask = ~((long) FsBlockSize - 1);
+        DirectIoEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.direct.io"));
         boolean compatible = false;
         try
         {
@@ -205,11 +205,8 @@ public class DirectIoLib
      * on the starting address. See "man 3 posix_memalign".
      *
      * @param memptr The pointer-to-pointer which will point to the address of the allocated aligned block
-     *
      * @param alignment The alignment multiple of the starting address of the allocated block
-     *
      * @param size The number of bytes to allocate
-     *
      * @return 0 on success, one of the error codes in errno.h (however, errno is not set) on failure.
      */
     private static native int posix_memalign(PointerByReference memptr, long alignment, long size);
@@ -285,12 +282,12 @@ public class DirectIoLib
             throw new IllegalArgumentException("size must be positive");
         }
         // always allocate a multiple of block size.
-        if (directIoEnabled)
+        if (DirectIoEnabled)
         {
             PointerByReference pointerToPointer = new PointerByReference();
             // allocate one additional block for read alignment.
-            int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
-            int ret = posix_memalign(pointerToPointer, fsBlockSize, toAllocate);
+            int toAllocate = blockEnd(size) + (size == 1 ? 0 : FsBlockSize);
+            int ret = posix_memalign(pointerToPointer, FsBlockSize, toAllocate);
             if (ret != 0)
             {
                 throw new IOException("failed to allocate aligned memory, error: " + strerror(ret));
@@ -318,7 +315,7 @@ public class DirectIoLib
      */
     public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
     {
-        if (directIoEnabled)
+        if (DirectIoEnabled)
         {
             // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
             long fileOffsetAligned = blockStart(fileOffset);
@@ -349,7 +346,7 @@ public class DirectIoLib
      */
     public static int open(String path, boolean readOnly) throws IOException
     {
-        int flags = directIoEnabled ? O_DIRECT : 0;
+        int flags = DirectIoEnabled ? O_DIRECT : 0;
         if (readOnly)
         {
             flags |= O_RDONLY;
@@ -414,7 +411,7 @@ public class DirectIoLib
      */
     private static long blockEnd(long value)
     {
-        return (value + fsBlockSize - 1) & fsBlockNotMask;
+        return (value + FsBlockSize - 1) & fsBlockNotMask;
     }
 
     /**
@@ -422,6 +419,6 @@ public class DirectIoLib
      */
     private static int blockEnd(int value)
     {
-        return (int) ((value + fsBlockSize - 1) & fsBlockNotMask);
+        return (int) ((value + FsBlockSize - 1) & fsBlockNotMask);
     }
 }

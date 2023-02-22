@@ -33,6 +33,8 @@ public final class JvmUtils
     public static final Unsafe unsafe;
     public static final ByteOrder nativeOrder;
 
+    public static final boolean nativeIsLittleEndian;
+
     static
     {
         try
@@ -41,6 +43,7 @@ public final class JvmUtils
             singleOneInstanceField.setAccessible(true);
             unsafe = (Unsafe) singleOneInstanceField.get(null);
             nativeOrder = ByteOrder.nativeOrder();
+            nativeIsLittleEndian = (nativeOrder == ByteOrder.LITTLE_ENDIAN);
         }
         catch (Exception e)
         {

@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
  * Created at: 02/02/2023
  * Author: hank
  */
-public class TestDirect
+public class TestNatives
 {
     @Test
     public void testDirectIoLib() throws IOException, IllegalAccessException, InvocationTargetException
@@ -76,7 +76,7 @@ public class TestDirect
     @Test
     public void testDirectRaf() throws IOException
     {
-        DirectRandomAccessFile raf = new DirectRandomAccessFile(new File("/home/hank/20230126155625_0.pxl"), true);
+        PixelsRandomAccessFile raf = new DirectPixelsRandomAccessFile(new File("/home/hank/20230126155625_0.pxl"));
         raf.seek(raf.length()-8);
         int a = raf.readInt();
         System.out.println(a);
@@ -84,5 +84,19 @@ public class TestDirect
         int b = raf.readInt();
         System.out.println(b);
         System.out.println(raf.length());
+    }
+
+    @Test
+    public void testMappedRaf() throws Exception
+    {
+        PixelsRandomAccessFile raf = new MappedPixelsRandomAccessFile(new File("/home/hank/20230126155625_0.pxl"));
+        raf.seek(raf.length()-8);
+        int a = raf.readInt();
+        System.out.println(a);
+        raf.seek(raf.length()-4);
+        int b = raf.readInt();
+        System.out.println(b);
+        System.out.println(raf.length());
+        raf.close();
     }
 }

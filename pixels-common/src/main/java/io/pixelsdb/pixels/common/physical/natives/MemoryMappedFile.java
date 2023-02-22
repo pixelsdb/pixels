@@ -33,6 +33,7 @@ package io.pixelsdb.pixels.common.physical.natives;
 
 import sun.nio.ch.FileChannelImpl;
 
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -40,8 +41,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 
 import static io.pixelsdb.pixels.common.physical.natives.DirectIoLib.wrapReadOnlyDirectByteBuffer;
-import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
-import static io.pixelsdb.pixels.common.utils.JvmUtils.unsafe;
+import static io.pixelsdb.pixels.common.utils.JvmUtils.*;
 
 /**
  * This class has been tested.
@@ -59,7 +59,8 @@ public class MemoryMappedFile
     private static final Method unmmap;
     private static final int BYTE_ARRAY_OFFSET;
 
-    private long addr, size;
+    private long addr;
+    private final long size;
     private final String loc;
 
     static
@@ -89,19 +90,33 @@ public class MemoryMappedFile
         return (i + 0xfffL) & ~0xfffL;
     }
 
-    private void mapAndSetOffset()
-            throws Exception
+    private void mapAndSetOffset(boolean forceSize)
+            throws IOException
     {
         final RandomAccessFile backingFile = new RandomAccessFile(this.loc, "rw");
-        backingFile.setLength(this.size);
+        if (forceSize)
+        {
+            backingFile.setLength(this.size);
+        }
         final FileChannel ch = backingFile.getChannel();
-        this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
-        ch.close();
-        backingFile.close();
+        try
+        {
+            this.addr = (long) mmap.invoke(ch, 1, 0L, this.size);
+        }
+        catch (Throwable e)
+        {
+            throw new IOException("mmap failed", e);
+        }
+        finally
+        {
+            ch.close();
+            backingFile.close();
+        }
     }
 
     /**
-     * Constructs a new memory mapped file.
+     * Constructs a new memory mapped file. The file size will be rounded to 4KB by force, which may extend the file
+     * by padding 0.
      *
      * @param loc the file name
      * @param len the file length
@@ -110,9 +125,30 @@ public class MemoryMappedFile
     public MemoryMappedFile(final String loc, long len)
             throws Exception
     {
+        this (loc, len, true);
+    }
+
+    /**
+     * Constructs a new memory mapped file.
+     *
+     * @param loc the file name
+     * @param len the file length
+     * @param forceRound4K true to round the file length to 4KB by force, which may extend the file by padding 0.
+     * @throws Exception in case there was an error creating the memory mapped file
+     */
+    public MemoryMappedFile(final String loc, long len, boolean forceRound4K)
+            throws IOException
+    {
         this.loc = loc;
-        this.size = roundTo4096(len);
-        mapAndSetOffset();
+        if (forceRound4K)
+        {
+            this.size = roundTo4096(len);
+        }
+        else
+        {
+            this.size = len;
+        }
+        mapAndSetOffset(forceRound4K);
     }
 
     private MemoryMappedFile(final String loc, long addr, long len) {
@@ -131,11 +167,21 @@ public class MemoryMappedFile
     }
 
     public void unmap()
-            throws Exception
+            throws IOException
     {
-        unmmap.invoke(null, addr, this.size);
+        try
+        {
+            unmmap.invoke(null, addr, this.size);
+        }
+        catch (Throwable e)
+        {
+            throw new IOException("unmmap failed", e);
+        }
     }
 
+    /**
+     * Set all the bytes in this memory mapped file to zero. Be <b>CAREFUL</b> with this method.
+     */
     public void clear()
     {
         unsafe.setMemory(addr, size, (byte)0);
@@ -168,18 +214,40 @@ public class MemoryMappedFile
         return unsafe.getByteVolatile(null, pos + addr);
     }
 
+    /**
+     * Reads a short from the specified position, using native endian.
+     *
+     * @param pos the position in the memory mapped file
+     * @return the value read
+     */
     public short getShort(long pos)
     {
         return unsafe.getShort(pos + addr);
     }
 
+    /**
+     * Reads a short (volatile) from the specified position, using native endian.
+     *
+     * @param pos the position in the memory mapped file
+     * @return the value read
+     */
     public short getShortVolatile(long pos)
     {
         return unsafe.getShortVolatile(null, pos + addr);
     }
 
+    public char getChar(long pos)
+    {
+        return unsafe.getChar(pos + addr);
+    }
+
+    public char getCharVolatile(long pos)
+    {
+        return unsafe.getCharVolatile(null, pos + addr);
+    }
+
     /**
-     * Reads an int from the specified position.
+     * Reads an int from the specified position, using native endian.
      *
      * @param pos the position in the memory mapped file
      * @return the value read
@@ -190,7 +258,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Reads an int (volatile) from the specified position.
+     * Reads an int (volatile) from the specified position, using native endian.
      *
      * @param pos position in the memory mapped file
      * @return the value read
@@ -201,7 +269,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Reads a long from the specified position.
+     * Reads a long from the specified position, using native endian.
      *
      * @param pos position in the memory mapped file
      * @return the value read
@@ -212,7 +280,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Reads a long (volatile) from the specified position.
+     * Reads a long (volatile) from the specified position, using native endian.
      *
      * @param pos position in the memory mapped file
      * @return the value read
@@ -220,6 +288,50 @@ public class MemoryMappedFile
     public long getLongVolatile(long pos)
     {
         return unsafe.getLongVolatile(null, pos + addr);
+    }
+
+    /**
+     * Reads a float from the specified position, using native endian.
+     *
+     * @param pos position in the memory mapped file
+     * @return the value read
+     */
+    public float getFloat(long pos)
+    {
+        return unsafe.getFloat(pos + addr);
+    }
+
+    /**
+     * Reads a float (volatile) from the specified position, using native endian.
+     *
+     * @param pos position in the memory mapped file
+     * @return the value read
+     */
+    public float getFloatVolatile(long pos)
+    {
+        return unsafe.getFloatVolatile(null, pos + addr);
+    }
+
+    /**
+     * Reads a double from the specified position, using native endian.
+     *
+     * @param pos position in the memory mapped file
+     * @return the value read
+     */
+    public double getDouble(long pos)
+    {
+        return unsafe.getDouble(pos + addr);
+    }
+
+    /**
+     * Reads a double (volatile) from the specified position, using native endian.
+     *
+     * @param pos position in the memory mapped file
+     * @return the value read
+     */
+    public double getDoubleVolatile(long pos)
+    {
+        return unsafe.getDoubleVolatile(null, pos + addr);
     }
 
     /**
@@ -244,18 +356,30 @@ public class MemoryMappedFile
         unsafe.putByteVolatile(null, pos + addr, val);
     }
 
+    /**
+     * Writes a short to the specified position, using native endian.
+     *
+     * @param pos the position in the memory mapped file
+     * @param val the value to write
+     */
     public void setShort(long pos, short val)
     {
         unsafe.putShort(pos + addr, val);
     }
 
+    /**
+     * Writes a short (volatile) to the specified position, using native endian.
+     *
+     * @param pos the position in the memory mapped file
+     * @param val the value to write
+     */
     public void setShortVolatile(long pos, short val)
     {
         unsafe.putShortVolatile(null, pos + addr, val);
     }
 
     /**
-     * Writes an int to the specified position.
+     * Writes an int to the specified position, using native endian.
      *
      * @param pos the position in the memory mapped file
      * @param val the value to write
@@ -266,7 +390,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Writes an int (volatile) to the specified position.
+     * Writes an int (volatile) to the specified position, using native endian.
      *
      * @param pos the position in the memory mapped file
      * @param val the value to write
@@ -277,7 +401,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Writes a long to the specified position.
+     * Writes a long to the specified position, using native endian.
      *
      * @param pos the position in the memory mapped file
      * @param val the value to write
@@ -288,7 +412,7 @@ public class MemoryMappedFile
     }
 
     /**
-     * Writes a long (volatile) to the specified position.
+     * Writes a long (volatile) to the specified position, using native endian.
      *
      * @param pos the position in the memory mapped file
      * @param val the value to write
@@ -369,11 +493,17 @@ public class MemoryMappedFile
         return unsafe.compareAndSwapLong(null, pos + addr, expected, value);
     }
 
+    /**
+     * Native endian is used.
+     */
     public long getAndAddLong(long pos, long delta)
     {
         return unsafe.getAndAddLong(null, pos + addr, delta);
     }
 
+    /**
+     * Native endian is used.
+     */
     public long getAndAddInt(long pos, int delta)
     {
         return unsafe.getAndAddInt(null, pos + addr, delta);

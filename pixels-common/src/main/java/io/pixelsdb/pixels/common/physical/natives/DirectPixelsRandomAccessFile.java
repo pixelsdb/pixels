@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical.natives;
 
-import java.io.Closeable;
-import java.io.DataInput;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -29,12 +27,11 @@ import java.util.LinkedList;
 
 /**
  * The random accessible file that can be opened with o_direct flag.
- * Currently, it is readonly.
  *
  * Created at: 02/02/2023
  * Author: hank
  */
-public class DirectRandomAccessFile implements DataInput, Closeable
+public class DirectPixelsRandomAccessFile implements PixelsRandomAccessFile
 {
     private File file;
     private int fd;
@@ -45,17 +42,17 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     private DirectBuffer smallBuffer;
     private LinkedList<DirectBuffer> largeBuffers = new LinkedList<>();
 
-    public DirectRandomAccessFile(File file, boolean readOnly) throws IOException
+    public DirectPixelsRandomAccessFile(File file) throws IOException
     {
         this.file = file;
-        this.fd = DirectIoLib.open(file.getPath(), readOnly);
+        this.fd = DirectIoLib.open(file.getPath(), true);
         this.offset = 0;
         this.length = this.file.length();
-        this.blockSize = DirectIoLib.fsBlockSize;
+        this.blockSize = DirectIoLib.FsBlockSize;
         this.bufferValid = false;
         try
         {
-            this.smallBuffer = DirectIoLib.allocateBuffer(DirectIoLib.fsBlockSize);
+            this.smallBuffer = DirectIoLib.allocateBuffer(DirectIoLib.FsBlockSize);
         } catch (IllegalAccessException | InvocationTargetException e)
         {
             throw new IOException("failed to allocate buffer", e);
@@ -94,6 +91,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         buffer.get(b, off, len);
     }
 
+    @Override
     public ByteBuffer readFully(int len) throws IOException
     {
         try
@@ -119,7 +117,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         long off = this.offset;
         long newOff = Math.min(off + n, length);
         seek(newOff);
-        return (int)(newOff - off);
+        return (int) (newOff - off);
     }
 
     private void populateBuffer() throws IOException
@@ -158,7 +156,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
             this.populateBuffer();
         }
         this.offset++;
-        return this.smallBuffer.get();
+        return this.smallBuffer.get() & 0xff;
     }
 
     @Override
@@ -179,10 +177,8 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         {
             this.populateBuffer();
         }
-        int b1 = this.smallBuffer.get();
-        int b2 = this.smallBuffer.get();
-        this.offset += 2;
-        return (b1<<8) + b2;
+        this.offset += Short.BYTES;
+        return this.smallBuffer.getShort() & 0xffff;
     }
 
     @Override
@@ -241,20 +237,6 @@ public class DirectRandomAccessFile implements DataInput, Closeable
     }
 
     @Override
-    public String readLine() throws IOException
-    {
-        throw new UnsupportedOperationException("read line is not supported");
-    }
-
-    /**
-     * This method is currently not implemented.
-     */
-    @Override
-    public String readUTF() throws IOException
-    {
-        throw new UnsupportedOperationException("read UTF is not supported");
-    }
-
     public void seek(long offset) throws IOException
     {
         if (this.bufferValid && offset > this.offset - this.smallBuffer.position() &&
@@ -269,6 +251,7 @@ public class DirectRandomAccessFile implements DataInput, Closeable
         this.offset = offset;
     }
 
+    @Override
     public long length()
     {
         return this.length;
