@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.cache.mq;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;

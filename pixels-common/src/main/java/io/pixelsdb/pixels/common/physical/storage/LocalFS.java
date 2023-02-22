@@ -22,12 +22,15 @@ package io.pixelsdb.pixels.common.physical.storage;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.direct.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.MappedRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -49,10 +52,13 @@ import static java.util.Objects.requireNonNull;
 public final class LocalFS implements Storage
 {
     private final static boolean EnableCache;
+    private final static boolean MmapEnabled;
+
 
     static
     {
         EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));
+        MmapEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.mmap"));
 
         if (EnableCache)
         {
@@ -65,7 +71,7 @@ public final class LocalFS implements Storage
         }
     }
 
-    private static String SchemePrefix = Scheme.file.name() + "://";
+    private static final String SchemePrefix = Scheme.file.name() + "://";
 
     public LocalFS() { }
 
@@ -258,7 +264,7 @@ public final class LocalFS implements Storage
         {
             throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
-        return new DataInputStream(new FileInputStream(file));
+        return new DataInputStream(Files.newInputStream(file.toPath()));
     }
 
     /**
@@ -301,7 +307,7 @@ public final class LocalFS implements Storage
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
-    public DirectRandomAccessFile openRaf(String path) throws IOException
+    public PixelsRandomAccessFile openRaf(String path) throws IOException
     {
         Path p = new Path(path);
         if (!p.valid)
@@ -317,7 +323,11 @@ public final class LocalFS implements Storage
         {
             throw new IOException("File '" + p.realPath + "' doesn't exists.");
         }
-        return new DirectRandomAccessFile(file, true);
+        if (MmapEnabled)
+        {
+            return new MappedRandomAccessFile(file);
+        }
+        return new DirectRandomAccessFile(file);
     }
 
     @Override
@@ -356,7 +366,7 @@ public final class LocalFS implements Storage
         {
             EtcdUtil.Instance().deleteByPrefix(getPathKey(path));
         }
-        return subDeleted && new File(path).delete();
+        return subDeleted && file.delete();
     }
 
     @Override

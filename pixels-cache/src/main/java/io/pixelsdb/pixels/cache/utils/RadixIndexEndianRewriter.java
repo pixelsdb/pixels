@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.cache.utils;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 // convert all big-endian to little-endian
 // inplace rewrite!!!

@@ -23,6 +23,8 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author hank
@@ -32,6 +34,8 @@ public final class JvmUtils
 {
     public static final Unsafe unsafe;
     public static final ByteOrder nativeOrder;
+    public static int JavaVersion = -1;
+    public static final boolean nativeIsLittleEndian;
 
     static
     {
@@ -41,6 +45,30 @@ public final class JvmUtils
             singleOneInstanceField.setAccessible(true);
             unsafe = (Unsafe) singleOneInstanceField.get(null);
             nativeOrder = ByteOrder.nativeOrder();
+            nativeIsLittleEndian = (nativeOrder == ByteOrder.LITTLE_ENDIAN);
+
+            List<Integer> versionNumbers = new ArrayList<>();
+            for (String v : System.getProperty("java.version").split("\\.|-"))
+            {
+                if (v.matches("\\d+"))
+                {
+                    versionNumbers.add(Integer.parseInt(v));
+                }
+            }
+            if (versionNumbers.get(0) == 1)
+            {
+                if (versionNumbers.get(1) >= 8)
+                {
+                    JavaVersion = versionNumbers.get(1);
+                }
+            } else if (versionNumbers.get(0) > 8)
+            {
+                JavaVersion = versionNumbers.get(0);
+            }
+            if (JavaVersion < 0)
+            {
+                throw new Exception(String.format("Java version: %s is not supported", System.getProperty("java.version")));
+            }
         }
         catch (Exception e)
         {

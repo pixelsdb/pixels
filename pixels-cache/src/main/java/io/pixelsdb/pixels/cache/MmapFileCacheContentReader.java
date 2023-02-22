@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.cache;
 
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 

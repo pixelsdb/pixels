@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.cache.mq;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 /**
  * The interface of messages that can be write/read into/from

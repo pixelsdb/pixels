@@ -7,7 +7,7 @@ We also include a copy of Apache License Version 2.0 at the end of this NOTICE f
 1. MappedBus
 Copyright 2015 Caplogic AB.
 Licensed under the Apache License, Version 2.0.
-* MemoryMappedFile in pixels-cache is derived from MappedBus.
+* MemoryMappedFile in pixels-common is derived from MappedBus.
 
 
 2. Apache ORC

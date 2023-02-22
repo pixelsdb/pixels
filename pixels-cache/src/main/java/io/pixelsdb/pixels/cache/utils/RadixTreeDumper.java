@@ -1,9 +1,6 @@
 package io.pixelsdb.pixels.cache.utils;
 
-import io.pixelsdb.pixels.cache.MemoryMappedFile;
-import io.pixelsdb.pixels.cache.PixelsCacheUtil;
-
-import java.nio.ByteBuffer;
+import io.pixelsdb.pixels.common.physical.natives.MemoryMappedFile;
 
 // dump the little-endian radix tree to a txt file
 // note that in current cache(including partitioned radix), we use big-endian radix tree more
