@@ -31,14 +31,14 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.nativeOrder;
  * Created at: 2/21/23
  * Author: hank
  */
-public class MappedPixelsRandomAccessFile implements PixelsRandomAccessFile
+public class MappedRandomAccessFile implements PixelsRandomAccessFile
 {
     private File file;
     private long offset;
     private long length;
     private MemoryMappedFile mmf;
 
-    public MappedPixelsRandomAccessFile(File file) throws IOException
+    public MappedRandomAccessFile(File file) throws IOException
     {
         this.file = file;
         this.offset = 0;

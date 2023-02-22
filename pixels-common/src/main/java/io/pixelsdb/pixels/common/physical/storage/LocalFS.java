@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.common.physical.storage;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.natives.DirectPixelsRandomAccessFile;
-import io.pixelsdb.pixels.common.physical.natives.MappedPixelsRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
+import io.pixelsdb.pixels.common.physical.natives.MappedRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
@@ -325,9 +325,9 @@ public final class LocalFS implements Storage
         }
         if (MmapEnabled)
         {
-            return new MappedPixelsRandomAccessFile(file);
+            return new MappedRandomAccessFile(file);
         }
-        return new DirectPixelsRandomAccessFile(file);
+        return new DirectRandomAccessFile(file);
     }
 
     @Override

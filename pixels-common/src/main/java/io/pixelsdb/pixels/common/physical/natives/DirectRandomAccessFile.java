@@ -31,7 +31,7 @@ import java.util.LinkedList;
  * Created at: 02/02/2023
  * Author: hank
  */
-public class DirectPixelsRandomAccessFile implements PixelsRandomAccessFile
+public class DirectRandomAccessFile implements PixelsRandomAccessFile
 {
     private File file;
     private int fd;
@@ -42,7 +42,7 @@ public class DirectPixelsRandomAccessFile implements PixelsRandomAccessFile
     private DirectBuffer smallBuffer;
     private LinkedList<DirectBuffer> largeBuffers = new LinkedList<>();
 
-    public DirectPixelsRandomAccessFile(File file) throws IOException
+    public DirectRandomAccessFile(File file) throws IOException
     {
         this.file = file;
         this.fd = DirectIoLib.open(file.getPath(), true);
