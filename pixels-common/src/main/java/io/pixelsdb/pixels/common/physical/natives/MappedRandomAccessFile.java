@@ -47,6 +47,12 @@ public class MappedRandomAccessFile implements PixelsRandomAccessFile
     }
 
     @Override
+    public ByteBuffer readFully(int len) throws IOException
+    {
+        return this.mmf.getDirectByteBuffer(this.offset, len);
+    }
+
+    @Override
     public void readFully(byte[] b) throws IOException
     {
         this.mmf.getBytes(this.offset, b);
@@ -176,11 +182,5 @@ public class MappedRandomAccessFile implements PixelsRandomAccessFile
     public long length()
     {
         return this.length;
-    }
-
-    @Override
-    public ByteBuffer readFully(int len) throws IOException
-    {
-        return this.mmf.getDirectByteBuffer(this.offset, len);
     }
 }
