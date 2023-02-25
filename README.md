@@ -5,7 +5,7 @@ Pixels is a columnar storage engine and auxiliary compute engine for data lakes 
 
 The columnar storage engine in Pixels is optimized for data analytics on tables that are stored in file/object storage systems (including S3, GCS, HDFS, Redis, and local file systems),and provides much higher performance than existing columnar formats such as Parquet.
 
-For cloud lakehouses, the auxiliary compute engine in Pixels can exploit serverless functions (e.g, AWS Lambda) to accelerate workload spikes, thus achieving better elasticity and cost-efficiency.
+For cloud lakehouses, the auxiliary compute engine in Pixels can exploit serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes, thus achieving better elasticity and cost-efficiency.
 
 ## Build Pixels
 Install JDK 17.0.3 or above, and open Pixels as a maven project in IntelliJ. 
