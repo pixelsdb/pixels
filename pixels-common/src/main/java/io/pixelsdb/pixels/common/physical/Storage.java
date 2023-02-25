@@ -102,21 +102,23 @@ public interface Storage
     String ensureSchemePrefix(String path) throws IOException;
 
     /**
-     * Get the statuses of the contents in this path if it is a directory.
+     * Get the statuses of the files or subdirectories in the given path if it is
+     * a directory or multiple directories seperated by colon (:).
      * The path in the returned status does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path
-     * @return
+     * @param path the given path, may contain multiple directories that are seperated by colon.
+     * @return the statuses of the files or subdirectories.
      * @throws IOException
      */
     List<Status> listStatus(String path) throws IOException;
 
     /**
-     * Get the paths of the contents in this path if it is a directory.
+     * Get the paths of the files or subdirectories in the given path if it is
+     * a directory or multiple directories seperated by colon (:).
      * The returned path does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path
-     * @return
+     * @param path the given path, may contain multiple directories that are seperated by colon.
+     * @return the paths of the files or subdirectories.
      * @throws IOException
      */
     List<String> listPaths(String path) throws IOException;
@@ -131,7 +133,7 @@ public interface Storage
     Status getStatus(String path) throws IOException;
 
     /**
-     * We assume there is an unique id for each file or object
+     * We assume there is a unique id for each file or object
      * in the storage system.
      * For HDFS, we assume each file only has one block, and the
      * file id is the id of this block.

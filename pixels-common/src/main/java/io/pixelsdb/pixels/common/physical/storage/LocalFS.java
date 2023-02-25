@@ -54,7 +54,6 @@ public final class LocalFS implements Storage
     private final static boolean EnableCache;
     private final static boolean MmapEnabled;
 
-
     static
     {
         EnableCache = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("cache.enabled"));

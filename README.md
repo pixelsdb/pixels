@@ -367,7 +367,7 @@ Under `PIXELS_HOME`, run pixels-sink:
 java -jar ./sbin/pixels-sink-*-full.jar
 ```
 
-Then use the following command in pixels-sink to load data for the TPC-H tables:
+Then use the following commands in pixels-sink to load data for the TPC-H tables:
 ```bash
 LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
@@ -378,7 +378,7 @@ LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 
 LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
 LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
 ```
-This may take a few hours. The last parameter `-c` of the `LOAD` command is the maximum number
+It may take about one hour. The last parameter `-c` of the `LOAD` command is the maximum number
 of threads used for loading data. It only effects when the input directory (specified by `-o`)
 contains multiple input files. In case that the TPC-H table has multiple parts, you can set 
 `-c` to the number of parts to improve the data loading performance.
@@ -400,7 +400,7 @@ Execute the TPC-H queries in trino-cli.
 
 ### Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
-In pixels-sink, use the following command to compact the files in the ordered path of each table:
+In pixels-sink, use the following commands to compact the files in the ordered path of each table:
 ```bash
 COMPACT -s tpch -t customer -l 1 -n no -c 2
 COMPACT -s tpch -t lineitem -l 2 -n no -c 16
@@ -417,3 +417,22 @@ improve the compaction performance. Compaction is normally faster than loading w
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database
 to the empty bucket.
+
+### Collect Data Statistics
+This is optional. Data statistics enable cost-based query optimization for the queries.
+Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema.
+In pixels-sink, use the following commands to collect the data statistics for the columns in each table.
+```bash
+STAT -d file:///data/tpch/100g/nation/ -s tpch -t nation -o false -c true
+STAT -d file:///data/tpch/100g/region/ -s tpch -t region -o false -c true
+STAT -d file:///data/tpch/100g/supplier/v-0-order/ -s tpch -t supplier -o false -c true
+STAT -d file:///data/tpch/100g/customer/v-0-order/ -s tpch -t customer -o false -c true
+STAT -d file:///data/tpch/100g/part/v-0-order/ -s tpch -t part -o false -c true
+STAT -d file:///data/tpch/100g/partsupp/v-0-order/ -s tpch -t partsupp -o false -c true
+STAT -d file:///data/tpch/100g/orders/v-0-order/ -s tpch -t orders -o false -c true
+STAT -d file:///data/tpch/100g/lineitem/v-0-order/ -s tpch -t lineitem -o false -c true
+```
+After it is finished, statistics of eac column can be found in the `pixels_metadata.COLS` metadata table.
+Finally, manually update the row count for each tpch table in `pixels_metadata.TBLS.TBL_ROW_COUNT`.
+
+Set `splits.index.type=cost_based` and restart Trino to benefit from cost base query optimization.
