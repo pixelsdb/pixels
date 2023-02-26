@@ -128,29 +128,38 @@ public class GCS implements Storage
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
-        {
-            throw new IOException("Path '" + path + "' is not valid.");
-        }
-        Page<Blob> blobs;
-        if (p.key != null)
-        {
-            blobs = this.gcs.list(p.bucket,
-                    com.google.cloud.storage.Storage.BlobListOption.prefix(p.key),
-                    com.google.cloud.storage.Storage.BlobListOption.currentDirectory());
-        }
-        else
-        {
-            blobs = this.gcs.list(p.bucket,
-                    com.google.cloud.storage.Storage.BlobListOption.currentDirectory());
-        }
-
         List<Status> statuses = new ArrayList<>();
-        for (Blob blob : blobs.iterateAll())
+        for (String eachPath : path.split(";"))
         {
-            Status status = new Status(path, blob.getSize(), blob.isDirectory(), 1);
-            statuses.add(status);
+            Path p = new Path(eachPath);
+            if (!p.valid)
+            {
+                throw new IOException("Path '" + eachPath + "' is not valid.");
+            }
+            Page<Blob> blobs;
+            if (p.key != null)
+            {
+                blobs = this.gcs.list(p.bucket,
+                        com.google.cloud.storage.Storage.BlobListOption.prefix(p.key),
+                        com.google.cloud.storage.Storage.BlobListOption.currentDirectory());
+
+            } else
+            {
+                blobs = this.gcs.list(p.bucket,
+                        com.google.cloud.storage.Storage.BlobListOption.currentDirectory());
+            }
+            Path op = new Path(eachPath);
+            // blobs.iterateAll() automatically fetch the next pages, no need to explicitly get the next page
+            for (Blob blob : blobs.iterateAll())
+            {
+                if (blob.getName().equals(p.key))
+                {
+                    // exclude the directory (i.e., eachPath) itself
+                    continue;
+                }
+                op.key = blob.getName();
+                statuses.add(new Status(op.toString(), blob.getSize(), blob.isDirectory(), 1));
+            }
         }
         return statuses;
     }

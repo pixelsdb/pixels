@@ -103,10 +103,10 @@ public interface Storage
 
     /**
      * Get the statuses of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by colon (:).
+     * a directory or multiple directories seperated by semicolon (;).
      * The path in the returned status does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by colon.
+     * @param path the given path, may contain multiple directories that are seperated by semicolon.
      * @return the statuses of the files or subdirectories.
      * @throws IOException
      */
@@ -114,10 +114,10 @@ public interface Storage
 
     /**
      * Get the paths of the files or subdirectories in the given path if it is
-     * a directory or multiple directories seperated by colon (:).
+     * a directory or multiple directories seperated by semicolon (;).
      * The returned path does not start with the scheme name.
      * For local fs, path is considered as local.
-     * @param path the given path, may contain multiple directories that are seperated by colon.
+     * @param path the given path, may contain multiple directories that are seperated by semicolon.
      * @return the paths of the files or subdirectories.
      * @throws IOException
      */

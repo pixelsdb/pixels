@@ -153,14 +153,22 @@ public class Redis implements Storage
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        Set<String> keys = this.jedis.keys(path + "*");
-        List<Status> statuses = new ArrayList<>(keys.size());
-        for (String key : keys)
+        List<Status> statuses = null;
+        for (String eachPath : path.split(";"))
         {
-            long length = this.jedis.strlen(key);
-            Status status = new Status(path, length, false, 1);
-            statuses.add(status);
+            eachPath = dropSchemePrefix(eachPath);
+            Set<String> keys = this.jedis.keys(eachPath + "*");
+            if (statuses == null)
+            {
+                statuses = new ArrayList<>(keys.size());
+            }
+            for (String key : keys)
+            {
+                long length = this.jedis.strlen(key);
+                // no need to add the scheme prefix
+                Status status = new Status(key, length, false, 1);
+                statuses.add(status);
+            }
         }
         return statuses;
     }
@@ -168,9 +176,18 @@ public class Redis implements Storage
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        Set<String> keys = this.jedis.keys(path + "*");
-        return new ArrayList<>(keys);
+        List<String> paths = null;
+        for (String eachPath : path.split(";"))
+        {
+            eachPath = dropSchemePrefix(eachPath);
+            Set<String> keys = this.jedis.keys(eachPath + "*");
+            if (paths == null)
+            {
+                paths = new ArrayList<>(keys.size());
+            }
+            paths.addAll(keys);
+        }
+        return paths;
     }
 
     @Override

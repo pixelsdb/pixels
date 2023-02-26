@@ -183,48 +183,57 @@ public abstract class AbstractS3 implements Storage
     abstract public String ensureSchemePrefix(String path) throws IOException;
 
     /**
-     * List status of a file or directory.
+     * Get the statuses of the files or subdirectories in the given path if it is
+     * a directory or multiple directories seperated by semicolon (;).
      * Note that S3 does not support real directories, a directory / folder is
      * an empty object with its name ends with '/'. So that of we want to list the
      * status of the objects in a 'folder', the path must ends with '/', otherwise
      * we can not filter out the status of the 'folder' itself from the returned result.
-     * @param path
-     * @return
+     * @param path the given path, may contain multiple directories that are seperated by semicolon.
+     * @return the statuses of the files or subdirectories.
      * @throws IOException
      */
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
+        List<Status> statuses = null;
+        for (String eachPath : path.split(";"))
         {
-            throw new IOException("Path '" + path + "' is not valid.");
-        }
-        ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder().bucket(p.bucket);
-        if (p.key != null)
-        {
-            builder.prefix(p.key);
-        }
-        ListObjectsV2Request request = builder.build();
-        ListObjectsV2Response response = s3.listObjectsV2(request);
-        List<S3Object> objects = new ArrayList<>(response.keyCount());
-        while (response.isTruncated())
-        {
-            objects.addAll(response.contents());
-            request = builder.continuationToken(response.nextContinuationToken()).build();
-            response = s3.listObjectsV2(request);
-        }
-        objects.addAll(response.contents());
-        List<Status> statuses = new ArrayList<>(objects.size());
-        Path op = new Path(path);
-        for (S3Object object : objects)
-        {
-            if (object.key().equals(p.key))
+            Path p = new Path(eachPath);
+            if (!p.valid)
             {
-                continue;
+                throw new IOException("Path '" + eachPath + "' is not valid.");
             }
-            op.key = object.key();
-            statuses.add(new Status(op.toString(), object.size(), op.key.endsWith("/"), 1));
+            ListObjectsV2Request.Builder builder = ListObjectsV2Request.builder().bucket(p.bucket);
+            if (p.key != null)
+            {
+                builder.prefix(p.key);
+            }
+            ListObjectsV2Request request = builder.build();
+            ListObjectsV2Response response = s3.listObjectsV2(request);
+            List<S3Object> objects = new ArrayList<>(response.keyCount());
+            while (response.isTruncated())
+            {
+                objects.addAll(response.contents());
+                request = builder.continuationToken(response.nextContinuationToken()).build();
+                response = s3.listObjectsV2(request);
+            }
+            objects.addAll(response.contents());
+            if (statuses == null)
+            {
+                statuses = new ArrayList<>(objects.size());
+            }
+            Path op = new Path(eachPath);
+            for (S3Object object : objects)
+            {
+                if (object.key().equals(p.key))
+                {
+                    // exclude the directory (i.e., eachPath) itself
+                    continue;
+                }
+                op.key = object.key();
+                statuses.add(new Status(op.toString(), object.size(), op.key.endsWith("/"), 1));
+            }
         }
         return statuses;
     }

@@ -31,9 +31,8 @@ import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
@@ -141,29 +140,35 @@ public final class LocalFS implements Storage
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
+        List<Status> statuses = new ArrayList<>();
+        for (String eachPath : path.split(";"))
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            Path p = new Path(eachPath);
+            if (!p.valid)
+            {
+                throw new IOException("path '" + eachPath + "' is not a valid local fs path");
+            }
+            File file = new File(p.realPath);
+            File[] files;
+            if (file.isDirectory())
+            {
+                files = file.listFiles();
+            } else
+            {
+                files = new File[]{file};
+            }
+            if (files == null)
+            {
+                throw new IOException("Failed to list files in path: " + p.realPath + ".");
+            } else
+            {
+                for (File eachFile : files)
+                {
+                    statuses.add(new Status(eachFile));
+                }
+            }
         }
-        File file = new File(p.realPath);
-        File[] files = null;
-        if (file.isDirectory())
-        {
-            files = file.listFiles();
-        }
-        else
-        {
-            files = new File[] {file};
-        }
-        if (files == null)
-        {
-            throw new IOException("Failed to list files in path: " + p.realPath + ".");
-        }
-        else
-        {
-            return Stream.of(files).map(Status::new).collect(Collectors.toList());
-        }
+        return statuses;
     }
 
     @Override
@@ -175,29 +180,35 @@ public final class LocalFS implements Storage
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        Path p = new Path(path);
-        if (!p.valid)
+        List<String> paths = new ArrayList<>();
+        for (String eachPath : path.split(";"))
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            Path p = new Path(eachPath);
+            if (!p.valid)
+            {
+                throw new IOException("path '" + eachPath + "' is not a valid local fs path");
+            }
+            File file = new File(p.realPath);
+            File[] files;
+            if (file.isDirectory())
+            {
+                files = file.listFiles();
+            } else
+            {
+                files = new File[]{file};
+            }
+            if (files == null)
+            {
+                throw new IOException("Failed to list files in path: " + p.realPath + ".");
+            } else
+            {
+                for (File eachFile : files)
+                {
+                    paths.add(eachFile.getPath());
+                }
+            }
         }
-        File file = new File(p.realPath);
-        File[] files = null;
-        if (file.isDirectory())
-        {
-            files = file.listFiles();
-        }
-        else
-        {
-            files = new File[] {file};
-        }
-        if (files == null)
-        {
-            throw new IOException("Failed to list files in path: " + p.realPath + ".");
-        }
-        else
-        {
-            return Stream.of(files).map(File::getPath).collect(Collectors.toList());
-        }
+        return paths;
     }
 
     @Override

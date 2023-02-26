@@ -128,19 +128,18 @@ public final class HDFS implements Storage
         FileStatus[] fileStatuses;
         try
         {
-            fileStatuses = this.fs.listStatus(new Path(path));
-            if (fileStatuses != null)
+            for (String eachPath : path.split(";"))
             {
-                for (FileStatus f : fileStatuses)
+                fileStatuses = this.fs.listStatus(new Path(eachPath));
+                if (fileStatuses != null)
                 {
-                    if (f.isFile())
+                    for (FileStatus f : fileStatuses)
                     {
                         statuses.add(new Status(f));
                     }
                 }
             }
-        }
-        catch (IOException e)
+        } catch (IOException e)
         {
             throw new IOException("error occurs when listing files in HDFS.", e);
         }
@@ -155,12 +154,12 @@ public final class HDFS implements Storage
         FileStatus[] fileStatuses;
         try
         {
-            fileStatuses = this.fs.listStatus(new Path(path));
-            if (fileStatuses != null)
+            for (String eachPath : path.split(";"))
             {
-                for (FileStatus f : fileStatuses)
+                fileStatuses = this.fs.listStatus(new Path(eachPath));
+                if (fileStatuses != null)
                 {
-                    if (f.isFile())
+                    for (FileStatus f : fileStatuses)
                     {
                         paths.add(f.getPath().toString());
                     }
