@@ -114,6 +114,21 @@ public final class LocalFS implements Storage
             }
             return this.realPath;
         }
+
+        /**
+         * Convert this path to a String with the scheme prefix of the storage.
+         * @param storage the storage.
+         * @return the String form of the path.
+         * @throws IOException
+         */
+        public String toStringWithPrefix(Storage storage) throws IOException
+        {
+            if (!this.valid)
+            {
+                return null;
+            }
+            return storage.ensureSchemePrefix(this.realPath);
+        }
     }
 
     @Override
@@ -164,7 +179,8 @@ public final class LocalFS implements Storage
             {
                 for (File eachFile : files)
                 {
-                    statuses.add(new Status(eachFile));
+                    statuses.add(new Status(ensureSchemePrefix(eachFile.getPath()),
+                            eachFile.length(), eachFile.isDirectory(), 1));
                 }
             }
         }
@@ -172,9 +188,15 @@ public final class LocalFS implements Storage
     }
 
     @Override
-    public Status getStatus(String path)
+    public Status getStatus(String path) throws IOException
     {
-        return new Status(new File(new Path(path).realPath));
+        Path p = new Path(path);
+        if (!p.valid)
+        {
+            throw new IOException("path '" + path + "' is not a valid local fs path");
+        }
+        File file = new File(p.realPath);
+        return new Status(ensureSchemePrefix(p.realPath), file.length(), file.isDirectory(), 1);
     }
 
     @Override
@@ -204,7 +226,7 @@ public final class LocalFS implements Storage
             {
                 for (File eachFile : files)
                 {
-                    paths.add(eachFile.getPath());
+                    paths.add(ensureSchemePrefix(eachFile.getPath()));
                 }
             }
         }

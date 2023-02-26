@@ -167,6 +167,25 @@ public abstract class AbstractS3 implements Storage
             }
             return this.bucket + "/" + this.key;
         }
+
+        /**
+         * Convert this path to a String with the scheme prefix of the storage.
+         * @param storage the storage.
+         * @return the String form of the path.
+         * @throws IOException
+         */
+        public String toStringWithPrefix(Storage storage) throws IOException
+        {
+            if (!this.valid)
+            {
+                return null;
+            }
+            if (this.key == null)
+            {
+                return this.bucket;
+            }
+            return storage.ensureSchemePrefix(this.bucket + "/" + this.key);
+        }
     }
 
     /**
@@ -232,7 +251,8 @@ public abstract class AbstractS3 implements Storage
                     continue;
                 }
                 op.key = object.key();
-                statuses.add(new Status(op.toString(), object.size(), op.key.endsWith("/"), 1));
+                statuses.add(new Status(op.toStringWithPrefix(this),
+                        object.size(), op.key.endsWith("/"), 1));
             }
         }
         return statuses;
@@ -261,14 +281,15 @@ public abstract class AbstractS3 implements Storage
         }
         if (p.isFolder)
         {
-            return new Status(p.toString(), 0, true, 1);
+            return new Status(p.toStringWithPrefix(this), 0, true, 1);
         }
 
         HeadObjectRequest request = HeadObjectRequest.builder().bucket(p.bucket).key(p.key).build();
         try
         {
             HeadObjectResponse response = s3.headObject(request);
-            return new Status(p.toString(), response.contentLength(), false, 1);
+            return new Status(p.toStringWithPrefix(this),
+                    response.contentLength(), false, 1);
         } catch (Exception e)
         {
             throw new IOException("Failed to get object head of '" + path + "'", e);

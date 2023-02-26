@@ -404,12 +404,12 @@ Execute the TPC-H queries in trino-cli.
 This is optional. It is only needed if we want to test the query performance on the compact layout.
 In pixels-sink, use the following commands to compact the files in the ordered path of each table:
 ```bash
-COMPACT -s tpch -t customer -l 1 -n no -c 2
-COMPACT -s tpch -t lineitem -l 2 -n no -c 16
-COMPACT -s tpch -t orders -l 4 -n no -c 8
-COMPACT -s tpch -t part -l 5 -n no -c 1
-COMPACT -s tpch -t partsupp -l 6 -n no -c 8
-COMPACT -s tpch -t supplier -l 8 -n no -c 1
+COMPACT -s tpch -t customer -n no -c 2
+COMPACT -s tpch -t lineitem -n no -c 16
+COMPACT -s tpch -t orders -n no -c 8
+COMPACT -s tpch -t part -n no -c 1
+COMPACT -s tpch -t partsupp -n no -c 8
+COMPACT -s tpch -t supplier -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
 The last parameter `-c` of `COMPACT` command is the maximum number

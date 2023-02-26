@@ -158,7 +158,8 @@ public class GCS implements Storage
                     continue;
                 }
                 op.key = blob.getName();
-                statuses.add(new Status(op.toString(), blob.getSize(), blob.isDirectory(), 1));
+                statuses.add(new Status(op.toStringWithPrefix(this),
+                        blob.getSize(), blob.isDirectory(), 1));
             }
         }
         return statuses;
@@ -181,7 +182,7 @@ public class GCS implements Storage
         }
         if (p.isFolder)
         {
-            return new Status(p.toString(), 0, true, 1);
+            return new Status(p.toStringWithPrefix(this), 0, true, 1);
         }
 
         Blob blob = this.gcs.get(p.bucket, p.key,
@@ -189,7 +190,7 @@ public class GCS implements Storage
                         com.google.cloud.storage.Storage.BlobField.SIZE));
         try
         {
-            return new Status(p.toString(), blob.getSize(), false, 1);
+            return new Status(p.toStringWithPrefix(this), blob.getSize(), false, 1);
         } catch (Exception e)
         {
             throw new IOException("Failed to get object metadata of '" + path + "'", e);

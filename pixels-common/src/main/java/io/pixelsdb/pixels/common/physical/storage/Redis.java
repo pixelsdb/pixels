@@ -165,8 +165,7 @@ public class Redis implements Storage
             for (String key : keys)
             {
                 long length = this.jedis.strlen(key);
-                // no need to add the scheme prefix
-                Status status = new Status(key, length, false, 1);
+                Status status = new Status(ensureSchemePrefix(key), length, false, 1);
                 statuses.add(status);
             }
         }
@@ -185,7 +184,10 @@ public class Redis implements Storage
             {
                 paths = new ArrayList<>(keys.size());
             }
-            paths.addAll(keys);
+            for (String key : keys)
+            {
+                paths.add(ensureSchemePrefix(key));
+            }
         }
         return paths;
     }
@@ -193,11 +195,11 @@ public class Redis implements Storage
     @Override
     public Status getStatus(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        long length = this.jedis.strlen(path);
+        String key = dropSchemePrefix(path);
+        long length = this.jedis.strlen(key);
         if (length > 0)
         {
-            Status status = new Status(path, length, false, 1);
+            Status status = new Status(ensureSchemePrefix(path), length, false, 1);
             return status;
         }
         throw new IOException("path does not exist");
