@@ -49,8 +49,8 @@ public interface Storage
         mock; // mock
 
         /**
-         * Case insensitive parsing from String to enum value.
-         * @param value
+         * Case-insensitive parsing from String name to enum value.
+         * @param value the name of storage scheme.
          * @return
          */
         public static Scheme from(String value)
