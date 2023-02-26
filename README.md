@@ -371,14 +371,14 @@ java -jar ./sbin/pixels-sink-*-full.jar
 
 Then use the following commands in pixels-sink to load data for the TPC-H tables:
 ```bash
-LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/nation -d tpch -t nation -n 100 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/orders -d tpch -t orders -n 638300 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/part -d tpch -t part -n 769240 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/part -s tpch -t part -n 769240 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
 ```
 It may take about one hour. The last parameter `-c` of the `LOAD` command is the maximum number
 of threads used for loading data. It only effects when the input directory (specified by `-o`)
