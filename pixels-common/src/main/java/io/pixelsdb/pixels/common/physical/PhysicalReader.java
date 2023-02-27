@@ -42,17 +42,6 @@ public interface PhysicalReader extends Closeable
     void readFully(byte[] buffer, int offset, int length) throws IOException;
 
     /**
-     * If direct I/O is supported, {@link #readFully(int)} will directly read from the file
-     * without going through the OS cache. This is currently supported on LocalFS.
-     *
-     * @return true if direct read is supported.
-     */
-    default boolean supportsDirect()
-    {
-        return false;
-    }
-
-    /**
      * @return true if readAsync is supported.
      */
     default boolean supportsAsync()

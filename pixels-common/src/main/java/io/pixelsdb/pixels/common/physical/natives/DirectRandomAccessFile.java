@@ -23,7 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The random accessible file that can be opened with o_direct flag.
@@ -40,7 +40,8 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
     private final int blockSize;
     private boolean bufferValid;
     private DirectBuffer smallBuffer;
-    private LinkedList<DirectBuffer> largeBuffers = new LinkedList<>();
+    // Issue #403: largeBuffers may be updated by asynchronous read request, hence it must be thread-safe.
+    private ConcurrentLinkedQueue<DirectBuffer> largeBuffers = new ConcurrentLinkedQueue<>();
 
     public DirectRandomAccessFile(File file) throws IOException
     {
@@ -99,6 +100,21 @@ public class DirectRandomAccessFile implements PixelsRandomAccessFile
             DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
             DirectIoLib.read(this.fd, this.offset, buffer, len);
             this.seek(this.offset + len);
+            this.largeBuffers.add(buffer);
+            return buffer.getBuffer();
+        } catch (IllegalAccessException | InvocationTargetException e)
+        {
+            throw new IOException("failed to allocate buffer", e);
+        }
+    }
+
+    @Override
+    public ByteBuffer readFully(long off, int len) throws IOException
+    {
+        try
+        {
+            DirectBuffer buffer = DirectIoLib.allocateBuffer(len);
+            DirectIoLib.read(this.fd, off, buffer, len);
             this.largeBuffers.add(buffer);
             return buffer.getBuffer();
         } catch (IllegalAccessException | InvocationTargetException e)

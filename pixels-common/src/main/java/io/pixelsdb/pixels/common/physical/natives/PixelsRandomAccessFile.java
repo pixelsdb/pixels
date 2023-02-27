@@ -17,7 +17,22 @@ public interface PixelsRandomAccessFile extends DataInput, Closeable
 
     long length();
 
+    /**
+     * Read a number of bytes starting from the current offset.
+     * @param len the number of bytes to read.
+     * @return the bytes read from the file.
+     * @throws IOException
+     */
     ByteBuffer readFully(int len) throws IOException;
+
+    /**
+     * Read a number of bytes starting from the given offset. This method does not change the current file offset.
+     * @param off the given offset.
+     * @param len the number of bytes to read.
+     * @return the bytes read from the file.
+     * @throws IOException
+     */
+    ByteBuffer readFully(long off, int len) throws IOException;
 
     @Override
     default String readLine() throws IOException

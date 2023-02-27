@@ -175,6 +175,5 @@ public interface PixelsReader
      * @throws java.io.IOException
      */
     @Override
-    void close()
-            throws IOException;
+    void close() throws IOException;
 }
