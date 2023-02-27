@@ -84,6 +84,9 @@ public class CostBasedSplitsIndex implements SplitsIndex
             tableSize += column.getSize();
             this.columnMap.put(column.getName(), column);
         }
+        checkArgument(rowGroupSize > 0 && tableSize > 0 && rowGroupSize <= tableSize,
+                String.format("row group size=%f, table size=%f, check if column statistics of '%s' are collected",
+                        rowGroupSize, tableSize, schemaTableName));
 
         if (SPLIT_SIZE_ROWS > 0)
         {
@@ -95,9 +98,11 @@ public class CostBasedSplitsIndex implements SplitsIndex
                 MetadataCache.Instance().cacheTable(schemaTableName, table);
             }
             double numRowGroups = Math.ceil(tableSize / rowGroupSize);
+            checkArgument(table.getRowCount() > 0,
+                    String.format("row count of '%s' is non-positive, check if the table statistics are collected",
+                            schemaTableName));
             double rowsPerRowGroup = table.getRowCount() / numRowGroups;
-            checkArgument(rowsPerRowGroup > 0,
-                    "Number of rows per row-group must > 0.");
+            checkArgument(rowsPerRowGroup > 0, "Number of rows per row-group must be positive.");
             // Round the split size cap to the nearest power of 2.
             int splitSizeCap = round(SPLIT_SIZE_ROWS / rowsPerRowGroup);
             this.maxSplitSize = Math.min(maxSplitSize, splitSizeCap);

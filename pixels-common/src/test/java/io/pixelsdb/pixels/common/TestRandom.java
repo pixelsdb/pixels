@@ -34,5 +34,18 @@ public class TestRandom
     {
         Random random = new Random(System.nanoTime());
         System.out.println(random.nextInt(1));
+
+        String str = "file:///data1/pixels;file:///data2/pixels";
+        for (String split : str.split(";"))
+        {
+            System.out.println(split);
+        }
+        System.out.println();
+
+        str = "file:///data3/pixels";
+        for (String split : str.split(";"))
+        {
+            System.out.println(split);
+        }
     }
 }

@@ -153,14 +153,21 @@ public class Redis implements Storage
     @Override
     public List<Status> listStatus(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        Set<String> keys = this.jedis.keys(path + "*");
-        List<Status> statuses = new ArrayList<>(keys.size());
-        for (String key : keys)
+        List<Status> statuses = null;
+        for (String eachPath : path.split(";"))
         {
-            long length = this.jedis.strlen(key);
-            Status status = new Status(path, length, false, 1);
-            statuses.add(status);
+            eachPath = dropSchemePrefix(eachPath);
+            Set<String> keys = this.jedis.keys(eachPath + "*");
+            if (statuses == null)
+            {
+                statuses = new ArrayList<>(keys.size());
+            }
+            for (String key : keys)
+            {
+                long length = this.jedis.strlen(key);
+                Status status = new Status(ensureSchemePrefix(key), length, false, 1);
+                statuses.add(status);
+            }
         }
         return statuses;
     }
@@ -168,19 +175,31 @@ public class Redis implements Storage
     @Override
     public List<String> listPaths(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        Set<String> keys = this.jedis.keys(path + "*");
-        return new ArrayList<>(keys);
+        List<String> paths = null;
+        for (String eachPath : path.split(";"))
+        {
+            eachPath = dropSchemePrefix(eachPath);
+            Set<String> keys = this.jedis.keys(eachPath + "*");
+            if (paths == null)
+            {
+                paths = new ArrayList<>(keys.size());
+            }
+            for (String key : keys)
+            {
+                paths.add(ensureSchemePrefix(key));
+            }
+        }
+        return paths;
     }
 
     @Override
     public Status getStatus(String path) throws IOException
     {
-        path = dropSchemePrefix(path);
-        long length = this.jedis.strlen(path);
+        String key = dropSchemePrefix(path);
+        long length = this.jedis.strlen(key);
         if (length > 0)
         {
-            Status status = new Status(path, length, false, 1);
+            Status status = new Status(ensureSchemePrefix(path), length, false, 1);
             return status;
         }
         throw new IOException("path does not exist");

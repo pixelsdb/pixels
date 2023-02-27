@@ -21,8 +21,6 @@ package io.pixelsdb.pixels.common.physical;
 
 import org.apache.hadoop.fs.FileStatus;
 
-import java.io.File;
-
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -41,7 +39,6 @@ public class Status implements Comparable
         this(null, 0, false, 0);
     }
 
-    //We should deprecate this soon?
     public Status(String path, long length, boolean isdir, int replication)
     {
         this.path = path;
@@ -57,15 +54,6 @@ public class Status implements Comparable
         this.length = hdfs.getLen();
         this.isdir = hdfs.isDirectory();
         this.replication = hdfs.getReplication();
-    }
-
-    public Status(File file)
-    {
-        requireNonNull(file);
-        this.path = file.getPath();
-        this.length = file.length();
-        this.isdir = file.isDirectory();
-        this.replication = 1;
     }
 
     /**

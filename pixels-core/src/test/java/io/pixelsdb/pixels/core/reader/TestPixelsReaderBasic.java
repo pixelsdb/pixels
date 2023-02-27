@@ -64,7 +64,6 @@ public class TestPixelsReaderBasic
                     .setPath(path)
                     .setPixelsFooterCache(new PixelsFooterCache())
                     .build();
-            List<PixelsProto.RowGroupInformation> rowGroupInformationList = reader.getFooter().getRowGroupInfosList();
             List<PixelsProto.Type> types = reader.getFooter().getTypesList();
             for (PixelsProto.Type type : types)
             {
@@ -76,13 +75,7 @@ public class TestPixelsReaderBasic
         {
             e.printStackTrace();
         }
-//        assertEquals(PixelsProto.CompressionKind.NONE, pixelsReader.getCompressionKind());
-//        assertEquals(TestParams.compressionBlockSize, pixelsReader.getCompressionBlockSize());
-//        assertEquals(schema, pixelsReader.getFileSchema());
-//        assertEquals(PixelsVersion.V1, pixelsReader.getFileVersion());
-//        assertEquals(TestParams.rowNum, pixelsReader.getNumberOfRows());
-//        assertEquals(TestParams.pixelStride, pixelsReader.getPixelStride());
-//        assertEquals(TimeZone.getDefault().getDisplayName(), pixelsReader.getWriterTimeZone());
+
     }
 
     @Test

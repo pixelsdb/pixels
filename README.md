@@ -1,14 +1,20 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine for data lakes and warehouses. It is optimized for data analytics on tables that are stored in HDFS and S3-like file/object storage systems, and provides much higher performance than existing columnar formats such as Parquet.
-Moreover, all the storage optimizations in Pixels, including data layout reordering, columnar caching, and I/O scheduling, are transparent to query engines and underlying file/object storage systems.
-Thus, it does not affect the maintainability and portability of the storage layer in data lakes.
+Pixels is a columnar storage engine and auxiliary compute engine for data lakes and warehouses.
+We have integrated it into popular query engines including Trino (405), Presto (0.209), and Hive (2.3+).
+
+The columnar storage engine in Pixels is optimized for data analytics on tables that are stored in file/object storage systems (including S3, GCS, HDFS, Redis, and local file systems),and provides much higher performance than existing columnar formats such as Parquet.
+All the storage optimizations are transparent to the query engines.
+
+For cloud lakehouses, the auxiliary compute engine in Pixels can exploit serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes, thus achieving better elasticity and cost-efficiency.
 
 ## Build Pixels
-Install JDK 8.0 and 17.0.3 or above (JDK 8 is recommended to build Pixels, whereas JDK 17 is required to build the Trino connector of Pixels and to run Trino), and open Pixels as a maven project in IntelliJ (with JDK 8.0). 
+Install JDK 17.0.3 or above, and open Pixels as a maven project in IntelliJ. 
 When the project is fully indexed and the dependencies are successfully downloaded,
-use JDK 8.0 and `mvn install` to build and install it to local Maven repository. Some test params are missing for the unit tests, you can simply create arbitrary values for them.
+use `mvn install` to build and install it to the local Maven repository.
+> JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
+> using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
 The build may take tens of seconds to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
 It will be used in the installation.
@@ -17,9 +23,7 @@ Pixels is compatible with different query engines, such as Trino, Presto, and Hi
 However, for simplicity, we use Trino as an example here to illustrate how Pixels works with query engines in the data lakes.
 
 To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
-and use JDK 17 and `mvn package` to build it.
-> **Note** that the Trino version we use requires Java 17.0.3 or above, thus pixels-trino should be built
-> using JDK 17.0.3 or above.
+and build it using `mvn package`.
 
 Find the following zip files in the build target directories:
 * `pixels-trino-listener-*.zip`, this is the event listener plugin for Trino.
@@ -39,7 +43,7 @@ Create an EC2 Ubuntu-20.04 or 22.04 instance with x86 arch and at least 20GB roo
 and install the following components.
 
 ### Install JDK
-Install JDK 17.0 in the EC2 instance (JDK 8.0 is not needed as we have already built Pixels in local machine):
+Install JDK 17.0 in the EC2 instance:
 ```bash
 sudo apt install openjdk-17-jdk openjdk-17-jre
 ```
@@ -52,7 +56,7 @@ If the other version of JDK is in use, switch to JDK 17:
 update-java-alternatives --list
 sudo update-java-alternatives --set /path/to/jdk-17.0
 ```
-Oracle JDK 17.0 or Azul Zulu JDK 17 also works.
+Oracle JDK 17.0, Azul Zulu JDK 17, or GraalVM 22 for Java 17 also works.
 
 ### Setup AWS Credentials
 If we use S3 as the underlying storage system, we have to configure the AWS credentials.
@@ -367,18 +371,18 @@ Under `PIXELS_HOME`, run pixels-sink:
 java -jar ./sbin/pixels-sink-*-full.jar
 ```
 
-Then use the following command in pixels-sink to load data for the TPC-H tables:
+Then use the following commands in pixels-sink to load data for the TPC-H tables:
 ```bash
-LOAD -f pixels -o file:///data/tpch/100g/customer -d tpch -t customer -n 319150 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/lineitem -d tpch -t lineitem -n 600040 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/nation -d tpch -t nation -n 100 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/orders -d tpch -t orders -n 638300 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/part -d tpch -t part -n 769240 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/partsupp -d tpch -t partsupp -n 360370 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/region -d tpch -t region -n 10 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/supplier -d tpch -t supplier -n 333340 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/part -s tpch -t part -n 769240 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
+LOAD -f pixels -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
 ```
-This may take a few hours. The last parameter `-c` of the `LOAD` command is the maximum number
+It may take about one hour. The last parameter `-c` of the `LOAD` command is the maximum number
 of threads used for loading data. It only effects when the input directory (specified by `-o`)
 contains multiple input files. In case that the TPC-H table has multiple parts, you can set 
 `-c` to the number of parts to improve the data loading performance.
@@ -400,14 +404,14 @@ Execute the TPC-H queries in trino-cli.
 
 ### Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
-In pixels-sink, use the following command to compact the files in the ordered path of each table:
+In pixels-sink, use the following commands to compact the files in the ordered path of each table:
 ```bash
-COMPACT -s tpch -t customer -l 1 -n no -c 2
-COMPACT -s tpch -t lineitem -l 2 -n no -c 16
-COMPACT -s tpch -t orders -l 4 -n no -c 8
-COMPACT -s tpch -t part -l 5 -n no -c 1
-COMPACT -s tpch -t partsupp -l 6 -n no -c 8
-COMPACT -s tpch -t supplier -l 8 -n no -c 1
+COMPACT -s tpch -t customer -n no -c 2
+COMPACT -s tpch -t lineitem -n no -c 16
+COMPACT -s tpch -t orders -n no -c 8
+COMPACT -s tpch -t part -n no -c 1
+COMPACT -s tpch -t partsupp -n no -c 8
+COMPACT -s tpch -t supplier -n no -c 1
 ```
 The tables `nation` and `region` are too small, no need to compact them.
 The last parameter `-c` of `COMPACT` command is the maximum number
@@ -417,3 +421,22 @@ improve the compaction performance. Compaction is normally faster than loading w
 To avoid scanning the small files in the ordered path during query execution,
 create an empty bucket in S3 and change the ordered path in the metadata database
 to the empty bucket.
+
+### Statistics Collection*
+This is optional. Data statistics enable cost-based query optimization for the queries.
+Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema.
+In pixels-sink, use the following commands to collect the data statistics for the columns in each table.
+```bash
+STAT -s tpch -t nation -o false -c true
+STAT -s tpch -t region -o false -c true
+STAT -s tpch -t supplier -o false -c true
+STAT -s tpch -t customer -o false -c true
+STAT -s tpch -t part -o false -c true
+STAT -s tpch -t partsupp -o false -c true
+STAT -s tpch -t orders -o false -c true
+STAT -s tpch -t lineitem -o false -c true
+```
+After it is finished, statistics of each tpch column can be found in the `pixels_metadata.COLS` metadata table.
+Finally, manually update the row count for each tpch table in `pixels_metadata.TBLS.TBL_ROW_COUNT`.
+
+Set `splits.index.type=cost_based` and restart Trino to benefit from cost-based query optimization.
