@@ -332,6 +332,12 @@ public final class LocalFS implements Storage
                 throw new IOException("File '" + p.realPath + "' already exists.");
             }
         }
+        File parent  = file.getParentFile();
+        if (parent != null)
+        {
+            // Issue #401: create the parent directory if not exists, ignore the return value
+            parent.mkdirs();
+        }
         if (!file.createNewFile())
         {
             throw new IOException("Failed to create local file '" + p.realPath + "'.");

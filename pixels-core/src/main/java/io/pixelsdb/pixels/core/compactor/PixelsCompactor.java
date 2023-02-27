@@ -59,13 +59,13 @@ public class PixelsCompactor
     private final long fileContentLength;
     private final int fileRowNum;
 
-    private final Storage storage;
+    private final Storage inputStorage;
     private final PhysicalWriter fsWriter;
     private final StatsRecorder[] fileColStatRecorders;
 
-    private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList;    // row group information in footer
+    private final List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList; // row group information in footer
     private final List<PixelsProto.RowGroupStatistic.Builder> rowGroupStatBuilderList; // row group statistic in footer
-    private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList; // row group fotters
+    private final List<PixelsProto.RowGroupFooter.Builder> rowGroupFooterBuilderList; // row group footers
     private final List<String> rowGroupPaths;
 
     private PixelsCompactor(
@@ -77,7 +77,7 @@ public class PixelsCompactor
             TimeZone timeZone,
             long fileContentLength,
             int fileRowNum,
-            Storage storage,
+            Storage inputStorage,
             PhysicalWriter fsWriter,
             StatsRecorder[] fileColStatRecorders,
             List<PixelsProto.RowGroupInformation.Builder> rowGroupInfoBuilderList,
@@ -98,7 +98,7 @@ public class PixelsCompactor
         checkArgument(fileRowNum > 0, "file row number is not positive");
         this.fileRowNum = fileRowNum;
 
-        this.storage = requireNonNull(storage, "storage is null");
+        this.inputStorage = requireNonNull(inputStorage, "input storage is null");
         this.fsWriter = requireNonNull(fsWriter, "fsWriter is null");
 
         this.fileColStatRecorders = requireNonNull(fileColStatRecorders, "file column stat reader is null");
@@ -119,7 +119,8 @@ public class PixelsCompactor
         private List<String> sourcePaths = null;
         private CompactLayout compactLayout = null;
         private TimeZone builderTimeZone = TimeZone.getDefault();
-        private Storage builderStorage = null;
+        private Storage builderInputStorage = null;
+        private Storage builderOutputStorage = null;
         private String builderFilePath = null;
         private StatsRecorder[] fileColStatRecorders;
         private long builderBlockSize = DEFAULT_HDFS_BLOCK_SIZE;
@@ -151,70 +152,66 @@ public class PixelsCompactor
         public PixelsCompactor.Builder setSchema(TypeDescription schema)
         {
             this.schema = schema;
-
             return this;
         }
 
         public PixelsCompactor.Builder setSourcePaths(List<String> sourcePaths)
         {
             this.sourcePaths = ImmutableList.copyOf(requireNonNull(sourcePaths));
-
             return this;
         }
 
         public PixelsCompactor.Builder setCompactLayout(CompactLayout compactLayout)
         {
             this.compactLayout = requireNonNull(compactLayout);
-
             return this;
         }
 
-        public PixelsCompactor.Builder setStorage(Storage storage)
+        public PixelsCompactor.Builder setInputStorage(Storage inputStorage)
         {
-            this.builderStorage = requireNonNull(storage);
+            this.builderInputStorage = requireNonNull(inputStorage);
+            return this;
+        }
 
+        public PixelsCompactor.Builder setOutputStorage(Storage outputStorage)
+        {
+            this.builderOutputStorage = requireNonNull(outputStorage);
             return this;
         }
 
         public PixelsCompactor.Builder setPath(String filePath)
         {
             this.builderFilePath = requireNonNull(filePath);
-
             return this;
         }
 
         public PixelsCompactor.Builder setTimeZone(TimeZone timeZone)
         {
             this.builderTimeZone = requireNonNull(timeZone);
-
             return this;
         }
 
         public PixelsCompactor.Builder setBlockSize(long blockSize)
         {
             this.builderBlockSize = blockSize;
-
             return this;
         }
 
         public PixelsCompactor.Builder setReplication(short replication)
         {
             this.builderReplication = replication;
-
             return this;
         }
 
         public PixelsCompactor.Builder setBlockPadding(boolean blockPadding)
         {
             this.builderBlockPadding = blockPadding;
-
             return this;
         }
 
         public Builder setOverwrite(boolean overwrite)
         {
             this.builderOverwrite = overwrite;
-
             return this;
         }
 
@@ -222,17 +219,17 @@ public class PixelsCompactor
                 throws IOException
         {
             // check arguments
-            if (sourcePaths == null || compactLayout == null || builderStorage == null ||
-                    builderFilePath == null)
+            if (sourcePaths == null || compactLayout == null || builderInputStorage == null ||
+                    builderOutputStorage == null || builderFilePath == null)
             {
-                throw new IllegalArgumentException("Missing argument to build PixelsCompactor");
+                throw new IllegalArgumentException("Missing argument(s) to build PixelsCompactor");
             }
 
             // read each source file footer
             for (int i = 0; i < sourcePaths.size(); i++)
             {
                 String path = sourcePaths.get(i);
-                PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderStorage, path);
+                PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(builderInputStorage, path);
                 if (fsReader == null)
                 {
                     throw new IOException("Read file failed.");
@@ -316,7 +313,7 @@ public class PixelsCompactor
                 fsReader.close();
             }
 
-            fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderStorage, builderFilePath, builderBlockSize,
+            fsWriter = PhysicalWriterUtil.newPhysicalWriter(builderOutputStorage, builderFilePath, builderBlockSize,
                     builderReplication, builderBlockPadding, builderOverwrite);
 
             return new PixelsCompactor(
@@ -328,7 +325,7 @@ public class PixelsCompactor
                     builderTimeZone,
                     fileContentLength,
                     fileRowNum,
-                    builderStorage,
+                    builderInputStorage,
                     fsWriter,
                     fileColStatRecorders,
                     rowGroupInfoBuilderList,
@@ -363,7 +360,7 @@ public class PixelsCompactor
             long columnChunkOffset = columnChunkIndexBuilder.getChunkOffset();
             long columnChunkLength = columnChunkIndexBuilder.getChunkLength();
             String path = this.rowGroupPaths.get(rowGroupId);
-            try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(storage, path))
+            try (PhysicalReader fsReader = PhysicalReaderUtil.newPhysicalReader(inputStorage, path))
             {
                 if (fsReader == null)
                 {
