@@ -332,12 +332,17 @@ public final class LocalFS implements Storage
                 throw new IOException("File '" + p.realPath + "' already exists.");
             }
         }
-        // Issue #401: create the parent directory if not exists, ignore the return value
-        if (file.mkdirs() && file.createNewFile())
+        File parent  = file.getParentFile();
+        if (parent != null)
         {
-            return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
+            // Issue #401: create the parent directory if not exists, ignore the return value
+            parent.mkdirs();
         }
-        throw new IOException("Failed to create local file '" + p.realPath + "'.");
+        if (!file.createNewFile())
+        {
+            throw new IOException("Failed to create local file '" + p.realPath + "'.");
+        }
+        return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
     public PixelsRandomAccessFile openRaf(String path) throws IOException
