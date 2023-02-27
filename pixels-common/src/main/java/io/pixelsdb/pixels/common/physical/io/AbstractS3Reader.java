@@ -65,8 +65,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
              * Issue #136:
              * Using MAX_PRIORITY-1 for client threads accelerates async read with sync client for
              * some queries that send many get object requests (e.g. 5%).
-             * Note that clientService is only used for the cause that async client is disabled while
-             * async read is enabled.
+             * Note that clientService is only used in case async client is disabled and async read is enabled.
              */
             thread.setPriority(Thread.MAX_PRIORITY-1);
             return thread;

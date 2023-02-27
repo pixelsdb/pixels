@@ -23,10 +23,13 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
 import io.pixelsdb.pixels.common.physical.storage.LocalFS;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Created at: 30/08/2021
@@ -38,7 +41,27 @@ public class PhysicalLocalReader implements PhysicalReader
     private final String path;
     private final long id;
     private final PixelsRandomAccessFile raf;
-    private final AtomicInteger numRequests;
+    protected static final boolean enableAsync;
+    protected static final ExecutorService readerService;
+
+    static
+    {
+        enableAsync = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("localfs.enable.async.io"));
+        int clientServiceThreads = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("localfs.reader.threads"));
+        ThreadGroup readerGroup = new ThreadGroup("localfs.readers");
+        readerGroup.setDaemon(true);
+        readerGroup.setMaxPriority(Thread.MAX_PRIORITY-1);
+        readerService = Executors.newFixedThreadPool(clientServiceThreads, runnable -> {
+            Thread thread = new Thread(readerGroup, runnable);
+            thread.setDaemon(true);
+            // ensure reader threads have higher priority than other threads
+            thread.setPriority(Thread.MAX_PRIORITY-1);
+            return thread;
+        });
+
+        Runtime.getRuntime().addShutdownHook(new Thread(readerService::shutdownNow));
+    }
 
     public PhysicalLocalReader(Storage storage, String path) throws IOException
     {
@@ -58,71 +81,81 @@ public class PhysicalLocalReader implements PhysicalReader
         this.path = path;
         this.raf = this.local.openRaf(path);
         this.id = this.local.getFileId(path);
-        this.numRequests = new AtomicInteger(1);
     }
 
     @Override
     public long getFileLength() throws IOException
     {
-        numRequests.incrementAndGet();
         return raf.length();
     }
 
     @Override
     public void seek(long desired) throws IOException
     {
-        numRequests.incrementAndGet();
         raf.seek(desired);
     }
 
     @Override
     public ByteBuffer readFully(int length) throws IOException
     {
-        numRequests.incrementAndGet();
         return raf.readFully(length);
+    }
+
+    @Override
+    public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
+    {
+        if (offset + len > this.raf.length())
+        {
+            throw new IOException("Offset " + offset + " plus " +
+                    len + " exceeds object length " + this.raf.length() + ".");
+        }
+
+        CompletableFuture<ByteBuffer> future = new CompletableFuture<>();
+        readerService.execute(() -> {
+            try
+            {
+                future.complete(raf.readFully(offset, len));
+            } catch (IOException e)
+            {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
     @Override
     public void readFully(byte[] buffer) throws IOException
     {
         raf.readFully(buffer);
-        numRequests.incrementAndGet();
     }
 
     @Override
     public void readFully(byte[] buffer, int offset, int length) throws IOException
     {
         raf.readFully(buffer, offset, length);
-        numRequests.incrementAndGet();
     }
 
-    /**
-     * @return true if readDirect is supported.
-     */
     @Override
-    public boolean supportsDirect()
+    public boolean supportsAsync()
     {
-        return true;
+        return enableAsync;
     }
 
     @Override
     public long readLong() throws IOException
     {
-        numRequests.incrementAndGet();
         return raf.readLong();
     }
 
     @Override
     public int readInt() throws IOException
     {
-        numRequests.incrementAndGet();
         return raf.readInt();
     }
 
     @Override
     public void close() throws IOException
     {
-        numRequests.incrementAndGet();
         this.raf.close();
     }
 
@@ -173,6 +206,7 @@ public class PhysicalLocalReader implements PhysicalReader
     @Override
     public int getNumReadRequests()
     {
-        return numRequests.get();
+        // Issue #403: no need to count the read requests on local fs, always return 0.
+        return 0;
     }
 }
