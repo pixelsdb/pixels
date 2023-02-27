@@ -39,7 +39,6 @@ public class Status implements Comparable
         this(null, 0, false, 0);
     }
 
-    //We should deprecate this soon?
     public Status(String path, long length, boolean isdir, int replication)
     {
         this.path = path;
