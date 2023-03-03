@@ -44,7 +44,7 @@ import static io.pixelsdb.pixels.common.utils.JvmUtils.JavaVersion;
  * Partially referenced the implementation of Jaydio (https://github.com/smacke/jaydio),
  * which is implemented by Stephen Macke and licensed under Apache 2.0.
  * We replaced the complex buffer implementation with java direct byte buffer, thus we
- * can directly return the byte buffer to the calling program with memory copying.
+ * can directly return the byte buffer to the calling program without memory copying.
  * <p>
  * Created at: 02/02/2023
  * Author: hank
@@ -122,7 +122,7 @@ public class DirectIoLib
                 final int majorRev = 1;
                 final int minorRev = 2;
 
-                List<Integer> versionNumbers = new ArrayList<Integer>();
+                List<Integer> versionNumbers = new ArrayList<>();
                 for (String v : System.getProperty("os.version").split("\\.|-"))
                 {
                     if (v.matches("\\d+"))
