@@ -5,7 +5,7 @@ import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheManager;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
-import io.pixelsdb.pixels.daemon.metric.MetricsServer;
+import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

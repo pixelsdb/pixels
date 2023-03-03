@@ -38,7 +38,7 @@ public class ReadPerfHistogram
 
     static
     {
-        Interval = Integer.parseInt(ConfigFactory.Instance().getProperty("metric.bytesms.interval"));
+        Interval = Integer.parseInt(ConfigFactory.Instance().getProperty("metrics.bytesms.interval"));
     }
 
     private Map<Long, List<Double>> seqReadCosts = new HashMap<>();

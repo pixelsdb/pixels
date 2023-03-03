@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metric;
+package io.pixelsdb.pixels.daemon.metrics;
 
 import io.pixelsdb.pixels.common.metrics.ReadPerfHistogram;
 import io.pixelsdb.pixels.common.metrics.ReadPerfMetrics;
@@ -66,7 +66,7 @@ public class MetricsServer implements Server
             {
                 // parse the json files under /dev/shm/pixels/
                 // and calculate the histogram.
-                String jsonDir = ConfigFactory.Instance().getProperty("metric.reader.json.dir");
+                String jsonDir = ConfigFactory.Instance().getProperty("metrics.reader.json.dir");
                 File dir = new File(jsonDir);
                 File[] jsonFiles = dir.listFiles((file, s) -> s.endsWith(".json"));
                 ReadPerfHistogram histogram = new ReadPerfHistogram();
@@ -89,7 +89,7 @@ public class MetricsServer implements Server
                 }
 
                 // save it as prom file under the text file dir of prometheus node exporter.
-                String textDir = ConfigFactory.Instance().getProperty("metric.node.text.dir");
+                String textDir = ConfigFactory.Instance().getProperty("metrics.node.text.dir");
                 if (!textDir.endsWith("/"))
                 {
                     textDir += "/";

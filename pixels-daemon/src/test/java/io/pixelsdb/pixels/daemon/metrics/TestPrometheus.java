@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metric;
+package io.pixelsdb.pixels.daemon.metrics;
 
 import io.prometheus.client.Collector;
 import io.prometheus.client.Gauge;
