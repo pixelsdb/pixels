@@ -32,11 +32,11 @@ public class PixelsCoreConfig
 
     public String getMetricsDir()
     {
-        return config.getProperty("metric.reader.json.dir");
+        return config.getProperty("metrics.reader.json.dir");
     }
 
     public float getMetricsCollectProb()
     {
-        return Float.valueOf(config.getProperty("metric.reader.collect.prob"));
+        return Float.valueOf(config.getProperty("metrics.reader.collect.prob"));
     }
 }

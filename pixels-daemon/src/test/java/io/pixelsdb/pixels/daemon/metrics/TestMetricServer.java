@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metric;
+package io.pixelsdb.pixels.daemon.metrics;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.Server;
@@ -30,7 +30,7 @@ public class TestMetricServer
     @Test
     public void test () throws InterruptedException
     {
-        ConfigFactory.Instance().addProperty("metric.node.text.dir", "/home/hank/");
+        ConfigFactory.Instance().addProperty("metrics.node.text.dir", "/home/hank/");
         Server server = new MetricsServer();
         Thread thread = new Thread(server);
         thread.start();
