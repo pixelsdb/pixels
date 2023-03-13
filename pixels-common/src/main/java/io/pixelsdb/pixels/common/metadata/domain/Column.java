@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.nio.ByteBuffer;
@@ -79,6 +80,7 @@ public class Column extends Base
         this.type = type;
     }
 
+    @JSONField(serialize = false)
     public double getChunkSize()
     {
         return chunkSize;
@@ -89,6 +91,7 @@ public class Column extends Base
         this.chunkSize = chunkSize;
     }
 
+    @JSONField(serialize = false)
     public double getSize()
     {
         return size;
@@ -99,16 +102,19 @@ public class Column extends Base
         this.size = size;
     }
 
+    @JSONField(serialize = false)
     public double getNullFraction()
     {
         return nullFraction;
     }
 
+    @JSONField(serialize = false)
     public void setNullFraction(double nullFraction)
     {
         this.nullFraction = nullFraction;
     }
 
+    @JSONField(serialize = false)
     public long getCardinality()
     {
         return cardinality;
@@ -119,6 +125,7 @@ public class Column extends Base
         this.cardinality = cardinality;
     }
 
+    @JSONField(serialize = false)
     public ByteBuffer getRecordStats()
     {
         return recordStats;

@@ -31,10 +31,15 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
+import io.pixelsdb.pixels.daemon.rest.RestServer;
 import org.junit.Test;
 
+import javax.net.ssl.SSLException;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateException;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
 import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
@@ -48,9 +53,16 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 public class TestServer {
 
     @Test
-    public void test()
+    public void testMetadataServer()
     {
         MetadataServer server = new MetadataServer(18888);
+        server.run();
+    }
+
+    @Test
+    public void testRestServer()
+    {
+        RestServer server = new RestServer(18890);
         server.run();
     }
 
@@ -61,16 +73,20 @@ public class TestServer {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try
         {
+            SelfSignedCertificate ssc = new SelfSignedCertificate();
+            SslContext sslContext = SslContextBuilder
+                    .forServer(ssc.certificate(), ssc.privateKey()).build();
+
             ServerBootstrap b = new ServerBootstrap();
             b.option(ChannelOption.SO_BACKLOG, 1024);
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
-                    .childHandler(new HttpHelloWorldServerInitializer(null));
+                    .childHandler(new HttpHelloWorldServerInitializer(sslContext));
             ChannelFuture channelFuture = b.bind(18890).sync();
-            System.err.println("Open your web browser and navigate to http://127.0.0.1:18890/");
+            System.err.println("Open your web browser and navigate to https://127.0.0.1:18890/");
             channelFuture.channel().closeFuture().sync();
-        } catch (InterruptedException e)
+        } catch (InterruptedException | CertificateException | SSLException e)
         {
             throw new RuntimeException(e);
         } finally {

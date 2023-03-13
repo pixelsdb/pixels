@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.HashSet;
@@ -61,6 +62,7 @@ public class Schema extends Base
         this.desc = desc;
     }
 
+    @JSONField(serialize = false)
     public Set<Long> getTableIds()
     {
         return tableIds;
