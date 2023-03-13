@@ -19,14 +19,16 @@
  */
 package io.pixelsdb.pixels.daemon.metadata;
 
+import io.grpc.ServerBuilder;
 import io.pixelsdb.pixels.common.utils.DBUtil;
 import io.pixelsdb.pixels.daemon.Server;
-import io.grpc.ServerBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Created at: 19-4-17
@@ -41,10 +43,10 @@ public class MetadataServer implements Server
 
     public MetadataServer(int port)
     {
-        assert (port > 0 && port <= 65535);
+        checkArgument(port > 0 && port <= 65535, "illegal rpc port");
+        checkArgument(port > 0 && port <= 65535, "illegal http port");
         this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new MetadataServiceImpl())
-                .build();
+                .addService(new MetadataServiceImpl()).build();
     }
 
     @Override

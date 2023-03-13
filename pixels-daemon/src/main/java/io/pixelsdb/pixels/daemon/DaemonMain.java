@@ -77,6 +77,7 @@ public class DaemonMain
                 {
                     ConfigFactory config = ConfigFactory.Instance();
                     int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
+                    int metadataHttpServerPort = Integer.parseInt(config.getProperty("rest.server.port"));
                     int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
 
                     // start metadata server

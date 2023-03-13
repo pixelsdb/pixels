@@ -63,7 +63,7 @@
 
         <!-- common libraries -->
         <dep.airlift.slice.version>0.34</dep.airlift.slice.version>
-        <dep.netty.version>4.1.68.Final</dep.netty.version>
+        <dep.netty.version>4.1.77.Final</dep.netty.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.guava.version>29.0-jre</dep.guava.version>
         <dep.protobuf.version>3.21.7</dep.protobuf.version>

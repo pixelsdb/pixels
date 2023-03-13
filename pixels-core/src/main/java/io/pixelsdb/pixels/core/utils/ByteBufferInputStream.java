@@ -84,7 +84,7 @@ public class ByteBufferInputStream extends InputStream
 
         /**
          * Issue #377:
-         * Reading direct byte buffer as following does observe any performance gain:
+         * Reading direct byte buffer as following does not observe any performance gain:
          * {@code
          * long address = DirectIoLib.getAddress(byteBuffer);
          * JvmUtils.unsafe.copyMemory(null, address + position,

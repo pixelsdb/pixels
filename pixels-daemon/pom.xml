@@ -87,6 +87,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- netty -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- hdfs -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
