@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 import java.util.ArrayList;
@@ -82,6 +83,7 @@ public class Table extends Base
         return rowCount;
     }
 
+    @JSONField(serialize = false)
     public void setRowCount(long rowCount)
     {
         this.rowCount = rowCount;
@@ -97,6 +99,7 @@ public class Table extends Base
         this.schemaId = schemaId;
     }
 
+    @JSONField(serialize = false)
     public List<Long> getColumnIds()
     {
         return columnIds;

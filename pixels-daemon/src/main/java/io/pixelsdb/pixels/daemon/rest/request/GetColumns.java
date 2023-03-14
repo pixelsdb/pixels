@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,19 +17,40 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metadata;
-
-import org.junit.Test;
+package io.pixelsdb.pixels.daemon.rest.request;
 
 /**
- * @author: tao
- * @date: Create in 2018-01-27 10:46
- **/
-public class TestServer {
+ * Created at: 3/14/23
+ * Author: hank
+ */
+public class GetColumns
+{
+    private String schemaName;
+    private String tableName;
 
-    @Test
-    public void test() {
-        MetadataServer server = new MetadataServer(18888);
-        server.run();
+    public GetColumns(String schemaName, String tableName)
+    {
+        this.schemaName = schemaName;
+        this.tableName = tableName;
+    }
+
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    public void setSchemaName(String schemaName)
+    {
+        this.schemaName = schemaName;
+    }
+
+    public String getTableName()
+    {
+        return tableName;
+    }
+
+    public void setTableName(String tableName)
+    {
+        this.tableName = tableName;
     }
 }

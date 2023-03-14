@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.metadata.domain;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 
 public class View extends Base
@@ -60,6 +61,7 @@ public class View extends Base
         this.type = type;
     }
 
+    @JSONField(serialize = false)
     public String getData()
     {
         return data;
