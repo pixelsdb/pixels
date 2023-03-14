@@ -81,31 +81,43 @@ public class DaemonMain
                     int restServerPort = Integer.parseInt(config.getProperty("rest.server.port"));
                     int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
 
-                    // start metadata server
-                    MetadataServer metadataServer = new MetadataServer(metadataServerPort);
-                    container.addServer("metadata", metadataServer);
-                    // start transaction server
-                    TransServer transServer = new TransServer(transServerPort);
-                    container.addServer("transaction", transServer);
-                    // start rest server
-                    RestServer restServer = new RestServer(restServerPort);
-                    container.addServer("rest", restServer);
-                    // start cache coordinator
-                    CacheCoordinator cacheCoordinator = new CacheCoordinator();
-                    container.addServer("cache_coordinator", cacheCoordinator);
+                    try
+                    {
+                        // start metadata server
+                        MetadataServer metadataServer = new MetadataServer(metadataServerPort);
+                        container.addServer("metadata", metadataServer);
+                        // start transaction server
+                        TransServer transServer = new TransServer(transServerPort);
+                        container.addServer("transaction", transServer);
+                        // start rest server
+                        RestServer restServer = new RestServer(restServerPort);
+                        container.addServer("rest", restServer);
+                        // start cache coordinator
+                        CacheCoordinator cacheCoordinator = new CacheCoordinator();
+                        container.addServer("cache_coordinator", cacheCoordinator);
+                    } catch (Throwable e)
+                    {
+                        log.error("failed to start coordinator", e);
+                    }
                 }
                 else
                 {
                     boolean metricsServerEnabled = Boolean.parseBoolean(
                             ConfigFactory.Instance().getProperty("metrics.server.enabled"));
-                    // start metrics server and cache manager on data node
-                    if (metricsServerEnabled)
+                    try
                     {
-                        MetricsServer metricsServer = new MetricsServer();
-                        container.addServer("metrics", metricsServer);
+                        // start metrics server and cache manager on data node
+                        if (metricsServerEnabled)
+                        {
+                            MetricsServer metricsServer = new MetricsServer();
+                            container.addServer("metrics", metricsServer);
+                        }
+                        CacheManager cacheManager = new CacheManager();
+                        container.addServer("cache_manager", cacheManager);
+                    } catch (Throwable e)
+                    {
+                        log.error("failed to start node manager", e);
                     }
-                    CacheManager cacheManager = new CacheManager();
-                    container.addServer("cache_manager", cacheManager);
                 }
 
                 // The shutdown hook ensures the servers are shutdown graceful

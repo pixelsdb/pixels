@@ -90,12 +90,14 @@ public class CacheManager
         this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
         this.hostName = System.getenv("HOSTNAME");
         logger.debug("HostName from system env: " + hostName);
-        if (hostName == null) {
-            try {
+        if (hostName == null)
+        {
+            try
+            {
                 this.hostName = InetAddress.getLocalHost().getHostName();
                 logger.debug("HostName from InetAddress: " + hostName);
-            }
-            catch (UnknownHostException e) {
+            } catch (UnknownHostException e)
+            {
                 logger.debug("Hostname is null. Exit");
                 return;
             }
@@ -124,26 +126,27 @@ public class CacheManager
      * */
     private void initialize()
     {
-        try {
+        try
+        {
             // 1. check the existence of the cache coordinator.
             KeyValue cacheCoordinatorKV = etcdUtil.getKeyValue(Constants.CACHE_COORDINATOR_LITERAL);
-            if (cacheCoordinatorKV == null) {
-                logger.info("No coordinator found. Exit");
+            if (cacheCoordinatorKV == null)
+            {
+                logger.error("No coordinator found. Exit");
                 return;
             }
             if (cacheConfig.isCacheEnabled())
             {
                 // 2. init cache writer and metadata service
-                this.cacheWriter =
-                        PixelsCacheWriter.newBuilder()
-                                .setCacheLocation(cacheConfig.getCacheLocation())
-                                .setCacheSize(cacheConfig.getCacheSize())
-                                .setIndexLocation(cacheConfig.getIndexLocation())
-                                .setIndexSize(cacheConfig.getIndexSize())
-                                .setOverwrite(false)
-                                .setHostName(hostName)
-                                .setCacheConfig(cacheConfig)
-                                .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
+                this.cacheWriter = PixelsCacheWriter.newBuilder()
+                        .setCacheLocation(cacheConfig.getCacheLocation())
+                        .setCacheSize(cacheConfig.getCacheSize())
+                        .setIndexLocation(cacheConfig.getIndexLocation())
+                        .setIndexSize(cacheConfig.getIndexSize())
+                        .setOverwrite(false)
+                        .setHostName(hostName)
+                        .setCacheConfig(cacheConfig)
+                        .build(); // cache version in the index file is cleared if its first 6 bytes are not magic ("PIXELS").
                 this.metadataService = new MetadataService(cacheConfig.getMetaHost(), cacheConfig.getMetaPort());
 
                 // 3. Update cache if necessary.
@@ -173,10 +176,9 @@ public class CacheManager
                     0, cacheConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
-        }
-        catch (Exception e) {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+        } catch (Exception e)
+        {
+            logger.error("failed to initialize cache manager", e);
         }
     }
 
@@ -184,7 +186,8 @@ public class CacheManager
             throws MetadataException
     {
         Layout matchedLayout = metadataService.getLayout(cacheConfig.getSchema(), cacheConfig.getTable(), version);
-        if (matchedLayout != null) {
+        if (matchedLayout != null)
+        {
             // update cache status
             cacheStatus.set(CacheNodeStatus.UPDATING.StatusCode);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
@@ -201,8 +204,8 @@ public class CacheManager
             cacheStatus.set(status);
             etcdUtil.putKeyValue(Constants.CACHE_NODE_STATUS_LITERAL + hostName, "" + cacheStatus.get());
             localCacheVersion = version;
-        }
-        else {
+        } else
+        {
             logger.warn("No matching layout found for the update version " + version);
         }
     }
@@ -211,7 +214,8 @@ public class CacheManager
     public void run()
     {
         logger.info("Starting Node Manager");
-        if (false == initializeSuccess) {
+        if (!initializeSuccess)
+        {
             logger.error("Initialization failed, stop now...");
             return;
         }
@@ -273,7 +277,6 @@ public class CacheManager
         } catch (InterruptedException e)
         {
             logger.error("Node Manager was interrupted abnormally.", e);
-            e.printStackTrace();
         } finally
         {
             if (watcher != null)
@@ -311,7 +314,6 @@ public class CacheManager
             {
                 logger.error("Failed to shutdown rpc channel for metadata service " +
                         "while shutting down Node Manager.", e);
-                e.printStackTrace();
             }
         }
         if (cacheWriter != null)
@@ -322,7 +324,6 @@ public class CacheManager
             } catch (Exception e)
             {
                 logger.error("Failed to close cache writer while shutting down Node Manager.", e);
-                e.printStackTrace();
             }
         }
         if (runningLatch != null)
@@ -331,7 +332,6 @@ public class CacheManager
         }
         EtcdUtil.Instance().getClient().close();
         logger.info("Node Manager on '" + hostName + "' is shutdown.");
-
     }
 
     /**
@@ -347,16 +347,16 @@ public class CacheManager
         {
             this.leaseClient = leaseClient;
             this.leaseId = leaseId;
-
         }
 
         @Override
         public void run()
         {
-            try {
+            try
+            {
                 leaseClient.keepAliveOnce(leaseId);
-            }
-            catch (Exception e) {
+            } catch (Exception e)
+            {
                 e.printStackTrace();
             }
         }

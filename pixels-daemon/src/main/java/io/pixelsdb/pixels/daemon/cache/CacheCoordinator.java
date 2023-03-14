@@ -189,10 +189,9 @@ public class CacheCoordinator
             coordinatorStatus.set(CoordinatorStatus.READY.StatusCode);
             initializeSuccess = true;
             logger.info("CacheCoordinator on " + hostName + " has started.");
-        }
-        catch (Exception e) {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+        } catch (Exception e)
+        {
+            logger.error("failed to initialize CacheCoordinator", e);
         }
     }
 
@@ -200,7 +199,8 @@ public class CacheCoordinator
     public void run()
     {
         logger.info("Starting Coordinator");
-        if (false == initializeSuccess) {
+        if (!initializeSuccess)
+        {
             logger.error("Initialization failed, stop now...");
             return;
         }
@@ -233,8 +233,7 @@ public class CacheCoordinator
                                         etcdUtil.putKeyValue(Constants.CACHE_VERSION_LITERAL, String.valueOf(layoutVersion));
                                     } catch (IOException | MetadataException e)
                                     {
-                                        logger.error(e.getMessage());
-                                        e.printStackTrace();
+                                        logger.error("failed to update cache distribution", e);
                                     }
                                 } else if (coordinatorStatus.get() == CoordinatorStatus.DEAD.StatusCode)
                                 {
@@ -291,7 +290,6 @@ public class CacheCoordinator
             {
                 logger.error("Failed to shutdown rpc channel for metadata service " +
                         "while shutting down Coordinator.", e);
-                e.printStackTrace();
             }
         }
         if (storage != null)
@@ -302,7 +300,6 @@ public class CacheCoordinator
             } catch (IOException e)
             {
                 logger.error("Failed to close cache storage while shutting down Coordinator.", e);
-                e.printStackTrace();
             }
         }
         if (runningLatch != null)
@@ -327,17 +324,22 @@ public class CacheCoordinator
         String[] paths = select(layout);
         // allocate: decide which node to cache each file
         List<KeyValue> nodes = etcdUtil.getKeyValuesByPrefix(Constants.CACHE_NODE_STATUS_LITERAL);
-        if (nodes == null || nodes.isEmpty()) {
+        if (nodes == null || nodes.isEmpty())
+        {
             logger.info("Nodes is null or empty, no updates");
             return;
         }
         HostAddress[] hosts = new HostAddress[nodes.size()];
         int hostIndex = 0;
-        for (int i = 0; i < nodes.size(); i++) {
+        for (int i = 0; i < nodes.size(); i++)
+        {
             KeyValue node = nodes.get(i);
             // key: host_[hostname]; value: [status]. available if status == 1.
-            if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) == CacheManager.CacheNodeStatus.READY.StatusCode) {
-                hosts[hostIndex++] = HostAddress.fromString(node.getKey().toString(StandardCharsets.UTF_8).substring(5));
+            if (Integer.parseInt(node.getValue().toString(StandardCharsets.UTF_8)) ==
+                    CacheManager.CacheNodeStatus.READY.StatusCode)
+            {
+                hosts[hostIndex++] = HostAddress.fromString(node.getKey()
+                        .toString(StandardCharsets.UTF_8).substring(5));
             }
         }
         allocate(paths, hosts, hostIndex, layoutVersion);
@@ -355,10 +357,12 @@ public class CacheCoordinator
         String compactPath = layout.getCompactPath();
         List<String> files = new ArrayList<>();
         List<Status> statuses = storage.listStatus(compactPath);
-        if (statuses != null) {
+        if (statuses != null)
+        {
             for (Status status : statuses)
             {
-                if (status.isFile()) {
+                if (status.isFile())
+                {
                     files.add(status.getPath());
                 }
             }
@@ -404,7 +408,8 @@ public class CacheCoordinator
         CacheLocationDistribution locationDistribution = new CacheLocationDistribution(nodes, size);
 
         List<HostAddress> cacheNodes = new ArrayList<>();
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++)
+        {
             cacheNodes.add(nodes[i]);
         }
 
@@ -469,8 +474,7 @@ public class CacheCoordinator
             }
         } catch (BalancerException e)
         {
-            logger.error(e.getMessage());
-            e.printStackTrace();
+            logger.error("failed to balance cache distribution", e);
         }
 
         return locationDistribution;
@@ -480,7 +484,6 @@ public class CacheCoordinator
         ImmutableList.Builder<HostAddress> builder = ImmutableList.builder();
         for (String host : hosts) {
             builder.add(HostAddress.fromString(host));
-//            break;
         }
         return builder.build();
     }
