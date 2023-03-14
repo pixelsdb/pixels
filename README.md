@@ -2,7 +2,7 @@ Pixels
 =======
 
 Pixels is a columnar storage engine and auxiliary compute engine for data lakes and warehouses.
-We have integrated it into popular query engines including Trino (405), Presto (0.209), and Hive (2.3+).
+We have integrated it into popular query engines including Trino (405), Presto (0.279), and Hive (2.3+).
 
 The columnar storage engine in Pixels is optimized for data analytics on tables that are stored in file/object storage systems (including S3, GCS, HDFS, Redis, and local file systems),and provides much higher performance than existing columnar formats such as Parquet.
 All the storage optimizations are transparent to the query engines.
