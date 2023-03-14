@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.daemon.rest;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -73,28 +74,42 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request)
     {
-        ByteBuf responseContent;
+        FullHttpResponse response;
         try
         {
-            responseContent = processRequest(request.uri(), request.content());
-        } catch (Throwable e)
+            byte[] responseContent = processRequest(request.uri(), request.content());
+            response = new DefaultFullHttpResponse(request.protocolVersion(),
+                    HttpResponseStatus.OK, Unpooled.wrappedBuffer(responseContent));
+        } catch (JSONException e)
         {
             log.error("failed to process request content", e);
-            return;
+            response = new DefaultFullHttpResponse(request.protocolVersion(),
+                    HttpResponseStatus.BAD_REQUEST, Unpooled.wrappedBuffer(
+                    "{error:\"invalid request content\"}".getBytes(StandardCharsets.UTF_8)));
+        } catch (InvalidArgumentException e)
+        {
+            log.error("failed to process request content", e);
+            response = new DefaultFullHttpResponse(request.protocolVersion(),
+                    HttpResponseStatus.BAD_REQUEST, Unpooled.wrappedBuffer(
+                    "{error:\"invalid request uri\"}".getBytes(StandardCharsets.UTF_8)));
+        } catch (MetadataException e)
+        {
+            log.error("failed get metadata", e);
+            response = new DefaultFullHttpResponse(request.protocolVersion(),
+                    HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.wrappedBuffer(
+                    "{error:\"metadata error\"}".getBytes(StandardCharsets.UTF_8)));
+        } catch (Throwable e)
+        {
+            log.error("failed get metadata", e);
+            response = new DefaultFullHttpResponse(request.protocolVersion(),
+                    HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.wrappedBuffer(
+                    "{error:\"unknown server error\"}".getBytes(StandardCharsets.UTF_8)));
         }
-
-        FullHttpResponse response = new DefaultFullHttpResponse(request.protocolVersion(),
-                HttpResponseStatus.OK, responseContent);
-
-        boolean keepAlive = HttpUtil.isKeepAlive(request);
-
-        ByteBuf buffer = request.content();
-        System.out.println(request.uri());
-        System.out.println(buffer.toString(StandardCharsets.UTF_8));
 
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
                 .setInt(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
 
+        boolean keepAlive = HttpUtil.isKeepAlive(request);
         if (keepAlive)
         {
             response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
@@ -119,7 +134,7 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         ctx.close();
     }
 
-    private ByteBuf processRequest(String uri, ByteBuf requestContent)
+    private byte[] processRequest(String uri, ByteBuf requestContent)
             throws InvalidArgumentException, MetadataException
     {
         requireNonNull(uri, "uri is null");
@@ -129,27 +144,26 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         {
             GetSchemas request = JSON.parseObject(content, GetSchemas.class);
             requireNonNull(request, "failed to parse request content");
-            return Unpooled.wrappedBuffer(JSON.toJSONString(
-                    metadataService.getSchemas()).getBytes(StandardCharsets.UTF_8));
+            return JSON.toJSONString(metadataService.getSchemas()).getBytes(StandardCharsets.UTF_8);
         } else if (uri.startsWith(URI_METADATA_GET_TABLES))
         {
             GetTables request = JSON.parseObject(content, GetTables.class);
             requireNonNull(request, "failed to parse request content");
-            return Unpooled.wrappedBuffer(JSON.toJSONString(
-                    metadataService.getTables(request.getSchemaName())).getBytes(StandardCharsets.UTF_8));
+            return JSON.toJSONString(metadataService.getTables(request.getSchemaName()))
+                    .getBytes(StandardCharsets.UTF_8);
         } else if (uri.startsWith(URI_METADATA_GET_VIEWS))
         {
             GetViews request = JSON.parseObject(content, GetViews.class);
             requireNonNull(request, "failed to parse request content");
-            return Unpooled.wrappedBuffer(JSON.toJSONString(
-                    metadataService.getViews(request.getSchemaName())).getBytes(StandardCharsets.UTF_8));
+            return JSON.toJSONString(metadataService.getViews(request.getSchemaName()))
+                    .getBytes(StandardCharsets.UTF_8);
         } else if (uri.startsWith(URI_METADATA_GET_COLUMNS))
         {
             GetColumns request = JSON.parseObject(content, GetColumns.class);
             requireNonNull(request, "failed to parse request content");
-            return Unpooled.wrappedBuffer(JSON.toJSONString(
-                    metadataService.getColumns(request.getSchemaName(), request.getTableName(), false))
-                    .getBytes(StandardCharsets.UTF_8));
+            return JSON.toJSONString(metadataService.getColumns(
+                    request.getSchemaName(), request.getTableName(), false))
+                    .getBytes(StandardCharsets.UTF_8);
         } else
         {
             throw new InvalidArgumentException("invalid uri: " + uri);

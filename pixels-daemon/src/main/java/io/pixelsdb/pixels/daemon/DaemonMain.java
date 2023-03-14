@@ -6,6 +6,7 @@ import io.pixelsdb.pixels.daemon.cache.CacheManager;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
+import io.pixelsdb.pixels.daemon.rest.RestServer;
 import io.pixelsdb.pixels.daemon.transaction.TransServer;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -77,7 +78,7 @@ public class DaemonMain
                 {
                     ConfigFactory config = ConfigFactory.Instance();
                     int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
-                    int metadataHttpServerPort = Integer.parseInt(config.getProperty("rest.server.port"));
+                    int restServerPort = Integer.parseInt(config.getProperty("rest.server.port"));
                     int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
 
                     // start metadata server
@@ -86,6 +87,9 @@ public class DaemonMain
                     // start transaction server
                     TransServer transServer = new TransServer(transServerPort);
                     container.addServer("transaction", transServer);
+                    // start rest server
+                    RestServer restServer = new RestServer(restServerPort);
+                    container.addServer("rest", restServer);
                     // start cache coordinator
                     CacheCoordinator cacheCoordinator = new CacheCoordinator();
                     container.addServer("cache_coordinator", cacheCoordinator);
