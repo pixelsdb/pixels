@@ -29,23 +29,23 @@ import java.sql.SQLException;
 /**
  * @author hank
  */
-public class DBUtil
+public class MetaDBUtil
 {
-    private static DBUtil INSTANCE = new DBUtil();
+    private static MetaDBUtil INSTANCE = new MetaDBUtil();
 
-    public static DBUtil Instance()
+    public static MetaDBUtil Instance()
     {
         return INSTANCE;
     }
 
     private Connection connection = null;
-    private static Logger log = LogManager.getLogger(DBUtil.class);
+    private static Logger log = LogManager.getLogger(MetaDBUtil.class);
 
     private String url;
     private String user;
     private String pass;
 
-    private DBUtil()
+    private MetaDBUtil()
     {
         try
         {

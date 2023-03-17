@@ -19,19 +19,24 @@
  */
 package io.pixelsdb.pixels.daemon.rest.request;
 
+import java.util.Properties;
+
 /**
+ * The request to open a query engine using jdbc url.
  * Created at: 3/17/23
  * Author: hank
  */
-public class ExecuteQuery
+public class OpenEngineConn
 {
     private String connectionName;
-    private String sql;
+    private Properties properties;
+    private String jdbcUrl;
 
-    public ExecuteQuery(String connectionName, String sql)
+    public OpenEngineConn(String connectionName, Properties properties, String jdbcUrl)
     {
         this.connectionName = connectionName;
-        this.sql = sql;
+        this.properties = properties;
+        this.jdbcUrl = jdbcUrl;
     }
 
     public String getConnectionName()
@@ -44,13 +49,23 @@ public class ExecuteQuery
         this.connectionName = connectionName;
     }
 
-    public String getSql()
+    public Properties getProperties()
     {
-        return sql;
+        return properties;
     }
 
-    public void setSql(String sql)
+    public void setProperties(Properties properties)
     {
-        this.sql = sql;
+        this.properties = properties;
+    }
+
+    public String getJdbcUrl()
+    {
+        return jdbcUrl;
+    }
+
+    public void setJdbcUrl(String jdbcUrl)
+    {
+        this.jdbcUrl = jdbcUrl;
     }
 }

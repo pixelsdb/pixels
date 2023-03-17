@@ -19,23 +19,17 @@
  */
 package io.pixelsdb.pixels.daemon.rest.request;
 
-import java.util.Properties;
-
 /**
- * Created at: 3/17/23
- * Author: hank
+ * @author hank
+ * @date 3/17/23
  */
-public class OpenJdbcConn
+public class CloseEngineConn
 {
     private String connectionName;
-    private Properties properties;
-    private String url;
 
-    public OpenJdbcConn(String connectionName, Properties properties, String url)
+    public CloseEngineConn(String connectionName)
     {
         this.connectionName = connectionName;
-        this.properties = properties;
-        this.url = url;
     }
 
     public String getConnectionName()
@@ -46,25 +40,5 @@ public class OpenJdbcConn
     public void setConnectionName(String connectionName)
     {
         this.connectionName = connectionName;
-    }
-
-    public Properties getProperties()
-    {
-        return properties;
-    }
-
-    public void setProperties(Properties properties)
-    {
-        this.properties = properties;
-    }
-
-    public String getUrl()
-    {
-        return url;
-    }
-
-    public void setUrl(String url)
-    {
-        this.url = url;
     }
 }

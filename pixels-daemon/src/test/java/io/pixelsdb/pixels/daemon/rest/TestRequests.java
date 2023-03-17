@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.daemon.rest;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.daemon.rest.request.OpenJdbcConn;
+import io.pixelsdb.pixels.daemon.rest.request.OpenEngineConn;
 import org.junit.Test;
 
 import java.util.Properties;
@@ -36,9 +36,10 @@ public class TestRequests
     {
         Properties properties = new Properties();
         properties.setProperty("user", "pixels");
-        OpenJdbcConn openJdbcConn = new OpenJdbcConn("trino", properties, "jdbc:trino://");
-        String json = JSON.toJSONString(openJdbcConn);
+        OpenEngineConn openEngineConn = new OpenEngineConn("trino", properties, "jdbc:trino://");
+        String json = JSON.toJSONString(openEngineConn);
         System.out.println(json);
-        OpenJdbcConn obj = JSON.parseObject(json, OpenJdbcConn.class);
+        OpenEngineConn obj = JSON.parseObject(json, OpenEngineConn.class);
+        assert obj.getProperties().getProperty("user").equals("pixels");
     }
 }
