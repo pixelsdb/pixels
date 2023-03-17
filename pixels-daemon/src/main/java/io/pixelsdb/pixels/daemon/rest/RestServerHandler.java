@@ -50,7 +50,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 {
-    private static Logger log = LogManager.getLogger(RestServerHandler.class);
+    private static final Logger log = LogManager.getLogger(RestServerHandler.class);
     private static final String URI_METADATA_GET_SCHEMAS = "/metadata/get_schemas";
     private static final String URI_METADATA_GET_TABLES = "/metadata/get_tables";
     private static final String URI_METADATA_GET_VIEWS = "/metadata/get_views";

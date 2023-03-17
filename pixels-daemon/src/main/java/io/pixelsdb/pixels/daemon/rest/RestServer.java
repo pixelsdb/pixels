@@ -43,7 +43,7 @@ import java.security.cert.CertificateException;
  */
 public class RestServer implements Server
 {
-    private static Logger log = LogManager.getLogger(RestServer.class);
+    private static final Logger log = LogManager.getLogger(RestServer.class);
 
     private boolean running = false;
 
