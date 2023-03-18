@@ -68,7 +68,7 @@ public class MetaDBUtil
     {
         try
         {
-            if (this.connection == null || this.connection.isValid(1000) == false)
+            if (this.connection == null || !this.connection.isValid(30))
             {
                 this.connection = DriverManager.getConnection(url, user, pass);
             }

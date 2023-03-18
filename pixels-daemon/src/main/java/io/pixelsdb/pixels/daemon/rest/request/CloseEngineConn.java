@@ -25,20 +25,20 @@ package io.pixelsdb.pixels.daemon.rest.request;
  */
 public class CloseEngineConn
 {
-    private String connectionName;
+    private String connName;
 
-    public CloseEngineConn(String connectionName)
+    public CloseEngineConn(String connName)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
     }
 
-    public String getConnectionName()
+    public String getConnName()
     {
-        return connectionName;
+        return connName;
     }
 
-    public void setConnectionName(String connectionName)
+    public void setConnName(String connName)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
     }
 }

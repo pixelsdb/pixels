@@ -36,7 +36,7 @@ public class TestRequests
     {
         Properties properties = new Properties();
         properties.setProperty("user", "pixels");
-        OpenEngineConn openEngineConn = new OpenEngineConn("trino", properties, "jdbc:trino://");
+        OpenEngineConn openEngineConn = new OpenEngineConn("trino", properties, "", "jdbc:trino://");
         String json = JSON.toJSONString(openEngineConn);
         System.out.println(json);
         OpenEngineConn obj = JSON.parseObject(json, OpenEngineConn.class);

@@ -25,23 +25,23 @@ package io.pixelsdb.pixels.daemon.rest.request;
  */
 public class ExecuteQuery
 {
-    private String connectionName;
+    private String connName;
     private String sql;
 
-    public ExecuteQuery(String connectionName, String sql)
+    public ExecuteQuery(String connName, String sql)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
         this.sql = sql;
     }
 
-    public String getConnectionName()
+    public String getConnName()
     {
-        return connectionName;
+        return connName;
     }
 
-    public void setConnectionName(String connectionName)
+    public void setConnName(String connName)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
     }
 
     public String getSql()

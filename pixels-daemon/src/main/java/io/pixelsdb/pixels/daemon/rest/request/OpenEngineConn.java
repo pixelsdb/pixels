@@ -28,25 +28,33 @@ import java.util.Properties;
  */
 public class OpenEngineConn
 {
-    private String connectionName;
+    private String connName;
     private Properties properties;
-    private String jdbcUrl;
+    /**
+     * JDBC driver.
+     */
+    private String driver;
+    /**
+     * JDBC url.
+     */
+    private String url;
 
-    public OpenEngineConn(String connectionName, Properties properties, String jdbcUrl)
+    public OpenEngineConn(String connName, Properties properties, String driver, String url)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
         this.properties = properties;
-        this.jdbcUrl = jdbcUrl;
+        this.driver = driver;
+        this.url = url;
     }
 
-    public String getConnectionName()
+    public String getConnName()
     {
-        return connectionName;
+        return connName;
     }
 
-    public void setConnectionName(String connectionName)
+    public void setConnName(String connName)
     {
-        this.connectionName = connectionName;
+        this.connName = connName;
     }
 
     public Properties getProperties()
@@ -59,13 +67,23 @@ public class OpenEngineConn
         this.properties = properties;
     }
 
-    public String getJdbcUrl()
+    public String getDriver()
     {
-        return jdbcUrl;
+        return driver;
     }
 
-    public void setJdbcUrl(String jdbcUrl)
+    public void setDriver(String driver)
     {
-        this.jdbcUrl = jdbcUrl;
+        this.driver = driver;
+    }
+
+    public String getUrl()
+    {
+        return url;
+    }
+
+    public void setUrl(String url)
+    {
+        this.url = url;
     }
 }

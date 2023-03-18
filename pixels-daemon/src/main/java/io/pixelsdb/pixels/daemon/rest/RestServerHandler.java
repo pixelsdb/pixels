@@ -32,11 +32,15 @@ import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.QueryEngineConns;
 import io.pixelsdb.pixels.daemon.rest.request.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import static java.util.Objects.requireNonNull;
 
@@ -129,6 +133,7 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         ctx.close();
     }
 
+    private static final String EMPTY_CONTENT = "{}";
     private static ByteBuf error(String message)
     {
         StringBuilder builder = new StringBuilder("{error:\"").append(message).append("\"}");
@@ -136,7 +141,7 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private static ByteBuf processRequest(String uri, ByteBuf requestContent)
-            throws InvalidArgumentException, MetadataException
+            throws InvalidArgumentException, MetadataException, SQLException
     {
         requireNonNull(uri, "uri is null");
         requireNonNull(requestContent, "requestContent is null");
@@ -167,14 +172,24 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         {
             OpenEngineConn request = JSON.parseObject(content, OpenEngineConn.class);
             requireNonNull(request, "failed to parse request content");
+            QueryEngineConns.Instance().openConn(request.getConnName(), request.getDriver(),
+                    request.getUrl(), request.getProperties());
+            response = EMPTY_CONTENT;
         } else if (uri.startsWith(URI_QUERY_EXECUTE_QUERY))
         {
             ExecuteQuery request = JSON.parseObject(content, ExecuteQuery.class);
             requireNonNull(request, "failed to parse request content");
+            Connection connection = QueryEngineConns.Instance().getConnection(request.getConnName());
+            Statement statement = connection.createStatement();
+            statement.executeQuery(request.getSql());
+            // TODO: return query result.
+            response = EMPTY_CONTENT;
         } else if (uri.startsWith(URI_QUERY_CLOSE_ENGINE_CONN))
         {
             CloseEngineConn request = JSON.parseObject(content, CloseEngineConn.class);
             requireNonNull(request, "failed to parse request content");
+            QueryEngineConns.Instance().closeConn(request.getConnName());
+            response = EMPTY_CONTENT;
         } else
         {
             throw new InvalidArgumentException("invalid uri: " + uri);
