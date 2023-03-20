@@ -27,11 +27,13 @@ public class ExecuteQuery
 {
     private String connName;
     private String sql;
+    private int previewCount;
 
-    public ExecuteQuery(String connName, String sql)
+    public ExecuteQuery(String connName, String sql, int previewCount)
     {
         this.connName = connName;
         this.sql = sql;
+        this.previewCount = previewCount;
     }
 
     public String getConnName()
@@ -52,5 +54,15 @@ public class ExecuteQuery
     public void setSql(String sql)
     {
         this.sql = sql;
+    }
+
+    public int getPreviewCount()
+    {
+        return previewCount;
+    }
+
+    public void setPreviewCount(int previewCount)
+    {
+        this.previewCount = previewCount;
     }
 }

@@ -34,13 +34,19 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.QueryEngineConns;
 import io.pixelsdb.pixels.daemon.rest.request.*;
+import io.pixelsdb.pixels.daemon.rest.response.QueryResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -181,9 +187,28 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             requireNonNull(request, "failed to parse request content");
             Connection connection = QueryEngineConns.Instance().getConnection(request.getConnName());
             Statement statement = connection.createStatement();
-            statement.executeQuery(request.getSql());
-            // TODO: return query result.
-            response = EMPTY_CONTENT;
+            ResultSet resultSet = statement.executeQuery(request.getSql());
+            int columnCount = resultSet.getMetaData().getColumnCount();
+            List<String> schema = new ArrayList<>(columnCount);
+            for (int i = 1; i <= columnCount; ++i)
+            {
+                // column id starts from 1
+                schema.add(resultSet.getMetaData().getColumnLabel(i));
+            }
+            String[] row = new String[columnCount];
+            List<String> previewRows = new ArrayList<>(request.getPreviewCount());
+            for (int i = 0; i < request.getPreviewCount() && resultSet.next(); ++i)
+            {
+                for (int j = 0; j < columnCount; ++j)
+                {
+                    row[j] = resultSet.getObject(j+1).toString();
+                }
+                previewRows.add(Stream.of(row).map(RestServerHandler::escapeSpecialCharacters)
+                        .collect(Collectors.joining(",")));
+            }
+            QueryResult queryResult = new QueryResult(schema, previewRows, resultSet.next(),
+                    0.0d, 0.0d); // TODO: get execution time and price.
+            response = JSON.toJSONString(queryResult);
         } else if (uri.startsWith(URI_QUERY_CLOSE_ENGINE_CONN))
         {
             CloseEngineConn request = JSON.parseObject(content, CloseEngineConn.class);
@@ -195,5 +220,16 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             throw new InvalidArgumentException("invalid uri: " + uri);
         }
         return Unpooled.wrappedBuffer(response.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String escapeSpecialCharacters(String data)
+    {
+        String escapedData = data.replaceAll("\\R", " ");
+        if (data.contains(",") || data.contains("\"") || data.contains("'"))
+        {
+            data = data.replace("\"", "\"\"");
+            escapedData = "\"" + data + "\"";
+        }
+        return escapedData;
     }
 }

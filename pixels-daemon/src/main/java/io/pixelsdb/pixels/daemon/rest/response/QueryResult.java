@@ -19,10 +19,77 @@
  */
 package io.pixelsdb.pixels.daemon.rest.response;
 
+import java.util.List;
+
 /**
  * Created at: 3/17/23
  * Author: hank
  */
 public class QueryResult
 {
+    private List<String> schema;
+    private List<String> previewRows;
+    private boolean hasMore;
+    private double executeTimeMs;
+    private double priceCents;
+
+    public QueryResult(List<String> schema, List<String> previewRows,
+                       boolean hasMore, double executeTimeMs, double priceCents)
+    {
+        this.schema = schema;
+        this.previewRows = previewRows;
+        this.hasMore = hasMore;
+        this.executeTimeMs = executeTimeMs;
+        this.priceCents = priceCents;
+    }
+
+    public List<String> getSchema()
+    {
+        return schema;
+    }
+
+    public void setSchema(List<String> schema)
+    {
+        this.schema = schema;
+    }
+
+    public List<String> getPreviewRows()
+    {
+        return previewRows;
+    }
+
+    public void setPreviewRows(List<String> previewRows)
+    {
+        this.previewRows = previewRows;
+    }
+
+    public boolean isHasMore()
+    {
+        return hasMore;
+    }
+
+    public void setHasMore(boolean hasMore)
+    {
+        this.hasMore = hasMore;
+    }
+
+    public double getExecuteTimeMs()
+    {
+        return executeTimeMs;
+    }
+
+    public void setExecuteTimeMs(double executeTimeMs)
+    {
+        this.executeTimeMs = executeTimeMs;
+    }
+
+    public double getPriceCents()
+    {
+        return priceCents;
+    }
+
+    public void setPriceCents(double priceCents)
+    {
+        this.priceCents = priceCents;
+    }
 }
