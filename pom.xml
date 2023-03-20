@@ -50,8 +50,8 @@
         <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
 
         <!-- query engines -->
-        <dep.presto.version>0.215</dep.presto.version>
-        <dep.trino.version>375</dep.trino.version>
+        <dep.presto.version>0.279</dep.presto.version>
+        <dep.trino.version>405</dep.trino.version>
 
         <!-- storage systems -->
         <dep.hadoop.version>3.3.1</dep.hadoop.version>
