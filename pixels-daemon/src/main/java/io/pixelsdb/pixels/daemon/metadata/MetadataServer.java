@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.daemon.metadata;
 
 import io.grpc.ServerBuilder;
-import io.pixelsdb.pixels.common.utils.DBUtil;
+import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.Server;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -66,7 +66,7 @@ public class MetadataServer implements Server
         {
             log.error("Interrupted when shutdown rpc server.", e);
         }
-        DBUtil.Instance().close();
+        MetaDBUtil.Instance().close();
     }
 
     @Override

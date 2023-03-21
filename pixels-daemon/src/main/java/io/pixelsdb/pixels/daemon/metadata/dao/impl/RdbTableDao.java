@@ -19,7 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.metadata.dao.impl;
 
-import io.pixelsdb.pixels.common.utils.DBUtil;
+import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.TableDao;
 import org.apache.logging.log4j.LogManager;
@@ -36,7 +36,7 @@ public class RdbTableDao extends TableDao
 {
     public RdbTableDao() {}
 
-    private static final DBUtil db = DBUtil.Instance();
+    private static final MetaDBUtil db = MetaDBUtil.Instance();
     private static final Logger log = LogManager.getLogger(RdbTableDao.class);
 
     @Override

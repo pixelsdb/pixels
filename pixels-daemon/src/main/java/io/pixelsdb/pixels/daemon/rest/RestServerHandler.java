@@ -32,14 +32,21 @@ import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.rest.request.GetColumns;
-import io.pixelsdb.pixels.daemon.rest.request.GetSchemas;
-import io.pixelsdb.pixels.daemon.rest.request.GetTables;
-import io.pixelsdb.pixels.daemon.rest.request.GetViews;
+import io.pixelsdb.pixels.common.utils.QueryEngineConns;
+import io.pixelsdb.pixels.daemon.rest.request.*;
+import io.pixelsdb.pixels.daemon.rest.response.QueryResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,11 +57,14 @@ import static java.util.Objects.requireNonNull;
  */
 public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpRequest>
 {
-    private static Logger log = LogManager.getLogger(RestServerHandler.class);
+    private static final Logger log = LogManager.getLogger(RestServerHandler.class);
     private static final String URI_METADATA_GET_SCHEMAS = "/metadata/get_schemas";
     private static final String URI_METADATA_GET_TABLES = "/metadata/get_tables";
     private static final String URI_METADATA_GET_VIEWS = "/metadata/get_views";
     private static final String URI_METADATA_GET_COLUMNS = "/metadata/get_columns";
+    private static final String URI_QUERY_OPEN_ENGINE_CONN = "/query/open_engine_conn";
+    private static final String URI_QUERY_EXECUTE_QUERY = "/query/execute_query";
+    private static final String URI_QUERY_CLOSE_ENGINE_CONN = "/query/close_engine_conn";
 
     private static final MetadataService metadataService;
 
@@ -77,33 +87,28 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         FullHttpResponse response;
         try
         {
-            byte[] responseContent = processRequest(request.uri(), request.content());
             response = new DefaultFullHttpResponse(request.protocolVersion(),
-                    HttpResponseStatus.OK, Unpooled.wrappedBuffer(responseContent));
+                    HttpResponseStatus.OK, processRequest(request.uri(), request.content()));
         } catch (JSONException e)
         {
             log.error("failed to process request content", e);
             response = new DefaultFullHttpResponse(request.protocolVersion(),
-                    HttpResponseStatus.BAD_REQUEST, Unpooled.wrappedBuffer(
-                    "{error:\"invalid request content\"}".getBytes(StandardCharsets.UTF_8)));
+                    HttpResponseStatus.BAD_REQUEST, error("invalid request content"));
         } catch (InvalidArgumentException e)
         {
             log.error("failed to process request content", e);
             response = new DefaultFullHttpResponse(request.protocolVersion(),
-                    HttpResponseStatus.BAD_REQUEST, Unpooled.wrappedBuffer(
-                    "{error:\"invalid request uri\"}".getBytes(StandardCharsets.UTF_8)));
+                    HttpResponseStatus.BAD_REQUEST, error("invalid request uri"));
         } catch (MetadataException e)
         {
             log.error("failed get metadata", e);
             response = new DefaultFullHttpResponse(request.protocolVersion(),
-                    HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.wrappedBuffer(
-                    "{error:\"metadata error\"}".getBytes(StandardCharsets.UTF_8)));
+                    HttpResponseStatus.INTERNAL_SERVER_ERROR, error("metadata error"));
         } catch (Throwable e)
         {
             log.error("failed get metadata", e);
             response = new DefaultFullHttpResponse(request.protocolVersion(),
-                    HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.wrappedBuffer(
-                    "{error:\"unknown server error\"}".getBytes(StandardCharsets.UTF_8)));
+                    HttpResponseStatus.INTERNAL_SERVER_ERROR, error("unknown server error"));
         }
 
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
@@ -134,39 +139,99 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         ctx.close();
     }
 
-    private byte[] processRequest(String uri, ByteBuf requestContent)
-            throws InvalidArgumentException, MetadataException
+    private static final String EMPTY_CONTENT = "{}";
+    private static ByteBuf error(String message)
+    {
+        StringBuilder builder = new StringBuilder("{error:\"").append(message).append("\"}");
+        return Unpooled.wrappedBuffer(builder.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static ByteBuf processRequest(String uri, ByteBuf requestContent)
+            throws InvalidArgumentException, MetadataException, SQLException
     {
         requireNonNull(uri, "uri is null");
         requireNonNull(requestContent, "requestContent is null");
         String content = requestContent.toString(StandardCharsets.UTF_8);
+        String response;
         if (uri.startsWith(URI_METADATA_GET_SCHEMAS))
         {
             GetSchemas request = JSON.parseObject(content, GetSchemas.class);
             requireNonNull(request, "failed to parse request content");
-            return JSON.toJSONString(metadataService.getSchemas()).getBytes(StandardCharsets.UTF_8);
+            response = JSON.toJSONString(metadataService.getSchemas());
         } else if (uri.startsWith(URI_METADATA_GET_TABLES))
         {
             GetTables request = JSON.parseObject(content, GetTables.class);
             requireNonNull(request, "failed to parse request content");
-            return JSON.toJSONString(metadataService.getTables(request.getSchemaName()))
-                    .getBytes(StandardCharsets.UTF_8);
+            response = JSON.toJSONString(metadataService.getTables(request.getSchemaName()));
         } else if (uri.startsWith(URI_METADATA_GET_VIEWS))
         {
             GetViews request = JSON.parseObject(content, GetViews.class);
             requireNonNull(request, "failed to parse request content");
-            return JSON.toJSONString(metadataService.getViews(request.getSchemaName()))
-                    .getBytes(StandardCharsets.UTF_8);
+            response = JSON.toJSONString(metadataService.getViews(request.getSchemaName()));
         } else if (uri.startsWith(URI_METADATA_GET_COLUMNS))
         {
             GetColumns request = JSON.parseObject(content, GetColumns.class);
             requireNonNull(request, "failed to parse request content");
-            return JSON.toJSONString(metadataService.getColumns(
-                    request.getSchemaName(), request.getTableName(), false))
-                    .getBytes(StandardCharsets.UTF_8);
+            response = JSON.toJSONString(metadataService.getColumns(
+                    request.getSchemaName(), request.getTableName(), false));
+        } else if (uri.startsWith(URI_QUERY_OPEN_ENGINE_CONN))
+        {
+            OpenEngineConn request = JSON.parseObject(content, OpenEngineConn.class);
+            requireNonNull(request, "failed to parse request content");
+            QueryEngineConns.Instance().openConn(request.getConnName(), request.getDriver(),
+                    request.getUrl(), request.getProperties());
+            response = EMPTY_CONTENT;
+        } else if (uri.startsWith(URI_QUERY_EXECUTE_QUERY))
+        {
+            ExecuteQuery request = JSON.parseObject(content, ExecuteQuery.class);
+            requireNonNull(request, "failed to parse request content");
+            Connection connection = QueryEngineConns.Instance().getConnection(request.getConnName());
+            Statement statement = connection.createStatement();
+            long start = System.currentTimeMillis();
+            ResultSet resultSet = statement.executeQuery(request.getSql());
+            long executeTimeMs = System.currentTimeMillis() - start;
+            int columnCount = resultSet.getMetaData().getColumnCount();
+            List<String> schema = new ArrayList<>(columnCount);
+            for (int i = 1; i <= columnCount; ++i)
+            {
+                // column id starts from 1
+                schema.add(resultSet.getMetaData().getColumnLabel(i));
+            }
+            String[] row = new String[columnCount];
+            List<String> previewRows = new ArrayList<>(request.getPreviewCount());
+            for (int i = 0; i < request.getPreviewCount() && resultSet.next(); ++i)
+            {
+                for (int j = 0; j < columnCount; ++j)
+                {
+                    row[j] = resultSet.getObject(j+1).toString();
+                }
+                previewRows.add(Stream.of(row).map(RestServerHandler::escapeSpecialCharacters)
+                        .collect(Collectors.joining(",")));
+            }
+            QueryResult queryResult = new QueryResult(schema, previewRows, resultSet.next(),
+                    executeTimeMs, executeTimeMs*0.00002); // TODO: get accurate execution time and price.
+            response = JSON.toJSONString(queryResult);
+        } else if (uri.startsWith(URI_QUERY_CLOSE_ENGINE_CONN))
+        {
+            CloseEngineConn request = JSON.parseObject(content, CloseEngineConn.class);
+            requireNonNull(request, "failed to parse request content");
+            QueryEngineConns.Instance().closeConn(request.getConnName());
+            response = EMPTY_CONTENT;
         } else
         {
             throw new InvalidArgumentException("invalid uri: " + uri);
         }
+        return Unpooled.wrappedBuffer(response.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String escapeSpecialCharacters(String data)
+    {
+        String escapedData = data.replaceAll("\\R", " ");
+        if (data.contains(",") || data.contains("\"") || data.contains("'"))
+        {
+            data = data.replace("\"", "\"\"");
+            escapedData = "\"" + data + "\"";
+        }
+        return escapedData;
     }
 }
