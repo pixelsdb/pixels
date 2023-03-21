@@ -187,7 +187,9 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             requireNonNull(request, "failed to parse request content");
             Connection connection = QueryEngineConns.Instance().getConnection(request.getConnName());
             Statement statement = connection.createStatement();
+            long start = System.currentTimeMillis();
             ResultSet resultSet = statement.executeQuery(request.getSql());
+            long executeTimeMs = System.currentTimeMillis() - start;
             int columnCount = resultSet.getMetaData().getColumnCount();
             List<String> schema = new ArrayList<>(columnCount);
             for (int i = 1; i <= columnCount; ++i)
@@ -207,7 +209,7 @@ public class RestServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         .collect(Collectors.joining(",")));
             }
             QueryResult queryResult = new QueryResult(schema, previewRows, resultSet.next(),
-                    0.0d, 0.0d); // TODO: get execution time and price.
+                    executeTimeMs, executeTimeMs*0.00002); // TODO: get accurate execution time and price.
             response = JSON.toJSONString(queryResult);
         } else if (uri.startsWith(URI_QUERY_CLOSE_ENGINE_CONN))
         {
