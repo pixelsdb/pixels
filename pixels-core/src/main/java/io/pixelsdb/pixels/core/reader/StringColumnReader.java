@@ -90,6 +90,10 @@ public class StringColumnReader
     private int isNullBitIndex = 0;
 
     /**
+     * Offset of content array when encode is not enabled.
+     */
+    private int bufferOffset = 0;
+    /**
      * This is the predicted size (number of elements) of dictionary.
      */
     private static final int DEFAULT_STARTS_SIZE = 1024;
@@ -162,6 +166,7 @@ public class StringColumnReader
             inputBuffer = Unpooled.wrappedBuffer(input);
             readContent(input.remaining(), encoding);
             isNullOffset = (int) chunkIndex.getIsNullOffset();
+            bufferOffset = 0;
             hasNull = true;
             elementIndex = 0;
             isNullBitIndex = 8;
@@ -216,7 +221,6 @@ public class StringColumnReader
                 // read values
                 // we get bytes here to reduce memory copies and avoid creating many small byte arrays.
                 byte[] buffer = contentBuf.array();
-                int bufferOffset = contentBuf.arrayOffset();
                 for (int i = 0; i < size; i++)
                 {
                     if (elementIndex % pixelStride == 0)
