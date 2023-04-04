@@ -113,8 +113,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             ByteBuffer curVecPartitionBuffer;
             if (isLong)
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Long.BYTES + 1);
-                curVecPartitionBuffer.put((byte) 1);
+                curVecPartitionBuffer = ByteBuffer.allocate((curPixelVectorIndex + 1) * Long.BYTES);
+                curVecPartitionBuffer.putLong(1);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putLong(curPixelVector[i]);
@@ -122,8 +122,8 @@ public class IntegerColumnWriter extends BaseColumnWriter
             }
             else
             {
-                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + 1);
-                curVecPartitionBuffer.put((byte) 0);
+                curVecPartitionBuffer = ByteBuffer.allocate(curPixelVectorIndex * Integer.BYTES + Long.BYTES);
+                curVecPartitionBuffer.putLong(0);
                 for (int i = 0; i < curPixelVectorIndex; i++)
                 {
                     curVecPartitionBuffer.putInt((int) curPixelVector[i]);
