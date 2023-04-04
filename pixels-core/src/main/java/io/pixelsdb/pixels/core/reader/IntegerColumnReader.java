@@ -122,7 +122,7 @@ public class IntegerColumnReader
                  * The position should not be pushed, because the first byte will be read
                  * again for the first pixel (stride).
                  */
-                isLong = inputBuffer.get(0) == (byte) 1;
+                isLong = inputBuffer.getLong(0) == 1;
             }
         }
         // if run length encoded
@@ -177,7 +177,7 @@ public class IntegerColumnReader
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                         // Read the first byte of the pixels (stride).
-                        isLong = inputBuffer.get() == (byte) 1;
+                        isLong = inputBuffer.getLong() == 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
@@ -215,7 +215,7 @@ public class IntegerColumnReader
                         int pixelId = elementIndex / pixelStride;
                         hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
                         // Read the first byte of the pixels (stride).
-                        isLong = inputBuffer.get() == (byte) 1;
+                        isLong = inputBuffer.getLong() == 1;
                         if (hasNull && isNullBitIndex > 0)
                         {
                             BitUtils.bitWiseDeCompact(isNull, inputBuffer, isNullOffset++, 1);
