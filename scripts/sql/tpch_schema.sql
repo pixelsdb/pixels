@@ -1,4 +1,4 @@
--- Run the following statements in Presto to create the Pixels database for TPC-H
+-- Run the following statements in Presto/Trino to create the Pixels database for TPC-H
 
 CREATE SCHEMA IF NOT EXISTS tpch;
 
