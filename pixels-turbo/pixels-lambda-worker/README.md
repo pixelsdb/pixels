@@ -27,19 +27,19 @@ S3 read-write permissions.
 In advanced settings, enable VPC and select the same VPC of our EC2 instances.
 
 Then, upload `pixels-lambda-worker.jar` as the code source of the Lambda function.
-In `Runtime settings`, select the handler class of the operator, e.g., `io.pixelsdb.pixels.lambda.ScanWorker`.
+In `Runtime settings`, select the handler class of the operator, e.g., `io.pixelsdb.pixels.lambda.worker.ScanWorker`.
 In `Layers`, add the two layers created above.
 In `Configuration->General configuration`, set timeout to 15 minutes and memory to 10240 MB.
 In `Configuration->Environment variables`, create an environment variable named `PIXELS_HOME` with the value `/opt/pixels`.
 `/opt/` is the path where the layers mounted on by default.
 
 In addition to the ScanWorker, we need to create other six operator functions:
-* `BroadcastChainJoinWorker` with the handler `io.pixelsdb.pixels.lambda.BroadcastChainJoinWorker`;
-* `AggregationWorker` with the handler `io.pixelsdb.pixels.lambda.AggregationWorker`;
-* `PartitionedJoinWorker` with the handler `io.pixelsdb.pixels.lambda.PartitionedJoinWorker`;
-* `PartitionWorker` with the handler `io.pixelsdb.pixels.lambda.PartitionWorker`;
-* `PartitionedChainJoinWorker` with the handler `io.pixelsdb.pixels.lambda.PartitionedChainJoinWorker`;
-* `BroadcastJoinWorker` with the handler `io.pixelsdb.pixels.lambda.BroadcastJoinWorker`.
+* `BroadcastChainJoinWorker` with the handler `io.pixelsdb.pixels.lambda.worker.BroadcastChainJoinWorker`;
+* `AggregationWorker` with the handler `io.pixelsdb.pixels.lambda.worker.AggregationWorker`;
+* `PartitionedJoinWorker` with the handler `io.pixelsdb.pixels.lambda.worker.PartitionedJoinWorker`;
+* `PartitionWorker` with the handler `io.pixelsdb.pixels.lambda.worker.PartitionWorker`;
+* `PartitionedChainJoinWorker` with the handler `io.pixelsdb.pixels.lambda.worker.PartitionedChainJoinWorker`;
+* `BroadcastJoinWorker` with the handler `io.pixelsdb.pixels.lambda.worker.BroadcastJoinWorker`.
 
 > Note: the names of the operator functions should be consistent with the worker names in `pixels.properties`.
 

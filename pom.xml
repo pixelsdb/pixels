@@ -39,7 +39,7 @@
         <module>pixels-core</module>
         <module>pixels-daemon</module>
         <module>pixels-executor</module>
-        <module>pixels-turbo/pixels-planner</module>
+        <module>pixels-turbo/pixels-turbo-planner</module>
         <module>pixels-turbo/pixels-lambda-worker</module>
         <module>pixels-turbo/pixels-lambda-invoker</module>
     </modules>
@@ -124,7 +124,7 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-planner</artifactId>
+                <artifactId>pixels-turbo-planner</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
