@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.executor.join;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import io.pixelsdb.pixels.executor.lambda.domain.PartitionInfo;
 import io.pixelsdb.pixels.executor.utils.HashTable;
 import io.pixelsdb.pixels.executor.utils.Tuple;
 
@@ -309,19 +308,19 @@ public class Joiner
      * This method should be called after {@link Joiner#join(VectorizedRowBatch) join} is done, if
      * the join is left outer join.
      */
-    public boolean writeLeftOuterAndPartition(PixelsWriter pixelsWriter, int batchSize,
-                                              PartitionInfo partitionInfo) throws IOException
+    public boolean writeLeftOuterAndPartition(PixelsWriter pixelsWriter, final int batchSize,
+                                              final int numPartition, int[] keyColumnIds) throws IOException
     {
         checkArgument(this.joinType == JoinType.EQUI_LEFT || this.joinType == JoinType.EQUI_FULL,
                 "getLeftOuter() can only be used for left or full outer join");
         checkArgument(batchSize > 0, "batchSize must be positive");
         requireNonNull(pixelsWriter, "pixelsWriter is null");
-        requireNonNull(partitionInfo, "partitionInfo is null");
+        requireNonNull(keyColumnIds, "keyColumnIds is null");
 
-        Partitioner partitioner = new Partitioner(partitionInfo.getNumPartition(),
-                batchSize, this.joinedSchema, partitionInfo.getKeyColumnIds());
-        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(partitionInfo.getNumPartition());
-        for (int i = 0; i < partitionInfo.getNumPartition(); ++i)
+        Partitioner partitioner = new Partitioner(numPartition,
+                batchSize, this.joinedSchema, keyColumnIds);
+        List<List<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
+        for (int i = 0; i < numPartition; ++i)
         {
             partitioned.add(new LinkedList<>());
         }
@@ -367,7 +366,7 @@ public class Joiner
                 partitioned.get(hash).add(tailBatches[hash]);
             }
         }
-        for (int hash = 0; hash < partitionInfo.getNumPartition(); ++hash)
+        for (int hash = 0; hash < numPartition; ++hash)
         {
             List<VectorizedRowBatch> batches = partitioned.get(hash);
             if (!batches.isEmpty())

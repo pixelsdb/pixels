@@ -1,0 +1,16 @@
+<Configuration status="INFO" name="pixels-lambda-worker">
+    <Appenders>
+        <Lambda name="Lambda">
+            <PatternLayout>
+                <pattern>%-d{yyyy-MM-dd HH:mm:ss,SSS} [%X{AWSRequestId}] [%c]-[%p] %m%n</pattern>
+            </PatternLayout>
+        </Lambda>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="Lambda"/>
+        </Root>
+        <Logger name="software.amazon.awssdk" level="WARN" />
+        <Logger name="software.amazon.awssdk.request" level="INFO" />
+    </Loggers>
+</Configuration>

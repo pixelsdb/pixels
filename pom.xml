@@ -38,9 +38,10 @@
         <module>pixels-cache</module>
         <module>pixels-core</module>
         <module>pixels-daemon</module>
-        <module>pixels-lambda</module>
         <module>pixels-executor</module>
-        <module>pixels-planner</module>
+        <module>pixels-turbo/pixels-planner</module>
+        <module>pixels-turbo/pixels-lambda-worker</module>
+        <module>pixels-turbo/pixels-lambda-invoker</module>
     </modules>
 
     <properties>
@@ -123,6 +124,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-planner</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-lambda-invoker</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
