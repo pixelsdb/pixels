@@ -70,6 +70,7 @@
         <dep.protobuf.version>3.21.7</dep.protobuf.version>
         <dep.grpc.version>1.49.1</dep.grpc.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
+        <dep.jna.version>5.13.0</dep.jna.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
 
@@ -413,6 +414,12 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-buffer</artifactId>
                 <version>${dep.netty.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${dep.jna.version}</version>
             </dependency>
 
             <!-- apache-httpclient -->
