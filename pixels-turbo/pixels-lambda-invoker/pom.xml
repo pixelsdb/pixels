@@ -30,7 +30,7 @@
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-turbo-planner</artifactId>
+            <artifactId>pixels-planner</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>

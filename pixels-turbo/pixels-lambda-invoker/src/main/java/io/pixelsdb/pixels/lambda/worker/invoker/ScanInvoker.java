@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.lambda.worker.invoker;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.output.ScanOutput;
+import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 
 /**
  * The lambda invoker for scan operator.

@@ -43,7 +43,7 @@
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-turbo-planner</artifactId>
+            <artifactId>pixels-planner</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -164,14 +164,13 @@
                             <finalName>pixels-lambda-worker</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-turbo/pixels-lambda-worker/target</outputDirectory>
                             <transformers>
-                                <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer">
-                                </transformer>
+                                <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer"/>
                             </transformers>
                         </configuration>
                     </execution>
                     <execution>
                         <id>pixels-lambda-worker-deps</id>
-                        <phase>package</phase>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>shade</goal>
                         </goals>
@@ -184,8 +183,7 @@
                             <finalName>pixels-lambda-worker-deps</finalName>
                             <outputDirectory>${project.parent.basedir}/pixels-turbo/pixels-lambda-worker/target</outputDirectory>
                             <transformers>
-                                <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer">
-                                </transformer>
+                                <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer"/>
                             </transformers>
                         </configuration>
                     </execution>
@@ -197,6 +195,28 @@
                         <version>2.13.0</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>pixels-lambda-worker-deps</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/main/resources/deps-assembly.xml</descriptor>
+                    </descriptors>
+                    <finalName>pixels-lambda-worker-deps</finalName>
+                    <outputDirectory>${project.parent.basedir}/pixels-turbo/pixels-lambda-worker/target</outputDirectory>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
             </plugin>
         </plugins>
     </build>

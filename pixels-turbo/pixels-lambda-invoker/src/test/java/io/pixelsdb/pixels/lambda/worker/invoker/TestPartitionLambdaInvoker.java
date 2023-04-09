@@ -23,9 +23,9 @@ import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.*;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.input.PartitionInput;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.output.PartitionOutput;
+import io.pixelsdb.pixels.planner.plan.physical.domain.*;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import org.junit.Before;
 import org.junit.Test;
 

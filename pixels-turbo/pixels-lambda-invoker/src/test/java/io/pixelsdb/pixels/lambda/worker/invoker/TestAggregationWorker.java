@@ -25,10 +25,10 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.OutputInfo;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.StorageInfo;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.input.AggregationInput;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.output.AggregationOutput;
+import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
+import io.pixelsdb.pixels.planner.plan.physical.input.AggregationInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
 import org.junit.Before;
 import org.junit.Test;
 

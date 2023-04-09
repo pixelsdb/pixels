@@ -33,9 +33,9 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.join.Joiner;
 import io.pixelsdb.pixels.executor.join.Partitioner;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.*;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.input.PartitionedChainJoinInput;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.planner.plan.physical.domain.*;
+import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

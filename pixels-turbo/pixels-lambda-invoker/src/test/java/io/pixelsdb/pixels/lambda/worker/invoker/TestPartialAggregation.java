@@ -25,9 +25,9 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.aggregation.FunctionType;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.*;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.input.ScanInput;
-import io.pixelsdb.pixels.turbo.planner.plan.physical.output.ScanOutput;
+import io.pixelsdb.pixels.planner.plan.physical.domain.*;
+import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import org.junit.Before;
 import org.junit.Test;
 
