@@ -2,39 +2,46 @@ Pixels
 =======
 
 The core of Pixels is a columnar storage engine designed for data lakes and warehouses.
-It is optimized for data analytics on tables that are stored in a diverse range of on-premises and cloud-native storage systems,
+It is optimized for analytical tables stored in on-premises and cloud-native storage systems,
 including S3, GCS, HDFS, Redis, and local file systems.
-In terms of performance, it outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to 20x.
-Furthermore, Pixels features a columnar cache that improves query performance even further.
+Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-For cloud lakehouses, Pixels also provides [Pixels-Turbo](https://github.com/pixelsdb/pixels/tree/master/pixels-turbo) -
-a query accelerator that exploits serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes.
-With `Pixels-Turbo`, we can achieve better elasticity and cost-efficiency for both bursty and sustained workloads.
+We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+). Please find these
+integrations in separate repositories:
+* [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
+* [Pixels Connector for Presto](https://github.com/pixelsdb/pixels-presto)
+* [Pixels SerDe for Hive](https://github.com/pixelsdb/pixels-hive)
 
-We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+):
-* [Trino Connector](https://github.com/pixelsdb/pixels-trino)
-* [Presto Connector](https://github.com/pixelsdb/pixels-presto)
-* [Hive SerDe](https://github.com/pixelsdb/pixels-hive)
+Pixels also has its own query engine [Pixels-Turbo](https://github.com/pixelsdb/pixels/tree/master/pixels-turbo).
+It processes sustained queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes.
+With `Pixels-Turbo`, we can achieve better performance and cost-efficiency for sustained workloads, while not compromising elasticity
+for workload spikes.
+
 
 ## Publications
+
+Pixels is an academic system aims at providing product-level quality. It supports all the functionalities required by TPC-H and
+is compatible with the mainstream data analytic ecosystems (e.g., popular clouds and big-data systems).
+The key techniques in Pixels can be found in the following publications, they elaborate on the system design.
 
 > `SIGMOD'23` Using Cloud Function as Accelerator for Elastic Data Analytics\
 > Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
 
-> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes [[BixTex]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
+> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes (short) [[BixTex]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
 > Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
 
 > `ICDE'22` Pixels: An Efficient Column Store for Cloud Data Lakes [[BixTex]](https://dblp.org/rec/conf/icde/BianA22.html?view=bibtex)\
 > Haoqiong Bian, Anastasia Ailamaki
 
-> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes [[BixTex]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
+> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[BixTex]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
 > Haoqiong Bian
 
-> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables [[BixTex]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
+> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[BixTex]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
 > Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
 
 > `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[BixTex]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
 > Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
+
 
 ## Build Pixels
 Install JDK 17.0.3 or above, and open Pixels as a maven project in IntelliJ. 

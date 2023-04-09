@@ -26,7 +26,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 /**
  * @author hank
- * @date 6/28/22
+ * @date 2023.04.06
  */
 public class LambdaInvokerProducer implements InvokerProducer
 {

@@ -37,6 +37,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.turbo.planner.plan.PlanOptimizer;
 import io.pixelsdb.pixels.turbo.planner.plan.logical.*;
 import io.pixelsdb.pixels.turbo.planner.plan.physical.*;
 import io.pixelsdb.pixels.turbo.planner.plan.physical.domain.*;
