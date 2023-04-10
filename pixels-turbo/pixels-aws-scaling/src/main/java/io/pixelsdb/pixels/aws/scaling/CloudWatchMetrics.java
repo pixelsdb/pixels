@@ -17,10 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.metrics;
+package io.pixelsdb.pixels.aws.scaling;
 
+import io.pixelsdb.pixels.common.metrics.NamedCount;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
 import software.amazon.awssdk.services.cloudwatch.model.PutMetricDataRequest;
@@ -36,7 +36,7 @@ import java.time.temporal.ChronoUnit;
  * @author hank
  * @date 1/2/23
  */
-public class CloudWatchCountMetrics
+public class CloudWatchMetrics
 {
     private static final String MetricsNamespace;
     private static final Dimension MetricsDimension;
@@ -49,8 +49,10 @@ public class CloudWatchCountMetrics
         MetricsDimension = Dimension.builder().name(dimensionName).value(dimensionValue).build();
     }
 
-    private final CloudWatchClient client = CloudWatchClient.builder().build();
-
+    /**
+     * Put the count metric into CloudWatch.
+     * @param count the count metric.
+     */
     public void putCount(NamedCount count)
     {
         /**
@@ -63,6 +65,6 @@ public class CloudWatchCountMetrics
                 .value((double) count.getCount()).timestamp(instant).dimensions(MetricsDimension).storageResolution(1).build();
         PutMetricDataRequest request = PutMetricDataRequest.builder().namespace(MetricsNamespace)
                 .metricData(datum).build();
-        this.client.putMetricData(request);
+        CloudWatch.Instance().getClient().putMetricData(request);
     }
 }

@@ -39,7 +39,7 @@ import java.util.concurrent.ExecutionException;
  * @author hank
  * @date 08/07/2022
  */
-public class TestAggregationWorker
+public class TestAggregationLambdaInvoker
 {
     @Before
     public void registerInvokers()

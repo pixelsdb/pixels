@@ -21,6 +21,9 @@ specific serverless computing platform (e.g., AWS Lambda).
 - `pixels-[platform]-worker` implements the serverless workers in a specific serverless computing platform (e.g., AWS Lambda).
 - `pixels-executor` implements the basic executors of relational operations, such as scan, filter, join, and aggregation.
 These executors are used in the serverless workers to execute the assigned physical operator.
+- `pixels-[platform]-scaling` implements the auto-scaling metrics collector for the specific cloud platform (e.g., AWS). 
+It reports the performance metrics, such as CPU/memory usage and query concurrency, in the MPP cluster. These metrics are 
+consumed by the scaling manager (e.g., AWS EC Autoscaling) in the cloud platform to make scaling decisions.
 
 ## Usage
 
@@ -29,5 +32,5 @@ Then, deploy the serverless workers following the instructions in the README.md 
 Currently, we only support AWS Lambda. So `pixels-lambda-worker` is the only option. More platform integrations
 will be provided in the future.
 
-After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when the Trino
-cluster is too busy to processing the new coming queries.
+After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when Trino 
+is too busy to process the new coming queries.

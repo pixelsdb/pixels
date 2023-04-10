@@ -42,6 +42,7 @@
         <module>pixels-turbo/pixels-planner</module>
         <module>pixels-turbo/pixels-lambda-worker</module>
         <module>pixels-turbo/pixels-lambda-invoker</module>
+        <module>pixels-turbo/pixels-aws-scaling</module>
     </modules>
 
     <properties>
@@ -130,6 +131,11 @@
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-lambda-invoker</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-aws-scaling</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

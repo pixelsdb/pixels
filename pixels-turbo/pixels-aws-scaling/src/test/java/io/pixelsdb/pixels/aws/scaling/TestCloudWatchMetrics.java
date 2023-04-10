@@ -17,22 +17,23 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.metrics;
+package io.pixelsdb.pixels.aws.scaling;
 
+import io.pixelsdb.pixels.common.metrics.NamedCount;
 import org.junit.Test;
 
 /**
  * Created at: 29/12/2022
  * Author: hank
  */
-public class TestCloudWatchCountMetrics
+public class TestCloudWatchMetrics
 {
     @Test
     public void testMultiple() throws InterruptedException
     {
         int[] concurrency = new int[] {1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
         //int[] concurrency = new int[] {3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1, 1, 1, 3, 3, 1};
-        CloudWatchCountMetrics metrics = new CloudWatchCountMetrics();
+        CloudWatchMetrics metrics = new CloudWatchMetrics();
         for (int i = 0; i < 21; ++i)
         {
             int finalI = i;
@@ -45,7 +46,7 @@ public class TestCloudWatchCountMetrics
     @Test
     public void testSingle()
     {
-        CloudWatchCountMetrics metrics = new CloudWatchCountMetrics();
+        CloudWatchMetrics metrics = new CloudWatchMetrics();
         metrics.putCount(new NamedCount("query-concurrency", 1));
         metrics.putCount(new NamedCount("query-concurrency", 2));
     }

@@ -38,7 +38,7 @@ import java.util.concurrent.ExecutionException;
  * @author hank
  * @date 08/07/2022
  */
-public class TestPartialAggregation
+public class TestPartialAggregationLambdaInvoker
 {
     @Before
     public void registerInvokers()
