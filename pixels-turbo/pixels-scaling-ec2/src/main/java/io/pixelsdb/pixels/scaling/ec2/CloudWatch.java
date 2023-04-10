@@ -17,30 +17,32 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.scaling.ec2;
+
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 
 /**
- * The SPI of a type of serverless worker.
- * In Pixels, each type of serverless worker should have only one invoker implementation and
- * the corresponding invoker provider.
- * Created at: 4/6/23
+ * Created at: 2023:04:10
  * Author: hank
  */
-public interface InvokerProvider
+public class CloudWatch
 {
-    /**
-     * Create the invoker of a serverless worker.
-     */
-    Invoker createInvoker();
+    private static final CloudWatch instance = new CloudWatch();
 
-    /**
-     * @return the worker type of the invoker created by this provider.
-     */
-    WorkerType workerType();
+    public static CloudWatch Instance()
+    {
+        return instance;
+    }
 
-    /**
-     * @param functionService the given cloud function service.
-     * @return true if this invoker provider belongs to the given cloud function service.
-     */
-    boolean belongsTo(FunctionService functionService);
+    private final CloudWatchClient client;
+
+    private CloudWatch()
+    {
+        client = CloudWatchClient.builder().build();
+    }
+
+    public CloudWatchClient getClient()
+    {
+        return client;
+    }
 }

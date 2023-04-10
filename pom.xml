@@ -40,9 +40,9 @@
         <module>pixels-daemon</module>
         <module>pixels-turbo/pixels-executor</module>
         <module>pixels-turbo/pixels-planner</module>
-        <module>pixels-turbo/pixels-lambda-worker</module>
-        <module>pixels-turbo/pixels-lambda-invoker</module>
-        <module>pixels-turbo/pixels-aws-scaling</module>
+        <module>pixels-turbo/pixels-worker-lambda</module>
+        <module>pixels-turbo/pixels-invoker-lambda</module>
+        <module>pixels-turbo/pixels-scaling-ec2</module>
     </modules>
 
     <properties>

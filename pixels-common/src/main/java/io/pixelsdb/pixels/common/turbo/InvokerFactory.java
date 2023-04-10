@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.common.turbo;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,11 +44,18 @@ public class InvokerFactory
      */
     private final Map<WorkerType, Invoker> invokerMap = new ConcurrentHashMap<>();
     private final ServiceLoader<InvokerProvider> providerLoader = ServiceLoader.load(InvokerProvider.class);
+    private final FunctionService functionServiceInUse;
 
     private InvokerFactory()
     {
-        this.providerLoader.forEach(invokerProvider ->
-                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker()));
+        String serviceName = ConfigFactory.Instance().getProperty("executor.function.service");
+        functionServiceInUse = FunctionService.from(serviceName);
+        this.providerLoader.forEach(invokerProvider -> {
+            if (invokerProvider.belongsTo(functionServiceInUse))
+            {
+                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker());
+            }
+        });
     }
 
     /**
@@ -57,8 +66,12 @@ public class InvokerFactory
     {
         this.providerLoader.reload();
         this.invokerMap.clear();
-        this.providerLoader.forEach(invokerProvider ->
-                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker()));
+        this.providerLoader.forEach(invokerProvider -> {
+            if (invokerProvider.belongsTo(functionServiceInUse))
+            {
+                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker());
+            }
+        });
     }
 
     public Invoker getInvoker(WorkerType workerType)
