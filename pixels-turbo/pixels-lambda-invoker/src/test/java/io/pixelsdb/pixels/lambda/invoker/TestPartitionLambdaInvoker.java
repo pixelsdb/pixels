@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -38,12 +37,6 @@ import java.util.concurrent.ExecutionException;
  */
 public class TestPartitionLambdaInvoker
 {
-    @Before
-    public void registerInvokers()
-    {
-        InvokerFactory.Instance().registerInvokers(new LambdaInvokerProducer());
-    }
-
     @Test
     public void testOrders() throws ExecutionException, InterruptedException
     {

@@ -17,27 +17,22 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
-import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
+import org.junit.Test;
 
 /**
- * The lambda invoker for partitioned chain join operator.
  * @author hank
- * @date 25/06/2022
+ * @date 8/12/22
  */
-public class PartitionedChainJoinInvoker extends LambdaInvoker
+public class TestLambdaInvoker
 {
-    protected PartitionedChainJoinInvoker(String functionName)
+    @Test
+    public void test()
     {
-        super(functionName);
-    }
-
-    @Override
-    public Output parseOutput(String outputJson)
-    {
-        return JSON.parseObject(outputJson, JoinOutput.class);
+        int memorySize = InvokerFactory.Instance().getInvoker(WorkerType.PARTITIONED_JOIN).getMemoryMB();
+        System.out.println(memorySize);
     }
 }

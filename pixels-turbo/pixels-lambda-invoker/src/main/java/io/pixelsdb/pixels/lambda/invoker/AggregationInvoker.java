@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+ * Copyright 2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,18 +17,29 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.lambda.invoker;
+
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
+import io.pixelsdb.pixels.common.turbo.Output;
 
 /**
- * The producer of a type of cloud function worker.
- * Created at: 4/6/23
- * Author: hank
+ * The lambda invoker for pre or final aggregation operator that aggregates
+ * the partial aggregation results produced in the previous stage.
+ *
+ * @author hank
+ * @date 06/07/2022
  */
-public interface InvokerProducer
+public class AggregationInvoker extends LambdaInvoker
 {
-    /**
-     * @param workerType the type of the worker
-     * @return null if the type of worker is not supported.
-     */
-    Invoker produce(WorkerType workerType);
+    protected AggregationInvoker(String functionName)
+    {
+        super(functionName);
+    }
+
+    @Override
+    public Output parseOutput(String outputJson)
+    {
+        return JSON.parseObject(outputJson, AggregationOutput.class);
+    }
 }

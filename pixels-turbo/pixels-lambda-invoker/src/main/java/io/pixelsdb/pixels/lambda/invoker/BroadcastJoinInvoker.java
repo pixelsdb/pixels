@@ -17,37 +17,28 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
-import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
-import software.amazon.awssdk.services.lambda.LambdaAsyncClient;
-
-import java.time.Duration;
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.common.turbo.Output;
 
 /**
+ * The lambda invoker for broadcast join operator.
+ *
  * @author hank
- * @date 4/18/22
+ * @date 07/05/2022
  */
-public class Lambda
+public class BroadcastJoinInvoker extends LambdaInvoker
 {
-    private static final Lambda instance = new Lambda();
-
-    public static Lambda Instance()
+    protected BroadcastJoinInvoker(String functionName)
     {
-        return instance;
+        super(functionName);
     }
 
-    private final LambdaAsyncClient asyncClient;
-
-    private Lambda()
+    @Override
+    public Output parseOutput(String outputJson)
     {
-        asyncClient = LambdaAsyncClient.builder().httpClientBuilder(
-                AwsCrtAsyncHttpClient.builder().maxConcurrency(1000)
-                        .connectionMaxIdleTime(Duration.ofSeconds(1000))).build();
-    }
-
-    public LambdaAsyncClient getAsyncClient()
-    {
-        return asyncClient;
+        return JSON.parseObject(outputJson, JoinOutput.class);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,27 +17,24 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
-
-import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
-import io.pixelsdb.pixels.common.turbo.Output;
+package io.pixelsdb.pixels.common.turbo;
 
 /**
- * The lambda invoker for broadcast chain join operator.
- * @author hank
- * @date 03/06/2022
+ * The SPI of a type of serverless worker.
+ * In Pixels, each type of serverless worker should have only one invoker implementation and
+ * the corresponding invoker provider.
+ * Created at: 4/6/23
+ * Author: hank
  */
-public class BroadcastChainJoinInvoker extends LambdaInvoker
+public interface InvokerProvider
 {
-    protected BroadcastChainJoinInvoker(String functionName)
-    {
-        super(functionName);
-    }
+    /**
+     * Create the invoker of a serverless worker.
+     */
+    Invoker createInvoker();
 
-    @Override
-    public Output parseOutput(String outputJson)
-    {
-        return JSON.parseObject(outputJson, JoinOutput.class);
-    }
+    /**
+     * @return the worker type of the invoker created by this provider.
+     */
+    WorkerType workerType();
 }

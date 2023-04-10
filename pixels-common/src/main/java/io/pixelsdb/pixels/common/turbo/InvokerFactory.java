@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.turbo;
 
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -40,24 +41,24 @@ public class InvokerFactory
      * But we still use concurrent hash map to avoid any possible concurrent retrievals and updates.
      */
     private final Map<WorkerType, Invoker> invokerMap = new ConcurrentHashMap<>();
+    private final ServiceLoader<InvokerProvider> providerLoader = ServiceLoader.load(InvokerProvider.class);
 
-    private InvokerFactory() { }
+    private InvokerFactory()
+    {
+        this.providerLoader.forEach(invokerProvider ->
+                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker()));
+    }
 
     /**
-     * Register the invoker implementations for the corresponding cloud function workers.
-     * It should be called before getInvoker.
-     * @param producer
+     * Reload the invokers of the serverless workers. NOTE that this method is not thread-safe.
+     * Other methods should not be called before this method returns.
      */
-    public void registerInvokers(InvokerProducer producer)
+    public void reload()
     {
-        for (WorkerType workerType : WorkerType.values())
-        {
-            Invoker invoker = producer.produce(workerType);
-            if (invoker != null)
-            {
-                this.invokerMap.put(workerType, invoker);
-            }
-        }
+        this.providerLoader.reload();
+        this.invokerMap.clear();
+        this.providerLoader.forEach(invokerProvider ->
+                this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker()));
     }
 
     public Invoker getInvoker(WorkerType workerType)

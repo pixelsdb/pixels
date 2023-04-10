@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -49,12 +49,6 @@ import static io.pixelsdb.pixels.executor.predicate.Bound.Type.INCLUDED;
  */
 public class TestBroadcastJoinLambdaInvoker
 {
-    @Before
-    public void registerInvokers()
-    {
-        InvokerFactory.Instance().registerInvokers(new LambdaInvokerProducer());
-    }
-
     @Test
     public void testPartLineitem() throws ExecutionException, InterruptedException
     {

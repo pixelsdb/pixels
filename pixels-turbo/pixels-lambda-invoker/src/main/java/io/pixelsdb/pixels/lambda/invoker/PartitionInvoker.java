@@ -17,21 +17,21 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 
 /**
- * The lambda invoker for broadcast join operator.
+ * The lambda invoker for hash partitioning operator.
  *
  * @author hank
  * @date 07/05/2022
  */
-public class BroadcastJoinInvoker extends LambdaInvoker
+public class PartitionInvoker extends LambdaInvoker
 {
-    protected BroadcastJoinInvoker(String functionName)
+    protected PartitionInvoker(String functionName)
     {
         super(functionName);
     }
@@ -39,6 +39,6 @@ public class BroadcastJoinInvoker extends LambdaInvoker
     @Override
     public Output parseOutput(String outputJson)
     {
-        return JSON.parseObject(outputJson, JoinOutput.class);
+        return JSON.parseObject(outputJson, PartitionOutput.class);
     }
 }

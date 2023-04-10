@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 PixelsDB.
+ * Copyright 2023 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,29 +17,33 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
-import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.Invoker;
+import io.pixelsdb.pixels.common.turbo.InvokerProvider;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
-import org.junit.Before;
-import org.junit.Test;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+
+import static io.pixelsdb.pixels.common.turbo.WorkerType.PARTITIONED_JOIN;
 
 /**
- * @author hank
- * @date 8/12/22
+ * Created at: 2023-04-10
+ * Author: hank
  */
-public class TestLambdaInvoker
+public class PartitionedJoinInvokerProvider implements InvokerProvider
 {
-    @Before
-    public void registerInvokers()
+    private static final ConfigFactory config = ConfigFactory.Instance();
+
+    @Override
+    public Invoker createInvoker()
     {
-        InvokerFactory.Instance().registerInvokers(new LambdaInvokerProducer());
+        String partitionedJoinWorker = config.getProperty("partitioned.join.worker.name");
+        return new PartitionedJoinInvoker(partitionedJoinWorker);
     }
 
-    @Test
-    public void test()
+    @Override
+    public WorkerType workerType()
     {
-        int memorySize = InvokerFactory.Instance().getInvoker(WorkerType.PARTITIONED_JOIN).getMemoryMB();
-        System.out.println(memorySize);
+        return PARTITIONED_JOIN;
     }
 }

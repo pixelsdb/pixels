@@ -17,22 +17,20 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.planner.plan.physical.output.AggregationOutput;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
 import io.pixelsdb.pixels.common.turbo.Output;
 
 /**
- * The lambda invoker for pre or final aggregation operator that aggregates
- * the partial aggregation results produced in the previous stage.
- *
+ * The lambda invoker for partitioned chain join operator.
  * @author hank
- * @date 06/07/2022
+ * @date 25/06/2022
  */
-public class AggregationInvoker extends LambdaInvoker
+public class PartitionedChainJoinInvoker extends LambdaInvoker
 {
-    protected AggregationInvoker(String functionName)
+    protected PartitionedChainJoinInvoker(String functionName)
     {
         super(functionName);
     }
@@ -40,6 +38,6 @@ public class AggregationInvoker extends LambdaInvoker
     @Override
     public Output parseOutput(String outputJson)
     {
-        return JSON.parseObject(outputJson, AggregationOutput.class);
+        return JSON.parseObject(outputJson, JoinOutput.class);
     }
 }

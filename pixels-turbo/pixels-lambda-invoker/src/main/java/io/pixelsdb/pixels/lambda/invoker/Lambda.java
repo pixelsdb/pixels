@@ -17,28 +17,37 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
-import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.common.turbo.Output;
-import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
+import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
+import software.amazon.awssdk.services.lambda.LambdaAsyncClient;
+
+import java.time.Duration;
 
 /**
- * The lambda invoker for hash partitioning operator.
- *
  * @author hank
- * @date 07/05/2022
+ * @date 4/18/22
  */
-public class PartitionInvoker extends LambdaInvoker
+public class Lambda
 {
-    protected PartitionInvoker(String functionName)
+    private static final Lambda instance = new Lambda();
+
+    public static Lambda Instance()
     {
-        super(functionName);
+        return instance;
     }
 
-    @Override
-    public Output parseOutput(String outputJson)
+    private final LambdaAsyncClient asyncClient;
+
+    private Lambda()
     {
-        return JSON.parseObject(outputJson, PartitionOutput.class);
+        asyncClient = LambdaAsyncClient.builder().httpClientBuilder(
+                AwsCrtAsyncHttpClient.builder().maxConcurrency(1000)
+                        .connectionMaxIdleTime(Duration.ofSeconds(1000))).build();
+    }
+
+    public LambdaAsyncClient getAsyncClient()
+    {
+        return asyncClient;
     }
 }

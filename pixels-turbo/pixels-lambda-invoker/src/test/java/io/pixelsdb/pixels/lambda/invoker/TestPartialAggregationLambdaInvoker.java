@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.lambda.worker.invoker;
+package io.pixelsdb.pixels.lambda.invoker;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.base.Joiner;
@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.executor.aggregation.FunctionType;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
 import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -40,12 +39,6 @@ import java.util.concurrent.ExecutionException;
  */
 public class TestPartialAggregationLambdaInvoker
 {
-    @Before
-    public void registerInvokers()
-    {
-        InvokerFactory.Instance().registerInvokers(new LambdaInvokerProducer());
-    }
-
     @Test
     public void testScanPartialAggregation() throws ExecutionException, InterruptedException
     {
