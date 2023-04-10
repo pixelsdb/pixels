@@ -50,9 +50,9 @@ public class QueryQueues
         if (instance == null)
         {
             int clusterQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("optimizer.cluster.queue.capacity"));
+                    ConfigFactory.Instance().getProperty("scaling.cluster.queue.capacity"));
             int lambdaQueueCapacity = Integer.parseInt(
-                    ConfigFactory.Instance().getProperty("optimizer.serverless.queue.capacity"));
+                    ConfigFactory.Instance().getProperty("scaling.serverless.queue.capacity"));
             instance = new QueryQueues(clusterQueueCapacity, lambdaQueueCapacity);
         }
         return instance;

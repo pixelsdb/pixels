@@ -31,11 +31,11 @@ import java.util.concurrent.TimeUnit;
  * Created at: 19/01/2023
  * Author: hank
  */
-public class AwsMetricsCollector
+public class EC2MetricsCollector
 {
-    private static final AwsMetricsCollector instance = new AwsMetricsCollector();
+    private static final EC2MetricsCollector instance = new EC2MetricsCollector();
 
-    public static AwsMetricsCollector Instance()
+    public static EC2MetricsCollector Instance()
     {
         return instance;
     }
@@ -46,7 +46,7 @@ public class AwsMetricsCollector
     private final int period;
     private final ScheduledExecutorService metricsReporter;
 
-    private AwsMetricsCollector()
+    private EC2MetricsCollector()
     {
         // Starting a background thread to report query concurrency periodically.
         this.transContext = TransContext.Instance();
