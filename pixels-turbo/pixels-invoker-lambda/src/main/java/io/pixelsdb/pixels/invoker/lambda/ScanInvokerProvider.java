@@ -50,7 +50,7 @@ public class ScanInvokerProvider implements InvokerProvider
     }
 
     @Override
-    public boolean belongsTo(FunctionService functionService)
+    public boolean compatibleWith(FunctionService functionService)
     {
         return functionService.equals(lambda);
     }

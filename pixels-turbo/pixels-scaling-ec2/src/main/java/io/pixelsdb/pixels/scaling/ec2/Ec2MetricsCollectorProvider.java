@@ -19,12 +19,25 @@
  */
 package io.pixelsdb.pixels.scaling.ec2;
 
+import io.pixelsdb.pixels.common.turbo.MachineService;
+import io.pixelsdb.pixels.common.turbo.MetricsCollector;
 import io.pixelsdb.pixels.common.turbo.MetricsCollectorProvider;
 
 /**
  * Created at: 2023-04-10
  * Author: hank
  */
-public class EC2MetricsCollectorProvider implements MetricsCollectorProvider
+public class Ec2MetricsCollectorProvider implements MetricsCollectorProvider
 {
+    @Override
+    public MetricsCollector createMetricsCollector()
+    {
+        return new Ec2MetricsCollector();
+    }
+
+    @Override
+    public boolean compatibleWith(MachineService machineService)
+    {
+        return machineService.equals(MachineService.ec2);
+    }
 }

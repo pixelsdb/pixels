@@ -17,12 +17,24 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.turbo;
+package io.pixelsdb.pixels.scaling.ec2;
+
+import io.pixelsdb.pixels.common.turbo.MetricsCollector;
+import org.junit.Test;
 
 /**
- * Created at: 2023-04-10
+ * Created at: 2023-04-11
  * Author: hank
  */
-public class MetricsCollectorFactory
+public class TestEc2MetricsCollector
 {
+    @Test
+    public void test()
+    {
+        if (MetricsCollector.Instance().isPresent())
+        {
+            System.out.println("reporting...");
+            MetricsCollector.Instance().get().report();
+        }
+    }
 }

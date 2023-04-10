@@ -20,9 +20,24 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
+ * The SPI of the metrics collector provider of the virtual machine service.
+ * In pixels.properties, set scaling.machine.service to the virtual machine service that the metrics collector
+ * implementation is compatible with.
+ * In Pixels, there should be at most one metrics collector implementation compatible with each virtual machine service.
+ * <br/>
  * Created at: 2023-04-10
  * Author: hank
  */
 public interface MetricsCollectorProvider
 {
+    /**
+     * Create an instance of the configured metrics collector instance.
+     */
+    MetricsCollector createMetricsCollector();
+
+    /**
+     * @param machineService the given cloud function service.
+     * @return true if this invoker provider is compatible with the given virtual machine service.
+     */
+    boolean compatibleWith(MachineService machineService);
 }

@@ -20,9 +20,12 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
- * The SPI of a type of serverless worker.
- * In Pixels, each type of serverless worker should have only one invoker implementation and
- * the corresponding invoker provider.
+ * The SPI of the invoker provider of serverless workers.
+ * In pixels.properties, set executor.function.service to the cloud function service that the invoker
+ * implementations are compatible with.
+ * In Pixels, there should be at most one set of invoker implementations compatible with each cloud
+ * function service. Each implementation corresponds to one type of serverless worker.
+ * <br/>
  * Created at: 4/6/23
  * Author: hank
  */
@@ -40,7 +43,7 @@ public interface InvokerProvider
 
     /**
      * @param functionService the given cloud function service.
-     * @return true if this invoker provider belongs to the given cloud function service.
+     * @return true if this invoker provider is compatible with the given cloud function service.
      */
-    boolean belongsTo(FunctionService functionService);
+    boolean compatibleWith(FunctionService functionService);
 }

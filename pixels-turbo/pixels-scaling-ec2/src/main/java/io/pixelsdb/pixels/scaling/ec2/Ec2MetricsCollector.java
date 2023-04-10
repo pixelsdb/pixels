@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.scaling.ec2;
 
 import io.pixelsdb.pixels.common.metrics.NamedCount;
 import io.pixelsdb.pixels.common.transaction.TransContext;
+import io.pixelsdb.pixels.common.turbo.MetricsCollector;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.concurrent.Executors;
@@ -31,22 +32,15 @@ import java.util.concurrent.TimeUnit;
  * Created at: 19/01/2023
  * Author: hank
  */
-public class EC2MetricsCollector
+public class Ec2MetricsCollector extends MetricsCollector
 {
-    private static final EC2MetricsCollector instance = new EC2MetricsCollector();
-
-    public static EC2MetricsCollector Instance()
-    {
-        return instance;
-    }
-
     private final TransContext transContext;
     private final CloudWatchMetrics cloudWatchMetrics;
     private final String metricsName;
     private final int period;
     private final ScheduledExecutorService metricsReporter;
 
-    private EC2MetricsCollector()
+    protected Ec2MetricsCollector()
     {
         // Starting a background thread to report query concurrency periodically.
         this.transContext = TransContext.Instance();
@@ -56,6 +50,7 @@ public class EC2MetricsCollector
         this.period = Integer.parseInt(ConfigFactory.Instance().getProperty("query.concurrency.report.period.sec"));
     }
 
+    @Override
     public void startAutoReport()
     {
         this.metricsReporter.scheduleAtFixedRate(() -> {
@@ -64,6 +59,7 @@ public class EC2MetricsCollector
         }, 0, period, TimeUnit.SECONDS);
     }
 
+    @Override
     public void report()
     {
         int concurrency = this.transContext.getTransConcurrency();
@@ -71,6 +67,7 @@ public class EC2MetricsCollector
         this.cloudWatchMetrics.putCount(count);
     }
 
+    @Override
     public void stopAutoReport()
     {
         this.metricsReporter.shutdown();

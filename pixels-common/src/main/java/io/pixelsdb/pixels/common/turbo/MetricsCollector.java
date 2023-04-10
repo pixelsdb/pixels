@@ -19,10 +19,54 @@
  */
 package io.pixelsdb.pixels.common.turbo;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+
+import java.util.Optional;
+import java.util.ServiceLoader;
+
 /**
  * Created at: 2023-04-10
  * Author: hank
  */
-public interface MetricsCollector
+public abstract class MetricsCollector
 {
+    private static MetricsCollector instance;
+
+    static
+    {
+        String serviceName = ConfigFactory.Instance().getProperty("scaling.machine.service");
+        MachineService machineService = MachineService.from(serviceName);
+        ServiceLoader<MetricsCollectorProvider> providerLoader = ServiceLoader.load(MetricsCollectorProvider.class);
+        providerLoader.forEach(provider -> {
+            if (provider.compatibleWith(machineService))
+            {
+                instance = provider.createMetricsCollector();
+            }
+        });
+    }
+
+    /**
+     * @return the instance of the configured metrics collector implementation.
+     */
+    public static Optional<MetricsCollector> Instance()
+    {
+        return Optional.ofNullable(instance);
+    }
+
+    protected MetricsCollector() { }
+
+    /**
+     * Start automatic metrics reporting.
+     */
+    abstract public void startAutoReport();
+
+    /**
+     * Manually report metrics.
+     */
+    abstract public void report();
+
+    /**
+     * Stop automatic metrics reporting.
+     */
+    abstract public void stopAutoReport();
 }

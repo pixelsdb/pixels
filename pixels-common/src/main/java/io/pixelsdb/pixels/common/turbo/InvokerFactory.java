@@ -51,7 +51,7 @@ public class InvokerFactory
         String serviceName = ConfigFactory.Instance().getProperty("executor.function.service");
         functionServiceInUse = FunctionService.from(serviceName);
         this.providerLoader.forEach(invokerProvider -> {
-            if (invokerProvider.belongsTo(functionServiceInUse))
+            if (invokerProvider.compatibleWith(functionServiceInUse))
             {
                 this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker());
             }
@@ -67,7 +67,7 @@ public class InvokerFactory
         this.providerLoader.reload();
         this.invokerMap.clear();
         this.providerLoader.forEach(invokerProvider -> {
-            if (invokerProvider.belongsTo(functionServiceInUse))
+            if (invokerProvider.compatibleWith(functionServiceInUse))
             {
                 this.invokerMap.put(invokerProvider.workerType(), invokerProvider.createInvoker());
             }
