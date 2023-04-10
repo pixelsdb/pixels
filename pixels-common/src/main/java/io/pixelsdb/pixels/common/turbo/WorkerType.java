@@ -25,7 +25,7 @@ package io.pixelsdb.pixels.common.turbo;
  */
 public enum WorkerType
 {
-    UNKNOW, // The first enum value is the default value.
+    UNKNOWN, // The first enum value is the default value.
     SCAN,
     PARTITION,
     BROADCAST_JOIN,
