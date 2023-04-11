@@ -130,12 +130,12 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-lambda-invoker</artifactId>
+                <artifactId>pixels-invoker-lambda</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
-                <artifactId>pixels-aws-scaling</artifactId>
+                <artifactId>pixels-scaling-ec2</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
