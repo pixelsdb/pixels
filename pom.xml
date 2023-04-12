@@ -43,6 +43,12 @@
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>
         <module>pixels-turbo/pixels-scaling-ec2</module>
+        <module>pixels-storage/pixels-storage-s3</module>
+        <module>pixels-storage/pixels-storage-hdfs</module>
+        <module>pixels-storage/pixels-storage-gcs</module>
+        <module>pixels-storage/pixels-storage-redis</module>
+        <module>pixels-storage/pixels-storage-localfs</module>
+        <module>pixels-storage/pixels-storage-mock</module>
     </modules>
 
     <properties>
