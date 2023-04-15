@@ -46,12 +46,6 @@ public class PhysicalReaderUtil
             case file:
                 reader = new PhysicalLocalReader(storage, path);
                 break;
-            case s3:
-                reader = new PhysicalS3Reader(storage, path);
-                break;
-            case minio:
-                reader = new PhysicalMinioReader(storage, path);
-                break;
             case redis:
                 reader = new PhysicalRedisReader(storage, path);
                 break;

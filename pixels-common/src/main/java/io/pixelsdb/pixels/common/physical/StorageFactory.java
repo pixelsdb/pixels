@@ -163,12 +163,6 @@ public class StorageFactory
             case file:
                 storage = new LocalFS();
                 break;
-            case s3:
-                storage = new S3();
-                break;
-            case minio:
-                storage = new Minio();
-                break;
             case redis:
                 storage = new Redis();
                 break;

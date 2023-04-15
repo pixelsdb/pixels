@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 
 /**
@@ -30,11 +31,11 @@ public interface StorageProvider
     /**
      * Create an instance of the file/object storage system handler.
      */
-    Storage createStorage() throws IOException;
+    Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException;
 
     /**
      * @param scheme the given storage scheme.
      * @return true if this physical reader provider is compatible with the given storage scheme.
      */
-    boolean compatibleWith(Storage.Scheme scheme);
+    boolean compatibleWith(@Nonnull Storage.Scheme scheme);
 }

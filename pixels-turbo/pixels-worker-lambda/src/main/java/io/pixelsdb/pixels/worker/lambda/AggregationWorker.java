@@ -47,8 +47,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
 import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 import static java.util.Objects.requireNonNull;
 
 /**

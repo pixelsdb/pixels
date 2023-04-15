@@ -17,33 +17,41 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.gcs;
+package io.pixelsdb.pixels.storage.s3;
 
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderOption;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderProvider;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageProvider;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
  * @author hank
  * @create 2023-04-15
  */
-public class GCSProvider implements StorageProvider
+public class S3ReaderProvider implements PhysicalReaderProvider
 {
     @Override
-    public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
     {
-        if (!scheme.equals(Storage.Scheme.gcs))
+        switch (storage.getScheme())
         {
-            throw new IOException("incompatible storage scheme: " + scheme);
+            case s3:
+                return new PhysicalS3Reader(storage, path);
+            case minio:
+                return new PhysicalMinioReader(storage, path);
+            default:
+                throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new GCS();
     }
 
     @Override
     public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
-        return scheme.equals(Storage.Scheme.gcs);
+        return scheme.equals(Storage.Scheme.s3) || scheme.equals(Storage.Scheme.minio);
     }
 }

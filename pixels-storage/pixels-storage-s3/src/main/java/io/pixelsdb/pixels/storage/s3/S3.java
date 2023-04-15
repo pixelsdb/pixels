@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 PixelsDB.
+ * Copyright 2021-2022 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -17,9 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.exception.StorageException;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -45,7 +46,8 @@ import static io.pixelsdb.pixels.common.utils.Constants.S3_META_PREFIX;
  * <br/>
  *
  * @author hank
- * Created at: 20/08/2021
+ * @create 2021-08-20
+ * @update 2022-09-04 (Move some methods to AbstractS3)
  */
 public final class S3 extends AbstractS3
 {
@@ -160,7 +162,7 @@ public final class S3 extends AbstractS3
     }
 
     @Override
-    protected boolean existsOrGenIdSucc(Path path) throws IOException
+    protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException
     {
         if (!EnableCache)
         {

@@ -61,10 +61,6 @@ public class PhysicalWriterUtil
             case file:
                 writer = new PhysicalLocalWriter(storage, path, overwrite);
                 break;
-            case s3:
-            case minio:
-                writer = new PhysicalS3Writer(storage, path, overwrite);
-                break;
             case redis:
                 writer = new PhysicalRedisWriter(storage, path, overwrite);
                 break;

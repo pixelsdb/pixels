@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
@@ -33,12 +34,12 @@ public interface PhysicalReaderProvider
     /**
      * Create an instance of the physical reader.
      */
-    PhysicalReader createReader(Storage storage, String path, @Nullable PhysicalReaderOption option)
-            throws IOException;
+    PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                @Nullable PhysicalReaderOption option) throws IOException;
 
     /**
      * @param scheme the given storage scheme.
      * @return true if this physical reader provider is compatible with the given storage scheme.
      */
-    boolean compatibleWith(Storage.Scheme scheme);
+    boolean compatibleWith(@Nonnull Storage.Scheme scheme);
 }

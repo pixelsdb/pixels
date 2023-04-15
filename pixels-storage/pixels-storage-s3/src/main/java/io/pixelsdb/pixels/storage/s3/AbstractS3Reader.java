@@ -17,11 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3;
 
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
@@ -39,7 +39,7 @@ import java.util.concurrent.Executors;
  * The abstract class for the physical readers of AWS S3 compatible storage systems.
  *
  * @author hank
- * Created at: 10/04/2022
+ * @create 2022-10-04
  */
 public abstract class AbstractS3Reader implements PhysicalReader
 {
@@ -75,7 +75,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     protected final AbstractS3 s3;
-    protected final AbstractS3.Path path;
+    protected final ObjectPath path;
     protected final String pathStr;
     protected final long id;
     protected final long length;
@@ -99,7 +99,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new AbstractS3.Path(path);
+        this.path = new ObjectPath(path);
         this.pathStr = path;
         this.id = this.s3.getFileId(path);
         this.length = this.s3.getStatus(path).getLength();

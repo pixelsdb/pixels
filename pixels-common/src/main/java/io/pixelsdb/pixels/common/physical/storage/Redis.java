@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.physical.io.RedisOutputStream;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import redis.clients.jedis.JedisPooled;
 
@@ -36,7 +37,6 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.physical.storage.AbstractS3.EnableCache;
 import static io.pixelsdb.pixels.common.utils.Constants.REDIS_ID_KEY;
 import static io.pixelsdb.pixels.common.utils.Constants.REDIS_META_PREFIX;
 import static java.util.Objects.requireNonNull;
@@ -51,6 +51,7 @@ public class Redis implements Storage
 {
     private static final String SchemePrefix = Scheme.redis.name() + "://";
 
+    private static final boolean EnableCache;
     private static String hostName = "localhost";
     private static int port = 6379;
     private static String userName = "";
@@ -58,6 +59,8 @@ public class Redis implements Storage
 
     static
     {
+        EnableCache = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("cache.enabled"));
         if (EnableCache)
         {
             /**

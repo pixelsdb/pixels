@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.gcs;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageProvider;
@@ -29,21 +29,25 @@ import java.io.IOException;
  * @author hank
  * @create 2023-04-15
  */
-public class GCSProvider implements StorageProvider
+public class S3Provider implements StorageProvider
 {
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
     {
-        if (!scheme.equals(Storage.Scheme.gcs))
+        switch (scheme)
         {
-            throw new IOException("incompatible storage scheme: " + scheme);
+            case s3:
+                return new S3();
+            case minio:
+                return new Minio();
+            default:
+                throw new IOException("incompatible storage scheme: " + scheme);
         }
-        return new GCS();
     }
 
     @Override
     public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
-        return scheme.equals(Storage.Scheme.gcs);
+        return scheme.equals(Storage.Scheme.s3) || scheme.equals(Storage.Scheme.minio);
     }
 }

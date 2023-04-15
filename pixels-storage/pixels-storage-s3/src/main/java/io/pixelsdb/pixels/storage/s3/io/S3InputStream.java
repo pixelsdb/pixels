@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3.io;
 
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
@@ -36,7 +36,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
  * The input stream for AWS S3 compatible storage systems.
  *
  * @author hank
- * Created at: 9/29/21
+ * @create 2021-09-29
  */
 public class S3InputStream extends InputStream
 {

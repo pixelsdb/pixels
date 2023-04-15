@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
  * <br/>
  *
  * @author hank
- * Created at: 10/04/2022
+ * @create 2022-10-04
  */
 public class PhysicalMinioReader extends AbstractS3Reader
 {

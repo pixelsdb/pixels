@@ -17,15 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.io.S3InputStream;
-import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.storage.s3.io.S3InputStream;
+import io.pixelsdb.pixels.storage.s3.io.S3OutputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
@@ -50,7 +51,7 @@ import static java.util.Objects.requireNonNull;
  * <br/>
  *
  * @author hank
- * Created at: 09/04/2022 23:55
+ * @create 2022-09-04 23:55
  */
 public abstract class AbstractS3 implements Storage
 {
@@ -88,106 +89,6 @@ public abstract class AbstractS3 implements Storage
 
     public abstract void reconnect();
 
-    public static class Path
-    {
-        public String bucket = null;
-        public String key = null;
-        public boolean valid = false;
-        /**
-         * True if this path is folder.
-         * In S3, 'folder' is an empty object with its name ends with '/'.
-         * Besides, we also consider the path that only contains a
-         * bucket name as a folder.
-         */
-        public boolean isFolder = false;
-
-        public Path(String path)
-        {
-            requireNonNull(path);
-            // remove the scheme header.
-            if (path.contains("://"))
-            {
-                path = path.substring(path.indexOf("://") + 3);
-            }
-            else if (path.startsWith("/"))
-            {
-                path = path.substring(1);
-            }
-            // the substring before the first '/' is the bucket name.
-            int slash = path.indexOf("/");
-            if (slash > 0)
-            {
-                this.bucket = path.substring(0, slash);
-                if (slash < path.length()-1)
-                {
-                    this.key = path.substring(slash + 1);
-                    this.isFolder = this.key.endsWith("/");
-                }
-                else
-                {
-                    // this is a bucket.
-                    this.isFolder = true;
-                }
-                this.valid = true;
-            }
-            else if (path.length() > 0)
-            {
-                // this is a bucket.
-                this.bucket = path;
-                this.isFolder = true;
-                this.valid = true;
-            }
-        }
-
-        public Path(String bucket, String key)
-        {
-            this.bucket = requireNonNull(bucket, "bucket is null");
-            this.key = key;
-            this.valid = true;
-            if (key != null)
-            {
-                this.isFolder = key.endsWith("/");
-            }
-            else
-            {
-                this.isFolder = true;
-            }
-        }
-
-        @Override
-        public String toString()
-        {
-            if (!this.valid)
-            {
-                return null;
-            }
-            if (this.key == null)
-            {
-                return this.bucket;
-            }
-            return this.bucket + "/" + this.key;
-        }
-
-        /**
-         * Convert this path to a String with the scheme prefix of the storage.
-         * @param storage the storage.
-         * @return the String form of the path.
-         * @throws IOException
-         */
-        public String toStringWithPrefix(Storage storage) throws IOException
-        {
-            if (!this.valid)
-            {
-                return null;
-            }
-            if (this.key == null)
-            {
-                return this.bucket;
-            }
-            return storage.ensureSchemePrefix(this.bucket + "/" + this.key);
-        }
-    }
-
     /**
      * Get the key for the file metadata (e.g., file id) in etcd.
      * @param path
@@ -218,7 +119,7 @@ public abstract class AbstractS3 implements Storage
         List<Status> statuses = null;
         for (String eachPath : path.split(";"))
         {
-            Path p = new Path(eachPath);
+            ObjectPath p = new ObjectPath(eachPath);
             if (!p.valid)
             {
                 throw new IOException("Path '" + eachPath + "' is not valid.");
@@ -242,7 +143,7 @@ public abstract class AbstractS3 implements Storage
             {
                 statuses = new ArrayList<>(objects.size());
             }
-            Path op = new Path(eachPath);
+            ObjectPath op = new ObjectPath(eachPath);
             for (S3Object object : objects)
             {
                 if (object.key().equals(p.key))
@@ -274,7 +175,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public Status getStatus(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -302,7 +203,7 @@ public abstract class AbstractS3 implements Storage
         requireNonNull(path, "path is null");
         if (EnableCache)
         {
-            Path p = new Path(path);
+            ObjectPath p = new ObjectPath(path);
             if (!p.valid)
             {
                 throw new IOException("Path '" + path + "' is not valid.");
@@ -325,7 +226,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public boolean mkdirs(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -340,7 +241,7 @@ public abstract class AbstractS3 implements Storage
             throw new IOException("Path '" + path + "' already exists.");
         }
 
-        if (!this.existsInS3(new Path(p.bucket)))
+        if (!this.existsInS3(new ObjectPath(p.bucket)))
         {
             CreateBucketRequest request = CreateBucketRequest.builder().bucket(p.bucket).build();
             s3.createBucket(request);
@@ -374,7 +275,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -400,7 +301,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -415,7 +316,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -445,7 +346,7 @@ public abstract class AbstractS3 implements Storage
                         Math.min(numStatuses, FilesPerDeleteRequest));
                 for (int j = 0; j < FilesPerDeleteRequest && i < numStatuses; ++j, ++i)
                 {
-                    Path sub = new Path(statuses.get(i).getPath());
+                    ObjectPath sub = new ObjectPath(statuses.get(i).getPath());
                     objectsToDelete.add(ObjectIdentifier.builder().key(sub.key).build());
                 }
                 try
@@ -486,8 +387,8 @@ public abstract class AbstractS3 implements Storage
     @Override
     public boolean directCopy(String src, String dest) throws IOException
     {
-        Path srcPath = new Path(src);
-        Path destPath = new Path(dest);
+        ObjectPath srcPath = new ObjectPath(src);
+        ObjectPath destPath = new ObjectPath(dest);
         if (!srcPath.valid)
         {
             throw new IOException("Path '" + src + "' is invalid.");
@@ -524,7 +425,7 @@ public abstract class AbstractS3 implements Storage
     @Override
     public boolean exists(String path) throws IOException
     {
-        return this.existsInS3(new Path(path));
+        return this.existsInS3(new ObjectPath(path));
     }
 
     /**
@@ -533,7 +434,7 @@ public abstract class AbstractS3 implements Storage
      * @return
      * @throws IOException
      */
-    protected boolean existsInS3(Path path) throws IOException
+    protected boolean existsInS3(ObjectPath path) throws IOException
     {
         if (!path.valid)
         {
@@ -573,18 +474,18 @@ public abstract class AbstractS3 implements Storage
         }
     }
 
-    abstract protected boolean existsOrGenIdSucc(Path path) throws IOException;
+    abstract protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException;
 
     @Override
     public boolean isFile(String path) throws IOException
     {
-        return !(new Path(path).isFolder);
+        return !(new ObjectPath(path).isFolder);
     }
 
     @Override
     public boolean isDirectory(String path) throws IOException
     {
-        return new Path(path).isFolder;
+        return new ObjectPath(path).isFolder;
     }
 
     public S3Client getClient()

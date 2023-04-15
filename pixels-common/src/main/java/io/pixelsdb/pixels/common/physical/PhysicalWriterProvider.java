@@ -33,12 +33,12 @@ public interface PhysicalWriterProvider
     /**
      * Create an instance of the physical writer.
      */
-    PhysicalWriter createWriter(Storage storage, String path, @Nonnull PhysicalWriterOption option)
-            throws IOException;
+    PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                @Nonnull PhysicalWriterOption option) throws IOException;
 
     /**
      * @param scheme the given storage scheme.
      * @return true if this physical writer provider is compatible with the given storage scheme.
      */
-    boolean compatibleWith(Storage.Scheme scheme);
+    boolean compatibleWith(@Nonnull Storage.Scheme scheme);
 }

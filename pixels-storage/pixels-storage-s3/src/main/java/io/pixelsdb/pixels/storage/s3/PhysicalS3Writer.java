@@ -17,11 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3;
 
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3;
 import io.pixelsdb.pixels.common.utils.Constants;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -34,12 +34,12 @@ import java.nio.ByteBuffer;
  * The physical writers for AWS S3 compatible storage systems.
  *
  * @author hank
- * Created at: 06/09/2021
+ * @create 2021-09-06
  */
 public class PhysicalS3Writer implements PhysicalWriter
 {
     private AbstractS3 s3;
-    private AbstractS3.Path path;
+    private ObjectPath path;
     private final String pathStr;
     private long position;
     private S3Client client;
@@ -60,7 +60,7 @@ public class PhysicalS3Writer implements PhysicalWriter
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new AbstractS3.Path(path);
+        this.path = new ObjectPath(path);
         this.pathStr = path;
         this.position = 0L;
         this.client = s3.getClient();

@@ -1,12 +1,12 @@
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.hdfs;
 
 import org.junit.Test;
 
 import java.io.IOException;
 
 /**
- * Created at: 2020/5/18
- * Author: hank
+ * @author hank
+ * @create 2020-05-18
  */
 public class TestOzone
 {

@@ -17,10 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.S3;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.ResponseBytes;
@@ -38,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
  * The physical reader for AWS S3.
  *
  * @author hank
- * Created at: 06/09/2021
+ * @create 2021-09-06
  */
 public class PhysicalS3Reader extends AbstractS3Reader
 {

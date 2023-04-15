@@ -128,6 +128,36 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-gcs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-hdfs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-localfs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-redis</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-s3</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-mock</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-executor</artifactId>
                 <version>${project.version}</version>
             </dependency>

@@ -17,9 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.s3;
 
-import io.pixelsdb.pixels.common.physical.io.S3OutputStream;
+import io.pixelsdb.pixels.common.physical.*;
+import io.pixelsdb.pixels.storage.s3.io.S3OutputStream;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Test;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -31,8 +32,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Created at: 9/8/21
- * Author: hank
+ * @author hank
+ * @create 2021-09-08
  */
 public class TestS3
 {

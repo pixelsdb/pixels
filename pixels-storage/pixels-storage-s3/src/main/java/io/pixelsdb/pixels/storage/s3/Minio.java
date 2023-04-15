@@ -17,9 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.exception.StorageException;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -34,7 +35,8 @@ import java.util.Objects;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.utils.Constants.*;
+import static io.pixelsdb.pixels.common.utils.Constants.MINIO_ID_KEY;
+import static io.pixelsdb.pixels.common.utils.Constants.MINIO_META_PREFIX;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -46,7 +48,7 @@ import static java.util.Objects.requireNonNull;
  * <br/>
  *
  * @author hank
- * Created at: 09/04/2022
+ * @create 2022-09-04
  */
 public final class Minio extends AbstractS3
 {
@@ -166,7 +168,7 @@ public final class Minio extends AbstractS3
     }
 
     @Override
-    protected boolean existsOrGenIdSucc(Path path) throws IOException
+    protected boolean existsOrGenIdSucc(ObjectPath path) throws IOException
     {
         if (!EnableCache)
         {

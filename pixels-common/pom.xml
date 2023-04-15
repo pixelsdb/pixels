@@ -40,45 +40,10 @@
             <artifactId>jna</artifactId>
         </dependency>
 
-        <!-- ozone, if it is enabled,
-        make sure that it is compatible with hadoop libs. -->
-        <!--<dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-ozone-client</artifactId>
-            <optional>true</optional>
-        </dependency>-->
-
         <!-- hadoop -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- aws sdk -->
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!--
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>netty-nio-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-        -->
-
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>apache-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>aws-crt-client</artifactId>
             <optional>true</optional>
         </dependency>
 

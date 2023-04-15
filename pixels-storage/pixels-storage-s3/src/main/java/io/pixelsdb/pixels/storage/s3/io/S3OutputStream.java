@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.s3.io;
 
 import io.pixelsdb.pixels.common.physical.scheduler.RetryPolicy;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -47,7 +47,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.S3_BUFFER_SIZE;
  * </p>
  *
  * @author hank
- * Created at: 9/24/21
+ * @create 2021-09-24
  */
 public class S3OutputStream extends OutputStream
 {

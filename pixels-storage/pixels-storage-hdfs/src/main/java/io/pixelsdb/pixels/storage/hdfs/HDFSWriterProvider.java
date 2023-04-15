@@ -27,8 +27,6 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 /**
  * @author hank
  * @create 2023-04-15
@@ -36,17 +34,19 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class HDFSWriterProvider implements PhysicalWriterProvider
 {
     @Override
-    public PhysicalWriter createWriter(Storage storage, String path, @Nonnull PhysicalWriterOption option)
-            throws IOException
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option) throws IOException
     {
-        checkArgument(storage.getScheme().equals(Storage.Scheme.hdfs),
-                "storage is incompatible with hdfs");
+        if (!storage.getScheme().equals(Storage.Scheme.hdfs))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
         return new PhysicalHDFSWriter(storage, path, option.getReplication(),
                 option.isAddBlockPadding(), option.getBlockSize(), option.isOverwrite());
     }
 
     @Override
-    public boolean compatibleWith(Storage.Scheme scheme)
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
         return scheme.equals(Storage.Scheme.hdfs);
     }

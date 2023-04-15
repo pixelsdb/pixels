@@ -24,10 +24,9 @@ import io.pixelsdb.pixels.common.physical.PhysicalReaderOption;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderProvider;
 import io.pixelsdb.pixels.common.physical.Storage;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author hank
@@ -36,16 +35,18 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class GCSReaderProvider implements PhysicalReaderProvider
 {
     @Override
-    public PhysicalReader createReader(Storage storage, String path, @Nullable PhysicalReaderOption option)
-            throws IOException
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
     {
-        checkArgument(storage.getScheme().equals(Storage.Scheme.gcs),
-                "storage is incompatible with gcs");
+        if (!storage.getScheme().equals(Storage.Scheme.gcs))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
         return new PhysicalGCSReader(storage, path);
     }
 
     @Override
-    public boolean compatibleWith(Storage.Scheme scheme)
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
         return scheme.equals(Storage.Scheme.gcs);
     }

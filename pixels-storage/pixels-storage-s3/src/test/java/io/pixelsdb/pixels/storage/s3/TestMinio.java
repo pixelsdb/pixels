@@ -17,8 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.s3;
 
+import io.pixelsdb.pixels.common.physical.*;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -27,11 +28,11 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 
-import static io.pixelsdb.pixels.common.physical.storage.Minio.ConfigMinio;
+import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
 
 /**
  * @author hank
- * Created at: 10/04/2022
+ * @create 2022-10-04
  */
 public class TestMinio
 {

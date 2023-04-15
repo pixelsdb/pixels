@@ -25,10 +25,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalWriterProvider;
 import io.pixelsdb.pixels.common.physical.Storage;
 
 import javax.annotation.Nonnull;
-
 import java.io.IOException;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * @author hank
@@ -37,16 +34,19 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class GCSWriterProvider implements PhysicalWriterProvider
 {
     @Override
-    public PhysicalWriter createWriter(Storage storage, String path, @Nonnull PhysicalWriterOption option)
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option)
             throws IOException
     {
-        checkArgument(storage.getScheme().equals(Storage.Scheme.gcs),
-                "storage is incompatible with gcs");
+        if (!storage.getScheme().equals(Storage.Scheme.gcs))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
         return new PhysicalGCSWriter(storage, path, option.isOverwrite());
     }
 
     @Override
-    public boolean compatibleWith(Storage.Scheme scheme)
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
         return scheme.equals(Storage.Scheme.gcs);
     }

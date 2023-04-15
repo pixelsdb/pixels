@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.storage.hdfs;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageProvider;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 
 /**
@@ -31,13 +32,17 @@ import java.io.IOException;
 public class HDFSProvider implements StorageProvider
 {
     @Override
-    public Storage createStorage() throws IOException
+    public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
     {
+        if (!scheme.equals(Storage.Scheme.hdfs))
+        {
+            throw new IOException("incompatible storage scheme: " + scheme);
+        }
         return new HDFS();
     }
 
     @Override
-    public boolean compatibleWith(Storage.Scheme scheme)
+    public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
         return scheme.equals(Storage.Scheme.hdfs);
     }
