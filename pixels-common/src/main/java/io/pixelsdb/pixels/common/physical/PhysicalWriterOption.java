@@ -40,9 +40,10 @@ public class PhysicalWriterOption
         return blockSize;
     }
 
-    public void setBlockSize(long blockSize)
+    public PhysicalWriterOption setBlockSize(long blockSize)
     {
         this.blockSize = blockSize;
+        return this;
     }
 
     public short getReplication()
@@ -50,9 +51,10 @@ public class PhysicalWriterOption
         return replication;
     }
 
-    public void setReplication(short replication)
+    public PhysicalWriterOption setReplication(short replication)
     {
         this.replication = replication;
+        return this;
     }
 
     public boolean isAddBlockPadding()
@@ -60,9 +62,10 @@ public class PhysicalWriterOption
         return addBlockPadding;
     }
 
-    public void setAddBlockPadding(boolean addBlockPadding)
+    public PhysicalWriterOption setAddBlockPadding(boolean addBlockPadding)
     {
         this.addBlockPadding = addBlockPadding;
+        return this;
     }
 
     public boolean isOverwrite()
@@ -70,8 +73,9 @@ public class PhysicalWriterOption
         return overwrite;
     }
 
-    public void setOverwrite(boolean overwrite)
+    public PhysicalWriterOption setOverwrite(boolean overwrite)
     {
         this.overwrite = overwrite;
+        return this;
     }
 }

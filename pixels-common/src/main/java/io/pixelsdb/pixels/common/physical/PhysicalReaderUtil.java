@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.io.*;
-
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -35,22 +33,24 @@ public class PhysicalReaderUtil
     {
     }
 
-    public static PhysicalReader newPhysicalReader(Storage storage, String path) throws IOException
+    public static PhysicalReader newPhysicalReader(
+            Storage storage, String path, PhysicalReaderOption option) throws IOException
     {
         checkArgument(storage != null, "storage should not be null");
         checkArgument(path != null, "path should not be null");
 
-        PhysicalReader reader;
-        switch (storage.getScheme())
+        if (!StorageFactory.Instance().getStorageProviders().containsKey(storage.getScheme()))
         {
-            case mock:
-                reader = new MockReader(storage, path);
-                break;
-            default:
-                throw new IOException("Storage scheme '" + storage.getScheme() + "' is not supported.");
+            throw new IOException(String.format("Storage scheme '%s' is not enabled or supported.",
+                    storage.getScheme().name()));
         }
+        return StorageFactory.Instance().getStorageProviders().get(storage.getScheme())
+                .createReader(storage, path, option);
+    }
 
-        return reader;
+    public static PhysicalReader newPhysicalReader(Storage storage, String path) throws IOException
+    {
+        return newPhysicalReader(storage, path, null); // currently, we do not use reader option.
     }
 
     public static PhysicalReader newPhysicalReader(Storage.Scheme scheme, String path) throws IOException
