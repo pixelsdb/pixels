@@ -173,6 +173,8 @@
                             </artifactSet>
                             <finalName>pixels-worker-lambda</finalName>
                             <transformers>
+                                <!-- ServicesResourceTransformer merges the resources in META-INF/services -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="com.github.edwgiz.maven_shade_plugin.log4j2_cache_transformer.PluginsCacheFileTransformer"/>
                             </transformers>
                         </configuration>
