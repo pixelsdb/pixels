@@ -160,9 +160,6 @@ public class StorageFactory
         Storage storage;
         switch (scheme)
         {
-            case file:
-                storage = new LocalFS();
-                break;
             case mock: 
                 storage = new Mock();
                 break;

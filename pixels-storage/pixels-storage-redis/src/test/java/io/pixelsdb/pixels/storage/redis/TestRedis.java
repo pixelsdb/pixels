@@ -30,7 +30,7 @@ import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
 
 /**
  * @author hank
- * Created at: 22/08/2022
+ * @create 2022-08-22
  */
 public class TestRedis
 {

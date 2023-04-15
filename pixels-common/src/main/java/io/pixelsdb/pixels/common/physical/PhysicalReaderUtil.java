@@ -43,9 +43,6 @@ public class PhysicalReaderUtil
         PhysicalReader reader;
         switch (storage.getScheme())
         {
-            case file:
-                reader = new PhysicalLocalReader(storage, path);
-                break;
             case mock:
                 reader = new MockReader(storage, path);
                 break;

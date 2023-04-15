@@ -17,12 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.localfs;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.natives.PixelsRandomAccessFile;
-import io.pixelsdb.pixels.common.physical.storage.LocalFS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.io.IOException;

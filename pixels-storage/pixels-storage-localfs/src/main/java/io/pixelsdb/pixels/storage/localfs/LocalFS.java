@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.localfs;
 
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
@@ -46,7 +46,7 @@ import static java.util.Objects.requireNonNull;
  * it could be a network file system mounted on a local point such as /mnt/nfs.
  *
  * @author hank
- * Created at: 20/08/2021
+ * @create 2021-08-20
  */
 public final class LocalFS implements Storage
 {

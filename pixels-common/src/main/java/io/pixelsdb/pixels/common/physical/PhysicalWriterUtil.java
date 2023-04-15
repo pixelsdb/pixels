@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.io.*;
-
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -58,8 +56,8 @@ public class PhysicalWriterUtil
         PhysicalWriter writer;
         switch (storage.getScheme())
         {
-            case file:
-                writer = new PhysicalLocalWriter(storage, path, overwrite);
+            case mock:
+                writer = null;
                 break;
             default:
                 throw new IOException("Storage scheme '" +

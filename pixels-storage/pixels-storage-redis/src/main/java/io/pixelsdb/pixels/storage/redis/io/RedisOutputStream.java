@@ -31,7 +31,7 @@ import static io.pixelsdb.pixels.common.utils.Constants.REDIS_BUFFER_SIZE;
  * The output stream for Redis.
  *
  * @author hank
- * @date 8/22/22
+ * @create 2022-08-22
  */
 public class RedisOutputStream extends OutputStream
 {
@@ -159,5 +159,4 @@ public class RedisOutputStream extends OutputStream
             throw new IllegalStateException("Closed");
         }
     }
-
 }

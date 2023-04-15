@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets;
  * The physical writers for AWS S3 compatible storage systems.
  *
  * @author hank
- * @date 8/22/22
+ * @create 2022-08-22
  */
 public class PhysicalRedisWriter implements PhysicalWriter
 {
