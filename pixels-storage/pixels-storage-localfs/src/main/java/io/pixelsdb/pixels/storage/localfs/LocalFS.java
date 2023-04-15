@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.storage.localfs;
 
 import io.etcd.jetcd.KeyValue;
+import io.pixelsdb.pixels.common.physical.FilePath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.natives.DirectRandomAccessFile;
@@ -78,59 +79,6 @@ public final class LocalFS implements Storage
         return LOCAL_FS_META_PREFIX + path;
     }
 
-    public static class Path
-    {
-        public String realPath = null;
-        public boolean valid = false;
-        public boolean isDir = false;
-
-        public Path(String path)
-        {
-            requireNonNull(path);
-            if (path.startsWith("file:///"))
-            {
-                valid = true;
-                realPath = path.substring(path.indexOf("://") + 3);
-            }
-            else if (path.startsWith("/"))
-            {
-                valid = true;
-                realPath = path;
-            }
-
-            if (valid)
-            {
-                File file = new File(realPath);
-                isDir = file.isDirectory();
-            }
-        }
-
-        @Override
-        public String toString()
-        {
-            if (!this.valid)
-            {
-                return null;
-            }
-            return this.realPath;
-        }
-
-        /**
-         * Convert this path to a String with the scheme prefix of the storage.
-         * @param storage the storage.
-         * @return the String form of the path.
-         * @throws IOException
-         */
-        public String toStringWithPrefix(Storage storage) throws IOException
-        {
-            if (!this.valid)
-            {
-                return null;
-            }
-            return storage.ensureSchemePrefix(this.realPath);
-        }
-    }
-
     @Override
     public Scheme getScheme()
     {
@@ -158,10 +106,10 @@ public final class LocalFS implements Storage
         List<Status> statuses = new ArrayList<>();
         for (String eachPath : path.split(";"))
         {
-            Path p = new Path(eachPath);
+            FilePath p = new FilePath(eachPath);
             if (!p.valid)
             {
-                throw new IOException("path '" + eachPath + "' is not a valid local fs path");
+                throw new IOException("Path '" + eachPath + "' is not a valid local fs path.");
             }
             File file = new File(p.realPath);
             File[] files;
@@ -190,10 +138,10 @@ public final class LocalFS implements Storage
     @Override
     public Status getStatus(String path) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         return new Status(ensureSchemePrefix(p.realPath), file.length(), file.isDirectory(), 1);
@@ -205,10 +153,10 @@ public final class LocalFS implements Storage
         List<String> paths = new ArrayList<>();
         for (String eachPath : path.split(";"))
         {
-            Path p = new Path(eachPath);
+            FilePath p = new FilePath(eachPath);
             if (!p.valid)
             {
-                throw new IOException("path '" + eachPath + "' is not a valid local fs path");
+                throw new IOException("Path '" + eachPath + "' is not a valid local fs path.");
             }
             File file = new File(p.realPath);
             File[] files;
@@ -262,10 +210,10 @@ public final class LocalFS implements Storage
     @Override
     public boolean mkdirs(String path) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         if (!file.isDirectory())
@@ -282,10 +230,10 @@ public final class LocalFS implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         if (file.isDirectory())
@@ -311,10 +259,10 @@ public final class LocalFS implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         if (file.isDirectory())
@@ -347,10 +295,10 @@ public final class LocalFS implements Storage
 
     public PixelsRandomAccessFile openRaf(String path) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         if (file.isDirectory())
@@ -371,10 +319,10 @@ public final class LocalFS implements Storage
     @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
-            throw new IOException("path '" + path + "' is not a valid local fs path");
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
         boolean subDeleted = true;
@@ -425,7 +373,7 @@ public final class LocalFS implements Storage
     @Override
     public boolean exists(String path)
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         if (!p.valid)
         {
             return false;
@@ -436,14 +384,14 @@ public final class LocalFS implements Storage
     @Override
     public boolean isFile(String path)
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         return p.valid && !p.isDir;
     }
 
     @Override
     public boolean isDirectory(String path)
     {
-        Path p = new Path(path);
+        FilePath p = new FilePath(path);
         return p.valid && p.isDir;
     }
 }
