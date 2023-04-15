@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.mock;
 
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
-public class MockReader implements PhysicalReader
+public class PhysicalMockReader implements PhysicalReader
 {
     private static final List<String> cacheIdxs = new ArrayList<>();
     private static final List<String> cacheKeys = new ArrayList<>();
@@ -84,7 +84,7 @@ public class MockReader implements PhysicalReader
     private final Random ran;
 
 
-    public MockReader(Storage storage, String path)
+    public PhysicalMockReader(Storage storage, String path)
     {
         // path is a block id
         assert (storage.getScheme() == Storage.Scheme.mock);
