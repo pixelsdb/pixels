@@ -17,11 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.hdfs;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.HDFS;
 import io.pixelsdb.pixels.common.utils.Constants;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.logging.log4j.LogManager;

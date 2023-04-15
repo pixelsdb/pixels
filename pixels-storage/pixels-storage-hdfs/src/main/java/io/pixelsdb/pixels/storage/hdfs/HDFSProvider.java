@@ -17,24 +17,28 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.hdfs;
+
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageProvider;
 
 import java.io.IOException;
 
 /**
- * Created at: 2023-04-15
- * Author: hank
+ * @author hank
+ * @create 2023-04-15
  */
-public interface StorageProvider
+public class HDFSProvider implements StorageProvider
 {
-    /**
-     * Create an instance of the file/object storage system handler.
-     */
-    Storage createStorage() throws IOException;
+    @Override
+    public Storage createStorage() throws IOException
+    {
+        return new HDFS();
+    }
 
-    /**
-     * @param scheme the given storage scheme.
-     * @return true if this physical reader provider is compatible with the given storage scheme.
-     */
-    boolean compatibleWith(Storage.Scheme scheme);
+    @Override
+    public boolean compatibleWith(Storage.Scheme scheme)
+    {
+        return scheme.equals(Storage.Scheme.hdfs);
+    }
 }

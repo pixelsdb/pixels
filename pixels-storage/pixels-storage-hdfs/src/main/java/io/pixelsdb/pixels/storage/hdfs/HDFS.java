@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.hdfs;
 
 import io.pixelsdb.pixels.common.physical.Location;
 import io.pixelsdb.pixels.common.physical.Status;
@@ -44,7 +44,7 @@ import java.util.List;
  * It is tested that this implementation is compatible with Hadoop-2.7.3 and Hadoop-3.3.1.
  *
  * @author hank
- * Created at: 20/08/2021
+ * @create 2021-08-20
  */
 public final class HDFS implements Storage
 {

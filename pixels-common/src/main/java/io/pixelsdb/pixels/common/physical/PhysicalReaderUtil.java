@@ -43,9 +43,6 @@ public class PhysicalReaderUtil
         PhysicalReader reader;
         switch (storage.getScheme())
         {
-            case hdfs:
-                reader = new PhysicalHDFSReader(storage, path);
-                break;
             case file:
                 reader = new PhysicalLocalReader(storage, path);
                 break;

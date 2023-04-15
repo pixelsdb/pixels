@@ -160,9 +160,6 @@ public class StorageFactory
         Storage storage;
         switch (scheme)
         {
-            case hdfs:
-                storage = new HDFS();
-                break;
             case file:
                 storage = new LocalFS();
                 break;

@@ -58,10 +58,6 @@ public class PhysicalWriterUtil
         PhysicalWriter writer;
         switch (storage.getScheme())
         {
-            case hdfs:
-                writer = new PhysicalHDFSWriter(storage, path, replication,
-                        addBlockPadding, blockSize, overwrite);
-                break;
             case file:
                 writer = new PhysicalLocalWriter(storage, path, overwrite);
                 break;
