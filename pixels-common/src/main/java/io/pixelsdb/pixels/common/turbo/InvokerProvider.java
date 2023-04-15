@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.turbo;
 
 /**
- * The SPI of the invoker provider of serverless workers.
+ * The SPI for the invoker provider of serverless workers.
  * In pixels.properties, set executor.function.service to the cloud function service that the invoker
  * implementations are compatible with.
  * In Pixels, there should be at most one set of invoker implementations compatible with each cloud
@@ -32,7 +32,7 @@ package io.pixelsdb.pixels.common.turbo;
 public interface InvokerProvider
 {
     /**
-     * Create the invoker of a serverless worker.
+     * Create an invoker instance of a serverless worker.
      */
     Invoker createInvoker();
 

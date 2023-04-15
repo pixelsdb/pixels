@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.gcs;
 
 import com.google.api.gax.paging.Page;
 import com.google.cloud.ReadChannel;
@@ -25,10 +25,11 @@ import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.*;
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.exception.StorageException;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3.Path;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 
 import java.io.*;
@@ -41,7 +42,6 @@ import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.GenerateId;
 import static io.pixelsdb.pixels.common.lock.EtcdAutoIncrement.InitId;
-import static io.pixelsdb.pixels.common.physical.storage.AbstractS3.EnableCache;
 import static io.pixelsdb.pixels.common.utils.Constants.*;
 import static java.util.Objects.requireNonNull;
 
@@ -54,14 +54,16 @@ public class GCS implements Storage
 {
     private static final String SchemePrefix = Scheme.gcs.name() + "://";
 
-    protected static final int RequestsPerBatch = 100;
+    protected final static boolean EnableCache;
+    protected final static int RequestsPerBatch = 100;
 
     private static String projectId = null;
     private static String location = null;
 
-
     static
     {
+        EnableCache = Boolean.parseBoolean(
+                ConfigFactory.Instance().getProperty("cache.enabled"));
         if (EnableCache)
         {
             /**
@@ -97,9 +99,9 @@ public class GCS implements Storage
         }
     }
 
-    private com.google.cloud.storage.Storage gcs;
+    private final com.google.cloud.storage.Storage gcs;
 
-    public GCS ()
+    protected GCS()
     {
         gcs = StorageOptions.newBuilder().setProjectId(projectId).build().getService();
     }
@@ -131,7 +133,7 @@ public class GCS implements Storage
         List<Status> statuses = new ArrayList<>();
         for (String eachPath : path.split(";"))
         {
-            Path p = new Path(eachPath);
+            ObjectPath p = new ObjectPath(eachPath);
             if (!p.valid)
             {
                 throw new IOException("Path '" + eachPath + "' is not valid.");
@@ -148,7 +150,7 @@ public class GCS implements Storage
                 blobs = this.gcs.list(p.bucket,
                         com.google.cloud.storage.Storage.BlobListOption.currentDirectory());
             }
-            Path op = new Path(eachPath);
+            ObjectPath op = new ObjectPath(eachPath);
             // blobs.iterateAll() automatically fetch the next pages, no need to explicitly get the next page
             for (Blob blob : blobs.iterateAll())
             {
@@ -175,7 +177,7 @@ public class GCS implements Storage
     @Override
     public Status getStatus(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -203,7 +205,7 @@ public class GCS implements Storage
         requireNonNull(path, "path is null");
         if (EnableCache)
         {
-            Path p = new Path(path);
+            ObjectPath p = new ObjectPath(path);
             if (!p.valid)
             {
                 throw new IOException("Path '" + path + "' is not valid.");
@@ -228,7 +230,7 @@ public class GCS implements Storage
         return GCS_META_PREFIX + path;
     }
 
-    private boolean existsOrGenIdSucc(Path path) throws IOException
+    private boolean existsOrGenIdSucc(ObjectPath path) throws IOException
     {
         if (!EnableCache)
         {
@@ -258,7 +260,7 @@ public class GCS implements Storage
      * @return
      * @throws IOException
      */
-    private boolean existsInGCS(Path path) throws IOException
+    private boolean existsInGCS(ObjectPath path) throws IOException
     {
         if (!path.valid)
         {
@@ -288,7 +290,7 @@ public class GCS implements Storage
     @Override
     public boolean mkdirs(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -299,7 +301,7 @@ public class GCS implements Storage
                     "the key for S3 directory (folder) must ends with '/'.");
         }
 
-        if (!this.existsInGCS(new Path(p.bucket)))
+        if (!this.existsInGCS(new ObjectPath(p.bucket)))
         {
             this.gcs.create(BucketInfo.newBuilder(p.bucket)
                     .setStorageClass(StorageClass.STANDARD)
@@ -318,7 +320,7 @@ public class GCS implements Storage
     @Override
     public DataInputStream open(String path) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -335,7 +337,7 @@ public class GCS implements Storage
     @Override
     public DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -359,7 +361,7 @@ public class GCS implements Storage
     @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
-        Path p = new Path(path);
+        ObjectPath p = new ObjectPath(path);
         if (!p.valid)
         {
             throw new IOException("Path '" + path + "' is not valid.");
@@ -388,7 +390,7 @@ public class GCS implements Storage
                 StorageBatch deleteBatch = this.gcs.batch();
                 for (int j = 0; j < RequestsPerBatch && i < numStatuses; ++j, ++i)
                 {
-                    Path sub = new Path(statuses.get(i).getPath());
+                    ObjectPath sub = new ObjectPath(statuses.get(i).getPath());
                     deleteBatch.delete(sub.bucket, sub.key);
                 }
                 try
@@ -426,8 +428,8 @@ public class GCS implements Storage
     @Override
     public boolean directCopy(String src, String dest) throws IOException
     {
-        Path srcPath = new Path(src);
-        Path destPath = new Path(dest);
+        ObjectPath srcPath = new ObjectPath(src);
+        ObjectPath destPath = new ObjectPath(dest);
         if (!srcPath.valid)
         {
             throw new IOException("Path '" + src + "' is invalid.");
@@ -463,19 +465,19 @@ public class GCS implements Storage
     @Override
     public boolean exists(String path) throws IOException
     {
-        return this.existsInGCS(new Path(path));
+        return this.existsInGCS(new ObjectPath(path));
     }
 
     @Override
     public boolean isFile(String path) throws IOException
     {
-        return !(new Path(path).isFolder);
+        return !(new ObjectPath(path).isFolder);
     }
 
     @Override
     public boolean isDirectory(String path) throws IOException
     {
-        return new Path(path).isFolder;
+        return new ObjectPath(path).isFolder;
     }
 
     public com.google.cloud.storage.Storage getClient()

@@ -58,9 +58,6 @@ public class PhysicalReaderUtil
             case redis:
                 reader = new PhysicalRedisReader(storage, path);
                 break;
-            case gcs:
-                reader = new PhysicalGCSReader(storage, path);
-                break;
             case mock:
                 reader = new MockReader(storage, path);
                 break;

@@ -37,9 +37,9 @@ import static java.util.Objects.requireNonNull;
  */
 public class StorageFactory
 {
-    private static Logger logger = LogManager.getLogger(StorageFactory.class);
-    private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
-    private Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
+    private static final Logger logger = LogManager.getLogger(StorageFactory.class);
+    private final Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
+    private final Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
 
     private StorageFactory()
     {
@@ -174,9 +174,6 @@ public class StorageFactory
                 break;
             case redis:
                 storage = new Redis();
-                break;
-            case gcs:
-                storage = new GCS();
                 break;
             case mock: 
                 storage = new Mock();

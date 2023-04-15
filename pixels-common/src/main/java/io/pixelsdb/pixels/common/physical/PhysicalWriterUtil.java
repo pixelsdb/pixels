@@ -72,9 +72,6 @@ public class PhysicalWriterUtil
             case redis:
                 writer = new PhysicalRedisWriter(storage, path, overwrite);
                 break;
-            case gcs:
-                writer = new PhysicalGCSWriter(storage, path, overwrite);
-                break;
             default:
                 throw new IOException("Storage scheme '" +
                         storage.getScheme() + "' is not supported.");

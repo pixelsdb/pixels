@@ -17,12 +17,11 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.gcs;
 
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3.Path;
-import io.pixelsdb.pixels.common.physical.storage.GCS;
 import io.pixelsdb.pixels.common.utils.Constants;
 
 import java.io.IOException;
@@ -34,16 +33,16 @@ import java.nio.ByteBuffer;
  * The physical writers for Google Cloud Storage.
  *
  * @author hank
- * Created at: 25/09/2022
+ * @create 2022-09-25
  */
 public class PhysicalGCSWriter implements PhysicalWriter
 {
     private GCS gcs;
-    private Path path;
+    private ObjectPath path;
     private String pathStr;
     private long position;
     private com.google.cloud.storage.Storage client;
-    private OutputStream out;
+    private final OutputStream out;
 
     public PhysicalGCSWriter(Storage storage, String path, boolean overwrite) throws IOException
     {
@@ -60,7 +59,7 @@ public class PhysicalGCSWriter implements PhysicalWriter
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new Path(path);
+        this.path = new ObjectPath(path);
         this.pathStr = path;
         this.position = 0L;
         this.client = this.gcs.getClient();

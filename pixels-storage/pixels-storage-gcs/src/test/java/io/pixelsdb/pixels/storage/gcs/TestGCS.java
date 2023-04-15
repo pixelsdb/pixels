@@ -17,12 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.gcs;
 
 import com.google.cloud.ReadChannel;
-import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.*;
-import io.pixelsdb.pixels.common.physical.storage.GCS;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.PhysicalWriterUtil;
 import org.junit.Test;
 
 import java.io.DataInputStream;
@@ -82,7 +84,7 @@ public class TestGCS
     public void testMkdir() throws IOException
     {
         GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
-        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+        io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         storage.mkdirs("pixels-test/hello-world/");
         storage.close();
@@ -92,7 +94,7 @@ public class TestGCS
     public void testCreateObject() throws IOException
     {
         GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
-        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+        io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         DataOutputStream output = storage.create("pixels-test/hello-world/test", false, GCS_BUFFER_SIZE);
         byte[] buffer = new byte[1024];
@@ -108,7 +110,7 @@ public class TestGCS
     public void testOpenObject() throws IOException
     {
         GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
-        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+        io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         DataInputStream input = storage.open("pixels-test/hello-world/test");
         byte[] buffer = new byte[1024];
@@ -122,7 +124,7 @@ public class TestGCS
     public void testGCSReader() throws IOException, ExecutionException, InterruptedException
     {
         GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
-        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+        io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, "pixels-test/hello-world/test1");
         long start = System.currentTimeMillis();
@@ -136,7 +138,7 @@ public class TestGCS
     public void testGCSWriter() throws IOException, ExecutionException, InterruptedException
     {
         GCS.ConfigGCS("pixels-lab", "EUROPE-WEST6");
-        io.pixelsdb.pixels.common.physical.Storage storage = StorageFactory.Instance().getStorage(
+        io.pixelsdb.pixels.common.physical.Storage storage = io.pixelsdb.pixels.common.physical.StorageFactory.Instance().getStorage(
                 io.pixelsdb.pixels.common.physical.Storage.Scheme.gcs);
         PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(
                 storage, "pixels-test/hello-world/test1", true);

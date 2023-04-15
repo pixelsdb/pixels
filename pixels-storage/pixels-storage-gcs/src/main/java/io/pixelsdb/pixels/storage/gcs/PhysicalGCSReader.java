@@ -17,14 +17,13 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.gcs;
 
 import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.BlobId;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.storage.AbstractS3.Path;
-import io.pixelsdb.pixels.common.physical.storage.GCS;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,11 +38,11 @@ import java.util.concurrent.Executors;
  * The physical readers of Google Cloud Storage.
  *
  * @author hank
- * Created at: 25/09/2022
+ * @create 2022-09-25
  */
 public class PhysicalGCSReader implements PhysicalReader
 {
-    private static final Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
+    private static final Logger logger = LogManager.getLogger(PhysicalGCSReader.class);
     protected boolean enableAsync = false;
     protected static final ExecutorService clientService;
 
@@ -72,7 +71,7 @@ public class PhysicalGCSReader implements PhysicalReader
     }
 
     protected final GCS gcs;
-    protected final Path path;
+    protected final ObjectPath path;
     protected final String pathStr;
     protected final long id;
     protected final long length;
@@ -96,7 +95,7 @@ public class PhysicalGCSReader implements PhysicalReader
             // remove the scheme.
             path = path.substring(path.indexOf("://") + 3);
         }
-        this.path = new Path(path);
+        this.path = new ObjectPath(path);
         this.pathStr = path;
         this.id = this.gcs.getFileId(path);
         this.length = this.gcs.getStatus(path).getLength();
