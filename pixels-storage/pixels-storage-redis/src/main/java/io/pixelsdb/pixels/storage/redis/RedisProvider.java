@@ -17,36 +17,53 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.storage.s3;
+package io.pixelsdb.pixels.storage.redis;
 
-import io.pixelsdb.pixels.common.physical.PhysicalWriter;
-import io.pixelsdb.pixels.common.physical.PhysicalWriterOption;
-import io.pixelsdb.pixels.common.physical.PhysicalWriterProvider;
-import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.*;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
  * @author hank
  * @create 2023-04-15
  */
-public class S3WriterProvider implements PhysicalWriterProvider
+public class RedisProvider implements StorageProvider
 {
     @Override
-    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
-                                       @Nonnull PhysicalWriterOption option) throws IOException
+    public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
+    {
+        if (!this.compatibleWith(scheme))
+        {
+            throw new IOException("incompatible storage scheme: " + scheme);
+        }
+        return new Redis();
+    }
+
+    @Override
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path, @Nullable PhysicalReaderOption option) throws IOException
     {
         if (!this.compatibleWith(storage.getScheme()))
         {
             throw new IOException("incompatible storage scheme: " + storage.getScheme());
         }
-        return new PhysicalS3Writer(storage, path, option.isOverwrite());
+        return new PhysicalRedisReader(storage, path);
+    }
+
+    @Override
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path, @Nonnull PhysicalWriterOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalRedisWriter(storage, path, option.isOverwrite());
     }
 
     @Override
     public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
-        return scheme.equals(Storage.Scheme.s3) || scheme.equals(Storage.Scheme.minio);
+        return scheme.equals(Storage.Scheme.redis);
     }
 }

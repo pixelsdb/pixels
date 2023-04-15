@@ -19,10 +19,10 @@
  */
 package io.pixelsdb.pixels.storage.gcs;
 
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageProvider;
+import io.pixelsdb.pixels.common.physical.*;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -34,11 +34,34 @@ public class GCSProvider implements StorageProvider
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
     {
-        if (!scheme.equals(Storage.Scheme.gcs))
+        if (!this.compatibleWith(scheme))
         {
             throw new IOException("incompatible storage scheme: " + scheme);
         }
         return new GCS();
+    }
+
+    @Override
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalGCSReader(storage, path);
+    }
+
+    @Override
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option)
+            throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalGCSWriter(storage, path, option.isOverwrite());
     }
 
     @Override

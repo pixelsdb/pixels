@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.storage.s3.Minio.ConfigMinio;
-import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
 import static java.util.Objects.requireNonNull;
 
 /**

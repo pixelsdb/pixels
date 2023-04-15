@@ -17,15 +17,15 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.storage;
+package io.pixelsdb.pixels.storage.redis;
 
 import io.etcd.jetcd.KeyValue;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.physical.io.RedisOutputStream;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.storage.redis.io.RedisOutputStream;
 import redis.clients.jedis.JedisPooled;
 
 import java.io.*;
@@ -45,7 +45,7 @@ import static java.util.Objects.requireNonNull;
  * The storage backed by Redis.
  *
  * @author hank
- * @date 8/21/22
+ * @create 2022-08-21
  */
 public class Redis implements Storage
 {
@@ -109,7 +109,7 @@ public class Redis implements Storage
 
     private JedisPooled jedis;
 
-    public Redis ()
+    public Redis()
     {
         if (password == null || password.isEmpty())
         {

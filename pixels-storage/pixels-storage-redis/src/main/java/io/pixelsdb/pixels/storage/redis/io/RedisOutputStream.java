@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical.io;
+package io.pixelsdb.pixels.storage.redis.io;
 
 import redis.clients.jedis.JedisPooled;
 

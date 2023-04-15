@@ -20,11 +20,13 @@
 package io.pixelsdb.pixels.common.physical;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
- * Created at: 2023-04-15
- * Author: hank
+ * The SPI for the file/object storage systems.
+ * @author hank
+ * @create 2023-04-15
  */
 public interface StorageProvider
 {
@@ -32,6 +34,18 @@ public interface StorageProvider
      * Create an instance of the file/object storage system handler.
      */
     Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException;
+
+    /**
+     * Create an instance of the physical reader.
+     */
+    PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                @Nullable PhysicalReaderOption option) throws IOException;
+
+    /**
+     * Create an instance of the physical writer.
+     */
+    PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                @Nonnull PhysicalWriterOption option) throws IOException;
 
     /**
      * @param scheme the given storage scheme.

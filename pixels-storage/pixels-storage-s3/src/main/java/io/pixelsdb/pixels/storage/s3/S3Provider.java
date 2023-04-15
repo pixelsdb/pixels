@@ -19,10 +19,10 @@
  */
 package io.pixelsdb.pixels.storage.s3;
 
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageProvider;
+import io.pixelsdb.pixels.common.physical.*;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -34,20 +34,38 @@ public class S3Provider implements StorageProvider
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
     {
-        switch (scheme)
+        if (!this.compatibleWith(scheme))
         {
-            case s3:
-                return new S3();
-            case minio:
-                return new Minio();
-            default:
-                throw new IOException("incompatible storage scheme: " + scheme);
+            throw new IOException("incompatible storage scheme: " + scheme);
         }
+        return new S3();
+    }
+
+    @Override
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalS3Reader(storage, path);
+    }
+
+    @Override
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalS3Writer(storage, path, option.isOverwrite());
     }
 
     @Override
     public boolean compatibleWith(@Nonnull Storage.Scheme scheme)
     {
-        return scheme.equals(Storage.Scheme.s3) || scheme.equals(Storage.Scheme.minio);
+        return scheme.equals(Storage.Scheme.s3);
     }
 }

@@ -46,9 +46,6 @@ public class PhysicalReaderUtil
             case file:
                 reader = new PhysicalLocalReader(storage, path);
                 break;
-            case redis:
-                reader = new PhysicalRedisReader(storage, path);
-                break;
             case mock:
                 reader = new MockReader(storage, path);
                 break;

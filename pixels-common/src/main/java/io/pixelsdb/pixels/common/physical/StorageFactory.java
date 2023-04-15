@@ -163,9 +163,6 @@ public class StorageFactory
             case file:
                 storage = new LocalFS();
                 break;
-            case redis:
-                storage = new Redis();
-                break;
             case mock: 
                 storage = new Mock();
                 break;

@@ -17,15 +17,16 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.physical;
+package io.pixelsdb.pixels.storage.redis;
 
+import io.pixelsdb.pixels.common.physical.*;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import static io.pixelsdb.pixels.common.physical.storage.Redis.ConfigRedis;
+import static io.pixelsdb.pixels.storage.redis.Redis.ConfigRedis;
 
 /**
  * @author hank

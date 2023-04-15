@@ -19,10 +19,10 @@
  */
 package io.pixelsdb.pixels.storage.hdfs;
 
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageProvider;
+import io.pixelsdb.pixels.common.physical.*;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -34,11 +34,34 @@ public class HDFSProvider implements StorageProvider
     @Override
     public Storage createStorage(@Nonnull Storage.Scheme scheme) throws IOException
     {
-        if (!scheme.equals(Storage.Scheme.hdfs))
+        if (!this.compatibleWith(scheme))
         {
             throw new IOException("incompatible storage scheme: " + scheme);
         }
         return new HDFS();
+    }
+
+    @Override
+    public PhysicalReader createReader(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nullable PhysicalReaderOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalHDFSReader(storage, path);
+    }
+
+    @Override
+    public PhysicalWriter createWriter(@Nonnull Storage storage, @Nonnull String path,
+                                       @Nonnull PhysicalWriterOption option) throws IOException
+    {
+        if (!this.compatibleWith(storage.getScheme()))
+        {
+            throw new IOException("incompatible storage scheme: " + storage.getScheme());
+        }
+        return new PhysicalHDFSWriter(storage, path, option.getReplication(),
+                option.isAddBlockPadding(), option.getBlockSize(), option.isOverwrite());
     }
 
     @Override

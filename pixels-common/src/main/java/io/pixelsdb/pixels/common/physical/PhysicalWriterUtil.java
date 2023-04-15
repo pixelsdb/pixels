@@ -61,9 +61,6 @@ public class PhysicalWriterUtil
             case file:
                 writer = new PhysicalLocalWriter(storage, path, overwrite);
                 break;
-            case redis:
-                writer = new PhysicalRedisWriter(storage, path, overwrite);
-                break;
             default:
                 throw new IOException("Storage scheme '" +
                         storage.getScheme() + "' is not supported.");
