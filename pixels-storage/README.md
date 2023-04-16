@@ -15,8 +15,8 @@ Queries will load and call the providers to get access to the underlying storage
 Storage provider can be used in either of the following ways:
 1. Put the compiled jar and its dependencies in the CLASSPATH of you program.
 2. If your program is build by maven, you can also add the storage provider as dependency.
-Note that if multiple storage providers are used in the same project, configure your maven plugins
-to merge the resources in `META-INF/services`. For example, in maven-shade-plugin, do it like this:
+Note that if multiple storage providers are used in the same project/module, make sure that your maven plugins
+merge the resources in `META-INF/services`. For example, in maven-shade-plugin, it can be done like this:
 ```xml
 <project>
     ...

@@ -35,8 +35,9 @@
 
     <modules>
         <module>pixels-common</module>
-        <module>pixels-cache</module>
         <module>pixels-core</module>
+        <module>pixels-cache</module>
+        <module>pixels-cli</module>
         <module>pixels-daemon</module>
         <module>pixels-proxy</module>
         <module>pixels-example</module>
@@ -57,7 +58,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
+        <maven.compiler.useIncrementalCompilation>true</maven.compiler.useIncrementalCompilation>
 
         <!-- query engines -->
         <dep.presto.version>0.279</dep.presto.version>
