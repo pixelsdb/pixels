@@ -35,6 +35,13 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-common</artifactId>
             <optional>true</optional>
+            <exclusions>
+                <exclusion>
+                    <!-- lambda workers do not require natives -->
+                    <groupId>net.java.dev.jna</groupId>
+                    <artifactId>jna</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
@@ -90,12 +97,6 @@
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-log4j2</artifactId>
             <version>${dep.lambda.java.log4j2.version}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>redis.clients</groupId>
-            <artifactId>jedis</artifactId>
             <optional>true</optional>
         </dependency>
 
@@ -171,6 +172,15 @@
                                     <include>io.pixelsdb:*</include>
                                 </includes>
                             </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>io.pixelsdb:pixels-common</artifact>
+                                    <excludes>
+                                        <!-- we do not need the protobuf generated classes for daemon -->
+                                        <exclude>io/pixelsdb/pixels/daemon/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <finalName>pixels-worker-lambda</finalName>
                             <transformers>
                                 <!-- ServicesResourceTransformer merges the resources in META-INF/services -->

@@ -70,6 +70,18 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>io.etcd</groupId>
+            <artifactId>jetcd-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- grpc -->
         <dependency>
             <groupId>io.grpc</groupId>

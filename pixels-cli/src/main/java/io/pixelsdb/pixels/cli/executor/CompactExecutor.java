@@ -132,16 +132,16 @@ public class CompactExecutor implements CommandExecutor
                 }
             }
 
-            String targetPath = targetPaths[targetPathId++];
+            String targetDirPath = targetPaths[targetPathId++];
             targetPathId %= targetPaths.length;
-            if (!targetPath.endsWith("/"))
+            if (!targetDirPath.endsWith("/"))
             {
-                targetPath += "/";
+                targetDirPath += "/";
             }
-            String filePath = targetPath + DateUtil.getCurTime() + "_compact.pxl";
+            String targetFilePath = targetDirPath + DateUtil.getCurTime() + "_compact.pxl";
 
             System.out.println("(" + thdId + ") " + sourcePaths.size() +
-                    " ordered files to be compacted into '" + filePath + "'.");
+                    " ordered files to be compacted into '" + targetFilePath + "'.");
 
             PixelsCompactor.Builder compactorBuilder =
                     PixelsCompactor.newBuilder()
@@ -158,13 +158,13 @@ public class CompactExecutor implements CommandExecutor
                             .setCompactLayout(compactLayout)
                             .setInputStorage(orderStorage)
                             .setOutputStorage(compactStorage)
-                            .setPath(filePath)
+                            .setPath(targetFilePath)
                             .setBlockSize(blockSize)
                             .setReplication(replication)
                             .setBlockPadding(false);
 
             long threadStart = System.currentTimeMillis();
-            String finalFilePath = filePath;
+            String finalFilePath = targetFilePath;
             compactExecutor.execute(() -> {
                 // Issue #192: run compaction in threads.
                 try

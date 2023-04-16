@@ -304,7 +304,8 @@ public class Main
                 System.out.println("Command error");
             }
         }
-
+        // Use exit to terminate other threads and invoke the shutdown hooks.
+        System.exit(0);
     }
 
     public static long executeSQL(String jdbcUrl, Properties jdbcProperties, String sql, String id)

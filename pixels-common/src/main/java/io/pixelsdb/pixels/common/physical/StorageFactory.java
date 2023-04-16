@@ -70,7 +70,8 @@ public class StorageFactory
             }
             if (!providerExists)
             {
-                throw new UnsupportedOperationException(String.format(
+                // only log a warning, do not throw exception.
+                logger.warn(String.format(
                         "no storage provider exists for scheme: %s", scheme.name()));
             }
         }

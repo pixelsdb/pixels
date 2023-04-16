@@ -123,14 +123,11 @@ public class PixelsConsumer extends Consumer
                             }
                             // we create a new pixels file if we can read a next line from the source file.
 
-                            targetFilePath = targetDirPath;
-                            if (targetStorage.getScheme() == Storage.Scheme.s3 ||
-                                    targetStorage.getScheme() == Storage.Scheme.minio)
+                            if (!targetDirPath.endsWith("/"))
                             {
-                                // Partition the objects into different prefixes to avoid throttling.
-                                targetFilePath += consumerId + "/";
+                                targetDirPath += "/";
                             }
-                            targetFilePath += DateUtil.getCurTime() + ".pxl";
+                            targetFilePath = targetDirPath + DateUtil.getCurTime() + ".pxl";
 
                             pixelsWriter = PixelsWriterImpl.newBuilder()
                                     .setSchema(schema)

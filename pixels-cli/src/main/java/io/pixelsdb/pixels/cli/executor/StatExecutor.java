@@ -95,15 +95,11 @@ public class StatExecutor implements CommandExecutor
 
         int rowGroupCount = 0;
         long rowCount = 0;
-        for (String path : files)
+        for (String filePath : files)
         {
-            if (!path.endsWith("/"))
-            {
-                path += "/";
-            }
-            Storage storage = StorageFactory.Instance().getStorage(path);
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
             PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setPath(path).setStorage(storage).setEnableCache(false)
+                    .setPath(filePath).setStorage(storage).setEnableCache(false)
                     .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
                     .setPixelsFooterCache(new PixelsFooterCache()).build();
             PixelsProto.Footer fileFooter = pixelsReader.getFooter();

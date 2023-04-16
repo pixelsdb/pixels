@@ -34,6 +34,7 @@
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- redis -->

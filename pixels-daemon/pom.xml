@@ -68,35 +68,31 @@
         </dependency>
 
         <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- aws sdk -->
+        <!-- grpc -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty-shaded</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!--
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>netty-nio-client</artifactId>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
             <optional>true</optional>
         </dependency>
-        -->
-
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>apache-client</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>aws-crt-client</artifactId>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
             <optional>true</optional>
         </dependency>
 
@@ -104,13 +100,6 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- hdfs -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>
