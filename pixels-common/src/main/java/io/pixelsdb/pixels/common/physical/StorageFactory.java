@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.common.physical;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.physical.storage.*;
+import com.google.common.collect.ImmutableMap;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,9 +37,13 @@ import static java.util.Objects.requireNonNull;
  */
 public class StorageFactory
 {
-    private static Logger logger = LogManager.getLogger(StorageFactory.class);
-    private Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
-    private Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
+    private static final Logger logger = LogManager.getLogger(StorageFactory.class);
+    private final Map<Storage.Scheme, Storage> storageImpls = new HashMap<>();
+    private final Set<Storage.Scheme> enabledSchemes = new TreeSet<>();
+    /**
+     * The providers of the enabled storage schemes.
+     */
+    private final ImmutableMap<Storage.Scheme, StorageProvider> storageProviders;
 
     private StorageFactory()
     {
@@ -48,10 +52,30 @@ public class StorageFactory
         String[] schemeNames = value.trim().split(",");
         checkArgument(schemeNames.length > 0,
                 "at lease one storage scheme must be enabled");
+        ImmutableMap.Builder<Storage.Scheme, StorageProvider> providersBuilder = ImmutableMap.builder();
+        ServiceLoader<StorageProvider> providerLoader = ServiceLoader.load(StorageProvider.class);
         for (String name : schemeNames)
         {
-            enabledSchemes.add(Storage.Scheme.from(name));
+            Storage.Scheme scheme = Storage.Scheme.from(name);
+            this.enabledSchemes.add(scheme);
+            boolean providerExists = false;
+            for (StorageProvider storageProvider : providerLoader)
+            {
+                if (storageProvider.compatibleWith(scheme))
+                {
+                    providersBuilder.put(scheme, storageProvider);
+                    providerExists = true;
+                    break;
+                }
+            }
+            if (!providerExists)
+            {
+                // only log a warning, do not throw exception.
+                logger.warn(String.format(
+                        "no storage provider exists for scheme: %s", scheme.name()));
+            }
         }
+        this.storageProviders = providersBuilder.build();
     }
 
     private static StorageFactory instance = null;
@@ -157,36 +181,15 @@ public class StorageFactory
             return storageImpls.get(scheme);
         }
 
-        Storage storage;
-        switch (scheme)
-        {
-            case hdfs:
-                storage = new HDFS();
-                break;
-            case file:
-                storage = new LocalFS();
-                break;
-            case s3:
-                storage = new S3();
-                break;
-            case minio:
-                storage = new Minio();
-                break;
-            case redis:
-                storage = new Redis();
-                break;
-            case gcs:
-                storage = new GCS();
-                break;
-            case mock: 
-                storage = new Mock();
-                break;
-            default:
-                throw new IOException("Unknown storage scheme: " + scheme.name());
-        }
+        Storage storage = this.storageProviders.get(scheme).createStorage(scheme);
         storageImpls.put(scheme, storage);
 
         return storage;
+    }
+
+    public ImmutableMap<Storage.Scheme, StorageProvider> getStorageProviders()
+    {
+        return storageProviders;
     }
 
     public void closeAll() throws IOException

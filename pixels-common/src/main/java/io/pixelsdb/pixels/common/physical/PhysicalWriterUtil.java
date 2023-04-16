@@ -19,8 +19,6 @@
  */
 package io.pixelsdb.pixels.common.physical;
 
-import io.pixelsdb.pixels.common.physical.io.*;
-
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -34,6 +32,29 @@ public class PhysicalWriterUtil
 {
     private PhysicalWriterUtil()
     {
+    }
+
+    /**
+     * Get a physical file system writer, using the given writer option.
+     * @param storage the file storage system.
+     * @param path the path of the file to write.
+     * @param option the writer option.
+     * @return
+     * @throws IOException
+     */
+    public static PhysicalWriter newPhysicalWriter(
+            Storage storage, String path, PhysicalWriterOption option) throws IOException
+    {
+        checkArgument(storage != null, "storage should not be null");
+        checkArgument(path != null, "path should not be null");
+
+        if (!StorageFactory.Instance().getStorageProviders().containsKey(storage.getScheme()))
+        {
+            throw new IOException(String.format("Storage scheme '%s' is not enabled or supported.",
+                    storage.getScheme().name()));
+        }
+        return StorageFactory.Instance().getStorageProviders().get(storage.getScheme())
+                .createWriter(storage, path, option);
     }
 
     /**
@@ -52,35 +73,10 @@ public class PhysicalWriterUtil
             Storage storage, String path, long blockSize, short replication,
             boolean addBlockPadding, boolean overwrite) throws IOException
     {
-        checkArgument(storage != null, "storage should not be null");
-        checkArgument(path != null, "path should not be null");
-
-        PhysicalWriter writer;
-        switch (storage.getScheme())
-        {
-            case hdfs:
-                writer = new PhysicalHDFSWriter(storage, path, replication,
-                        addBlockPadding, blockSize, overwrite);
-                break;
-            case file:
-                writer = new PhysicalLocalWriter(storage, path, overwrite);
-                break;
-            case s3:
-            case minio:
-                writer = new PhysicalS3Writer(storage, path, overwrite);
-                break;
-            case redis:
-                writer = new PhysicalRedisWriter(storage, path, overwrite);
-                break;
-            case gcs:
-                writer = new PhysicalGCSWriter(storage, path, overwrite);
-                break;
-            default:
-                throw new IOException("Storage scheme '" +
-                        storage.getScheme() + "' is not supported.");
-        }
-
-        return writer;
+        PhysicalWriterOption option = new PhysicalWriterOption()
+                .setBlockSize(blockSize).setReplication(replication)
+                .setAddBlockPadding(addBlockPadding).setOverwrite(overwrite);
+        return newPhysicalWriter(storage, path, option);
     }
 
     /**

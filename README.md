@@ -1,26 +1,79 @@
 Pixels
 =======
 
-Pixels is a columnar storage engine and auxiliary compute engine for data lakes and warehouses.
-We have integrated it into popular query engines including Trino (405), Presto (0.279), and Hive (2.3+).
+The core of Pixels is a columnar storage engine designed for data lakes and warehouses.
+It is optimized for analytical tables stored in on-premises and cloud-native storage systems,
+including S3, GCS, HDFS, Redis, and local file systems.
+Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-The columnar storage engine in Pixels is optimized for data analytics on tables that are stored in file/object storage systems (including S3, GCS, HDFS, Redis, and local file systems),and provides much higher performance than existing columnar formats such as Parquet.
-All the storage optimizations are transparent to the query engines.
+We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+). Please find these
+integrations in separate repositories:
+* [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
+* [Pixels Connector for Presto](https://github.com/pixelsdb/pixels-presto)
+* [Pixels SerDe for Hive](https://github.com/pixelsdb/pixels-hive)
 
-For cloud lakehouses, the auxiliary compute engine in Pixels can exploit serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes, thus achieving better elasticity and cost-efficiency.
+Pixels also has its own query engine [Pixels-Turbo](https://github.com/pixelsdb/pixels/tree/master/pixels-turbo).
+It processes sustained queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions (e.g, AWS Lambda) to accelerate the processing of workload spikes.
+With `Pixels-Turbo`, we can achieve better performance and cost-efficiency for sustained workloads, while not compromising elasticity
+for workload spikes.
+
+
+## Publications
+
+Pixels is an academic system aims at providing product-level quality. It supports all the functionalities required by TPC-H and
+is compatible with the mainstream data analytic ecosystems (e.g., popular clouds and big-data systems).
+The key techniques in Pixels can be found in the following publications, they elaborate on the system design.
+
+> `SIGMOD'23` Using Cloud Function as Accelerator for Elastic Data Analytics\
+> Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
+
+> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes (short) [[BixTex]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
+> Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
+
+> `ICDE'22` Pixels: An Efficient Column Store for Cloud Data Lakes [[BixTex]](https://dblp.org/rec/conf/icde/BianA22.html?view=bibtex)\
+> Haoqiong Bian, Anastasia Ailamaki
+
+> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[BixTex]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
+> Haoqiong Bian
+
+> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[BixTex]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
+> Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
+
+> `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[BixTex]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
+> Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
+
+
+## Development Environment*
+
+This is optional if you want to develop Pixels in an IDE.
+
+In the directory that you prefer, clone the Pixels codebase:
+```bash
+git clone https://github.com/pixelsdb/pixels.git
+```
+Install JDK 17.0.3 or above, open Pixels as a maven project in IntelliJ.
+When the project is fully indexed and the dependencies are successfully downloaded,
+add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
+point it to a directory that you want to put the pixels configuration file and the runtime logs.
+
+Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by 
+setting up a *Remote JVM Debug*.
 
 ## Build Pixels
-Install JDK 17.0.3 or above, and open Pixels as a maven project in IntelliJ. 
-When the project is fully indexed and the dependencies are successfully downloaded,
-use `mvn install` to build and install it to the local Maven repository.
+
+Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
+```bash
+git clone https://github.com/pixelsdb/pixels.git
+```
+Enter `SRC_BASE/pixels`, use `mvn install` to build and install it to the local Maven repository.
 > JDK 17.0.3+ is required by Trino. To run Pixels in Presto or other query engines, please build Pixels and the corresponding connector
 > using the Java version required by the query engine. Pixels by itself is compatible with Java 8 or above.
 
-The build may take tens of seconds to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
+It may take a couple of minutes to complete. After that, find `pixels-daemon-*-full.jar` in `pixels-daemon/target`, which is the jar to run Pixels daemons. 
 It will be used in the installation.
 
 Pixels is compatible with different query engines, such as Trino, Presto, and Hive.
-However, for simplicity, we use Trino as an example here to illustrate how Pixels works with query engines in the data lakes.
+However, for simplicity, we use Trino as an example to illustrate how Pixels works with query engines in the data lakes.
 
 To use Pixels in Trino, download [pixels-trino](https://github.com/pixelsdb/pixels-trino), 
 and build it using `mvn package`.
@@ -78,15 +131,32 @@ export PIXELS_HOME=$HOME/opt/pixels/
 
 But you still need to:
 - Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
-- Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
+- Modify `pixels.properties` to ensure the following properties are valid:
+```properties
+pixels.var.dir=/home/pixels/opt/pixels/var/
+metadata.db.driver=com.mysql.jdbc.Driver
+metadata.db.user=pixels
+metadata.db.password=password
+metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull
+metadata.server.port=18888
+metadata.server.host=localhost
+trans.server.port=18889
+trans.server.host=localhost
+etcd.hosts=localhost
+etcd.port=2379
+metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
+presto.pixels.jdbc.url=jdbc:trino://localhost:8080/pixels/tpch
+hdfs.config.dir=/opt/hadoop-2.7.3/etc/hadoop/
+```
+The hostnames, ports, paths, usernames, and passwords in these properties are to be configured in the following steps of installation.
 
 > **Note:** optionally, you can also set the `PIXEL_CONFIG` system environment variable
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
 
-To install it step-by-step, or to install on EC2, please see the guidance below.
+Optionally, to install it step-by-step, please see the guidance below.
 
----
+### Install Step-by-Step*
 
 Here, we install Pixels and other binary packages into the `~/opt` directory:
 ```bash
@@ -361,26 +431,24 @@ During data loading, Pixels will automatically create the folders in the bucket 
 
 ### Load Data
 
-We use `pixels-sink` to load data into Pixels tables.
-Get the source code of pixels-sink from [this link](https://github.com/pixelsdb/pixels-sink.git), open it as a maven project in IntelliJ,
-and use `mvn package` to build it.
-Then, find `pixels-sink-*-full.jar` in `target` and put it into `PIXELS_HOME/sbin`.
+We use `pixels-cli` to load data into Pixels tables.
+After building Pixels, find `pixels-cli-*-full.jar` in `target` and put it into `PIXELS_HOME/sbin`.
 
-Under `PIXELS_HOME`, run pixels-sink:
+Under `PIXELS_HOME`, run pixels-cli:
 ```bash
-java -jar ./sbin/pixels-sink-*-full.jar
+java -jar ./sbin/pixels-cli-*-full.jar
 ```
 
-Then use the following commands in pixels-sink to load data for the TPC-H tables:
+Then use the following commands in pixels-cli to load data for the TPC-H tables:
 ```bash
-LOAD -f pixels -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/part -s tpch -t part -n 769240 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
-LOAD -f pixels -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
+LOAD -o file:///data/tpch/100g/customer -s tpch -t customer -n 319150 -r \| -c 1
+LOAD -o file:///data/tpch/100g/lineitem -s tpch -t lineitem -n 600040 -r \| -c 1
+LOAD -o file:///data/tpch/100g/nation -s tpch -t nation -n 100 -r \| -c 1
+LOAD -o file:///data/tpch/100g/orders -s tpch -t orders -n 638300 -r \| -c 1
+LOAD -o file:///data/tpch/100g/part -s tpch -t part -n 769240 -r \| -c 1
+LOAD -o file:///data/tpch/100g/partsupp -s tpch -t partsupp -n 360370 -r \| -c 1
+LOAD -o file:///data/tpch/100g/region -s tpch -t region -n 10 -r \| -c 1
+LOAD -o file:///data/tpch/100g/supplier -s tpch -t supplier -n 333340 -r \| -c 1
 ```
 It may take about one hour. The last parameter `-c` of the `LOAD` command is the maximum number
 of threads used for loading data. It only effects when the input directory (specified by `-o`)
@@ -404,7 +472,7 @@ Execute the TPC-H queries in trino-cli.
 
 ### Data Compaction*
 This is optional. It is only needed if we want to test the query performance on the compact layout.
-In pixels-sink, use the following commands to compact the files in the ordered path of each table:
+In pixels-cli, use the following commands to compact the files in the ordered path of each table:
 ```bash
 COMPACT -s tpch -t customer -n no -c 2
 COMPACT -s tpch -t lineitem -n no -c 16
@@ -425,7 +493,7 @@ to the empty bucket.
 ### Statistics Collection*
 This is optional. Data statistics enable cost-based query optimization for the queries.
 Start Pixels and Trino, make sure that Trino can execute queries on `tpch` schema.
-In pixels-sink, use the following commands to collect the data statistics for the columns in each table.
+In pixels-cli, use the following commands to collect the data statistics for the columns in each table.
 ```bash
 STAT -s tpch -t nation -o false -c true
 STAT -s tpch -t region -o false -c true

@@ -35,19 +35,30 @@
 
     <modules>
         <module>pixels-common</module>
-        <module>pixels-cache</module>
         <module>pixels-core</module>
+        <module>pixels-cache</module>
+        <module>pixels-cli</module>
         <module>pixels-daemon</module>
-        <module>pixels-lambda</module>
-        <module>pixels-executor</module>
-        <module>pixels-planner</module>
+        <module>pixels-proxy</module>
+        <module>pixels-example</module>
+        <module>pixels-storage/pixels-storage-s3</module>
+        <module>pixels-storage/pixels-storage-hdfs</module>
+        <module>pixels-storage/pixels-storage-gcs</module>
+        <module>pixels-storage/pixels-storage-redis</module>
+        <module>pixels-storage/pixels-storage-localfs</module>
+        <module>pixels-storage/pixels-storage-mock</module>
+        <module>pixels-turbo/pixels-executor</module>
+        <module>pixels-turbo/pixels-planner</module>
+        <module>pixels-turbo/pixels-worker-lambda</module>
+        <module>pixels-turbo/pixels-invoker-lambda</module>
+        <module>pixels-turbo/pixels-scaling-ec2</module>
     </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <maven.compiler.useIncrementalCompilation>false</maven.compiler.useIncrementalCompilation>
+        <maven.compiler.useIncrementalCompilation>true</maven.compiler.useIncrementalCompilation>
 
         <!-- query engines -->
         <dep.presto.version>0.279</dep.presto.version>
@@ -69,6 +80,7 @@
         <dep.protobuf.version>3.21.7</dep.protobuf.version>
         <dep.grpc.version>1.49.1</dep.grpc.version>
         <dep.jetcd.version>0.5.0</dep.jetcd.version>
+        <dep.jna.version>5.13.0</dep.jna.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
 
@@ -117,12 +129,52 @@
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-gcs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-hdfs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-localfs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-redis</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-s3</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-storage-mock</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-executor</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.pixelsdb</groupId>
                 <artifactId>pixels-planner</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-invoker-lambda</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-scaling-ec2</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -172,6 +224,12 @@
                 <groupId>io.etcd</groupId>
                 <artifactId>jetcd-core</artifactId>
                 <version>${dep.jetcd.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>io.grpc</groupId>
+                        <artifactId>grpc-core</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- ozone -->
@@ -401,6 +459,12 @@
                 <groupId>io.netty</groupId>
                 <artifactId>netty-buffer</artifactId>
                 <version>${dep.netty.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${dep.jna.version}</version>
             </dependency>
 
             <!-- apache-httpclient -->

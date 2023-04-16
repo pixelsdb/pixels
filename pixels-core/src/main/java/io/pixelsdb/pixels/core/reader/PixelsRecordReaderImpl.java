@@ -638,8 +638,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                     /**
                      * Issue #67 (patch):
                      * Deal with null or empty cache chunk.
-                     * If cache read failed (e.g. cache read timeout), columnlet will be null.
-                     * In this condition, we have to read the columnlet from disk.
+                     * If cache read failed (e.g. cache read timeout), column chunk (columnlet) will be null.
+                     * In this condition, we have to read the column chunk (columnlet) from disk.
                      */
                     int rgIdx = rgId - RGStart;
                     PixelsProto.RowGroupIndex rowGroupIndex =

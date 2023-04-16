@@ -1,0 +1,2 @@
+io.pixelsdb.pixels.storage.s3.S3Provider
+io.pixelsdb.pixels.storage.s3.MinioProvider
