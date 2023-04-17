@@ -21,7 +21,7 @@ for workload spikes.
 ## Publications
 
 Pixels is an academic system aims at providing product-level quality. It supports all the functionalities required by TPC-H and
-is compatible with the mainstream data analytic ecosystems (e.g., popular clouds and big-data systems).
+is compatible with the mainstream data analytic ecosystems.
 The key techniques in Pixels can be found in the following publications, they elaborate on the system design.
 
 > `SIGMOD'23` Using Cloud Function as Accelerator for Elastic Data Analytics\
