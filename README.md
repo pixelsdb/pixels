@@ -36,7 +36,7 @@ The key techniques in Pixels can be found in the following publications, they el
 > `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[Cite]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
 > Haoqiong Bian
 
-> `Journal of Software 2020,31(1):137-161` Survey on Storage and Optimization Techniques of HDFS (Chinese: HDFS存储和优化技术研究综述)[[Cite]](https://www.jos.org.cn/josen/article/export/5872)\
+> `Journal of Software 2020,31(1):137-161` Survey on Storage and Optimization Techniques of HDFS (Chinese: HDFS存储和优化技术研究综述) [[Cite]](https://www.jos.org.cn/josen/article/export/5872)\
 > Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
 
 > `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[Cite]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
