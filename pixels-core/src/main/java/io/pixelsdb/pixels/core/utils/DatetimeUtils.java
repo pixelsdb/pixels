@@ -19,36 +19,50 @@
  */
 package io.pixelsdb.pixels.core.utils;
 
+import java.sql.Date;
+import java.time.LocalDate;
+
 /**
  * @author hank
  * @create 2021-04-26
  */
 public class DatetimeUtils
 {
-    // TODO: currently we assume there are 86400000 millis in a day, without dealing with leap second.
-
+    /**
+     * Convert the days to milliseconds, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     */
     public static long dayToMillis (int day)
     {
         /**
          * Issue #419:
-         * In SQL, Date (day) does not have time zone, hence we do not need to add timezone offset.
+         * No need to add the timezone offset, because both days and milliseconds
+         * are since the Unix epoch.
          */
         return day * 86400000L;
     }
 
     /**
-     * Convert the milliseconds to the days, both since the Unix epoch ('1970-01-01 00:00:00'),
-     * without considering the effect of timezone.
-     * @param millis the milliseconds since the Unix epoch.
-     * @return the days since the Unix epoch.
+     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * @param date
+     * @return
      */
-    public static int millisToDay (long millis)
+    public static int sqlDateToDay (Date date)
     {
-        return (int)((millis) / 86400000);
+        return (int) date.toLocalDate().toEpochDay();
+    }
+
+    /**
+     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * @param date
+     * @return
+     */
+    public static int stringToDay (String date)
+    {
+        return (int) LocalDate.parse(date).toEpochDay();
     }
 
     public static int roundSqlTime (long millis)
     {
-        return (int)(millis%86400000);
+        return (int)(millis % 86400000);
     }
 }

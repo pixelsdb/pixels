@@ -25,8 +25,7 @@ import java.sql.Date;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -408,7 +407,7 @@ public class DateColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, Date.valueOf(value));
+        set(writeIndex++, stringToDay(value));
     }
 
     /**
@@ -431,7 +430,7 @@ public class DateColumnVector extends ColumnVector
         }
         else
         {
-            this.dates[elementNum] = millisToDay(date.getTime());
+            this.dates[elementNum] = sqlDateToDay(date);
             this.isNull[elementNum] = false;
         }
     }
@@ -464,7 +463,7 @@ public class DateColumnVector extends ColumnVector
         {
             writeIndex = elementNum + 1;
         }
-        this.dates[elementNum] = millisToDay(scratchDate.getTime());
+        this.dates[elementNum] = sqlDateToDay(scratchDate);
         this.isNull[elementNum] = false;
     }
 
@@ -493,7 +492,7 @@ public class DateColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        dates[0] = millisToDay(date.getTime());
+        dates[0] = sqlDateToDay(date);
     }
 
     @Override
