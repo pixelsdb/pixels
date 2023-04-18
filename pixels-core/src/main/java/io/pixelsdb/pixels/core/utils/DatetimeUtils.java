@@ -28,8 +28,16 @@ import java.time.LocalDate;
  */
 public class DatetimeUtils
 {
+    private static final long TIME_OFFSET;
+
+    static
+    {
+        TIME_OFFSET = Date.valueOf("1970-01-01").getTime();
+    }
+
     /**
      * Convert the days to milliseconds, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Leap seconds are not considered.
      */
     public static long dayToMillis (int day)
     {
@@ -37,8 +45,20 @@ public class DatetimeUtils
          * Issue #419:
          * No need to add the timezone offset, because both days and milliseconds
          * are since the Unix epoch.
+         * TODO: add leap seconds.
          */
         return day * 86400000L;
+    }
+
+    /**
+     * Convert the milliseconds to days, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Leap seconds are not considered.
+     */
+    @Deprecated
+    public static int millisToDay (long millis)
+    {
+        // TODO: more tests on this method.
+        return Math.round((millis - TIME_OFFSET) / 86400000f);
     }
 
     /**
