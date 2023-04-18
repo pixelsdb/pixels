@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.core.utils;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.TimeZone;
 
 /**
  * @author hank
@@ -28,11 +29,11 @@ import java.time.LocalDate;
  */
 public class DatetimeUtils
 {
-    private static final long TIME_OFFSET;
+    private static long TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
 
-    static
+    public static void resetTimezoneOffset()
     {
-        TIME_OFFSET = Date.valueOf("1970-01-01").getTime();
+        TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
     }
 
     /**
@@ -53,18 +54,18 @@ public class DatetimeUtils
     /**
      * Convert the milliseconds to days, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
      * Leap seconds are not considered.
+     * <b>If the default timezone is changed, must call {@link #resetTimezoneOffset()} before this method.</b>
      */
-    @Deprecated
     public static int millisToDay (long millis)
     {
-        // TODO: more tests on this method.
-        return Math.round((millis - TIME_OFFSET) / 86400000f);
+        // TODO: add leap seconds.
+        return Math.round((millis + TIMEZONE_OFFSET) / 86400000f);
     }
 
     /**
      * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
-     * @param date
-     * @return
+     * This method produces more temporary objects than:<br/>
+     * {@code millisToDay(date.getTime())}.
      */
     public static int sqlDateToDay (Date date)
     {

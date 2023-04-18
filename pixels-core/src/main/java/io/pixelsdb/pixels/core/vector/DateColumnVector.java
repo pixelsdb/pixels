@@ -430,7 +430,7 @@ public class DateColumnVector extends ColumnVector
         }
         else
         {
-            this.dates[elementNum] = sqlDateToDay(date);
+            this.dates[elementNum] = millisToDay(date.getTime());
             this.isNull[elementNum] = false;
         }
     }
@@ -463,7 +463,7 @@ public class DateColumnVector extends ColumnVector
         {
             writeIndex = elementNum + 1;
         }
-        this.dates[elementNum] = sqlDateToDay(scratchDate);
+        this.dates[elementNum] = millisToDay(scratchDate.getTime());
         this.isNull[elementNum] = false;
     }
 
@@ -492,7 +492,7 @@ public class DateColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        dates[0] = sqlDateToDay(date);
+        dates[0] = millisToDay(date.getTime());
     }
 
     @Override

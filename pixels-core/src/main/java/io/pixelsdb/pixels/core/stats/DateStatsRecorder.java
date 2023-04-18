@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import java.sql.Date;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.sqlDateToDay;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
 
 /**
  * pixels
@@ -101,7 +101,7 @@ public class DateStatsRecorder
     @Override
     public void updateDate(Date value)
     {
-        this.updateDate(sqlDateToDay(value));
+        this.updateDate(millisToDay(value.getTime()));
     }
 
     @Override
