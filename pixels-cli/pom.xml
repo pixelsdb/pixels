@@ -10,6 +10,8 @@
     </parent>
 
     <artifactId>pixels-cli</artifactId>
+    <name>Pixels Cli</name>
+    <description>The command line tool of Pixels that provides data manipulations support.</description>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

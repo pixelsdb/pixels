@@ -10,6 +10,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>pixels-daemon</artifactId>
+    <name>Pixels Daemon</name>
+    <description>The daemon of Pixels that provides internal services.</description>
 
     <properties>
         <maven.compiler.target>1.8</maven.compiler.target>
