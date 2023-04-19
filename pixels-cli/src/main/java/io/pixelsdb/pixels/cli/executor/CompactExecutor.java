@@ -164,7 +164,6 @@ public class CompactExecutor implements CommandExecutor
                             .setBlockPadding(false);
 
             long threadStart = System.currentTimeMillis();
-            String finalFilePath = targetFilePath;
             compactExecutor.execute(() -> {
                 // Issue #192: run compaction in threads.
                 try
@@ -177,7 +176,7 @@ public class CompactExecutor implements CommandExecutor
                 {
                     e.printStackTrace();
                 }
-                System.out.println("Compact file '" + finalFilePath + "' is built in " +
+                System.out.println("Compact file '" + targetFilePath + "' is built in " +
                         ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
             });
         }
