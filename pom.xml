@@ -54,8 +54,8 @@
         <module>pixels-turbo/pixels-worker-lambda</module>
         <module>pixels-turbo/pixels-invoker-lambda</module>
         <module>pixels-turbo/pixels-scaling-ec2</module>
-        <module>pixels-invoker-vhive</module>
-        <module>pixels-worker-vhive</module>
+        <module>pixels-turbo/pixels-worker-vhive</module>
+        <module>pixels-turbo/pixels-invoker-vhive</module>
     </modules>
 
     <properties>
