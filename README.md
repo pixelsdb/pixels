@@ -83,7 +83,7 @@ They will be used in the installation.
 If you want to develop Pixels in Intellij, open `SRC_BASE/pixels` as a maven project.
 When the project is fully indexed and the dependencies are successfully downloaded,
 add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
-point it to a directory that you want to put the pixels configuration file and the runtime logs.
+point it to your Pixels home that contains the configuration file (i.e., `pixels.properties`) and stores the runtime logs.
 
 Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by
 setting up a *Remote JVM Debug*.
