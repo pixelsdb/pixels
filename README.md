@@ -21,25 +21,28 @@ for workload spikes.
 ## Publications
 
 Pixels is an academic system aims at providing product-level quality. It supports all the functionalities required by TPC-H and
-is compatible with the mainstream data analytic ecosystems (e.g., popular clouds and big-data systems).
-The key techniques in Pixels can be found in the following publications, they elaborate on the system design.
+is compatible with the mainstream data analytic ecosystems.
+The key ideas and insights in Pixels are elaborated in the following publications.
 
 > `SIGMOD'23` Using Cloud Function as Accelerator for Elastic Data Analytics\
 > Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
 
-> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes (short) [[BixTex]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
+> `EDBT'22` Columnar Storage Optimization and Caching for Data Lakes (short) [[Cite]](https://dblp.org/rec/conf/edbt/JinBC022.html?view=bibtex)\
 > Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
 
-> `ICDE'22` Pixels: An Efficient Column Store for Cloud Data Lakes [[BixTex]](https://dblp.org/rec/conf/icde/BianA22.html?view=bibtex)\
+> `ICDE'22` Pixels: An Efficient Column Store for Cloud Data Lakes [[Cite]](https://dblp.org/rec/conf/icde/BianA22.html?view=bibtex)\
 > Haoqiong Bian, Anastasia Ailamaki
 
-> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[BixTex]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
+> `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[Cite]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
 > Haoqiong Bian
 
-> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[BixTex]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
+> `Journal of Software 2020,31(1):137-161` Survey on Storage and Optimization Techniques of HDFS (Chinese: HDFS存储和优化技术研究综述) [[Cite]](https://www.jos.org.cn/josen/article/export/5872)\
+> Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
+
+> `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[Cite]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
 > Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
 
-> `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[BixTex]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
+> `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[Cite]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
 > Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
 
 
