@@ -37,33 +37,33 @@ public class DatetimeUtils
     }
 
     /**
-     * Convert the days to milliseconds, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Convert the epoch days in UTC of a date (e.g., '1999-12-31') to the first millisecond in local time
+     * of the date since the Unix epoch ('1970-01-01 00:00:00 UTC').
      * Leap seconds are not considered.
      */
-    public static long dayToMillis (int day)
+    public static long utcDaysToLocalMillis(int day)
     {
         /**
          * Issue #419:
          * No need to add the timezone offset, because both days and milliseconds
          * are since the Unix epoch.
-         * TODO: add leap seconds.
          */
-        return day * 86400000L;
+        return Date.valueOf(LocalDate.ofEpochDay(day)).getTime();
     }
 
     /**
-     * Convert the milliseconds to days, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Convert the first millisecond in local time of a date (e.g., '1999-12-31') since the
+     * Unix epoch ('1970-01-01 00:00:00 UTC') to the epoch days in UTC of the date.
      * Leap seconds are not considered.
      * <b>If the default timezone is changed, must call {@link #resetTimezoneOffset()} before this method.</b>
      */
-    public static int millisToDay (long millis)
+    public static int localMillisToUtcDays(long millis)
     {
-        // TODO: add leap seconds.
         return Math.round((millis + TIMEZONE_OFFSET) / 86400000f);
     }
 
     /**
-     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Convert the {@link Date} in local time to the days in epoch day in UTC of the date (e.g., '1999-12-31').
      * This method produces more temporary objects than:<br/>
      * {@code millisToDay(date.getTime())}.
      */
@@ -73,7 +73,7 @@ public class DatetimeUtils
     }
 
     /**
-     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Convert the {@link Date} to the days since the Unix epoch ('1970-01-01').
      * @param date
      * @return
      */
@@ -82,7 +82,33 @@ public class DatetimeUtils
         return (int) LocalDate.parse(date).toEpochDay();
     }
 
-    public static int roundSqlTime (long millis)
+    public static long daysToMillis (int days)
+    {
+        return (long) days * 86400000L;
+    }
+
+    /**
+     * Rounds the number of milliseconds relative to the epoch down to the nearest whole number of
+     * seconds. 500 would round to 0, -500 would round to -1.
+     */
+    public static long millisToSeconds(long millis)
+    {
+        if (millis >= 0)
+        {
+            return millis / 1000;
+        }
+        else
+        {
+            return (millis - 999) / 1000;
+        }
+    }
+
+    /**
+     * Get the milliseconds in a day.
+     * @param millis the milliseconds since the Unix epoch ('1970-01-01 00:00:00 UTC');
+     * @return the milliseconds in a day.
+     */
+    public static int millisInDay(long millis)
     {
         return (int)(millis % 86400000);
     }
