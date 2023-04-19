@@ -46,22 +46,6 @@ The key ideas and insights in Pixels are elaborated in the following publication
 > Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
 
 
-## Development Environment*
-
-This is optional if you want to develop Pixels in an IDE.
-
-In the directory that you prefer, clone the Pixels codebase:
-```bash
-git clone https://github.com/pixelsdb/pixels.git
-```
-Install JDK 17.0.3 or above, open Pixels as a maven project in IntelliJ.
-When the project is fully indexed and the dependencies are successfully downloaded,
-add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
-point it to a directory that you want to put the pixels configuration file and the runtime logs.
-
-Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by 
-setting up a *Remote JVM Debug*.
-
 ## Build Pixels
 
 Install JDK 17.0.3 or above, and clone the Pixels codebase into any `SRC_BASE` directory:
@@ -92,6 +76,18 @@ They will be used in the installation.
 > Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
 > the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
 > written.
+
+
+## Development Environment*
+
+If you want to develop Pixels in Intellij, open `SRC_BASE/pixels` as a maven project.
+When the project is fully indexed and the dependencies are successfully downloaded,
+add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
+point it to a directory that you want to put the pixels configuration file and the runtime logs.
+
+Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by
+setting up a *Remote JVM Debug*.
+
 
 ## Installation in AWS
 
