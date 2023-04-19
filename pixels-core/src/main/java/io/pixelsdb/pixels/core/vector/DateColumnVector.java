@@ -25,8 +25,7 @@ import java.sql.Date;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.dayToMillis;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisToDay;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -43,8 +42,8 @@ import static java.util.Objects.requireNonNull;
  * Generally, the caller will fill in a scratch date object with values from a row, work
  * using the scratch date, and then perhaps update the column vector row with a result.
  *
- * 2021-04-24
  * @author hank
+ * @create 2021-04-24
  */
 public class DateColumnVector extends ColumnVector
 {
@@ -154,7 +153,6 @@ public class DateColumnVector extends ColumnVector
      */
     public void dateUpdate(Date date, int elementNum)
     {
-
         date.setTime(dayToMillis(this.dates[elementNum]));
     }
 
@@ -172,21 +170,20 @@ public class DateColumnVector extends ColumnVector
     }
 
     /**
-     * Return a long representation of a date.
+     * Return a long representation, i.e., the seconds since the Unix epoch ('1970-01-01 00:00:00' UTC/GMT), of the element.
      *
-     * @param elementNum
+     * @param elementNum the index of the element in this vector
      * @return
      */
     public long getDateAsLong(int elementNum)
     {
-        scratchDate.setTime(dayToMillis(dates[elementNum]));
-        return getDateAsLong(scratchDate);
+        return millisToSeconds(dayToMillis(dates[elementNum]));
     }
 
     /**
-     * Return a long representation of a Date.
+     * Return a long representation, i.e., the seconds since the Unix epoch ('1970-01-01 00:00:00' UTC/GMT), of a Date.
      *
-     * @param date
+     * @param date the date
      * @return
      */
     public static long getDateAsLong(Date date)
@@ -222,7 +219,7 @@ public class DateColumnVector extends ColumnVector
      */
     public int compareTo(int elementNum, Date date)
     {
-        return asScratchDate(elementNum).compareTo(date);
+        return Long.compare(getDateAsLong(elementNum), getDateAsLong(date));
     }
 
     /**
@@ -235,7 +232,7 @@ public class DateColumnVector extends ColumnVector
      */
     public int compareTo(Date date, int elementNum)
     {
-        return date.compareTo(asScratchDate(elementNum));
+        return Long.compare(getDateAsLong(date), getDateAsLong(elementNum));
     }
 
     /**
@@ -388,7 +385,8 @@ public class DateColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        this.dates[writeIndex] = millisToDay(value);
+        // Issue #419: value is already the days since the Unix epoch, no need to convert.
+        this.dates[writeIndex] = value;
         this.isNull[writeIndex++] = false;
     }
 
@@ -409,7 +407,7 @@ public class DateColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        set(writeIndex++, Date.valueOf(value));
+        set(writeIndex++, stringToDay(value));
     }
 
     /**
@@ -438,7 +436,7 @@ public class DateColumnVector extends ColumnVector
     }
 
     /**
-     * Set a row from a value, which is the days from 1970-1-1 UTC.
+     * Set a row from a value, which is the days since 1970-1-1 UTC.
      * We assume the entry has already been isRepeated adjusted.
      *
      * @param elementNum

@@ -19,36 +19,71 @@
  */
 package io.pixelsdb.pixels.core.utils;
 
-import java.util.Calendar;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.TimeZone;
 
 /**
- * Created at: 26/04/2021
- * Author: hank
+ * @author hank
+ * @create 2021-04-26
  */
 public class DatetimeUtils
 {
-    // TODO: currently we assume there are 86400000 millis in a day, without dealing with leap second.
-    private static final int TIMEZONE_OFFSET;
+    private static long TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
 
-    static
+    public static void resetTimezoneOffset()
     {
-        Calendar calendar = Calendar.getInstance();
-        TIMEZONE_OFFSET = -(calendar.get(Calendar.ZONE_OFFSET) +
-                calendar.get(Calendar.DST_OFFSET)) / (60 * 1000);
+        TIMEZONE_OFFSET = TimeZone.getDefault().getRawOffset();
     }
 
+    /**
+     * Convert the days to milliseconds, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Leap seconds are not considered.
+     */
     public static long dayToMillis (int day)
     {
-        return day*86400000L+TIMEZONE_OFFSET;
+        /**
+         * Issue #419:
+         * No need to add the timezone offset, because both days and milliseconds
+         * are since the Unix epoch.
+         * TODO: add leap seconds.
+         */
+        return day * 86400000L;
     }
 
+    /**
+     * Convert the milliseconds to days, both since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * Leap seconds are not considered.
+     * <b>If the default timezone is changed, must call {@link #resetTimezoneOffset()} before this method.</b>
+     */
     public static int millisToDay (long millis)
     {
-        return (int)((millis-TIMEZONE_OFFSET)/86400000);
+        // TODO: add leap seconds.
+        return Math.round((millis + TIMEZONE_OFFSET) / 86400000f);
+    }
+
+    /**
+     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * This method produces more temporary objects than:<br/>
+     * {@code millisToDay(date.getTime())}.
+     */
+    public static int sqlDateToDay (Date date)
+    {
+        return (int) date.toLocalDate().toEpochDay();
+    }
+
+    /**
+     * Convert the {@link Date} of local time to the days since the Unix epoch ('1970-01-01 00:00:00 UTC').
+     * @param date
+     * @return
+     */
+    public static int stringToDay (String date)
+    {
+        return (int) LocalDate.parse(date).toEpochDay();
     }
 
     public static int roundSqlTime (long millis)
     {
-        return (int)(millis%86400000);
+        return (int)(millis % 86400000);
     }
 }

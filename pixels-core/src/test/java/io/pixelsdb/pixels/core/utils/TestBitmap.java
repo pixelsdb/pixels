@@ -22,8 +22,8 @@ package io.pixelsdb.pixels.core.utils;
 import org.junit.Test;
 
 /**
- * Created at: 09/04/2022
- * Author: hank
+ * @create 2022-04-09
+ * @author hank
  */
 public class TestBitmap
 {
