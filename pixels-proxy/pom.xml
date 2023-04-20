@@ -23,7 +23,6 @@
 
         <!-- web frameworks and packaging -->
         <dep.spring.boot.version>2.7.10</dep.spring.boot.version>
-        <dep.kaptcha.version>2.3.3</dep.kaptcha.version>
         <dep.asciidoctor.version>2.2.1</dep.asciidoctor.version>
         <!-- this is from spring-boot-dependencies-2.7.10.pom -->
         <spring-restdocs.version>2.0.7.RELEASE</spring-restdocs.version>
@@ -110,13 +109,6 @@
             <artifactId>simpleclient_pushgateway</artifactId>
             <version>${dep.prometheus.client.version}</version>
         </dependency>
-
-        <!-- captcha -->
-        <!--<dependency>
-            <groupId>pro.fessional</groupId>
-            <artifactId>kaptcha</artifactId>
-            <version>${dep.kaptcha.version}</version>
-        </dependency>-->
 
         <!--apache commons -->
         <dependency>
@@ -213,5 +205,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>
