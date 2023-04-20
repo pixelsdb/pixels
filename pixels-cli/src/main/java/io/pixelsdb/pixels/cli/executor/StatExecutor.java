@@ -145,8 +145,10 @@ public class StatExecutor implements CommandExecutor
         properties.setProperty("user", instance.getProperty("presto.user"));
         // properties.setProperty("password", instance.getProperty("presto.password"));
         properties.setProperty("SSL", instance.getProperty("presto.ssl"));
-        properties.setProperty("sessionProperties", "pixels.ordered_path_enabled:" + orderedEnabled);
-        properties.setProperty("sessionProperties", "pixels.compact_path_enabled:" + compactEnabled);
+        StringBuilder builder = new StringBuilder()
+                .append("pixels.ordered_path_enabled:").append(orderedEnabled).append(";")
+                .append("pixels.compact_path_enabled:").append(compactEnabled);
+        properties.setProperty("sessionProperties", builder.toString());
         String jdbc = instance.getProperty("presto.pixels.jdbc.url");
         try
         {
