@@ -145,71 +145,6 @@ public class DateColumnVector extends ColumnVector
     }
 
     /**
-     * Set a Date object from a row of the column.
-     * We assume the entry has already been NULL checked and isRepeated adjusted.
-     *
-     * @param date
-     * @param elementNum
-     */
-    public void dateUpdate(Date date, int elementNum)
-    {
-        date.setTime(dayToMillis(this.dates[elementNum]));
-    }
-
-    /**
-     * Return the scratch Date object set from a row.
-     * We assume the entry has already been NULL checked and isRepeated adjusted.
-     *
-     * @param elementNum
-     * @return
-     */
-    public Date asScratchDate(int elementNum)
-    {
-        scratchDate.setTime(dayToMillis(dates[elementNum]));
-        return scratchDate;
-    }
-
-    /**
-     * Return a long representation, i.e., the seconds since the Unix epoch ('1970-01-01 00:00:00' UTC/GMT), of the element.
-     *
-     * @param elementNum the index of the element in this vector
-     * @return
-     */
-    public long getDateAsLong(int elementNum)
-    {
-        return millisToSeconds(dayToMillis(dates[elementNum]));
-    }
-
-    /**
-     * Return a long representation, i.e., the seconds since the Unix epoch ('1970-01-01 00:00:00' UTC/GMT), of a Date.
-     *
-     * @param date the date
-     * @return
-     */
-    public static long getDateAsLong(Date date)
-    {
-        return millisToSeconds(date.getTime());
-    }
-
-    // Copy of TimestampWritable.millisToSeconds
-
-    /**
-     * Rounds the number of milliseconds relative to the epoch down to the nearest whole number of
-     * seconds. 500 would round to 0, -500 would round to -1.
-     */
-    private static long millisToSeconds(long millis)
-    {
-        if (millis >= 0)
-        {
-            return millis / 1000;
-        }
-        else
-        {
-            return (millis - 999) / 1000;
-        }
-    }
-
-    /**
      * Compare row to Date.
      * We assume the entry has already been NULL checked and isRepeated adjusted.
      *
@@ -219,7 +154,7 @@ public class DateColumnVector extends ColumnVector
      */
     public int compareTo(int elementNum, Date date)
     {
-        return Long.compare(getDateAsLong(elementNum), getDateAsLong(date));
+        return Integer.compare(dates[elementNum], localMillisToUtcDays(date.getTime()));
     }
 
     /**
@@ -232,7 +167,7 @@ public class DateColumnVector extends ColumnVector
      */
     public int compareTo(Date date, int elementNum)
     {
-        return Long.compare(getDateAsLong(date), getDateAsLong(elementNum));
+        return Integer.compare(localMillisToUtcDays(date.getTime()), dates[elementNum]);
     }
 
     /**
@@ -430,7 +365,7 @@ public class DateColumnVector extends ColumnVector
         }
         else
         {
-            this.dates[elementNum] = millisToDay(date.getTime());
+            this.dates[elementNum] = localMillisToUtcDays(date.getTime());
             this.isNull[elementNum] = false;
         }
     }
@@ -449,21 +384,6 @@ public class DateColumnVector extends ColumnVector
             writeIndex = elementNum + 1;
         }
         this.dates[elementNum] = days;
-        this.isNull[elementNum] = false;
-    }
-
-    /**
-     * Set a row from the current value in the scratch date.
-     *
-     * @param elementNum
-     */
-    public void setFromScratchDate(int elementNum)
-    {
-        if (elementNum >= writeIndex)
-        {
-            writeIndex = elementNum + 1;
-        }
-        this.dates[elementNum] = millisToDay(scratchDate.getTime());
         this.isNull[elementNum] = false;
     }
 
@@ -492,7 +412,7 @@ public class DateColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        dates[0] = millisToDay(date.getTime());
+        dates[0] = localMillisToUtcDays(date.getTime());
     }
 
     @Override
@@ -504,7 +424,7 @@ public class DateColumnVector extends ColumnVector
         }
         if (noNulls || !isNull[row])
         {
-            scratchDate.setTime(dayToMillis(dates[row]));
+            scratchDate.setTime(utcDaysToLocalMillis(dates[row]));
             buffer.append(scratchDate.toString());
         }
         else

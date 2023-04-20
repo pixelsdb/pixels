@@ -6,8 +6,8 @@ It is optimized for analytical tables stored in on-premises and cloud-native sto
 including S3, GCS, HDFS, Redis, and local file systems.
 Pixels outperforms Parquet, which is the most widely used columnar format in today's lakehouses, by up to two orders of magnitude.
 
-We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+). Please find these
-integrations in separate repositories:
+We have integrated Pixels with popular query engines including Trino (405), Presto (0.279), and Hive (2.3+). These
+integrations are opensourced in separate repositories:
 * [Pixels Connector for Trino](https://github.com/pixelsdb/pixels-trino)
 * [Pixels Connector for Presto](https://github.com/pixelsdb/pixels-presto)
 * [Pixels SerDe for Hive](https://github.com/pixelsdb/pixels-hive)
@@ -20,7 +20,7 @@ for workload spikes.
 
 ## Publications
 
-Pixels is an academic system aims at providing product-level quality. It supports all the functionalities required by TPC-H and
+Pixels is an academic system aims at providing production-grade quality. It supports all the functionalities required by TPC-H and
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
@@ -36,31 +36,12 @@ The key ideas and insights in Pixels are elaborated in the following publication
 > `CIDR'20` Pixels: Multiversion Wide Table Store for Data Lakes (abstract) [[Cite]](https://dblp.org/rec/conf/cidr/Bian20.html?view=bibtex)\
 > Haoqiong Bian
 
-> `Journal of Software 2020,31(1):137-161` Survey on Storage and Optimization Techniques of HDFS (Chinese: HDFS存储和优化技术研究综述) [[Cite]](https://www.jos.org.cn/josen/article/export/5872)\
-> Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
-
 > `ICDE'18` Rainbow: Adaptive Layout Optimization for Wide Tables (demo) [[Cite]](https://dblp.org/rec/conf/icde/BianTJCQD18.html?view=bibtex)\
 > Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
 
 > `SIGMOD'17` Wide Table Layout Optimization by Column Ordering and Duplication [[Cite]](https://dblp.org/rec/conf/sigmod/BianYTCCDM17.html?view=bibtex)\
 > Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
 
-
-## Development Environment*
-
-This is optional if you want to develop Pixels in an IDE.
-
-In the directory that you prefer, clone the Pixels codebase:
-```bash
-git clone https://github.com/pixelsdb/pixels.git
-```
-Install JDK 17.0.3 or above, open Pixels as a maven project in IntelliJ.
-When the project is fully indexed and the dependencies are successfully downloaded,
-add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
-point it to a directory that you want to put the pixels configuration file and the runtime logs.
-
-Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by 
-setting up a *Remote JVM Debug*.
 
 ## Build Pixels
 
@@ -92,6 +73,18 @@ They will be used in the installation.
 > Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](#Install-Pixels) to put
 > the `pixels.properties` into `PIXELS_HOME` and create the `logs` directory where the log files will be
 > written.
+
+
+## Development Environment*
+
+If you want to develop Pixels in Intellij, open `SRC_BASE/pixels` as a maven project.
+When the project is fully indexed and the dependencies are successfully downloaded,
+add a `PIXELS_HOME` environment variable in *Run -> Edit Configurations -> Edit configuration templates*,
+point it to your Pixels home that contains the configuration file (i.e., `pixels.properties`) and stores the runtime logs.
+
+Now, in Intellij, you can build Pixels using the maven plugin, run and debug unit tests, and debug Pixels by
+setting up a *Remote JVM Debug*.
+
 
 ## Installation in AWS
 

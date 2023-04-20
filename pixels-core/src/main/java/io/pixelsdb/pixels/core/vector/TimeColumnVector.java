@@ -25,7 +25,7 @@ import java.sql.Time;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.roundSqlTime;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.millisInDay;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -382,7 +382,7 @@ public class TimeColumnVector extends ColumnVector
         {
             ensureSize(writeIndex * 2, true);
         }
-        this.times[writeIndex] = roundSqlTime(value);
+        this.times[writeIndex] = millisInDay(value);
         this.isNull[writeIndex++] = false;
     }
 
@@ -427,7 +427,7 @@ public class TimeColumnVector extends ColumnVector
         else
         {
             this.isNull[elementNum] = false;
-            this.times[elementNum] = roundSqlTime(t.getTime());
+            this.times[elementNum] = millisInDay(t.getTime());
         }
     }
 
@@ -460,7 +460,7 @@ public class TimeColumnVector extends ColumnVector
             writeIndex = elementNum + 1;
         }
         // scratchTime may be changed outside this class, so we also mod it by millis in a day.
-        this.times[elementNum] = roundSqlTime(scratchTime.getTime());
+        this.times[elementNum] = millisInDay(scratchTime.getTime());
         this.isNull[elementNum] = false;
     }
 
@@ -490,7 +490,7 @@ public class TimeColumnVector extends ColumnVector
     {
         noNulls = true;
         isRepeating = true;
-        times[0] = roundSqlTime(t.getTime());
+        times[0] = millisInDay(t.getTime());
     }
 
     @Override
