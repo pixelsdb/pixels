@@ -8,7 +8,7 @@ option java_package = "io.pixelsdb.pixels.worker.vhive";
 option java_outer_classname = "WorkerProto";
 
 service WorkerService {
-    rpc Scan (ScanRequest) returns (ScanResponse);
+    rpc Scan (ScanInput) returns (ScanOutput);
     rpc Hello (HelloRequest) returns (HelloResponse);
 
     // rpc Aggregation (AggregationRequest) return (AggregationResponse);
@@ -111,8 +111,8 @@ message NonPartitionOutput {
     repeated uint32 rowGroupNums = 3;
 }
 
-// equals to ScanInput + Context
-message ScanRequest {
+// equals to io.pixelsdb.pixels.planner.plan.physical.input.ScanInput
+message ScanInput {
     uint64 queryId = 1;
     ScanTableInfo scanTableInfo = 2;
     repeated bool scanProjection = 3;
@@ -121,8 +121,8 @@ message ScanRequest {
     OutputInfo output = 6;
 }
 
-// equals to ScanOutput
-message ScanResponse {
+// equals to io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput
+message ScanOutput {
     Output base = 1;
     repeated string outputs = 2;
     repeated uint32 rowGroupNums = 3;
