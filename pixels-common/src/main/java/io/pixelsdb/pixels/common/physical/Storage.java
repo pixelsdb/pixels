@@ -40,13 +40,19 @@ public interface Storage
      */
     enum Scheme
     {
-        hdfs,  // HDFS
-        file,  // local fs
-        s3,    // Amazon S3
-        minio, // Minio
-        redis, // Redis
-        gcs,   // google cloud storage
-        mock; // mock
+        hdfs(0),  // HDFS
+        file(1),  // local fs
+        s3(2),    // Amazon S3
+        minio(3), // Minio
+        redis(4), // Redis
+        gcs(5),   // google cloud storage
+        mock(6); // mock
+
+        private int number;
+
+        Scheme(int number) {
+            this.number = number;
+        }
 
         /**
          * Case-insensitive parsing from String name to enum value.
@@ -56,6 +62,27 @@ public interface Storage
         public static Scheme from(String value)
         {
             return valueOf(value.toLowerCase());
+        }
+
+        public static Scheme fromNumber(int number) {
+            switch (number) {
+                case 0:
+                    return hdfs;
+                case 1:
+                    return file;
+                case 2:
+                    return s3;
+                case 3:
+                    return minio;
+                case 4:
+                    return redis;
+                case 5:
+                    return gcs;
+                case 6:
+                    return mock;
+                default:
+                    return null;
+            }
         }
 
         /**
