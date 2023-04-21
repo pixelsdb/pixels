@@ -12,15 +12,14 @@ import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     private static Logger log = LogManager.getLogger(WorkerServiceImpl.class);
-    private final ScanWorker handler;
+    private final ScanWorker scanWorker;
 
     public WorkerServiceImpl() {
-        this.handler = new ScanWorker();
+        this.scanWorker = new ScanWorker();
     }
 
     @Override
