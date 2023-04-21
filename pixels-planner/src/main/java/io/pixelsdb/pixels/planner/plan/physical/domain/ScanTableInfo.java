@@ -49,6 +49,12 @@ public class ScanTableInfo extends TableInfo
         this.filter = filter;
     }
 
+    private ScanTableInfo(Builder builder) {
+        super(builder.tableName, builder.base, builder.columnsToRead);
+        this.inputSplits = builder.inputSplits;
+        this.filter = builder.filter;
+    }
+
     public List<InputSplit> getInputSplits()
     {
         return inputSplits;
@@ -67,5 +73,48 @@ public class ScanTableInfo extends TableInfo
     public void setFilter(String filter)
     {
         this.filter = filter;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private String tableName;
+        private boolean base;
+        private String[] columnsToRead;
+        private List<InputSplit> inputSplits;
+        private String filter;
+
+        private Builder() {}
+
+        public Builder setTableName(String tableName) {
+            this.tableName = tableName;
+            return this;
+        }
+
+        public Builder setBase(boolean base) {
+            this.base = base;
+            return this;
+        }
+
+        public Builder setColumnsToRead(String[] columnsToRead) {
+            this.columnsToRead = columnsToRead;
+            return this;
+        }
+
+        public Builder setInputSplits(List<InputSplit> inputSplits) {
+            this.inputSplits = inputSplits;
+            return this;
+        }
+
+        public Builder setFilter(String filter) {
+            this.filter = filter;
+            return this;
+        }
+
+        public ScanTableInfo build() {
+            return new ScanTableInfo(this);
+        }
     }
 }

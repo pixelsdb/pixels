@@ -82,6 +82,18 @@ public class PartialAggregationInfo
         this.numPartition = numPartition;
     }
 
+    private PartialAggregationInfo(Builder builder) {
+        this(
+                builder.groupKeyColumnAlias,
+                builder.resultColumnAlias,
+                builder.resultColumnTypes,
+                builder.groupKeyColumnIds,
+                builder.aggregateColumnIds,
+                builder.functionTypes,
+                builder.partition,
+                builder.numPartition);
+    }
+
     public String[] getGroupKeyColumnAlias()
     {
         return groupKeyColumnAlias;
@@ -160,5 +172,66 @@ public class PartialAggregationInfo
     public void setNumPartition(int numPartition)
     {
         this.numPartition = numPartition;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private String[] groupKeyColumnAlias;
+        private String[] resultColumnAlias;
+        private String[] resultColumnTypes;
+        private int[] groupKeyColumnIds;
+        private int[] aggregateColumnIds;
+        private FunctionType[] functionTypes;
+        private boolean partition;
+        private int numPartition;
+
+        private Builder() {}
+
+        public Builder setGroupKeyColumnAlias(String[] groupKeyColumnAlias) {
+            this.groupKeyColumnAlias = groupKeyColumnAlias;
+            return this;
+        }
+
+        public Builder setResultColumnAlias(String[] resultColumnAlias) {
+            this.resultColumnAlias = resultColumnAlias;
+            return this;
+        }
+
+        public Builder setResultColumnTypes(String[] resultColumnTypes) {
+            this.resultColumnTypes = resultColumnTypes;
+            return this;
+        }
+
+        public Builder setGroupKeyColumnIds(int[] groupKeyColumnIds) {
+            this.groupKeyColumnIds = groupKeyColumnIds;
+            return this;
+        }
+
+        public Builder setAggregateColumnIds(int[] aggregateColumnIds) {
+            this.aggregateColumnIds = aggregateColumnIds;
+            return this;
+        }
+
+        public Builder setFunctionTypes(FunctionType[] functionTypes) {
+            this.functionTypes = functionTypes;
+            return this;
+        }
+
+        public Builder setPartition(boolean partition) {
+            this.partition = partition;
+            return this;
+        }
+
+        public Builder setNumPartition(int numPartition) {
+            this.numPartition = numPartition;
+            return this;
+        }
+
+        public PartialAggregationInfo build() {
+            return new PartialAggregationInfo(this);
+        }
     }
 }

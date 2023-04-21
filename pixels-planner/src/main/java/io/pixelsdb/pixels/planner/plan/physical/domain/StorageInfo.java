@@ -58,6 +58,10 @@ public class StorageInfo
         this.secretKey = secretKey;
     }
 
+    private StorageInfo(Builder builder) {
+        this(builder.scheme, builder.endpoint, builder.accessKey, builder.secretKey);
+    }
+
     public Storage.Scheme getScheme()
     {
         return scheme;
@@ -96,5 +100,42 @@ public class StorageInfo
     public void setSecretKey(String secretKey)
     {
         this.secretKey = secretKey;
+    }
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private Storage.Scheme scheme;
+        private String endpoint;
+        private String accessKey;
+        private String secretKey;
+
+        private Builder() {}
+
+        public Builder setScheme(Storage.Scheme scheme) {
+            this.scheme = scheme;
+            return this;
+        }
+
+        public Builder setEndpoint(String endpoint) {
+            this.endpoint = endpoint;
+            return this;
+        }
+
+        public Builder setAccessKey(String accessKey) {
+            this.accessKey = accessKey;
+            return this;
+        }
+
+        public Builder setSecretKey(String secretKey) {
+            this.secretKey = secretKey;
+            return this;
+        }
+
+        public StorageInfo build() {
+            return new StorageInfo(this);
+        }
     }
 }
