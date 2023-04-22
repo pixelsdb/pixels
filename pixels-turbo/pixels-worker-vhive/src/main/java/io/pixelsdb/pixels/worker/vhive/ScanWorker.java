@@ -24,9 +24,6 @@ import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.ScanOutput;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
-import io.pixelsdb.pixels.worker.lambda.MetricsCollector;
-import io.pixelsdb.pixels.worker.lambda.PixelsWorkerException;
-import io.pixelsdb.pixels.worker.lambda.WorkerCommon;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
