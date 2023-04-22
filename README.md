@@ -318,25 +318,26 @@ sudo apt-get install python
 Prometheus and Grafana are optional. We can install them to monitor the
 performance metrics of the whole system.
 
-To install Prometheus, copy `node_exporter-0.15.2.linux-amd64.tar.xz`, `jmx_exporter-0.11.0.tar.gz`, and `prometheus-2.1.0.linux-amd64.tar.xz`
+To install Prometheus, copy `node_exporter-1.5.0.linux-amd64.tar.xz`, `jmx_exporter-0.18.0.tar.xz`, and `prometheus-2.43.0.linux-amd64.tar.xz`
 under `scripts/tars` into the `~/opt` directory and decompress them.
 
 Create links:
 ```bash
-ln -s jmx_exporter-0.11.0/ jmx_exporter
-ln -s node_exporter-0.15.2.linux-amd64 node_exporter
-ln -s prometheus-2.1.0.linux-amd64 prometheus
+ln -s jmx_exporter-0.18.0/ jmx_exporter
+ln -s node_exporter-1.5.0.linux-amd64 node_exporter
+ln -s prometheus-2.43.0.linux-amd64 prometheus
 ```
 
 Append the following lines into `~/.bashrc`:
 ```bash
 export PROMETHEUS_HOME=$HOME/opt/prometheus/
-export PATH=$PATH:$PROMETHEUS_HOME
+export NODE_EXPORTER_HOME=$HOME/opt/node_exporter
+export PATH=$PATH:$PROMETHEUS_HOME:$NODE_EXPORTER_HOME
 ```
 
 Enter the `etc` directory under the home of Trino-server. Append this line to `jvm.config`:
 ```bash
--javaagent:/home/ubuntu/opt/jmx_exporter/jmx_prometheus_javaagent-0.11.0.jar=9101:/home/ubuntu/opt/jmx_exporter/trino-jmx.yml
+-javaagent:/home/ubuntu/opt/jmx_exporter/jmx_prometheus_javaagent-0.18.0.jar=9101:/home/ubuntu/opt/jmx_exporter/pixels-jmx.yml
 ```
 
 Start `node_exporter` and `prometheus` respectively, using the `start-*.sh` in their directories.
@@ -346,15 +347,15 @@ Then, follow the instructions [here](https://grafana.com/docs/grafana/latest/ins
 to install Grafana.
 
 Log in Grafana, create a Prometheus data source named `cluster-monitor`.
-Set URL to `http://localhost:9090`, Scrape Interval to `5s`, and HTTP Method to `GET`. Other configurations remains default.
+Set `URL` to `http://localhost:9090`, `Scrape Interval` to `5s`, and `HTTP Method` to `GET`. Other configurations remains default.
 
 Import the json dashboard configuration files under `scripts/grafana` into Grafana.
-Then we get three dashboards `Cluster Exporter`, `JVM Exporter`, and `Node Exporter` in Grafana.
+Then we get three dashboards `Node Exporter` and `JVM Exporter` in Grafana.
 These dashboards can be used to monitor the performance metrics of the instance.
 
 ## Start Pixels
 Enter `PIXELS_HOME`.
-If pixels-cache is enabled, setup the cache before starting Pixels:
+If pixels-cache is enabled, set up the cache before starting Pixels:
 ```bash
 ./sbin/reset-cache.sh
 sudo ./sbin/pin-cache.sh
