@@ -28,34 +28,7 @@
         <!-- pixels -->
         <dependency>
             <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-core</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-common</artifactId>
-            <optional>true</optional>
-            <exclusions>
-                <exclusion>
-                    <!-- lambda workers do not require natives -->
-                    <groupId>net.java.dev.jna</groupId>
-                    <artifactId>jna</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-cache</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-planner</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-executor</artifactId>
+            <artifactId>pixels-worker-common</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>
@@ -100,35 +73,11 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- TODO: remove netty-buffer dependency from pixels-core -->
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-buffer</artifactId>
-            <optional>true</optional>
-        </dependency>
-
         <!-- google -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>${dep.gson.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- alibaba -->
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
             <optional>true</optional>
         </dependency>
 

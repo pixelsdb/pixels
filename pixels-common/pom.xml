@@ -6,6 +6,7 @@
         <artifactId>pixels</artifactId>
         <groupId>io.pixelsdb</groupId>
         <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -38,6 +39,7 @@
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna</artifactId>
+            <optional>true</optional>
         </dependency>
 
         <!-- hadoop -->
