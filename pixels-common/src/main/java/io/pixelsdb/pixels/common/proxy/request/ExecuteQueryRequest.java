@@ -17,34 +17,28 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
-
-import java.util.Properties;
+package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * The request to open a query engine using jdbc url.
  * Created at: 3/17/23
  * Author: hank
  */
-public class OpenEngineConn
+public class ExecuteQueryRequest
 {
     private String connName;
-    private Properties properties;
-    /**
-     * JDBC driver.
-     */
-    private String driver;
-    /**
-     * JDBC url.
-     */
-    private String url;
+    private String sql;
+    private int previewCount;
 
-    public OpenEngineConn(String connName, Properties properties, String driver, String url)
+    /**
+     * Default constructor for Jackson.
+     */
+    public ExecuteQueryRequest() {}
+
+    public ExecuteQueryRequest(String connName, String sql, int previewCount)
     {
         this.connName = connName;
-        this.properties = properties;
-        this.driver = driver;
-        this.url = url;
+        this.sql = sql;
+        this.previewCount = previewCount;
     }
 
     public String getConnName()
@@ -57,33 +51,23 @@ public class OpenEngineConn
         this.connName = connName;
     }
 
-    public Properties getProperties()
+    public String getSql()
     {
-        return properties;
+        return sql;
     }
 
-    public void setProperties(Properties properties)
+    public void setSql(String sql)
     {
-        this.properties = properties;
+        this.sql = sql;
     }
 
-    public String getDriver()
+    public int getPreviewCount()
     {
-        return driver;
+        return previewCount;
     }
 
-    public void setDriver(String driver)
+    public void setPreviewCount(int previewCount)
     {
-        this.driver = driver;
-    }
-
-    public String getUrl()
-    {
-        return url;
-    }
-
-    public void setUrl(String url)
-    {
-        this.url = url;
+        this.previewCount = previewCount;
     }
 }

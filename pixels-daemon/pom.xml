@@ -97,13 +97,6 @@
             <artifactId>grpc-stub</artifactId>
             <optional>true</optional>
         </dependency>
-
-        <!-- netty -->
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <optional>true</optional>
-        </dependency>
     </dependencies>
 
     <build>

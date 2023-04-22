@@ -17,29 +17,33 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest;
-
-import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.daemon.rest.request.OpenEngineConn;
-import org.junit.Test;
-
-import java.util.Properties;
+package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * Created at: 3/17/23
- * Author: hank
+ * @author hank
+ * @create 2023-03-14
  */
-public class TestRequests
+public class GetViewsRequest
 {
-    @Test
-    public void test()
+    private String schemaName;
+
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetViewsRequest() { }
+
+    public GetViewsRequest(String schemaName)
     {
-        Properties properties = new Properties();
-        properties.setProperty("user", "pixels");
-        OpenEngineConn openEngineConn = new OpenEngineConn("trino", properties, "", "jdbc:trino://");
-        String json = JSON.toJSONString(openEngineConn);
-        System.out.println(json);
-        OpenEngineConn obj = JSON.parseObject(json, OpenEngineConn.class);
-        assert obj.getProperties().getProperty("user").equals("pixels");
+        this.schemaName = schemaName;
+    }
+
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    public void setSchemaName(String schemaName)
+    {
+        this.schemaName = schemaName;
     }
 }

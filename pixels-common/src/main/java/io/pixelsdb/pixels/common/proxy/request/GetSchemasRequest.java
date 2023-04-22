@@ -17,28 +17,33 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
+package io.pixelsdb.pixels.common.proxy.request;
 
 /**
  * @author hank
- * @date 3/17/23
+ * @create 2023-03-14
  */
-public class CloseEngineConn
+public class GetSchemasRequest
 {
-    private String connName;
+    private String username;
 
-    public CloseEngineConn(String connName)
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetSchemasRequest() { }
+
+    public GetSchemasRequest(String username)
     {
-        this.connName = connName;
+        this.username = username;
     }
 
-    public String getConnName()
+    public String getUsername()
     {
-        return connName;
+        return username;
     }
 
-    public void setConnName(String connName)
+    public void setUsername(String username)
     {
-        this.connName = connName;
+        this.username = username;
     }
 }

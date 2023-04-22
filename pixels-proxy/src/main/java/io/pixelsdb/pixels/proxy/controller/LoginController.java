@@ -17,16 +17,29 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.proxy;
+package io.pixelsdb.pixels.proxy.controller;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 
-@SpringBootApplication
-public class PixelsProxyApplication
+/**
+ * @author hank
+ * @create 2023-04-21
+ */
+@Controller
+public class LoginController
 {
-	public static void main(String[] args)
-	{
-		SpringApplication.run(PixelsProxyApplication.class, args);
-	}
+    LoginController() { }
+
+    @GetMapping("/login") // post to "/login" is processed by the SecurityFilterChain
+    public String signForm()
+    {
+        return "login";
+    }
+
+    @GetMapping("/logout")
+    public String logoutPage()
+    {
+        return "login";
+    }
 }

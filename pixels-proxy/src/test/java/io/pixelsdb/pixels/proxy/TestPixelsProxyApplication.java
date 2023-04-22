@@ -19,14 +19,12 @@
  */
 package io.pixelsdb.pixels.proxy;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootApplication
-public class PixelsProxyApplication
+@SpringBootTest
+class TestPixelsProxyApplication
 {
-	public static void main(String[] args)
-	{
-		SpringApplication.run(PixelsProxyApplication.class, args);
-	}
+	@Test
+	void contextLoads() { }
 }

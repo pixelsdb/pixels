@@ -17,13 +17,33 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.rest.request;
+package io.pixelsdb.pixels.common.proxy.request;
 
 /**
- * Created at: 3/14/23
- * Author: hank
+ * @author hank
+ * @create 2023-03-14
  */
-public class GetSchemas
+public class GetTablesRequest
 {
-    // get_schemas has no parameters.
+    private String schemaName;
+
+    /**
+     * Default constructor for Jackson.
+     */
+    public GetTablesRequest() { }
+
+    public GetTablesRequest(String schemaName)
+    {
+        this.schemaName = schemaName;
+    }
+
+    public String getSchemaName()
+    {
+        return schemaName;
+    }
+
+    public void setSchemaName(String schemaName)
+    {
+        this.schemaName = schemaName;
+    }
 }
